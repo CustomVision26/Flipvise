@@ -1,0 +1,146 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import { Sparkles, ArrowUpDown } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { EditCardDialog } from "./edit-card-dialog";
+import { DeleteCardDialog } from "./delete-card-dialog";
+
+type CardData = {
+  id: number;
+  deckId: number;
+  front: string | null;
+  frontImageUrl: string | null;
+  back: string | null;
+  backImageUrl: string | null;
+  aiGenerated: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type SortOption = "newest" | "oldest" | "front-asc" | "front-desc" | "ai-first";
+
+function sortCards(cards: CardData[], sort: SortOption): CardData[] {
+  const sorted = [...cards];
+  switch (sort) {
+    case "newest":
+      return sorted.sort((a, b) => b.id - a.id);
+    case "oldest":
+      return sorted.sort((a, b) => a.id - b.id);
+    case "front-asc":
+      return sorted.sort((a, b) =>
+        (a.front ?? "").localeCompare(b.front ?? "")
+      );
+    case "front-desc":
+      return sorted.sort((a, b) =>
+        (b.front ?? "").localeCompare(a.front ?? "")
+      );
+    case "ai-first":
+      return sorted.sort((a, b) => Number(b.aiGenerated) - Number(a.aiGenerated));
+  }
+}
+
+interface CardGridProps {
+  cards: CardData[];
+  deckId: number;
+}
+
+export function CardGrid({ cards, deckId }: CardGridProps) {
+  const [sort, setSort] = useState<SortOption>("newest");
+  const sorted = sortCards(cards, sort);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 self-end">
+        <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+        <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+          <SelectTrigger className="w-44 h-8 text-xs">
+            <SelectValue placeholder="Sort by…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="front-asc">Front A → Z</SelectItem>
+            <SelectItem value="front-desc">Front Z → A</SelectItem>
+            <SelectItem value="ai-first">AI generated first</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {sorted.map((card, i) => (
+          <Card
+            key={card.id}
+            className="flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 fill-mode-both hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,transform]"
+            style={{ animationDelay: `${i * 50}ms` }}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                  Front
+                </p>
+                {card.aiGenerated && (
+                  <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px] font-normal">
+                    <Sparkles className="size-3 text-primary" />
+                    AI
+                  </Badge>
+                )}
+              </div>
+              {card.front && (
+                <p className="text-foreground font-medium">{card.front}</p>
+              )}
+              {card.frontImageUrl && (
+                <div className="mt-1 rounded-md overflow-hidden border border-border">
+                  <Image
+                    src={card.frontImageUrl}
+                    alt="Front image"
+                    width={400}
+                    height={160}
+                    className="w-full object-cover max-h-28"
+                  />
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="flex-1 pb-2">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                Back
+              </p>
+              {card.back && (
+                <p className="text-foreground mt-1 text-sm">{card.back}</p>
+              )}
+              {card.backImageUrl && (
+                <div className="mt-2 rounded-md overflow-hidden border border-border">
+                  <Image
+                    src={card.backImageUrl}
+                    alt="Back image"
+                    width={400}
+                    height={160}
+                    className="w-full object-cover max-h-28"
+                  />
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-end gap-2 pt-2">
+              <EditCardDialog card={card} deckId={deckId} />
+              <DeleteCardDialog cardId={card.id} deckId={deckId} />
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

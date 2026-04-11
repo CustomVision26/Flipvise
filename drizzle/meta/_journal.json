@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1775710546223,
+      "tag": "0000_famous_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775910153570,
+      "tag": "0001_add_ai_generated_to_cards",
+      "breakpoints": true
+    }
+  ]
+}
