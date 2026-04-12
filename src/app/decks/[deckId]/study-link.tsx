@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -13,14 +14,20 @@ export function StudyLink({ deckId }: { deckId: number }) {
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href={`/decks/${deckId}/study`}
-            className={buttonVariants({ variant: "default" })}
-          >
-            🧠 Brain Challenge
-          </Link>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={(props) => (
+            <Link
+              href={`/decks/${deckId}/study`}
+              {...props}
+              className={cn(
+                buttonVariants({ variant: "default" }),
+                props.className
+              )}
+            >
+              🧠 Brain Challenge
+            </Link>
+          )}
+        />
         <TooltipContent>
           <p>Lets go! and test my memory bank</p>
         </TooltipContent>
