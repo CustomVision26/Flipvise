@@ -16,7 +16,7 @@ export default async function Home() {
         {/* Logo — neatly centered, full natural size */}
         <div className="relative">
           <Image
-            src="/FLIPVISE_logo.png"
+            src="/FLIPVISE_STUDIO_LOGO.PNG"
             alt="Flipvise"
             width={420}
             height={160}

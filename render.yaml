@@ -1,0 +1,37 @@
+# Blueprint: https://render.com/docs/blueprint-spec
+# After deploy, add your Render URL in the Clerk Dashboard (Frontend API / redirects)
+# and set the Clerk webhook URL to: https://<this-service>.onrender.com/api/webhooks/clerk
+services:
+  - type: web
+    name: flipvise
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20
+
+      # Clerk Authentication
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_WEBHOOK_SECRET
+        sync: false
+
+      # Neon Database
+      - key: DATABASE_URL
+        sync: false
+
+      # Vercel Blob Storage
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
+
+      # OpenAI
+      - key: OPENAI_API_KEY
+        sync: false

@@ -31,7 +31,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           appearance={{
             baseTheme: shadcn,
             layout: {
-              logoImageUrl: "/FLIPVISE_logo.png",
+              logoImageUrl: "/FLIPVISE_STUDIO_LOGO.PNG",
               logoLinkUrl: "/",
               logoPlacement: "inside",
             },
