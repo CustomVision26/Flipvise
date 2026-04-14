@@ -4,7 +4,14 @@ import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
-export function HeaderUserSection() {
+import { SettingsMenu } from "@/components/settings-menu";
+import type { ProUiThemeId } from "@/lib/pro-ui-theme";
+
+interface HeaderUserSectionProps {
+  currentUiTheme?: ProUiThemeId;
+}
+
+export function HeaderUserSection({ currentUiTheme }: HeaderUserSectionProps) {
   const { userId, has } = useAuth();
   const { user } = useUser();
 
@@ -38,6 +45,7 @@ export function HeaderUserSection() {
         {isPro ? "Pro" : "Free"}
       </Badge>
       <UserButton />
+      <SettingsMenu currentUiTheme={currentUiTheme} />
     </div>
   );
 }

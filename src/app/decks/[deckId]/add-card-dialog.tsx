@@ -52,13 +52,12 @@ function ImageUploadSection({
     <div className="flex flex-col gap-2">
       <Label className="text-muted-foreground text-xs">{label}</Label>
       {imagePreview ? (
-        <div className="relative w-full rounded-lg overflow-hidden border border-border">
+        <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border bg-muted/30">
           <Image
             src={imagePreview}
             alt={altText}
-            width={400}
-            height={200}
-            className="w-full object-cover max-h-40"
+            fill
+            className="object-contain"
             unoptimized={imagePreview.startsWith("blob:")}
           />
           {isUploading && (
@@ -150,6 +149,22 @@ export function AddCardDialog({ deckId, trigger, isAtLimit = false }: AddCardDia
   async function handleFrontImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const maxSize = 5 * 1024 * 1024;
+    
+    if (!allowedTypes.includes(file.type)) {
+      setError("Invalid file type. Only JPG, JPEG, PNG, WebP, and GIF images are allowed.");
+      if (frontFileInputRef.current) frontFileInputRef.current.value = "";
+      return;
+    }
+    
+    if (file.size > maxSize) {
+      setError("Image size must be 5MB or less.");
+      if (frontFileInputRef.current) frontFileInputRef.current.value = "";
+      return;
+    }
+    
     setError(null);
     setIsUploadingFront(true);
     setFrontImagePreview(URL.createObjectURL(file));
@@ -176,6 +191,22 @@ export function AddCardDialog({ deckId, trigger, isAtLimit = false }: AddCardDia
   async function handleBackImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const maxSize = 5 * 1024 * 1024;
+    
+    if (!allowedTypes.includes(file.type)) {
+      setError("Invalid file type. Only JPG, JPEG, PNG, WebP, and GIF images are allowed.");
+      if (backFileInputRef.current) backFileInputRef.current.value = "";
+      return;
+    }
+    
+    if (file.size > maxSize) {
+      setError("Image size must be 5MB or less.");
+      if (backFileInputRef.current) backFileInputRef.current.value = "";
+      return;
+    }
+    
     setError(null);
     setIsUploadingBack(true);
     setBackImagePreview(URL.createObjectURL(file));

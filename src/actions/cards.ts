@@ -6,7 +6,7 @@ import { getAccessContext } from "@/lib/access";
 import { z } from "zod";
 import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { put, del } from "@vercel/blob";
+import { uploadToS3, deleteFromS3 } from "@/lib/s3";
 import { getDeckById } from "@/db/queries/decks";
 import { createCard, updateCard, deleteCard, getCardById, getCardsByDeck, bulkCreateCards, deleteAllCards } from "@/db/queries/cards";
 import {
@@ -120,12 +120,14 @@ export async function uploadCardImageAction(
     throw new Error("Image must be under 5 MB");
   }
 
-  const blob = await put(`card-images/${userId}/${deckId}/${file.name}`, file, {
-    access: "public",
+  const url = await uploadToS3({
+    userId,
+    deckId,
+    file,
     addRandomSuffix: true,
   });
 
-  return blob.url;
+  return url;
 }
 
 export async function createCardAction(data: CreateCardInput) {
@@ -190,7 +192,7 @@ export async function updateCardAction(data: UpdateCardInput) {
 
   if (oldFrontImageUrl && oldFrontImageUrl !== frontImageUrl) {
     try {
-      await del(oldFrontImageUrl);
+      await deleteFromS3(oldFrontImageUrl);
     } catch {
       // Silently ignore deletion errors — card update should still succeed
     }
@@ -198,7 +200,7 @@ export async function updateCardAction(data: UpdateCardInput) {
 
   if (oldBackImageUrl && oldBackImageUrl !== backImageUrl) {
     try {
-      await del(oldBackImageUrl);
+      await deleteFromS3(oldBackImageUrl);
     } catch {
       // Silently ignore deletion errors — card update should still succeed
     }
@@ -231,14 +233,14 @@ export async function deleteCardAction(data: DeleteCardInput) {
   const card = await getCardById(cardId, deckId);
   if (card?.frontImageUrl) {
     try {
-      await del(card.frontImageUrl);
+      await deleteFromS3(card.frontImageUrl);
     } catch {
       // Silently ignore deletion errors
     }
   }
   if (card?.backImageUrl) {
     try {
-      await del(card.backImageUrl);
+      await deleteFromS3(card.backImageUrl);
     } catch {
       // Silently ignore deletion errors
     }

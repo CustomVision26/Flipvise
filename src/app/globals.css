@@ -756,3 +756,300 @@
     @apply font-sans;
   }
 }
+
+/* ========================================
+   AURORA GRADIENT MESH ANIMATIONS
+   ======================================== */
+@keyframes aurora {
+  0%, 100% {
+    background-position: 0% 50%;
+    opacity: 1;
+  }
+  25% {
+    background-position: 50% 75%;
+    opacity: 0.8;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 1;
+  }
+  75% {
+    background-position: 50% 25%;
+    opacity: 0.9;
+  }
+}
+
+.animate-aurora {
+  background-size: 400% 400%;
+  animation: aurora 20s ease infinite;
+}
+
+/* ========================================
+   SPLIT SCREEN PULSE
+   ======================================== */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+/* ========================================
+   RETRO VAPORWAVE GRID
+   ======================================== */
+.perspective-grid {
+  background-image: 
+    linear-gradient(0deg, rgba(255, 0, 255, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.3) 1px, transparent 1px);
+  background-size: 50px 50px;
+  transform: perspective(500px) rotateX(60deg);
+  transform-origin: bottom;
+  animation: grid-shift 10s linear infinite;
+}
+
+@keyframes grid-shift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+/* ========================================
+   PARTICLE FIELD
+   ======================================== */
+.particle-field {
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  animation: particle-float 8s ease-in-out infinite;
+}
+
+@keyframes particle-float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(50px, -50px) scale(1.5);
+    opacity: 0.8;
+  }
+}
+
+/* ========================================
+   FLOATING BUBBLES WITH NEON GLOW
+   ======================================== */
+@keyframes float-bubble {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  33% {
+    transform: translateY(-40px) scale(1.2);
+  }
+  66% {
+    transform: translateY(-20px) scale(0.9);
+  }
+}
+
+.animate-float-bubble {
+  animation: float-bubble 10s ease-in-out infinite;
+}
+
+.neon-glow-cyan { box-shadow: 0 0 60px rgba(34, 211, 238, 0.6), 0 0 100px rgba(34, 211, 238, 0.4); }
+.neon-glow-pink { box-shadow: 0 0 60px rgba(236, 72, 153, 0.6), 0 0 100px rgba(236, 72, 153, 0.4); }
+.neon-glow-green { box-shadow: 0 0 60px rgba(34, 197, 94, 0.6), 0 0 100px rgba(34, 197, 94, 0.4); }
+.neon-glow-purple { box-shadow: 0 0 60px rgba(168, 85, 247, 0.6), 0 0 100px rgba(168, 85, 247, 0.4); }
+.neon-glow-yellow { box-shadow: 0 0 60px rgba(234, 179, 8, 0.6), 0 0 100px rgba(234, 179, 8, 0.4); }
+.neon-glow-teal { box-shadow: 0 0 60px rgba(20, 184, 166, 0.6), 0 0 100px rgba(20, 184, 166, 0.4); }
+
+/* ========================================
+   3D ISOMETRIC CARDS
+   ======================================== */
+.glass-card-3d {
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.glass-card-3d::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+@keyframes isometric-float {
+  0%, 100% {
+    transform: rotateX(20deg) rotateY(-20deg) translateZ(0) translateY(0);
+  }
+  50% {
+    transform: rotateX(20deg) rotateY(-20deg) translateZ(20px) translateY(-20px);
+  }
+}
+
+@keyframes isometric-rotate {
+  0%, 100% {
+    transform: rotateX(20deg) rotateY(-20deg) rotateZ(0deg);
+  }
+  50% {
+    transform: rotateX(20deg) rotateY(-20deg) rotateZ(180deg);
+  }
+}
+
+@keyframes isometric-pulse {
+  0%, 100% {
+    transform: rotateX(20deg) rotateY(-20deg) scale(1);
+  }
+  50% {
+    transform: rotateX(20deg) rotateY(-20deg) scale(1.15);
+  }
+}
+
+.animate-isometric-float {
+  animation: isometric-float 8s ease-in-out infinite;
+}
+
+.animate-isometric-rotate {
+  animation: isometric-rotate 10s linear infinite;
+}
+
+.animate-isometric-pulse {
+  animation: isometric-pulse 6s ease-in-out infinite;
+}
+
+/* ========================================
+   CYBERPUNK NEON BORDERS
+   ======================================== */
+.neon-border-blue { border-color: rgba(59, 130, 246, 0.6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.2); }
+.neon-border-pink { border-color: rgba(236, 72, 153, 0.6); box-shadow: 0 0 20px rgba(236, 72, 153, 0.5), inset 0 0 20px rgba(236, 72, 153, 0.2); }
+.neon-border-green { border-color: rgba(34, 197, 94, 0.6); box-shadow: 0 0 20px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.2); }
+.neon-border-purple { border-color: rgba(168, 85, 247, 0.6); box-shadow: 0 0 20px rgba(168, 85, 247, 0.5), inset 0 0 20px rgba(168, 85, 247, 0.2); }
+.neon-border-orange { border-color: rgba(249, 115, 22, 0.6); box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 20px rgba(249, 115, 22, 0.2); }
+.neon-border-violet { border-color: rgba(139, 92, 246, 0.6); box-shadow: 0 0 20px rgba(139, 92, 246, 0.5), inset 0 0 20px rgba(139, 92, 246, 0.2); }
+
+.neon-border-rainbow {
+  border: 3px solid transparent;
+  background: linear-gradient(var(--background), var(--background)) padding-box,
+              linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899, #f97316) border-box;
+  animation: rotate-border 6s linear infinite;
+}
+
+@keyframes rotate-border {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* ========================================
+   MATERIAL DESIGN ELEVATION
+   ======================================== */
+.material-elevation {
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    0 8px 16px rgba(0, 0, 0, 0.1),
+    0 16px 32px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-brutal {
+  box-shadow: 
+    0 0 60px rgba(0, 0, 0, 0.3),
+    0 0 120px rgba(59, 130, 246, 0.2),
+    0 0 180px rgba(168, 85, 247, 0.2);
+}
+
+/* ========================================
+   GRADIENT TEXT ANIMATION
+   ======================================== */
+@keyframes gradient-text {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-text {
+  background-size: 200% auto;
+  animation: gradient-text 4s ease-in-out infinite;
+}
+
+.neon-text-glow {
+  text-shadow: 
+    0 0 10px rgba(34, 211, 238, 0.8),
+    0 0 20px rgba(168, 85, 247, 0.6),
+    0 0 30px rgba(236, 72, 153, 0.4);
+}
+
+/* ========================================
+   ULTRA GLASS CONTAINER
+   ======================================== */
+.ultra-glass-container {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+
+.ultra-glass-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ultra-glass-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent,
+    rgba(34, 211, 238, 0.8),
+    rgba(168, 85, 247, 0.8),
+    rgba(236, 72, 153, 0.8),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0.5;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+}
+
+.drop-shadow-neon {
+  filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.5))
+          drop-shadow(0 0 40px rgba(168, 85, 247, 0.3));
+}

@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ChevronLeft,
   ChevronRight,
   Shuffle,
@@ -299,7 +305,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             transition: "transform 0.55s cubic-bezier(0.45, 0, 0.55, 1)",
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
             position: "relative",
-            height: "420px",
+            height: "540px",
           }}
         >
           {/* Front */}
@@ -313,13 +319,12 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             </div>
             {currentCard.frontImageUrl && (
               <div className="shrink-0 px-6 pb-2">
-                <div className="relative w-full rounded-lg overflow-hidden border border-border max-h-44">
+                <div className="relative w-full h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
                   <Image
                     src={currentCard.frontImageUrl}
                     alt="Card front image"
-                    width={600}
-                    height={200}
-                    className="w-full object-contain max-h-44"
+                    fill
+                    className="object-contain p-3"
                   />
                 </div>
               </div>
@@ -348,13 +353,12 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             </div>
             {currentCard.backImageUrl && (
               <div className="shrink-0 px-6 pb-2">
-                <div className="relative w-full rounded-lg overflow-hidden border border-border max-h-44">
+                <div className="relative w-full h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
                   <Image
                     src={currentCard.backImageUrl}
                     alt="Card back image"
-                    width={600}
-                    height={200}
-                    className="w-full object-contain max-h-44"
+                    fill
+                    className="object-contain p-3"
                   />
                 </div>
               </div>
@@ -372,25 +376,45 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
           <p className="text-sm text-muted-foreground italic text-center max-w-sm">
             🤝 Be honest with yourself — your growth depends on it. Did you really get it right?
           </p>
-        <div className="flex items-center gap-4">
-          <Button
-            size="lg"
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={handleCorrect}
-          >
-            <CheckCircle className="h-5 w-5" />
-            Correct
-          </Button>
-          <Button
-            size="lg"
-            variant="destructive"
-            className="gap-2"
-            onClick={handleIncorrect}
-          >
-            <XCircle className="h-5 w-5" />
-            Incorrect
-          </Button>
-        </div>
+        <TooltipProvider>
+          <div className="flex items-center gap-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button
+                    size="lg"
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={handleCorrect}
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    Correct
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Click if you answered correctly</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button
+                    size="lg"
+                    variant="destructive"
+                    className="gap-2"
+                    onClick={handleIncorrect}
+                  >
+                    <XCircle className="h-5 w-5" />
+                    Incorrect
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Click if you answered incorrectly</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { shadcn } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { ThemeProvider } from "@/components/theme-provider";
+import { LOGO_PUBLIC_URL } from "@/lib/branding";
 
 /** Drop legacy `system` from localStorage so only light | dark are used. */
 function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
@@ -31,7 +32,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
           appearance={{
             baseTheme: shadcn,
             layout: {
-              logoImageUrl: "/FLIPVISE_STUDIO_LOGO.PNG",
+              logoImageUrl: LOGO_PUBLIC_URL,
               logoLinkUrl: "/",
               logoPlacement: "inside",
             },

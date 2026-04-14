@@ -77,9 +77,9 @@ export default async function DeckPage({ params }: DeckPageProps) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
-                      <span>
-                        <Button disabled>🧠 Brain Challenge</Button>
-                      </span>
+                      <div className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-50">
+                        🧠 Brain Challenge
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Lets go! and test my memory bank</p>

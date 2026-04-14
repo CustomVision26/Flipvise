@@ -104,13 +104,12 @@ export function CardGrid({ cards, deckId }: CardGridProps) {
                 <p className="text-foreground font-medium">{card.front}</p>
               )}
               {card.frontImageUrl && (
-                <div className="mt-1 rounded-md overflow-hidden border border-border">
+                <div className="relative mt-2 h-32 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm">
                   <Image
                     src={card.frontImageUrl}
                     alt="Front image"
-                    width={400}
-                    height={160}
-                    className="w-full object-cover max-h-28"
+                    fill
+                    className="object-contain p-1"
                   />
                 </div>
               )}
@@ -123,13 +122,12 @@ export function CardGrid({ cards, deckId }: CardGridProps) {
                 <p className="text-foreground mt-1 text-sm">{card.back}</p>
               )}
               {card.backImageUrl && (
-                <div className="mt-2 rounded-md overflow-hidden border border-border">
+                <div className="relative mt-2 h-32 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm">
                   <Image
                     src={card.backImageUrl}
                     alt="Back image"
-                    width={400}
-                    height={160}
-                    className="w-full object-cover max-h-28"
+                    fill
+                    className="object-contain p-1"
                   />
                 </div>
               )}

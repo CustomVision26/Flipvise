@@ -5,10 +5,12 @@ import Image from "next/image";
 import { AppProviders } from "@/components/app-providers";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import { getAccessContext } from "@/lib/access";
 import {
   PRO_UI_THEME_COOKIE,
   resolveProUiThemeDataAttribute,
+  resolveProUiThemeSelection,
 } from "@/lib/pro-ui-theme";
 import "./globals.css";
 
@@ -30,10 +32,12 @@ export default async function RootLayout({
 }>) {
   const { isPro } = await getAccessContext();
   const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(PRO_UI_THEME_COOKIE)?.value;
   const proUiTheme = resolveProUiThemeDataAttribute(
     isPro,
-    cookieStore.get(PRO_UI_THEME_COOKIE)?.value,
+    cookieValue,
   );
+  const proUiThemeSelection = resolveProUiThemeSelection(cookieValue);
 
   return (
     <html
@@ -48,16 +52,16 @@ export default async function RootLayout({
             <header className="flex items-center justify-between border-b border-border px-6 py-3">
               <div className="flex items-center gap-2">
                 <Image
-                  src="/FLIPVISE_STUDIO_LOGO.PNG"
+                  src={LOGO_PUBLIC_URL}
                   alt="Flipvise logo"
                   width={120}
                   height={40}
-                  className="object-contain"
+                  className="object-contain mix-blend-multiply dark:mix-blend-screen"
                   priority
                 />
               </div>
               <div className="flex items-center gap-2">
-                <HeaderUserSection />
+                <HeaderUserSection currentUiTheme={proUiThemeSelection} />
               </div>
             </header>
             {children}
