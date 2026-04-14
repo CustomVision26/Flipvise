@@ -1,11 +1,11 @@
 {
-  "id": "178a9055-8eed-40f7-a732-2a3fe8424be5",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "prevId": "",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.cards": {
-      "name": "cards",
+    "public.admin_privilege_logs": {
+      "name": "admin_privilege_logs",
       "schema": "",
       "columns": {
         "id": {
@@ -15,39 +15,46 @@
           "notNull": true,
           "identity": {
             "type": "always",
-            "name": "cards_id_seq",
-            "schema": "public",
+            "name": "admin_privilege_logs_id_seq",
             "increment": "1",
-            "startWith": "1",
             "minValue": "1",
             "maxValue": "2147483647",
+            "startWith": "1",
             "cache": "1",
-            "cycle": false
+            "cycle": false,
+            "schema": "public"
           }
         },
-        "deckId": {
-          "name": "deckId",
-          "type": "integer",
+        "targetUserId": {
+          "name": "targetUserId",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
-        "front": {
-          "name": "front",
-          "type": "text",
+        "targetUserName": {
+          "name": "targetUserName",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
-        "back": {
-          "name": "back",
-          "type": "text",
+        "grantedByUserId": {
+          "name": "grantedByUserId",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
         },
-        "backImageUrl": {
-          "name": "backImageUrl",
-          "type": "text",
+        "grantedByName": {
+          "name": "grantedByName",
+          "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "admin_privilege_action",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
         },
         "createdAt": {
           "name": "createdAt",
@@ -55,9 +62,75 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.deactivated": {
+      "name": "deactivated",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "deactivated_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
         },
-        "updatedAt": {
-          "name": "updatedAt",
+        "userId": {
+          "name": "userId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userName": {
+          "name": "userName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deactivatedByUserId": {
+          "name": "deactivatedByUserId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deactivatedByName": {
+          "name": "deactivatedByName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deactivatedAt": {
+          "name": "deactivatedAt",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -65,25 +138,19 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "cards_deckId_decks_id_fk": {
-          "name": "cards_deckId_decks_id_fk",
-          "tableFrom": "cards",
-          "tableTo": "decks",
-          "columnsFrom": [
-            "deckId"
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "deactivated_userId_unique": {
+          "columns": [
+            "userId"
           ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "nullsNotDistinct": false,
+          "name": "deactivated_userId_unique"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
       "checkConstraints": {},
+      "policies": {},
       "isRLSEnabled": false
     },
     "public.decks": {
@@ -98,13 +165,13 @@
           "identity": {
             "type": "always",
             "name": "decks_id_seq",
-            "schema": "public",
             "increment": "1",
-            "startWith": "1",
             "minValue": "1",
             "maxValue": "2147483647",
+            "startWith": "1",
             "cache": "1",
-            "cycle": false
+            "cycle": false,
+            "schema": "public"
           }
         },
         "userId": {
@@ -144,20 +211,128 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
       "checkConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false
+    },
+    "public.cards": {
+      "name": "cards",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "cards_id_seq",
+            "increment": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "startWith": "1",
+            "cache": "1",
+            "cycle": false,
+            "schema": "public"
+          }
+        },
+        "deckId": {
+          "name": "deckId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "front": {
+          "name": "front",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "frontImageUrl": {
+          "name": "frontImageUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "back": {
+          "name": "back",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "backImageUrl": {
+          "name": "backImageUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aiGenerated": {
+          "name": "aiGenerated",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cards_deckId_decks_id_fk": {
+          "name": "cards_deckId_decks_id_fk",
+          "tableFrom": "cards",
+          "tableTo": "decks",
+          "schemaTo": "public",
+          "columnsFrom": [
+            "deckId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {},
+      "policies": {},
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.admin_privilege_action": {
+      "name": "admin_privilege_action",
+      "values": [
+        "granted",
+        "revoked"
+      ],
+      "schema": "public"
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},
   "policies": {},
   "views": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
     "tables": {}
   }
 }

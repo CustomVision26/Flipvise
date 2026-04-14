@@ -25,7 +25,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       defaultTheme="dark"
       enableSystem={false}
       disableTransitionOnChange
-      enableColorScheme
     >
       <ThemeStorageNormalize>
         <ClerkProvider
