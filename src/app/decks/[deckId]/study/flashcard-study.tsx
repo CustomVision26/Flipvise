@@ -379,35 +379,31 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
         <TooltipProvider>
           <div className="flex items-center gap-4">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Button
-                    size="lg"
-                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={handleCorrect}
-                  >
-                    <CheckCircle className="h-5 w-5" />
-                    Correct
-                  </Button>
-                </div>
+              <TooltipTrigger>
+                <Button
+                  size="lg"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={handleCorrect}
+                >
+                  <CheckCircle className="h-5 w-5" />
+                  Correct
+                </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>Click if you answered correctly</p>
               </TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Button
-                    size="lg"
-                    variant="destructive"
-                    className="gap-2"
-                    onClick={handleIncorrect}
-                  >
-                    <XCircle className="h-5 w-5" />
-                    Incorrect
-                  </Button>
-                </div>
+              <TooltipTrigger>
+                <Button
+                  size="lg"
+                  variant="destructive"
+                  className="gap-2"
+                  onClick={handleIncorrect}
+                >
+                  <XCircle className="h-5 w-5" />
+                  Incorrect
+                </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>Click if you answered incorrectly</p>
