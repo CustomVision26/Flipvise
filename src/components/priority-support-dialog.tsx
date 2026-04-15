@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface PrioritySupportDialogProps {
@@ -101,11 +101,12 @@ export function PrioritySupportDialog({ trigger, open: controlledOpen, onOpenCha
           <Button variant="outline" onClick={() => setOpen(false)}>
             Close
           </Button>
-          <Button asChild>
-            <a href="mailto:customvision26@gmail.com?subject=Priority%20Support%20Request">
-              Send Email
-            </a>
-          </Button>
+          <a 
+            href="mailto:customvision26@gmail.com?subject=Priority%20Support%20Request"
+            className={buttonVariants()}
+          >
+            Send Email
+          </a>
         </div>
       </DialogContent>
     </Dialog>
