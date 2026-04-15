@@ -38,7 +38,7 @@ function FormattedCardBack({ text }: { text: string }) {
 
   if (lines.length <= 1) {
     return (
-      <p className="text-center text-xl font-semibold leading-relaxed">{text}</p>
+      <p className="text-center text-base sm:text-xl font-semibold leading-relaxed break-words">{text}</p>
     );
   }
 
@@ -47,20 +47,20 @@ function FormattedCardBack({ text }: { text: string }) {
       {lines.map((line, i) => {
         if (/^Step\s*\d+:/i.test(line)) {
           return (
-            <p key={i} className="font-semibold text-sm text-primary pt-2 first:pt-0">
+            <p key={i} className="font-semibold text-xs sm:text-sm text-primary pt-2 first:pt-0 break-words">
               {line}
             </p>
           );
         }
         if (/^(Answer|Result|Solution|∴)[\s:]*/i.test(line)) {
           return (
-            <p key={i} className="font-bold text-sm text-emerald-400 pt-3 mt-1 border-t border-border">
+            <p key={i} className="font-bold text-xs sm:text-sm text-emerald-400 pt-3 mt-1 border-t border-border break-words">
               {line}
             </p>
           );
         }
         return (
-          <p key={i} className="text-xs font-mono text-foreground pl-3 leading-relaxed">
+          <p key={i} className="text-[10px] sm:text-xs font-mono text-foreground pl-2 sm:pl-3 leading-relaxed break-words">
             {line}
           </p>
         );
@@ -194,12 +194,12 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
     const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-8">
-        <div className="w-full max-w-md flex flex-col items-center gap-6 rounded-2xl border bg-card p-10 shadow-md text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:gap-8 px-4">
+        <div className="w-full max-w-md flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-card p-6 sm:p-10 shadow-md text-center">
           <div className="flex flex-col items-center gap-2">
-            <Trophy className="h-12 w-12 text-yellow-500" />
-            <h2 className="text-2xl font-bold tracking-tight">Session Complete!</h2>
-            <p className="text-muted-foreground text-sm">{deckName}</p>
+            <Trophy className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500" />
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Session Complete!</h2>
+            <p className="text-muted-foreground text-sm break-words max-w-full">{deckName}</p>
           </div>
 
           <div className="w-full flex flex-col gap-2">
@@ -210,15 +210,15 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             <Progress value={scorePercent} className="h-3" />
           </div>
 
-          <div className="w-full grid grid-cols-2 gap-4">
-            <div className="flex flex-col items-center gap-1 rounded-xl border bg-emerald-500/10 border-emerald-500/20 py-4">
-              <CheckCircle className="h-6 w-6 text-emerald-500" />
-              <span className="text-2xl font-bold text-emerald-500">{correctCount}</span>
+          <div className="w-full grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="flex flex-col items-center gap-1 rounded-xl border bg-emerald-500/10 border-emerald-500/20 py-3 sm:py-4">
+              <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500" />
+              <span className="text-xl sm:text-2xl font-bold text-emerald-500">{correctCount}</span>
               <span className="text-xs text-muted-foreground">Correct</span>
             </div>
-            <div className="flex flex-col items-center gap-1 rounded-xl border bg-rose-500/10 border-rose-500/20 py-4">
-              <XCircle className="h-6 w-6 text-rose-500" />
-              <span className="text-2xl font-bold text-rose-500">{incorrectCount}</span>
+            <div className="flex flex-col items-center gap-1 rounded-xl border bg-rose-500/10 border-rose-500/20 py-3 sm:py-4">
+              <XCircle className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
+              <span className="text-xl sm:text-2xl font-bold text-rose-500">{incorrectCount}</span>
               <span className="text-xs text-muted-foreground">Incorrect</span>
             </div>
           </div>
@@ -228,14 +228,14 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
           </p>
 
           <div className="w-full flex flex-col gap-3">
-            <Button size="lg" className="w-full gap-2" onClick={handleStudyAgain}>
+            <Button size="default" className="w-full gap-2 h-10 sm:h-11" onClick={handleStudyAgain}>
               <RotateCcw className="h-4 w-4" />
               Study Again
             </Button>
             <Button
               variant="outline"
-              size="lg"
-              className="w-full gap-2"
+              size="default"
+              className="w-full gap-2 h-10 sm:h-11"
               onClick={() => router.push(`/decks/${deckId}`)}
             >
               <ArrowLeft className="h-4 w-4" />
@@ -248,42 +248,42 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-8">
+    <div className="flex flex-1 flex-col items-center gap-4 sm:gap-8">
       {/* Progress bar */}
       <div className="w-full max-w-2xl flex flex-col gap-2">
         {/* Deck title */}
-        <h1 className="text-2xl font-bold tracking-tight">{deckName}</h1>
-        <div className="flex justify-between text-sm text-muted-foreground">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">{deckName}</h1>
+        <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
           <span>
             Card {currentIndex + 1} of {total}
           </span>
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto gap-1.5 px-2 py-0 text-sm text-muted-foreground hover:text-foreground"
+            className="h-auto gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
             onClick={handleShuffle}
           >
-            <Shuffle className="h-3.5 w-3.5" />
-            Shuffle
+            <Shuffle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="hidden sm:inline">Shuffle</span>
           </Button>
         </div>
         <Progress value={progressPercent} className="h-2" />
-        <div className="flex items-center gap-4 mt-1">
-          <div className="flex items-center gap-1.5 text-sm text-emerald-500">
-            <CheckCircle className="h-4 w-4" />
+        <div className="flex items-center gap-3 sm:gap-4 mt-1">
+          <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-500">
+            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="font-semibold">{correctCount}</span>
-            <span className="text-muted-foreground">correct</span>
+            <span className="text-muted-foreground hidden sm:inline">correct</span>
           </div>
-          <div className="flex items-center gap-1.5 text-sm text-rose-500">
-            <XCircle className="h-4 w-4" />
+          <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-rose-500">
+            <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
             <span className="font-semibold">{incorrectCount}</span>
-            <span className="text-muted-foreground">incorrect</span>
+            <span className="text-muted-foreground hidden sm:inline">incorrect</span>
           </div>
         </div>
       </div>
 
       {/* Keyboard hint */}
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-xs sm:text-sm hidden md:block">
         Use <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">←</kbd>{" "}
         <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">→</kbd>{" "}
         arrow keys to navigate and{" "}
@@ -300,38 +300,38 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
         aria-label={isFlipped ? "Card back — click to flip" : "Card front — click to flip"}
       >
         <div
+          className="flashcard-container"
           style={{
             transformStyle: "preserve-3d",
             transition: "transform 0.55s cubic-bezier(0.45, 0, 0.55, 1)",
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
             position: "relative",
-            height: "540px",
           }}
         >
           {/* Front */}
           <div
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
-            className="absolute inset-0 flex flex-col rounded-2xl border bg-card shadow-md overflow-hidden"
+            className="absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl border bg-card shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]"
           >
-            <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
               <Badge variant="secondary" className="text-xs">Front</Badge>
-              <span className="text-muted-foreground text-xs">Click to reveal answer</span>
+              <span className="text-muted-foreground text-xs hidden sm:inline">Click to reveal answer</span>
             </div>
             {currentCard.frontImageUrl && (
-              <div className="shrink-0 px-6 pb-2">
-                <div className="relative w-full h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+              <div className="shrink-0 px-3 sm:px-6 pb-2">
+                <div className="relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
                   <Image
                     src={currentCard.frontImageUrl}
                     alt="Card front image"
                     fill
-                    className="object-contain p-3"
+                    className="object-contain p-2 sm:p-3"
                   />
                 </div>
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto px-8 py-3 flex flex-col items-center justify-center">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col items-center justify-center">
               {currentCard.front && (
-                <p className="text-center text-xl font-semibold leading-relaxed">
+                <p className="text-center text-base sm:text-xl font-semibold leading-relaxed break-words">
                   {currentCard.front}
                 </p>
               )}
@@ -345,25 +345,25 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               WebkitBackfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
             }}
-            className="absolute inset-0 flex flex-col rounded-2xl border bg-card shadow-md overflow-hidden"
+            className="absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl border bg-card shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]"
           >
-            <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
               <Badge variant="outline" className="text-xs">Back</Badge>
-              <span className="text-muted-foreground text-xs">Click to flip back</span>
+              <span className="text-muted-foreground text-xs hidden sm:inline">Click to flip back</span>
             </div>
             {currentCard.backImageUrl && (
-              <div className="shrink-0 px-6 pb-2">
-                <div className="relative w-full h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+              <div className="shrink-0 px-3 sm:px-6 pb-2">
+                <div className="relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
                   <Image
                     src={currentCard.backImageUrl}
                     alt="Card back image"
                     fill
-                    className="object-contain p-3"
+                    className="object-contain p-2 sm:p-3"
                   />
                 </div>
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto px-8 py-3 flex flex-col justify-center">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col justify-center">
               {currentCard.back && <FormattedCardBack text={currentCard.back} />}
             </div>
           </div>
@@ -372,21 +372,22 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
 
       {/* Correct / Incorrect buttons — visible only on back side */}
       {isFlipped && (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-sm text-muted-foreground italic text-center max-w-sm">
+        <div className="flex flex-col items-center gap-2 sm:gap-3">
+          <p className="text-xs sm:text-sm text-muted-foreground italic text-center max-w-xs sm:max-w-sm px-4">
             🤝 Be honest with yourself — your growth depends on it. Did you really get it right?
           </p>
         <TooltipProvider>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <Button
-                  size="lg"
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  size="default"
+                  className="gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white h-10 sm:h-11 px-4 sm:px-6 text-sm"
                   onClick={handleCorrect}
                 >
-                  <CheckCircle className="h-5 w-5" />
-                  Correct
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">Correct</span>
+                  <span className="sm:hidden">✓</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -394,15 +395,16 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               </TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <Button
-                  size="lg"
+                  size="default"
                   variant="destructive"
-                  className="gap-2"
+                  className="gap-1.5 sm:gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
                   onClick={handleIncorrect}
                 >
-                  <XCircle className="h-5 w-5" />
-                  Incorrect
+                  <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">Incorrect</span>
+                  <span className="sm:hidden">✗</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -415,37 +417,37 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
       )}
 
       {/* Navigation controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <Button
           variant="outline"
-          size="lg"
-          className="gap-2"
+          size="default"
+          className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
           onClick={handlePrevious}
           disabled={currentIndex === 0}
         >
-          <ChevronLeft className="h-4 w-4" />
-          Previous
+          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Previous</span>
         </Button>
 
         <Button
           variant="secondary"
-          size="lg"
-          className="gap-2 min-w-28"
+          size="default"
+          className="gap-1 sm:gap-2 min-w-20 sm:min-w-28 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
           onClick={handleFlip}
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
           {isFlipped ? "Unflip" : "Flip"}
         </Button>
 
         <Button
           variant="outline"
-          size="lg"
-          className="gap-2"
+          size="default"
+          className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
           onClick={handleNext}
           disabled={currentIndex === total - 1}
         >
-          Next
-          <ChevronRight className="h-4 w-4" />
+          <span className="hidden sm:inline">Next</span>
+          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
       </div>
     </div>

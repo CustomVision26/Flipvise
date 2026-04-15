@@ -72,6 +72,16 @@ const generateCardsSchema = z.object({
     .refine((n) => n % 5 === 0, "Count must be a multiple of 5"),
 });
 
+const generateAnswerSchema = z.object({
+  deckId: z.number().int().positive(),
+  question: z.string().min(1),
+});
+
+const validateQuestionRelevanceSchema = z.object({
+  isRelevant: z.boolean(),
+  warning: z.string().optional(),
+});
+
 type CreateCardInput = {
   deckId: number;
   front: string;
@@ -91,6 +101,7 @@ type UpdateCardInput = {
 };
 type DeleteCardInput = z.infer<typeof deleteCardSchema>;
 type GenerateCardsInput = z.infer<typeof generateCardsSchema>;
+type GenerateAnswerInput = z.infer<typeof generateAnswerSchema>;
 type UploadCardImageInput = z.infer<typeof uploadCardImageSchema>;
 
 export async function uploadCardImageAction(
@@ -356,4 +367,92 @@ Rules:
   await bulkCreateCards(deckId, trimmed, true);
 
   revalidatePath(`/decks/${deckId}`);
+}
+
+export async function generateAnswerAction(data: GenerateAnswerInput): Promise<string> {
+  const { userId, hasAI } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  if (!hasAI) throw new Error("AI answer generation requires a Pro plan.");
+
+  const parsed = generateAnswerSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { deckId, question } = parsed.data;
+
+  const deck = await getDeckById(deckId, userId);
+  if (!deck) throw new Error("Deck not found");
+
+  const existingCards = await getCardsByDeck(deckId);
+  const sampleCards = existingCards.slice(0, 5);
+
+  const deckContext = deck.description
+    ? `Deck Name: ${deck.name}\nDescription: ${deck.description}`
+    : `Deck Name: ${deck.name}`;
+
+  const sampleCardsContext = sampleCards.length > 0
+    ? `\n\nExisting cards in this deck (for reference):\n${sampleCards.map((c, i) => `${i + 1}. Front: ${c.front || '[image only]'} | Back: ${c.back || '[image only]'}`).join('\n')}`
+    : '';
+
+  const fullContext = deckContext + sampleCardsContext;
+
+  const { output: validationOutput } = await generateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: validateQuestionRelevanceSchema,
+    }),
+    system: `You are a flashcard validation assistant. Determine if a given question matches the topic and scope of a flashcard deck.
+
+Analyze the deck's name, description, and existing cards to understand its topic and scope. Then determine if the user's question is relevant to this deck.
+
+Return:
+- isRelevant: true if the question fits the deck's topic, false if it seems off-topic
+- warning: If isRelevant is false, provide a brief, helpful message (1-2 sentences) explaining why the question seems unrelated and suggesting the user verify they're in the right deck. If isRelevant is true, omit this field.`,
+    prompt: `${fullContext}
+
+User's Question: ${question}
+
+Does this question match the deck's topic and scope?`,
+  });
+
+  if (!validationOutput.isRelevant && validationOutput.warning) {
+    throw new Error(validationOutput.warning);
+  }
+
+  const { output } = await generateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: z.object({
+        answer: z.string(),
+      }),
+    }),
+    system: `You are a flashcard assistant helping users complete flashcards. Given a question or term on the front of a flashcard, generate an appropriate answer or definition for the back.
+
+For **problem-solving, mathematical, or computational questions** (e.g. math problems, physics calculations, programming challenges):
+- Provide a complete step-by-step solution using this uniform format:
+
+Step 1: [Brief label describing the action]
+[The computation or reasoning for this step]
+Step 2: [Brief label describing the action]
+[The computation or reasoning for this step]
+(continue for as many steps as needed)
+Answer: [The final result]
+
+For **non-problem-solving questions** (definitions, facts, concepts, language learning):
+- Provide a concise, accurate answer or definition
+- Keep it brief and direct
+
+Rules:
+- NEVER use markdown formatting (no **, no *, no #, no backticks)
+- NEVER use bullet points or dashes in step-by-step solutions
+- Use plain newlines between steps
+- Infer the appropriate format from the question type`,
+    prompt: `${fullContext}
+
+Question/Term: ${question}
+
+Generate an appropriate answer for the back of this flashcard.`,
+  });
+
+  return output.answer;
 }

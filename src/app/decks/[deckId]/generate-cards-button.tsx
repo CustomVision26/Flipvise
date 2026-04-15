@@ -87,12 +87,13 @@ export function GenerateCardsButton({
               variant="outline"
               size="sm"
               onClick={() => router.push("/pricing")}
-              className="gap-1.5"
+              className="gap-1 sm:gap-1.5 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
             />
           }
         >
-          <Sparkles className="size-4" />
-          Generate with AI
+          <Sparkles className="size-3 sm:size-4" />
+          <span className="hidden sm:inline">Generate with AI</span>
+          <span className="sm:hidden">AI Gen</span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-56 text-center">
           AI card generation is a Pro feature. Click to upgrade your plan.
@@ -105,19 +106,22 @@ export function GenerateCardsButton({
   const noBatchRoom = batchOptions.length === 0;
 
   return (
-    <div className="flex max-w-md flex-col items-stretch gap-2 sm:max-w-lg sm:items-end">
-      <Alert className="text-left">
-        <Sparkles className="text-primary" />
-        <AlertTitle>AI flashcard batches</AlertTitle>
-        <AlertDescription className="text-muted-foreground space-y-1">
-          <p>
+    <div className="flex w-full max-w-md flex-col items-stretch gap-2 sm:max-w-lg sm:items-end">
+      <Alert className="text-left text-xs sm:text-sm p-3 sm:p-4">
+        <Sparkles className="text-primary h-4 w-4 sm:h-5 sm:w-5" />
+        <AlertTitle className="text-sm sm:text-base">AI flashcard batches</AlertTitle>
+        <AlertDescription className="text-muted-foreground space-y-1 text-xs sm:text-sm">
+          <p className="hidden sm:block">
             Choose how many cards to generate (multiples of 5, up to 75 per run). Each option
             includes an AI marker on new cards.
           </p>
-          <p className="text-foreground font-medium">
-            {aiGeneratedCount} AI-generated · {manualCardCount} manual · {Math.max(0, remainingDeckSlots)} card slot
-            {Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} left in this deck (
-            {deckCardLimit} max, {hasUnlimitedDecks ? "Pro" : "Free"} plan)
+          <p className="sm:hidden">
+            Choose batch size (multiples of 5, max 75).
+          </p>
+          <p className="text-foreground font-medium text-[10px] sm:text-sm">
+            {aiGeneratedCount} AI · {manualCardCount} manual · {Math.max(0, remainingDeckSlots)} slot
+            {Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} left (
+            {deckCardLimit} max, {hasUnlimitedDecks ? "Pro" : "Free"})
           </p>
         </AlertDescription>
       </Alert>
@@ -131,14 +135,15 @@ export function GenerateCardsButton({
                 size="sm"
                 aria-disabled="true"
                 onClick={(e) => e.preventDefault()}
-                className="gap-1.5 cursor-not-allowed opacity-50"
+                className="gap-1 sm:gap-1.5 cursor-not-allowed opacity-50 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
               />
             }
           >
-            <Sparkles className="size-4" />
-            Generate with AI
+            <Sparkles className="size-3 sm:size-4" />
+            <span className="hidden sm:inline">Generate with AI</span>
+            <span className="sm:hidden">AI Gen</span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-64 text-center">
+          <TooltipContent side="bottom" className="max-w-64 text-center text-xs sm:text-sm">
             AI generation is limited to {AI_GENERATION_CAP_PER_DECK} AI-generated cards per deck.
             This deck already has {aiGeneratedCount}.
           </TooltipContent>
@@ -152,14 +157,15 @@ export function GenerateCardsButton({
                 size="sm"
                 aria-disabled="true"
                 onClick={(e) => e.preventDefault()}
-                className="gap-1.5 cursor-not-allowed opacity-50"
+                className="gap-1 sm:gap-1.5 cursor-not-allowed opacity-50 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
               />
             }
           >
-            <Sparkles className="size-4" />
-            Generate with AI
+            <Sparkles className="size-3 sm:size-4" />
+            <span className="hidden sm:inline">Generate with AI</span>
+            <span className="sm:hidden">AI Gen</span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-56 text-center">
+          <TooltipContent side="bottom" className="max-w-56 text-center text-xs sm:text-sm">
             Add a description to this deck first. Click &ldquo;Edit Deck&rdquo; to add one.
           </TooltipContent>
         </Tooltip>
@@ -172,14 +178,15 @@ export function GenerateCardsButton({
                 size="sm"
                 aria-disabled="true"
                 onClick={(e) => e.preventDefault()}
-                className="gap-1.5 cursor-not-allowed opacity-50"
+                className="gap-1 sm:gap-1.5 cursor-not-allowed opacity-50 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
               />
             }
           >
-            <Sparkles className="size-4" />
-            Generate with AI
+            <Sparkles className="size-3 sm:size-4" />
+            <span className="hidden sm:inline">Generate with AI</span>
+            <span className="sm:hidden">AI Gen</span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-64 text-center">
+          <TooltipContent side="bottom" className="max-w-64 text-center text-xs sm:text-sm">
             {remainingDeckSlots <= 0
               ? hasUnlimitedDecks
                 ? `This deck is full (${deckCardLimit} cards on Pro). Delete cards to free space.`
@@ -194,13 +201,13 @@ export function GenerateCardsButton({
             onValueChange={(v) => setBatchSize(Number(v))}
             disabled={isPending}
           >
-            <SelectTrigger size="sm" className="w-full min-w-[200px] sm:w-[220px]">
+            <SelectTrigger size="sm" className="w-full min-w-[140px] sm:min-w-[200px] sm:w-[220px] h-8 sm:h-9 text-xs sm:text-sm">
               <SelectValue placeholder="Cards per batch" />
             </SelectTrigger>
             <SelectContent>
               {batchOptions.map((n) => (
-                <SelectItem key={n} value={String(n)}>
-                  <Sparkles className="size-4 text-primary" />
+                <SelectItem key={n} value={String(n)} className="text-xs sm:text-sm">
+                  <Sparkles className="size-3 sm:size-4 text-primary" />
                   <span>{n} cards</span>
                 </SelectItem>
               ))}
@@ -211,15 +218,16 @@ export function GenerateCardsButton({
             size="sm"
             onClick={handleGenerate}
             disabled={isPending}
-            className="gap-1.5"
+            className="gap-1 sm:gap-1.5 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
           >
-            <Sparkles className="size-4" />
-            {isPending ? "Generating…" : "Generate with AI"}
+            <Sparkles className="size-3 sm:size-4" />
+            <span className="hidden sm:inline">{isPending ? "Generating…" : "Generate with AI"}</span>
+            <span className="sm:hidden">{isPending ? "Gen…" : "Gen AI"}</span>
           </Button>
         </div>
       )}
       {error && (
-        <p className="text-destructive max-w-md text-right text-xs">{error}</p>
+        <p className="text-destructive max-w-md text-right text-[10px] sm:text-xs">{error}</p>
       )}
     </div>
   );

@@ -51,7 +51,7 @@ function ImageUploadSection({
     <div className="flex flex-col gap-2">
       <Label className="text-muted-foreground text-xs">{label}</Label>
       {imagePreview ? (
-        <div className="relative w-full h-48 rounded-lg overflow-hidden border border-border bg-muted/30">
+        <div className="relative w-full h-32 sm:h-48 rounded-lg overflow-hidden border border-border bg-muted/30">
           <Image
             src={imagePreview}
             alt={altText}
@@ -60,7 +60,7 @@ function ImageUploadSection({
             unoptimized={imagePreview.startsWith("blob:")}
           />
           {isUploading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-sm text-muted-foreground">
+            <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-xs sm:text-sm text-muted-foreground">
               Uploading…
             </div>
           )}
@@ -69,10 +69,10 @@ function ImageUploadSection({
               type="button"
               variant="destructive"
               size="icon"
-              className="absolute top-2 right-2 h-7 w-7"
+              className="absolute top-2 right-2 h-6 w-6 sm:h-7 sm:w-7"
               onClick={onRemove}
             >
-              <X className="h-4 w-4" />
+              <X className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           )}
         </div>
@@ -81,11 +81,11 @@ function ImageUploadSection({
           type="button"
           variant="outline"
           size="sm"
-          className="w-fit gap-2"
+          className="w-fit gap-2 text-xs sm:text-sm h-8 sm:h-9"
           onClick={() => fileInputRef.current?.click()}
           disabled={isBusy}
         >
-          <ImagePlus className="h-4 w-4" />
+          <ImagePlus className="h-3 w-3 sm:h-4 sm:w-4" />
           Add image
         </Button>
       )}
@@ -240,25 +240,25 @@ export function EditCardDialog({ card, deckId }: EditCardDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" />}>
+      <DialogTrigger render={<Button variant="ghost" size="sm" className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3" />}>
         Edit
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit card</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Edit card</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Each side can have text, an image, or both — at least one is required per side.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-5 py-2">
+        <div className="flex flex-col gap-4 sm:gap-5 py-2">
           {/* Front */}
-          <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+          <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border p-3 sm:p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Front
             </p>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`front-${card.id}`}>
+              <Label htmlFor={`front-${card.id}`} className="text-xs sm:text-sm">
                 Text <span className="text-muted-foreground font-normal">(question, term, etc.)</span>
               </Label>
               <Textarea
@@ -268,6 +268,7 @@ export function EditCardDialog({ card, deckId }: EditCardDialogProps) {
                 onChange={(e) => setFront(e.target.value)}
                 rows={3}
                 disabled={isBusy}
+                className="text-sm"
               />
             </div>
             <ImageUploadSection
@@ -283,12 +284,12 @@ export function EditCardDialog({ card, deckId }: EditCardDialogProps) {
           </div>
 
           {/* Back */}
-          <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+          <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border p-3 sm:p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Back
             </p>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`back-${card.id}`}>
+              <Label htmlFor={`back-${card.id}`} className="text-xs sm:text-sm">
                 Text <span className="text-muted-foreground font-normal">(answer, definition, etc.)</span>
               </Label>
               <Textarea
@@ -298,6 +299,7 @@ export function EditCardDialog({ card, deckId }: EditCardDialogProps) {
                 onChange={(e) => setBack(e.target.value)}
                 rows={3}
                 disabled={isBusy}
+                className="text-sm"
               />
             </div>
             <ImageUploadSection
@@ -312,20 +314,22 @@ export function EditCardDialog({ card, deckId }: EditCardDialogProps) {
             />
           </div>
 
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
           <Button
             variant="outline"
             onClick={() => handleOpenChange(false)}
             disabled={isBusy}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isBusy || !frontHasContent || !backHasContent}
+            className="w-full sm:w-auto"
           >
             {isPending ? "Saving…" : isUploading ? "Uploading…" : "Save changes"}
           </Button>

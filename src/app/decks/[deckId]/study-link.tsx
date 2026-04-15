@@ -21,6 +21,7 @@ export function StudyLink({ deckId }: { deckId: number }) {
               {...props}
               className={cn(
                 buttonVariants({ variant: "default" }),
+                "text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4",
                 props.className
               )}
             >

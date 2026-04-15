@@ -185,36 +185,36 @@ export default async function AdminPage() {
   }));
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-8">
+    <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Monitor and manage all users across Flipvise
           </p>
         </div>
         <Link
           href="/dashboard"
-          className={buttonVariants({ variant: "outline", size: "sm" }) + " shrink-0"}
+          className={buttonVariants({ variant: "outline", size: "sm" }) + " shrink-0 text-xs sm:text-sm h-8 sm:h-9"}
         >
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
           My Decks
         </Link>
       </div>
 
       {/* Overview stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {statsCards.map(({ label, value, icon: Icon, description, accent }) => (
           <Card key={label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground leading-tight">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
                 {label}
               </CardTitle>
-              <Icon className={`h-4 w-4 shrink-0 ${accent || "text-muted-foreground"}`} />
+              <Icon className={`h-3 w-3 sm:h-4 sm:w-4 shrink-0 ${accent || "text-muted-foreground"}`} />
             </CardHeader>
             <CardContent>
-              <p className={`text-3xl font-bold ${accent}`}>
+              <p className={`text-2xl sm:text-3xl font-bold ${accent}`}>
                 {value.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground mt-1">{description}</p>

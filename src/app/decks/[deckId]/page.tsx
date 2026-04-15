@@ -41,10 +41,10 @@ export default async function DeckPage({ params }: DeckPageProps) {
   const isAtCardLimit = cards.length >= deckCardLimit;
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-8">
+    <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
       {/* Deck section */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-col gap-1">
             <Link
               href="/dashboard"
@@ -52,12 +52,12 @@ export default async function DeckPage({ params }: DeckPageProps) {
             >
               ← Dashboard
             </Link>
-            <h1 className="text-3xl font-bold tracking-tight">{deck.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">{deck.name}</h1>
             {deck.description && (
-              <p className="text-muted-foreground mt-1">{deck.description}</p>
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">{deck.description}</p>
             )}
           </div>
-          <div className="flex flex-col gap-3 lg:items-end">
+          <div className="flex flex-col gap-2 sm:gap-3 lg:items-end">
             <GenerateCardsButton
               deckId={id}
               hasDescription={!!deck.description}
@@ -77,7 +77,7 @@ export default async function DeckPage({ params }: DeckPageProps) {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
-                      <div className="inline-flex h-10 shrink-0 cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-50">
+                      <div className="inline-flex h-9 sm:h-10 shrink-0 cursor-not-allowed items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-primary-foreground opacity-50">
                         🧠 Brain Challenge
                       </div>
                     </TooltipTrigger>
@@ -133,18 +133,19 @@ export default async function DeckPage({ params }: DeckPageProps) {
       {/* Cards section */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Cards</h2>
-          <AddCardDialog deckId={id} isAtLimit={isAtCardLimit} />
+          <h2 className="text-base sm:text-lg font-semibold">Cards</h2>
+          <AddCardDialog deckId={id} isAtLimit={isAtCardLimit} hasAI={hasAI} />
         </div>
 
         {cards.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-20 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
             <p className="text-muted-foreground text-sm">
               This deck has no cards yet.
             </p>
             <AddCardDialog
               deckId={id}
               isAtLimit={isAtCardLimit}
+              hasAI={hasAI}
               trigger={<Button>Add your first card</Button>}
             />
           </div>

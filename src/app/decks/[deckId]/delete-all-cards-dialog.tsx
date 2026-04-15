@@ -37,17 +37,18 @@ export function DeleteAllCardsDialog({ deckId, cardCount }: DeleteAllCardsDialog
           <Button
             variant="outline"
             size="sm"
-            className="gap-1.5 text-destructive hover:text-destructive border-destructive/40 hover:border-destructive hover:bg-destructive/10"
+            className="gap-1 sm:gap-1.5 text-destructive hover:text-destructive border-destructive/40 hover:border-destructive hover:bg-destructive/10 text-xs sm:text-sm h-8 sm:h-9 px-2.5 sm:px-3"
           />
         }
       >
-        <Trash2 className="size-4" />
-        Delete All Cards
+        <Trash2 className="size-3 sm:size-4" />
+        <span className="hidden sm:inline">Delete All Cards</span>
+        <span className="sm:hidden">Delete All</span>
       </AlertDialogTrigger>
-      <AlertDialogContent>
+      <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete all cards?</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogTitle className="text-base sm:text-lg">Delete all cards?</AlertDialogTitle>
+          <AlertDialogDescription className="text-xs sm:text-sm">
             This will permanently remove all{" "}
             <span className="font-semibold text-foreground">
               {cardCount} card{cardCount !== 1 ? "s" : ""}
@@ -55,12 +56,12 @@ export function DeleteAllCardsDialog({ deckId, cardCount }: DeleteAllCardsDialog
             from this deck. This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <AlertDialogCancel disabled={isPending} className="w-full sm:w-auto">Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDeleteAll}
             disabled={isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
           >
             {isPending ? "Deleting…" : "Delete All Cards"}
           </AlertDialogAction>

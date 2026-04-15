@@ -66,9 +66,9 @@ export function CardGrid({ cards, deckId }: CardGridProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 self-end">
-        <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+        <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
         <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-          <SelectTrigger className="w-44 h-8 text-xs">
+          <SelectTrigger className="w-36 sm:w-44 h-8 text-xs">
             <SelectValue placeholder="Sort by…" />
           </SelectTrigger>
           <SelectContent>
@@ -81,7 +81,7 @@ export function CardGrid({ cards, deckId }: CardGridProps) {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {sorted.map((card, i) => (
           <Card
             key={card.id}
@@ -104,7 +104,7 @@ export function CardGrid({ cards, deckId }: CardGridProps) {
                 <p className="text-foreground font-medium">{card.front}</p>
               )}
               {card.frontImageUrl && (
-                <div className="relative mt-2 h-32 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm">
+                <div className="relative mt-2 h-24 sm:h-32 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm">
                   <Image
                     src={card.frontImageUrl}
                     alt="Front image"
@@ -119,10 +119,10 @@ export function CardGrid({ cards, deckId }: CardGridProps) {
                 Back
               </p>
               {card.back && (
-                <p className="text-foreground mt-1 text-sm">{card.back}</p>
+                <p className="text-foreground mt-1 text-sm break-words">{card.back}</p>
               )}
               {card.backImageUrl && (
-                <div className="relative mt-2 h-32 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm">
+                <div className="relative mt-2 h-24 sm:h-32 rounded-lg overflow-hidden border border-border bg-muted/30 shadow-sm">
                   <Image
                     src={card.backImageUrl}
                     alt="Back image"

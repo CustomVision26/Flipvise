@@ -54,30 +54,31 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+      <DialogTrigger render={<Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" />}>
         Edit Deck
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <DialogHeader>
-          <DialogTitle>Edit deck</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Edit deck</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Update the name and description of this deck.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="deck-name">Name</Label>
+            <Label htmlFor="deck-name" className="text-xs sm:text-sm">Name</Label>
             <Input
               id="deck-name"
               placeholder="Deck name…"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={isPending}
+              className="text-sm"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="deck-description">Description</Label>
+            <Label htmlFor="deck-description" className="text-xs sm:text-sm">Description</Label>
             <Textarea
               id="deck-description"
               placeholder="Optional description…"
@@ -85,22 +86,25 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               disabled={isPending}
+              className="text-sm"
             />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
           <Button
             variant="outline"
             onClick={() => handleOpenChange(false)}
             disabled={isPending}
+            className="w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isPending || !name.trim()}
+            className="w-full sm:w-auto"
           >
             {isPending ? "Saving…" : "Save changes"}
           </Button>

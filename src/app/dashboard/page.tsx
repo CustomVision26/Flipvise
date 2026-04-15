@@ -32,14 +32,14 @@ export default async function DashboardPage() {
     : 0;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-8">
+    <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
       {/* Page header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage your flashcard decks</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your flashcard decks</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <AddDeckDialog isAtLimit={isAtLimit} />
         </div>
       </div>
@@ -138,24 +138,24 @@ export default async function DashboardPage() {
 
       {/* Deck grid */}
       {decks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-20 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
           <p className="text-muted-foreground text-sm">You have no decks yet.</p>
           <AddDeckDialog triggerLabel="Create your first deck" isAtLimit={isAtLimit} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {decks.map((deck) => (
-            <div key={deck.id} className="relative h-40">
+            <div key={deck.id} className="relative min-h-[140px] sm:h-40">
               <Link href={`/decks/${deck.id}`} className="block h-full">
                 <Card className="h-full flex flex-col transition-colors hover:bg-muted/50 cursor-pointer">
-                  <CardHeader className="pr-12 flex-none">
-                    <CardTitle className="line-clamp-1">{deck.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">
+                  <CardHeader className="pr-10 sm:pr-12 flex-none pb-2 sm:pb-3">
+                    <CardTitle className="line-clamp-1 text-base sm:text-lg">{deck.name}</CardTitle>
+                    <CardDescription className="line-clamp-2 text-xs sm:text-sm">
                       {deck.description ?? "No description provided."}
                     </CardDescription>
                   </CardHeader>
                   <div className="flex-1" />
-                  <CardFooter className="flex items-center justify-between">
+                  <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-0 sm:justify-between pt-2">
                     <span className="text-muted-foreground text-xs">
                       {deck.cardCount} {deck.cardCount === 1 ? "card" : "cards"}
                     </span>
@@ -170,7 +170,7 @@ export default async function DashboardPage() {
                   </CardFooter>
                 </Card>
               </Link>
-              <div className="absolute top-3 right-3">
+              <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
                 <DeleteDeckButton deckId={deck.id} deckName={deck.name} />
               </div>
             </div>

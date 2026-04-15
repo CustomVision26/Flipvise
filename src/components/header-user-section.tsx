@@ -29,18 +29,18 @@ export function HeaderUserSection({ currentUiTheme }: HeaderUserSectionProps) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1 sm:gap-2">
       {isAdmin && (
         <Link
           href="/admin"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          className={buttonVariants({ variant: "outline", size: "sm" }) + " text-xs h-8 px-2.5 sm:px-3"}
         >
           Admin
         </Link>
       )}
       <Badge
         variant={isPro ? "default" : "secondary"}
-        className="text-xs font-semibold tracking-wide"
+        className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2"
       >
         {isPro ? "Pro" : "Free"}
       </Badge>

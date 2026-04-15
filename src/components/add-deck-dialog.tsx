@@ -72,11 +72,11 @@ export function AddDeckDialog({ triggerLabel = "+ New Deck", isAtLimit = false }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button />}>{triggerLabel}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogTrigger render={<Button className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4" />}>{triggerLabel}</DialogTrigger>
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <DialogHeader>
-          <DialogTitle>Create a new deck</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Create a new deck</DialogTitle>
+          <DialogDescription className="text-sm">
             Give your deck a name and an optional description.
           </DialogDescription>
         </DialogHeader>

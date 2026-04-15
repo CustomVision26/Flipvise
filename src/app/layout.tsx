@@ -49,18 +49,18 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <AppProviders>
           <TooltipProvider>
-            <header className="flex items-center justify-between border-b border-border px-6 py-3">
+            <header className="flex items-center justify-between border-b border-border px-3 py-2 sm:px-6 sm:py-3">
               <div className="flex items-center gap-2">
                 <Image
                   src={LOGO_PUBLIC_URL}
                   alt="Flipvise logo"
                   width={120}
                   height={40}
-                  className="object-contain mix-blend-multiply dark:mix-blend-screen"
+                  className="object-contain mix-blend-multiply dark:mix-blend-screen w-20 h-auto sm:w-[120px]"
                   priority
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <HeaderUserSection currentUiTheme={proUiThemeSelection} />
               </div>
             </header>

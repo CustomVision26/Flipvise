@@ -60,27 +60,27 @@ export default async function Home() {
       </div>
 
       {/* Layer 7: Main content - Minimalist clean container with material shadows and cyberpunk accents */}
-      <div className="relative z-20 flex flex-col items-center gap-8 text-center px-6">
+      <div className="relative z-20 flex flex-col items-center gap-4 sm:gap-8 text-center px-3 sm:px-6">
         
         {/* Ultra glass container with all effects combined */}
-        <div className="ultra-glass-container rounded-3xl border-3 bg-background/50 backdrop-blur-3xl shadow-brutal p-12 flex flex-col items-center gap-6 neon-border-rainbow material-elevation">
+        <div className="ultra-glass-container rounded-2xl sm:rounded-3xl border-3 bg-background/50 backdrop-blur-3xl shadow-brutal p-6 sm:p-12 flex flex-col items-center gap-4 sm:gap-6 neon-border-rainbow material-elevation max-w-[95vw] sm:max-w-none">
           <Image
             src={LOGO_PUBLIC_URL}
             alt="Flipvise"
             width={240}
             height={90}
-            className="object-contain drop-shadow-neon"
+            className="object-contain drop-shadow-neon w-32 h-auto sm:w-60"
             priority
           />
 
           <Show when="signed-out">
-            <div className="flex w-full justify-center gap-3">
+            <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
               <SignInBtn />
               <SignUpBtn />
             </div>
           </Show>
 
-          <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent max-w-sm leading-relaxed drop-shadow-neon animate-gradient-text neon-text-glow">
+          <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent max-w-xs sm:max-w-sm leading-relaxed drop-shadow-neon animate-gradient-text neon-text-glow">
             Flip. Learn. Master
           </p>
         </div>

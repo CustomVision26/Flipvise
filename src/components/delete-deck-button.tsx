@@ -51,20 +51,21 @@ export function DeleteDeckButton({ deckId, deckName }: DeleteDeckButtonProps) {
         <Trash2 className="size-4" />
       </AlertDialogTrigger>
 
-      <AlertDialogContent>
+      <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete &ldquo;{deckName}&rdquo;?</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogTitle className="text-base sm:text-lg">Delete &ldquo;{deckName}&rdquo;?</AlertDialogTitle>
+          <AlertDialogDescription className="text-xs sm:text-sm">
             This will permanently delete the deck and all of its cards. This
             action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={isPending}
             onClick={handleDelete}
+            className="w-full sm:w-auto"
           >
             {isPending ? "Deleting…" : "Delete Deck"}
           </AlertDialogAction>
