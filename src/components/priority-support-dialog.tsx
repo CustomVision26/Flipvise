@@ -7,7 +7,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,14 +24,17 @@ export function PrioritySupportDialog({ trigger, open: controlledOpen, onOpenCha
   const open = isControlled ? controlledOpen : uncontrolledOpen;
   const setOpen = isControlled ? (onOpenChange ?? (() => {})) : setUncontrolledOpen;
 
+  const TriggerWrapper = trigger ? (
+    <div onClick={() => setOpen(true)} className="cursor-pointer">
+      {trigger}
+    </div>
+  ) : null;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger && (
-        <DialogTrigger asChild>
-          {trigger}
-        </DialogTrigger>
-      )}
-      <DialogContent className="max-w-lg">
+    <>
+      {TriggerWrapper}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle>Priority Support</DialogTitle>
