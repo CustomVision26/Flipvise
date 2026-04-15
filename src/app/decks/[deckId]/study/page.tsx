@@ -32,9 +32,10 @@ export default async function StudyPage({ params }: StudyPageProps) {
             href={`/decks/${id}`}
             className="text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
-            ← Back to {deck.name}
+            ← Back to Deck
           </Link>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Study Session</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{deck.name}</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Study Session</p>
         </div>
         <Badge variant="secondary" className="text-xs">
           {cards.length} card{cards.length !== 1 ? "s" : ""}

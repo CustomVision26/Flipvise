@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -90,14 +91,12 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   const router = useRouter();
   const [deck, setDeck] = useState<CardData[]>(cards);
   const [currentIndex, setCurrentIndex] = useState(0);
-  // visibleIndex tracks which card's content is rendered — lags behind
-  // currentIndex when navigating while flipped so the new card's answer
-  // is never shown during the unflip animation.
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [autoShuffle, setAutoShuffle] = useState(false);
   const pendingNavRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const total = deck.length;
@@ -151,6 +150,21 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, total]);
 
+  useEffect(() => {
+    if (autoShuffle) {
+      if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+      setDeck(shuffleArray(cards));
+      setCurrentIndex(0);
+      setVisibleIndex(0);
+      setIsFlipped(false);
+    } else {
+      setDeck(cards);
+      setCurrentIndex(0);
+      setVisibleIndex(0);
+      setIsFlipped(false);
+    }
+  }, [autoShuffle]);
+
   function handleShuffle() {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
     setDeck(shuffleArray(cards));
@@ -181,7 +195,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
 
   function handleStudyAgain() {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
-    setDeck(cards);
+    setDeck(shuffleArray(cards));
     setCurrentIndex(0);
     setVisibleIndex(0);
     setIsFlipped(false);
@@ -193,6 +207,19 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   if (sessionComplete) {
     const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
 
+    let motivationalMessage = "";
+    let messageColor = "";
+    if (scorePercent === 100) {
+      motivationalMessage = "Perfect score! You've mastered this deck!";
+      messageColor = "text-yellow-500";
+    } else if (scorePercent >= 50) {
+      motivationalMessage = "Great progress! Keep practicing to reach perfection!";
+      messageColor = "text-blue-400";
+    } else {
+      motivationalMessage = "Don't give up! Every mistake is a step toward mastery!";
+      messageColor = "text-purple-400";
+    }
+
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:gap-8 px-4">
         <div className="w-full max-w-md flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-card p-6 sm:p-10 shadow-md text-center">
@@ -200,6 +227,9 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             <Trophy className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500" />
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Session Complete!</h2>
             <p className="text-muted-foreground text-sm break-words max-w-full">{deckName}</p>
+            <p className={`text-sm sm:text-base font-semibold ${messageColor} mt-2 px-4`}>
+              {motivationalMessage}
+            </p>
           </div>
 
           <div className="w-full flex flex-col gap-2">
@@ -251,21 +281,39 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
     <div className="flex flex-1 flex-col items-center gap-4 sm:gap-8">
       {/* Progress bar */}
       <div className="w-full max-w-2xl flex flex-col gap-2">
-        {/* Deck title */}
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight break-words">{deckName}</h1>
-        <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
+        <div className="flex justify-between items-center text-xs sm:text-sm text-muted-foreground">
           <span>
             Card {currentIndex + 1} of {total}
           </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
-            onClick={handleShuffle}
-          >
-            <Shuffle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            <span className="hidden sm:inline">Shuffle</span>
-          </Button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-xs sm:text-sm font-semibold text-foreground">
+              {Math.round(progressPercent)}%
+            </span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Switch
+                id="auto-shuffle"
+                checked={autoShuffle}
+                onCheckedChange={setAutoShuffle}
+                className="scale-75 sm:scale-100"
+              />
+              <label
+                htmlFor="auto-shuffle"
+                className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
+              >
+                Auto Shuffle
+              </label>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
+              onClick={handleShuffle}
+              disabled={autoShuffle}
+            >
+              <Shuffle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden sm:inline">Shuffle</span>
+            </Button>
+          </div>
         </div>
         <Progress value={progressPercent} className="h-2" />
         <div className="flex items-center gap-3 sm:gap-4 mt-1">

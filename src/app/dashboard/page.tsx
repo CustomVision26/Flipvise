@@ -18,10 +18,10 @@ import { AddDeckDialog } from "@/components/add-deck-dialog";
 import { DeleteDeckButton } from "@/components/delete-deck-button";
 
 const DECK_LIMIT = 3;
-const CARDS_PER_DECK_LIMIT = 15;
+const CARDS_PER_DECK_LIMIT = 8;
 
 export default async function DashboardPage() {
-  const { userId, hasUnlimitedDecks, isPro } = await getAccessContext();
+  const { userId, hasUnlimitedDecks, has75CardsPerDeck, isPro } = await getAccessContext();
   if (!userId) redirect("/");
 
   const decks = await getDecksByUserWithCardCount(userId);
@@ -30,6 +30,7 @@ export default async function DashboardPage() {
   const deckUsagePercent = isFreePlan
     ? Math.min((decks.length / DECK_LIMIT) * 100, 100)
     : 0;
+  const cardsPerDeckLimit = has75CardsPerDeck ? 75 : CARDS_PER_DECK_LIMIT;
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
@@ -70,7 +71,7 @@ export default async function DashboardPage() {
               <p className="text-xs text-muted-foreground">
                 Each deck is limited to{" "}
                 <span className="text-foreground font-semibold">
-                  {CARDS_PER_DECK_LIMIT} cards
+                  {cardsPerDeckLimit} cards
                 </span>{" "}
                 on the Free plan.
               </p>
@@ -100,7 +101,7 @@ export default async function DashboardPage() {
                 </li>
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
-                  <span>Unlimited cards per deck</span>
+                  <span>75 cards per deck</span>
                 </li>
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
@@ -122,16 +123,16 @@ export default async function DashboardPage() {
 
       {/* At limit alert */}
       {isAtLimit && (
-        <Alert>
+          <Alert>
           <AlertTitle>Deck limit reached</AlertTitle>
           <AlertDescription>
             Free plan allows up to{" "}
             <strong>{DECK_LIMIT} decks</strong> with{" "}
-            <strong>{CARDS_PER_DECK_LIMIT} cards</strong> per deck.{" "}
+            <strong>{cardsPerDeckLimit} cards</strong> per deck.{" "}
             <Link href="/pricing" className="underline underline-offset-3 hover:text-foreground">
               Upgrade to Pro
             </Link>{" "}
-            for unlimited decks and cards.
+            for unlimited decks and 75 cards per deck.
           </AlertDescription>
         </Alert>
       )}
@@ -181,7 +182,7 @@ export default async function DashboardPage() {
       {/* Pro plan — already subscribed */}
       {isPro && (
         <p className="text-xs text-muted-foreground text-center">
-          You&apos;re on the <span className="text-foreground font-medium">Pro plan</span> — enjoy unlimited decks and cards.
+          You&apos;re on the <span className="text-foreground font-medium">Pro plan</span> — enjoy unlimited decks and 75 cards per deck.
         </p>
       )}
     </div>

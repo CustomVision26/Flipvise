@@ -23,7 +23,7 @@ interface DeckPageProps {
 }
 
 export default async function DeckPage({ params }: DeckPageProps) {
-  const { userId, hasUnlimitedDecks, hasAI } = await getAccessContext();
+  const { userId, hasUnlimitedDecks, hasAI, has75CardsPerDeck } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -37,7 +37,7 @@ export default async function DeckPage({ params }: DeckPageProps) {
 
   const aiGeneratedCount = cards.filter((c) => c.aiGenerated).length;
   const isFreePlan = !hasUnlimitedDecks;
-  const deckCardLimit = getCardsPerDeckLimit(hasUnlimitedDecks);
+  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   const isAtCardLimit = cards.length >= deckCardLimit;
 
   return (

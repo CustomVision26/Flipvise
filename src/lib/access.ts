@@ -28,6 +28,9 @@ export async function getAccessContext() {
       isPro: false,
       hasUnlimitedDecks: false,
       hasAI: false,
+      has75CardsPerDeck: false,
+      hasPrioritySupport: false,
+      hasCustomColors: false,
       adminGranted: false,
       isAdmin: false,
     };
@@ -36,14 +39,20 @@ export async function getAccessContext() {
   const paidPro = has({ plan: "pro" });
   const paidUnlimitedDecks = has({ feature: "unlimited_decks" });
   const paidAI = has({ feature: "ai_flashcard_generation" });
+  const paid75Cards = has({ feature: "75_cards_per_deck" });
+  const paidPrioritySupport = has({ feature: "priority_support" });
+  const paidCustomColors = has({ feature: "12_interface_colors" });
 
   // Fast path: fully unlocked via Clerk Billing — skip the extra API call.
-  if (paidPro && paidUnlimitedDecks && paidAI) {
+  if (paidPro && paidUnlimitedDecks && paidAI && paid75Cards && paidPrioritySupport && paidCustomColors) {
     return {
       userId,
       isPro: true,
       hasUnlimitedDecks: true,
       hasAI: true,
+      has75CardsPerDeck: true,
+      hasPrioritySupport: true,
+      hasCustomColors: true,
       adminGranted: false,
       isAdmin: false,
     };
@@ -63,6 +72,9 @@ export async function getAccessContext() {
     isPro: paidPro || unlocked,
     hasUnlimitedDecks: paidUnlimitedDecks || unlocked,
     hasAI: paidAI || unlocked,
+    has75CardsPerDeck: paid75Cards || unlocked,
+    hasPrioritySupport: paidPrioritySupport || unlocked,
+    hasCustomColors: paidCustomColors || unlocked,
     adminGranted,
     isAdmin,
   };

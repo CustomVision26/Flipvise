@@ -6,12 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { SettingsMenu } from "@/components/settings-menu";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
+import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 
 interface HeaderUserSectionProps {
-  currentUiTheme?: ProUiThemeId;
+  currentProTheme?: ProUiThemeId;
+  currentFreeTheme?: FreeUiThemeId;
 }
 
-export function HeaderUserSection({ currentUiTheme }: HeaderUserSectionProps) {
+export function HeaderUserSection({ currentProTheme, currentFreeTheme }: HeaderUserSectionProps) {
   const { userId, has } = useAuth();
   const { user } = useUser();
 
@@ -21,7 +23,6 @@ export function HeaderUserSection({ currentUiTheme }: HeaderUserSectionProps) {
     | undefined;
   const adminGranted = meta?.adminGranted === true;
   const isAdmin = meta?.role === "admin";
-  // Admins (assigned from Clerk Dashboard or the app) get Pro automatically.
   const isPro = isPaidPro || adminGranted || isAdmin;
 
   if (!userId) {
@@ -38,14 +39,19 @@ export function HeaderUserSection({ currentUiTheme }: HeaderUserSectionProps) {
           Admin
         </Link>
       )}
-      <Badge
-        variant={isPro ? "default" : "secondary"}
-        className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2"
-      >
-        {isPro ? "Pro" : "Free"}
-      </Badge>
+      <Link href="/pricing">
+        <Badge
+          variant={isPro ? "default" : "secondary"}
+          className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2 cursor-pointer hover:opacity-80 transition-opacity"
+        >
+          {isPro ? "Pro" : "Free"}
+        </Badge>
+      </Link>
       <UserButton />
-      <SettingsMenu currentUiTheme={currentUiTheme} />
+      <SettingsMenu 
+        currentProTheme={currentProTheme}
+        currentFreeTheme={currentFreeTheme}
+      />
     </div>
   );
 }

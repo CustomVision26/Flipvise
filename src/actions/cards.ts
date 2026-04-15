@@ -79,7 +79,7 @@ const generateAnswerSchema = z.object({
 
 const validateQuestionRelevanceSchema = z.object({
   isRelevant: z.boolean(),
-  warning: z.string().optional(),
+  warning: z.string().nullable(),
 });
 
 type CreateCardInput = {
@@ -142,7 +142,7 @@ export async function uploadCardImageAction(
 }
 
 export async function createCardAction(data: CreateCardInput) {
-  const { userId, hasUnlimitedDecks } = await getAccessContext();
+  const { userId, has75CardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = createCardSchema.safeParse(data);
@@ -157,10 +157,10 @@ export async function createCardAction(data: CreateCardInput) {
   if (!deck) throw new Error("Deck not found");
 
   const existingCards = await getCardsByDeck(deckId);
-  const deckCardLimit = getCardsPerDeckLimit(hasUnlimitedDecks);
+  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
-      hasUnlimitedDecks
+      has75CardsPerDeck
         ? `Pro plan limit: ${CARDS_PER_DECK_LIMIT_PRO} cards per deck. Delete cards to add more.`
         : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade to Pro for up to ${CARDS_PER_DECK_LIMIT_PRO} cards per deck.`,
     );
@@ -286,7 +286,7 @@ export async function deleteAllCardsAction(data: DeleteAllCardsInput) {
 }
 
 export async function generateCardsAction(data: GenerateCardsInput) {
-  const { userId, hasAI, hasUnlimitedDecks } = await getAccessContext();
+  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   if (!hasAI) throw new Error("AI flashcard generation requires a Pro plan.");
@@ -308,11 +308,11 @@ export async function generateCardsAction(data: GenerateCardsInput) {
     );
   }
 
-  const deckCardLimit = getCardsPerDeckLimit(hasUnlimitedDecks);
+  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   const remainingDeckSlots = deckCardLimit - existingCards.length;
   if (count > remainingDeckSlots) {
     throw new Error(
-      hasUnlimitedDecks
+      has75CardsPerDeck
         ? `Not enough room in this deck (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left; max ${CARDS_PER_DECK_LIMIT_PRO} per deck).`
         : `Not enough room in this deck on the Free plan (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left).`,
     );
@@ -416,7 +416,7 @@ Does this question match the deck's topic and scope?`,
   });
 
   if (!validationOutput.isRelevant && validationOutput.warning) {
-    throw new Error(validationOutput.warning);
+    throw new Error(`${validationOutput.warning} You can still add this card manually if you'd like.`);
   }
 
   const { output } = await generateText({

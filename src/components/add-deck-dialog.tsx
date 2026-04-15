@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { HelpCircle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,6 +17,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { createDeckAction } from "@/actions/decks";
 
 interface AddDeckDialogProps {
@@ -81,28 +88,67 @@ export function AddDeckDialog({ triggerLabel = "+ New Deck", isAtLimit = false }
           </DialogDescription>
         </DialogHeader>
 
-        <form id="add-deck-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="deck-name">Name</Label>
-            <Input
-              id="deck-name"
-              name="name"
-              placeholder="e.g. Spanish Vocabulary"
-              autoFocus
-            />
-          </div>
+        <TooltipProvider>
+          <form id="add-deck-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="deck-name">Name</Label>
+                <Tooltip>
+                  <TooltipTrigger type="button" className="text-muted-foreground hover:text-foreground transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <p className="font-semibold mb-1">Examples:</p>
+                    <ul className="space-y-1 text-xs">
+                      <li>• Mathematics</li>
+                      <li>• Jamaica's History</li>
+                      <li>• Spanish Vocabulary</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                id="deck-name"
+                name="name"
+                placeholder="e.g. Spanish Vocabulary"
+                autoFocus
+              />
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="deck-description">Description (optional)</Label>
-            <Textarea
-              id="deck-description"
-              name="description"
-              placeholder="What is this deck about?"
-            />
-          </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="deck-description">Description (optional)</Label>
+                <Tooltip>
+                  <TooltipTrigger type="button" className="text-muted-foreground hover:text-foreground transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <p className="font-semibold mb-1">Be specific to help AI understand:</p>
+                    <ul className="space-y-1.5 text-xs">
+                      <li>
+                        <span className="font-medium">Mathematics</span>
+                        <br />
+                        → Algebra, Geometry, or Calculus
+                      </li>
+                      <li>
+                        <span className="font-medium">Jamaica's History</span>
+                        <br />
+                        → Learning the 20th century history of Jamaica
+                      </li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                id="deck-description"
+                name="description"
+                placeholder="What would you like to learn?"
+              />
+            </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </form>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </form>
+        </TooltipProvider>
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" type="button" />}>

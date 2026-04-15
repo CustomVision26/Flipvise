@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
-import { shadcn } from "@clerk/themes";
+import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
@@ -18,6 +18,23 @@ function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ClerkWithTheme({ children }: { children: React.ReactNode }) {
+  return (
+    <ClerkProvider
+      appearance={{
+        baseTheme: dark,
+        layout: {
+          logoImageUrl: LOGO_PUBLIC_URL,
+          logoLinkUrl: "/",
+          logoPlacement: "inside",
+        },
+      }}
+    >
+      {children}
+    </ClerkProvider>
+  );
+}
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider
@@ -27,18 +44,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <ThemeStorageNormalize>
-        <ClerkProvider
-          appearance={{
-            baseTheme: shadcn,
-            layout: {
-              logoImageUrl: LOGO_PUBLIC_URL,
-              logoLinkUrl: "/",
-              logoPlacement: "inside",
-            },
-          }}
-        >
+        <ClerkWithTheme>
           {children}
-        </ClerkProvider>
+        </ClerkWithTheme>
       </ThemeStorageNormalize>
     </ThemeProvider>
   );
