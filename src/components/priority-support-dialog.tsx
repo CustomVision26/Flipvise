@@ -109,5 +109,6 @@ export function PrioritySupportDialog({ trigger, open: controlledOpen, onOpenCha
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
