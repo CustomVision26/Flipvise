@@ -379,7 +379,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
         <TooltipProvider>
           <div className="flex items-center gap-3 sm:gap-4">
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger render={<span />}>
                 <Button
                   size="default"
                   className="gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white h-10 sm:h-11 px-4 sm:px-6 text-sm"
@@ -395,7 +395,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               </TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger render={<span />}>
                 <Button
                   size="default"
                   variant="destructive"
