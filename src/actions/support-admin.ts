@@ -52,7 +52,7 @@ export async function adminUpdateTicketStatusAction(
   await requireAdmin();
 
   const parsed = updateStatusSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   await updateSupportTicketStatus(
     parsed.data.ticketId,
@@ -66,7 +66,7 @@ export async function adminReplyToTicketAction(data: AdminReplyInput) {
   const { userId, name } = await requireAdmin();
 
   const parsed = replySchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   await addTicketReply({
     ticketId: parsed.data.ticketId,

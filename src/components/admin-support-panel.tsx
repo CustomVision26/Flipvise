@@ -227,7 +227,8 @@ function TicketDetailSheet({
     setStatus(ticket.status);
   }
 
-  function handleStatusChange(newStatus: string) {
+  function handleStatusChange(newStatus: string | null) {
+    if (!newStatus) return;
     setStatus(newStatus);
     startStatusTransition(async () => {
       try {
@@ -584,7 +585,7 @@ export function AdminSupportPanel({ tickets: initialTickets, stats }: AdminSuppo
                     <SelectItem value="closed">Closed</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <Select value={categoryFilter} onValueChange={(v) => { if (v !== null) setCategoryFilter(v); }}>
                   <SelectTrigger className="w-[calc(50%-4px)] sm:w-[120px] h-8 text-sm">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>

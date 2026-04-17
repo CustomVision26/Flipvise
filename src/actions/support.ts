@@ -103,7 +103,7 @@ export async function submitGeneralSupportAction(data: GeneralSupportInput) {
   const { userId, userEmail, userName } = await getAuthenticatedUser();
 
   const parsed = generalSupportSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   return createSupportTicket({
     userId,
@@ -112,7 +112,6 @@ export async function submitGeneralSupportAction(data: GeneralSupportInput) {
     subject: parsed.data.subject,
     message: parsed.data.message,
     category: "general_support",
-    attachmentUrl: parsed.data.attachmentUrl,
   });
 }
 
@@ -120,7 +119,7 @@ export async function submitBugReportAction(data: BugReportInput) {
   const { userId, userEmail, userName } = await getAuthenticatedUser();
 
   const parsed = bugReportSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   return createSupportTicket({
     userId,
@@ -130,7 +129,6 @@ export async function submitBugReportAction(data: BugReportInput) {
     message: parsed.data.message,
     category: "bug_report",
     priority: parsed.data.priority,
-    attachmentUrl: parsed.data.attachmentUrl,
   });
 }
 
@@ -138,7 +136,7 @@ export async function submitFeatureRequestAction(data: FeatureRequestInput) {
   const { userId, userEmail, userName } = await getAuthenticatedUser();
 
   const parsed = featureRequestSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   return createSupportTicket({
     userId,
@@ -148,7 +146,6 @@ export async function submitFeatureRequestAction(data: FeatureRequestInput) {
     message: parsed.data.message,
     category: "feature_request",
     priority: "normal",
-    attachmentUrl: parsed.data.attachmentUrl,
   });
 }
 
@@ -156,7 +153,7 @@ export async function submitFeedbackAction(data: FeedbackInput) {
   const { userId, userEmail, userName } = await getAuthenticatedUser();
 
   const parsed = feedbackSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   return createSupportTicket({
     userId,
@@ -166,7 +163,6 @@ export async function submitFeedbackAction(data: FeedbackInput) {
     message: parsed.data.message,
     category: "feedback",
     priority: "low",
-    attachmentUrl: parsed.data.attachmentUrl,
   });
 }
 
@@ -174,7 +170,7 @@ export async function submitBillingIssueAction(data: BillingInput) {
   const { userId, userEmail, userName } = await getAuthenticatedUser();
 
   const parsed = billingSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   return createSupportTicket({
     userId,
@@ -184,7 +180,6 @@ export async function submitBillingIssueAction(data: BillingInput) {
     message: parsed.data.message,
     category: "billing",
     priority: "high",
-    attachmentUrl: parsed.data.attachmentUrl,
   });
 }
 
@@ -192,7 +187,7 @@ export async function submitAccountIssueAction(data: AccountInput) {
   const { userId, userEmail, userName } = await getAuthenticatedUser();
 
   const parsed = accountSchema.safeParse(data);
-  if (!parsed.success) throw new Error(parsed.error.errors[0]?.message ?? "Invalid input");
+  if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
   return createSupportTicket({
     userId,
@@ -202,7 +197,6 @@ export async function submitAccountIssueAction(data: AccountInput) {
     message: parsed.data.message,
     category: "account",
     priority: "normal",
-    attachmentUrl: parsed.data.attachmentUrl,
   });
 }
 
