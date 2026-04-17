@@ -86,6 +86,7 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 const FLIP_DURATION_MS = 560;
+const SLIDE_MS = 260;
 
 export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps) {
   const router = useRouter();
@@ -97,28 +98,51 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [autoShuffle, setAutoShuffle] = useState(false);
+  const [slideX, setSlideX] = useState(0);
+  const [slideOpacity, setSlideOpacity] = useState(1);
+  const [enableSlideTransition, setEnableSlideTransition] = useState(false);
+  const [dragOffsetX, setDragOffsetX] = useState(0);
+  const [isDragSnapBack, setIsDragSnapBack] = useState(false);
+  const dragStartXRef = useRef<number | null>(null);
+  const hasDraggedRef = useRef(false);
   const pendingNavRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const snapBackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const total = deck.length;
   const currentCard = deck[visibleIndex];
   const progressPercent = ((currentIndex + 1) / total) * 100;
 
-  function navigateTo(newIndex: number) {
+  function navigateTo(newIndex: number, direction: "left" | "right") {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
     setCurrentIndex(newIndex);
-    if (isFlipped) {
+
+    // Phase 1: slide + fade out
+    setEnableSlideTransition(true);
+    setSlideX(direction === "left" ? -35 : 35);
+    setSlideOpacity(0);
+
+    pendingNavRef.current = setTimeout(() => {
+      // Phase 2: reset flip, update content, snap to opposite side (invisible)
+      setEnableSlideTransition(false);
       setIsFlipped(false);
-      pendingNavRef.current = setTimeout(() => {
-        setVisibleIndex(newIndex);
-      }, FLIP_DURATION_MS);
-    } else {
       setVisibleIndex(newIndex);
-    }
+      setSlideX(direction === "left" ? 35 : -35);
+
+      // Phase 3: slide + fade in from opposite side
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setEnableSlideTransition(true);
+          setSlideX(0);
+          setSlideOpacity(1);
+        });
+      });
+    }, SLIDE_MS);
   }
 
   useEffect(() => {
     return () => {
       if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+      if (snapBackTimerRef.current) clearTimeout(snapBackTimerRef.current);
     };
   }, []);
 
@@ -126,14 +150,71 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
     setIsFlipped((prev) => !prev);
   }
 
+  const SWIPE_THRESHOLD = 60;
+
+  function snapBack() {
+    if (snapBackTimerRef.current) clearTimeout(snapBackTimerRef.current);
+    setIsDragSnapBack(true);
+    setDragOffsetX(0);
+    snapBackTimerRef.current = setTimeout(() => setIsDragSnapBack(false), 220);
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (enableSlideTransition) return;
+    if (snapBackTimerRef.current) clearTimeout(snapBackTimerRef.current);
+    setIsDragSnapBack(false);
+    dragStartXRef.current = e.clientX;
+    hasDraggedRef.current = false;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragStartXRef.current === null) return;
+    const delta = e.clientX - dragStartXRef.current;
+    if (Math.abs(delta) > 8) hasDraggedRef.current = true;
+    setDragOffsetX(delta);
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (dragStartXRef.current === null) return;
+    const delta = e.clientX - dragStartXRef.current;
+    dragStartXRef.current = null;
+
+    if (Math.abs(delta) >= SWIPE_THRESHOLD) {
+      setDragOffsetX(0);
+      if (delta < 0 && currentIndex < total - 1) {
+        navigateTo(currentIndex + 1, "left");
+      } else if (delta > 0 && currentIndex > 0) {
+        navigateTo(currentIndex - 1, "right");
+      } else {
+        snapBack();
+      }
+    } else {
+      snapBack();
+    }
+  }
+
+  function handlePointerCancel() {
+    dragStartXRef.current = null;
+    snapBack();
+  }
+
+  function handleCardClick() {
+    if (hasDraggedRef.current) {
+      hasDraggedRef.current = false;
+      return;
+    }
+    handleFlip();
+  }
+
   function handlePrevious() {
     if (currentIndex === 0) return;
-    navigateTo(currentIndex - 1);
+    navigateTo(currentIndex - 1, "right");
   }
 
   function handleNext() {
     if (currentIndex === total - 1) return;
-    navigateTo(currentIndex + 1);
+    navigateTo(currentIndex + 1, "left");
   }
 
   useEffect(() => {
@@ -150,23 +231,28 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex, total]);
 
+  function resetSlide() {
+    setSlideX(0);
+    setSlideOpacity(1);
+    setEnableSlideTransition(false);
+  }
+
   useEffect(() => {
+    if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+    resetSlide();
     if (autoShuffle) {
-      if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
       setDeck(shuffleArray(cards));
-      setCurrentIndex(0);
-      setVisibleIndex(0);
-      setIsFlipped(false);
     } else {
       setDeck(cards);
-      setCurrentIndex(0);
-      setVisibleIndex(0);
-      setIsFlipped(false);
     }
+    setCurrentIndex(0);
+    setVisibleIndex(0);
+    setIsFlipped(false);
   }, [autoShuffle]);
 
   function handleShuffle() {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+    resetSlide();
     setDeck(shuffleArray(cards));
     setCurrentIndex(0);
     setVisibleIndex(0);
@@ -176,7 +262,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   function handleCorrect() {
     setCorrectCount((c) => c + 1);
     if (currentIndex < total - 1) {
-      navigateTo(currentIndex + 1);
+      navigateTo(currentIndex + 1, "left");
     } else {
       setIsFlipped(false);
       pendingNavRef.current = setTimeout(() => setSessionComplete(true), FLIP_DURATION_MS);
@@ -186,7 +272,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   function handleIncorrect() {
     setIncorrectCount((c) => c + 1);
     if (currentIndex < total - 1) {
-      navigateTo(currentIndex + 1);
+      navigateTo(currentIndex + 1, "left");
     } else {
       setIsFlipped(false);
       pendingNavRef.current = setTimeout(() => setSessionComplete(true), FLIP_DURATION_MS);
@@ -195,6 +281,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
 
   function handleStudyAgain() {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+    resetSlide();
     setDeck(shuffleArray(cards));
     setCurrentIndex(0);
     setVisibleIndex(0);
@@ -330,22 +417,42 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
         </div>
       </div>
 
-      {/* Keyboard hint */}
+      {/* Hint */}
+      <p className="text-muted-foreground text-xs sm:text-sm md:hidden text-center">
+        Swipe left / right to navigate · Tap to flip
+      </p>
       <p className="text-muted-foreground text-xs sm:text-sm hidden md:block">
         Use <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">←</kbd>{" "}
         <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">→</kbd>{" "}
         arrow keys to navigate and{" "}
         <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">Space</kbd>{" "}
-        to flip
+        to flip · or drag the card
       </p>
 
       {/* Flashcard */}
       <div
-        className="w-full max-w-2xl cursor-pointer select-none"
-        style={{ perspective: "1200px" }}
-        onClick={handleFlip}
+        className="w-full max-w-2xl select-none"
+        style={{
+          transform: `translateX(calc(${slideX}% + ${dragOffsetX}px))`,
+          opacity: slideOpacity,
+          transition: enableSlideTransition
+            ? `transform ${SLIDE_MS}ms cubic-bezier(0.4, 0, 0.2, 1), opacity ${SLIDE_MS}ms ease`
+            : isDragSnapBack
+            ? "transform 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+            : "none",
+          touchAction: "pan-y",
+          cursor: dragOffsetX !== 0 ? "grabbing" : "grab",
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onClick={handleCardClick}
         role="button"
         aria-label={isFlipped ? "Card back — click to flip" : "Card front — click to flip"}
+      >
+      <div
+        style={{ perspective: "1200px" }}
       >
         <div
           className="flashcard-container"
@@ -416,6 +523,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Correct / Incorrect buttons — visible only on back side */}

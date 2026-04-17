@@ -1,9 +1,12 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve } from 'path';
 import { defineConfig } from 'drizzle-kit';
 
-// Production config - used on Render
+// Load .env.local for local development
+config({ path: resolve(process.cwd(), '.env.local') });
+
 export default defineConfig({
-  out: './drizzle',
+  out: './drizzle-local',
   schema: './src/db/schema.ts',
   dialect: 'postgresql',
   dbCredentials: {

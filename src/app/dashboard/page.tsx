@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -15,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getDecksByUserWithCardCount } from "@/db/queries/decks";
 import { AddDeckDialog } from "@/components/add-deck-dialog";
-import { DeleteDeckButton } from "@/components/delete-deck-button";
+import { DeckCardPopover } from "@/components/deck-card-popover";
 
 const DECK_LIMIT = 3;
 const CARDS_PER_DECK_LIMIT = 8;
@@ -146,35 +145,7 @@ export default async function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {decks.map((deck) => (
-            <div key={deck.id} className="relative min-h-[140px] sm:h-40">
-              <Link href={`/decks/${deck.id}`} className="block h-full">
-                <Card className="h-full flex flex-col transition-colors hover:bg-muted/50 cursor-pointer">
-                  <CardHeader className="pr-10 sm:pr-12 flex-none pb-2 sm:pb-3">
-                    <CardTitle className="line-clamp-1 text-base sm:text-lg">{deck.name}</CardTitle>
-                    <CardDescription className="line-clamp-2 text-xs sm:text-sm">
-                      {deck.description ?? "No description provided."}
-                    </CardDescription>
-                  </CardHeader>
-                  <div className="flex-1" />
-                  <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-0 sm:justify-between pt-2">
-                    <span className="text-muted-foreground text-xs">
-                      {deck.cardCount} {deck.cardCount === 1 ? "card" : "cards"}
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      Updated{" "}
-                      {deck.updatedAt.toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </CardFooter>
-                </Card>
-              </Link>
-              <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                <DeleteDeckButton deckId={deck.id} deckName={deck.name} />
-              </div>
-            </div>
+            <DeckCardPopover key={deck.id} deck={deck} />
           ))}
         </div>
       )}

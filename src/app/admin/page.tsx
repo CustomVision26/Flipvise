@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { getAdminOverviewStats, getDeckStatsByUser, getAdminPrivilegeLogs } from "@/db/queries/admin";
+import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
+import type { SerializedTicket } from "@/components/admin-support-panel";
 import { AdminTabs, type SerializedUser, type SerializedLog } from "@/components/admin-tabs";
 import { Users, CreditCard, Layers, ArrowLeft, BadgeCheck, ShieldCheck } from "lucide-react";
 
@@ -17,7 +19,7 @@ const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
-async function getActiveSessionUserIds(): Promise<Set<string>> {
+async function getActiveSessionData(): Promise<Map<string, number>> {
   try {
     const res = await fetch(
       "https://api.clerk.com/v1/sessions?status=active&limit=500",
@@ -26,14 +28,18 @@ async function getActiveSessionUserIds(): Promise<Set<string>> {
         cache: "no-store",
       },
     );
-    if (!res.ok) return new Set();
+    if (!res.ok) return new Map();
     const body: unknown = await res.json();
     const sessions: { user_id: string }[] = Array.isArray(body)
       ? (body as { user_id: string }[])
       : ((body as { data?: { user_id: string }[] }).data ?? []);
-    return new Set(sessions.map((s) => s.user_id));
+    const sessionCounts = new Map<string, number>();
+    for (const s of sessions) {
+      sessionCounts.set(s.user_id, (sessionCounts.get(s.user_id) ?? 0) + 1);
+    }
+    return sessionCounts;
   } catch {
-    return new Set();
+    return new Map();
   }
 }
 
@@ -45,14 +51,18 @@ export default async function AdminPage() {
     { data: clerkUsers, totalCount },
     dbStats,
     deckStatsByUser,
-    activeUserIds,
+    activeSessionData,
     privilegeLogs,
+    rawSupportTickets,
+    supportStats,
   ] = await Promise.all([
     clerkClient.users.getUserList({ limit: 500, orderBy: "-created_at" }),
     getAdminOverviewStats(),
     getDeckStatsByUser(),
-    getActiveSessionUserIds(),
+    getActiveSessionData(),
     getAdminPrivilegeLogs(100),
+    getAllSupportTickets(),
+    getSupportTicketStats(),
   ]);
 
   // Verify admin role from the live Clerk API — sessionClaims can lag after
@@ -149,7 +159,8 @@ export default async function AdminPage() {
     // Admins automatically have all Pro features; no manual grant needed.
     const isPro = isPaidPro || adminGranted || isAdmin;
     // Banned users cannot have active sessions.
-    const isOnline = !isBanned && activeUserIds.has(user.id);
+    const activeSessionCount = !isBanned ? (activeSessionData.get(user.id) ?? 0) : 0;
+    const isOnline = activeSessionCount > 0;
 
     const userStats = statsByUserId.get(user.id);
 
@@ -163,6 +174,7 @@ export default async function AdminPage() {
       adminGranted,
       isPro,
       isOnline,
+      activeSessionCount,
       deckCount: userStats?.deckCount ?? 0,
       cardCount: userStats?.cardCount ?? 0,
       lastUpdated: userStats?.lastUpdated?.toISOString() ?? null,
@@ -172,6 +184,21 @@ export default async function AdminPage() {
         : null,
     };
   });
+
+  // Serialize support tickets (dates → ISO strings).
+  const serializedTickets: SerializedTicket[] = rawSupportTickets.map((t) => ({
+    id: t.id,
+    userId: t.userId,
+    userEmail: t.userEmail ?? null,
+    userName: t.userName ?? null,
+    subject: t.subject,
+    message: t.message,
+    category: t.category,
+    status: t.status,
+    priority: t.priority,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+  }));
 
   // Serialize DB log rows (dates → ISO strings).
   const serializedLogs: SerializedLog[] = privilegeLogs.map((log) => ({
@@ -228,6 +255,8 @@ export default async function AdminPage() {
         currentUserId={userId}
         users={serializedUsers}
         logs={serializedLogs}
+        supportTickets={serializedTickets}
+        supportStats={supportStats}
       />
     </div>
   );

@@ -5,6 +5,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { SettingsMenu } from "@/components/settings-menu";
+import { HelpCenter } from "@/components/help-center";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 
@@ -47,11 +53,17 @@ export function HeaderUserSection({ currentProTheme, currentFreeTheme }: HeaderU
           {isPro ? "Pro" : "Free"}
         </Badge>
       </Link>
-      <UserButton />
+      <Tooltip>
+        <TooltipTrigger render={<span className="inline-flex items-center" />}>
+          <UserButton />
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Account</TooltipContent>
+      </Tooltip>
       <SettingsMenu 
         currentProTheme={currentProTheme}
         currentFreeTheme={currentFreeTheme}
       />
+      <HelpCenter />
     </div>
   );
 }

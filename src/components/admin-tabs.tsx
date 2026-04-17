@@ -29,7 +29,13 @@ import {
   ShieldCheck,
   ShieldOff,
   ClipboardList,
+  LifeBuoy,
 } from "lucide-react";
+import {
+  AdminSupportPanel,
+  type SerializedTicket,
+  type SupportStats,
+} from "@/components/admin-support-panel";
 
 export type SerializedUser = {
   id: string;
@@ -41,6 +47,7 @@ export type SerializedUser = {
   adminGranted: boolean;
   isPro: boolean;
   isOnline: boolean;
+  activeSessionCount: number;
   deckCount: number;
   cardCount: number;
   lastUpdated: string | null;
@@ -62,6 +69,8 @@ interface AdminTabsProps {
   currentUserId: string;
   users: SerializedUser[];
   logs: SerializedLog[];
+  supportTickets: SerializedTicket[];
+  supportStats: SupportStats;
 }
 
 function formatDate(dateStr: string | null | undefined) {
@@ -87,7 +96,7 @@ type PlanFilter = "all" | "pro" | "free";
 type RoleFilter = "all" | "admin" | "user";
 type StatusFilter = "all" | "online" | "offline" | "banned";
 
-export function AdminTabs({ currentUserId, users, logs }: AdminTabsProps) {
+export function AdminTabs({ currentUserId, users, logs, supportTickets, supportStats }: AdminTabsProps) {
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -145,6 +154,18 @@ export function AdminTabs({ currentUserId, users, logs }: AdminTabsProps) {
           {logs.length > 0 && (
             <Badge className="ml-2 text-xs h-5 px-1.5" variant="secondary">
               {logs.length}
+            </Badge>
+          )}
+        </TabsTrigger>
+        <TabsTrigger
+          value="support-center"
+          className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+        >
+          <LifeBuoy className="h-4 w-4 mr-2" />
+          Support Center
+          {supportStats.totals.openCount > 0 && (
+            <Badge className="ml-2 text-xs h-5 px-1.5" variant="destructive">
+              {supportStats.totals.openCount} open
             </Badge>
           )}
         </TabsTrigger>
@@ -300,13 +321,24 @@ export function AdminTabs({ currentUserId, users, logs }: AdminTabsProps) {
                               Banned
                             </span>
                           </span>
+                        ) : user.isOnline ? (
+                          <span className="flex flex-col gap-0.5">
+                            <span className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-green-500" />
+                              <span className="text-xs text-green-500 font-medium">
+                                Online
+                              </span>
+                            </span>
+                            <span className="text-xs text-muted-foreground pl-3.5">
+                              {user.activeSessionCount}{" "}
+                              {user.activeSessionCount === 1 ? "device" : "devices"}
+                            </span>
+                          </span>
                         ) : (
                           <span className="flex items-center gap-1.5">
-                            <span
-                              className={`h-2 w-2 rounded-full ${user.isOnline ? "bg-green-500" : "bg-muted-foreground/40"}`}
-                            />
+                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
                             <span className="text-xs text-muted-foreground">
-                              {user.isOnline ? "Online" : "Offline"}
+                              Offline
                             </span>
                           </span>
                         )}
@@ -472,6 +504,11 @@ export function AdminTabs({ currentUserId, users, logs }: AdminTabsProps) {
             )}
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* ── Support Center ── */}
+      <TabsContent value="support-center" className="mt-0 px-4 pb-8 sm:px-6">
+        <AdminSupportPanel tickets={supportTickets} stats={supportStats} />
       </TabsContent>
     </Tabs>
   );

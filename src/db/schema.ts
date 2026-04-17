@@ -8,6 +8,29 @@ import {
   pgEnum,
 } from 'drizzle-orm/pg-core';
 
+export const supportCategoryEnum = pgEnum('support_category', [
+  'general_support',
+  'bug_report',
+  'feature_request',
+  'feedback',
+  'billing',
+  'account',
+]);
+
+export const supportStatusEnum = pgEnum('support_status', [
+  'open',
+  'in_progress',
+  'resolved',
+  'closed',
+]);
+
+export const supportPriorityEnum = pgEnum('support_priority', [
+  'low',
+  'normal',
+  'high',
+  'urgent',
+]);
+
 export const decks = pgTable('decks', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar({ length: 255 }).notNull(),
@@ -38,6 +61,32 @@ export const deactivated = pgTable('deactivated', {
   deactivatedByName: varchar({ length: 255 }).notNull(),
   reason: text(),
   deactivatedAt: timestamp().notNull().defaultNow(),
+});
+
+export const supportTickets = pgTable('support_tickets', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar({ length: 255 }).notNull(),
+  userEmail: varchar({ length: 255 }),
+  userName: varchar({ length: 255 }),
+  subject: varchar({ length: 500 }).notNull(),
+  message: text().notNull(),
+  category: supportCategoryEnum().notNull(),
+  status: supportStatusEnum().notNull().default('open'),
+  priority: supportPriorityEnum().notNull().default('normal'),
+  attachmentUrl: text(),
+  createdAt: timestamp().notNull().defaultNow(),
+  updatedAt: timestamp().notNull().defaultNow(),
+});
+
+export const supportTicketReplies = pgTable('support_ticket_replies', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  ticketId: integer()
+    .notNull()
+    .references(() => supportTickets.id, { onDelete: 'cascade' }),
+  adminId: varchar({ length: 255 }).notNull(),
+  adminName: varchar({ length: 255 }).notNull(),
+  message: text().notNull(),
+  createdAt: timestamp().notNull().defaultNow(),
 });
 
 export const cards = pgTable('cards', {

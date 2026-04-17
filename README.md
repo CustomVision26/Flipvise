@@ -1,160 +1,219 @@
-# Flipvise
+# 🎴 Flipvise - AI-Powered Flashcard App
 
-A modern flashcard application built with Next.js, featuring AI-generated flashcards, spaced repetition learning, and image uploads.
+A modern flashcard application built with Next.js, featuring AI-generated cards, image uploads, and spaced repetition learning.
 
-## Features
+## 🏗️ Tech Stack
 
-- 🎴 Create and manage flashcard decks
-- 🖼️ Add images to flashcards (front and back)
-- 🤖 AI-powered flashcard generation (Pro plan)
-- 🔄 Spaced repetition study system
-- 🔐 Secure authentication with Clerk
-- 💳 Subscription management with Clerk Billing
-- ☁️ Scalable image storage with AWS S3
-
-## Tech Stack
-
-- **Framework**: Next.js 16+ (App Router)
-- **Database**: PostgreSQL (Neon) with Drizzle ORM
+- **Framework**: Next.js 16 (App Router)
+- **Database**: Neon PostgreSQL + Drizzle ORM
 - **Authentication**: Clerk
+- **AI**: OpenAI GPT (via Vercel AI SDK)
 - **Storage**: AWS S3
-- **AI**: OpenAI (GPT-4o) via Vercel AI SDK
 - **UI**: shadcn/ui + Tailwind CSS
-- **Deployment**: Render
+- **Hosting**: Render
 
-## Prerequisites
+## 🚀 Quick Start
 
-- Node.js 20.x
-- PostgreSQL database (Neon recommended)
-- AWS account (for S3 image storage)
-- Clerk account (for authentication)
-- OpenAI API key (for AI features)
+### Local Development
 
-## Getting Started
+1. **Clone and install**:
+   ```bash
+   git clone <your-repo-url>
+   cd Flipvise
+   npm install
+   ```
 
-### 1. Clone the repository
+2. **Environment setup**:
+   - The `.env.local` file is already configured for local development
+   - Verify credentials are correct (see `SETUP-GUIDE.md`)
 
+3. **Initialize local database**:
+   ```bash
+   npm run db:push:local
+   ```
+
+4. **Start development server**:
+   ```bash
+   npm run dev
+   ```
+
+5. **Open**: http://localhost:3000
+
+## 📚 Documentation
+
+- **[SETUP-GUIDE.md](./SETUP-GUIDE.md)** - Complete environment setup (LOCAL + PRODUCTION)
+- **[RENDER-DEPLOY.md](./RENDER-DEPLOY.md)** - Step-by-step Render deployment guide
+- **[MIGRATION-SUMMARY.md](./MIGRATION-SUMMARY.md)** - Database migration history
+
+## 🔧 Development Commands
+
+### Local Development
 ```bash
-git clone <your-repo-url>
-cd Flipvise
-npm install
+npm run dev                  # Start dev server
+npm run db:push:local       # Push schema to local database
+npm run db:studio:local     # Open Drizzle Studio (local)
+npm run db:generate:local   # Generate migration files (local)
 ```
 
-### 2. Set up environment variables
-
-Copy the example environment file:
-
+### Production
 ```bash
-cp .env.example .env.local
+npm run build               # Build for production
+npm start                   # Start production server
+npm run db:push:prod       # Push schema to production database
+npm run db:studio:prod     # Open Drizzle Studio (production)
 ```
 
-Fill in the required values in `.env.local`:
-
-```env
-# Database
-DATABASE_URL=your_neon_database_url
-
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
-CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
-
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key
-
-# AWS S3 (see AWS-S3-SETUP.md for detailed instructions)
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_S3_BUCKET_NAME=your_bucket_name
-AWS_CLOUDFRONT_URL=https://your-cloudfront-url (optional)
+### Utilities
+```bash
+npm run lint               # Run ESLint
+npm run db:verify-s3       # Verify S3 setup
+npm run db:migrate-cloudfront  # Migrate CloudFront to S3
 ```
 
-### 3. Set up AWS S3
+## 📁 Project Structure
 
-**Important**: Follow the comprehensive guide in [AWS-S3-SETUP.md](./AWS-S3-SETUP.md) to:
-- Create an S3 bucket
-- Configure CORS and public access policies
-- Create an IAM user with proper permissions
-- (Optional) Set up CloudFront CDN
-
-### 4. Run database migrations
-
-```bash
-npm run db:migrate
+```
+Flipvise/
+├── src/
+│   ├── app/              # Next.js app directory
+│   ├── components/       # React components
+│   │   └── ui/          # shadcn/ui components
+│   ├── db/              # Database configuration
+│   │   ├── schema.ts    # Drizzle schema
+│   │   └── queries/     # Database query helpers
+│   └── lib/             # Utility functions
+├── drizzle/             # Production migrations
+├── drizzle-local/       # Local migrations
+├── public/              # Static assets
+├── .env.local           # Local environment (not in git)
+├── .env.production.example  # Production template
+├── drizzle.config.ts    # Production DB config
+└── drizzle.config.local.ts  # Local DB config
 ```
 
-### 5. Start the development server
+## 🔐 Environment Variables
+
+### Required for Local Development (`.env.local`)
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk public key
+- `CLERK_SECRET_KEY` - Clerk secret key
+- `CLERK_WEBHOOK_SECRET` - Clerk webhook secret
+- `OPENAI_API_KEY` - OpenAI API key
+- `AWS_REGION` - AWS region
+- `AWS_ACCESS_KEY_ID` - AWS access key
+- `AWS_SECRET_ACCESS_KEY` - AWS secret key
+- `AWS_S3_BUCKET_NAME` - S3 bucket name
+
+See `SETUP-GUIDE.md` for detailed configuration.
+
+## 🎯 Features
+
+- ✨ **AI Card Generation** - Generate flashcards from text using OpenAI
+- 📸 **Image Support** - Upload images to cards (stored in S3)
+- 🗂️ **Deck Organization** - Organize cards into decks
+- 🔐 **Authentication** - Secure user authentication via Clerk
+- 📱 **Responsive Design** - Works on desktop and mobile
+- 🌙 **Dark Mode** - Built-in dark mode support
+- 👨‍💼 **Admin Features** - User management and privilege controls
+
+## 🛠️ Architecture Decisions
+
+### Data Fetching
+- ✅ Server Components for data fetching (no client-side fetches)
+- ✅ Query helpers in `src/db/queries/` (no inline queries)
+- ✅ Server Actions for mutations (no API routes for mutations)
+
+### UI Components
+- ✅ shadcn/ui only - no custom UI components
+- ✅ Dark mode compliant
+- ✅ Clerk modal mode for authentication
+
+### Database
+- ✅ Drizzle ORM (no raw SQL)
+- ✅ Row-level security via userId filtering
+- ✅ Cascade deletes on deck removal
+
+### Validation
+- ✅ Zod schemas for all inputs
+- ✅ Type-safe with TypeScript
+
+## 🚢 Deployment
+
+See **[RENDER-DEPLOY.md](./RENDER-DEPLOY.md)** for complete deployment instructions.
+
+Quick steps:
+1. Push code to GitHub
+2. Create Web Service on Render
+3. Set environment variables
+4. Deploy
+5. Run database migration
+
+## 🧪 Testing
 
 ```bash
+# Test local environment
 npm run dev
+
+# Test database connection
+npm run db:studio:local
+
+# Test S3 setup
+npm run db:verify-s3
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the application.
+## 📊 Database Schema
 
-## Project Structure
+### Tables
+- `decks` - Flashcard decks
+- `cards` - Individual flashcards
+- `admin_privilege_logs` - Admin action audit log
+- `deactivated` - Deactivated user records
 
-```
-src/
-├── app/                    # Next.js App Router pages
-│   ├── decks/             # Deck and card management pages
-│   └── ...
-├── actions/               # Server Actions
-├── components/            # React components
-│   └── ui/               # shadcn/ui components
-├── db/                    # Database layer
-│   ├── schema.ts         # Drizzle schema
-│   └── queries/          # Database query helpers
-└── lib/                   # Utility functions
-    ├── s3.ts             # AWS S3 client
-    └── ...
-```
+See `src/db/schema.ts` for full schema definition.
 
-## Deployment
+## 🤝 Contributing
 
-### Deploy to Render
+1. Create feature branch
+2. Make changes
+3. Test locally thoroughly
+4. Commit with clear message
+5. Push and create PR
 
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Configure build settings:
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-4. Add all environment variables from `.env.local`
-5. Deploy!
+## 📝 Notes
 
-**Note**: Make sure to add all AWS S3 environment variables to your Render environment settings.
+- **Node Version**: 20.x (specified in `package.json`)
+- **Free Tier Limits**: Neon database may sleep after inactivity
+- **Environment**: Use `.env.local` for local, Render env vars for production
+- **Never commit**: `.env` or `.env.local` files
 
-## Image Upload Architecture
+## 🆘 Troubleshooting
 
-Images are stored in AWS S3 with the following structure:
+### Common Issues
 
-```
-card-images/{userId}/{deckId}/{filename}
-```
+**"Database connection failed"**
+- Check DATABASE_URL in .env.local
+- Verify Neon database is active
 
-- Images are publicly accessible via direct S3 URLs or CloudFront CDN
-- Automatic cleanup when cards are deleted or updated
-- File size limit: 5 MB per image
-- Supported formats: JPEG, PNG, WebP, GIF
+**"Clerk auth not working"**
+- Verify using correct keys (test vs live)
+- Check Clerk dashboard settings
 
-## Scripts
+**"S3 upload failed"**
+- Verify AWS credentials
+- Check bucket permissions and CORS
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run db:migrate` - Run database migrations
-- `npm run lint` - Run ESLint
+See `SETUP-GUIDE.md` for detailed troubleshooting.
 
-## Environment Variables
+## 📞 Support
 
-See [.env.example](./.env.example) for all required and optional environment variables.
+- **Issues**: Open a GitHub issue
+- **Docs**: Check `SETUP-GUIDE.md` and `RENDER-DEPLOY.md`
+- **Questions**: Review project documentation first
 
-## License
+## 📄 License
 
-[Your License Here]
+Private project - All rights reserved
 
-## Support
+---
 
-For AWS S3 setup issues, see [AWS-S3-SETUP.md](./AWS-S3-SETUP.md).
-
-For other questions, open an issue in the repository.
+**Built with ❤️ using Next.js and modern web technologies**

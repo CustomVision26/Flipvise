@@ -57,10 +57,16 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
-
-# vercel
-.vercel
+.env.old
+.env.production.reference
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# drizzle local migrations
+drizzle-local/
+
+# config summary docs (may contain secrets)
+ENVIRONMENT-CONFIG-SUMMARY.md
+*-CONFIG-SUMMARY.md

@@ -369,6 +369,16 @@ Rules:
   revalidatePath(`/decks/${deckId}`);
 }
 
+export async function getCardsForPreviewAction(deckId: number) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const deck = await getDeckById(deckId, userId);
+  if (!deck) throw new Error("Deck not found");
+
+  return getCardsByDeck(deckId);
+}
+
 export async function generateAnswerAction(data: GenerateAnswerInput): Promise<string> {
   const { userId, hasAI } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");

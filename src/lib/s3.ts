@@ -93,4 +93,43 @@ export async function deleteFromS3(url: string): Promise<void> {
   await s3Client.send(command);
 }
 
+export interface UploadSupportAttachmentOptions {
+  userId: string;
+  file: File;
+}
+
+export async function uploadSupportAttachmentToS3(options: UploadSupportAttachmentOptions): Promise<string> {
+  const { userId, file } = options;
+
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const extension = file.name.includes(".")
+    ? file.name.substring(file.name.lastIndexOf("."))
+    : "";
+  const fileName = `attachment-${timestamp}-${randomString}${extension}`;
+  const key = `support-attachments/${userId}/${fileName}`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: file.type,
+      CacheControl: "public, max-age=31536000, immutable",
+    },
+  });
+
+  await upload.done();
+
+  if (CDN_URL) {
+    return `${CDN_URL}/${key}`;
+  }
+
+  return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
+
 export { s3Client };
