@@ -26,7 +26,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
           <Link
             href={`/decks/${id}`}
@@ -34,10 +34,10 @@ export default async function StudyPage({ params }: StudyPageProps) {
           >
             ← Back to Deck
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{deck.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">{deck.name}</h1>
           <p className="text-sm sm:text-base text-muted-foreground">Study Session</p>
         </div>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-xs self-start sm:self-auto shrink-0">
           {cards.length} card{cards.length !== 1 ? "s" : ""}
         </Badge>
       </div>

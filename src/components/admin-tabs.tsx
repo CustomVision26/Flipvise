@@ -125,47 +125,51 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
 
   return (
     <Tabs defaultValue="all-users">
-      <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 h-auto">
+      <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 h-auto overflow-x-auto flex-nowrap">
         <TabsTrigger
           value="all-users"
-          className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          className="rounded-none border-b-2 border-transparent px-3 sm:px-6 py-3 font-medium text-xs sm:text-sm whitespace-nowrap data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
         >
-          <Users className="h-4 w-4 mr-2" />
-          All Users
+          <Users className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden xs:inline">All </span>Users
           {bannedCount > 0 && (
-            <Badge variant="destructive" className="ml-2 text-xs h-5 px-1.5">
-              {bannedCount} banned
+            <Badge variant="destructive" className="ml-1.5 sm:ml-2 text-xs h-5 px-1 sm:px-1.5">
+              <span className="hidden sm:inline">{bannedCount} banned</span>
+              <span className="sm:hidden">{bannedCount}</span>
             </Badge>
           )}
         </TabsTrigger>
         <TabsTrigger
           value="admin-roles"
-          className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          className="rounded-none border-b-2 border-transparent px-3 sm:px-6 py-3 font-medium text-xs sm:text-sm whitespace-nowrap data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
         >
-          <ShieldCheck className="h-4 w-4 mr-2" />
-          Admin Role Management
+          <ShieldCheck className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline">Admin Role Management</span>
+          <span className="sm:hidden">Roles</span>
         </TabsTrigger>
         <TabsTrigger
           value="audit-log"
-          className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          className="rounded-none border-b-2 border-transparent px-3 sm:px-6 py-3 font-medium text-xs sm:text-sm whitespace-nowrap data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
         >
-          <ClipboardList className="h-4 w-4 mr-2" />
-          Privilege Audit Log
+          <ClipboardList className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline">Privilege Audit Log</span>
+          <span className="sm:hidden">Audit</span>
           {logs.length > 0 && (
-            <Badge className="ml-2 text-xs h-5 px-1.5" variant="secondary">
+            <Badge className="ml-1.5 sm:ml-2 text-xs h-5 px-1 sm:px-1.5" variant="secondary">
               {logs.length}
             </Badge>
           )}
         </TabsTrigger>
         <TabsTrigger
           value="support-center"
-          className="rounded-none border-b-2 border-transparent px-6 py-3 font-medium data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          className="rounded-none border-b-2 border-transparent px-3 sm:px-6 py-3 font-medium text-xs sm:text-sm whitespace-nowrap data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
         >
-          <LifeBuoy className="h-4 w-4 mr-2" />
-          Support Center
+          <LifeBuoy className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+          <span className="hidden sm:inline">Support Center</span>
+          <span className="sm:hidden">Support</span>
           {supportStats.totals.openCount > 0 && (
-            <Badge className="ml-2 text-xs h-5 px-1.5" variant="destructive">
-              {supportStats.totals.openCount} open
+            <Badge className="ml-1.5 sm:ml-2 text-xs h-5 px-1 sm:px-1.5" variant="destructive">
+              {supportStats.totals.openCount}
             </Badge>
           )}
         </TabsTrigger>
@@ -182,60 +186,62 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                   {filteredUsers.length} of {users.length} users
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {/* Search */}
-                <div className="relative min-w-[220px]">
+                <div className="relative w-full sm:w-auto sm:min-w-[220px]">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     placeholder="Search by name or email…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8"
+                    className="pl-8 w-full"
                   />
                 </div>
-                {/* Plan filter */}
-                <Select
-                  value={planFilter}
-                  onValueChange={(v) => setPlanFilter(v as PlanFilter)}
-                >
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Plans</SelectItem>
-                    <SelectItem value="pro">Pro</SelectItem>
-                    <SelectItem value="free">Free</SelectItem>
-                  </SelectContent>
-                </Select>
-                {/* Role filter */}
-                <Select
-                  value={roleFilter}
-                  onValueChange={(v) => setRoleFilter(v as RoleFilter)}
-                >
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="user">User</SelectItem>
-                  </SelectContent>
-                </Select>
-                {/* Status filter */}
-                <Select
-                  value={statusFilter}
-                  onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-                >
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="online">Online</SelectItem>
-                    <SelectItem value="offline">Offline</SelectItem>
-                    <SelectItem value="banned">Banned</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-wrap gap-2">
+                  {/* Plan filter */}
+                  <Select
+                    value={planFilter}
+                    onValueChange={(v) => setPlanFilter(v as PlanFilter)}
+                  >
+                    <SelectTrigger className="w-[calc(50%-4px)] sm:w-[130px]">
+                      <SelectValue placeholder="Plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Plans</SelectItem>
+                      <SelectItem value="pro">Pro</SelectItem>
+                      <SelectItem value="free">Free</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {/* Role filter */}
+                  <Select
+                    value={roleFilter}
+                    onValueChange={(v) => setRoleFilter(v as RoleFilter)}
+                  >
+                    <SelectTrigger className="w-[calc(50%-4px)] sm:w-[130px]">
+                      <SelectValue placeholder="Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="user">User</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {/* Status filter */}
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+                  >
+                    <SelectTrigger className="w-full sm:w-[130px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="offline">Offline</SelectItem>
+                      <SelectItem value="banned">Banned</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardHeader>
