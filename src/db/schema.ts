@@ -31,6 +31,8 @@ export const supportPriorityEnum = pgEnum('support_priority', [
   'urgent',
 ]);
 
+export const cardTypeEnum = pgEnum('card_type', ['standard', 'multiple_choice']);
+
 export const decks = pgTable('decks', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar({ length: 255 }).notNull(),
@@ -100,6 +102,12 @@ export const cards = pgTable('cards', {
   backImageUrl: text(),
   /** True when the card was created by AI generation (not manual add). */
   aiGenerated: boolean().notNull().default(false),
+  /** Card format: standard Q&A or multiple choice. */
+  cardType: cardTypeEnum().notNull().default('standard'),
+  /** For multiple-choice cards: 4 options. First element is the correct answer. Null for standard cards. */
+  choices: text().array(),
+  /** Index into `choices` pointing to the correct answer (0..3). Null for standard cards. */
+  correctChoiceIndex: integer(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });

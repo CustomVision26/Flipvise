@@ -118,6 +118,10 @@ export function GenerateCardsButton({
           <p className="sm:hidden">
             Choose batch size (multiples of 5, max 75).
           </p>
+          <p className="text-[10px] sm:text-xs italic">
+            AI reads your deck&apos;s name, description, and existing cards to match their style,
+            scope, and difficulty — and avoid duplicates.
+          </p>
           <p className="text-foreground font-medium text-[10px] sm:text-sm">
             {aiGeneratedCount} AI · {manualCardCount} manual · {Math.max(0, remainingDeckSlots)} slot
             {Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} left (

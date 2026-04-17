@@ -150,7 +150,7 @@ export default async function DeckPage({ params }: DeckPageProps) {
             />
           </div>
         ) : (
-          <CardGrid cards={cards} deckId={id} />
+          <CardGrid cards={cards} deckId={id} hasAI={hasAI} />
         )}
       </div>
     </div>
