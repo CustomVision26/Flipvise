@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getAccessContext } from "@/lib/access";
 import Link from "next/link";
 import {
@@ -14,7 +15,8 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getDecksByUserWithCardCount } from "@/db/queries/decks";
 import { AddDeckDialog } from "@/components/add-deck-dialog";
-import { DeckCardPopover } from "@/components/deck-card-popover";
+import { DeckGrid } from "./deck-grid";
+import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 
 const DECK_LIMIT = 3;
 const CARDS_PER_DECK_LIMIT = 8;
@@ -24,6 +26,8 @@ export default async function DashboardPage() {
   if (!userId) redirect("/");
 
   const decks = await getDecksByUserWithCardCount(userId);
+  const cookieStore = await cookies();
+  const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
   const isFreePlan = !hasUnlimitedDecks;
   const isAtLimit = isFreePlan && decks.length >= DECK_LIMIT;
   const deckUsagePercent = isFreePlan
@@ -143,11 +147,7 @@ export default async function DashboardPage() {
           <AddDeckDialog triggerLabel="Create your first deck" isAtLimit={isAtLimit} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {decks.map((deck) => (
-            <DeckCardPopover key={deck.id} deck={deck} />
-          ))}
-        </div>
+        <DeckGrid decks={decks} initialView={initialView} />
       )}
 
       {/* Pro plan — already subscribed */}

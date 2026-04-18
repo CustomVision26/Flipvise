@@ -36,6 +36,8 @@ type PreviewCard = {
   aiGenerated: boolean;
 };
 
+export type DeckView = "grid" | "list" | "compact";
+
 interface DeckCardPopoverProps {
   deck: {
     id: number;
@@ -44,9 +46,10 @@ interface DeckCardPopoverProps {
     cardCount: number;
     updatedAt: Date;
   };
+  view?: DeckView;
 }
 
-export function DeckCardPopover({ deck }: DeckCardPopoverProps) {
+export function DeckCardPopover({ deck, view = "grid" }: DeckCardPopoverProps) {
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -80,8 +83,27 @@ export function DeckCardPopover({ deck }: DeckCardPopoverProps) {
     }
   }
 
+  const updatedLabel = deck.updatedAt.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const updatedShort = deck.updatedAt.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const wrapperClass =
+    view === "compact"
+      ? "relative min-h-[140px] sm:min-h-[160px]"
+      : "relative";
+
   return (
-    <div className="relative min-h-[140px] sm:h-40">
+    <div className={wrapperClass}>
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger
           nativeButton={false}
@@ -96,33 +118,73 @@ export function DeckCardPopover({ deck }: DeckCardPopoverProps) {
         >
           <Card
             className={cn(
-              "h-full flex flex-col transition-all duration-200 cursor-pointer select-none",
-              "hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5",
+              "h-full transition-all duration-200 cursor-pointer select-none",
+              "hover:bg-muted/50 hover:shadow-md",
               "active:scale-[0.99]",
+              view === "compact"
+                ? "flex flex-col hover:-translate-y-0.5"
+                : "flex flex-row items-center gap-3 sm:gap-4",
+              view === "grid" && "py-3 px-4",
+              view === "list" && "py-2 px-3",
             )}
           >
-            <CardHeader className="pr-4 flex-none pb-2 sm:pb-3">
-              <CardTitle className="line-clamp-1 text-base sm:text-lg">
-                {deck.name}
-              </CardTitle>
-              <CardDescription className="line-clamp-2 text-xs sm:text-sm">
-                {deck.description ?? "No description provided."}
-              </CardDescription>
-            </CardHeader>
-            <div className="flex-1" />
-            <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-0 sm:justify-between pt-2">
-              <span className="text-muted-foreground text-xs">
-                {deck.cardCount} {deck.cardCount === 1 ? "card" : "cards"}
-              </span>
-              <span className="text-muted-foreground text-xs">
-                Updated{" "}
-                {deck.updatedAt.toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </CardFooter>
+            {view === "compact" ? (
+              <>
+                <CardHeader className="px-3 py-3 gap-1">
+                  <CardTitle className="line-clamp-2 text-sm sm:text-base leading-tight">
+                    {deck.name}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2 text-[11px] sm:text-xs">
+                    {deck.description ?? "No description provided."}
+                  </CardDescription>
+                </CardHeader>
+                <div className="flex-1" />
+                <CardFooter className="px-3 pb-3 pt-0 flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground text-[11px] tabular-nums">
+                    {deck.cardCount}{" "}
+                    {deck.cardCount === 1 ? "card" : "cards"}
+                  </span>
+                  <span className="text-muted-foreground text-[11px] tabular-nums truncate">
+                    {updatedShort}
+                  </span>
+                </CardFooter>
+              </>
+            ) : view === "list" ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="line-clamp-1 text-sm font-medium">
+                    {deck.name}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {deck.cardCount}{" "}
+                  {deck.cardCount === 1 ? "card" : "cards"}
+                </span>
+                <span className="hidden sm:inline shrink-0 text-xs text-muted-foreground tabular-nums">
+                  Updated {updatedLabel}
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <p className="text-sm sm:text-base font-semibold break-words whitespace-pre-wrap">
+                    {deck.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap">
+                    {deck.description ?? "No description provided."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap shrink-0 items-center gap-x-6 gap-y-1 text-xs text-muted-foreground tabular-nums">
+                  <span className="sm:w-16 sm:text-right">
+                    {deck.cardCount}{" "}
+                    {deck.cardCount === 1 ? "card" : "cards"}
+                  </span>
+                  <span className="sm:w-44 sm:text-right">
+                    Updated {updatedLabel}
+                  </span>
+                </div>
+              </>
+            )}
           </Card>
         </PopoverTrigger>
 

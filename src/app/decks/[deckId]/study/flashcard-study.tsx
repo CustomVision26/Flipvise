@@ -14,6 +14,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ChevronLeft,
   ChevronRight,
   Shuffle,
@@ -23,6 +33,8 @@ import {
   RotateCcw,
   ArrowLeft,
   Trophy,
+  Flag,
+  CircleDashed,
 } from "lucide-react";
 
 
@@ -94,9 +106,9 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [incorrectCount, setIncorrectCount] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, "correct" | "incorrect">>({});
   const [sessionComplete, setSessionComplete] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [autoShuffle, setAutoShuffle] = useState(false);
   const [slideX, setSlideX] = useState(0);
   const [slideOpacity, setSlideOpacity] = useState(1);
@@ -111,6 +123,11 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   const total = deck.length;
   const currentCard = deck[visibleIndex];
   const progressPercent = ((currentIndex + 1) / total) * 100;
+  const answerValues = Object.values(answers);
+  const correctCount = answerValues.filter((v) => v === "correct").length;
+  const incorrectCount = answerValues.filter((v) => v === "incorrect").length;
+  const answeredCount = correctCount + incorrectCount;
+  const unansweredCount = Math.max(0, total - answeredCount);
 
   function navigateTo(newIndex: number, direction: "left" | "right") {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
@@ -260,7 +277,8 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   }
 
   function handleCorrect() {
-    setCorrectCount((c) => c + 1);
+    const cardId = currentCard.id;
+    setAnswers((prev) => ({ ...prev, [cardId]: "correct" }));
     if (currentIndex < total - 1) {
       navigateTo(currentIndex + 1, "left");
     } else {
@@ -270,13 +288,21 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   }
 
   function handleIncorrect() {
-    setIncorrectCount((c) => c + 1);
+    const cardId = currentCard.id;
+    setAnswers((prev) => ({ ...prev, [cardId]: "incorrect" }));
     if (currentIndex < total - 1) {
       navigateTo(currentIndex + 1, "left");
     } else {
       setIsFlipped(false);
       pendingNavRef.current = setTimeout(() => setSessionComplete(true), FLIP_DURATION_MS);
     }
+  }
+
+  function handleSubmit() {
+    if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+    setSubmitConfirmOpen(false);
+    setIsFlipped(false);
+    setSessionComplete(true);
   }
 
   function handleStudyAgain() {
@@ -286,8 +312,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
     setCurrentIndex(0);
     setVisibleIndex(0);
     setIsFlipped(false);
-    setCorrectCount(0);
-    setIncorrectCount(0);
+    setAnswers({});
     setSessionComplete(false);
   }
 
@@ -327,7 +352,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             <Progress value={scorePercent} className="h-3" />
           </div>
 
-          <div className="w-full grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="w-full grid grid-cols-3 gap-2 sm:gap-3">
             <div className="flex flex-col items-center gap-1 rounded-xl border bg-emerald-500/10 border-emerald-500/20 py-3 sm:py-4">
               <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500" />
               <span className="text-xl sm:text-2xl font-bold text-emerald-500">{correctCount}</span>
@@ -338,10 +363,15 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               <span className="text-xl sm:text-2xl font-bold text-rose-500">{incorrectCount}</span>
               <span className="text-xs text-muted-foreground">Incorrect</span>
             </div>
+            <div className="flex flex-col items-center gap-1 rounded-xl border bg-muted/40 border-border py-3 sm:py-4">
+              <CircleDashed className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+              <span className="text-xl sm:text-2xl font-bold text-foreground">{unansweredCount}</span>
+              <span className="text-xs text-muted-foreground">Unanswered</span>
+            </div>
           </div>
 
           <p className="text-muted-foreground text-sm">
-            {total} card{total !== 1 ? "s" : ""} studied
+            {answeredCount} of {total} card{total !== 1 ? "s" : ""} answered
           </p>
 
           <div className="w-full flex flex-col gap-3">
@@ -573,39 +603,79 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
       )}
 
       {/* Navigation controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        <Button
-          variant="outline"
-          size="default"
-          className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-          onClick={handlePrevious}
-          disabled={currentIndex === 0}
-        >
-          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Previous</span>
-        </Button>
+      <div className="flex flex-col items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button
+            variant="outline"
+            size="default"
+            className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+            onClick={handlePrevious}
+            disabled={currentIndex === 0}
+          >
+            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Previous</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="default"
+            className="gap-1 sm:gap-2 min-w-20 sm:min-w-28 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+            onClick={handleFlip}
+          >
+            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+            {isFlipped ? "Unflip" : "Flip"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="default"
+            className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+            onClick={handleNext}
+            disabled={currentIndex === total - 1}
+          >
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+          </Button>
+        </div>
 
         <Button
-          variant="secondary"
           size="default"
-          className="gap-1 sm:gap-2 min-w-20 sm:min-w-28 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-          onClick={handleFlip}
+          className="gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
+          onClick={() => {
+            if (unansweredCount > 0) {
+              setSubmitConfirmOpen(true);
+            } else {
+              handleSubmit();
+            }
+          }}
         >
-          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-          {isFlipped ? "Unflip" : "Flip"}
-        </Button>
-
-        <Button
-          variant="outline"
-          size="default"
-          className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-          onClick={handleNext}
-          disabled={currentIndex === total - 1}
-        >
-          <span className="hidden sm:inline">Next</span>
-          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+          <Flag className="h-4 w-4" />
+          Submit Review
         </Button>
       </div>
+
+      <AlertDialog open={submitConfirmOpen} onOpenChange={setSubmitConfirmOpen}>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base sm:text-lg">
+              Submit with {unansweredCount} unanswered{" "}
+              {unansweredCount === 1 ? "card" : "cards"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
+              Your results will be posted as-is. Unanswered cards will be shown
+              separately and won&apos;t count toward your correct score.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+            <AlertDialogCancel className="w-full sm:w-auto">
+              Keep reviewing
+            </AlertDialogCancel>
+            <AlertDialogAction className="w-full sm:w-auto" onClick={handleSubmit}>
+              Submit anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

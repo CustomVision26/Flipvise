@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { getAccessContext } from "@/lib/access";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { StudyLink } from "./study-link";
 import { GenerateCardsButton } from "./generate-cards-button";
 import { CardGrid } from "./card-grid";
 import { getCardsPerDeckLimit } from "@/lib/deck-limits";
+import { CARDS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 
 interface DeckPageProps {
   params: Promise<{ deckId: string }>;
@@ -34,6 +36,8 @@ export default async function DeckPage({ params }: DeckPageProps) {
   if (!deck) notFound();
 
   const cards = await getCardsByDeck(id, userId);
+  const cookieStore = await cookies();
+  const initialView = resolveViewMode(cookieStore.get(CARDS_VIEW_COOKIE)?.value);
 
   const aiGeneratedCount = cards.filter((c) => c.aiGenerated).length;
   const isFreePlan = !hasUnlimitedDecks;
@@ -150,7 +154,7 @@ export default async function DeckPage({ params }: DeckPageProps) {
             />
           </div>
         ) : (
-          <CardGrid cards={cards} deckId={id} hasAI={hasAI} />
+          <CardGrid cards={cards} deckId={id} hasAI={hasAI} initialView={initialView} />
         )}
       </div>
     </div>
