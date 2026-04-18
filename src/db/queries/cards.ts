@@ -1,12 +1,19 @@
 import { db } from "@/db";
-import { cards } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { cards, decks } from "@/db/schema";
+import { and, desc, eq, getTableColumns } from "drizzle-orm";
 
-export async function getCardsByDeck(deckId: number) {
+/**
+ * Lists every card in a deck, enforcing ownership at the query level by
+ * joining `decks` and requiring `decks.userId = userId`. This means callers
+ * cannot accidentally leak another user's cards even if they forget to
+ * call `getDeckById` first.
+ */
+export async function getCardsByDeck(deckId: number, userId: string) {
   return db
-    .select()
+    .select(getTableColumns(cards))
     .from(cards)
-    .where(eq(cards.deckId, deckId))
+    .innerJoin(decks, eq(cards.deckId, decks.id))
+    .where(and(eq(cards.deckId, deckId), eq(decks.userId, userId)))
     .orderBy(desc(cards.updatedAt));
 }
 

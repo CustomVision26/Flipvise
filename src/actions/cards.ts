@@ -334,7 +334,7 @@ export async function createCardAction(data: CreateCardInput) {
   const deck = await getDeckById(deckId, userId);
   if (!deck) throw new Error("Deck not found");
 
-  const existingCards = await getCardsByDeck(deckId);
+  const existingCards = await getCardsByDeck(deckId, userId);
   const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
@@ -519,7 +519,7 @@ export async function generateCardsAction(data: GenerateCardsInput) {
   const deck = await getDeckById(deckId, userId);
   if (!deck) throw new Error("Deck not found");
 
-  const existingCards = await getCardsByDeck(deckId);
+  const existingCards = await getCardsByDeck(deckId, userId);
   const aiGeneratedSoFar = existingCards.filter((c) => c.aiGenerated).length;
   const remainingAiSlots = AI_GENERATION_CAP_PER_DECK - aiGeneratedSoFar;
   if (count > remainingAiSlots) {
@@ -624,7 +624,7 @@ export async function getCardsForPreviewAction(deckId: number) {
   const deck = await getDeckById(deckId, userId);
   if (!deck) throw new Error("Deck not found");
 
-  return getCardsByDeck(deckId);
+  return getCardsByDeck(deckId, userId);
 }
 
 export async function generateAnswerAction(
@@ -643,7 +643,7 @@ export async function generateAnswerAction(
   const deck = await getDeckById(deckId, userId);
   if (!deck) throw new Error("Deck not found");
 
-  const existingCards = await getCardsByDeck(deckId);
+  const existingCards = await getCardsByDeck(deckId, userId);
   const fullContext = buildDeckContext(deck, existingCards);
 
   const { output: validationOutput } = await generateText({
@@ -793,7 +793,7 @@ export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceC
   const deck = await getDeckById(deckId, userId);
   if (!deck) throw new Error("Deck not found");
 
-  const existingCards = await getCardsByDeck(deckId);
+  const existingCards = await getCardsByDeck(deckId, userId);
   const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
@@ -883,7 +883,7 @@ export async function generateMultipleChoiceAction(
   const deck = await getDeckById(deckId, userId);
   if (!deck) throw new Error("Deck not found");
 
-  const existingCards = await getCardsByDeck(deckId);
+  const existingCards = await getCardsByDeck(deckId, userId);
   const fullContext = buildDeckContext(deck, existingCards);
 
   const { output: validationOutput } = await generateText({

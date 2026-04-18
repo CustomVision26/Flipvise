@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getDeckById } from "@/db/queries/decks";
 import { getCardsByDeck } from "@/db/queries/cards";
-import { FlashcardStudy } from "./flashcard-study";
+import { StudySession } from "./study-session";
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -21,7 +21,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
   const deck = await getDeckById(id, userId);
   if (!deck) notFound();
 
-  const cards = await getCardsByDeck(id);
+  const cards = await getCardsByDeck(id, userId);
   if (cards.length === 0) redirect(`/decks/${id}`);
 
   return (
@@ -42,7 +42,7 @@ export default async function StudyPage({ params }: StudyPageProps) {
         </Badge>
       </div>
 
-      <FlashcardStudy cards={cards} deckId={id} deckName={deck.name} />
+      <StudySession cards={cards} deckId={id} deckName={deck.name} />
     </div>
   );
 }

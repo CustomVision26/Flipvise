@@ -33,7 +33,7 @@ export default async function DeckPage({ params }: DeckPageProps) {
   const deck = await getDeckById(id, userId);
   if (!deck) notFound();
 
-  const cards = await getCardsByDeck(id);
+  const cards = await getCardsByDeck(id, userId);
 
   const aiGeneratedCount = cards.filter((c) => c.aiGenerated).length;
   const isFreePlan = !hasUnlimitedDecks;
