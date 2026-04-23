@@ -34,6 +34,10 @@ type DeckData = {
   cardCount: number;
   createdAt: Date;
   updatedAt: Date;
+  /** Team workspace deck cover (dashboard card hero). */
+  coverImageUrl?: string | null;
+  /** First card in preview order (latest `updatedAt`) — front image for team-tier preview promo. */
+  firstPreviewCardFrontImageUrl?: string | null;
 };
 
 type SortOption =
@@ -101,9 +105,19 @@ function buildPageList(current: number, total: number): (number | "ellipsis")[] 
 interface DeckGridProps {
   decks: DeckData[];
   initialView?: ViewMode;
+  workspaceQueryString?: string;
+  deckPopoverVariant?: "full" | "team-preview";
+  /** Team Clerk plan — richer “preview cards” entry with first-card image + CTA. */
+  teamTierPreviewPromo?: boolean;
 }
 
-export function DeckGrid({ decks, initialView = "grid" }: DeckGridProps) {
+export function DeckGrid({
+  decks,
+  initialView = "grid",
+  workspaceQueryString,
+  deckPopoverVariant = "full",
+  teamTierPreviewPromo = false,
+}: DeckGridProps) {
   const [sort, setSort] = useState<SortOption>("newest");
   const [pageSize, setPageSize] = useState<PageSize>(9);
   const [page, setPage] = useState(1);
@@ -196,7 +210,14 @@ export function DeckGrid({ decks, initialView = "grid" }: DeckGridProps) {
         }
       >
         {paginated.map((deck) => (
-          <DeckCardPopover key={deck.id} deck={deck} view={view} />
+          <DeckCardPopover
+            key={deck.id}
+            deck={deck}
+            view={view}
+            workspaceQueryString={workspaceQueryString}
+            variant={deckPopoverVariant}
+            teamTierPreviewPromo={teamTierPreviewPromo}
+          />
         ))}
       </div>
 

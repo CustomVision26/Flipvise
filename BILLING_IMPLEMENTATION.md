@@ -4,10 +4,24 @@ This document provides a comprehensive overview of how billing and feature gatin
 
 ## Plans
 
-The app has two subscription plans:
+The app has two **personal** subscription plans (Clerk plan ids):
 
 - **`free_user`** (default) - Free tier with limited features
 - **`pro`** - Paid tier with premium features
+
+It also has **team-tier** plans (Clerk plan ids) used when a user subscribes as a **workspace owner** — see `src/lib/team-plans.ts` (`pro_team_basic`, `pro_team_gold`, `pro_platinum_plan`, `pro_enterprise`). Those are separate from the personal `pro` plan. In Clerk, each team-tier plan should include the same **feature** entitlements as `pro` so the subscriber’s **personal** workspace (decks, AI, colors, and so on) matches Pro behavior. `getAccessContext()` treats a user with an active team-tier plan and the full Pro feature bundle as `isPro: true` for UI and gating, while `hasClerkPersonalPro` remains `true` only when `has({ plan: "pro" })` (personal `pro` subscription).
+
+### Stacking: personal Pro, member of someone else’s team, and your own team subscription
+
+- **Invited members** of another user’s team workspace are modeled in the database (`team_members`) and do **not** need a team-tier subscription on their own Clerk account. Their access to that workspace’s decks and team-tier Pro **deck** limits follows `src/lib/team-deck-pro-features.ts` and ownership/membership in `src/db/queries/teams.ts`.
+- A user can **simultaneously**: hold a personal **`pro`** plan, be a **member** (or co-admin) of another user’s team workspace, and **subscribe to a team-tier plan** on their own account to own one or more workspaces, subject to `TEAM_PLAN_LIMITS` in `src/lib/team-plans.ts` and `createTeamAction` in `src/actions/teams.ts`. There is no single app-level “one workspace only” rule; membership rows and owned `teams` rows are independent.
+- **Clerk** typically attaches one primary subscription to a user. In production, you should confirm in Clerk that the combination you want (e.g. personal `pro` plus a team-tier product, or only team-tier with Pro features) matches your pricing — the app’s code checks `has({ plan: "…" })` and `has({ feature: "…" })` and team ownership in the DB.
+
+### Product rules: team tier vs Pro vs downgrade
+
+- **While subscribed to a team-tier plan** (and Clerk grants the full Pro feature bundle), the user’s **personal** account is treated as having **Pro-level features** (`isPro` in `getAccessContext()`), even if they are not on the personal `pro` plan id. Team-tier-only subscribers still have `hasClerkPersonalPro: false` if they do not have `has({ plan: "pro" })`.
+- If a user **downgrades from a team-tier plan** to **personal `pro` only** (or cancels in a way that removes team-tier and team plan entitlements), they **lose** access to **subscriber-only** team surfaces: team admin dashboards, workspace management, and other flows gated on `activeTeamPlan` and owned team workspaces, until they resubscribe to a team tier. **Invited** access to *other* people’s team workspaces is unchanged as long as membership rows and the subscriber’s team remain valid in the app DB.
+- **Personal `pro` alone** does not grant team-tier **owner** capabilities (extra workspaces, team billing tier, team admin for owned workspaces, and so on). Those require an appropriate team-tier plan on the subscriber’s account (and matching Clerk configuration). Invited access to a team workspace is separate and does not make the user a “team plan subscriber” in Clerk.
 
 ## Features
 

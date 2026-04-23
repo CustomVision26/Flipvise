@@ -2,6 +2,10 @@ import { createClerkClient } from "@clerk/backend";
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { buildPublicMetadataPatchAfterExternalAdminRoleRemoval } from "@/lib/admin-role-metadata";
+import {
+  extractBillingUserIdFromWebhookData,
+  syncTeamSubscriberRoleMetadata,
+} from "@/lib/team-clerk-metadata";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +20,17 @@ type ClerkUserUpdatedData = {
 
 type VerifiedClerkEvent = {
   type: string;
-  data: ClerkUserUpdatedData;
+  data: unknown;
 };
+
+function isBillingSubscriptionEvent(type: string): boolean {
+  return (
+    type.startsWith("subscriptionItem.") ||
+    type.startsWith("subscription.") ||
+    type === "paymentAttempt.created" ||
+    type === "paymentAttempt.updated"
+  );
+}
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CLERK_WEBHOOK_SECRET;
@@ -45,17 +58,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  if (isBillingSubscriptionEvent(evt.type)) {
+    const userId = extractBillingUserIdFromWebhookData(evt.data);
+    if (userId) {
+      try {
+        await syncTeamSubscriberRoleMetadata(clerkClient, userId);
+      } catch (err) {
+        console.error("clerk webhook: team subscriber metadata sync failed", err);
+        return NextResponse.json({ error: "Metadata sync failed" }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ received: true });
+  }
+
   if (evt.type !== "user.updated") {
     return NextResponse.json({ received: true });
   }
 
-  const userId = evt.data?.id;
+  const data = evt.data as ClerkUserUpdatedData;
+  const userId = data?.id;
   if (!userId) {
     return NextResponse.json({ received: true });
   }
 
   const patch = buildPublicMetadataPatchAfterExternalAdminRoleRemoval(
-    evt.data.public_metadata,
+    data.public_metadata,
   );
   if (!patch) {
     return NextResponse.json({ received: true });

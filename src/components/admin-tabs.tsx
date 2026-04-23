@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { GrantAccessButton } from "@/components/grant-access-button";
+import { AssignUserPlanButton } from "@/components/assign-user-plan-button";
 import { ToggleAdminRoleButton } from "@/components/toggle-admin-role-button";
 import { BanUserButton } from "@/components/ban-user-button";
 import {
@@ -36,37 +36,13 @@ import {
   type SerializedTicket,
   type SupportStats,
 } from "@/components/admin-support-panel";
+import type { SerializedLog, SerializedUser } from "@/lib/admin-dashboard-types";
 
-export type SerializedUser = {
-  id: string;
-  fullName: string;
-  email: string | null;
-  isAdmin: boolean;
-  isBanned: boolean;
-  isPaidPro: boolean;
-  adminGranted: boolean;
-  isPro: boolean;
-  isOnline: boolean;
-  activeSessionCount: number;
-  deckCount: number;
-  cardCount: number;
-  lastUpdated: string | null;
-  createdAt: string;
-  lastSignInAt: string | null;
-};
-
-export type SerializedLog = {
-  id: number;
-  targetUserId: string;
-  targetUserName: string;
-  grantedByUserId: string;
-  grantedByName: string;
-  action: "granted" | "revoked";
-  createdAt: string;
-};
+export type { SerializedUser, SerializedLog } from "@/lib/admin-dashboard-types";
 
 interface AdminTabsProps {
   currentUserId: string;
+  callerIsSuperadmin: boolean;
   users: SerializedUser[];
   logs: SerializedLog[];
   supportTickets: SerializedTicket[];
@@ -96,7 +72,14 @@ type PlanFilter = "all" | "pro" | "free";
 type RoleFilter = "all" | "admin" | "user";
 type StatusFilter = "all" | "online" | "offline" | "banned";
 
-export function AdminTabs({ currentUserId, users, logs, supportTickets, supportStats }: AdminTabsProps) {
+export function AdminTabs({
+  currentUserId,
+  callerIsSuperadmin,
+  users,
+  logs,
+  supportTickets,
+  supportStats,
+}: AdminTabsProps) {
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -110,8 +93,8 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
         const emailMatch = (u.email ?? "").toLowerCase().includes(q);
         if (!nameMatch && !emailMatch) return false;
       }
-      if (planFilter === "pro" && !u.isPro) return false;
-      if (planFilter === "free" && u.isPro) return false;
+      if (planFilter === "pro" && u.planDisplayName === "Free") return false;
+      if (planFilter === "free" && u.planDisplayName !== "Free") return false;
       if (roleFilter === "admin" && !u.isAdmin) return false;
       if (roleFilter === "user" && u.isAdmin) return false;
       if (statusFilter === "online" && !u.isOnline) return false;
@@ -252,12 +235,10 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Plan</TableHead>
-                  <TableHead className="text-right">Decks</TableHead>
-                  <TableHead className="text-right">Cards</TableHead>
+                  <TableHead>Associate plan</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead>Last Sign-in</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -265,7 +246,7 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                 {filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={8}
                       className="text-center text-muted-foreground py-10"
                     >
                       No users match your search or filters.
@@ -280,7 +261,12 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                       <TableCell className="font-medium whitespace-nowrap">
                         <span className="flex items-center gap-2">
                           {user.fullName}
-                          {user.isAdmin && (
+                          {user.isSuperadmin && (
+                            <Badge variant="default" className="text-xs py-0">
+                              Owner
+                            </Badge>
+                          )}
+                          {user.isAdmin && !user.isSuperadmin && (
                             <Badge variant="destructive" className="text-xs py-0">
                               Admin
                             </Badge>
@@ -295,20 +281,20 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                       <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {user.email ?? "—"}
                       </TableCell>
-                      <TableCell>
-                        {user.isPro ? (
-                          <Badge className="text-xs">Pro</Badge>
+                      <TableCell className="max-w-[11rem]">
+                        <Badge
+                          className="text-xs font-normal whitespace-normal text-left h-auto min-h-7 max-w-full py-1 leading-snug"
+                          variant={user.planDisplayName === "Free" ? "secondary" : "default"}
+                        >
+                          {user.planDisplayName}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[12rem]">
+                        {user.associatePlan ? (
+                          <span className="line-clamp-2">{user.associatePlan}</span>
                         ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            Free
-                          </Badge>
+                          "—"
                         )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {user.deckCount}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {user.cardCount}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {formatDate(user.lastUpdated)}
@@ -320,44 +306,13 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                         {user.lastSignInAt ? formatDate(user.lastSignInAt) : "Never"}
                       </TableCell>
                       <TableCell>
-                        {user.isBanned ? (
-                          <span className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-destructive" />
-                            <span className="text-xs text-destructive font-medium">
-                              Banned
-                            </span>
-                          </span>
-                        ) : user.isOnline ? (
-                          <span className="flex flex-col gap-0.5">
-                            <span className="flex items-center gap-1.5">
-                              <span className="h-2 w-2 rounded-full bg-green-500" />
-                              <span className="text-xs text-green-500 font-medium">
-                                Online
-                              </span>
-                            </span>
-                            <span className="text-xs text-muted-foreground pl-3.5">
-                              {user.activeSessionCount}{" "}
-                              {user.activeSessionCount === 1 ? "device" : "devices"}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                            <span className="text-xs text-muted-foreground">
-                              Offline
-                            </span>
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <div className="flex items-center gap-1.5">
-                          <GrantAccessButton
+                          <AssignUserPlanButton
                             targetUserId={user.id}
                             targetUserName={user.fullName}
                             targetUserEmail={user.email}
-                            adminGranted={user.adminGranted}
-                            isPaidPro={user.isPaidPro || user.isAdmin}
                             isSelf={user.id === currentUserId}
+                            targetIsPlatformOwner={user.isSuperadmin}
                           />
                           <BanUserButton
                             targetUserId={user.id}
@@ -365,7 +320,9 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                             targetUserEmail={user.email}
                             isBanned={user.isBanned}
                             isSelf={user.id === currentUserId}
-                            isAdmin={user.isAdmin}
+                            callerIsSuperadmin={callerIsSuperadmin}
+                            targetIsSuperadmin={user.isSuperadmin}
+                            targetIsCoAdmin={user.isAdmin && !user.isSuperadmin}
                           />
                         </div>
                       </TableCell>
@@ -384,8 +341,8 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
           <CardHeader>
             <CardTitle>Admin Role Management</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Grant or revoke admin privileges. Every change is recorded in the
-              Privilege Audit Log tab.
+              Only the platform owner can grant or revoke co-admin roles. Every
+              change is recorded in the Privilege Audit Log tab.
             </p>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
@@ -419,11 +376,18 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                     </TableCell>
                     <TableCell>
                       <span className="flex items-center gap-1.5">
-                        {user.isAdmin ? (
+                        {user.isSuperadmin ? (
+                          <>
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            <Badge variant="default" className="text-xs">
+                              Owner
+                            </Badge>
+                          </>
+                        ) : user.isAdmin ? (
                           <>
                             <ShieldCheck className="h-4 w-4 text-destructive" />
                             <Badge variant="destructive" className="text-xs">
-                              Admin
+                              Co-admin
                             </Badge>
                           </>
                         ) : (
@@ -441,8 +405,10 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                         targetUserId={user.id}
                         targetUserName={user.fullName}
                         targetUserEmail={user.email}
-                        isAdmin={user.isAdmin}
+                        isCoAdmin={user.isAdmin && !user.isSuperadmin}
+                        targetIsSuperadmin={user.isSuperadmin}
                         isSelf={user.id === currentUserId}
+                        callerIsSuperadmin={callerIsSuperadmin}
                       />
                     </TableCell>
                   </TableRow>
@@ -485,15 +451,22 @@ export function AdminTabs({ currentUserId, users, logs, supportTickets, supportS
                         {log.targetUserName}
                       </TableCell>
                       <TableCell>
-                        {log.action === "granted" ? (
-                          <Badge className="text-xs gap-1">
+                        {log.action === "granted" || log.action === "superadmin_granted" ? (
+                          <Badge
+                            variant={log.action === "superadmin_granted" ? "default" : "secondary"}
+                            className="text-xs gap-1"
+                          >
                             <ShieldCheck className="h-3 w-3" />
-                            Granted
+                            {log.action === "superadmin_granted"
+                              ? "Owner role"
+                              : "Co-admin granted"}
                           </Badge>
                         ) : (
                           <Badge variant="destructive" className="text-xs gap-1">
                             <ShieldOff className="h-3 w-3" />
-                            Revoked
+                            {log.action === "superadmin_revoked"
+                              ? "Owner revoked"
+                              : "Co-admin revoked"}
                           </Badge>
                         )}
                       </TableCell>

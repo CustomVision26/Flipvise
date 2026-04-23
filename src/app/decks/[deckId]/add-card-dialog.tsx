@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   createCardAction,
   createMultipleChoiceCardAction,
@@ -47,6 +49,8 @@ interface AddCardDialogProps {
   trigger?: React.ReactElement;
   isAtLimit?: boolean;
   hasAI?: boolean;
+  /** Pro personal (75 cards / deck) — Free users only get the standard card format in this dialog. */
+  allowsMultipleChoiceFormat?: boolean;
 }
 
 function ImageUploadSection({
@@ -933,9 +937,18 @@ export function AddCardDialog({
   trigger,
   isAtLimit = false,
   hasAI = false,
+  allowsMultipleChoiceFormat = true,
 }: AddCardDialogProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"standard" | "multiple_choice">("standard");
+
+  const effectiveTab = allowsMultipleChoiceFormat ? tab : "standard";
+
+  useEffect(() => {
+    if (open && !allowsMultipleChoiceFormat) {
+      setTab("standard");
+    }
+  }, [open, allowsMultipleChoiceFormat]);
 
   if (isAtLimit) {
     return (
@@ -987,7 +1000,9 @@ export function AddCardDialog({
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Add a new card</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
-            Choose a card format: a classic question-and-answer card, or a multiple-choice card.
+            {allowsMultipleChoiceFormat
+              ? "Choose a card format: a classic question-and-answer card, or a multiple-choice card."
+              : "On the Free plan, new cards use the standard question-and-answer format. Upgrade to Pro to add multiple-choice cards."}
           </DialogDescription>
         </DialogHeader>
 
@@ -1001,13 +1016,52 @@ export function AddCardDialog({
         )}
 
         <Tabs
-          value={tab}
-          onValueChange={(v) => setTab(v as "standard" | "multiple_choice")}
+          value={effectiveTab}
+          onValueChange={(v) => {
+            if (!allowsMultipleChoiceFormat) return;
+            setTab(v as "standard" | "multiple_choice");
+          }}
           className="gap-3"
         >
           <TabsList className="w-full grid grid-cols-2 h-9">
             <TabsTrigger value="standard">Standard</TabsTrigger>
-            <TabsTrigger value="multiple_choice">Multiple Choice</TabsTrigger>
+            {allowsMultipleChoiceFormat ? (
+              <TabsTrigger value="multiple_choice">Multiple Choice</TabsTrigger>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={(props) => (
+                    <span
+                      {...props}
+                      className={cn(
+                        "flex min-h-9 min-w-0 flex-1 cursor-not-allowed items-stretch rounded-md",
+                        props.className,
+                      )}
+                    >
+                      <TabsTrigger
+                        value="multiple_choice"
+                        disabled
+                        className="pointer-events-none w-full opacity-40"
+                      >
+                        Multiple Choice
+                      </TabsTrigger>
+                    </span>
+                  )}
+                />
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  <p>
+                    Multiple choice is a Pro feature. Upgrade your personal plan to unlock this
+                    format.
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="mt-2 inline-block font-medium text-primary underline underline-offset-2 hover:opacity-90"
+                  >
+                    View Pro plans
+                  </Link>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </TabsList>
 
           <TabsContent value="standard" keepMounted>

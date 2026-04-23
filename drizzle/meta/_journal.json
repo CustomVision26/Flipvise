@@ -29,6 +29,62 @@
       "when": 1776468973873,
       "tag": "0003_outgoing_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776605302467,
+      "tag": "0004_lonely_shinobi_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776605366313,
+      "tag": "0005_colorful_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776700000000,
+      "tag": "0006_deck_cover_image",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776693945069,
+      "tag": "0007_team_invite_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776800000000,
+      "tag": "0008_team_invitation_revoked",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776747503561,
+      "tag": "0009_team_workspace_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776900000000,
+      "tag": "0010_team_member_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777000000000,
+      "tag": "0011_admin_privilege_superadmin_actions",
+      "breakpoints": true
     }
   ]
 }

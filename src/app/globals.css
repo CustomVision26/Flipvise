@@ -4,6 +4,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Clerk billing (CDN / @clerk/ui): checkout drawer + modal layers must sit above routed
+ * content. Fallback if appearance.elements keys differ between Clerk versions.
+ */
+@layer components {
+  .cl-modalBackdrop,
+  .cl-modalContainer,
+  .cl-drawerBackdrop,
+  .cl-drawerRoot,
+  .cl-drawerContent {
+    z-index: 100 !important;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

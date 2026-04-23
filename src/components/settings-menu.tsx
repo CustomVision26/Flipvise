@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTransition } from "react";
-import { Settings, Moon, Sun } from "lucide-react";
+import { Settings, Moon, Sun, Mic } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -40,8 +40,10 @@ import {
   type FreeUiThemeId,
 } from "@/lib/free-ui-theme";
 import { setFreeUiThemeAction } from "@/actions/free-ui-theme";
+import { resolveActiveTeamPlanFromHas } from "@/lib/team-plans";
 import { cn } from "@/lib/utils";
-import { PrioritySupportDialog } from "@/components/priority-support-dialog";
+import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
+import { MicrophoneSettingsDialog } from "@/components/microphone-settings-dialog";
 
 interface SettingsMenuProps {
   currentProTheme?: ProUiThemeId;
@@ -58,18 +60,21 @@ export function SettingsMenu({
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
   const [isPending, startTransition] = useTransition();
-  const [prioritySupportOpen, setPrioritySupportOpen] = React.useState(false);
+  const [micDialogOpen, setMicDialogOpen] = React.useState(false);
 
   const isPaidPro = has?.({ plan: "pro" }) ?? false;
-  const hasPrioritySupport = has?.({ feature: "priority_support" }) ?? false;
   const hasCustomColors = has?.({ feature: "12_interface_colors" }) ?? false;
   const meta = user?.publicMetadata as
     | { adminGranted?: boolean; role?: string }
     | undefined;
   const adminGranted = meta?.adminGranted === true;
-  const isAdmin = meta?.role === "admin";
-  const isPro = isPaidPro || adminGranted || isAdmin;
-  const showPrioritySupport = hasPrioritySupport || isAdmin;
+  const isAdmin = isClerkPlatformAdminRole(meta?.role);
+  const activeTeamPlan = resolveActiveTeamPlanFromHas(has);
+  const isPro =
+    isPaidPro ||
+    adminGranted ||
+    isAdmin ||
+    activeTeamPlan !== null;
 
   React.useEffect(() => {
     setMounted(true);
@@ -201,29 +206,26 @@ export function SettingsMenu({
             </>
           )}
 
-          {showPrioritySupport && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  onClick={() => setPrioritySupportOpen(true)}
-                  className="cursor-pointer"
-                >
-                  <span className="mr-2">⚡</span>
-                  Priority Support
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </>
-          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-foreground">
+              Device
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => setMicDialogOpen(true)}
+              className="cursor-pointer gap-2"
+            >
+              <Mic className="size-4 text-muted-foreground" aria-hidden />
+              <span className="text-foreground">Microphone</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {showPrioritySupport && (
-        <PrioritySupportDialog 
-          open={prioritySupportOpen} 
-          onOpenChange={setPrioritySupportOpen}
-        />
-      )}
+      <MicrophoneSettingsDialog
+        open={micDialogOpen}
+        onOpenChange={setMicDialogOpen}
+      />
     </>
   );
 }

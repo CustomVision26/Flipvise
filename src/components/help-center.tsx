@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useRef, useCallback } from "react";
+import { useMemo, useState, useTransition, useRef, useCallback } from "react";
+import { useAuth, useUser } from "@clerk/nextjs";
 import {
   HelpCircle,
   MessageSquare,
@@ -14,8 +15,11 @@ import {
   ChevronRight,
   ImagePlus,
   X,
+  Zap,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -632,9 +636,87 @@ function AccountForm() {
   );
 }
 
+// ── Priority Support content ───────────────────────────────────────────────
+
+function PrioritySupportContent() {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        <Badge className="text-xs">Pro</Badge>
+        <p className="text-sm text-muted-foreground">
+          Fast, personalized help from our support team.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold">What you get</h4>
+        <ul className="space-y-2 text-sm">
+          <li className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">✓</span>
+            <span>Priority email response within 4 business hours</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">✓</span>
+            <span>Direct access to senior support engineers</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">✓</span>
+            <span>Screen-sharing sessions for complex issues</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary mt-0.5">✓</span>
+            <span>Custom feature guidance and best practices</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="border-t border-border" />
+
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold">Contact Support</h4>
+        <div className="space-y-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">
+              Email
+            </span>
+            <a
+              href="mailto:customvision26@gmail.com?subject=Priority%20Support%20Request"
+              className="text-sm text-primary hover:underline break-all"
+            >
+              customvision26@gmail.com
+            </a>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground uppercase tracking-wide">
+              Response Time
+            </span>
+            <span className="text-sm">
+              Within 4 business hours (Mon-Fri, 9am-5pm EST)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-border" />
+
+      <p className="text-xs text-muted-foreground">
+        Please include your account email and a detailed description of your issue.
+        Our priority support team will respond as quickly as possible.
+      </p>
+
+      <a
+        href="mailto:customvision26@gmail.com?subject=Priority%20Support%20Request"
+        className={buttonVariants() + " w-full"}
+      >
+        Send Email
+      </a>
+    </div>
+  );
+}
+
 // ── Tab definitions ────────────────────────────────────────────────────────
 
-const TABS = [
+const BASE_TABS = [
   {
     id: "support",
     label: "Support",
@@ -679,31 +761,57 @@ const TABS = [
   },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+const PRIORITY_TAB = {
+  id: "priority",
+  label: "Priority Support",
+  icon: Zap,
+  description: "Fast-tracked Pro support",
+  form: <PrioritySupportContent />,
+} as const;
+
+type HelpTab = {
+  id: string;
+  label: string;
+  icon: typeof MessageSquare;
+  description: string;
+  form: React.ReactNode;
+};
 
 // ── Landing view ───────────────────────────────────────────────────────────
 
-function HelpLanding({ onSelect }: { onSelect: (id: TabId) => void }) {
+function HelpLanding({
+  tabs,
+  onSelect,
+}: {
+  tabs: readonly HelpTab[];
+  onSelect: (id: string) => void;
+}) {
   return (
     <div className="flex flex-col gap-3 py-2">
       <p className="text-sm text-muted-foreground mb-1">
         How can we help you today?
       </p>
-      {TABS.map(({ id, label, icon: Icon, description }) => (
-        <button
-          key={id}
-          type="button"
-          onClick={() => onSelect(id)}
-          className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-left hover:bg-accent transition-colors w-full group"
-        >
-          <Icon className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium leading-none">{label}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-          </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-        </button>
-      ))}
+      {tabs.map(({ id, label, icon: Icon, description }) => {
+        const isPriority = id === "priority";
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onSelect(id)}
+            className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-left hover:bg-accent transition-colors w-full group"
+          >
+            <Icon className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium leading-none">{label}</p>
+                {isPriority && <Badge className="text-[10px] px-1.5 py-0">Pro</Badge>}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -711,10 +819,24 @@ function HelpLanding({ onSelect }: { onSelect: (id: TabId) => void }) {
 // ── Root component ─────────────────────────────────────────────────────────
 
 export function HelpCenter() {
-  const [activeTab, setActiveTab] = useState<TabId | null>(null);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const { has } = useAuth();
+  const { user } = useUser();
 
-  const activeTabData = activeTab ? TABS.find((t) => t.id === activeTab) : null;
+  const hasPrioritySupport = has?.({ feature: "priority_support" }) ?? false;
+  const meta = user?.publicMetadata as
+    | { adminGranted?: boolean; role?: string }
+    | undefined;
+  const isAdmin = isClerkPlatformAdminRole(meta?.role);
+  const showPrioritySupport = hasPrioritySupport || isAdmin;
+
+  const tabs = useMemo<readonly HelpTab[]>(
+    () => (showPrioritySupport ? [PRIORITY_TAB, ...BASE_TABS] : [...BASE_TABS]),
+    [showPrioritySupport],
+  );
+
+  const activeTabData = activeTab ? tabs.find((t) => t.id === activeTab) : null;
 
   function handleOpenChange(v: boolean) {
     setOpen(v);
@@ -756,6 +878,9 @@ export function HelpCenter() {
             <SheetTitle className="text-base">
               {activeTabData ? activeTabData.label : "Help Center"}
             </SheetTitle>
+            {activeTabData?.id === "priority" && (
+              <Badge className="text-[10px] px-1.5 py-0">Pro</Badge>
+            )}
           </div>
           {activeTabData && (
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -766,10 +891,10 @@ export function HelpCenter() {
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {activeTab === null ? (
-            <HelpLanding onSelect={setActiveTab} />
+            <HelpLanding tabs={tabs} onSelect={setActiveTab} />
           ) : (
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
-              {TABS.map(({ id, form }) => (
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)}>
+              {tabs.map(({ id, form }) => (
                 <TabsContent key={id} value={id} className="mt-0">
                   {form}
                 </TabsContent>

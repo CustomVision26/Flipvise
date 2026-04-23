@@ -22,7 +22,9 @@ interface BanUserButtonProps {
   targetUserEmail: string | null;
   isBanned: boolean;
   isSelf: boolean;
-  isAdmin: boolean;
+  callerIsSuperadmin: boolean;
+  targetIsSuperadmin: boolean;
+  targetIsCoAdmin: boolean;
 }
 
 export function BanUserButton({
@@ -31,13 +33,15 @@ export function BanUserButton({
   targetUserEmail,
   isBanned,
   isSelf,
-  isAdmin,
+  callerIsSuperadmin,
+  targetIsSuperadmin,
+  targetIsCoAdmin,
 }: BanUserButtonProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Cannot ban yourself or another admin
-  if (isSelf || isAdmin) return null;
+  if (isSelf || targetIsSuperadmin) return null;
+  if (targetIsCoAdmin && !callerIsSuperadmin) return null;
 
   function handleConfirm() {
     setOpen(false);

@@ -1,15 +1,36 @@
 import { Show } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
+import { z } from "zod";
 import { redirect } from "next/navigation";
+import { getAccessContext } from "@/lib/access";
+import { personalDashboardHref } from "@/lib/personal-dashboard-url";
 import Image from "next/image";
 import { SignInBtn, SignUpBtn } from "@/components/auth-buttons";
+import { HomeInviteEmailAuthButtons } from "@/components/home-invite-email-auth-buttons";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import { Card } from "@/components/ui/card";
 import { ForceDarkTheme } from "@/components/force-dark-theme";
 
-export default async function Home() {
-  const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+function parseInviteEmailFromSearchParams(inviteEmail: unknown): string | null {
+  const raw =
+    typeof inviteEmail === "string"
+      ? inviteEmail
+      : Array.isArray(inviteEmail)
+        ? inviteEmail[0]
+        : undefined;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const parsed = z.string().email().safeParse(raw.trim());
+  return parsed.success ? parsed.data : null;
+}
+
+interface HomePageProps {
+  searchParams: Promise<{ invite_email?: string | string[] }>;
+}
+
+export default async function Home({ searchParams }: HomePageProps) {
+  const { userId, isPro, activeTeamPlan } = await getAccessContext();
+  if (userId) redirect(personalDashboardHref(userId, activeTeamPlan, isPro));
+  const sp = await searchParams;
+  const inviteEmailForAuth = parseInviteEmailFromSearchParams(sp.invite_email);
   return (
     <ForceDarkTheme>
       <div className="relative flex flex-1 flex-col items-center justify-center min-h-screen">
@@ -104,10 +125,14 @@ export default async function Home() {
           />
 
           <Show when="signed-out">
-            <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
-              <SignInBtn />
-              <SignUpBtn />
-            </div>
+            {inviteEmailForAuth ? (
+              <HomeInviteEmailAuthButtons email={inviteEmailForAuth} />
+            ) : (
+              <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
+                <SignInBtn />
+                <SignUpBtn />
+              </div>
+            )}
           </Show>
 
           <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent max-w-xs sm:max-w-sm leading-relaxed drop-shadow-neon animate-gradient-text neon-text-glow">

@@ -6,6 +6,7 @@ import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
+import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
 
 /** Drop legacy `system` from localStorage so only light | dark are used. */
 function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ function ClerkWithTheme({ children }: { children: React.ReactNode }) {
         },
       }}
     >
+      <ClerkSessionRouterSync />
       {children}
     </ClerkProvider>
   );

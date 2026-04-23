@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,6 +37,8 @@ import {
   Clock,
   Flag,
   CircleHelp,
+  Play,
+  ListChecks,
 } from "lucide-react";
 import { submitQuizResultAction, type QuizResult } from "@/actions/study";
 
@@ -178,7 +188,8 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
     [questions.length],
   );
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
-  const startTimeRef = useRef<number>(Date.now());
+  const startTimeRef = useRef<number>(0);
+  const [quizStarted, setQuizStarted] = useState(false);
 
   const [result, setResult] = useState<QuizResult | null>(null);
   const [submitting, startTransition] = useTransition();
@@ -224,7 +235,7 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
   );
 
   useEffect(() => {
-    if (result || totalQuestions === 0) return;
+    if (!quizStarted || result || totalQuestions === 0) return;
     const id = window.setInterval(() => {
       setRemainingSeconds((s) => {
         if (s <= 1) {
@@ -235,13 +246,19 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [result, totalQuestions]);
+  }, [quizStarted, result, totalQuestions]);
 
   useEffect(() => {
-    if (remainingSeconds === 0 && !result && totalQuestions > 0) {
-      submitQuiz({ timedOut: true });
+    if (
+      !quizStarted ||
+      remainingSeconds !== 0 ||
+      result ||
+      totalQuestions === 0
+    ) {
+      return;
     }
-  }, [remainingSeconds, result, totalQuestions, submitQuiz]);
+    submitQuiz({ timedOut: true });
+  }, [quizStarted, remainingSeconds, result, totalQuestions, submitQuiz]);
 
   function handleSelect(optionIndex: number) {
     setSelectedByIndex((prev) => {
@@ -266,6 +283,12 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
     submitQuiz({ timedOut: false });
   }
 
+  function handleStartQuiz() {
+    startTimeRef.current = Date.now();
+    setRemainingSeconds(totalSeconds);
+    setQuizStarted(true);
+  }
+
   function handleRetake() {
     const fresh = buildQuestions(cards);
     setQuestions(fresh);
@@ -273,7 +296,8 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
     setCurrentIndex(0);
     setResult(null);
     setSubmitError(null);
-    startTimeRef.current = Date.now();
+    setQuizStarted(false);
+    startTimeRef.current = 0;
     setRemainingSeconds(getQuizDurationSeconds(fresh.length));
   }
 
@@ -310,6 +334,52 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
             Back to Deck
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (!quizStarted) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-6">
+        <Card className="w-full max-w-md shadow-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <ListChecks className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-xl">Timed quiz</CardTitle>
+            <CardDescription className="text-balance">
+              <span className="font-medium text-foreground">{deckName}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-center text-sm text-muted-foreground">
+            <p>
+              {totalQuestions} question{totalQuestions !== 1 ? "s" : ""} ·{" "}
+              <span className="tabular-nums font-medium text-foreground">
+                {formatClock(totalSeconds)}
+              </span>{" "}
+              on the clock
+            </p>
+            <p className="text-xs">
+              Press start when you are ready. The timer begins only after you
+              start.
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button size="default" className="w-full gap-2 sm:w-auto sm:min-w-40" onClick={handleStartQuiz}>
+              <Play className="h-4 w-4" />
+              Start quiz
+            </Button>
+            <Button
+              variant="outline"
+              size="default"
+              className="w-full gap-2 sm:w-auto"
+              onClick={() => router.push(`/decks/${deckId}`)}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to deck
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }

@@ -1,20 +1,40 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/clerk-auth";
 import { revalidatePath } from "next/cache";
 import { getAccessContext } from "@/lib/access";
 import { z } from "zod";
 import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
-import { getDeckById } from "@/db/queries/decks";
-import { createCard, updateCard, deleteCard, getCardById, getCardsByDeck, bulkCreateCards, deleteAllCards, createMultipleChoiceCard, updateMultipleChoiceCard, updateCardChoices } from "@/db/queries/cards";
+import {
+  createCard,
+  updateCard,
+  deleteCard,
+  getCardById,
+  getCardsByDeckUnscoped,
+  bulkCreateCards,
+  deleteAllCards,
+  createMultipleChoiceCard,
+  updateMultipleChoiceCard,
+  updateCardChoices,
+} from "@/db/queries/cards";
+import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   AI_GENERATION_CAP_PER_DECK,
   CARDS_PER_DECK_LIMIT_FREE,
   CARDS_PER_DECK_LIMIT_PRO,
   getCardsPerDeckLimit,
 } from "@/lib/deck-limits";
+import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
+
+async function requireDeckEditor(userId: string, deckId: number) {
+  const bundle = await getDeckWithViewerAccess(deckId, userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+  return bundle.deck;
+}
 
 const createCardSchema = z
   .object({
@@ -53,6 +73,11 @@ const updateCardSchema = z
     backImageUrl: z.string().url().nullable().optional(),
     oldFrontImageUrl: z.string().url().nullable().optional(),
     oldBackImageUrl: z.string().url().nullable().optional(),
+    distractors: z
+      .array(z.string().min(1))
+      .length(3)
+      .nullable()
+      .optional(),
   })
   .refine((d) => d.front.trim().length > 0 || !!d.frontImageUrl, {
     message: "Front must have text or an image",
@@ -276,6 +301,7 @@ type UpdateCardInput = {
   backImageUrl?: string | null;
   oldFrontImageUrl?: string | null;
   oldBackImageUrl?: string | null;
+  distractors?: string[] | null;
 };
 type DeleteCardInput = z.infer<typeof deleteCardSchema>;
 type GenerateCardsInput = z.infer<typeof generateCardsSchema>;
@@ -294,8 +320,7 @@ export async function uploadCardImageAction(
 
   const { deckId } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
 
   const file = formData.get("image");
   if (!(file instanceof File)) throw new Error("No image file provided");
@@ -331,14 +356,16 @@ export async function createCardAction(data: CreateCardInput) {
 
   const { deckId, front, frontImageUrl, back, backImageUrl, distractors } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effective75 = has75CardsPerDeck || teamTierPro;
+  const effectiveAI = hasAI || teamTierPro;
 
-  const existingCards = await getCardsByDeck(deckId, userId);
-  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
+  const existingCards = await getCardsByDeckUnscoped(deckId);
+  const deckCardLimit = getCardsPerDeckLimit(effective75);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
-      has75CardsPerDeck
+      effective75
         ? `Pro plan limit: ${CARDS_PER_DECK_LIMIT_PRO} cards per deck. Delete cards to add more.`
         : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade to Pro for up to ${CARDS_PER_DECK_LIMIT_PRO} cards per deck.`,
     );
@@ -375,7 +402,7 @@ export async function createCardAction(data: CreateCardInput) {
   // meaningfully distract an image-only card).
   if (
     !initialChoices &&
-    hasAI &&
+    effectiveAI &&
     frontText &&
     backText &&
     inserted?.id
@@ -416,10 +443,10 @@ export async function updateCardAction(data: UpdateCardInput) {
     backImageUrl,
     oldFrontImageUrl,
     oldBackImageUrl,
+    distractors,
   } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
 
   if (oldFrontImageUrl && oldFrontImageUrl !== frontImageUrl) {
     try {
@@ -437,14 +464,28 @@ export async function updateCardAction(data: UpdateCardInput) {
     }
   }
 
+  const backText = cleanUserText(back) || null;
+
   await updateCard(
     cardId,
     deckId,
     cleanUserText(front) || null,
     frontImageUrl ?? null,
-    cleanUserText(back) || null,
+    backText,
     backImageUrl ?? null,
   );
+
+  const providedDistractors =
+    Array.isArray(distractors) && distractors.length === 3 && backText
+      ? [cleanAiText(distractors[0]), cleanAiText(distractors[1]), cleanAiText(distractors[2])]
+      : null;
+  if (
+    backText &&
+    providedDistractors &&
+    providedDistractors.every((d) => d.length > 0)
+  ) {
+    await updateCardChoices(cardId, deckId, [backText, ...providedDistractors], 0);
+  }
 
   revalidatePath(`/decks/${deckId}`);
 }
@@ -458,8 +499,7 @@ export async function deleteCardAction(data: DeleteCardInput) {
 
   const { cardId, deckId } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
 
   const card = await getCardById(cardId, deckId);
   if (card?.frontImageUrl) {
@@ -497,8 +537,7 @@ export async function deleteAllCardsAction(data: DeleteAllCardsInput) {
 
   const { deckId } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
 
   await deleteAllCards(deckId);
 
@@ -509,17 +548,19 @@ export async function generateCardsAction(data: GenerateCardsInput) {
   const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
-  if (!hasAI) throw new Error("AI flashcard generation requires a Pro plan.");
-
   const parsed = generateCardsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
   const { deckId, count } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effectiveAI = hasAI || teamTierPro;
+  const effective75 = has75CardsPerDeck || teamTierPro;
 
-  const existingCards = await getCardsByDeck(deckId, userId);
+  if (!effectiveAI) throw new Error("AI flashcard generation requires a Pro plan.");
+
+  const existingCards = await getCardsByDeckUnscoped(deckId);
   const aiGeneratedSoFar = existingCards.filter((c) => c.aiGenerated).length;
   const remainingAiSlots = AI_GENERATION_CAP_PER_DECK - aiGeneratedSoFar;
   if (count > remainingAiSlots) {
@@ -528,11 +569,11 @@ export async function generateCardsAction(data: GenerateCardsInput) {
     );
   }
 
-  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
+  const deckCardLimit = getCardsPerDeckLimit(effective75);
   const remainingDeckSlots = deckCardLimit - existingCards.length;
   if (count > remainingDeckSlots) {
     throw new Error(
-      has75CardsPerDeck
+      effective75
         ? `Not enough room in this deck (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left; max ${CARDS_PER_DECK_LIMIT_PRO} per deck).`
         : `Not enough room in this deck on the Free plan (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left).`,
     );
@@ -621,10 +662,31 @@ export async function getCardsForPreviewAction(deckId: number) {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  await requireDeckEditor(userId, deckId);
 
-  return getCardsByDeck(deckId, userId);
+  return getCardsByDeckUnscoped(deckId);
+}
+
+const deckViewerPreviewSchema = z.object({
+  deckId: z.number().int().positive(),
+});
+
+export type DeckViewerPreviewInput = z.infer<typeof deckViewerPreviewSchema>;
+
+/** Preview carousel for any user who can view the deck (including assigned `team_member`). */
+export async function getCardsForDeckViewerPreviewAction(
+  data: DeckViewerPreviewInput,
+) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = deckViewerPreviewSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  if (!bundle) throw new Error("Deck not found");
+
+  return getCardsByDeckUnscoped(parsed.data.deckId);
 }
 
 export async function generateAnswerAction(
@@ -633,17 +695,16 @@ export async function generateAnswerAction(
   const { userId, hasAI } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
-  if (!hasAI) throw new Error("AI answer generation requires a Pro plan.");
-
   const parsed = generateAnswerSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
   const { deckId, question } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  if (!(hasAI || teamTierPro)) throw new Error("AI answer generation requires a Pro plan.");
 
-  const existingCards = await getCardsByDeck(deckId, userId);
+  const existingCards = await getCardsByDeckUnscoped(deckId);
   const fullContext = buildDeckContext(deck, existingCards);
 
   const { output: validationOutput } = await generateText({
@@ -790,14 +851,21 @@ export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceC
 
   const { deckId, question, questionImageUrl, correctAnswer, distractors } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effective75 = has75CardsPerDeck || teamTierPro;
 
-  const existingCards = await getCardsByDeck(deckId, userId);
-  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
+  if (!effective75) {
+    throw new Error(
+      "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
+    );
+  }
+
+  const existingCards = await getCardsByDeckUnscoped(deckId);
+  const deckCardLimit = getCardsPerDeckLimit(effective75);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
-      has75CardsPerDeck
+      effective75
         ? `Pro plan limit: ${CARDS_PER_DECK_LIMIT_PRO} cards per deck. Delete cards to add more.`
         : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade to Pro for up to ${CARDS_PER_DECK_LIMIT_PRO} cards per deck.`,
     );
@@ -839,8 +907,7 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
     distractors,
   } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
 
   if (oldQuestionImageUrl && oldQuestionImageUrl !== questionImageUrl) {
     try {
@@ -870,20 +937,27 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
 export async function generateMultipleChoiceAction(
   data: GenerateMultipleChoiceInput,
 ): Promise<{ correctAnswer: string; distractors: [string, string, string] }> {
-  const { userId, hasAI } = await getAccessContext();
+  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
-
-  if (!hasAI) throw new Error("AI multiple-choice generation requires a Pro plan.");
 
   const parsed = generateMultipleChoiceSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
   const { deckId, question, correctAnswer } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effective75 = has75CardsPerDeck || teamTierPro;
+  const effectiveAI = hasAI || teamTierPro;
 
-  const existingCards = await getCardsByDeck(deckId, userId);
+  if (!effective75) {
+    throw new Error(
+      "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
+    );
+  }
+  if (!effectiveAI) throw new Error("AI multiple-choice generation requires a Pro plan.");
+
+  const existingCards = await getCardsByDeckUnscoped(deckId);
   const fullContext = buildDeckContext(deck, existingCards);
 
   const { output: validationOutput } = await generateText({

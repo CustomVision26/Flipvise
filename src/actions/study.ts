@@ -1,9 +1,10 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { getAccessContext } from "@/lib/access";
 import { z } from "zod";
-import { getDeckById } from "@/db/queries/decks";
-import { getCardsByDeck } from "@/db/queries/cards";
+import { getCardsForDeckViewer } from "@/db/queries/cards";
+import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
+import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import {
   pickQuoteForPercent,
   type QuizQuote,
@@ -69,7 +70,7 @@ function normalize(text: string): string {
 export async function submitQuizResultAction(
   data: SubmitQuizResultInput,
 ): Promise<QuizResult> {
-  const { userId } = await auth();
+  const { userId, has75CardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = submitQuizResultSchema.safeParse(data);
@@ -77,10 +78,17 @@ export async function submitQuizResultAction(
 
   const { deckId, answers, elapsedSeconds, timedOut } = parsed.data;
 
-  const deck = await getDeckById(deckId, userId);
-  if (!deck) throw new Error("Deck not found");
+  const deckAccess = await getDeckWithViewerAccess(deckId, userId);
+  if (!deckAccess) throw new Error("Deck not found");
 
-  const cards = await getCardsByDeck(deckId, userId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deckAccess.deck);
+  if (!has75CardsPerDeck && !teamTierPro) {
+    throw new Error(
+      "Quiz study requires Pro. Upgrade your personal plan on the Pricing page.",
+    );
+  }
+
+  const cards = await getCardsForDeckViewer(deckId, userId);
   const cardMap = new Map(cards.map((c) => [c.id, c]));
 
   let correct = 0;

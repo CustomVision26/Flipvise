@@ -122,15 +122,17 @@ export function DeckPreviewCarousel({
             Card {currentIndex + 1} of {cards.length}
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleClose}
-          className="shrink-0 ml-3 gap-1.5 h-9 px-3 text-sm font-medium transition-all duration-150 hover:scale-105 active:scale-95"
-          aria-label="Close preview"
-        >
-          <X className="size-4" />
-          <span className="hidden sm:inline">Close</span>
-        </Button>
+        <div className="flex shrink-0 items-center gap-2 ml-3">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            className="gap-1.5 h-9 px-3 text-sm font-medium transition-all duration-150 hover:scale-105 active:scale-95"
+            aria-label="Close preview"
+          >
+            <X className="size-4" />
+            <span className="hidden sm:inline">Close</span>
+          </Button>
+        </div>
       </div>
 
       {/* Progress bar — smooth fill on navigation */}

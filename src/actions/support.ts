@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@/lib/clerk-auth";
 import {
   createSupportTicket,
   getSupportTicketsByUser,

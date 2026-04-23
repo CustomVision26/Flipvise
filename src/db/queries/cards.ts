@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { cards, decks } from "@/db/schema";
-import { and, desc, eq, getTableColumns } from "drizzle-orm";
+import { resolveDeckViewerAccess } from "@/db/queries/teams";
+import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 
 /**
  * Lists every card in a deck, enforcing ownership at the query level by
@@ -15,6 +16,63 @@ export async function getCardsByDeck(deckId: number, userId: string) {
     .innerJoin(decks, eq(cards.deckId, decks.id))
     .where(and(eq(cards.deckId, deckId), eq(decks.userId, userId)))
     .orderBy(desc(cards.updatedAt));
+}
+
+/** Call only after team/ownership access is verified elsewhere. */
+export async function getCardsByDeckUnscoped(deckId: number) {
+  return db
+    .select(getTableColumns(cards))
+    .from(cards)
+    .where(eq(cards.deckId, deckId))
+    .orderBy(desc(cards.updatedAt));
+}
+
+/** Resolves team access then loads cards (owner, team admin, or assigned member). */
+export async function getCardsForDeckViewer(deckId: number, userId: string) {
+  const access = await resolveDeckViewerAccess(deckId, userId);
+  if (!access) return [];
+  return getCardsByDeckUnscoped(deckId);
+}
+
+/**
+ * For each deck id, the `frontImageUrl` of the card that appears first in the
+ * preview carousel (`getCardsByDeckUnscoped` order: `updatedAt` desc).
+ */
+export async function getFirstPreviewCardFrontByDeckIds(
+  deckIds: number[],
+): Promise<Map<number, string | null>> {
+  const unique = [...new Set(deckIds)].filter((id) => Number.isFinite(id) && id > 0);
+  const out = new Map<number, string | null>();
+  for (const id of unique) out.set(id, null);
+  if (unique.length === 0) return out;
+
+  const rows = await db
+    .select({
+      deckId: cards.deckId,
+      frontImageUrl: cards.frontImageUrl,
+      updatedAt: cards.updatedAt,
+    })
+    .from(cards)
+    .where(inArray(cards.deckId, unique));
+
+  const best = new Map<number, { t: number; img: string | null }>();
+  for (const id of unique) {
+    best.set(id, { t: Number.NEGATIVE_INFINITY, img: null });
+  }
+
+  for (const r of rows) {
+    const t = r.updatedAt.getTime();
+    const b = best.get(r.deckId);
+    if (!b) continue;
+    if (t >= b.t) {
+      best.set(r.deckId, { t, img: r.frontImageUrl });
+    }
+  }
+
+  for (const id of unique) {
+    out.set(id, best.get(id)?.img ?? null);
+  }
+  return out;
 }
 
 export async function createCard(

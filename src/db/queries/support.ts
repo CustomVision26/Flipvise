@@ -82,21 +82,30 @@ export async function addTicketReply(params: {
   adminName: string;
   message: string;
 }) {
-  const [reply] = await db
-    .insert(supportTicketReplies)
-    .values(params)
-    .returning();
-  return reply;
+  return db.transaction(async (tx) => {
+    const [reply] = await tx
+      .insert(supportTicketReplies)
+      .values(params)
+      .returning();
+    const [ticket] = await tx
+      .update(supportTickets)
+      .set({ updatedAt: new Date() })
+      .where(eq(supportTickets.id, params.ticketId))
+      .returning();
+    return { reply, ticket: ticket ?? null };
+  });
 }
 
 export async function updateSupportTicketStatus(
   ticketId: number,
   status: SupportStatus,
 ) {
-  return db
+  const [row] = await db
     .update(supportTickets)
     .set({ status, updatedAt: new Date() })
-    .where(eq(supportTickets.id, ticketId));
+    .where(eq(supportTickets.id, ticketId))
+    .returning();
+  return row ?? null;
 }
 
 export async function getSupportTicketStats() {

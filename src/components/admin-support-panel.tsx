@@ -60,22 +60,11 @@ import {
   adminUpdateTicketStatusAction,
   adminReplyToTicketAction,
 } from "@/actions/support-admin";
+import type { SerializedTicket, SupportStats } from "@/lib/support-admin-dto";
 
 // ── Serialised types (plain objects safe to pass from Server → Client) ─────
 
-export type SerializedTicket = {
-  id: number;
-  userId: string;
-  userEmail: string | null;
-  userName: string | null;
-  subject: string;
-  message: string;
-  category: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  updatedAt: string;
-};
+export type { SerializedTicket, SupportStats };
 
 export type SerializedReply = {
   id: number;
@@ -84,18 +73,6 @@ export type SerializedReply = {
   adminName: string;
   message: string;
   createdAt: string;
-};
-
-export type SupportStats = {
-  byCategory: { category: string; count: number }[];
-  byStatus: { status: string; count: number }[];
-  byPriority: { priority: string; count: number }[];
-  totals: {
-    total: number;
-    openCount: number;
-    resolvedCount: number;
-    urgentCount: number;
-  };
 };
 
 interface AdminSupportPanelProps {
@@ -206,7 +183,7 @@ interface TicketDetailSheetProps {
   ticket: SerializedTicket;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onTicketUpdated: (updated: SerializedTicket) => void;
+  onTicketUpdated: (updated: SerializedTicket, stats?: SupportStats) => void;
 }
 
 function TicketDetailSheet({
@@ -232,8 +209,11 @@ function TicketDetailSheet({
     setStatus(newStatus);
     startStatusTransition(async () => {
       try {
-        await adminUpdateTicketStatusAction({ ticketId: ticket.id, status: newStatus as "open" | "in_progress" | "resolved" | "closed" });
-        onTicketUpdated({ ...ticket, status: newStatus });
+        const { ticket: next, stats } = await adminUpdateTicketStatusAction({
+          ticketId: ticket.id,
+          status: newStatus as "open" | "in_progress" | "resolved" | "closed",
+        });
+        onTicketUpdated(next, stats);
       } catch {
         setStatus(ticket.status);
       }
@@ -247,7 +227,11 @@ function TicketDetailSheet({
     const text = replyText;
     startReplyTransition(async () => {
       try {
-        await adminReplyToTicketAction({ ticketId: ticket.id, message: text });
+        const { ticket: next } = await adminReplyToTicketAction({
+          ticketId: ticket.id,
+          message: text,
+        });
+        onTicketUpdated(next);
         setLocalReplies((prev) => [
           ...prev,
           {
@@ -379,8 +363,12 @@ type StatusFilter = "all" | "open" | "in_progress" | "resolved" | "closed";
 type CategoryFilter = "all" | string;
 type PriorityFilter = "all" | "low" | "normal" | "high" | "urgent";
 
-export function AdminSupportPanel({ tickets: initialTickets, stats }: AdminSupportPanelProps) {
+export function AdminSupportPanel({
+  tickets: initialTickets,
+  stats: initialStats,
+}: AdminSupportPanelProps) {
   const [tickets, setTickets] = useState(initialTickets);
+  const [stats, setStats] = useState(initialStats);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -423,10 +411,11 @@ export function AdminSupportPanel({ tickets: initialTickets, stats }: AdminSuppo
     color: PRIORITY_COLORS[d.priority] ?? "#94a3b8",
   }));
 
-  function handleTicketUpdated(updated: SerializedTicket) {
+  function handleTicketUpdated(updated: SerializedTicket, nextStats?: SupportStats) {
     setTickets((prev) =>
       prev.map((t) => (t.id === updated.id ? updated : t))
     );
+    if (nextStats) setStats(nextStats);
     if (selectedTicket?.id === updated.id) setSelectedTicket(updated);
   }
 

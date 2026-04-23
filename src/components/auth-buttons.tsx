@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 
 export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
   return (
-    <SignInButton mode="modal">
+    <SignInButton
+      mode="modal"
+      fallbackRedirectUrl="/auth/continue"
+      signUpFallbackRedirectUrl="/auth/continue"
+    >
       <Button variant="outline" size={size}>Sign In</Button>
     </SignInButton>
   );
@@ -13,7 +17,11 @@ export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
 
 export function SignUpBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
   return (
-    <SignUpButton mode="modal">
+    <SignUpButton
+      mode="modal"
+      fallbackRedirectUrl="/auth/continue"
+      signInFallbackRedirectUrl="/auth/continue"
+    >
       <Button size={size}>Sign Up</Button>
     </SignUpButton>
   );

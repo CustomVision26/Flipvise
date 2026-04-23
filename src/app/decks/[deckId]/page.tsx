@@ -9,8 +9,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getDeckById } from "@/db/queries/decks";
-import { getCardsByDeck } from "@/db/queries/cards";
+import { getCardsByDeckUnscoped } from "@/db/queries/cards";
+import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
+import {
+  buildResolvedTeamWorkspaceQueryString,
+  resolveTeamWorkspaceFromSearchParams,
+} from "@/lib/resolve-team-workspace-url";
+import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
 import { EditDeckDialog } from "./edit-deck-dialog";
 import { DeleteAllCardsDialog } from "./delete-all-cards-dialog";
@@ -18,30 +23,57 @@ import { StudyLink } from "./study-link";
 import { GenerateCardsButton } from "./generate-cards-button";
 import { CardGrid } from "./card-grid";
 import { getCardsPerDeckLimit } from "@/lib/deck-limits";
+import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import { CARDS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 
 interface DeckPageProps {
   params: Promise<{ deckId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function DeckPage({ params }: DeckPageProps) {
-  const { userId, hasUnlimitedDecks, hasAI, has75CardsPerDeck } = await getAccessContext();
+export default async function DeckPage({ params, searchParams }: DeckPageProps) {
+  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
   const id = Number(deckId);
   if (isNaN(id)) notFound();
 
-  const deck = await getDeckById(id, userId);
-  if (!deck) notFound();
+  const sp = await searchParams;
+  const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
+  const workspaceQs =
+    teamWorkspaceUrl != null
+      ? await buildResolvedTeamWorkspaceQueryString(userId, teamWorkspaceUrl)
+      : "";
 
-  const cards = await getCardsByDeck(id, userId);
+  const bundle = await getDeckWithViewerAccess(id, userId);
+  if (!bundle) notFound();
+  if (!canEditDeckContent(bundle.access)) {
+    const studyPath = `/decks/${id}/study`;
+    redirect(
+      workspaceQs ? withTeamWorkspaceQuery(studyPath, workspaceQs) : studyPath,
+    );
+  }
+
+  const deck = bundle.deck;
+  const { heading: teamDeckHeading, teamTierPro } = await getTeamDeckContext(deck);
+  const fromTeamWorkspaceUrl =
+    teamWorkspaceUrl != null &&
+    deck.teamId != null &&
+    deck.teamId === teamWorkspaceUrl.teamId;
+  const dashboardHref =
+    fromTeamWorkspaceUrl && workspaceQs
+      ? `/dashboard?${workspaceQs}`
+      : "/dashboard";
+  const cards = await getCardsByDeckUnscoped(id);
   const cookieStore = await cookies();
   const initialView = resolveViewMode(cookieStore.get(CARDS_VIEW_COOKIE)?.value);
 
   const aiGeneratedCount = cards.filter((c) => c.aiGenerated).length;
-  const isFreePlan = !hasUnlimitedDecks;
-  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
+  const effective75 = has75CardsPerDeck || teamTierPro;
+  const effectiveAI = hasAI || teamTierPro;
+  const isFreePlan = !effective75;
+  const deckCardLimit = getCardsPerDeckLimit(effective75);
   const isAtCardLimit = cards.length >= deckCardLimit;
 
   return (
@@ -51,12 +83,26 @@ export default async function DeckPage({ params }: DeckPageProps) {
         <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-col gap-1">
             <Link
-              href="/dashboard"
+              href={dashboardHref}
               className="text-muted-foreground hover:text-foreground text-sm transition-colors"
             >
               ← Dashboard
             </Link>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">{deck.name}</h1>
+            {teamDeckHeading && (
+              <div className="mt-1 space-y-0.5">
+                <p className="text-muted-foreground text-sm">
+                  Team:{" "}
+                  <span className="font-medium text-foreground">{teamDeckHeading.teamName}</span>
+                </p>
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  Owner:{" "}
+                  <span className="text-foreground/90">{teamDeckHeading.ownerDisplayName}</span>
+                </p>
+              </div>
+            )}
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">
+              {deck.name}
+            </h1>
             {deck.description && (
               <p className="text-muted-foreground mt-1 text-sm sm:text-base">{deck.description}</p>
             )}
@@ -67,8 +113,8 @@ export default async function DeckPage({ params }: DeckPageProps) {
               hasDescription={!!deck.description}
               totalCardCount={cards.length}
               aiGeneratedCount={aiGeneratedCount}
-              hasAI={hasAI}
-              hasUnlimitedDecks={hasUnlimitedDecks}
+              hasAI={effectiveAI}
+              has75CardsPerDeck={effective75}
             />
             <div className="flex flex-wrap gap-2">
               <EditDeckDialog deck={deck} />
@@ -76,7 +122,12 @@ export default async function DeckPage({ params }: DeckPageProps) {
                 <DeleteAllCardsDialog deckId={id} cardCount={cards.length} />
               )}
               {cards.length > 0 ? (
-                <StudyLink deckId={id} />
+                <StudyLink
+                  deckId={id}
+                  workspaceQueryString={
+                    fromTeamWorkspaceUrl ? workspaceQs : undefined
+                  }
+                />
               ) : (
                 <TooltipProvider>
                   <Tooltip>
@@ -138,7 +189,12 @@ export default async function DeckPage({ params }: DeckPageProps) {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-semibold">Cards</h2>
-          <AddCardDialog deckId={id} isAtLimit={isAtCardLimit} hasAI={hasAI} />
+          <AddCardDialog
+            deckId={id}
+            isAtLimit={isAtCardLimit}
+            hasAI={effectiveAI}
+            allowsMultipleChoiceFormat={effective75}
+          />
         </div>
 
         {cards.length === 0 ? (
@@ -149,12 +205,13 @@ export default async function DeckPage({ params }: DeckPageProps) {
             <AddCardDialog
               deckId={id}
               isAtLimit={isAtCardLimit}
-              hasAI={hasAI}
+              hasAI={effectiveAI}
+              allowsMultipleChoiceFormat={effective75}
               trigger={<Button>Add your first card</Button>}
             />
           </div>
         ) : (
-          <CardGrid cards={cards} deckId={id} hasAI={hasAI} initialView={initialView} />
+          <CardGrid cards={cards} deckId={id} hasAI={effectiveAI} initialView={initialView} />
         )}
       </div>
     </div>

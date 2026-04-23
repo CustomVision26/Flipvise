@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
+import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  generateAnswerAction,
   generateMultipleChoiceAction,
   updateCardAction,
   updateMultipleChoiceCardAction,
@@ -32,7 +34,10 @@ import {
   ChevronDown,
   ChevronUp,
   ImagePlus,
+  Mic,
+  MicOff,
   RefreshCw,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -139,10 +144,12 @@ function ImageUploadSection({
 function StandardEditForm({
   card,
   deckId,
+  hasAI,
   onClose,
 }: {
   card: EditCardDialogProps["card"];
   deckId: number;
+  hasAI: boolean;
   onClose: () => void;
 }) {
   const [front, setFront] = useState(card.front ?? "");
@@ -159,11 +166,18 @@ function StandardEditForm({
   const [isUploadingBack, setIsUploadingBack] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
+  const [aiDistractors, setAiDistractors] = useState<[string, string, string] | null>(null);
+  const [aiDistractorsFor, setAiDistractorsFor] = useState<string | null>(null);
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
 
+  const frontSpeech = useSpeechRecognition((t) => setFront((prev) => prev + t));
+  const backSpeech = useSpeechRecognition((t) => setBack((prev) => prev + t));
+  const speechError = frontSpeech.error ?? backSpeech.error;
+
   const isUploading = isUploadingFront || isUploadingBack;
-  const isBusy = isPending || isUploading;
+  const isBusy = isPending || isUploading || isGeneratingAnswer;
   const frontHasContent = front.trim().length > 0 || !!frontImageUrl;
   const backHasContent = back.trim().length > 0 || !!backImageUrl;
 
@@ -200,8 +214,45 @@ function StandardEditForm({
     }
   }
 
+  async function handleGenerateAnswer() {
+    if (!front.trim()) {
+      setError("Please enter a question or term in the front field first.");
+      return;
+    }
+    setError(null);
+    frontSpeech.stop();
+    backSpeech.stop();
+    setIsGeneratingAnswer(true);
+    try {
+      const { answer, distractors } = await generateAnswerAction({
+        deckId,
+        question: front.trim(),
+      });
+      setBack(answer);
+      const hasValidDistractors =
+        distractors.length === 3 && distractors.every((d) => d.trim().length > 0);
+      if (hasValidDistractors) {
+        setAiDistractors([distractors[0], distractors[1], distractors[2]]);
+        setAiDistractorsFor(answer.trim());
+      } else {
+        setAiDistractors(null);
+        setAiDistractorsFor(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate answer.");
+    } finally {
+      setIsGeneratingAnswer(false);
+    }
+  }
+
   function handleSubmit() {
     setError(null);
+    frontSpeech.stop();
+    backSpeech.stop();
+    const distractorsToSend =
+      aiDistractors && aiDistractorsFor !== null && aiDistractorsFor === back.trim()
+        ? aiDistractors
+        : null;
     startTransition(async () => {
       try {
         await updateCardAction({
@@ -213,6 +264,7 @@ function StandardEditForm({
           backImageUrl,
           oldFrontImageUrl: card.frontImageUrl ?? null,
           oldBackImageUrl: card.backImageUrl ?? null,
+          distractors: distractorsToSend,
         });
         onClose();
       } catch (err) {
@@ -229,9 +281,45 @@ function StandardEditForm({
           Front
         </p>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`front-${card.id}`} className="text-xs sm:text-sm">
-            Text <span className="text-muted-foreground font-normal">(question, term, etc.)</span>
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`front-${card.id}`} className="text-xs sm:text-sm">
+              Text <span className="text-muted-foreground font-normal">(question, term, etc.)</span>
+            </Label>
+            {frontSpeech.supported && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={<span />}>
+                    <Button
+                      type="button"
+                      variant={frontSpeech.isRecording ? "destructive" : "outline"}
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      aria-label={
+                        frontSpeech.isRecording
+                          ? "Stop recording front text"
+                          : "Dictate front text with microphone"
+                      }
+                      onClick={() =>
+                        frontSpeech.isRecording ? frontSpeech.stop() : frontSpeech.start()
+                      }
+                      disabled={isBusy || backSpeech.isRecording}
+                    >
+                      {frontSpeech.isRecording ? (
+                        <MicOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Mic className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-64 text-center">
+                    {frontSpeech.isRecording
+                      ? "Stop recording"
+                      : "Record with microphone — text is appended to this field"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <Textarea
             id={`front-${card.id}`}
             placeholder="Question or term… (optional if image added)"
@@ -273,12 +361,76 @@ function StandardEditForm({
           Back
         </p>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`back-${card.id}`} className="text-xs sm:text-sm">
-            Text{" "}
-            <span className="text-muted-foreground font-normal">
-              (answer, definition, etc.)
-            </span>
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`back-${card.id}`} className="text-xs sm:text-sm">
+              Text{" "}
+              <span className="text-muted-foreground font-normal">
+                (answer, definition, etc.)
+              </span>
+            </Label>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {hasAI && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger render={<span />}>
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={handleGenerateAnswer}
+                        disabled={!front.trim() || isBusy}
+                        aria-label="Generate answer with AI"
+                      >
+                        <Sparkles
+                          className={`h-3.5 w-3.5 ${isGeneratingAnswer ? "animate-pulse" : ""}`}
+                        />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-64 text-center">
+                      {!front.trim()
+                        ? "Enter a question or term on the front first"
+                        : "Generate answer with AI. Uses your deck name, description, and existing cards so the answer matches your deck's style and scope."}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {backSpeech.supported && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger render={<span />}>
+                      <Button
+                        type="button"
+                        variant={backSpeech.isRecording ? "destructive" : "outline"}
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        aria-label={
+                          backSpeech.isRecording
+                            ? "Stop recording back text"
+                            : "Dictate back text with microphone"
+                        }
+                        onClick={() =>
+                          backSpeech.isRecording ? backSpeech.stop() : backSpeech.start()
+                        }
+                        disabled={isBusy || frontSpeech.isRecording}
+                      >
+                        {backSpeech.isRecording ? (
+                          <MicOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Mic className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-64 text-center">
+                      {backSpeech.isRecording
+                        ? "Stop recording"
+                        : "Record with microphone — text is appended to this field"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          </div>
           <Textarea
             id={`back-${card.id}`}
             placeholder="Answer or definition… (optional if image added)"
@@ -314,12 +466,30 @@ function StandardEditForm({
         />
       </div>
 
+      {!frontSpeech.supported && !backSpeech.supported && (
+        <p className="text-muted-foreground text-[11px] sm:text-xs">
+          Voice dictation isn&apos;t supported in this browser. Try Chrome, Edge, or Safari.
+        </p>
+      )}
+
+      {speechError && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive whitespace-pre-line">
+          {speechError}
+        </div>
+      )}
+
       {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
 
       <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
         <Button
           variant="outline"
-          onClick={onClose}
+          onClick={() => {
+            frontSpeech.stop();
+            backSpeech.stop();
+            frontSpeech.clearError();
+            backSpeech.clearError();
+            onClose();
+          }}
           disabled={isBusy}
           className="w-full sm:w-auto"
         >
@@ -330,7 +500,13 @@ function StandardEditForm({
           disabled={isBusy || !frontHasContent || !backHasContent}
           className="w-full sm:w-auto"
         >
-          {isPending ? "Saving…" : isUploading ? "Uploading…" : "Save changes"}
+          {isPending
+            ? "Saving…"
+            : isUploading
+              ? "Uploading…"
+              : isGeneratingAnswer
+                ? "Generating…"
+                : "Save changes"}
         </Button>
       </DialogFooter>
     </div>
@@ -371,6 +547,10 @@ function MultipleChoiceEditForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  const questionSpeech = useSpeechRecognition((t) => setQuestion((prev) => prev + t));
+  const correctSpeech = useSpeechRecognition((t) => setCorrectAnswer((prev) => prev + t));
+  const mcSpeechError = questionSpeech.error ?? correctSpeech.error;
 
   const isBusy = isPending || isUploadingImage || isRegeneratingDistractors;
   const questionHasContent = question.trim().length > 0 || !!questionImageUrl;
@@ -441,6 +621,8 @@ function MultipleChoiceEditForm({
 
   function handleSubmit() {
     setError(null);
+    questionSpeech.stop();
+    correctSpeech.stop();
     startTransition(async () => {
       try {
         await updateMultipleChoiceCardAction({
@@ -467,9 +649,45 @@ function MultipleChoiceEditForm({
           Question
         </p>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`mc-question-${card.id}`} className="text-xs sm:text-sm">
-            Text
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`mc-question-${card.id}`} className="text-xs sm:text-sm">
+              Text
+            </Label>
+            {questionSpeech.supported && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={<span />}>
+                    <Button
+                      type="button"
+                      variant={questionSpeech.isRecording ? "destructive" : "outline"}
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      aria-label={
+                        questionSpeech.isRecording
+                          ? "Stop recording question"
+                          : "Dictate question with microphone"
+                      }
+                      onClick={() =>
+                        questionSpeech.isRecording ? questionSpeech.stop() : questionSpeech.start()
+                      }
+                      disabled={isBusy || correctSpeech.isRecording}
+                    >
+                      {questionSpeech.isRecording ? (
+                        <MicOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Mic className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-64 text-center">
+                    {questionSpeech.isRecording
+                      ? "Stop recording"
+                      : "Record with microphone — text is appended to this field"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <Textarea
             id={`mc-question-${card.id}`}
             value={question}
@@ -502,13 +720,49 @@ function MultipleChoiceEditForm({
         </p>
 
         <div className="flex flex-col gap-1.5">
-          <Label
-            htmlFor={`mc-correct-${card.id}`}
-            className="text-xs sm:text-sm flex items-center gap-1.5"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-            Correct answer
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label
+              htmlFor={`mc-correct-${card.id}`}
+              className="text-xs sm:text-sm flex items-center gap-1.5 min-w-0"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+              <span className="leading-snug">Correct answer</span>
+            </Label>
+            {correctSpeech.supported && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={<span />}>
+                    <Button
+                      type="button"
+                      variant={correctSpeech.isRecording ? "destructive" : "outline"}
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      aria-label={
+                        correctSpeech.isRecording
+                          ? "Stop recording correct answer"
+                          : "Dictate correct answer with microphone"
+                      }
+                      onClick={() =>
+                        correctSpeech.isRecording ? correctSpeech.stop() : correctSpeech.start()
+                      }
+                      disabled={isBusy || questionSpeech.isRecording}
+                    >
+                      {correctSpeech.isRecording ? (
+                        <MicOff className="h-3.5 w-3.5" />
+                      ) : (
+                        <Mic className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-64 text-center">
+                    {correctSpeech.isRecording
+                      ? "Stop recording"
+                      : "Record with microphone — text is appended to this field"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           <Input
             id={`mc-correct-${card.id}`}
             value={correctAnswer}
@@ -583,12 +837,30 @@ function MultipleChoiceEditForm({
         </div>
       </div>
 
+      {!questionSpeech.supported && !correctSpeech.supported && (
+        <p className="text-muted-foreground text-[11px] sm:text-xs">
+          Voice dictation isn&apos;t supported in this browser. Try Chrome, Edge, or Safari.
+        </p>
+      )}
+
+      {mcSpeechError && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive whitespace-pre-line">
+          {mcSpeechError}
+        </div>
+      )}
+
       {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
 
       <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
         <Button
           variant="outline"
-          onClick={onClose}
+          onClick={() => {
+            questionSpeech.stop();
+            correctSpeech.stop();
+            questionSpeech.clearError();
+            correctSpeech.clearError();
+            onClose();
+          }}
           disabled={isBusy}
           className="w-full sm:w-auto"
         >
@@ -649,7 +921,12 @@ export function EditCardDialog({ card, deckId, hasAI = false }: EditCardDialogPr
             onClose={() => setOpen(false)}
           />
         ) : (
-          <StandardEditForm card={card} deckId={deckId} onClose={() => setOpen(false)} />
+          <StandardEditForm
+            card={card}
+            deckId={deckId}
+            hasAI={hasAI}
+            onClose={() => setOpen(false)}
+          />
         )}
       </DialogContent>
     </Dialog>

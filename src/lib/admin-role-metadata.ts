@@ -13,6 +13,8 @@ export type AdminRolePublicMetadata = {
   plan?: string;
   stripe_subscription_status?: string;
   preAdminGrantSnapshot?: PreAdminGrantSnapshot | null;
+  /** Cleared when revoking platform admin — invite-only team workspaces are listed here while admin. */
+  teamTierInvitedMemberships?: unknown;
 };
 
 /** Mirrors the admin dashboard heuristic for paid status stored on Clerk `publicMetadata`. */
@@ -24,17 +26,31 @@ export function looksLikePaidProFromPublicMetadata(
   return m.plan === "pro" || m.stripe_subscription_status === "active";
 }
 
-/** Called when granting the admin role: capture whether complimentary Pro was already on. */
-export function buildPublicMetadataPatchForAdminRoleGrant(
+function buildElevatedPlatformRoleGrantPatch(
+  role: "admin" | "superadmin",
   previousMeta: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
   const m = previousMeta as AdminRolePublicMetadata | undefined;
   return {
-    role: "admin",
+    role,
     preAdminGrantSnapshot: {
       adminGranted: m?.adminGranted === true,
     },
   };
+}
+
+/** Called when granting the co-admin role: capture whether complimentary Pro was already on. */
+export function buildPublicMetadataPatchForAdminRoleGrant(
+  previousMeta: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  return buildElevatedPlatformRoleGrantPatch("admin", previousMeta);
+}
+
+/** First-time platform owner metadata (allow-list bootstrap when user was not yet co-admin). */
+export function buildPublicMetadataPatchForSuperadminRoleGrant(
+  previousMeta: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  return buildElevatedPlatformRoleGrantPatch("superadmin", previousMeta);
 }
 
 /**
@@ -51,6 +67,7 @@ export function buildPublicMetadataPatchForAdminRoleRevoke(
   const patch: Record<string, unknown> = {
     role: null,
     preAdminGrantSnapshot: null,
+    teamTierInvitedMemberships: null,
   };
 
   if (snap && typeof snap === "object" && typeof snap.adminGranted === "boolean") {
@@ -63,21 +80,27 @@ export function buildPublicMetadataPatchForAdminRoleRevoke(
 }
 
 /**
- * When the admin role is removed in the Clerk Dashboard, `user.updated` fires with `role !== "admin"`.
- * Apply the same snapshot restore so `adminGranted` reflects the pre-admin complimentary state.
+ * When co-admin or owner role is removed in the Clerk Dashboard, `user.updated` fires without
+ * `role === "admin"` / `"superadmin"`. Apply the same snapshot restore so `adminGranted` reflects
+ * the pre-elevated complimentary state.
  */
 export function buildPublicMetadataPatchAfterExternalAdminRoleRemoval(
   publicMetadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> | null {
   const m = (publicMetadata ?? {}) as AdminRolePublicMetadata;
-  if (m.role === "admin") return null;
+  if (m.role === "admin" || m.role === "superadmin") return null;
 
   const snap = m.preAdminGrantSnapshot;
   if (snap && typeof snap === "object" && typeof snap.adminGranted === "boolean") {
     return {
       adminGranted: snap.adminGranted ? true : null,
       preAdminGrantSnapshot: null,
+      teamTierInvitedMemberships: null,
     };
+  }
+
+  if (m.teamTierInvitedMemberships != null) {
+    return { teamTierInvitedMemberships: null };
   }
 
   return null;

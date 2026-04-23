@@ -1,5 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
+import dynamic from "next/dynamic";
 import { createClerkClient } from "@clerk/backend";
+import { getAccessContext } from "@/lib/access";
+import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
+import {
+  isPlatformSuperadminAllowListed,
+  reconcilePlatformSuperadminClerkMetadata,
+} from "@/lib/platform-superadmin";
+import { personalDashboardHref } from "@/lib/personal-dashboard-url";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -9,11 +16,47 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { getAdminOverviewStats, getDeckStatsByUser, getAdminPrivilegeLogs } from "@/db/queries/admin";
+import {
+  getAdminOverviewStats,
+  getDeckStatsByUser,
+  getTeamOwnerPlanLabelsByUserIds,
+  getUserTeamPlanAssociationsByUserIds,
+  getAdminPrivilegeLogs,
+} from "@/db/queries/admin";
+import { getAdminUserPlanColumnLabel } from "@/lib/admin-user-plan-label";
+import {
+  augmentAdminPlanLabelWithWinner,
+  fetchUserBillingSubscriptionSafe,
+  parsePlanSourceUpdatedAtMs,
+  resolveAdminUserEffectivePlanSlug,
+} from "@/lib/plan-metadata-billing-resolution";
+import { isTeamPlanId } from "@/lib/team-plans";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
-import type { SerializedTicket } from "@/components/admin-support-panel";
-import { AdminTabs, type SerializedUser, type SerializedLog } from "@/components/admin-tabs";
+import {
+  serializeSupportTicketRow,
+  type SerializedTicket,
+} from "@/lib/support-admin-dto";
+import type { SerializedLog, SerializedUser } from "@/lib/admin-dashboard-types";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, CreditCard, Layers, ArrowLeft, BadgeCheck, ShieldCheck } from "lucide-react";
+
+const AdminTabs = dynamic(
+  () => import("@/components/admin-tabs").then((m) => m.AdminTabs),
+  {
+    ssr: true,
+    loading: () => (
+      <div
+        className="rounded-tl-none border border-t-0 p-4 space-y-3"
+        aria-busy
+        aria-label="Loading admin panel"
+      >
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-9 w-full max-w-md" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    ),
+  },
+);
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -44,32 +87,61 @@ async function getActiveSessionData(): Promise<Map<string, number>> {
 }
 
 export default async function AdminPage() {
-  const { userId } = await auth();
+  const { userId, isPro, activeTeamPlan } = await getAccessContext();
   if (!userId) redirect("/");
 
+  const personalDashboardLink = personalDashboardHref(
+    userId,
+    activeTeamPlan,
+    isPro,
+  );
+
+  await reconcilePlatformSuperadminClerkMetadata(clerkClient, userId);
+
+  const { data: clerkUsers, totalCount } = await clerkClient.users.getUserList({
+    limit: 500,
+    orderBy: "-created_at",
+  });
+
+  const userIds = clerkUsers.map((u) => u.id);
   const [
-    { data: clerkUsers, totalCount },
     dbStats,
     deckStatsByUser,
+    teamPlanByUserId,
+    teamOwnerPlanByUserId,
     activeSessionData,
     privilegeLogs,
     rawSupportTickets,
     supportStats,
   ] = await Promise.all([
-    clerkClient.users.getUserList({ limit: 500, orderBy: "-created_at" }),
     getAdminOverviewStats(),
     getDeckStatsByUser(),
+    getUserTeamPlanAssociationsByUserIds(
+      userIds,
+      clerkUsers.map((u) => {
+        const primary =
+          u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)
+            ?.emailAddress ?? null;
+        return { userId: u.id, email: primary };
+      }),
+    ),
+    getTeamOwnerPlanLabelsByUserIds(userIds),
     getActiveSessionData(),
     getAdminPrivilegeLogs(100),
     getAllSupportTickets(),
     getSupportTicketStats(),
   ]);
 
-  // Verify admin role from the live Clerk API — sessionClaims can lag after
+  // Verify platform admin from the live Clerk API — sessionClaims can lag after
   // publicMetadata is updated in the Dashboard until the JWT rotates.
   const currentUser = clerkUsers.find((u) => u.id === userId);
   const liveRole = (currentUser?.publicMetadata as { role?: string })?.role;
-  if (liveRole !== "admin") redirect("/dashboard");
+  const canAccessAdmin =
+    isClerkPlatformAdminRole(liveRole) || isPlatformSuperadminAllowListed(userId);
+  if (!canAccessAdmin) redirect(personalDashboardLink);
+
+  const callerIsSuperadmin =
+    isPlatformSuperadminAllowListed(userId) || liveRole === "superadmin";
 
   const statsByUserId = new Map(deckStatsByUser.map((s) => [s.userId, s]));
 
@@ -82,13 +154,20 @@ export default async function AdminPage() {
     const meta = u.publicMetadata as {
       role?: string;
       plan?: string;
+      teamPlanId?: string;
       stripe_subscription_status?: string;
       adminGranted?: boolean;
     };
+    const p = typeof meta?.plan === "string" ? meta.plan.trim() : "";
+    const t = typeof meta?.teamPlanId === "string" ? meta.teamPlanId.trim() : "";
+    const billingSlug = p || t;
     const isPaidPro =
-      meta?.plan === "pro" || meta?.stripe_subscription_status === "active";
+      billingSlug === "pro" ||
+      (Boolean(billingSlug) && isTeamPlanId(billingSlug)) ||
+      meta?.stripe_subscription_status === "active";
     const isAdminGranted = meta?.adminGranted === true;
-    const isAdminRole = meta?.role === "admin";
+    const isAdminRole =
+      meta?.role === "admin" || meta?.role === "superadmin";
 
     if (isPaidPro) paidSubscriberCount++;
     else if (isAdminGranted) adminApprovedCount++;
@@ -133,6 +212,25 @@ export default async function AdminPage() {
     },
   ];
 
+  const billingByUserId = new Map<
+    string,
+    Awaited<ReturnType<typeof fetchUserBillingSubscriptionSafe>>
+  >();
+  for (const u of clerkUsers) {
+    const m = u.publicMetadata as {
+      planSourceUpdatedAt?: unknown;
+      stripe_subscription_status?: string;
+    };
+    const needsBillingSnapshot =
+      parsePlanSourceUpdatedAtMs(m?.planSourceUpdatedAt) != null ||
+      m?.stripe_subscription_status === "active";
+    if (!needsBillingSnapshot) continue;
+    billingByUserId.set(
+      u.id,
+      await fetchUserBillingSubscriptionSafe(clerkClient, u.id),
+    );
+  }
+
   // Serialize Clerk user objects into plain data safe to pass to a Client Component.
   const serializedUsers: SerializedUser[] = clerkUsers.map((user) => {
     const primaryEmail =
@@ -147,17 +245,54 @@ export default async function AdminPage() {
     const meta = user.publicMetadata as {
       role?: string;
       plan?: string;
+      /** Set by `syncTeamSubscriberRoleMetadata` for team-tier Clerk billing; may be absent in `plan`. */
+      teamPlanId?: string;
       stripe_subscription_status?: string;
       adminGranted?: boolean;
+      planSourceUpdatedAt?: string;
     };
 
-    const isAdmin = meta?.role === "admin";
+    const isSuperadmin =
+      meta?.role === "superadmin" || isPlatformSuperadminAllowListed(user.id);
+    const isCoAdmin = meta?.role === "admin";
+    const isAdmin = isCoAdmin || isSuperadmin;
     const isBanned = user.banned === true;
+
+    const metaMs = parsePlanSourceUpdatedAtMs(meta?.planSourceUpdatedAt);
+    const billingSub =
+      metaMs != null || meta?.stripe_subscription_status === "active"
+        ? (billingByUserId.get(user.id) ?? null)
+        : null;
+    const planResolutionAdmin = resolveAdminUserEffectivePlanSlug({
+      publicMetadata: meta,
+      subscription: billingSub,
+    });
+    const planOrTeamSlug = planResolutionAdmin.effectiveSlug;
+
     const isPaidPro =
-      meta?.plan === "pro" || meta?.stripe_subscription_status === "active";
+      planOrTeamSlug === "pro" ||
+      (planOrTeamSlug != null &&
+        planOrTeamSlug.length > 0 &&
+        isTeamPlanId(planOrTeamSlug)) ||
+      meta?.stripe_subscription_status === "active";
     const adminGranted = meta?.adminGranted === true;
     // Admins automatically have all Pro features; no manual grant needed.
     const isPro = isPaidPro || adminGranted || isAdmin;
+    const associatePlan = teamPlanByUserId.get(user.id)?.label ?? null;
+    const fromClerk = getAdminUserPlanColumnLabel({
+      isSuperadmin,
+      isCoAdmin,
+      adminGranted,
+      planMeta: planOrTeamSlug,
+      stripeSubscriptionActive: meta?.stripe_subscription_status === "active",
+    });
+    const withAssociateFallback =
+      fromClerk !== "Free" ? fromClerk : (teamOwnerPlanByUserId.get(user.id) ?? "Free");
+    const planDisplayName = augmentAdminPlanLabelWithWinner(withAssociateFallback, {
+      comparedMetadataToBilling: planResolutionAdmin.comparedMetadataToBilling,
+      winner: planResolutionAdmin.winner,
+      legacyMetadataOverride: planResolutionAdmin.legacyMetadataOverride,
+    });
     // Banned users cannot have active sessions.
     const activeSessionCount = !isBanned ? (activeSessionData.get(user.id) ?? 0) : 0;
     const isOnline = activeSessionCount > 0;
@@ -168,15 +303,16 @@ export default async function AdminPage() {
       id: user.id,
       fullName,
       email: primaryEmail,
+      isSuperadmin,
       isAdmin,
       isBanned,
       isPaidPro,
       adminGranted,
       isPro,
+      planDisplayName,
+      associatePlan,
       isOnline,
       activeSessionCount,
-      deckCount: userStats?.deckCount ?? 0,
-      cardCount: userStats?.cardCount ?? 0,
       lastUpdated: userStats?.lastUpdated?.toISOString() ?? null,
       createdAt: new Date(user.createdAt).toISOString(),
       lastSignInAt: user.lastSignInAt
@@ -186,19 +322,8 @@ export default async function AdminPage() {
   });
 
   // Serialize support tickets (dates → ISO strings).
-  const serializedTickets: SerializedTicket[] = rawSupportTickets.map((t) => ({
-    id: t.id,
-    userId: t.userId,
-    userEmail: t.userEmail ?? null,
-    userName: t.userName ?? null,
-    subject: t.subject,
-    message: t.message,
-    category: t.category,
-    status: t.status,
-    priority: t.priority,
-    createdAt: t.createdAt.toISOString(),
-    updatedAt: t.updatedAt.toISOString(),
-  }));
+  const serializedTickets: SerializedTicket[] =
+    rawSupportTickets.map(serializeSupportTicketRow);
 
   // Serialize DB log rows (dates → ISO strings).
   const serializedLogs: SerializedLog[] = privilegeLogs.map((log) => ({
@@ -207,7 +332,7 @@ export default async function AdminPage() {
     targetUserName: log.targetUserName,
     grantedByUserId: log.grantedByUserId,
     grantedByName: log.grantedByName,
-    action: log.action,
+    action: log.action as SerializedLog["action"],
     createdAt: log.createdAt.toISOString(),
   }));
 
@@ -222,11 +347,11 @@ export default async function AdminPage() {
           </p>
         </div>
         <Link
-          href="/dashboard"
+          href={personalDashboardLink}
           className={buttonVariants({ variant: "outline", size: "sm" }) + " shrink-0 text-xs sm:text-sm h-8 sm:h-9"}
         >
-          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-          My Decks
+          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" aria-hidden />
+          Personal Dashboard
         </Link>
       </div>
 
@@ -253,6 +378,7 @@ export default async function AdminPage() {
       {/* Tabbed panel — All Users / Admin Roles / Audit Log */}
       <AdminTabs
         currentUserId={userId}
+        callerIsSuperadmin={callerIsSuperadmin}
         users={serializedUsers}
         logs={serializedLogs}
         supportTickets={serializedTickets}

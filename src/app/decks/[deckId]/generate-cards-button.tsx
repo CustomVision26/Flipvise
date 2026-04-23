@@ -30,7 +30,7 @@ interface GenerateCardsButtonProps {
   totalCardCount: number;
   aiGeneratedCount: number;
   hasAI: boolean;
-  hasUnlimitedDecks: boolean;
+  has75CardsPerDeck: boolean;
 }
 
 export function GenerateCardsButton({
@@ -39,7 +39,7 @@ export function GenerateCardsButton({
   totalCardCount,
   aiGeneratedCount,
   hasAI,
-  hasUnlimitedDecks,
+  has75CardsPerDeck,
 }: GenerateCardsButtonProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function GenerateCardsButton({
 
   const manualCardCount = totalCardCount - aiGeneratedCount;
   const remainingAiSlots = AI_GENERATION_CAP_PER_DECK - aiGeneratedCount;
-  const deckCardLimit = getCardsPerDeckLimit(hasUnlimitedDecks);
+  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   const remainingDeckSlots = deckCardLimit - totalCardCount;
 
   const batchOptions = useMemo(
@@ -125,7 +125,7 @@ export function GenerateCardsButton({
           <p className="text-foreground font-medium text-[10px] sm:text-sm">
             {aiGeneratedCount} AI · {manualCardCount} manual · {Math.max(0, remainingDeckSlots)} slot
             {Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} left (
-            {deckCardLimit} max, {hasUnlimitedDecks ? "Pro" : "Free"})
+            {deckCardLimit} max, {has75CardsPerDeck ? "Pro" : "Free"})
           </p>
         </AlertDescription>
       </Alert>
@@ -192,7 +192,7 @@ export function GenerateCardsButton({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-64 text-center text-xs sm:text-sm">
             {remainingDeckSlots <= 0
-              ? hasUnlimitedDecks
+              ? has75CardsPerDeck
                 ? `This deck is full (${deckCardLimit} cards on Pro). Delete cards to free space.`
                 : `This deck is full on the Free plan (${deckCardLimit} cards). Upgrade to Pro for more room per deck, or delete cards.`
               : "No valid batch size left for AI generation with current limits."}

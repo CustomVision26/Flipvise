@@ -19,21 +19,26 @@ interface ToggleAdminRoleButtonProps {
   targetUserId: string;
   targetUserName: string;
   targetUserEmail: string | null;
-  isAdmin: boolean;
+  /** Target has co-admin role (`admin`), not platform owner. */
+  isCoAdmin: boolean;
+  targetIsSuperadmin: boolean;
   isSelf: boolean;
+  callerIsSuperadmin: boolean;
 }
 
 export function ToggleAdminRoleButton({
   targetUserId,
   targetUserName,
   targetUserEmail,
-  isAdmin,
+  isCoAdmin,
+  targetIsSuperadmin,
   isSelf,
+  callerIsSuperadmin,
 }: ToggleAdminRoleButtonProps) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  if (isSelf) return null;
+  if (isSelf || targetIsSuperadmin || !callerIsSuperadmin) return null;
 
   function handleConfirm() {
     setOpen(false);
@@ -41,7 +46,7 @@ export function ToggleAdminRoleButton({
       await toggleAdminRoleAction({
         targetUserId,
         targetUserName,
-        grant: !isAdmin,
+        grant: !isCoAdmin,
       });
     });
   }
@@ -49,24 +54,24 @@ export function ToggleAdminRoleButton({
   return (
     <>
       <Button
-        variant={isAdmin ? "destructive" : "outline"}
+        variant={isCoAdmin ? "destructive" : "outline"}
         size="xs"
         onClick={() => setOpen(true)}
         disabled={isPending}
       >
-        {isPending ? "…" : isAdmin ? "Revoke Admin" : "Grant Admin"}
+        {isPending ? "…" : isCoAdmin ? "Revoke co-admin" : "Grant co-admin"}
       </Button>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {isAdmin ? "Revoke admin role?" : "Grant admin role?"}
+              {isCoAdmin ? "Revoke co-admin role?" : "Grant co-admin role?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {isAdmin
-                ? "This will remove admin privileges from the following user. Complimentary Pro (if any) returns to how it was before they became admin; paid Pro from billing and its expiration are unchanged. The change is recorded in the Privilege Audit Log."
-                : "This will grant admin privileges to the following user. They will be able to access admin tools. The change is recorded in the Privilege Audit Log."}
+              {isCoAdmin
+                ? "This will remove co-admin privileges from the following user. Complimentary Pro (if any) returns to how it was before they became co-admin; paid Pro from billing and its expiration are unchanged. The change is recorded in the Privilege Audit Log."
+                : "This will grant co-admin privileges to the following user. They will be able to access the admin dashboard and manage users, but cannot grant or revoke co-admins or ban other co-admins. The change is recorded in the Privilege Audit Log."}
             </AlertDialogDescription>
             <AdminUserIdentityBlock
               name={targetUserName}
@@ -79,12 +84,12 @@ export function ToggleAdminRoleButton({
             <AlertDialogAction
               onClick={handleConfirm}
               className={
-                isAdmin
+                isCoAdmin
                   ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   : undefined
               }
             >
-              {isAdmin ? "Revoke Admin" : "Grant Admin"}
+              {isCoAdmin ? "Revoke co-admin" : "Grant co-admin"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
