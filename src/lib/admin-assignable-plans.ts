@@ -1,4 +1,5 @@
 import { TEAM_PLAN_IDS, TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import { ADMIN_PLAN_KEY } from "@/lib/plan-metadata-billing-resolution";
 
 const BASE = [
   { id: "free" as const, label: "Free (clear plan flags)" },
@@ -23,6 +24,8 @@ export function isAdminPlanAssignment(value: string): value is AdminPlanAssignme
 
 /**
  * `publicMetadata` fields written by the admin "Assign plan" action. Shallow-merged; `null` removes a key in Clerk.
+ * Sets `adminPlan` (the source-of-truth for admin overrides).
+ * Does NOT set `plan` directly — the caller must call resolveEffectivePlan() and write `plan` separately.
  */
 export function publicMetadataPatchForAdminPlanAssignment(
   assignment: AdminPlanAssignment,
@@ -30,14 +33,14 @@ export function publicMetadataPatchForAdminPlanAssignment(
   switch (assignment) {
     case "free":
       return {
-        plan: null,
+        [ADMIN_PLAN_KEY]: null,
         teamPlanId: null,
         teamRole: null,
         adminGranted: null,
       };
     case "pro":
       return {
-        plan: "pro",
+        [ADMIN_PLAN_KEY]: "pro",
         teamPlanId: null,
         teamRole: null,
         adminGranted: null,
@@ -45,7 +48,7 @@ export function publicMetadataPatchForAdminPlanAssignment(
     default:
       if (isTeamPlanId(assignment)) {
         return {
-          plan: assignment,
+          [ADMIN_PLAN_KEY]: assignment,
           teamPlanId: assignment,
           teamRole: "team_admin",
           adminGranted: null,

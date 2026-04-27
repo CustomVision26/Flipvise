@@ -7,14 +7,16 @@ import { HeaderLogo } from "@/components/header-logo";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
-import { isTeamPlanId, TEAM_PLAN_LABELS } from "@/lib/team-plans";
+import { isTeamPlanId } from "@/lib/team-plans";
 import { personalDashboardHref } from "@/lib/personal-dashboard-url";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import {
+  countPendingInvitationsForEmail,
   getTeamsForTeamDashboard,
   getWorkspaceNavTeamsForUser,
   userHasTeamAdminDashboardAccess,
 } from "@/db/queries/teams";
+import { currentUser } from "@/lib/clerk-auth";
 import { TeamAdminHeaderSwitcherClient } from "@/components/team-admin-header-switcher-client";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { shouldHideHelpCenter } from "@/lib/team-help";
@@ -51,15 +53,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { userId, isPro, adminGranted, isAdmin, activeTeamPlan } =
+  const { userId, isPro, adminGranted, isAdmin, activeTeamPlan, hasCustomColors } =
     await getAccessContext();
 
-  const personalPlanLabelForWorkspace =
-    activeTeamPlan !== null
-      ? TEAM_PLAN_LABELS[activeTeamPlan]
-      : isPro
-        ? "Pro"
-        : "Free";
+  // Team plan subscribers receive Pro on their personal workspace — show "Pro" here,
+  // not the team plan name (which belongs only to the team owner dashboard).
+  const personalPlanLabelForWorkspace = isPro ? "Pro" : "Free";
 
   const teamAdminHeaderPayload =
     userId != null
@@ -140,6 +139,18 @@ export default async function RootLayout({
     !isAdmin &&
     !adminGranted &&
     (await shouldHideHelpCenter(userId, teamContext));
+
+  const inboxUnreadCount = await (async () => {
+    if (!userId) return 0;
+    try {
+      const sessionUser = await currentUser();
+      const email = sessionUser?.primaryEmailAddress?.emailAddress ?? null;
+      if (!email) return 0;
+      return await countPendingInvitationsForEmail(email);
+    } catch {
+      return 0;
+    }
+  })();
   
   const proCookieValue = cookieStore.get(PRO_UI_THEME_COOKIE)?.value;
   const proUiTheme = resolveProUiThemeDataAttribute(isPro, proCookieValue);
@@ -197,6 +208,10 @@ export default async function RootLayout({
                         personalPlanLabelForWorkspace={
                           personalPlanLabelForWorkspace
                         }
+                        resolvedIsPro={isPro}
+                        resolvedActiveTeamPlan={activeTeamPlan}
+                        resolvedHasCustomColors={hasCustomColors}
+                        inboxUnreadCount={inboxUnreadCount}
                       />
                     </div>
                   )}

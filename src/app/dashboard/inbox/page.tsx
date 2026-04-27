@@ -2,8 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Inbox } from "lucide-react";
 import { currentUser } from "@/lib/clerk-auth";
+import { auth } from "@clerk/nextjs/server";
 import { TeamInviteInboxSection } from "@/components/team-invite-inbox-section";
+import { BillingInboxSection } from "@/components/billing-inbox-section";
+import { AffiliateInviteInboxSection } from "@/components/affiliate-invite-inbox-section";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { getAllAffiliatesByEmailOrUserId } from "@/db/queries/affiliates";
+import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
 
 export default async function DashboardInboxPage() {
   const sessionUser = await currentUser();
@@ -12,6 +17,31 @@ export default async function DashboardInboxPage() {
   const inboxEmail =
     sessionUser.primaryEmailAddress?.emailAddress ?? null;
   if (!inboxEmail) redirect("/dashboard");
+  const { userId } = await auth();
+  if (!userId) redirect("/");
+
+  const affiliateRows = await getAllAffiliatesByEmailOrUserId(
+    inboxEmail,
+    userId,
+  );
+
+  const allAffiliates: SerializedAffiliate[] = affiliateRows.map((a) => ({
+    id: a.id,
+    invitedEmail: a.invitedEmail,
+    invitedUserId: a.invitedUserId ?? null,
+    affiliateName: a.affiliateName,
+    planAssigned: a.planAssigned,
+    startedAt: a.startedAt.toISOString(),
+    endsAt: a.endsAt.toISOString(),
+    addedByUserId: a.addedByUserId,
+    addedByName: a.addedByName,
+    status: a.status as "pending" | "active" | "revoked",
+    token: a.token ?? null,
+    inviteAcceptedAt: a.inviteAcceptedAt ? a.inviteAcceptedAt.toISOString() : null,
+    revokedAt: a.revokedAt ? a.revokedAt.toISOString() : null,
+    revokedByName: a.revokedByName ?? null,
+    createdAt: a.createdAt.toISOString(),
+  }));
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
@@ -26,7 +56,7 @@ export default async function DashboardInboxPage() {
             <span className="min-w-0">Inbox</span>
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Team invitations and requests for your account.
+            Team invitations, affiliate invites, and requests for your account.
           </p>
         </div>
         <Link
@@ -41,7 +71,9 @@ export default async function DashboardInboxPage() {
         </Link>
       </div>
 
+      <AffiliateInviteInboxSection affiliates={allAffiliates} />
       <TeamInviteInboxSection userEmail={inboxEmail} mode="page" />
+      <BillingInboxSection userId={userId} userEmail={inboxEmail} />
     </div>
   );
 }

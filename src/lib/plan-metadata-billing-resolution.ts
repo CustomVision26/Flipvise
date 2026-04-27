@@ -9,11 +9,98 @@ import {
 /** ISO timestamp written whenever an admin applies a plan from `/admin`. */
 export const PLAN_SOURCE_UPDATED_AT_KEY = "planSourceUpdatedAt";
 
+// ─── Stripe-only billing metadata keys ───────────────────────────────────────
+/** Stripe only — plan slug of the active/last Stripe subscription. */
+export const BILLING_PLAN_KEY = "billingPlan" as const;
+/** Stripe only — Stripe subscription status mapped to a simple set. */
+export const BILLING_STATUS_KEY = "billingStatus" as const;
+/** Stripe only — ISO timestamp of the last billing state write. */
+export const BILLING_PLAN_UPDATED_AT_KEY = "billingPlanUpdatedAt" as const;
+
+// ─── Admin-only metadata keys ─────────────────────────────────────────────────
+/** Admin only — plan slug manually assigned by a platform admin. */
+export const ADMIN_PLAN_KEY = "adminPlan" as const;
+/** Admin only — ISO timestamp of the last admin plan assignment. */
+export const ADMIN_PLAN_UPDATED_AT_KEY = "adminPlanUpdatedAt" as const;
+
+export type BillingStatusValue = "active" | "trialing" | "canceled" | "expired";
+
 export type PlanPublicMetadata = {
+  /** Resolved/computed display plan — do not write directly; use resolveEffectivePlan(). */
   plan?: unknown;
   teamPlanId?: unknown;
+  /** Legacy: ISO timestamp written by admin plan assignment (kept for backward compat). */
   planSourceUpdatedAt?: unknown;
+  /** Stripe-sourced plan slug. */
+  billingPlan?: unknown;
+  /** Stripe subscription status. */
+  billingStatus?: unknown;
+  /** ISO timestamp of last Stripe billing write. */
+  billingPlanUpdatedAt?: unknown;
+  /** Admin-assigned plan slug. */
+  adminPlan?: unknown;
+  /** ISO timestamp of last admin plan assignment. */
+  adminPlanUpdatedAt?: unknown;
 };
+
+/**
+ * Computes the resolved `plan` value from the two independent sources:
+ * Stripe billing state and admin assignment.
+ *
+ * Rules (in order):
+ * 1. If billing is canceled/expired AND no admin plan exists → free (null).
+ * 2. If billing is canceled/expired AND admin assigned AFTER the cancellation → adminPlan.
+ * 3. If billing is canceled/expired AND admin assigned BEFORE or same time → free (null).
+ * 4. If billing is active AND both sources exist → whichever timestamp is newer wins.
+ * 5. If billing is active with no admin plan → billingPlan.
+ * 6. No active billing but adminPlan exists → adminPlan.
+ * 7. Nothing → free (null).
+ */
+export function resolveEffectivePlan(
+  meta: Record<string, unknown>,
+): string | null {
+  const billingPlan =
+    typeof meta[BILLING_PLAN_KEY] === "string" ? (meta[BILLING_PLAN_KEY] as string) : null;
+  const billingStatus =
+    typeof meta[BILLING_STATUS_KEY] === "string" ? (meta[BILLING_STATUS_KEY] as string) : null;
+  const billingPlanUpdatedAt =
+    typeof meta[BILLING_PLAN_UPDATED_AT_KEY] === "string"
+      ? (meta[BILLING_PLAN_UPDATED_AT_KEY] as string)
+      : null;
+  const adminPlan =
+    typeof meta[ADMIN_PLAN_KEY] === "string" && (meta[ADMIN_PLAN_KEY] as string).trim()
+      ? (meta[ADMIN_PLAN_KEY] as string).trim()
+      : null;
+  const adminPlanUpdatedAt =
+    typeof meta[ADMIN_PLAN_UPDATED_AT_KEY] === "string"
+      ? (meta[ADMIN_PLAN_UPDATED_AT_KEY] as string)
+      : null;
+
+  const isBillingActive = billingStatus === "active" || billingStatus === "trialing";
+  const isBillingCanceled = billingStatus === "canceled" || billingStatus === "expired";
+
+  if (isBillingCanceled) {
+    const billingCanceledMs = parsePlanSourceUpdatedAtMs(billingPlanUpdatedAt) ?? 0;
+    const adminAssignedMs = parsePlanSourceUpdatedAtMs(adminPlanUpdatedAt) ?? 0;
+    // Admin re-assigned a plan after billing was canceled — honor admin override.
+    if (adminPlan && adminAssignedMs > billingCanceledMs) return adminPlan;
+    // Billing canceled with no newer admin override → free.
+    return null;
+  }
+
+  if (isBillingActive && billingPlan) {
+    const billingMs = parsePlanSourceUpdatedAtMs(billingPlanUpdatedAt) ?? 0;
+    const adminMs = parsePlanSourceUpdatedAtMs(adminPlanUpdatedAt) ?? 0;
+    // Admin override is newer than billing event → admin wins.
+    if (adminPlan && adminMs > billingMs) return adminPlan;
+    return billingPlan;
+  }
+
+  // No active billing — fall back to admin plan if present.
+  if (adminPlan) return adminPlan;
+
+  return null;
+}
 
 type BillingSubscriptionShape = {
   created_at?: number;
@@ -57,10 +144,10 @@ export function metadataPlanSlugFromPublicMeta(
   meta: PlanPublicMetadata | undefined,
 ): string | undefined {
   if (!meta) return undefined;
-  const p = typeof meta.plan === "string" ? meta.plan.trim() : "";
-  if (p) return p;
   const t = typeof meta.teamPlanId === "string" ? meta.teamPlanId.trim() : "";
-  return t || undefined;
+  if (t) return t;
+  const p = typeof meta.plan === "string" ? meta.plan.trim() : "";
+  return p || undefined;
 }
 
 export function parsePlanSourceUpdatedAtMs(

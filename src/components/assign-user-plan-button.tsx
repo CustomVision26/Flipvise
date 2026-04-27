@@ -43,7 +43,41 @@ type AssignUserPlanButtonProps = {
   targetUserEmail: string | null;
   isSelf: boolean;
   targetIsPlatformOwner: boolean;
+  /** Resolved effective plan currently displayed to this user. */
+  currentResolvedPlan?: string | null;
+  /** Stripe-sourced plan slug (billingPlan metadata). */
+  billingPlan?: string | null;
+  /** Stripe subscription status (billingStatus metadata). */
+  billingStatus?: string | null;
+  /** ISO timestamp of last Stripe billing write. */
+  billingPlanUpdatedAt?: string | null;
+  /** Admin-assigned plan slug (adminPlan metadata). */
+  adminPlan?: string | null;
+  /** ISO timestamp of last admin plan assignment. */
+  adminPlanUpdatedAt?: string | null;
 };
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function billingStatusBadge(status: string | null | undefined): { label: string; color: string } {
+  switch (status) {
+    case "active": return { label: "Active", color: "text-green-500" };
+    case "trialing": return { label: "Trialing", color: "text-blue-500" };
+    case "canceled": return { label: "Canceled", color: "text-destructive" };
+    case "expired": return { label: "Expired", color: "text-destructive" };
+    default: return { label: "None", color: "text-muted-foreground" };
+  }
+}
 
 export function AssignUserPlanButton({
   targetUserId,
@@ -51,6 +85,12 @@ export function AssignUserPlanButton({
   targetUserEmail,
   isSelf,
   targetIsPlatformOwner,
+  currentResolvedPlan,
+  billingPlan,
+  billingStatus,
+  billingPlanUpdatedAt,
+  adminPlan,
+  adminPlanUpdatedAt,
 }: AssignUserPlanButtonProps) {
   const [pending, setPending] = useState<AdminPlanAssignment | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -197,10 +237,69 @@ export function AssignUserPlanButton({
               below. It does <strong>not</strong> create or cancel paid
               subscriptions in the Clerk Dashboard.
             </AlertDialogDescription>
-            <div className="space-y-2 text-left text-sm text-muted-foreground">
+            <div className="space-y-3 text-left text-sm text-muted-foreground">
+              {/* ── Resolution context ── */}
+              <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5 space-y-2 text-xs">
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Current plan state</p>
+                {/* Resolved plan */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Resolved plan</span>
+                  <span className="font-medium text-foreground">
+                    {currentResolvedPlan && currentResolvedPlan !== "Free" ? currentResolvedPlan : "Free"}
+                  </span>
+                </div>
+                {/* Billing source */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Stripe billing</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-medium text-foreground">{billingPlan ?? "—"}</span>
+                    {billingStatus && (
+                      <span className={cn("font-medium", billingStatusBadge(billingStatus).color)}>
+                        ({billingStatusBadge(billingStatus).label})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {billingPlanUpdatedAt && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Billing updated</span>
+                    <span className="text-foreground">{fmtDate(billingPlanUpdatedAt)}</span>
+                  </div>
+                )}
+                {/* Admin source */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Admin override</span>
+                  <span className="font-medium text-foreground">{adminPlan ?? "—"}</span>
+                </div>
+                {adminPlanUpdatedAt && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Override set</span>
+                    <span className="text-foreground">{fmtDate(adminPlanUpdatedAt)}</span>
+                  </div>
+                )}
+                {/* What will happen */}
+                {pending && (
+                  <>
+                    <div className="border-t border-border my-1" />
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">After assignment</span>
+                      <span className="font-semibold text-foreground">
+                        {pending === "free"
+                          ? billingStatus === "active" || billingStatus === "trialing"
+                            ? `${billingPlan ?? "billing plan"} (billing wins)`
+                            : "Free"
+                          : billingStatus === "active" || billingStatus === "trialing"
+                          ? "Newer timestamp wins"
+                          : labelForAdminPlanAssignment(pending)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
               {pending && (
                 <p className="text-foreground font-medium">
-                  Selection: {labelForAdminPlanAssignment(pending)}
+                  Assigning: {labelForAdminPlanAssignment(pending)}
                 </p>
               )}
               <p>

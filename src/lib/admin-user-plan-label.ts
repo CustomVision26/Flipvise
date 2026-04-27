@@ -2,8 +2,10 @@ import { TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plan
 
 /**
  * Resolves a single line for the admin users table "Plan" column, in order:
- * platform super → co → subscribed product (`publicMetadata.plan` or `teamPlanId`) →
- * `adminGranted` → active Stripe with no plan slug → Free.
+ * admin role (super/co-admin) → subscribed product (`publicMetadata.plan` or
+ * `teamPlanId`) → `adminGranted` → active Stripe with no plan slug → Free.
+ *
+ * Superadmin/co-admin are roles, but both include Pro access automatically.
  */
 export function getAdminUserPlanColumnLabel(input: {
   isSuperadmin: boolean;
@@ -15,12 +17,8 @@ export function getAdminUserPlanColumnLabel(input: {
 }): string {
   const { isSuperadmin, isCoAdmin, adminGranted, planMeta, stripeSubscriptionActive } =
     input;
-
-  if (isSuperadmin) {
-    return "Platform superadmin";
-  }
-  if (isCoAdmin) {
-    return "Platform co-admin";
+  if (isSuperadmin || isCoAdmin) {
+    return "Pro";
   }
 
   const p = planMeta?.trim();

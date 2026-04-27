@@ -547,6 +547,7 @@ export async function getWorkspaceNavTeamsForUser(
       planUrlValue: isTeamPlanId(t.planSlug) ? t.planSlug : "pro",
       ownerDisplayName: ownerDisplayNameById.get(t.ownerUserId) ?? "Subscriber",
       canAccessTeamAdmin,
+      isSubscriberOwned: t.ownerUserId === userId,
     };
   });
 
@@ -714,6 +715,25 @@ export async function revokePendingTeamInvitation(invitationId: number, teamId: 
     )
     .returning({ id: teamInvitations.id });
   return updated[0] ?? null;
+}
+
+/** Count of open (pending + non-expired) invitations for the inbox nav badge. */
+export async function countPendingInvitationsForEmail(
+  inviteeEmail: string,
+): Promise<number> {
+  const normalized = inviteeEmail.toLowerCase();
+  const now = new Date();
+  const rows = await db
+    .select({ value: count() })
+    .from(teamInvitations)
+    .where(
+      and(
+        eq(teamInvitations.email, normalized),
+        eq(teamInvitations.status, "pending"),
+        gt(teamInvitations.expiresAt, now),
+      ),
+    );
+  return rows[0]?.value ?? 0;
 }
 
 /** Invitations sent to this email (any status), newest first — for personal inbox. */

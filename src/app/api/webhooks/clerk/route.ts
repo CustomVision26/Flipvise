@@ -6,6 +6,11 @@ import {
   extractBillingUserIdFromWebhookData,
   syncTeamSubscriberRoleMetadata,
 } from "@/lib/team-clerk-metadata";
+import { billingActivePlanSlug } from "@/lib/plan-metadata-billing-resolution";
+import {
+  upsertBillingInvoiceRecord,
+  upsertBillingInvoicesFromSubscription,
+} from "@/db/queries/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +35,32 @@ function isBillingSubscriptionEvent(type: string): boolean {
     type === "paymentAttempt.created" ||
     type === "paymentAttempt.updated"
   );
+}
+
+function readString(
+  value: unknown,
+  fallback?: string | null,
+): string | null {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  return fallback ?? null;
+}
+
+function readNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.round(parsed) : null;
+  }
+  return null;
+}
+
+function readDate(value: unknown): Date | null {
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value);
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? new Date(parsed) : null;
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -62,6 +93,59 @@ export async function POST(req: NextRequest) {
     const userId = extractBillingUserIdFromWebhookData(evt.data);
     if (userId) {
       try {
+        const subscription = await clerkClient.billing.getUserBillingSubscription(userId);
+        const planSlug = billingActivePlanSlug(subscription) ?? null;
+        const user = await clerkClient.users.getUser(userId);
+        const userEmail =
+          user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress?.toLowerCase() ??
+          null;
+
+        await upsertBillingInvoicesFromSubscription(
+          userId,
+          userEmail,
+          planSlug,
+          subscription.invoices ?? [],
+        );
+
+        if (evt.type === "paymentAttempt.created" || evt.type === "paymentAttempt.updated") {
+          const data = evt.data as Record<string, unknown>;
+          const paymentAttemptId =
+            readString(data.id) ??
+            readString(data.payment_attempt_id) ??
+            readString(data.paymentAttemptId) ??
+            readString((data.payment_attempt as Record<string, unknown> | undefined)?.id);
+          if (paymentAttemptId) {
+            await upsertBillingInvoiceRecord({
+              externalId: paymentAttemptId,
+              source: "payment_attempt",
+              userId,
+              userEmail,
+              planSlug,
+              invoiceNumber:
+                readString(data.invoice_number) ??
+                readString(data.invoiceNumber) ??
+                readString(data.number),
+              status: readString(data.status, "unknown"),
+              amountCents:
+                readNumber(data.amount) ??
+                readNumber(data.amount_due) ??
+                readNumber(data.amountDue) ??
+                readNumber(data.total),
+              currency: readString(data.currency),
+              hostedInvoiceUrl:
+                readString(data.hosted_invoice_url) ??
+                readString(data.hostedInvoiceUrl),
+              invoicePdfUrl:
+                readString(data.invoice_pdf) ??
+                readString(data.invoicePdf),
+              paidAt:
+                readDate(data.created_at) ??
+                readDate(data.createdAt) ??
+                new Date(),
+            });
+          }
+        }
+
         await syncTeamSubscriberRoleMetadata(clerkClient, userId);
       } catch (err) {
         console.error("clerk webhook: team subscriber metadata sync failed", err);

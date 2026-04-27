@@ -1,0 +1,139 @@
+[
+  {
+    "id": "free",
+    "name": "Free",
+    "monthlyPrice": null,
+    "yearlyMonthlyPrice": null,
+    "description": "Get started with flashcard study — no credit card needed.",
+    "features": [
+      "Up to 3 decks",
+      "Up to 8 cards per deck",
+      "Manual card creation",
+      "3 interface color themes",
+      "Study mode"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  },
+  {
+    "id": "pro",
+    "name": "Pro",
+    "monthlyPrice": 15,
+    "yearlyMonthlyPrice": 10,
+    "description": "Everything you need for serious flashcard learning.",
+    "features": [
+      "Unlimited Decks",
+      "AI Flashcard Generation",
+      "75 cards Per Deck",
+      "Priority support",
+      "Standard Reviews and Quiz",
+      "Multiple Interface Colors"
+    ],
+    "highlighted": true,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  },
+  {
+    "id": "pro_team_basic",
+    "name": "Team Basic",
+    "monthlyPrice": 35,
+    "yearlyMonthlyPrice": 25,
+    "description": "Collaborate with a small study group.",
+    "features": [
+      "Pro Plan features",
+      "Up to 2 team workspaces",
+      "Up to 5 members per workspace",
+      "Team deck sharing",
+      "Team Management Abilities",
+      "Track Member Progress"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  },
+  {
+    "id": "pro_team_gold",
+    "name": "Team Gold",
+    "monthlyPrice": 75,
+    "yearlyMonthlyPrice": 65,
+    "description": "Scale your team learning across multiple workspaces.",
+    "features": [
+      "Pro Plan features",
+      "Up to 5 team workspaces",
+      "Up to 15 members per workspace",
+      "Team deck sharing",
+      "Team Management Abilities",
+      "Track Member Progress"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  },
+  {
+    "id": "pro_platinum_plan",
+    "name": "Platinum",
+    "monthlyPrice": 250,
+    "yearlyMonthlyPrice": 230,
+    "description": "Power user plan for large teams and institutions.",
+    "features": [
+      "Pro Plan features",
+      "Up to 10 team workspaces",
+      "Up to 25 members per workspace",
+      "Team deck sharing",
+      "Team Management Abilities",
+      "Track Member Progress"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  },
+  {
+    "id": "pro_enterprise",
+    "name": "Enterprise",
+    "monthlyPrice": 500,
+    "yearlyMonthlyPrice": 450,
+    "description": "Full-scale deployment for large organizations.",
+    "features": [
+      "Pro Plan features",
+      "Up to 20 team workspaces",
+      "Up to 35 members per workspace",
+      "Team deck sharing",
+      "Team Management Abilities",
+      "Track Member Progress"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  }
+]

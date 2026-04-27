@@ -15,7 +15,7 @@ import {
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import {
-  resolveActiveTeamPlanFromHas,
+  type TeamPlanId,
   TEAM_PLAN_LABELS,
 } from "@/lib/team-plans";
 import type { WorkspaceTeamOption } from "@/components/workspace-context-dropdown";
@@ -44,6 +44,14 @@ interface HeaderUserSectionProps {
   personalWorkspaceHref?: string;
   /** Shown next to "Personal" in the workspace dropdown (e.g. Team Gold, Pro, Free). */
   personalPlanLabelForWorkspace?: string;
+  /** Server-resolved effective Pro state from `getAccessContext()`. */
+  resolvedIsPro?: boolean;
+  /** Server-resolved active team plan from `getAccessContext()`. */
+  resolvedActiveTeamPlan?: TeamPlanId | null;
+  /** Server-resolved custom color entitlement from `getAccessContext()`. */
+  resolvedHasCustomColors?: boolean;
+  /** Count of open (pending + non-expired) inbox invitations for the nav badge. */
+  inboxUnreadCount?: number;
 }
 
 export function HeaderUserSection({
@@ -56,23 +64,21 @@ export function HeaderUserSection({
   activeWorkspaceTeamId = null,
   personalWorkspaceHref = "/dashboard",
   personalPlanLabelForWorkspace = "Free",
+  resolvedIsPro = false,
+  resolvedActiveTeamPlan = null,
+  resolvedHasCustomColors = false,
+  inboxUnreadCount = 0,
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
-  const { userId, has } = useAuth();
+  const { userId } = useAuth();
   const { user } = useUser();
-
-  const isPaidPro = has?.({ plan: "pro" }) ?? false;
   const meta = user?.publicMetadata as
     | { adminGranted?: boolean; role?: string }
     | undefined;
   const adminGranted = meta?.adminGranted === true;
   const isAdmin = isClerkPlatformAdminRole(meta?.role);
-  const activeTeamPlan = resolveActiveTeamPlanFromHas(has);
-  const isPro =
-    isPaidPro ||
-    adminGranted ||
-    isAdmin ||
-    activeTeamPlan !== null;
+  const activeTeamPlan = resolvedActiveTeamPlan;
+  const isPro = resolvedIsPro || adminGranted || isAdmin;
 
   const workspaceNavUnlocked = isAdmin || adminGranted;
   /** Team onboarding route: hide for non–platform-admin users only. */
@@ -97,11 +103,9 @@ export function HeaderUserSection({
     activeTeamPlan != null
       ? `${planName} plan`
       : isPro
-        ? isPaidPro
-          ? "Pro plan"
-          : adminGranted
-            ? "Pro plan (complimentary)"
-            : "Pro plan (administrator)"
+        ? adminGranted
+          ? "Pro plan (complimentary)"
+          : "Pro plan"
         : "Free plan";
 
   if (!userId) {
@@ -192,8 +196,10 @@ export function HeaderUserSection({
       <SettingsMenu 
         currentProTheme={currentProTheme}
         currentFreeTheme={currentFreeTheme}
+        isPro={isPro}
+        hasCustomColors={resolvedHasCustomColors}
       />
-      <InboxNavIconButton />
+      <InboxNavIconButton unreadCount={inboxUnreadCount} />
       {!hideHelpCenter && <HelpCenter />}
     </div>
   );

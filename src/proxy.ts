@@ -36,7 +36,9 @@ export default async function proxy(
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    // Exclude Next internals, static assets, and billing webhooks from Clerk (Stripe needs raw body).
+    "/((?!_next|api/webhooks|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Other API routes (non-webhook) and tRPC still run through Clerk.
+    "/(api(?!/webhooks)|trpc)(.*)",
   ],
 };

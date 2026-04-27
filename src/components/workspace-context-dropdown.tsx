@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, Info, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,7 +54,6 @@ export function WorkspaceContextDropdown({
 }: WorkspaceContextDropdownProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { userId } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [pending, setPending] = React.useState(false);
@@ -83,25 +81,29 @@ export function WorkspaceContextDropdown({
     });
   }, [teams, q]);
 
-  /** True when this user owns at least one team-tier workspace (their subscription block in the menu). */
+  /**
+   * True when the signed-in user owns at least one team-tier workspace.
+   * Uses the server-computed `isSubscriberOwned` flag rather than comparing
+   * `ownerUserId` against the client-side `useAuth()` userId, which can be
+   * null during SSR hydration and cause a structural mismatch (removeChild crash).
+   */
   const subscriberOwnsTeamTierWorkspace = React.useMemo(() => {
-    if (!userId) return false;
     return teams.some(
-      (t) => t.ownerUserId === userId && isTeamPlanId(t.planUrlValue),
+      (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
     );
-  }, [teams, userId]);
+  }, [teams]);
 
   /** Team workspaces this session user owns (same subscriber as Personal), filtered — only used when {@link subscriberOwnsTeamTierWorkspace}. */
   const subscriberOwnTeamsFiltered = React.useMemo(() => {
-    if (!userId || !subscriberOwnsTeamTierWorkspace) return [];
-    return filteredTeams.filter((t) => t.ownerUserId === userId);
-  }, [filteredTeams, userId, subscriberOwnsTeamTierWorkspace]);
+    if (!subscriberOwnsTeamTierWorkspace) return [];
+    return filteredTeams.filter((t) => t.isSubscriberOwned);
+  }, [filteredTeams, subscriberOwnsTeamTierWorkspace]);
 
   /** Other subscribers’ workspaces, grouped by `ownerUserId` (dividers between owners). */
   const otherSubscriberWorkspaceGroups = React.useMemo(() => {
     const list =
-      userId && subscriberOwnsTeamTierWorkspace
-        ? filteredTeams.filter((t) => t.ownerUserId !== userId)
+      subscriberOwnsTeamTierWorkspace
+        ? filteredTeams.filter((t) => !t.isSubscriberOwned)
         : filteredTeams;
     const map = new Map<string, TeamWorkspaceNavTeam[]>();
     const ownerOrder: string[] = [];
@@ -116,7 +118,7 @@ export function WorkspaceContextDropdown({
       ownerUserId,
       teams: map.get(ownerUserId)!,
     }));
-  }, [filteredTeams, userId, subscriberOwnsTeamTierWorkspace]);
+  }, [filteredTeams, subscriberOwnsTeamTierWorkspace]);
 
   const otherSubscriberGroupsNonEmpty = otherSubscriberWorkspaceGroups.some(
     (g) => g.teams.length > 0,
@@ -275,7 +277,7 @@ export function WorkspaceContextDropdown({
             />
           </div>
         </div>
-        <div className="max-h-64 overflow-y-auto p-1">
+        <div className="max-h-64 overflow-y-scroll p-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent]">
           <DropdownMenuGroup>
             {teamsNavLimited && (
               <div className="px-2 pb-2">
@@ -344,12 +346,28 @@ export function WorkspaceContextDropdown({
             )}
             {subscriberOwnsTeamTierWorkspace &&
               subscriberOwnTeamsFiltered.map((t) => teamWorkspaceMenuItem(t))}
+            {/* ── Divider + label before invited workspaces (user doesn't own team-tier) ── */}
             {!subscriberOwnsTeamTierWorkspace &&
               personalMatches &&
-              filteredTeams.length > 0 && <DropdownMenuSeparator className="my-1" />}
+              filteredTeams.length > 0 && (
+                <>
+                  <div role="separator" className="-mx-1 my-1 h-px bg-border" />
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    Invited workspaces
+                  </div>
+                </>
+              )}
+            {/* ── Divider + label before invited workspaces (user owns team-tier too) ── */}
             {subscriberOwnsTeamTierWorkspace &&
               otherSubscriberGroupsNonEmpty &&
-              subscriberSectionHasRows && <DropdownMenuSeparator className="my-1" />}
+              subscriberSectionHasRows && (
+                <>
+                  <div role="separator" className="-mx-1 my-1 h-px bg-border" />
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    Invited workspaces
+                  </div>
+                </>
+              )}
             {otherSubscriberWorkspaceGroups.map((group, groupIndex) => (
               <React.Fragment key={group.ownerUserId}>
                 {groupIndex > 0 && <DropdownMenuSeparator className="my-1" />}

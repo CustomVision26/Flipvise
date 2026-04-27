@@ -10,7 +10,14 @@ import {
 } from "@/components/ui/tooltip";
 
 /** Header icon that links to `/dashboard/inbox` (team invitations). */
-export function InboxNavIconButton() {
+export function InboxNavIconButton({
+  unreadCount = 0,
+}: {
+  unreadCount?: number;
+}) {
+  const clampedCount = Math.min(unreadCount, 99);
+  const label = clampedCount > 0 ? `Inbox (${clampedCount} pending)` : "Inbox";
+
   return (
     <Tooltip>
       <TooltipTrigger
@@ -20,14 +27,22 @@ export function InboxNavIconButton() {
             render={<Link href="/dashboard/inbox" />}
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full"
-            aria-label="Inbox"
+            className="relative h-8 w-8 rounded-full"
+            aria-label={label}
           />
         }
       >
         <Inbox className="size-[18px]" aria-hidden />
+        {clampedCount > 0 && (
+          <span
+            aria-hidden
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-[3px] text-[10px] font-semibold leading-none text-destructive-foreground ring-2 ring-background"
+          >
+            {clampedCount > 9 ? "9+" : clampedCount}
+          </span>
+        )}
       </TooltipTrigger>
-      <TooltipContent side="bottom">Inbox</TooltipContent>
+      <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
   );
 }

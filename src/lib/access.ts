@@ -2,7 +2,7 @@ import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
 import { proBillingFeatureBundleSatisfied } from "@/lib/pro-billing-feature-bundle";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
-import { TEAM_PLAN_IDS, type TeamPlanId } from "@/lib/team-plans";
+import { TEAM_PLAN_IDS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
 import {
   metadataPlanSlugFromPublicMeta,
   resolvePersonalPlanMetadataVsBilling,
@@ -172,6 +172,55 @@ export async function getAccessContext() {
         activeTeamPlan: null,
         hasClerkPersonalPro: planResolution.billingJwtPersonalPro,
       };
+    }
+  }
+
+  // Billing metadata fallback: when plan/teamPlanId were not propagated to metadata
+  // (e.g. webhook set billingPlan/billingStatus but the resolved computed fields are absent),
+  // read the Stripe-sourced fields directly so team-tier subscribers always get their
+  // correct access level on the personal workspace. Only applies when the primary
+  // resolution path found no paid plan and no admin override forced free.
+  if (!unlocked && !metadataForcedPersonalFree && !superadminAllowListed) {
+    const rawBillingPlan =
+      typeof meta.billingPlan === "string" ? meta.billingPlan.trim() || null : null;
+    const rawBillingStatus =
+      typeof meta.billingStatus === "string" ? meta.billingStatus : null;
+    const isBillingActiveRaw =
+      rawBillingStatus === "active" || rawBillingStatus === "trialing";
+
+    if (isBillingActiveRaw && rawBillingPlan !== null) {
+      if (isTeamPlanId(rawBillingPlan)) {
+        return {
+          userId,
+          isPro: true,
+          hasUnlimitedDecks: true,
+          hasAI: true,
+          has75CardsPerDeck: true,
+          hasPrioritySupport: true,
+          hasCustomColors: true,
+          adminGranted: false,
+          isAdmin: false,
+          isSuperadmin: false,
+          activeTeamPlan: rawBillingPlan as TeamPlanId,
+          hasClerkPersonalPro: paidProFromHas,
+        };
+      }
+      if (rawBillingPlan === "pro") {
+        return {
+          userId,
+          isPro: true,
+          hasUnlimitedDecks: true,
+          hasAI: true,
+          has75CardsPerDeck: true,
+          hasPrioritySupport: true,
+          hasCustomColors: true,
+          adminGranted: false,
+          isAdmin: false,
+          isSuperadmin: false,
+          activeTeamPlan: null,
+          hasClerkPersonalPro: planResolution.billingJwtPersonalPro,
+        };
+      }
     }
   }
 

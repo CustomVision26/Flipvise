@@ -11,6 +11,13 @@ The app has two **personal** subscription plans (Clerk plan ids):
 
 It also has **team-tier** plans (Clerk plan ids) used when a user subscribes as a **workspace owner** — see `src/lib/team-plans.ts` (`pro_team_basic`, `pro_team_gold`, `pro_platinum_plan`, `pro_enterprise`). Those are separate from the personal `pro` plan. In Clerk, each team-tier plan should include the same **feature** entitlements as `pro` so the subscriber’s **personal** workspace (decks, AI, colors, and so on) matches Pro behavior. `getAccessContext()` treats a user with an active team-tier plan and the full Pro feature bundle as `isPro: true` for UI and gating, while `hasClerkPersonalPro` remains `true` only when `has({ plan: "pro" })` (personal `pro` subscription).
 
+Current team-tier limits (source of truth: `TEAM_PLAN_LIMITS` in `src/lib/team-plans.ts`):
+
+- **Team Basic**: 2 workspaces, 5 members per workspace
+- **Team Gold**: 5 workspaces, 15 members per workspace
+- **Platinum**: 10 workspaces, 25 members per workspace
+- **Enterprise**: 20 workspaces, 35 members per workspace
+
 ### Stacking: personal Pro, member of someone else’s team, and your own team subscription
 
 - **Invited members** of another user’s team workspace are modeled in the database (`team_members`) and do **not** need a team-tier subscription on their own Clerk account. Their access to that workspace’s decks and team-tier Pro **deck** limits follows `src/lib/team-deck-pro-features.ts` and ownership/membership in `src/db/queries/teams.ts`.
@@ -169,7 +176,7 @@ The `/pricing` page shows all plan features:
 
 ### Test as Pro User
 1. Subscribe to Pro plan OR have admin grant Pro access
-2. Should see: unlimited decks, 75 cards per deck, AI generation, priority support access, 12 color themes
+2. Should see: unlimited decks, 75 cards per deck, AI generation, priority support access, 12 color themes, track personal progress, do standard reviews and quiz
 3. All upgrade prompts should disappear
 
 ### Test as Admin

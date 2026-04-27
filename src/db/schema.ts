@@ -195,6 +195,94 @@ export const supportTicketReplies = pgTable('support_ticket_replies', {
   createdAt: timestamp().notNull().defaultNow(),
 });
 
+export const billingInvoices = pgTable(
+  'billing_invoices',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    /** Clerk invoice id or payment attempt id (stable external reference). */
+    externalId: varchar({ length: 255 }).notNull(),
+    /** Source kind from Clerk webhook / API normalization. */
+    source: varchar({ length: 32 }).notNull(),
+    userId: varchar({ length: 255 }).notNull(),
+    userEmail: varchar({ length: 255 }),
+    planSlug: varchar({ length: 128 }),
+    invoiceNumber: varchar({ length: 128 }),
+    status: varchar({ length: 64 }).notNull().default('unknown'),
+    /** Total charged (after tax). Matches Stripe invoice.amount_paid. */
+    amountCents: integer(),
+    /** Subtotal before tax. Matches Stripe invoice.subtotal. */
+    subtotalCents: integer(),
+    /** Tax collected in cents. Matches Stripe invoice.tax. */
+    taxAmountCents: integer(),
+    currency: varchar({ length: 16 }),
+    hostedInvoiceUrl: text(),
+    invoicePdfUrl: text(),
+    periodStart: timestamp(),
+    periodEnd: timestamp(),
+    paidAt: timestamp(),
+    /** Total discount applied in cents (sum of Stripe total_discount_amounts). */
+    discountAmountCents: integer(),
+    /** Human-readable coupon/discount label (e.g. "LAUNCH50 — 50% off"). */
+    discountLabel: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('billing_invoices_external_id_uidx').on(t.externalId)],
+);
+
+export const affiliateStatusEnum = pgEnum('affiliate_status', ['pending', 'active', 'revoked']);
+
+/** Marketing affiliates invited by an admin to promote the platform. */
+export const affiliates = pgTable('affiliates', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  /** Email address the invite was sent to. */
+  invitedEmail: varchar({ length: 255 }).notNull(),
+  /** Clerk user ID once the invitee creates an account — set via webhook or manually. */
+  invitedUserId: varchar({ length: 255 }),
+  affiliateName: varchar({ length: 255 }).notNull(),
+  /** Plan slug granted for the affiliate period (e.g. "pro", "pro_team_basic"). */
+  planAssigned: varchar({ length: 64 }).notNull(),
+  startedAt: timestamp().notNull().defaultNow(),
+  endsAt: timestamp().notNull(),
+  addedByUserId: varchar({ length: 255 }).notNull(),
+  addedByName: varchar({ length: 255 }).notNull(),
+  status: affiliateStatusEnum().notNull().default('pending'),
+  /** Unique token sent in the invite link; used to accept the invitation. */
+  token: varchar({ length: 64 }).unique(),
+  /** Set when the invitee accepts the invitation. */
+  inviteAcceptedAt: timestamp(),
+  revokedAt: timestamp(),
+  revokedByUserId: varchar({ length: 255 }),
+  revokedByName: varchar({ length: 255 }),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+/**
+ * One row per Clerk user who has (or had) a Stripe subscription.
+ * Upserted by the Stripe webhook on checkout.session.completed and kept
+ * in sync via customer.subscription.updated / customer.subscription.deleted.
+ * Used to look up the active subscription when applying proration.
+ */
+export const stripeSubscriptions = pgTable('stripe_subscriptions', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  /** Clerk user ID — unique; one active subscription row per user. */
+  userId: varchar({ length: 255 }).notNull().unique(),
+  /** Stripe Customer ID (cus_…). */
+  stripeCustomerId: varchar({ length: 255 }).notNull(),
+  /** Stripe Subscription ID (sub_…). */
+  stripeSubscriptionId: varchar({ length: 255 }).notNull().unique(),
+  /** Stripe Subscription Item ID (si_…) — required for price swap on proration. */
+  stripeSubscriptionItemId: varchar({ length: 255 }),
+  /** Plan slug matching the price currently on the subscription. */
+  planSlug: varchar({ length: 64 }),
+  /** Mirrors the Stripe subscription status field. */
+  status: varchar({ length: 64 }).notNull().default('active'),
+  /** When the current billing period ends (Unix-epoch seconds stored as timestamp). */
+  currentPeriodEnd: timestamp(),
+  createdAt: timestamp().notNull().defaultNow(),
+  updatedAt: timestamp().notNull().defaultNow(),
+});
+
 export const cards = pgTable('cards', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   deckId: integer()

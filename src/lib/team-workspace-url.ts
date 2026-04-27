@@ -21,6 +21,11 @@ export type TeamWorkspaceNavTeam = {
   ownerDisplayName: string;
   /** Subscriber owner or `team_admin` — may open `/dashboard/team-admin` for this workspace. */
   canAccessTeamAdmin: boolean;
+  /**
+   * True when the signed-in user is the subscriber/owner of this team workspace.
+   * Computed server-side to avoid relying on client-side auth during SSR hydration.
+   */
+  isSubscriberOwned: boolean;
 };
 
 export function buildTeamWorkspaceQueryString(input: {

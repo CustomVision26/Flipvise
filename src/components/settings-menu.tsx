@@ -4,7 +4,6 @@ import * as React from "react";
 import { useTransition } from "react";
 import { Settings, Moon, Sun, Mic } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,41 +39,27 @@ import {
   type FreeUiThemeId,
 } from "@/lib/free-ui-theme";
 import { setFreeUiThemeAction } from "@/actions/free-ui-theme";
-import { resolveActiveTeamPlanFromHas } from "@/lib/team-plans";
 import { cn } from "@/lib/utils";
-import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { MicrophoneSettingsDialog } from "@/components/microphone-settings-dialog";
 
 interface SettingsMenuProps {
   currentProTheme?: ProUiThemeId;
   currentFreeTheme?: FreeUiThemeId;
+  isPro?: boolean;
+  hasCustomColors?: boolean;
 }
 
 export function SettingsMenu({ 
   currentProTheme = "neutral",
-  currentFreeTheme = "neutral"
+  currentFreeTheme = "neutral",
+  isPro = false,
+  hasCustomColors = false,
 }: SettingsMenuProps) {
   const { theme, setTheme } = useTheme();
-  const { has } = useAuth();
-  const { user } = useUser();
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
   const [isPending, startTransition] = useTransition();
   const [micDialogOpen, setMicDialogOpen] = React.useState(false);
-
-  const isPaidPro = has?.({ plan: "pro" }) ?? false;
-  const hasCustomColors = has?.({ feature: "12_interface_colors" }) ?? false;
-  const meta = user?.publicMetadata as
-    | { adminGranted?: boolean; role?: string }
-    | undefined;
-  const adminGranted = meta?.adminGranted === true;
-  const isAdmin = isClerkPlatformAdminRole(meta?.role);
-  const activeTeamPlan = resolveActiveTeamPlanFromHas(has);
-  const isPro =
-    isPaidPro ||
-    adminGranted ||
-    isAdmin ||
-    activeTeamPlan !== null;
 
   React.useEffect(() => {
     setMounted(true);

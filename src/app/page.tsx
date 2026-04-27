@@ -121,6 +121,7 @@ export default async function Home({ searchParams }: HomePageProps) {
             width={240}
             height={90}
             className="object-contain drop-shadow-neon w-32 h-auto sm:w-60"
+            style={{ height: "auto" }}
             priority
           />
 

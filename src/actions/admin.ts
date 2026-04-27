@@ -15,11 +15,11 @@ import {
   isClerkSuperadminRole,
 } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
-import {
-  isAdminPlanAssignment,
-  publicMetadataPatchForAdminPlanAssignment,
-} from "@/lib/admin-assignable-plans";
-import { PLAN_SOURCE_UPDATED_AT_KEY } from "@/lib/plan-metadata-billing-resolution";
+import { isAdminPlanAssignment } from "@/lib/admin-assignable-plans";
+import { applyPlanUpgrade } from "@/lib/apply-plan-upgrade";
+import { countTeamsForOwner, insertTeam } from "@/db/queries/teams";
+import { insertTeamWorkspaceEvent } from "@/db/queries/team-workspace-events";
+import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -99,13 +99,9 @@ export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignme
     throw new Error("Cannot change plan metadata for a platform owner account from here");
   }
 
-  const patch = publicMetadataPatchForAdminPlanAssignment(assignment);
-  await clerkClient.users.updateUserMetadata(targetUserId, {
-    publicMetadata: {
-      ...patch,
-      [PLAN_SOURCE_UPDATED_AT_KEY]: new Date().toISOString(),
-    } as Record<string, unknown>,
-  });
+  // Apply the plan — prorates an active Stripe subscription when one exists;
+  // falls back to a Clerk-metadata-only write when there is none.
+  await applyPlanUpgrade(targetUserId, assignment);
 
   revalidatePath("/admin");
 }
@@ -204,6 +200,82 @@ export async function toggleUserBanAction(data: ToggleUserBanInput) {
   } else {
     await clerkClient.users.unbanUser(targetUserId);
   }
+
+  revalidatePath("/admin");
+}
+
+const createTeamWorkspaceForUserSchema = z.object({
+  targetUserId: z.string().min(1),
+  name: z.string().min(1).max(255),
+});
+
+type CreateTeamWorkspaceForUserInput = z.infer<
+  typeof createTeamWorkspaceForUserSchema
+>;
+
+function readTeamPlanFromPublicMetadata(
+  publicMetadata: unknown,
+): string | null {
+  const meta = publicMetadata as { plan?: unknown; teamPlanId?: unknown };
+  if (typeof meta?.teamPlanId === "string" && meta.teamPlanId.trim().length > 0) {
+    return meta.teamPlanId.trim();
+  }
+  if (typeof meta?.plan === "string" && meta.plan.trim().length > 0) {
+    return meta.plan.trim();
+  }
+  return null;
+}
+
+export async function createTeamWorkspaceForUserAction(
+  data: CreateTeamWorkspaceForUserInput,
+) {
+  const { userId } = await requirePlatformAdminActor();
+
+  const parsed = createTeamWorkspaceForUserSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { targetUserId, name } = parsed.data;
+  const workspaceName = name.trim();
+  if (!workspaceName) throw new Error("Workspace name is required.");
+
+  if (targetUserId === userId) {
+    throw new Error("Use the team dashboard to create your own workspace.");
+  }
+
+  const target = await clerkClient.users.getUser(targetUserId);
+  const targetRole = readPublicRole(target);
+  if (
+    isPlatformSuperadminAllowListed(targetUserId) ||
+    isClerkSuperadminRole(targetRole) ||
+    isClerkPlatformAdminRole(targetRole)
+  ) {
+    throw new Error("Cannot create a subscriber workspace for an admin account.");
+  }
+
+  const teamPlanSlug = readTeamPlanFromPublicMetadata(target.publicMetadata);
+  if (!teamPlanSlug || !isTeamPlanId(teamPlanSlug)) {
+    throw new Error("User must be on a team-tier plan before creating a workspace.");
+  }
+
+  const limits = limitsForPlan(teamPlanSlug);
+  const existing = await countTeamsForOwner(targetUserId);
+  if (existing >= limits.maxTeams) {
+    throw new Error(
+      `Workspace limit reached for this user (${limits.maxTeams} on their plan).`,
+    );
+  }
+
+  const teamId = await insertTeam(targetUserId, workspaceName, teamPlanSlug);
+  if (!teamId) throw new Error("Could not create workspace.");
+
+  await insertTeamWorkspaceEvent({
+    ownerUserId: targetUserId,
+    action: "created",
+    teamId,
+    teamName: workspaceName,
+    planSlug: teamPlanSlug,
+    previousTeamName: null,
+  });
 
   revalidatePath("/admin");
 }

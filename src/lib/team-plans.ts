@@ -30,10 +30,10 @@ export const TEAM_PLAN_LIMITS: Record<
   TeamPlanId,
   { maxTeams: number; maxMembersPerTeam: number }
 > = {
-  pro_team_basic: { maxTeams: 2, maxMembersPerTeam: 4 },
+  pro_team_basic: { maxTeams: 2, maxMembersPerTeam: 5 },
   pro_team_gold: { maxTeams: 5, maxMembersPerTeam: 15 },
-  pro_platinum_plan: { maxTeams: 20, maxMembersPerTeam: 25 },
-  pro_enterprise: { maxTeams: 20, maxMembersPerTeam: 40 },
+  pro_platinum_plan: { maxTeams: 10, maxMembersPerTeam: 25 },
+  pro_enterprise: { maxTeams: 20, maxMembersPerTeam: 35 },
 };
 
 export function isTeamPlanId(slug: string): slug is TeamPlanId {
