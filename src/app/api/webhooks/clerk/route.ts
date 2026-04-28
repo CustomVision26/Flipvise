@@ -100,11 +100,15 @@ export async function POST(req: NextRequest) {
           user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress?.toLowerCase() ??
           null;
 
+        const subscriptionAny = subscription as Record<string, unknown>;
+        const rawInvoices = Array.isArray(subscriptionAny.invoices)
+          ? (subscriptionAny.invoices as unknown[])
+          : [];
         await upsertBillingInvoicesFromSubscription(
           userId,
           userEmail,
           planSlug,
-          subscription.invoices ?? [],
+          rawInvoices,
         );
 
         if (evt.type === "paymentAttempt.created" || evt.type === "paymentAttempt.updated") {
