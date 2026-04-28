@@ -233,7 +233,7 @@ export default async function AdminPage() {
       clerkUsers.map(async (u) => [
         u.id,
         await fetchUserBillingSubscriptionSafe(clerkClient, u.id),
-      ]),
+      ] as const),
     ),
   );
 
