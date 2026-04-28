@@ -31,6 +31,7 @@ const PlanConfigSchema = z.object({
   features: z.array(z.string().min(1)).min(1),
   highlighted: z.boolean().optional(),
   discount: PlanDiscountSchema.optional(),
+  discontinueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 const UpdatePlanInput = z.object({

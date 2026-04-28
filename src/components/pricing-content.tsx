@@ -41,6 +41,8 @@ export type PlanConfig = {
   features: string[];
   highlighted?: boolean;
   discount?: PlanDiscount;
+  /** ISO date string (YYYY-MM-DD) — when set, marks the date this plan will be discontinued. */
+  discontinueAt?: string | null;
 };
 
 /** Returns the discounted price given a base price and discount config. */
@@ -286,12 +288,6 @@ export function PricingContent({
             )}
           >
             Annual
-            <Badge
-              variant="secondary"
-              className="text-xs bg-green-500/15 text-green-400 border-green-500/20"
-            >
-              Save up to 20%
-            </Badge>
           </Label>
         </div>
 

@@ -37,12 +37,13 @@
     ],
     "highlighted": true,
     "discount": {
-      "active": false,
+      "active": true,
       "type": "percentage",
-      "value": 0,
-      "label": "",
-      "stripeCouponId": ""
-    }
+      "value": 20,
+      "label": "Summer Launch",
+      "stripeCouponId": "SummerLaunch"
+    },
+    "discontinueAt": "2026-05-09"
   },
   {
     "id": "pro_team_basic",
@@ -65,7 +66,8 @@
       "value": 0,
       "label": "",
       "stripeCouponId": ""
-    }
+    },
+    "discontinueAt": null
   },
   {
     "id": "pro_team_gold",
@@ -88,7 +90,8 @@
       "value": 0,
       "label": "",
       "stripeCouponId": ""
-    }
+    },
+    "discontinueAt": null
   },
   {
     "id": "pro_platinum_plan",
@@ -111,7 +114,8 @@
       "value": 0,
       "label": "",
       "stripeCouponId": ""
-    }
+    },
+    "discontinueAt": null
   },
   {
     "id": "pro_enterprise",
@@ -134,6 +138,7 @@
       "value": 0,
       "label": "",
       "stripeCouponId": ""
-    }
+    },
+    "discontinueAt": null
   }
 ]

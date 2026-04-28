@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Trash2, GripVertical, Save, Check, X, Tag } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, Check, X, Tag, CalendarOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -217,8 +217,77 @@ function PlanEditor({
           </div>
         )}
 
-        {/* Discount */}
+        {/* Discontinue date */}
         {!isFree && (
+          <div className="space-y-3 rounded-lg border border-dashed p-3">
+            <div className="flex items-center gap-2">
+              <CalendarOff className="size-3.5 text-rose-400" />
+              <Label className="text-xs font-medium">Discontinue Date</Label>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">
+                End date{" "}
+                <span className="text-muted-foreground/60">
+                  (the date this plan will stop being available — leave blank to keep it active)
+                </span>
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={draft.discontinueAt ?? ""}
+                  onChange={(e) =>
+                    update({ discontinueAt: e.target.value === "" ? null : e.target.value })
+                  }
+                  className="h-8 text-sm w-auto"
+                />
+                {draft.discontinueAt && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update({
+                        discontinueAt: null,
+                        // Also deactivate any running discount when the end date is cleared.
+                        discount: draft.discount?.active
+                          ? { ...draft.discount, active: false }
+                          : draft.discount,
+                      })
+                    }
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    title="Clear date"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+              {draft.discontinueAt && (
+                <p className="text-xs text-rose-400 bg-rose-500/10 rounded-md px-3 py-2 border border-rose-500/20 mt-1">
+                  This plan will be discontinued on{" "}
+                  <strong>
+                    {new Date(draft.discontinueAt + "T00:00:00").toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </strong>
+                  .
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Discount */}
+        {!isFree && (() => {
+          const hasEndDate = !!draft.discontinueAt;
+          const hasType = !!draft.discount?.type;
+          const hasValue = (draft.discount?.value ?? 0) > 0;
+          const hasCouponId = (draft.discount?.stripeCouponId ?? "").trim().length > 0;
+          const canActivate = hasEndDate && hasType && hasValue && hasCouponId;
+          const missingReasons: string[] = [];
+          if (!hasEndDate) missingReasons.push("a discontinue end date");
+          if (!hasValue) missingReasons.push("a discount value greater than 0");
+          if (!hasCouponId) missingReasons.push("a Stripe Coupon ID");
+          return (
           <div className="space-y-3 rounded-lg border border-dashed p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -229,6 +298,7 @@ function PlanEditor({
                 <Switch
                   id={`discount-active-${plan.id}`}
                   checked={!!draft.discount?.active}
+                  disabled={!canActivate}
                   onCheckedChange={(val) =>
                     update({
                       discount: {
@@ -241,7 +311,10 @@ function PlanEditor({
                     })
                   }
                 />
-                <Label htmlFor={`discount-active-${plan.id}`} className="text-xs cursor-pointer">
+                <Label
+                  htmlFor={`discount-active-${plan.id}`}
+                  className={`text-xs ${canActivate ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
+                >
                   {draft.discount?.active ? (
                     <span className="text-amber-400 font-medium">Active</span>
                   ) : (
@@ -250,6 +323,15 @@ function PlanEditor({
                 </Label>
               </div>
             </div>
+            {!canActivate && (
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 border border-border">
+                To activate a discount, first set{" "}
+                {missingReasons.length === 1
+                  ? missingReasons[0]
+                  : `${missingReasons.slice(0, -1).join(", ")} and ${missingReasons[missingReasons.length - 1]}`}
+                .
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -357,16 +439,11 @@ function PlanEditor({
                   ? `${draft.discount.value}% discount`
                   : `$${draft.discount.value} off`}
                 {draft.discount.label ? ` — "${draft.discount.label}"` : ""}
-                {!draft.discount.stripeCouponId && (
-                  <span className="block mt-1 text-amber-400/70">
-                    ⚠ No Stripe Coupon ID — discount will display on the pricing page but won't be
-                    applied at checkout.
-                  </span>
-                )}
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* Features */}
         <div className="space-y-2">
