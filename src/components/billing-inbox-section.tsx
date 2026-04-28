@@ -52,11 +52,15 @@ export async function BillingInboxSection({
 }) {
   try {
     const subscription = await clerkClient.billing.getUserBillingSubscription(userId);
+    const subscriptionAny = subscription as unknown as Record<string, unknown>;
+    const rawInvoices = Array.isArray(subscriptionAny.invoices)
+      ? subscriptionAny.invoices
+      : [];
     await upsertBillingInvoicesFromSubscription(
       userId,
       userEmail,
       billingActivePlanSlug(subscription) ?? null,
-      subscription.invoices ?? [],
+      rawInvoices as Parameters<typeof upsertBillingInvoicesFromSubscription>[3],
     );
   } catch {
     // Best effort: keep inbox working even when billing API sync is unavailable.
