@@ -198,8 +198,9 @@ export function buildAdminSubscriptionRows(
   const rows: AdminSubscriptionRow[] = [];
   for (const user of users) {
     const sub = subscriptionsByUserId.get(user.id) ?? null;
-    const planSlug = billingActivePlanSlug(sub ?? undefined) ?? user.planDisplayName;
-    const sourceMs = sub ? billingReferenceTimestampMs(sub) : 0;
+    type SubShape = Parameters<typeof billingActivePlanSlug>[0];
+    const planSlug = billingActivePlanSlug((sub ?? undefined) as SubShape) ?? user.planDisplayName;
+    const sourceMs = sub ? billingReferenceTimestampMs(sub as SubShape) : 0;
     const periodDates = readPeriodDates(sub);
     rows.push({
       userId: user.id,
