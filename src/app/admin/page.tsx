@@ -418,7 +418,7 @@ export default async function AdminPage() {
       return s != null && isTeamPlanId(s) ? s : null;
     })();
     const teamTierPlanSlug = isTeamPlanId(planOrTeamSlug ?? "")
-      ? planOrTeamSlug
+      ? (planOrTeamSlug ?? null)
       : (liveBillingTeamSlug ?? fallbackOwnedTeamSlug);
     const workspaceCreatedCount = teamWorkspaceCountsByOwnerUserId.get(user.id) ?? 0;
     const workspaceTotalCount =
