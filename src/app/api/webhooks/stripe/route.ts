@@ -240,6 +240,8 @@ export async function POST(req: NextRequest) {
                 expand: ["items.data"],
               });
               const firstItem = sub.items?.data?.[0];
+              // current_period_end moved to SubscriptionItem in API ≥ 2025-03-31.basil
+              const firstItemAny = firstItem as unknown as { current_period_end?: number };
               await upsertStripeSubscription({
                 userId,
                 stripeCustomerId: customerId,
@@ -248,8 +250,8 @@ export async function POST(req: NextRequest) {
                 planSlug: selectedPlan,
                 status: sub.status,
                 currentPeriodEnd:
-                  typeof sub.current_period_end === "number"
-                    ? new Date(sub.current_period_end * 1000)
+                  typeof firstItemAny?.current_period_end === "number"
+                    ? new Date(firstItemAny.current_period_end * 1000)
                     : null,
               });
             } catch {
@@ -288,6 +290,8 @@ export async function POST(req: NextRequest) {
                 await markStripeSubscriptionStatus(sub.id, stripeStatus);
               } else {
                 const firstItem = sub.items?.data?.[0];
+                // current_period_end moved to SubscriptionItem in API ≥ 2025-03-31.basil
+                const firstItemAny = firstItem as unknown as { current_period_end?: number };
                 await upsertStripeSubscription({
                   userId: resolution.userId,
                   stripeCustomerId: customerId,
@@ -296,8 +300,8 @@ export async function POST(req: NextRequest) {
                   planSlug: activePlan,
                   status: stripeStatus,
                   currentPeriodEnd:
-                    typeof sub.current_period_end === "number"
-                      ? new Date(sub.current_period_end * 1000)
+                    typeof firstItemAny?.current_period_end === "number"
+                      ? new Date(firstItemAny.current_period_end * 1000)
                       : null,
                 });
               }
