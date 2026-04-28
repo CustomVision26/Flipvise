@@ -86,6 +86,7 @@ export type AdminInvoiceRow = {
   periodEnd: string | null;
   hostedInvoiceUrl: string | null;
   invoicePdfUrl: string | null;
+  discount: string | null;
 };
 
 function toIso(value: number | string | null | undefined): string | null {
@@ -244,6 +245,7 @@ export function buildAdminInvoiceRows(
         periodEnd: toIso(invoice.periodEnd ?? invoice.period_end),
         hostedInvoiceUrl: invoice.hostedInvoiceUrl ?? invoice.hosted_invoice_url ?? null,
         invoicePdfUrl: invoice.invoicePdf ?? invoice.invoice_pdf ?? null,
+        discount: null,
       });
     }
   }
