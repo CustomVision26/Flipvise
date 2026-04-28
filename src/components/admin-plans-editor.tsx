@@ -256,11 +256,11 @@ function PlanEditor({
                 <Label className="text-xs text-muted-foreground">Type</Label>
                 <Select
                   value={draft.discount?.type ?? "percentage"}
-                  onValueChange={(val: PlanDiscount["type"]) =>
+                  onValueChange={(val) =>
                     update({
                       discount: {
                         active: draft.discount?.active ?? false,
-                        type: val,
+                        type: (val as PlanDiscount["type"]) ?? "percentage",
                         value: draft.discount?.value ?? 0,
                         label: draft.discount?.label ?? "",
                         stripeCouponId: draft.discount?.stripeCouponId ?? "",
