@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
           user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress?.toLowerCase() ??
           null;
 
-        const subscriptionAny = subscription as Record<string, unknown>;
+        const subscriptionAny = subscription as unknown as Record<string, unknown>;
         const rawInvoices = Array.isArray(subscriptionAny.invoices)
           ? (subscriptionAny.invoices as unknown[])
           : [];
