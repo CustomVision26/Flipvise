@@ -546,6 +546,7 @@ export default async function AdminPage() {
       periodEnd: row.periodEnd?.toISOString() ?? null,
       hostedInvoiceUrl: row.hostedInvoiceUrl,
       invoicePdfUrl: row.invoicePdfUrl,
+      discount: row.discountLabel ?? null,
     };
   });
   const byId = new Map<string, SerializedAdminInvoice>();
