@@ -102,13 +102,13 @@ export async function POST(req: NextRequest) {
 
         const subscriptionAny = subscription as unknown as Record<string, unknown>;
         const rawInvoices = Array.isArray(subscriptionAny.invoices)
-          ? (subscriptionAny.invoices as unknown[])
+          ? subscriptionAny.invoices
           : [];
         await upsertBillingInvoicesFromSubscription(
           userId,
           userEmail,
           planSlug,
-          rawInvoices,
+          rawInvoices as Parameters<typeof upsertBillingInvoicesFromSubscription>[3],
         );
 
         if (evt.type === "paymentAttempt.created" || evt.type === "paymentAttempt.updated") {
