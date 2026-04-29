@@ -28,6 +28,7 @@ interface StudySessionProps {
   cards: CardData[];
   deckId: number;
   deckName: string;
+  teamId: number | null;
   /** Pro personal (75 cards / deck) — Free users cannot open Quiz mode in the UI. */
   allowsQuizStudy?: boolean;
 }
@@ -36,6 +37,7 @@ export function StudySession({
   cards,
   deckId,
   deckName,
+  teamId,
   allowsQuizStudy = true,
 }: StudySessionProps) {
   const [tab, setTab] = useState<"review" | "quiz">("review");
@@ -106,7 +108,7 @@ export function StudySession({
           <FlashcardStudy cards={cards} deckId={deckId} deckName={deckName} />
         </TabsContent>
         <TabsContent value="quiz" className="flex flex-1 flex-col">
-          <QuizStudy cards={cards} deckId={deckId} deckName={deckName} />
+          <QuizStudy cards={cards} deckId={deckId} deckName={deckName} teamId={teamId} />
         </TabsContent>
       </Tabs>
     </TooltipProvider>

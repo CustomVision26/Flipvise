@@ -25,8 +25,8 @@ import {
   PLAN_SOURCE_UPDATED_AT_KEY,
   resolveEffectivePlan,
 } from "@/lib/plan-metadata-billing-resolution";
-import { isTeamPlanId } from "@/lib/team-plans";
-import { TEAM_PLAN_IDS } from "@/lib/team-plans";
+import { isTeamPlanId, TEAM_PLAN_IDS } from "@/lib/team-plans";
+import { updateOwnedTeamsPlanSlug } from "@/db/queries/teams";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -111,6 +111,10 @@ async function applyPlanToClerkMetadata(
       teamPlanId: isTeam ? resolvedPlan : null,
     } as Record<string, unknown>,
   });
+
+  // Sync all workspaces owned by this user so their plan limits reflect the
+  // new effective plan immediately (e.g. Team Gold → Team Basic reduces limits).
+  await updateOwnedTeamsPlanSlug(userId, resolvedPlan ?? "pro");
 }
 
 export type ApplyPlanUpgradeResult =

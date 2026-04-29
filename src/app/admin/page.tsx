@@ -26,6 +26,7 @@ import {
   getTeamOwnerPlanSlugsByUserIds,
   getUserTeamPlanAssociationsByUserIds,
   getAdminPrivilegeLogs,
+  getAdminPlanAssignmentLogs,
   getTeamWorkspaceCountsByOwnerUserIds,
   getTeamInviteeTotalsByOwnerUserIds,
   getWorkspaceDetailsByOwnerUserIds,
@@ -57,6 +58,7 @@ import type {
   SerializedAdminInvoice,
   SerializedAdminSubscription,
   SerializedLog,
+  SerializedPlanAssignmentLog,
   SerializedUser,
 } from "@/lib/admin-dashboard-types";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
@@ -181,6 +183,7 @@ export default async function AdminPage() {
     workspaceDetailsByOwnerUserId,
     activeSessionData,
     privilegeLogs,
+    rawPlanAssignmentLogs,
     rawSupportTickets,
     supportStats,
     persistedBillingInvoices,
@@ -205,6 +208,7 @@ export default async function AdminPage() {
     getWorkspaceDetailsByOwnerUserIds(userIds),
     getActiveSessionData(),
     getAdminPrivilegeLogs(100),
+    getAdminPlanAssignmentLogs(500),
     getAllSupportTickets(),
     getSupportTicketStats(),
     listBillingInvoicesForAdmin(2000),
@@ -594,6 +598,21 @@ export default async function AdminPage() {
     createdAt: log.createdAt.toISOString(),
   }));
 
+  // Serialize plan assignment / ban history logs.
+  const serializedPlanAssignmentLogs: SerializedPlanAssignmentLog[] =
+    rawPlanAssignmentLogs.map((log) => ({
+      id: log.id,
+      targetUserId: log.targetUserId,
+      targetUserName: log.targetUserName,
+      targetUserEmail: log.targetUserEmail ?? null,
+      action: log.action as SerializedPlanAssignmentLog["action"],
+      planName: log.planName ?? null,
+      previousPlanName: log.previousPlanName ?? null,
+      assignedByUserId: log.assignedByUserId,
+      assignedByName: log.assignedByName,
+      createdAt: log.createdAt.toISOString(),
+    }));
+
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
       {/* Header */}
@@ -666,6 +685,7 @@ export default async function AdminPage() {
         callerIsSuperadmin={callerIsSuperadmin}
         users={serializedUsers}
         logs={serializedLogs}
+        planAssignmentLogs={serializedPlanAssignmentLogs}
         subscriptions={serializedSubscriptions}
         invoices={serializedInvoices}
         supportTickets={serializedTickets}

@@ -166,6 +166,25 @@ export async function getMemberRecord(teamId: number, userId: string) {
   }
 }
 
+/** All member rows for a set of team IDs — used to batch-resolve member roles. */
+export async function listTeamMembersByTeamIds(teamIds: number[]) {
+  if (teamIds.length === 0) return [];
+  try {
+    return await db
+      .select()
+      .from(teamMembers)
+      .where(inArray(teamMembers.teamId, teamIds));
+  } catch (e) {
+    if (!isMissingTeamMemberAuditColumnError(e)) throw e;
+    warnMissingTeamMemberAuditColumnsOnce();
+    const rows = await db
+      .select(teamMemberRowSelectLegacy)
+      .from(teamMembers)
+      .where(inArray(teamMembers.teamId, teamIds));
+    return rows.map(withDefaultTeamMemberAudit);
+  }
+}
+
 /** Teams where the user is a member (any role). */
 export async function getTeamMembershipsForUser(userId: string) {
   try {
@@ -592,6 +611,28 @@ export async function insertTeam(
     .values({ ownerUserId, name, planSlug })
     .returning({ id: teams.id });
   return row?.id;
+}
+
+/**
+ * Sync all workspaces owned by a user to reflect their new resolved plan.
+ *
+ * Called after every plan change (admin assignment or Stripe webhook) so that
+ * workspace limits — maxTeams / maxMembersPerTeam — always match the user's
+ * current effective subscription rather than the plan at workspace creation time.
+ *
+ * When `resolvedPlanSlug` is a team plan id the workspace gains the correct
+ * team-tier limits. When it is `"pro"` or `"free"` (personal / no team plan)
+ * `isTeamPlanId` returns false and the workspace is effectively locked out of
+ * team-tier features until the user re-subscribes to a team plan.
+ */
+export async function updateOwnedTeamsPlanSlug(
+  ownerUserId: string,
+  resolvedPlanSlug: string,
+): Promise<void> {
+  await db
+    .update(teams)
+    .set({ planSlug: resolvedPlanSlug })
+    .where(eq(teams.ownerUserId, ownerUserId));
 }
 
 export async function insertTeamMember(

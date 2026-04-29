@@ -38,6 +38,9 @@ interface DeckSpeechRecognitionEvent extends Event {
     [index: number]: { 0: DeckSpeechRecognitionAlternative };
   };
 }
+interface DeckSpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
 interface DeckSpeechRecognition extends EventTarget {
   lang: string;
   interimResults: boolean;
@@ -45,7 +48,7 @@ interface DeckSpeechRecognition extends EventTarget {
   start(): void;
   stop(): void;
   onresult: ((ev: DeckSpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((ev: DeckSpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
 }
 
@@ -118,7 +121,7 @@ export function AddDeckDialog({
   const recognitionRef = React.useRef<DeckSpeechRecognition | null>(null);
 
   const showSpeechUi = speechToTextEnabled && speechSupported;
-  const showDeckFrontImage = deckFrontImageUploadEnabled && forTeamWorkspace;
+  const showDeckFrontImage = deckFrontImageUploadEnabled && (forTeamWorkspace || forPersonalWorkspace);
 
   React.useEffect(() => {
     setSpeechSupported(getSpeechRecognitionCtor() !== undefined);
@@ -183,9 +186,18 @@ export function AddDeckDialog({
       }
       appendToField(el, chunk);
     };
-    rec.onerror = () => {
+    rec.onerror = (ev: DeckSpeechRecognitionErrorEvent) => {
       setDictationField(null);
       recognitionRef.current = null;
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+        setError("Microphone access was denied. Check your browser permissions.");
+      } else if (ev.error === "no-speech") {
+        setError("No speech detected. Please try again.");
+      } else if (ev.error === "network") {
+        setError("Network error during dictation. Please check your connection.");
+      } else if (ev.error !== "aborted") {
+        setError("Dictation error. Please try again.");
+      }
     };
     rec.onend = () => {
       setDictationField(null);

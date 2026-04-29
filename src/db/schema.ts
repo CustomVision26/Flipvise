@@ -7,6 +7,7 @@ import {
   timestamp,
   pgEnum,
   uniqueIndex,
+  json,
 } from 'drizzle-orm/pg-core';
 
 export const supportCategoryEnum = pgEnum('support_category', [
@@ -148,6 +149,13 @@ export const adminPrivilegeActionEnum = pgEnum('admin_privilege_action', [
   'superadmin_revoked',
 ]);
 
+export const adminPlanAssignmentActionEnum = pgEnum('admin_plan_assignment_action', [
+  'plan_assigned',
+  'plan_removed',
+  'user_banned',
+  'user_unbanned',
+]);
+
 export const adminPrivilegeLogs = pgTable('admin_privilege_logs', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   targetUserId: varchar({ length: 255 }).notNull(),
@@ -155,6 +163,21 @@ export const adminPrivilegeLogs = pgTable('admin_privilege_logs', {
   grantedByUserId: varchar({ length: 255 }).notNull(),
   grantedByName: varchar({ length: 255 }).notNull(),
   action: adminPrivilegeActionEnum().notNull(),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+export const adminPlanAssignmentLogs = pgTable('admin_plan_assignment_logs', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  targetUserId: varchar({ length: 255 }).notNull(),
+  targetUserName: varchar({ length: 255 }).notNull(),
+  targetUserEmail: varchar({ length: 255 }),
+  action: adminPlanAssignmentActionEnum().notNull(),
+  /** Human-readable new plan name (e.g. "Pro", "Team Basic", "Free"). Null for ban/unban actions. */
+  planName: varchar({ length: 128 }),
+  /** Human-readable previous plan name before the change. Null when no prior plan exists. */
+  previousPlanName: varchar({ length: 128 }),
+  assignedByUserId: varchar({ length: 255 }).notNull(),
+  assignedByName: varchar({ length: 255 }).notNull(),
   createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -281,6 +304,76 @@ export const stripeSubscriptions = pgTable('stripe_subscriptions', {
   currentPeriodEnd: timestamp(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
+});
+
+export type PerCardSnapshot = {
+  cardId: number;
+  /** Question / front text shown to the user. */
+  question: string | null;
+  /** The correct answer text. */
+  correctAnswer: string;
+  /** What the user selected; null means unanswered. */
+  selectedAnswer: string | null;
+  correct: boolean;
+};
+
+/**
+ * Tracks when a user explicitly marks an inbox item as read.
+ * Works across all item types (quiz_result, team_invite, billing, affiliate).
+ */
+export const inboxReads = pgTable(
+  'inbox_reads',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    /** Discriminator: 'quiz_result' | 'team_invite' | 'billing' | 'affiliate' */
+    itemType: varchar({ length: 64 }).notNull(),
+    /** The numeric ID of the item as a string. */
+    itemId: varchar({ length: 255 }).notNull(),
+    readAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('inbox_reads_uidx').on(t.userId, t.itemType, t.itemId)],
+);
+
+/** Saved quiz attempt — persisted when a user opts in on the result screen. */
+export const quizResults = pgTable('quiz_results', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  /** Clerk user ID of the person who took the quiz. */
+  userId: varchar({ length: 255 }).notNull(),
+  /** FK to the deck; set null if the deck is later deleted. */
+  deckId: integer().references(() => decks.id, { onDelete: 'set null' }),
+  /** Snapshot of the deck name at save time. */
+  deckName: varchar({ length: 255 }).notNull(),
+  /** Set when the quiz was taken on a team-owned deck. */
+  teamId: integer().references(() => teams.id, { onDelete: 'set null' }),
+  correct: integer().notNull(),
+  incorrect: integer().notNull(),
+  unanswered: integer().notNull(),
+  total: integer().notNull(),
+  /** Rounded integer 0-100. */
+  percent: integer().notNull(),
+  elapsedSeconds: integer().notNull().default(0),
+  /**
+   * Per-card breakdown snapshot — array of { cardId, question, correctAnswer, selectedAnswer, correct }.
+   * Stored as JSON so the full review is available even after cards are edited or deleted.
+   */
+  perCard: json().$type<PerCardSnapshot[]>(),
+  savedAt: timestamp().notNull().defaultNow(),
+});
+
+/**
+ * One inbox message per saved quiz result.
+ * For personal quizzes the recipient is the quiz-taker themselves.
+ * For team-deck quizzes the recipient is the team workspace owner.
+ */
+export const quizResultInboxMessages = pgTable('quiz_result_inbox_messages', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  recipientUserId: varchar({ length: 255 }).notNull(),
+  quizResultId: integer()
+    .notNull()
+    .references(() => quizResults.id, { onDelete: 'cascade' }),
+  read: boolean().notNull().default(false),
+  createdAt: timestamp().notNull().defaultNow(),
 });
 
 export const cards = pgTable('cards', {

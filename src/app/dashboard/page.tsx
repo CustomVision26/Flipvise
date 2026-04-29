@@ -89,7 +89,7 @@ function DashboardTeamHeading({
   return (
     <div className="min-w-0 space-y-1">
       <h1 className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0 text-2xl sm:text-3xl font-bold tracking-tight">
-        <span className="shrink-0 text-foreground">Dashboard</span>
+        <span className="shrink-0 text-foreground">Team Dashboard</span>
         {showTeamTierExtras && ownerName ? (
           <>
             <span className="shrink-0 text-muted-foreground" aria-hidden>
@@ -512,6 +512,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             isAtLimit={isAtLimit}
             forPersonalWorkspace
             speechToTextEnabled={ownSubscriberTeamTierExtras}
+            deckFrontImageUploadEnabled={isPro}
           />
         </div>
       </div>
@@ -617,6 +618,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             isAtLimit={isAtLimit}
             forPersonalWorkspace
             speechToTextEnabled={ownSubscriberTeamTierExtras}
+            deckFrontImageUploadEnabled={isPro}
           />
         </div>
       ) : (

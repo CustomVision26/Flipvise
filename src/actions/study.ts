@@ -10,6 +10,7 @@ import {
   type QuizQuote,
   type QuizTier,
 } from "@/lib/quiz-quotes";
+import { saveQuizResult } from "@/db/queries/quiz-results";
 
 const quizAnswerSchema = z.object({
   cardId: z.number().int().positive(),
@@ -151,4 +152,65 @@ export async function submitQuizResultAction(
     timedOut: timedOut ?? false,
     perCard,
   };
+}
+
+const perCardSnapshotSchema = z.object({
+  cardId: z.number().int(),
+  question: z.string().nullable(),
+  correctAnswer: z.string(),
+  selectedAnswer: z.string().nullable(),
+  correct: z.boolean(),
+});
+
+const saveQuizResultSchema = z.object({
+  deckId: z.number().int().positive(),
+  deckName: z.string().min(1),
+  teamId: z.number().int().positive().nullable(),
+  correct: z.number().int().min(0),
+  incorrect: z.number().int().min(0),
+  unanswered: z.number().int().min(0),
+  total: z.number().int().min(1),
+  percent: z.number().int().min(0).max(100),
+  elapsedSeconds: z.number().int().min(0),
+  perCard: z.array(perCardSnapshotSchema),
+});
+
+type SaveQuizResultInput = z.infer<typeof saveQuizResultSchema>;
+
+/** Persists a quiz result the user has opted to save, and queues an inbox message. */
+export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{ id: number }> {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = saveQuizResultSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const {
+    deckId,
+    deckName,
+    teamId,
+    correct,
+    incorrect,
+    unanswered,
+    total,
+    percent,
+    elapsedSeconds,
+    perCard,
+  } = parsed.data;
+
+  const saved = await saveQuizResult({
+    userId,
+    deckId,
+    deckName,
+    teamId,
+    correct,
+    incorrect,
+    unanswered,
+    total,
+    percent,
+    elapsedSeconds,
+    perCard,
+  });
+
+  return { id: saved.id };
 }

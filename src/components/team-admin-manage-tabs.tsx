@@ -24,6 +24,8 @@ import type { InferSelectModel } from "drizzle-orm";
 import { teamInvitations, teamMembers } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import { TEAM_INVITE_EXPIRY_DAYS } from "@/lib/team-invite-expiry";
+import { TeamQuizResultsTab } from "@/components/team-quiz-results-tab";
+import type { QuizResultRow } from "@/db/queries/quiz-results";
 
 type InvitationRow = InferSelectModel<typeof teamInvitations>;
 type MemberRow = InferSelectModel<typeof teamMembers>;
@@ -32,6 +34,7 @@ export type { TeamAssignWorkspaceSnapshot };
 
 export type TeamAdminManageTabsProps = {
   teamId: number;
+  teamName: string;
   ownerUserId: string;
   /** `teams.createdAt` for the selected workspace. */
   teamCreatedAt: Date;
@@ -47,10 +50,12 @@ export type TeamAdminManageTabsProps = {
   invitationHistory: InvitationRow[];
   workspaceHistory?: TeamWorkspaceEventRow[] | null;
   assignWorkspaceSnapshots: TeamAssignWorkspaceSnapshot[];
+  teamQuizResults: QuizResultRow[];
 };
 
 export function TeamAdminManageTabs({
   teamId,
+  teamName,
   ownerUserId,
   teamCreatedAt,
   currentUserId,
@@ -64,6 +69,7 @@ export function TeamAdminManageTabs({
   invitationHistory,
   workspaceHistory = [],
   assignWorkspaceSnapshots,
+  teamQuizResults,
 }: TeamAdminManageTabsProps) {
   return (
     <Tabs defaultValue="assign-decks" className="w-full gap-4">
@@ -94,6 +100,12 @@ export function TeamAdminManageTabs({
           className="shrink-0 rounded-none border-b-2 border-transparent px-2.5 py-2 text-xs data-active:border-primary data-active:bg-transparent sm:px-3 sm:text-sm"
         >
           Invite members
+        </TabsTrigger>
+        <TabsTrigger
+          value="quiz-results"
+          className="shrink-0 rounded-none border-b-2 border-transparent px-2.5 py-2 text-xs data-active:border-primary data-active:bg-transparent sm:px-3 sm:text-sm"
+        >
+          Quiz results
         </TabsTrigger>
       </TabsList>
 
@@ -228,6 +240,16 @@ export function TeamAdminManageTabs({
             </Tabs>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="quiz-results" className="mt-0">
+        <TeamQuizResultsTab
+          results={teamQuizResults}
+          teamName={teamName}
+          ownerUserId={ownerUserId}
+          members={members}
+          userFieldDisplayById={userFieldDisplayById}
+        />
       </TabsContent>
     </Tabs>
   );

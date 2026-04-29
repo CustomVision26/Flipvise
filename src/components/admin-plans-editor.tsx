@@ -89,6 +89,15 @@ function PlanEditor({
 
   const isFree = plan.id === "free";
 
+  const hasEndDate = !!draft.discontinueAt;
+  const hasValue = (draft.discount?.value ?? 0) > 0;
+  const hasCouponId = (draft.discount?.stripeCouponId ?? "").trim().length > 0;
+  const canActivateDiscount = hasEndDate && hasValue && hasCouponId;
+  const discountMissingReasons: string[] = [];
+  if (!hasEndDate) discountMissingReasons.push("a discontinue end date");
+  if (!hasValue) discountMissingReasons.push("a discount value greater than 0");
+  if (!hasCouponId) discountMissingReasons.push("a Stripe Coupon ID");
+
   return (
     <Card className={isDirty ? "ring-2 ring-primary/40" : ""}>
       <CardHeader className="pb-3">
@@ -277,17 +286,7 @@ function PlanEditor({
         )}
 
         {/* Discount */}
-        {!isFree && (() => {
-          const hasEndDate = !!draft.discontinueAt;
-          const hasType = !!draft.discount?.type;
-          const hasValue = (draft.discount?.value ?? 0) > 0;
-          const hasCouponId = (draft.discount?.stripeCouponId ?? "").trim().length > 0;
-          const canActivate = hasEndDate && hasType && hasValue && hasCouponId;
-          const missingReasons: string[] = [];
-          if (!hasEndDate) missingReasons.push("a discontinue end date");
-          if (!hasValue) missingReasons.push("a discount value greater than 0");
-          if (!hasCouponId) missingReasons.push("a Stripe Coupon ID");
-          return (
+        {!isFree && (
           <div className="space-y-3 rounded-lg border border-dashed p-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -298,7 +297,7 @@ function PlanEditor({
                 <Switch
                   id={`discount-active-${plan.id}`}
                   checked={!!draft.discount?.active}
-                  disabled={!canActivate}
+                  disabled={!canActivateDiscount}
                   onCheckedChange={(val) =>
                     update({
                       discount: {
@@ -313,7 +312,7 @@ function PlanEditor({
                 />
                 <Label
                   htmlFor={`discount-active-${plan.id}`}
-                  className={`text-xs ${canActivate ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
+                  className={`text-xs ${canActivateDiscount ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
                 >
                   {draft.discount?.active ? (
                     <span className="text-amber-400 font-medium">Active</span>
@@ -323,12 +322,12 @@ function PlanEditor({
                 </Label>
               </div>
             </div>
-            {!canActivate && (
+            {!canActivateDiscount && (
               <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 border border-border">
                 To activate a discount, first set{" "}
-                {missingReasons.length === 1
-                  ? missingReasons[0]
-                  : `${missingReasons.slice(0, -1).join(", ")} and ${missingReasons[missingReasons.length - 1]}`}
+                {discountMissingReasons.length === 1
+                  ? discountMissingReasons[0]
+                  : `${discountMissingReasons.slice(0, -1).join(", ")} and ${discountMissingReasons[discountMissingReasons.length - 1]}`}
                 .
               </p>
             )}
@@ -442,8 +441,7 @@ function PlanEditor({
               </div>
             )}
           </div>
-          );
-        })()}
+        )}
 
         {/* Features */}
         <div className="space-y-2">

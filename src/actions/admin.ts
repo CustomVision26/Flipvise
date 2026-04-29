@@ -4,7 +4,7 @@ import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { logAdminPrivilegeChange } from "@/db/queries/admin";
+import { logAdminPrivilegeChange, logAdminPlanAssignment } from "@/db/queries/admin";
 import {
   buildPublicMetadataPatchForAdminRoleGrant,
   buildPublicMetadataPatchForAdminRoleRevoke,
@@ -19,7 +19,7 @@ import { isAdminPlanAssignment } from "@/lib/admin-assignable-plans";
 import { applyPlanUpgrade } from "@/lib/apply-plan-upgrade";
 import { countTeamsForOwner, insertTeam } from "@/db/queries/teams";
 import { insertTeamWorkspaceEvent } from "@/db/queries/team-workspace-events";
-import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
+import { isTeamPlanId, limitsForPlan, TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -78,12 +78,26 @@ const applyPlanAssignmentSchema = z.object({
 
 type ApplyPlanAssignmentInput = z.infer<typeof applyPlanAssignmentSchema>;
 
+function planSlugToDisplayName(slug: string | null | undefined): string {
+  if (!slug || slug === "free") return "Free";
+  if (slug === "pro") return "Pro";
+  if (isTeamPlanId(slug)) return TEAM_PLAN_LABELS[slug as TeamPlanId];
+  return slug;
+}
+
+function previousPlanSlugFromMeta(meta: Record<string, unknown>): string | null {
+  const adminPlan = typeof meta.adminPlan === "string" ? meta.adminPlan : null;
+  const plan = typeof meta.plan === "string" ? meta.plan : null;
+  const billingPlan = typeof meta.billingPlan === "string" ? meta.billingPlan : null;
+  return adminPlan ?? billingPlan ?? plan ?? null;
+}
+
 /**
  * Overwrites the target user's Clerk public metadata plan flags for testing / support.
  * Does not create or cancel Clerk Billing subscriptions.
  */
 export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignmentInput) {
-  const { userId } = await requirePlatformAdminActor();
+  const { userId, caller } = await requirePlatformAdminActor();
 
   const parsed = applyPlanAssignmentSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -99,9 +113,34 @@ export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignme
     throw new Error("Cannot change plan metadata for a platform owner account from here");
   }
 
+  const targetMeta = target.publicMetadata as Record<string, unknown>;
+  const previousSlug = previousPlanSlugFromMeta(targetMeta);
+  const targetName =
+    [target.firstName, target.lastName].filter(Boolean).join(" ") ||
+    target.username ||
+    targetUserId;
+  const targetEmail =
+    target.emailAddresses.find((e) => e.id === target.primaryEmailAddressId)
+      ?.emailAddress ?? null;
+  const callerName =
+    [caller.firstName, caller.lastName].filter(Boolean).join(" ") ||
+    caller.username ||
+    userId;
+
   // Apply the plan — prorates an active Stripe subscription when one exists;
   // falls back to a Clerk-metadata-only write when there is none.
   await applyPlanUpgrade(targetUserId, assignment);
+
+  await logAdminPlanAssignment({
+    targetUserId,
+    targetUserName: targetName,
+    targetUserEmail: targetEmail,
+    action: assignment === "free" ? "plan_removed" : "plan_assigned",
+    planName: planSlugToDisplayName(assignment),
+    previousPlanName: planSlugToDisplayName(previousSlug),
+    assignedByUserId: userId,
+    assignedByName: callerName,
+  });
 
   revalidatePath("/admin");
 }
@@ -200,6 +239,29 @@ export async function toggleUserBanAction(data: ToggleUserBanInput) {
   } else {
     await clerkClient.users.unbanUser(targetUserId);
   }
+
+  const targetName =
+    [target.firstName, target.lastName].filter(Boolean).join(" ") ||
+    target.username ||
+    targetUserId;
+  const targetEmail =
+    target.emailAddresses.find((e) => e.id === target.primaryEmailAddressId)
+      ?.emailAddress ?? null;
+  const callerName =
+    [caller.firstName, caller.lastName].filter(Boolean).join(" ") ||
+    caller.username ||
+    userId;
+
+  await logAdminPlanAssignment({
+    targetUserId,
+    targetUserName: targetName,
+    targetUserEmail: targetEmail,
+    action: ban ? "user_banned" : "user_unbanned",
+    planName: null,
+    previousPlanName: null,
+    assignedByUserId: userId,
+    assignedByName: callerName,
+  });
 
   revalidatePath("/admin");
 }

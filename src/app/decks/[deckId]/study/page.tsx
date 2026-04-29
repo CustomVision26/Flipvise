@@ -101,6 +101,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         cards={cards}
         deckId={id}
         deckName={deck.name}
+        teamId={deck.teamId ?? null}
         allowsQuizStudy={effective75}
       />
     </div>

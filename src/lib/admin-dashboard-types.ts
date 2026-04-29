@@ -123,6 +123,19 @@ export type SerializedAffiliate = {
   createdAt: string;
 };
 
+export type SerializedPlanAssignmentLog = {
+  id: number;
+  targetUserId: string;
+  targetUserName: string;
+  targetUserEmail: string | null;
+  action: "plan_assigned" | "plan_removed" | "user_banned" | "user_unbanned";
+  planName: string | null;
+  previousPlanName: string | null;
+  assignedByUserId: string;
+  assignedByName: string;
+  createdAt: string;
+};
+
 export type SerializedAdminInvoice = {
   id: string;
   userId: string;

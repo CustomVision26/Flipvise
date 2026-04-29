@@ -39,8 +39,10 @@ import {
   CircleHelp,
   Play,
   ListChecks,
+  BookCheck,
 } from "lucide-react";
-import { submitQuizResultAction, type QuizResult } from "@/actions/study";
+import { submitQuizResultAction, saveQuizResultAction, type QuizResult } from "@/actions/study";
+import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
 
 type CardData = {
   id: number;
@@ -64,6 +66,7 @@ interface QuizStudyProps {
   cards: CardData[];
   deckId: number;
   deckName: string;
+  teamId: number | null;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -174,7 +177,7 @@ function buildQuestions(cards: CardData[]): QuizQuestion[] {
   return shuffleArray(questions);
 }
 
-export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
+export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
   const router = useRouter();
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => buildQuestions(cards));
@@ -182,6 +185,7 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
   const [selectedByIndex, setSelectedByIndex] = useState<(number | null)[]>(() =>
     Array(questions.length).fill(null),
   );
+  const [voice, setVoice] = useState<TtsVoice>("nova");
 
   const totalSeconds = useMemo(
     () => getQuizDurationSeconds(questions.length),
@@ -307,7 +311,9 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
         result={result}
         questions={questions}
         selectedByIndex={selectedByIndex}
+        deckId={deckId}
         deckName={deckName}
+        teamId={teamId}
         onRetake={handleRetake}
         onBack={() => router.push(`/decks/${deckId}`)}
       />
@@ -393,18 +399,21 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
     <div className="flex flex-1 flex-col items-center gap-4 sm:gap-6">
       <div className="w-full max-w-2xl flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div
-            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-sm sm:text-base ${
-              timerCritical
-                ? "border-rose-500/50 bg-rose-500/10 text-rose-400 animate-pulse"
-                : timerWarning
-                  ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
-                  : "border-border bg-muted/30 text-foreground"
-            }`}
-            aria-label="Time remaining"
-          >
-            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            {formatClock(remainingSeconds)}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-sm sm:text-base ${
+                timerCritical
+                  ? "border-rose-500/50 bg-rose-500/10 text-rose-400 animate-pulse"
+                  : timerWarning
+                    ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                    : "border-border bg-muted/30 text-foreground"
+              }`}
+              aria-label="Time remaining"
+            >
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {formatClock(remainingSeconds)}
+            </div>
+            <VoiceSelector voice={voice} onChange={setVoice} />
           </div>
           <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
             <span>
@@ -450,7 +459,12 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
           <Badge variant="secondary" className="text-xs">
             Question {currentIndex + 1}
           </Badge>
-          <span className="text-muted-foreground text-xs">Select the best answer</span>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-xs hidden sm:inline">Select the best answer</span>
+            {current.question && (
+              <SpeakButton text={current.question} voice={voice} stopKey={currentIndex} />
+            )}
+          </div>
         </div>
         {current.questionImageUrl && (
           <div className="px-3 sm:px-6 pb-2">
@@ -483,29 +497,31 @@ export function QuizStudy({ cards, deckId, deckName }: QuizStudyProps) {
         {current.options.map((text, i) => {
           const isSelected = selectedForCurrent === i;
           return (
-            <Button
-              key={`${current.cardId}-${i}`}
-              variant={isSelected ? "default" : "outline"}
-              role="radio"
-              aria-checked={isSelected}
-              className={`justify-start text-left h-auto py-3 px-4 whitespace-normal break-words ${
-                isSelected ? "" : "hover:bg-muted/50"
-              }`}
-              onClick={() => handleSelect(i)}
-            >
-              <span className="flex items-start gap-2.5 w-full">
-                <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
-                    isSelected
-                      ? "border-primary-foreground bg-primary-foreground text-primary"
-                      : "border-muted-foreground/40 bg-transparent"
-                  }`}
-                >
-                  {String.fromCharCode(65 + i)}
+            <div key={`${current.cardId}-${i}`} className="flex items-center gap-1.5">
+              <Button
+                variant={isSelected ? "default" : "outline"}
+                role="radio"
+                aria-checked={isSelected}
+                className={`flex-1 justify-start text-left h-auto py-3 px-4 whitespace-normal break-words ${
+                  isSelected ? "" : "hover:bg-muted/50"
+                }`}
+                onClick={() => handleSelect(i)}
+              >
+                <span className="flex items-start gap-2.5 w-full">
+                  <span
+                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                      isSelected
+                        ? "border-primary-foreground bg-primary-foreground text-primary"
+                        : "border-muted-foreground/40 bg-transparent"
+                    }`}
+                  >
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <span className="break-words">{text}</span>
                 </span>
-                <span className="break-words">{text}</span>
-              </span>
-            </Button>
+              </Button>
+              <SpeakButton text={text} voice={voice} stopKey={currentIndex} />
+            </div>
           );
         })}
       </div>
@@ -595,19 +611,69 @@ function QuizResultCard({
   result,
   questions,
   selectedByIndex,
+  deckId,
   deckName,
+  teamId,
   onRetake,
   onBack,
 }: {
   result: QuizResult;
   questions: QuizQuestion[];
   selectedByIndex: (number | null)[];
+  deckId: number;
   deckName: string;
+  teamId: number | null;
   onRetake: () => void;
   onBack: () => void;
 }) {
   const { percent, correct, incorrect, unanswered, total, tier, quote, elapsedSeconds, timedOut } =
     result;
+
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saving, startSaving] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const perCardSnapshot = useMemo(
+    () =>
+      questions.map((q, i) => {
+        const perCardEntry = result.perCard.find((p) => p.cardId === q.cardId);
+        const selectedIdx = selectedByIndex[i];
+        const selectedAnswer =
+          selectedIdx !== null && selectedIdx !== undefined ? q.options[selectedIdx] ?? null : null;
+        return {
+          cardId: q.cardId,
+          question: q.question,
+          correctAnswer: perCardEntry?.correctText ?? q.options[q.correctIndex] ?? "",
+          selectedAnswer,
+          correct: perCardEntry?.correct ?? false,
+        };
+      }),
+    [questions, selectedByIndex, result.perCard],
+  );
+
+  function handleSaveConfirm() {
+    startSaving(async () => {
+      try {
+        await saveQuizResultAction({
+          deckId,
+          deckName,
+          teamId,
+          correct,
+          incorrect,
+          unanswered,
+          total,
+          percent,
+          elapsedSeconds,
+          perCard: perCardSnapshot,
+        });
+        setSaved(true);
+        setSaveDialogOpen(false);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Failed to save result");
+      }
+    });
+  }
 
   const tierStyles: Record<
     typeof tier,
@@ -659,6 +725,12 @@ function QuizResultCard({
             <span className={`font-semibold ${style.color}`}>{percent} / 100</span>
           </div>
           <Progress value={percent} className="h-3" />
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>Correct cards</span>
+            <span className={`font-semibold ${style.color}`}>
+              {correct} / {total}
+            </span>
+          </div>
         </div>
 
         <div className="w-full grid grid-cols-3 gap-2 sm:gap-3">
@@ -692,7 +764,28 @@ function QuizResultCard({
           </figcaption>
         </figure>
 
+        {saveError && (
+          <p className="text-xs text-rose-500 text-center">{saveError}</p>
+        )}
+
         <div className="w-full flex flex-col gap-3">
+          {!saved ? (
+            <Button
+              size="default"
+              variant="secondary"
+              className="w-full gap-2 h-10 sm:h-11"
+              onClick={() => setSaveDialogOpen(true)}
+              disabled={saving}
+            >
+              <BookCheck className="h-4 w-4" />
+              Save Result
+            </Button>
+          ) : (
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-medium text-emerald-400">
+              <CheckCircle className="h-4 w-4" />
+              Result saved to your inbox
+            </div>
+          )}
           <Button size="default" className="w-full gap-2 h-10 sm:h-11" onClick={onRetake}>
             <RotateCcw className="h-4 w-4" />
             Retake Quiz
@@ -707,6 +800,25 @@ function QuizResultCard({
             Back to Deck
           </Button>
         </div>
+
+        <AlertDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Save quiz result?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {teamId
+                  ? "Your result will be saved and a copy will be sent to your workspace owner's inbox."
+                  : "Your result will be saved and a copy will appear in your inbox."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSaveConfirm} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <div className="w-full max-w-xl flex flex-col gap-2">

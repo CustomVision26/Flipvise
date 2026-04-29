@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import {
   adminPrivilegeLogs,
+  adminPlanAssignmentLogs,
   cards,
   decks,
   teamDeckAssignments,
@@ -544,6 +545,33 @@ export async function getWorkspaceDetailsByOwnerUserIds(
   }
 
   return out;
+}
+
+export async function getAdminPlanAssignmentLogs(limit = 500) {
+  return db
+    .select()
+    .from(adminPlanAssignmentLogs)
+    .orderBy(desc(adminPlanAssignmentLogs.createdAt))
+    .limit(limit);
+}
+
+export type AdminPlanAssignmentAction =
+  | "plan_assigned"
+  | "plan_removed"
+  | "user_banned"
+  | "user_unbanned";
+
+export async function logAdminPlanAssignment(data: {
+  targetUserId: string;
+  targetUserName: string;
+  targetUserEmail: string | null;
+  action: AdminPlanAssignmentAction;
+  planName: string | null;
+  previousPlanName: string | null;
+  assignedByUserId: string;
+  assignedByName: string;
+}) {
+  return db.insert(adminPlanAssignmentLogs).values(data);
 }
 
 export type AdminPrivilegeLogAction =

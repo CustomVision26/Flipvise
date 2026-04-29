@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import {
+  SpeakButton,
+  VoiceSelector,
+  type TtsVoice,
+} from "@/components/speak-button";
 
 type CardData = {
   id: number;
@@ -34,6 +39,7 @@ export function DeckPreviewCarousel({
   const [animKey, setAnimKey] = useState(0);
   const [isClosing, setIsClosing] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [voice, setVoice] = useState<TtsVoice>("nova");
 
   // Refs to avoid stale closures in keyboard handler
   const currentIndexRef = useRef(currentIndex);
@@ -123,6 +129,9 @@ export function DeckPreviewCarousel({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 ml-3">
+          {/* Voice selector */}
+          <VoiceSelector voice={voice} onChange={setVoice} />
+
           <Button
             variant="outline"
             onClick={handleClose}
@@ -187,6 +196,7 @@ export function DeckPreviewCarousel({
                   <CardSlide
                     card={card}
                     animKey={i === currentIndex ? animKey : -1}
+                    voice={voice}
                   />
                 </div>
               </div>
@@ -256,7 +266,16 @@ export function DeckPreviewCarousel({
   );
 }
 
-function CardSlide({ card, animKey }: { card: CardData; animKey: number }) {
+
+function CardSlide({
+  card,
+  animKey,
+  voice,
+}: {
+  card: CardData;
+  animKey: number;
+  voice: TtsVoice;
+}) {
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
       {/* Question — slides in from top */}
@@ -277,6 +296,9 @@ function CardSlide({ card, animKey }: { card: CardData; animKey: number }) {
               <Sparkles className="size-3 text-primary" />
               AI
             </Badge>
+          )}
+          {card.front && (
+            <SpeakButton text={card.front} stopKey={animKey} voice={voice} className="ml-auto" />
           )}
         </div>
         {card.front ? (
@@ -320,6 +342,9 @@ function CardSlide({ card, animKey }: { card: CardData; animKey: number }) {
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             Answer
           </span>
+          {card.back && (
+            <SpeakButton text={card.back} stopKey={animKey} voice={voice} className="ml-auto" />
+          )}
         </div>
         {card.back ? (
           <p className="text-foreground text-sm sm:text-base leading-relaxed whitespace-pre-line">

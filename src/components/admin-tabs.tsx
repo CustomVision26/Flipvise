@@ -61,6 +61,7 @@ import type {
   SerializedAdminWorkspace,
   SerializedAffiliate,
   SerializedLog,
+  SerializedPlanAssignmentLog,
   SerializedUser,
 } from "@/lib/admin-dashboard-types";
 import { TEAM_PLAN_LABELS } from "@/lib/team-plans";
@@ -73,6 +74,7 @@ interface AdminTabsProps {
   callerIsSuperadmin: boolean;
   users: SerializedUser[];
   logs: SerializedLog[];
+  planAssignmentLogs: SerializedPlanAssignmentLog[];
   subscriptions: SerializedAdminSubscription[];
   invoices: SerializedAdminInvoice[];
   supportTickets: SerializedTicket[];
@@ -146,6 +148,7 @@ export function AdminTabs({
   callerIsSuperadmin,
   users,
   logs,
+  planAssignmentLogs,
   subscriptions,
   invoices,
   supportTickets,
@@ -179,7 +182,8 @@ export function AdminTabs({
     | "audit-log"
     | "support-center"
     | "plans"
-    | "marketing-affiliates" =
+    | "marketing-affiliates"
+    | "plan-history" =
     pathname === "/admin/team-workspaces"
       ? "workspace-admin"
       : pathname === "/admin/subscription"
@@ -196,7 +200,9 @@ export function AdminTabs({
               ? "plans"
               : pathname === "/admin/marketing-affiliates"
                 ? "marketing-affiliates"
-                : "all-users";
+                : pathname === "/admin/plan-history"
+                  ? "plan-history"
+                  : "all-users";
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -424,6 +430,21 @@ export function AdminTabs({
                     </span>
                   ) : null;
                 })()}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/plan-history")}
+              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "plan-history" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+            >
+              <span className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Plan History
+                {planAssignmentLogs.length > 0 ? (
+                  <Badge className="ml-auto text-xs" variant="secondary">
+                    {planAssignmentLogs.length}
+                  </Badge>
+                ) : null}
               </span>
             </button>
           </CardContent>
@@ -1419,6 +1440,91 @@ export function AdminTabs({
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {log.grantedByName}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        {formatDateTime(log.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ── Plan Assignment History ── */}
+      {activeSection === "plan-history" ? (
+        <Card className="rounded-tl-none border-t-0">
+          <CardHeader>
+            <CardTitle>Plan Assignment &amp; Ban History</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              A full record of every plan assignment and user ban/unban performed by admins,
+              showing the user affected, previous and new plan, and who made the change.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            {planAssignmentLogs.length === 0 ? (
+              <p className="p-6 text-sm text-muted-foreground">
+                No plan or ban actions recorded yet. Changes will appear here automatically after any
+                plan assignment or user ban.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Previous Plan</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>New Plan</TableHead>
+                    <TableHead>Admin</TableHead>
+                    <TableHead>Date &amp; Time</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {planAssignmentLogs.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <div className="font-medium whitespace-nowrap">{log.targetUserName}</div>
+                        {log.targetUserEmail ? (
+                          <div className="text-xs text-muted-foreground">{log.targetUserEmail}</div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        {log.action === "user_banned" || log.action === "user_unbanned"
+                          ? <span className="text-muted-foreground/60">—</span>
+                          : (log.previousPlanName ?? "Free")}
+                      </TableCell>
+                      <TableCell>
+                        {log.action === "plan_assigned" ? (
+                          <Badge variant="secondary" className="text-xs gap-1 whitespace-nowrap">
+                            <ShieldCheck className="h-3 w-3" />
+                            Plan Assigned
+                          </Badge>
+                        ) : log.action === "plan_removed" ? (
+                          <Badge variant="outline" className="text-xs gap-1 whitespace-nowrap">
+                            <ShieldOff className="h-3 w-3" />
+                            Plan Removed
+                          </Badge>
+                        ) : log.action === "user_banned" ? (
+                          <Badge variant="destructive" className="text-xs gap-1 whitespace-nowrap">
+                            <ShieldOff className="h-3 w-3" />
+                            User Banned
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs gap-1 whitespace-nowrap border-emerald-500 text-emerald-500">
+                            <ShieldCheck className="h-3 w-3" />
+                            User Unbanned
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {log.action === "user_banned" || log.action === "user_unbanned"
+                          ? <span className="text-muted-foreground/60">—</span>
+                          : <span className="font-medium">{log.planName ?? "Free"}</span>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        {log.assignedByName}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                         {formatDateTime(log.createdAt)}

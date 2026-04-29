@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
@@ -10,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button-variants";
 import {
   getDecksForTeam,
   getTeamsForTeamDashboard,
@@ -25,8 +23,10 @@ import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
 import { buildResolvedTeamWorkspaceQueryString } from "@/lib/resolve-team-workspace-url";
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
+import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
 import { TeamAdminManageTabs } from "@/components/team-admin-manage-tabs";
 import { AddTeamDialog } from "@/components/add-team-dialog";
+import { MainDashboardButton } from "@/components/main-dashboard-button";
 import {
   getClerkPrimaryEmailsByUserIds,
   getClerkUserDisplayNameById,
@@ -123,6 +123,7 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
       workspaceHistory,
       teamDecks,
       ownerDisplayName,
+      teamQuizResults,
     ],
     assignWorkspaceSnapshots,
   ] = await Promise.all([
@@ -134,6 +135,7 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
       listTeamWorkspaceEventsForTeam(selected.ownerUserId, selected.id),
       getDecksForTeam(selected.id, selected.ownerUserId),
       getClerkUserDisplayNameById(selected.ownerUserId),
+      getQuizResultsForTeam(selected.id),
     ]),
     Promise.all(
       teamsForSubscriber.map(async (t) => {
@@ -160,6 +162,7 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
     selected.ownerUserId,
     ...members.map((m) => m.userId),
     ...members.map((m) => m.addedByUserId).filter((id): id is string => Boolean(id)),
+    ...teamQuizResults.map((r) => r.userId),
   ];
   const assignMemberUserIds = assignWorkspaceSnapshots.flatMap((w) =>
     w.normalMembers.map((m) => m.userId),
@@ -221,7 +224,7 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="min-w-0 space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Team Admin Dashboard</h1>
             <p
               className="text-lg font-semibold tracking-tight text-foreground sm:text-xl truncate min-w-0"
               title={ownerDisplayName}
@@ -250,13 +253,10 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start">
-          <Link
+          <MainDashboardButton
+            teamId={isTeamPlanId(selected.planSlug) ? selected.id : null}
             href={mainDashboardHref}
-            prefetch
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            ← Main dashboard
-          </Link>
+          />
         </div>
       </div>
 
@@ -303,6 +303,7 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
       <TeamAdminManageTabs
         key={selected.id}
         teamId={selected.id}
+        teamName={selected.name}
         ownerUserId={selected.ownerUserId}
         teamCreatedAt={selected.createdAt}
         currentUserId={userId}
@@ -316,6 +317,7 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
         invitationHistory={invitationHistory}
         workspaceHistory={workspaceHistory}
         assignWorkspaceSnapshots={assignWorkspaceSnapshots}
+        teamQuizResults={teamQuizResults}
       />
     </div>
   );

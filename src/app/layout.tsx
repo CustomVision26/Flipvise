@@ -41,6 +41,7 @@ const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -53,56 +54,89 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { userId, isPro, adminGranted, isAdmin, activeTeamPlan, hasCustomColors } =
-    await getAccessContext();
+  // Batch 1: session + cookies + headers — all independent, run in parallel
+  const [
+    { userId, isPro, adminGranted, isAdmin, activeTeamPlan, hasCustomColors },
+    cookieStore,
+    headerStore,
+  ] = await Promise.all([
+    getAccessContext(),
+    cookies(),
+    headers(),
+  ]);
+
+  // Extract cookie / header values synchronously
+  const teamContext = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
+  const proCookieValue = cookieStore.get(PRO_UI_THEME_COOKIE)?.value;
+  const freeCookieValue = cookieStore.get(FREE_UI_THEME_COOKIE)?.value;
+  const pathnameHeader = headerStore.get("x-pathname") ?? "";
+  const xSearch = headerStore.get("x-search") ?? "";
+
+  // Batch 2: all DB queries — independent of each other, run in parallel
+  const [teamAdminHeaderPayload, workspaceNav, hideHelpCenter, inboxUnreadCount] =
+    await Promise.all([
+      // Team admin header teams
+      userId != null
+        ? tryTeamQuery(async () => {
+            const canAccess = await userHasTeamAdminDashboardAccess(userId);
+            if (!canAccess) {
+              return {
+                teamAdminHeaderTeams: [] as {
+                  id: number;
+                  name: string;
+                  ownerUserId: string;
+                  workspacePlanQuery?: string;
+                }[],
+              };
+            }
+            const teams = await getTeamsForTeamDashboard(userId);
+            return {
+              teamAdminHeaderTeams: teams.map((t) => ({
+                id: t.id,
+                name: t.name,
+                ownerUserId: t.ownerUserId,
+                workspacePlanQuery: isTeamPlanId(t.planSlug) ? t.planSlug : undefined,
+              })),
+            };
+          }, { teamAdminHeaderTeams: [] })
+        : Promise.resolve({ teamAdminHeaderTeams: [] }),
+
+      // Workspace nav
+      userId != null
+        ? tryTeamQuery(
+            () => getWorkspaceNavTeamsForUser(userId, { personalProUnlocked: isPro }),
+            { teams: [], totalEligibleCount: 0 },
+          )
+        : Promise.resolve({ teams: [], totalEligibleCount: 0 }),
+
+      // Help center visibility
+      userId != null && !isAdmin && !adminGranted
+        ? shouldHideHelpCenter(userId, teamContext)
+        : Promise.resolve(false),
+
+      // Inbox unread count
+      userId != null
+        ? (async () => {
+            try {
+              const sessionUser = await currentUser();
+              const email = sessionUser?.primaryEmailAddress?.emailAddress ?? null;
+              if (!email) return 0;
+              return await countPendingInvitationsForEmail(email);
+            } catch {
+              return 0;
+            }
+          })()
+        : Promise.resolve(0),
+    ]);
+
+  const teamAdminHeaderTeams = teamAdminHeaderPayload.teamAdminHeaderTeams;
+  const workspaceTeams = workspaceNav.teams;
+  const workspaceTeamsTotalEligible = workspaceNav.totalEligibleCount;
+  const showWorkspaceSwitcher = workspaceTeamsTotalEligible > 0;
 
   // Team plan subscribers receive Pro on their personal workspace — show "Pro" here,
   // not the team plan name (which belongs only to the team owner dashboard).
   const personalPlanLabelForWorkspace = isPro ? "Pro" : "Free";
-
-  const teamAdminHeaderPayload =
-    userId != null
-      ? await tryTeamQuery(async () => {
-          const canAccess = await userHasTeamAdminDashboardAccess(userId);
-          if (!canAccess) {
-            return {
-              teamAdminHeaderTeams: [] as {
-                id: number;
-                name: string;
-                ownerUserId: string;
-                workspacePlanQuery?: string;
-              }[],
-            };
-          }
-          const teams = await getTeamsForTeamDashboard(userId);
-          return {
-            teamAdminHeaderTeams: teams.map((t) => ({
-              id: t.id,
-              name: t.name,
-              ownerUserId: t.ownerUserId,
-              workspacePlanQuery: isTeamPlanId(t.planSlug)
-                ? t.planSlug
-                : undefined,
-            })),
-          };
-        }, { teamAdminHeaderTeams: [] })
-      : { teamAdminHeaderTeams: [] };
-
-  const teamAdminHeaderTeams = teamAdminHeaderPayload.teamAdminHeaderTeams;
-
-  const workspaceNav =
-    userId != null
-      ? await tryTeamQuery(
-          () =>
-            getWorkspaceNavTeamsForUser(userId, {
-              personalProUnlocked: isPro,
-            }),
-          { teams: [], totalEligibleCount: 0 },
-        )
-      : { teams: [], totalEligibleCount: 0 };
-  const workspaceTeams = workspaceNav.teams;
-  const workspaceTeamsTotalEligible = workspaceNav.totalEligibleCount;
-  const showWorkspaceSwitcher = workspaceTeamsTotalEligible > 0;
 
   const dashboardHrefWithUserQuery =
     userId != null
@@ -113,13 +147,7 @@ export default async function RootLayout({
       ? dashboardHrefWithUserQuery
       : "/dashboard";
 
-  const cookieStore = await cookies();
-  const teamContext = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
-
   const allowedWorkspaceIds = new Set(workspaceTeams.map((t) => t.id));
-  const headerStore = await headers();
-  const pathnameHeader = headerStore.get("x-pathname") ?? "";
-  const xSearch = headerStore.get("x-search") ?? "";
   const teamIdFromUrlShape = teamWorkspaceTeamIdFromUrlShapeIfValid(
     parseSearchParamsRecordFromSearchString(xSearch),
   );
@@ -134,32 +162,11 @@ export default async function RootLayout({
       : null;
   /** URL wins over cookie so the switcher matches `/dashboard?team=…` on first paint (layout runs before the page sets the cookie). */
   const activeWorkspaceTeamId = activeFromUrl ?? activeFromCookie;
-  const hideHelpCenter =
-    userId != null &&
-    !isAdmin &&
-    !adminGranted &&
-    (await shouldHideHelpCenter(userId, teamContext));
 
-  const inboxUnreadCount = await (async () => {
-    if (!userId) return 0;
-    try {
-      const sessionUser = await currentUser();
-      const email = sessionUser?.primaryEmailAddress?.emailAddress ?? null;
-      if (!email) return 0;
-      return await countPendingInvitationsForEmail(email);
-    } catch {
-      return 0;
-    }
-  })();
-  
-  const proCookieValue = cookieStore.get(PRO_UI_THEME_COOKIE)?.value;
   const proUiTheme = resolveProUiThemeDataAttribute(isPro, proCookieValue);
   const proUiThemeSelection = resolveProUiThemeSelection(proCookieValue);
-  
-  const freeCookieValue = cookieStore.get(FREE_UI_THEME_COOKIE)?.value;
   const freeUiTheme = resolveFreeUiThemeDataAttribute(isPro, freeCookieValue);
   const freeUiThemeSelection = resolveFreeUiThemeSelection(freeCookieValue);
-  
   const appliedTheme = isPro ? proUiTheme : freeUiTheme;
   const isTeamInviteRoute = pathnameHeader.startsWith("/invite/team");
   const showHeaderChrome = Boolean(userId) || isTeamInviteRoute;

@@ -15,6 +15,7 @@ import {
 } from "@/lib/plan-metadata-billing-resolution";
 import { stripe } from "@/lib/stripe";
 import { isTeamPlanId, TEAM_PLAN_IDS, type TeamPlanId } from "@/lib/team-plans";
+import { updateOwnedTeamsPlanSlug } from "@/db/queries/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +154,16 @@ async function setStripeBillingState(
       teamPlanId: isTeamPlan ? resolvedPlan : null,
     },
   });
+
+  // Keep all workspaces owned by this user in sync with the new resolved plan
+  // so workspace limits (maxTeams / maxMembersPerTeam) always match the active
+  // Stripe subscription rather than the plan at workspace creation time.
+  try {
+    await updateOwnedTeamsPlanSlug(userId, resolvedPlan ?? "pro");
+  } catch {
+    // Best-effort — billing state already written above; a retry or
+    // subsequent plan change will bring the workspace row back in sync.
+  }
 }
 
 function asPaidPlanId(value: unknown): PaidPlanId | null {

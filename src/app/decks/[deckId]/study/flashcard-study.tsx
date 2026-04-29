@@ -36,6 +36,7 @@ import {
   Flag,
   CircleDashed,
 } from "lucide-react";
+import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
 
 
 type CardData = {
@@ -106,6 +107,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [voice, setVoice] = useState<TtsVoice>("nova");
   const [answers, setAnswers] = useState<Record<number, "correct" | "incorrect">>({});
   const [sessionComplete, setSessionComplete] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
@@ -433,17 +435,20 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
           </div>
         </div>
         <Progress value={progressPercent} className="h-2" />
-        <div className="flex items-center gap-3 sm:gap-4 mt-1">
-          <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-500">
-            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="font-semibold">{correctCount}</span>
-            <span className="text-muted-foreground hidden sm:inline">correct</span>
+        <div className="flex items-center justify-between gap-3 mt-1">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-500">
+              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="font-semibold">{correctCount}</span>
+              <span className="text-muted-foreground hidden sm:inline">correct</span>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-rose-500">
+              <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="font-semibold">{incorrectCount}</span>
+              <span className="text-muted-foreground hidden sm:inline">incorrect</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-rose-500">
-            <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="font-semibold">{incorrectCount}</span>
-            <span className="text-muted-foreground hidden sm:inline">incorrect</span>
-          </div>
+          <VoiceSelector voice={voice} onChange={setVoice} />
         </div>
       </div>
 
@@ -555,6 +560,30 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
         </div>
       </div>
       </div>
+
+      {/* Listen row — outside the card so clicks never trigger the flip */}
+      {(currentCard.front || currentCard.back) && (
+        <div className="flex items-center justify-center gap-3">
+          {currentCard.front && (
+            <SpeakButton
+              text={currentCard.front}
+              voice={voice}
+              stopKey={currentIndex}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-full border border-border bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all w-auto"
+              label="Question"
+            />
+          )}
+          {currentCard.back && (
+            <SpeakButton
+              text={currentCard.back}
+              voice={voice}
+              stopKey={currentIndex}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-full border border-border bg-background text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all w-auto"
+              label="Answer"
+            />
+          )}
+        </div>
+      )}
 
       {/* Correct / Incorrect buttons — visible only on back side */}
       {isFlipped && (
