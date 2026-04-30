@@ -16,6 +16,7 @@ import {
 import { stripe } from "@/lib/stripe";
 import { isTeamPlanId, TEAM_PLAN_IDS, type TeamPlanId } from "@/lib/team-plans";
 import { updateOwnedTeamsPlanSlug } from "@/db/queries/teams";
+import { loopsSendEvent, loopsUpdateContact } from "@/lib/loops";
 
 export const dynamic = "force-dynamic";
 
@@ -166,6 +167,18 @@ async function setStripeBillingState(
   }
 }
 
+async function getClerkUserEmail(userId: string): Promise<string | null> {
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    return (
+      user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
+        ?.emailAddress?.toLowerCase() ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
 function asPaidPlanId(value: unknown): PaidPlanId | null {
   if (typeof value !== "string") return null;
   return (PAID_PLAN_IDS as readonly string[]).includes(value) ? (value as PaidPlanId) : null;
@@ -269,6 +282,14 @@ export async function POST(req: NextRequest) {
               // Best-effort — billing state already written above.
             }
           }
+
+          // Loops: update contact group + fire plan_upgraded event
+          void (async () => {
+            const email = await getClerkUserEmail(userId);
+            if (!email) return;
+            await loopsUpdateContact(email, { userId, userGroup: selectedPlan });
+            await loopsSendEvent(email, "plan_upgraded", { userId, userGroup: selectedPlan });
+          })();
         }
         break;
       }
@@ -290,6 +311,25 @@ export async function POST(req: NextRequest) {
               : null;
 
           await setStripeBillingState(resolution.userId, activePlan, billingStatus);
+
+          // Loops: sync userGroup and fire lifecycle events
+          void (async () => {
+            const email = await getClerkUserEmail(resolution.userId);
+            if (!email) return;
+            if (billingStatus === "active" || billingStatus === "trialing") {
+              await loopsUpdateContact(email, {
+                userId: resolution.userId,
+                userGroup: activePlan ?? "pro",
+              });
+            } else {
+              // canceled / expired — downgrade contact back to free
+              await loopsUpdateContact(email, { userId: resolution.userId, userGroup: "free" });
+              await loopsSendEvent(email, "plan_cancelled", {
+                userId: resolution.userId,
+                userGroup: "free",
+              });
+            }
+          })();
 
           // Keep the stripe_subscriptions row in sync with the latest status,
           // plan slug, and item ID (price swaps update the item list).
@@ -340,6 +380,14 @@ export async function POST(req: NextRequest) {
         const userEmail =
           user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress?.toLowerCase() ??
           null;
+
+        // Loops: fire payment_succeeded once per successful charge
+        if (userEmail && event.type === "invoice.payment_succeeded") {
+          void loopsSendEvent(userEmail, "payment_succeeded", {
+            userId,
+            userGroup: invoicePlan,
+          });
+        }
 
         // Derive the billing period.
         // Primary: first subscription line item period (most accurate for subscriptions).

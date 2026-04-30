@@ -47,6 +47,7 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { deleteDeckAction } from "@/actions/decks";
+import { getGradientBySlug } from "@/lib/deck-gradients";
 import {
   getCardsForDeckViewerPreviewAction,
   getCardsForPreviewAction,
@@ -75,6 +76,7 @@ interface DeckCardPopoverProps {
     /** Team deck cover — shown on dashboard cards only. */
     coverImageUrl?: string | null;
     firstPreviewCardFrontImageUrl?: string | null;
+    gradient?: string | null;
   };
   view?: DeckView;
   /** When set, append to deck and study links (team workspace URL context). */
@@ -347,12 +349,16 @@ export function DeckCardPopover({
     </div>
   ) : null;
 
+  const deckGradient = getGradientBySlug(deck.gradient);
+  const hasGradient = deckGradient.slug !== "none";
+
   const deckCard = (
     <Card
       className={cn(
         "h-full transition-all duration-200 cursor-pointer select-none overflow-hidden",
-        "hover:bg-muted/50 hover:shadow-md",
+        hasGradient ? "hover:opacity-90 hover:shadow-md" : "hover:bg-muted/50 hover:shadow-md",
         "active:scale-[0.99]",
+        hasGradient && deckGradient.classes,
         view === "compact"
           ? cn("flex flex-col hover:-translate-y-0.5", hasCover && "p-0")
           : view === "list"
@@ -369,20 +375,20 @@ export function DeckCardPopover({
       {view === "compact" ? (
         <>
           <CardHeader className="px-3 py-3 gap-1">
-            <CardTitle className="line-clamp-2 text-sm sm:text-base leading-tight">
+            <CardTitle className={cn("line-clamp-2 text-sm sm:text-base leading-tight", hasGradient && "text-white")}>
               {deck.name}
             </CardTitle>
-            <CardDescription className="line-clamp-2 text-[11px] sm:text-xs">
+            <CardDescription className={cn("line-clamp-2 text-[11px] sm:text-xs", hasGradient && "text-white/70")}>
               {deck.description ?? "No description provided."}
             </CardDescription>
           </CardHeader>
           <div className="flex-1" />
           <CardFooter className="px-3 pb-3 pt-0 flex items-center justify-between gap-2">
-            <span className="text-muted-foreground text-[11px] tabular-nums">
+            <span className={cn("text-[11px] tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
               {deck.cardCount}{" "}
               {deck.cardCount === 1 ? "card" : "cards"}
             </span>
-            <span className="text-muted-foreground text-[11px] tabular-nums truncate">
+            <span className={cn("text-[11px] tabular-nums truncate", hasGradient ? "text-white/70" : "text-muted-foreground")}>
               {updatedShort}
             </span>
           </CardFooter>
@@ -391,27 +397,27 @@ export function DeckCardPopover({
         <>
           {coverThumbList}
           <div className="flex-1 min-w-0">
-            <p className="line-clamp-1 text-sm font-medium">{deck.name}</p>
+            <p className={cn("line-clamp-1 text-sm font-medium", hasGradient && "text-white")}>{deck.name}</p>
           </div>
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+          <span className={cn("shrink-0 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
             {deck.cardCount}{" "}
             {deck.cardCount === 1 ? "card" : "cards"}
           </span>
-          <span className="hidden sm:inline shrink-0 text-xs text-muted-foreground tabular-nums">
+          <span className={cn("hidden sm:inline shrink-0 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
             Updated {updatedLabel}
           </span>
         </>
       ) : (
         <div className="flex min-h-0 flex-1 flex-row items-center gap-3 sm:gap-4">
           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-            <p className="text-sm sm:text-base font-semibold break-words whitespace-pre-wrap">
+            <p className={cn("text-sm sm:text-base font-semibold break-words whitespace-pre-wrap", hasGradient && "text-white")}>
               {deck.name}
             </p>
-            <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap">
+            <p className={cn("text-xs break-words whitespace-pre-wrap", hasGradient ? "text-white/70" : "text-muted-foreground")}>
               {deck.description ?? "No description provided."}
             </p>
           </div>
-          <div className="flex flex-wrap shrink-0 items-center gap-x-6 gap-y-1 text-xs text-muted-foreground tabular-nums">
+          <div className={cn("flex flex-wrap shrink-0 items-center gap-x-6 gap-y-1 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
             <span className="sm:w-16 sm:text-right">
               {deck.cardCount}{" "}
               {deck.cardCount === 1 ? "card" : "cards"}

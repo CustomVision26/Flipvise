@@ -8,6 +8,7 @@ import {
   getClerkUserDisplayNameById,
 } from "@/lib/clerk-user-display";
 import Link from "next/link";
+import { Layers, BookOpen } from "lucide-react";
 import {
   buildResolvedTeamWorkspaceQueryString,
   resolveTeamWorkspaceFromSearchParams,
@@ -266,8 +267,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
         {teamDecks.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
-            <p className="text-muted-foreground text-sm">No team decks yet.</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-14 sm:py-24 text-center px-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
+              <Layers className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground text-sm">No team decks yet</p>
+              <p className="text-muted-foreground text-xs max-w-xs">Create your first team deck to get started sharing flashcards with your team.</p>
+            </div>
             <AddDeckDialog
               triggerLabel="Create a team deck"
               isAtLimit={false}
@@ -342,9 +349,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
         {assigned.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No decks assigned yet. Ask your team admin to assign decks to you.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
+              <BookOpen className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground text-sm">No decks assigned yet</p>
+              <p className="text-muted-foreground text-xs max-w-xs">Your team admin hasn&apos;t assigned any decks to you yet. Check back soon.</p>
+            </div>
+          </div>
         ) : (
           <DeckGrid
             decks={assigned}
@@ -413,9 +426,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
         {assigned.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No decks assigned yet. Ask your team admin to assign decks to you.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
+              <BookOpen className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground text-sm">No decks assigned yet</p>
+              <p className="text-muted-foreground text-xs max-w-xs">Your team admin hasn&apos;t assigned any decks to you yet. Check back soon.</p>
+            </div>
+          </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {assigned.map((d) => (
@@ -611,8 +630,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       {/* Deck grid */}
       {decks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
-          <p className="text-muted-foreground text-sm">You have no decks yet.</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-14 sm:py-24 text-center px-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
+            <Layers className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-medium text-foreground text-sm">No decks yet</p>
+            <p className="text-muted-foreground text-xs max-w-xs">Create your first deck to start building your flashcard library.</p>
+          </div>
           <AddDeckDialog
             triggerLabel="Create your first deck"
             isAtLimit={isAtLimit}

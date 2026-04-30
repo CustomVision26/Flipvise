@@ -19,6 +19,7 @@ const createDeckSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
     description: z.string().optional(),
+    gradient: z.string().optional(),
     teamId: z.number().int().positive().optional(),
     /** When true, always create a personal deck for the session user (`teamId` ignored). */
     personalOnly: z.literal(true).optional(),
@@ -49,7 +50,7 @@ export async function createDeckAction(
   if (!parsed.success) throw new Error("Invalid input");
 
   const sessionUserId = userId;
-  const { name, description, teamId, personalOnly, teamWorkspaceOnly } = parsed.data;
+  const { name, description, gradient, teamId, personalOnly, teamWorkspaceOnly } = parsed.data;
 
   async function insertPersonalDeckForSessionUser(): Promise<number> {
     if (!hasUnlimitedDecks) {
@@ -58,7 +59,7 @@ export async function createDeckAction(
         throw new Error("Free plan limit reached. Upgrade to Pro for unlimited decks.");
       }
     }
-    return createDeck(sessionUserId, name, description);
+    return createDeck(sessionUserId, name, description, null, gradient);
   }
 
   async function insertTeamDeckForTeamId(tid: number): Promise<number> {
@@ -68,7 +69,7 @@ export async function createDeckAction(
     const membership = await getMemberRecord(tid, sessionUserId);
     const isTeamAdmin = membership?.role === "team_admin";
     if (!isOwner && !isTeamAdmin) throw new Error("Forbidden");
-    return createDeck(team.ownerUserId, name, description, tid);
+    return createDeck(team.ownerUserId, name, description, tid, gradient);
   }
 
   let deckId: number;
@@ -94,6 +95,7 @@ const updateDeckSchema = z.object({
   deckId: z.number().int().positive(),
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  gradient: z.string().optional(),
 });
 
 type UpdateDeckInput = z.infer<typeof updateDeckSchema>;
@@ -115,6 +117,7 @@ export async function updateDeckAction(data: UpdateDeckInput) {
     bundle.deck.userId,
     parsed.data.name,
     parsed.data.description,
+    parsed.data.gradient,
   );
 
   revalidatePath(`/decks/${parsed.data.deckId}`);

@@ -5,7 +5,7 @@ import type { InferSelectModel } from "drizzle-orm";
 
 export type DeckRow = InferSelectModel<typeof decks>;
 
-/** Drizzle projection when DB is behind schema (no `coverImageUrl` column yet). */
+/** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` columns). */
 export const deckRowSelectWithoutCover = {
   id: decks.id,
   userId: decks.userId,
@@ -45,8 +45,8 @@ export function isMissingDeckCoverColumnError(error: unknown): boolean {
   return false;
 }
 
-function withNullCover<T extends Omit<DeckRow, "coverImageUrl">>(row: T): DeckRow {
-  return { ...row, coverImageUrl: null };
+function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient">>(row: T): DeckRow {
+  return { ...row, coverImageUrl: null, gradient: null };
 }
 
 export async function getDecksByUser(userId: string): Promise<DeckRow[]> {
@@ -77,6 +77,7 @@ export async function getDecksByUserWithCardCount(userId: string) {
       userId: decks.userId,
       name: decks.name,
       description: decks.description,
+      gradient: decks.gradient,
       createdAt: decks.createdAt,
       updatedAt: decks.updatedAt,
       cardCount: count(cards.id),
@@ -89,6 +90,7 @@ export async function getDecksByUserWithCardCount(userId: string) {
       decks.userId,
       decks.name,
       decks.description,
+      decks.gradient,
       decks.createdAt,
       decks.updatedAt,
     );
@@ -102,6 +104,7 @@ export async function getPersonalDecksByUserWithCardCount(userId: string) {
       userId: decks.userId,
       name: decks.name,
       description: decks.description,
+      gradient: decks.gradient,
       createdAt: decks.createdAt,
       updatedAt: decks.updatedAt,
       cardCount: count(cards.id),
@@ -114,6 +117,7 @@ export async function getPersonalDecksByUserWithCardCount(userId: string) {
       decks.userId,
       decks.name,
       decks.description,
+      decks.gradient,
       decks.createdAt,
       decks.updatedAt,
     );
@@ -158,10 +162,11 @@ export async function createDeck(
   name: string,
   description?: string,
   teamId?: number | null,
+  gradient?: string | null,
 ): Promise<number> {
   const [row] = await db
     .insert(decks)
-    .values({ userId, name, description, teamId: teamId ?? null })
+    .values({ userId, name, description, teamId: teamId ?? null, gradient: gradient ?? null })
     .returning({ id: decks.id });
   if (!row) throw new Error("Failed to create deck");
   return row.id;
@@ -172,10 +177,11 @@ export async function updateDeck(
   userId: string,
   name: string,
   description?: string,
+  gradient?: string | null,
 ) {
   return db
     .update(decks)
-    .set({ name, description, updatedAt: new Date() })
+    .set({ name, description, gradient: gradient ?? null, updatedAt: new Date() })
     .where(and(eq(decks.id, deckId), eq(decks.userId, userId)));
 }
 

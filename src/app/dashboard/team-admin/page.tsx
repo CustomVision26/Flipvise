@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
+import { Users, Layers, LayoutGrid } from "lucide-react";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
   Card,
@@ -263,39 +264,50 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Teams/Workspaces
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Workspaces
+              </CardTitle>
+              <LayoutGrid className="h-4 w-4 text-muted-foreground" aria-hidden />
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">
-              {teamsForSubscriber.length} / {limits.maxTeams}
+            <p className="text-2xl font-bold tabular-nums">
+              {teamsForSubscriber.length}
+              <span className="text-lg font-normal text-muted-foreground"> / {limits.maxTeams}</span>
             </p>
-            <CardDescription>Subscriber-owned workspaces on this plan</CardDescription>
+            <CardDescription className="mt-0.5">Active subscriber-owned workspaces</CardDescription>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Members (this team)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Members
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">
-              {memberCount} / {limits.maxMembersPerTeam}
+            <p className="text-2xl font-bold tabular-nums">
+              {memberCount}
+              <span className="text-lg font-normal text-muted-foreground"> / {limits.maxMembersPerTeam}</span>
             </p>
-            <CardDescription>Actual member/s</CardDescription>
+            <CardDescription className="mt-0.5">Members in this workspace</CardDescription>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Decks (this team)
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Decks
+              </CardTitle>
+              <Layers className="h-4 w-4 text-muted-foreground" aria-hidden />
+            </div>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">{teamDecks.length}</p>
-            <CardDescription>Team-scoped decks</CardDescription>
+            <p className="text-2xl font-bold tabular-nums">{teamDecks.length}</p>
+            <CardDescription className="mt-0.5">Flashcard decks in this workspace</CardDescription>
           </CardContent>
         </Card>
       </div>

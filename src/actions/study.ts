@@ -11,6 +11,10 @@ import {
   type QuizTier,
 } from "@/lib/quiz-quotes";
 import { saveQuizResult } from "@/db/queries/quiz-results";
+import { loopsSendQuizResultEmail } from "@/lib/loops";
+import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
+import { generateQuizResultPdfBuffer } from "@/lib/quiz-pdf-server";
+import type { QuizResultRow } from "@/db/queries/quiz-results";
 
 const quizAnswerSchema = z.object({
   cardId: z.number().int().positive(),
@@ -198,7 +202,7 @@ export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{
     perCard,
   } = parsed.data;
 
-  const saved = await saveQuizResult({
+  const { result: saved, ownerUserId, teamName } = await saveQuizResult({
     userId,
     deckId,
     deckName,
@@ -212,5 +216,105 @@ export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{
     perCard,
   });
 
+  // Send quiz-result email notifications (errors suppressed inside the helper).
+  await sendQuizResultEmails({
+    userId,
+    ownerUserId,
+    teamName,
+    result: saved,
+  });
+
   return { id: saved.id };
+}
+
+type QuizEmailContext = {
+  userId: string;
+  ownerUserId: string | null;
+  teamName: string | null;
+  result: QuizResultRow;
+};
+
+/**
+ * Resolves Clerk emails/names for the quiz-taker (and team owner when applicable),
+ * generates a PDF attachment, then fires transactional Loops emails.
+ *
+ * - Personal quiz: one email + PDF to the quiz-taker.
+ * - Team quiz: one email + PDF to the quiz-taker, one to the team owner.
+ *   If the quiz-taker IS the owner (edge-case), only one email is sent.
+ */
+async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
+  const { result, userId, ownerUserId, teamName } = ctx;
+
+  const sharedFields = {
+    deckName: result.deckName,
+    correct: result.correct,
+    incorrect: result.incorrect,
+    unanswered: result.unanswered,
+    total: result.total,
+    percent: result.percent,
+    elapsedSeconds: result.elapsedSeconds,
+  } as const;
+
+  // Resolve display info for quiz-taker (and owner in parallel when needed).
+  const [takerDisplay, ownerDisplay] = await Promise.all([
+    getClerkUserFieldDisplayById(userId),
+    ownerUserId && ownerUserId !== userId
+      ? getClerkUserFieldDisplayById(ownerUserId)
+      : Promise.resolve(null),
+  ]);
+
+  const takerName = takerDisplay.primaryLine;
+  const takerEmail = takerDisplay.primaryEmail;
+  const ownerName = ownerDisplay?.primaryLine ?? null;
+  const ownerEmail = ownerDisplay?.primaryEmail ?? null;
+
+  // Generate the PDF once; the same file is attached to both recipient emails.
+  let pdfBuffer: Buffer | undefined;
+  try {
+    pdfBuffer = await generateQuizResultPdfBuffer({
+      deckName: result.deckName,
+      savedAt: result.savedAt,
+      correct: result.correct,
+      incorrect: result.incorrect,
+      unanswered: result.unanswered,
+      total: result.total,
+      percent: result.percent,
+      elapsedSeconds: result.elapsedSeconds,
+      perCard: result.perCard,
+      userName: takerName,
+      userEmail: takerEmail,
+      teamName,
+      ownerName,
+      ownerEmail,
+    });
+  } catch (err) {
+    console.error("[QuizEmail] PDF generation failed:", err);
+  }
+
+  if (takerEmail) {
+    await loopsSendQuizResultEmail(
+      {
+        ...sharedFields,
+        email: takerEmail,
+        userName: takerName,
+        memberName: takerName,
+        isOwnerCopy: 0,
+      },
+      pdfBuffer,
+    );
+  }
+
+  // For team quizzes, also notify the owner (unless the owner is the quiz-taker).
+  if (ownerUserId && ownerUserId !== userId && ownerEmail) {
+    await loopsSendQuizResultEmail(
+      {
+        ...sharedFields,
+        email: ownerEmail,
+        userName: ownerName ?? ownerEmail,
+        memberName: takerName,
+        isOwnerCopy: 1,
+      },
+      pdfBuffer,
+    );
+  }
 }

@@ -7,6 +7,14 @@ export type QuizResultRow = InferSelectModel<typeof quizResults>;
 export type QuizResultInboxMessageRow = InferSelectModel<typeof quizResultInboxMessages>;
 export type { PerCardSnapshot };
 
+export type SaveQuizResultOutput = {
+  result: QuizResultRow;
+  /** The team owner's Clerk userId when this was a team-deck quiz; null for personal quizzes. */
+  ownerUserId: string | null;
+  /** Team workspace name when this was a team-deck quiz; null for personal quizzes. */
+  teamName: string | null;
+};
+
 export type SaveQuizResultInput = {
   userId: string;
   deckId: number | null;
@@ -22,7 +30,7 @@ export type SaveQuizResultInput = {
 };
 
 /** Persists a quiz result and creates one inbox message for the appropriate recipient. */
-export async function saveQuizResult(input: SaveQuizResultInput): Promise<QuizResultRow> {
+export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQuizResultOutput> {
   const [saved] = await db
     .insert(quizResults)
     .values({
@@ -41,14 +49,18 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<QuizRe
     .returning();
 
   let recipientUserId = input.userId;
+  let ownerUserId: string | null = null;
+  let teamName: string | null = null;
 
   if (input.teamId !== null) {
     const [team] = await db
-      .select({ ownerUserId: teams.ownerUserId })
+      .select({ ownerUserId: teams.ownerUserId, name: teams.name })
       .from(teams)
       .where(eq(teams.id, input.teamId));
     if (team) {
       recipientUserId = team.ownerUserId;
+      ownerUserId = team.ownerUserId;
+      teamName = team.name;
     }
   }
 
@@ -57,7 +69,7 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<QuizRe
     quizResultId: saved.id,
   });
 
-  return saved;
+  return { result: saved, ownerUserId, teamName };
 }
 
 /** All saved quiz results for a given user (their own history). */

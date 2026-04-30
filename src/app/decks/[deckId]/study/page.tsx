@@ -1,6 +1,7 @@
 import { getAccessContext } from "@/lib/access";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
@@ -71,9 +72,10 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         <div className="flex flex-col gap-1">
           <Link
             href={studyBackHref}
-            className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
-            {studyBackLabel}
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {studyBackLabel.replace("← ", "")}
           </Link>
           {teamDeckHeading && (
             <div className="mt-1 space-y-0.5">
@@ -90,11 +92,14 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">
             {deck.name}
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Study Session</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-muted-foreground">Study Session</span>
+            <span className="text-muted-foreground text-xs" aria-hidden>·</span>
+            <Badge variant="secondary" className="text-xs">
+              {cards.length} card{cards.length !== 1 ? "s" : ""}
+            </Badge>
+          </div>
         </div>
-        <Badge variant="secondary" className="text-xs self-start sm:self-auto shrink-0">
-          {cards.length} card{cards.length !== 1 ? "s" : ""}
-        </Badge>
       </div>
 
       <StudySession
@@ -103,6 +108,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         deckName={deck.name}
         teamId={deck.teamId ?? null}
         allowsQuizStudy={effective75}
+        deckGradient={deck.gradient ?? null}
       />
     </div>
   );

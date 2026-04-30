@@ -37,6 +37,8 @@ import {
   CircleDashed,
 } from "lucide-react";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
+import { getGradientBySlug } from "@/lib/deck-gradients";
+import { cn } from "@/lib/utils";
 
 
 type CardData = {
@@ -47,12 +49,12 @@ type CardData = {
   backImageUrl?: string | null;
 };
 
-function FormattedCardBack({ text }: { text: string }) {
+function FormattedCardBack({ text, hasGradient }: { text: string; hasGradient?: boolean }) {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
 
   if (lines.length <= 1) {
     return (
-      <p className="text-center text-base sm:text-xl font-semibold leading-relaxed break-words">{text}</p>
+      <p className={cn("text-center text-base sm:text-xl font-semibold leading-relaxed break-words", hasGradient && "text-white")}>{text}</p>
     );
   }
 
@@ -61,20 +63,20 @@ function FormattedCardBack({ text }: { text: string }) {
       {lines.map((line, i) => {
         if (/^Step\s*\d+:/i.test(line)) {
           return (
-            <p key={i} className="font-semibold text-xs sm:text-sm text-primary pt-2 first:pt-0 break-words">
+            <p key={i} className={cn("font-semibold text-xs sm:text-sm pt-2 first:pt-0 break-words", hasGradient ? "text-white/90" : "text-primary")}>
               {line}
             </p>
           );
         }
         if (/^(Answer|Result|Solution|∴)[\s:]*/i.test(line)) {
           return (
-            <p key={i} className="font-bold text-xs sm:text-sm text-emerald-400 pt-3 mt-1 border-t border-border break-words">
+            <p key={i} className={cn("font-bold text-xs sm:text-sm pt-3 mt-1 border-t break-words", hasGradient ? "text-white border-white/20" : "text-emerald-400 border-border")}>
               {line}
             </p>
           );
         }
         return (
-          <p key={i} className="text-[10px] sm:text-xs font-mono text-foreground pl-2 sm:pl-3 leading-relaxed break-words">
+          <p key={i} className={cn("text-[10px] sm:text-xs font-mono pl-2 sm:pl-3 leading-relaxed break-words", hasGradient ? "text-white/80" : "text-foreground")}>
             {line}
           </p>
         );
@@ -87,6 +89,7 @@ interface FlashcardStudyProps {
   cards: CardData[];
   deckId: number;
   deckName: string;
+  deckGradient?: string | null;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -101,8 +104,10 @@ function shuffleArray<T>(arr: T[]): T[] {
 const FLIP_DURATION_MS = 560;
 const SLIDE_MS = 260;
 
-export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps) {
+export function FlashcardStudy({ cards, deckId, deckName, deckGradient }: FlashcardStudyProps) {
   const router = useRouter();
+  const cardGradient = getGradientBySlug(deckGradient);
+  const hasGradient = cardGradient.slug !== "none";
   const [deck, setDeck] = useState<CardData[]>(cards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
@@ -501,11 +506,16 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
           {/* Front */}
           <div
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
-            className="absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl border bg-card shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]"
+            className={cn(
+              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]",
+              hasGradient
+                ? cn(cardGradient.classes, "border border-white/20")
+                : "bg-card border",
+            )}
           >
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
-              <Badge variant="secondary" className="text-xs">Front</Badge>
-              <span className="text-muted-foreground text-xs hidden sm:inline">Click to reveal answer</span>
+              <Badge variant="secondary" className={cn("text-xs", hasGradient && "bg-white/20 text-white border-white/30")}>Front</Badge>
+              <span className={cn("text-xs hidden sm:inline", hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
             </div>
             {currentCard.frontImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2">
@@ -521,7 +531,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
             )}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col items-center justify-center">
               {currentCard.front && (
-                <p className="text-center text-base sm:text-xl font-semibold leading-relaxed break-words">
+                <p className={cn("text-center text-base sm:text-xl font-semibold leading-relaxed break-words", hasGradient && "text-white")}>
                   {currentCard.front}
                 </p>
               )}
@@ -535,11 +545,16 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               WebkitBackfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
             }}
-            className="absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl border bg-card shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]"
+            className={cn(
+              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]",
+              hasGradient
+                ? cn(cardGradient.classes, "border border-white/20")
+                : "bg-card border",
+            )}
           >
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
-              <Badge variant="outline" className="text-xs">Back</Badge>
-              <span className="text-muted-foreground text-xs hidden sm:inline">Click to flip back</span>
+              <Badge variant="outline" className={cn("text-xs", hasGradient && "bg-white/20 text-white border-white/30")}>Back</Badge>
+              <span className={cn("text-xs hidden sm:inline", hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
             </div>
             {currentCard.backImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2">
@@ -554,7 +569,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               </div>
             )}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col justify-center">
-              {currentCard.back && <FormattedCardBack text={currentCard.back} />}
+              {currentCard.back && <FormattedCardBack text={currentCard.back} hasGradient={hasGradient} />}
             </div>
           </div>
         </div>
@@ -564,7 +579,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
       {/* Listen row — outside the card so clicks never trigger the flip */}
       {(currentCard.front || currentCard.back) && (
         <div className="flex items-center justify-center gap-3">
-          {currentCard.front && (
+          {!isFlipped && currentCard.front && (
             <SpeakButton
               text={currentCard.front}
               voice={voice}
@@ -573,7 +588,7 @@ export function FlashcardStudy({ cards, deckId, deckName }: FlashcardStudyProps)
               label="Question"
             />
           )}
-          {currentCard.back && (
+          {isFlipped && currentCard.back && (
             <SpeakButton
               text={currentCard.back}
               voice={voice}

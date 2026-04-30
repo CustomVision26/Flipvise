@@ -48,6 +48,9 @@ export default async function PricingPage() {
 
         {/* Heading */}
         <div className="text-center space-y-2 sm:space-y-3">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-2">
+            Plans &amp; Pricing
+          </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Simple, Transparent Pricing
           </h1>

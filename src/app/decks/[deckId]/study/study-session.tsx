@@ -31,6 +31,7 @@ interface StudySessionProps {
   teamId: number | null;
   /** Pro personal (75 cards / deck) — Free users cannot open Quiz mode in the UI. */
   allowsQuizStudy?: boolean;
+  deckGradient?: string | null;
 }
 
 export function StudySession({
@@ -39,6 +40,7 @@ export function StudySession({
   deckName,
   teamId,
   allowsQuizStudy = true,
+  deckGradient,
 }: StudySessionProps) {
   const [tab, setTab] = useState<"review" | "quiz">("review");
   const effectiveTab = allowsQuizStudy ? tab : "review";
@@ -105,7 +107,7 @@ export function StudySession({
           )}
         </TabsList>
         <TabsContent value="review" className="flex flex-1 flex-col">
-          <FlashcardStudy cards={cards} deckId={deckId} deckName={deckName} />
+          <FlashcardStudy cards={cards} deckId={deckId} deckName={deckName} deckGradient={deckGradient ?? null} />
         </TabsContent>
         <TabsContent value="quiz" className="flex flex-1 flex-col">
           <QuizStudy cards={cards} deckId={deckId} deckName={deckName} teamId={teamId} />

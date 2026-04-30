@@ -38,6 +38,7 @@ type DeckData = {
   coverImageUrl?: string | null;
   /** First card in preview order (latest `updatedAt`) — front image for team-tier preview promo. */
   firstPreviewCardFrontImageUrl?: string | null;
+  gradient?: string | null;
 };
 
 type SortOption =

@@ -4,6 +4,8 @@ import { useState, useTransition, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff, ImagePlus, X, Loader2 } from "lucide-react";
+import { GradientPicker } from "@/components/gradient-picker";
+import type { GradientSlug } from "@/lib/deck-gradients";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,6 +51,7 @@ interface EditDeckDialogProps {
     description: string | null;
     teamId: number | null;
     coverImageUrl?: string | null;
+    gradient?: string | null;
   };
 }
 
@@ -57,6 +60,7 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(deck.name);
   const [description, setDescription] = useState(deck.description ?? "");
+  const [gradient, setGradient] = useState<GradientSlug>((deck.gradient as GradientSlug) ?? "none");
   const [coverUrl, setCoverUrl] = useState(deck.coverImageUrl ?? null);
   const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -89,6 +93,7 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
       descriptionSpeech.clearError();
       setName(deck.name);
       setDescription(deck.description ?? "");
+      setGradient((deck.gradient as GradientSlug) ?? "none");
       setCoverUploadError(null);
       setError(null);
     }
@@ -150,6 +155,7 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
           deckId: deck.id,
           name,
           description: description.trim() || undefined,
+          gradient: gradient !== "none" ? gradient : undefined,
         });
         setOpen(false);
       } catch (err) {
@@ -324,6 +330,8 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
               )}
             </div>
           )}
+
+          <GradientPicker value={gradient} onChange={setGradient} disabled={isPending} />
 
           {!nameSpeech.supported && !descriptionSpeech.supported && (
             <p className="text-muted-foreground text-[11px] sm:text-xs">

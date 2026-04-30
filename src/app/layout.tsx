@@ -45,8 +45,19 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Flipvise",
-  description: "Flashcard app to supercharge your learning",
+  title: {
+    default: "Flipvise — Smart Flashcards & Learning",
+    template: "%s | Flipvise",
+  },
+  description:
+    "Create AI-powered flashcard decks, study with flashcards or quizzes, and collaborate with your team. The smartest way to learn anything.",
+  keywords: ["flashcards", "learning", "AI", "quiz", "study", "flashcard app", "spaced repetition"],
+  openGraph: {
+    title: "Flipvise — Smart Flashcards & Learning",
+    description:
+      "Create AI-powered flashcard decks, study with flashcards or quizzes, and collaborate with your team.",
+    type: "website",
+  },
 };
 
 export default async function RootLayout({

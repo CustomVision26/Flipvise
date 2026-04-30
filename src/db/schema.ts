@@ -73,6 +73,8 @@ export const decks = pgTable('decks', {
   description: text(),
   /** Optional hero/cover image for team workspace decks (S3 URL). */
   coverImageUrl: text(),
+  /** Gradient slug (e.g. "ocean", "sunset") applied to deck tile and study flashcard. */
+  gradient: text(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });

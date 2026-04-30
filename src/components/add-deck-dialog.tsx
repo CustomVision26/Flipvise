@@ -27,6 +27,8 @@ import {
 import { createDeckAction } from "@/actions/decks";
 import { createCardAction, uploadCardImageAction } from "@/actions/cards";
 import { cn } from "@/lib/utils";
+import { GradientPicker } from "@/components/gradient-picker";
+import type { GradientSlug } from "@/lib/deck-gradients";
 
 /** Minimal typings for browser Web Speech API (not in all TS lib.dom builds). */
 interface DeckSpeechRecognitionAlternative {
@@ -109,6 +111,7 @@ export function AddDeckDialog({
   const [open, setOpen] = React.useState(false);
   const [isPending, setIsPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [gradient, setGradient] = React.useState<GradientSlug>("none");
   const [speechSupported, setSpeechSupported] = React.useState(false);
   const [dictationField, setDictationField] = React.useState<"name" | "description" | null>(
     null,
@@ -236,6 +239,7 @@ export function AddDeckDialog({
   function resetDialogFormState() {
     setFrontImageFile(null);
     setFrontImagePreviewUrl(null);
+    setGradient("none");
     stopDictation();
   }
 
@@ -256,11 +260,13 @@ export function AddDeckDialog({
 
     setIsPending(true);
     try {
+      const gradientValue = gradient !== "none" ? gradient : undefined;
       let deckId: number;
       if (forPersonalWorkspace) {
         const r = await createDeckAction({
           name,
           description: description || undefined,
+          gradient: gradientValue,
           personalOnly: true,
         });
         deckId = r.deckId;
@@ -272,6 +278,7 @@ export function AddDeckDialog({
         const r = await createDeckAction({
           name,
           description: description || undefined,
+          gradient: gradientValue,
           teamId,
           teamWorkspaceOnly: true,
         });
@@ -280,6 +287,7 @@ export function AddDeckDialog({
         const r = await createDeckAction({
           name,
           description: description || undefined,
+          gradient: gradientValue,
           ...(teamId !== undefined ? { teamId } : {}),
         });
         deckId = r.deckId;
@@ -514,6 +522,8 @@ export function AddDeckDialog({
                 )}
               </div>
             )}
+
+            <GradientPicker value={gradient} onChange={setGradient} disabled={isPending} />
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </form>

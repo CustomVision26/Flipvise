@@ -305,7 +305,7 @@ export async function getDecksForTeam(
       .select(deckRowSelectWithoutCover)
       .from(decks)
       .where(and(eq(decks.teamId, teamId), eq(decks.userId, ownerUserId)));
-    return rows.map((r) => ({ ...r, coverImageUrl: null }));
+    return rows.map((r) => ({ ...r, coverImageUrl: null, gradient: null }));
   }
 }
 
@@ -365,7 +365,7 @@ export async function getAssignedDecksForMember(
           eq(teamDeckAssignments.memberUserId, memberUserId),
         ),
       );
-    return rows.map((r) => ({ ...r, coverImageUrl: null }));
+    return rows.map((r) => ({ ...r, coverImageUrl: null, gradient: null }));
   }
 }
 

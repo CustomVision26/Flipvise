@@ -11,6 +11,12 @@ import {
   upsertBillingInvoiceRecord,
   upsertBillingInvoicesFromSubscription,
 } from "@/db/queries/billing";
+import {
+  loopsCreateContact,
+  loopsDeleteContact,
+  loopsSendEvent,
+  loopsUpdateContact,
+} from "@/lib/loops";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +28,23 @@ type ClerkUserUpdatedData = {
   id?: string;
   public_metadata?: Record<string, unknown>;
 };
+
+type ClerkUserEventData = {
+  id?: string;
+  email_addresses?: Array<{ id: string; email_address: string }>;
+  primary_email_address_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  deleted?: boolean;
+};
+
+function extractPrimaryEmail(data: ClerkUserEventData): string | null {
+  if (!data.email_addresses?.length) return null;
+  const primary = data.primary_email_address_id
+    ? data.email_addresses.find((e) => e.id === data.primary_email_address_id)
+    : data.email_addresses[0];
+  return primary?.email_address?.toLowerCase() ?? null;
+}
 
 type VerifiedClerkEvent = {
   type: string;
@@ -159,16 +182,71 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
+  // -------------------------------------------------------------------------
+  // user.created — add to Loops audience and fire "signup" event
+  // -------------------------------------------------------------------------
+  if (evt.type === "user.created") {
+    const data = evt.data as ClerkUserEventData;
+    const userId = data?.id;
+    const email = extractPrimaryEmail(data);
+
+    if (userId && email) {
+      // Fire-and-forget — don't block the webhook response
+      void (async () => {
+        await loopsCreateContact(email, {
+          userId,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          userGroup: "free",
+        });
+        await loopsSendEvent(email, "signup", {
+          userId,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          userGroup: "free",
+        });
+      })();
+    }
+
+    return NextResponse.json({ received: true });
+  }
+
+  // -------------------------------------------------------------------------
+  // user.deleted — remove from Loops audience
+  // -------------------------------------------------------------------------
+  if (evt.type === "user.deleted") {
+    const data = evt.data as ClerkUserEventData;
+    const email = extractPrimaryEmail(data);
+    if (email) {
+      void loopsDeleteContact(email);
+    }
+    return NextResponse.json({ received: true });
+  }
+
+  // -------------------------------------------------------------------------
+  // user.updated — sync latest name/email to Loops + handle admin-role patch
+  // -------------------------------------------------------------------------
   if (evt.type !== "user.updated") {
     return NextResponse.json({ received: true });
   }
 
-  const data = evt.data as ClerkUserUpdatedData;
+  const data = evt.data as ClerkUserUpdatedData & ClerkUserEventData;
   const userId = data?.id;
   if (!userId) {
     return NextResponse.json({ received: true });
   }
 
+  // Sync contact details to Loops (non-blocking)
+  const email = extractPrimaryEmail(data);
+  if (email) {
+    void loopsUpdateContact(email, {
+      userId,
+      firstName: data.first_name,
+      lastName: data.last_name,
+    });
+  }
+
+  // Existing: repair publicMetadata if admin role was removed externally
   const patch = buildPublicMetadataPatchAfterExternalAdminRoleRemoval(
     data.public_metadata,
   );

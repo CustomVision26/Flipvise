@@ -9,6 +9,7 @@ import { HomeInviteEmailAuthButtons } from "@/components/home-invite-email-auth-
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import { Card } from "@/components/ui/card";
 import { ForceDarkTheme } from "@/components/force-dark-theme";
+import { Brain, Sparkles, Users } from "lucide-react";
 
 function parseInviteEmailFromSearchParams(inviteEmail: unknown): string | null {
   const raw =
@@ -110,20 +111,32 @@ export default async function Home({ searchParams }: HomePageProps) {
         <Card className="absolute bottom-[45%] right-[40%] w-36 h-28 animate-sway glass-card-3d bg-gradient-to-br from-red-500/10 to-rose-600/10 backdrop-blur-sm border-2 border-red-400/30 shadow-2xl shadow-red-500/20 neon-border-pink" style={{ animationDelay: '1.2s' }} />
       </div>
 
-      {/* Layer 7: Main content - Minimalist clean container with material shadows and cyberpunk accents */}
-      <div className="relative z-20 flex flex-col items-center gap-4 sm:gap-8 text-center px-3 sm:px-6">
+      {/* Layer 7: Main content */}
+      <div className="relative z-20 flex flex-col items-center gap-6 sm:gap-10 text-center px-3 sm:px-6">
         
-        {/* Ultra glass container with all effects combined */}
-        <div className="ultra-glass-container rounded-2xl sm:rounded-3xl border-3 bg-background/50 backdrop-blur-3xl shadow-brutal p-6 sm:p-12 flex flex-col items-center gap-4 sm:gap-6 neon-border-rainbow material-elevation max-w-[95vw] sm:max-w-none">
+        {/* Hero glass container */}
+        <div className="ultra-glass-container rounded-2xl sm:rounded-3xl border-3 bg-background/50 backdrop-blur-3xl shadow-brutal p-6 sm:p-12 flex flex-col items-center gap-4 sm:gap-6 neon-border-rainbow material-elevation max-w-[95vw] sm:max-w-xl">
           <Image
             src={LOGO_PUBLIC_URL}
             alt="Flipvise"
             width={240}
             height={90}
-            className="object-contain drop-shadow-neon w-32 h-auto sm:w-60"
+            className="object-contain drop-shadow-neon w-32 h-auto sm:w-52"
             style={{ height: "auto" }}
             priority
           />
+
+          <div className="flex flex-col gap-1.5 sm:gap-2">
+            <h1 className="text-xl sm:text-3xl font-bold text-foreground leading-tight">
+              Master Any Subject with{" "}
+              <span className="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Smart Flashcards
+              </span>
+            </h1>
+            <p className="text-muted-foreground text-sm sm:text-base max-w-sm mx-auto leading-relaxed">
+              Create, study, and collaborate — powered by AI to make learning effortless.
+            </p>
+          </div>
 
           <Show when="signed-out">
             {inviteEmailForAuth ? (
@@ -136,9 +149,40 @@ export default async function Home({ searchParams }: HomePageProps) {
             )}
           </Show>
 
-          <p className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent max-w-xs sm:max-w-sm leading-relaxed drop-shadow-neon animate-gradient-text neon-text-glow">
-            Flip. Learn. Master
+          <p className="text-base sm:text-lg font-semibold bg-gradient-to-r from-cyan-400 via-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent animate-gradient-text neon-text-glow">
+            Flip. Learn. Master.
           </p>
+        </div>
+
+        {/* Feature highlights */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 w-full max-w-[95vw] sm:max-w-2xl">
+          <div className="flex flex-row sm:flex-col items-center sm:items-center gap-3 sm:gap-2 rounded-xl bg-background/30 backdrop-blur-md border border-white/10 px-4 py-3 sm:py-4 text-left sm:text-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-400">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">AI Generation</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Generate flashcards instantly from any topic</p>
+            </div>
+          </div>
+          <div className="flex flex-row sm:flex-col items-center sm:items-center gap-3 sm:gap-2 rounded-xl bg-background/30 backdrop-blur-md border border-white/10 px-4 py-3 sm:py-4 text-left sm:text-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-500/20 text-purple-400">
+              <Brain className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Smart Study</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Flashcards, quizzes, and progress tracking</p>
+            </div>
+          </div>
+          <div className="flex flex-row sm:flex-col items-center sm:items-center gap-3 sm:gap-2 rounded-xl bg-background/30 backdrop-blur-md border border-white/10 px-4 py-3 sm:py-4 text-left sm:text-center">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pink-500/20 text-pink-400">
+              <Users className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Team Learning</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Invite members and share deck libraries</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
