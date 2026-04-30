@@ -35,11 +35,14 @@ export async function loopsCreateContact(
   if (!client) return;
 
   try {
-    await client.createContact(email, {
-      userId: props.userId,
-      ...(props.firstName ? { firstName: props.firstName } : {}),
-      ...(props.lastName ? { lastName: props.lastName } : {}),
-      userGroup: props.userGroup ?? "free",
+    await client.createContact({
+      email,
+      properties: {
+        userId: props.userId,
+        ...(props.firstName ? { firstName: props.firstName } : {}),
+        ...(props.lastName ? { lastName: props.lastName } : {}),
+        userGroup: props.userGroup ?? "free",
+      },
     });
   } catch (err) {
     console.error("[Loops] createContact failed:", err);
@@ -57,11 +60,14 @@ export async function loopsUpdateContact(
   if (!client) return;
 
   try {
-    await client.updateContact(email, {
-      userId: props.userId,
-      ...(props.firstName != null ? { firstName: props.firstName } : {}),
-      ...(props.lastName != null ? { lastName: props.lastName } : {}),
-      ...(props.userGroup ? { userGroup: props.userGroup } : {}),
+    await client.updateContact({
+      email,
+      properties: {
+        userId: props.userId,
+        ...(props.firstName != null ? { firstName: props.firstName } : {}),
+        ...(props.lastName != null ? { lastName: props.lastName } : {}),
+        ...(props.userGroup ? { userGroup: props.userGroup } : {}),
+      },
     });
   } catch (err) {
     console.error("[Loops] updateContact failed:", err);
