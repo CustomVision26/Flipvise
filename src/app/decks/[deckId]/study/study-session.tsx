@@ -24,7 +24,7 @@ type CardData = {
   correctChoiceIndex: number | null;
 };
 
-interface StudySessionProps {
+export interface StudySessionProps {
   cards: CardData[];
   deckId: number;
   deckName: string;
@@ -32,6 +32,8 @@ interface StudySessionProps {
   /** Pro personal (75 cards / deck) — Free users cannot open Quiz mode in the UI. */
   allowsQuizStudy?: boolean;
   deckGradient?: string | null;
+  /** Team workspace study URL — quiz results are saved automatically after submit. */
+  autoSaveQuizResult?: boolean;
 }
 
 export function StudySession({
@@ -41,6 +43,7 @@ export function StudySession({
   teamId,
   allowsQuizStudy = true,
   deckGradient,
+  autoSaveQuizResult = false,
 }: StudySessionProps) {
   const [tab, setTab] = useState<"review" | "quiz">("review");
   const effectiveTab = allowsQuizStudy ? tab : "review";
@@ -110,7 +113,14 @@ export function StudySession({
           <FlashcardStudy cards={cards} deckId={deckId} deckName={deckName} deckGradient={deckGradient ?? null} />
         </TabsContent>
         <TabsContent value="quiz" className="flex flex-1 flex-col">
-          <QuizStudy cards={cards} deckId={deckId} deckName={deckName} teamId={teamId} />
+          <QuizStudy
+            cards={cards}
+            deckId={deckId}
+            deckName={deckName}
+            teamId={teamId}
+            deckGradient={deckGradient ?? null}
+            autoSaveQuizResult={autoSaveQuizResult}
+          />
         </TabsContent>
       </Tabs>
     </TooltipProvider>

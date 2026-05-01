@@ -1,6 +1,7 @@
 "use client";
 
 import { UserButton, useAuth, useUser } from "@clerk/nextjs";
+import { UserBillingPage } from "@/components/user-billing-page";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,7 @@ import {
 } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
-import { Shield } from "lucide-react";
+import { CreditCard, Shield } from "lucide-react";
 
 interface HeaderUserSectionProps {
   currentProTheme?: ProUiThemeId;
@@ -188,7 +189,15 @@ export function HeaderUserSection({
               <span className="order-3 inline-flex shrink-0 items-center" />
             }
           >
-            <UserButton />
+            <UserButton>
+              <UserButton.UserProfilePage
+                label="Billing"
+                url="billing"
+                labelIcon={<CreditCard className="size-4" />}
+              >
+                <UserBillingPage />
+              </UserButton.UserProfilePage>
+            </UserButton>
           </TooltipTrigger>
           <TooltipContent side="bottom">Account</TooltipContent>
         </Tooltip>

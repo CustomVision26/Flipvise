@@ -364,9 +364,8 @@ export const quizResults = pgTable('quiz_results', {
 });
 
 /**
- * One inbox message per saved quiz result.
- * For personal quizzes the recipient is the quiz-taker themselves.
- * For team-deck quizzes the recipient is the team workspace owner.
+ * Inbox rows for saved quiz results (multiple rows may share the same `quizResultId`).
+ * The quiz-taker always gets one row; for team-deck quizzes the workspace owner gets a second row when the taker is not the owner.
  */
 export const quizResultInboxMessages = pgTable('quiz_result_inbox_messages', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

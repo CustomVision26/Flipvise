@@ -46,14 +46,26 @@ export function DeckPreviewCarousel({
   currentIndexRef.current = currentIndex;
   const cardsLengthRef = useRef(cards.length);
   cardsLengthRef.current = cards.length;
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleClose = useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     setIsClosing(true);
-    setTimeout(() => {
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
       setIsClosing(false);
       onClose();
     }, 180);
   }, [onClose]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const goNext = useCallback(() => {
     if (currentIndexRef.current >= cardsLengthRef.current - 1) return;

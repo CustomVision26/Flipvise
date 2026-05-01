@@ -11,10 +11,12 @@ import {
   type QuizTier,
 } from "@/lib/quiz-quotes";
 import { saveQuizResult } from "@/db/queries/quiz-results";
-import { loopsSendQuizResultEmail } from "@/lib/loops";
+import { isQuizResultPdfAttachmentEnabled, loopsSendQuizResultEmail } from "@/lib/loops";
+import { resolveAppUrl } from "@/lib/stripe";
 import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { generateQuizResultPdfBuffer } from "@/lib/quiz-pdf-server";
 import type { QuizResultRow } from "@/db/queries/quiz-results";
+import type { PerCardSnapshot } from "@/db/schema";
 
 const quizAnswerSchema = z.object({
   cardId: z.number().int().positive(),
@@ -66,6 +68,8 @@ function normalize(text: string): string {
 
 /**
  * Validates a quiz submission on the server and returns the final score.
+ * Does not persist — personal study flows opt in via `saveQuizResultAction` on the results screen;
+ * team workspace study saves immediately after submit on the client.
  *
  * The client sends the text string the user picked for each card, and the
  * server re-derives the correct text from the database. This means the
@@ -170,6 +174,11 @@ const saveQuizResultSchema = z.object({
   deckId: z.number().int().positive(),
   deckName: z.string().min(1),
   teamId: z.number().int().positive().nullable(),
+  /**
+   * True when the quiz was saved from a team-workspace study URL (resolved workspace matches deck team).
+   * Drives Loops template: owner template on workspace team decks; taker template on personal-surface saves.
+   */
+  savedFromTeamWorkspace: z.boolean(),
   correct: z.number().int().min(0),
   incorrect: z.number().int().min(0),
   unanswered: z.number().int().min(0),
@@ -181,7 +190,7 @@ const saveQuizResultSchema = z.object({
 
 type SaveQuizResultInput = z.infer<typeof saveQuizResultSchema>;
 
-/** Persists a quiz result the user has opted to save, and queues an inbox message. */
+/** Persists quiz results (inbox + email) — from the results screen in personal study, or right after submit in team workspace study. */
 export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{ id: number }> {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
@@ -189,42 +198,22 @@ export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{
   const parsed = saveQuizResultSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const {
-    deckId,
-    deckName,
-    teamId,
-    correct,
-    incorrect,
-    unanswered,
-    total,
-    percent,
-    elapsedSeconds,
-    perCard,
-  } = parsed.data;
+  const d = parsed.data;
 
-  const { result: saved, ownerUserId, teamName } = await saveQuizResult({
+  return persistQuizResultAndNotify({
     userId,
-    deckId,
-    deckName,
-    teamId,
-    correct,
-    incorrect,
-    unanswered,
-    total,
-    percent,
-    elapsedSeconds,
-    perCard,
+    deckId: d.deckId,
+    deckName: d.deckName,
+    teamId: d.teamId,
+    savedFromTeamWorkspace: d.savedFromTeamWorkspace,
+    correct: d.correct,
+    incorrect: d.incorrect,
+    unanswered: d.unanswered,
+    total: d.total,
+    percent: d.percent,
+    elapsedSeconds: d.elapsedSeconds,
+    perCard: d.perCard,
   });
-
-  // Send quiz-result email notifications (errors suppressed inside the helper).
-  await sendQuizResultEmails({
-    userId,
-    ownerUserId,
-    teamName,
-    result: saved,
-  });
-
-  return { id: saved.id };
 }
 
 type QuizEmailContext = {
@@ -232,21 +221,29 @@ type QuizEmailContext = {
   ownerUserId: string | null;
   teamName: string | null;
   result: QuizResultRow;
+  /** Study opened/saved from team workspace URL — see `.cursor/rules/loops-quiz-result-email.mdc`. */
+  savedFromTeamWorkspace: boolean;
 };
 
 /**
  * Resolves Clerk emails/names for the quiz-taker (and team owner when applicable),
  * generates a PDF attachment, then fires transactional Loops emails.
  *
- * - Personal quiz: one email + PDF to the quiz-taker.
- * - Team quiz: one email + PDF to the quiz-taker, one to the team owner.
- *   If the quiz-taker IS the owner (edge-case), only one email is sent.
+ * Routing is driven by `savedFromTeamWorkspace` and team membership; see
+ * `.cursor/rules/loops-quiz-result-email.mdc` for the full matrix.
  */
 async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
-  const { result, userId, ownerUserId, teamName } = ctx;
+  const { result, userId, ownerUserId, teamName, savedFromTeamWorkspace } = ctx;
+
+  const teamMemberNotOwner = Boolean(ownerUserId && ownerUserId !== userId);
+  const teamDeck = ownerUserId !== null;
+  /** Owner template only for invited member/admin saving from team workspace — workspace owner always uses taker template (same person; no third Loops template). */
+  const useOwnerLoopsTemplate =
+    savedFromTeamWorkspace && teamDeck && teamMemberNotOwner;
 
   const sharedFields = {
     deckName: result.deckName,
+    teamName: teamName ?? "",
     correct: result.correct,
     incorrect: result.incorrect,
     unanswered: result.unanswered,
@@ -268,44 +265,87 @@ async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
   const ownerName = ownerDisplay?.primaryLine ?? null;
   const ownerEmail = ownerDisplay?.primaryEmail ?? null;
 
-  // Generate the PDF once; the same file is attached to both recipient emails.
+  // PDF attachment for Loops is opt-in (`LOOPS_QUIZ_RESULT_ATTACH_PDF=true`) — default skips generation.
   let pdfBuffer: Buffer | undefined;
-  try {
-    pdfBuffer = await generateQuizResultPdfBuffer({
-      deckName: result.deckName,
-      savedAt: result.savedAt,
-      correct: result.correct,
-      incorrect: result.incorrect,
-      unanswered: result.unanswered,
-      total: result.total,
-      percent: result.percent,
-      elapsedSeconds: result.elapsedSeconds,
-      perCard: result.perCard,
-      userName: takerName,
-      userEmail: takerEmail,
-      teamName,
-      ownerName,
-      ownerEmail,
-    });
-  } catch (err) {
-    console.error("[QuizEmail] PDF generation failed:", err);
+  if (isQuizResultPdfAttachmentEnabled()) {
+    try {
+      pdfBuffer = await generateQuizResultPdfBuffer({
+        deckName: result.deckName,
+        savedAt: result.savedAt,
+        correct: result.correct,
+        incorrect: result.incorrect,
+        unanswered: result.unanswered,
+        total: result.total,
+        percent: result.percent,
+        elapsedSeconds: result.elapsedSeconds,
+        perCard: result.perCard,
+        userName: takerName,
+        userEmail: takerEmail,
+        teamName,
+        ownerName,
+        ownerEmail,
+      });
+    } catch (err) {
+      console.error("[QuizEmail] PDF generation failed:", err);
+    }
   }
 
-  if (takerEmail) {
-    await loopsSendQuizResultEmail(
-      {
-        ...sharedFields,
-        email: takerEmail,
-        userName: takerName,
-        memberName: takerName,
-        isOwnerCopy: 0,
-      },
-      pdfBuffer,
+  const viewUrl = `${resolveAppUrl()}/dashboard/quiz-results/${result.id}`;
+
+  const teamLabel = teamName?.trim() ? ` · ${teamName}` : "";
+  const subjectLineTaker = `${result.deckName} · ${result.percent}%${teamLabel}`;
+  const subjectLineOwner = `${takerName} · ${result.deckName} · ${result.percent}%${teamLabel}`;
+
+  const quoteSeed = result.correct * 31 + (result.deckId ?? 0) + result.total;
+  const performanceMessage = pickQuoteForPercent(result.percent, quoteSeed).text;
+
+  if (!takerEmail) {
+    console.warn(
+      `[QuizEmail] Loops send skipped for quiz-taker: Clerk user ${userId} has no email address on file.`,
     );
   }
 
-  // For team quizzes, also notify the owner (unless the owner is the quiz-taker).
-  if (ownerUserId && ownerUserId !== userId && ownerEmail) {
+  if (useOwnerLoopsTemplate && teamMemberNotOwner && !ownerEmail && ownerUserId) {
+    console.warn(
+      `[QuizEmail] Loops send skipped for workspace owner: Clerk user ${ownerUserId} has no email address on file.`,
+    );
+  }
+
+  if (takerEmail) {
+    if (useOwnerLoopsTemplate) {
+      await loopsSendQuizResultEmail(
+        {
+          ...sharedFields,
+          email: takerEmail,
+          userName: takerName,
+          memberName: takerName,
+          isOwnerCopy: 0,
+          loopsTemplateRole: "owner",
+          viewUrl,
+          subjectLine: subjectLineTaker,
+          performanceMessage,
+        },
+        pdfBuffer,
+      );
+    } else {
+      await loopsSendQuizResultEmail(
+        {
+          ...sharedFields,
+          email: takerEmail,
+          userName: takerName,
+          memberName: takerName,
+          isOwnerCopy: 0,
+          loopsTemplateRole: "taker",
+          viewUrl,
+          subjectLine: subjectLineTaker,
+          performanceMessage,
+        },
+        pdfBuffer,
+      );
+    }
+  }
+
+  if (useOwnerLoopsTemplate && teamMemberNotOwner && ownerEmail) {
     await loopsSendQuizResultEmail(
       {
         ...sharedFields,
@@ -313,8 +353,51 @@ async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
         userName: ownerName ?? ownerEmail,
         memberName: takerName,
         isOwnerCopy: 1,
+        loopsTemplateRole: "owner",
+        viewUrl,
+        subjectLine: subjectLineOwner,
+        performanceMessage,
       },
       pdfBuffer,
     );
   }
+}
+
+async function persistQuizResultAndNotify(params: {
+  userId: string;
+  deckId: number;
+  deckName: string;
+  teamId: number | null;
+  savedFromTeamWorkspace: boolean;
+  correct: number;
+  incorrect: number;
+  unanswered: number;
+  total: number;
+  percent: number;
+  elapsedSeconds: number;
+  perCard: PerCardSnapshot[];
+}): Promise<{ id: number }> {
+  const { result: saved, ownerUserId, teamName } = await saveQuizResult({
+    userId: params.userId,
+    deckId: params.deckId,
+    deckName: params.deckName,
+    teamId: params.teamId,
+    correct: params.correct,
+    incorrect: params.incorrect,
+    unanswered: params.unanswered,
+    total: params.total,
+    percent: params.percent,
+    elapsedSeconds: params.elapsedSeconds,
+    perCard: params.perCard,
+  });
+
+  await sendQuizResultEmails({
+    userId: params.userId,
+    ownerUserId,
+    teamName,
+    result: saved,
+    savedFromTeamWorkspace: params.savedFromTeamWorkspace,
+  });
+
+  return { id: saved.id };
 }

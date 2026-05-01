@@ -8,7 +8,8 @@ config({ path: resolve(process.cwd(), '.env') });
 config({ path: resolve(process.cwd(), '.env.local'), override: true });
 
 export default defineConfig({
-  out: './drizzle-local',
+  /** Same migration journal as prod (`drizzle.config.ts`); only `DATABASE_URL` differs. */
+  out: './drizzle',
   schema: './src/db/schema.ts',
   dialect: 'postgresql',
   dbCredentials: {

@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -41,8 +49,14 @@ import {
   ListChecks,
   BookCheck,
 } from "lucide-react";
-import { submitQuizResultAction, saveQuizResultAction, type QuizResult } from "@/actions/study";
+import {
+  submitQuizResultAction,
+  saveQuizResultAction,
+  type QuizResult,
+} from "@/actions/study";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
+import { getDeckQuizAccent } from "@/lib/deck-quiz-accent";
+import { cn } from "@/lib/utils";
 
 type CardData = {
   id: number;
@@ -67,6 +81,10 @@ interface QuizStudyProps {
   deckId: number;
   deckName: string;
   teamId: number | null;
+  /** Same gradient slug as deck detail / flashcards — tints quiz chrome and question card. */
+  deckGradient?: string | null;
+  /** Set when study was opened from a team workspace URL — result is saved right after submit. */
+  autoSaveQuizResult?: boolean;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -80,6 +98,42 @@ function shuffleArray<T>(arr: T[]): T[] {
 
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/**
+ * Quiz UI only: multiple-choice options that include a step-by-step workout
+ * (`Step 1:`, `Step 2:`, …) are shown as the final answer (e.g. after
+ * `Answer:`) so each choice matches short options like the others.
+ * `submitQuizResultAction` still receives the full stored option string.
+ */
+function formatQuizOptionForDisplay(raw: string): string {
+  const text = raw.trim();
+  if (!text) return raw;
+  if (!/\bStep\s*\d+\s*:/i.test(text)) return text;
+
+  let lastExplicit: string | null = null;
+  const explicitRe = /(?:Answer|Result|Solution|∴)\s*:\s*([^\n]+)/gi;
+  let em: RegExpExecArray | null;
+  while ((em = explicitRe.exec(text)) !== null) {
+    const v = em[1]?.trim();
+    if (v) lastExplicit = v;
+  }
+  if (lastExplicit) return lastExplicit;
+
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!/^Step\s*\d+\s*:/i.test(line) && line.length > 0) return line;
+  }
+
+  const segments = text.split(/\bStep\s*\d+\s*:/i);
+  const lastSeg = segments[segments.length - 1]?.replace(/^\s+/, "").trim() ?? "";
+  if (lastSeg && lastSeg.length < text.length) return lastSeg;
+
+  return text;
 }
 
 /**
@@ -177,8 +231,43 @@ function buildQuestions(cards: CardData[]): QuizQuestion[] {
   return shuffleArray(questions);
 }
 
-export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
+function buildPerCardSnapshotForSave(
+  result: QuizResult,
+  questions: QuizQuestion[],
+  selectedByIndex: (number | null)[],
+) {
+  return questions.map((q, i) => {
+    const perCardEntry = result.perCard.find((p) => p.cardId === q.cardId);
+    const selectedIdx = selectedByIndex[i];
+    const selectedAnswer =
+      selectedIdx !== null && selectedIdx !== undefined ? q.options[selectedIdx] ?? null : null;
+    return {
+      cardId: q.cardId,
+      question: q.question,
+      correctAnswer: perCardEntry?.correctText ?? q.options[q.correctIndex] ?? "",
+      selectedAnswer,
+      correct: perCardEntry?.correct ?? false,
+    };
+  });
+}
+
+export function QuizStudy({
+  cards,
+  deckId,
+  deckName,
+  teamId,
+  deckGradient = null,
+  autoSaveQuizResult = false,
+}: QuizStudyProps) {
   const router = useRouter();
+  const deckAccent = useMemo(() => getDeckQuizAccent(deckGradient), [deckGradient]);
+  const deckAccentCss =
+    deckAccent.hasDeckAccent && deckAccent.accent && deckAccent.accentForeground
+      ? ({
+          "--deck-accent": deckAccent.accent,
+          "--deck-accent-fg": deckAccent.accentForeground,
+        } as CSSProperties)
+      : undefined;
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => buildQuestions(cards));
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -199,6 +288,8 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
   const [submitting, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [autoPersisted, setAutoPersisted] = useState(false);
+  const [autoPersistError, setAutoPersistError] = useState<string | null>(null);
 
   const totalQuestions = questions.length;
   const answeredCount = selectedByIndex.filter((x) => x !== null).length;
@@ -229,13 +320,51 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
             elapsedSeconds: elapsed,
             timedOut: reason.timedOut,
           });
+          if (autoSaveQuizResult) {
+            try {
+              const perCard = buildPerCardSnapshotForSave(res, questions, selectedByIndex);
+              await saveQuizResultAction({
+                deckId,
+                deckName,
+                teamId,
+                savedFromTeamWorkspace: autoSaveQuizResult,
+                correct: res.correct,
+                incorrect: res.incorrect,
+                unanswered: res.unanswered,
+                total: res.total,
+                percent: res.percent,
+                elapsedSeconds: res.elapsedSeconds,
+                perCard,
+              });
+              setAutoPersisted(true);
+              setAutoPersistError(null);
+            } catch (err) {
+              setAutoPersisted(false);
+              setAutoPersistError(
+                err instanceof Error ? err.message : "Failed to save result",
+              );
+            }
+          } else {
+            setAutoPersisted(false);
+            setAutoPersistError(null);
+          }
           setResult(res);
         } catch (err) {
           setSubmitError(err instanceof Error ? err.message : "Failed to submit quiz");
         }
       });
     },
-    [result, submitting, totalSeconds, questions, selectedByIndex, deckId],
+    [
+      result,
+      submitting,
+      totalSeconds,
+      questions,
+      selectedByIndex,
+      deckId,
+      autoSaveQuizResult,
+      deckName,
+      teamId,
+    ],
   );
 
   useEffect(() => {
@@ -300,6 +429,8 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
     setCurrentIndex(0);
     setResult(null);
     setSubmitError(null);
+    setAutoPersisted(false);
+    setAutoPersistError(null);
     setQuizStarted(false);
     startTimeRef.current = 0;
     setRemainingSeconds(getQuizDurationSeconds(fresh.length));
@@ -314,6 +445,10 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
         deckId={deckId}
         deckName={deckName}
         teamId={teamId}
+        deckGradient={deckGradient}
+        autoSaveQuizResult={autoSaveQuizResult}
+        autoPersisted={autoPersisted}
+        autoPersistError={autoPersistError}
         onRetake={handleRetake}
         onBack={() => router.push(`/decks/${deckId}`)}
       />
@@ -346,10 +481,23 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
 
   if (!quizStarted) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 py-6">
+      <div
+        className="flex flex-1 items-center justify-center px-4 py-6"
+        style={deckAccentCss}
+      >
         <Card className="w-full max-w-md shadow-md">
           <CardHeader className="text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <div
+              className={cn(
+                "mx-auto flex h-12 w-12 items-center justify-center rounded-full",
+                !deckAccent.hasDeckAccent && "bg-primary/15 text-primary",
+              )}
+              style={
+                deckAccent.hasDeckAccent && deckAccent.accent && deckAccent.accentForeground
+                  ? { backgroundColor: deckAccent.accent, color: deckAccent.accentForeground }
+                  : undefined
+              }
+            >
               <ListChecks className="h-6 w-6" />
             </div>
             <CardTitle className="text-xl">Timed quiz</CardTitle>
@@ -371,7 +519,15 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
             </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button size="default" className="w-full gap-2 sm:w-auto sm:min-w-40" onClick={handleStartQuiz}>
+            <Button
+              size="default"
+              className={cn(
+                "w-full gap-2 sm:w-auto sm:min-w-40",
+                deckAccent.hasDeckAccent &&
+                  "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+              )}
+              onClick={handleStartQuiz}
+            >
               <Play className="h-4 w-4" />
               Start quiz
             </Button>
@@ -396,7 +552,10 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
   const timerCritical = remainingSeconds <= 30;
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-4 sm:gap-6">
+    <div
+      className="flex flex-1 flex-col items-center gap-4 sm:gap-6 w-full min-w-0"
+      style={deckAccentCss}
+    >
       <div className="w-full max-w-2xl flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -428,23 +587,61 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
             </span>
           </div>
         </div>
-        <Progress value={progressPercent} className="h-2" />
+        <Progress
+          value={progressPercent}
+          className={cn(
+            "h-2",
+            deckAccent.hasDeckAccent &&
+              "[&_[data-slot=progress-indicator]]:!bg-[var(--deck-accent)]",
+          )}
+        />
         <div className="flex flex-wrap gap-1.5">
           {questions.map((_, i) => {
             const isCurrent = i === currentIndex;
             const isAnswered = selectedByIndex[i] !== null;
+            const answeredDeckStyle: CSSProperties | undefined =
+              deckAccent.hasDeckAccent && deckAccent.accent && !isCurrent && isAnswered
+                ? {
+                    borderColor: `color-mix(in srgb, ${deckAccent.accent} 52%, transparent)`,
+                    backgroundColor: `color-mix(in srgb, ${deckAccent.accent} 20%, transparent)`,
+                    color: `color-mix(in srgb, ${deckAccent.accent} 72%, #ffffff)`,
+                  }
+                : undefined;
+            const currentDeckStyle: CSSProperties | undefined =
+              deckAccent.hasDeckAccent &&
+              deckAccent.accent &&
+              deckAccent.accentForeground &&
+              isCurrent
+                ? {
+                    backgroundColor: deckAccent.accent,
+                    color: deckAccent.accentForeground,
+                    borderColor: "transparent",
+                  }
+                : undefined;
             return (
               <button
                 key={i}
                 type="button"
                 onClick={() => setCurrentIndex(i)}
-                className={`h-6 w-6 sm:h-7 sm:w-7 rounded-md border text-[10px] sm:text-xs font-semibold transition-colors ${
-                  isCurrent
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : isAnswered
-                      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
-                      : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                }`}
+                className={cn(
+                  "h-6 w-6 sm:h-7 sm:w-7 rounded-md border text-[10px] sm:text-xs font-semibold transition-colors",
+                  isCurrent &&
+                    !deckAccent.hasDeckAccent &&
+                    "border-primary bg-primary text-primary-foreground",
+                  isCurrent && deckAccent.hasDeckAccent && "border-transparent",
+                  !isCurrent &&
+                    isAnswered &&
+                    !deckAccent.hasDeckAccent &&
+                    "border-emerald-500/50 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25",
+                  !isCurrent &&
+                    isAnswered &&
+                    deckAccent.hasDeckAccent &&
+                    "hover:opacity-95 border",
+                  !isCurrent &&
+                    !isAnswered &&
+                    "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50",
+                )}
+                style={isCurrent ? currentDeckStyle : answeredDeckStyle}
                 aria-label={`Go to question ${i + 1}${isAnswered ? " (answered)" : ""}`}
               >
                 {i + 1}
@@ -454,13 +651,33 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
         </div>
       </div>
 
-      <div className="w-full max-w-2xl rounded-xl sm:rounded-2xl border bg-card shadow-md overflow-hidden">
+      <div
+        className={cn(
+          "w-full max-w-2xl rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
+          deckAccent.hasDeckAccent
+            ? cn(deckAccent.gradient.classes, "border-white/20")
+            : "bg-card border-border",
+        )}
+      >
         <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
-          <Badge variant="secondary" className="text-xs">
+          <Badge
+            variant="secondary"
+            className={cn(
+              "text-xs",
+              deckAccent.hasDeckAccent && "border border-white/30 bg-white/20 text-white",
+            )}
+          >
             Question {currentIndex + 1}
           </Badge>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs hidden sm:inline">Select the best answer</span>
+            <span
+              className={cn(
+                "text-xs hidden sm:inline",
+                deckAccent.hasDeckAccent ? "text-white/70" : "text-muted-foreground",
+              )}
+            >
+              Select the best answer
+            </span>
             {current.question && (
               <SpeakButton text={current.question} voice={voice} stopKey={currentIndex} />
             )}
@@ -468,7 +685,12 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
         </div>
         {current.questionImageUrl && (
           <div className="px-3 sm:px-6 pb-2">
-            <div className="relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+            <div
+              className={cn(
+                "relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border bg-muted/20 shadow-inner",
+                deckAccent.hasDeckAccent ? "border-white/25" : "border-border",
+              )}
+            >
               <Image
                 src={current.questionImageUrl}
                 alt="Question image"
@@ -480,11 +702,23 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
         )}
         <div className="px-4 sm:px-8 py-5 sm:py-6">
           {current.question ? (
-            <p className="text-center text-base sm:text-xl font-semibold leading-relaxed break-words">
+            <p
+              className={cn(
+                "text-center text-base sm:text-xl font-semibold leading-relaxed break-words",
+                deckAccent.hasDeckAccent && "text-white",
+              )}
+            >
               {current.question}
             </p>
           ) : (
-            <p className="text-center text-muted-foreground text-sm">(Image only)</p>
+            <p
+              className={cn(
+                "text-center text-sm",
+                deckAccent.hasDeckAccent ? "text-white/75" : "text-muted-foreground",
+              )}
+            >
+              (Image only)
+            </p>
           )}
         </div>
       </div>
@@ -496,31 +730,39 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
       >
         {current.options.map((text, i) => {
           const isSelected = selectedForCurrent === i;
+          const displayText = formatQuizOptionForDisplay(text);
           return (
             <div key={`${current.cardId}-${i}`} className="flex items-center gap-1.5">
               <Button
                 variant={isSelected ? "default" : "outline"}
                 role="radio"
                 aria-checked={isSelected}
-                className={`flex-1 justify-start text-left h-auto py-3 px-4 whitespace-normal break-words ${
-                  isSelected ? "" : "hover:bg-muted/50"
-                }`}
+                className={cn(
+                  "flex-1 justify-start text-left h-auto py-3 px-4 whitespace-normal break-words",
+                  isSelected ? "" : "hover:bg-muted/50",
+                  deckAccent.hasDeckAccent &&
+                    isSelected &&
+                    "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+                )}
                 onClick={() => handleSelect(i)}
               >
                 <span className="flex items-start gap-2.5 w-full">
                   <span
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
-                      isSelected
-                        ? "border-primary-foreground bg-primary-foreground text-primary"
-                        : "border-muted-foreground/40 bg-transparent"
-                    }`}
+                    className={cn(
+                      "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold",
+                      isSelected &&
+                        (deckAccent.hasDeckAccent
+                          ? "border-[var(--deck-accent-fg)] bg-[var(--deck-accent-fg)] text-[var(--deck-accent)]"
+                          : "border-primary-foreground bg-primary-foreground text-primary"),
+                      !isSelected && "border-muted-foreground/40 bg-transparent",
+                    )}
                   >
                     {String.fromCharCode(65 + i)}
                   </span>
-                  <span className="break-words">{text}</span>
+                  <span className="break-words">{displayText}</span>
                 </span>
               </Button>
-              <SpeakButton text={text} voice={voice} stopKey={currentIndex} />
+              <SpeakButton text={displayText} voice={voice} stopKey={currentIndex} />
             </div>
           );
         })}
@@ -540,7 +782,11 @@ export function QuizStudy({ cards, deckId, deckName, teamId }: QuizStudyProps) {
 
         <Button
           size="default"
-          className="gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
+          className={cn(
+            "gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm",
+            deckAccent.hasDeckAccent &&
+              "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+          )}
           onClick={handleFinishRequest}
           disabled={submitting}
         >
@@ -614,6 +860,10 @@ function QuizResultCard({
   deckId,
   deckName,
   teamId,
+  deckGradient,
+  autoSaveQuizResult,
+  autoPersisted,
+  autoPersistError,
   onRetake,
   onBack,
 }: {
@@ -623,42 +873,46 @@ function QuizResultCard({
   deckId: number;
   deckName: string;
   teamId: number | null;
+  deckGradient: string | null;
+  autoSaveQuizResult: boolean;
+  autoPersisted: boolean;
+  autoPersistError: string | null;
   onRetake: () => void;
   onBack: () => void;
 }) {
   const { percent, correct, incorrect, unanswered, total, tier, quote, elapsedSeconds, timedOut } =
     result;
 
+  const resultAccent = useMemo(() => getDeckQuizAccent(deckGradient), [deckGradient]);
+  const resultAccentCss =
+    resultAccent.hasDeckAccent && resultAccent.accent && resultAccent.accentForeground
+      ? ({
+          "--deck-accent": resultAccent.accent,
+          "--deck-accent-fg": resultAccent.accentForeground,
+        } as CSSProperties)
+      : undefined;
+
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saving, startSaving] = useTransition();
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(() => autoSaveQuizResult && autoPersisted);
+  const [saveError, setSaveError] = useState<string | null>(() =>
+    autoSaveQuizResult && autoPersistError ? autoPersistError : null,
+  );
 
   const perCardSnapshot = useMemo(
-    () =>
-      questions.map((q, i) => {
-        const perCardEntry = result.perCard.find((p) => p.cardId === q.cardId);
-        const selectedIdx = selectedByIndex[i];
-        const selectedAnswer =
-          selectedIdx !== null && selectedIdx !== undefined ? q.options[selectedIdx] ?? null : null;
-        return {
-          cardId: q.cardId,
-          question: q.question,
-          correctAnswer: perCardEntry?.correctText ?? q.options[q.correctIndex] ?? "",
-          selectedAnswer,
-          correct: perCardEntry?.correct ?? false,
-        };
-      }),
-    [questions, selectedByIndex, result.perCard],
+    () => buildPerCardSnapshotForSave(result, questions, selectedByIndex),
+    [questions, selectedByIndex, result],
   );
 
   function handleSaveConfirm() {
     startSaving(async () => {
       try {
+        setSaveError(null);
         await saveQuizResultAction({
           deckId,
           deckName,
           teamId,
+          savedFromTeamWorkspace: autoSaveQuizResult,
           correct,
           incorrect,
           unanswered,
@@ -703,7 +957,10 @@ function QuizResultCard({
   const perCardMap = new Map(result.perCard.map((c) => [c.cardId, c]));
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-6 px-2 sm:px-4 py-2 sm:py-4">
+    <div
+      className="flex flex-1 flex-col items-center gap-6 px-2 sm:px-4 py-2 sm:py-4 w-full min-w-0"
+      style={resultAccentCss}
+    >
       <div
         className={`w-full max-w-xl flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-gradient-to-b ${style.accent} bg-card p-6 sm:p-10 shadow-md text-center`}
       >
@@ -768,6 +1025,19 @@ function QuizResultCard({
           <p className="text-xs text-rose-500 text-center">{saveError}</p>
         )}
 
+        {!saved && !autoSaveQuizResult && (
+          <p className="text-xs text-muted-foreground text-center px-2">
+            Saving is optional. Use Back to deck or Retake to leave without keeping this attempt in your history or
+            inbox.
+          </p>
+        )}
+
+        {!saved && autoSaveQuizResult && saveError && (
+          <p className="text-xs text-muted-foreground text-center px-2">
+            Automatic save did not complete. Use Save result below, or try again later.
+          </p>
+        )}
+
         <div className="w-full flex flex-col gap-3">
           {!saved ? (
             <Button
@@ -783,10 +1053,20 @@ function QuizResultCard({
           ) : (
             <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-medium text-emerald-400">
               <CheckCircle className="h-4 w-4" />
-              Result saved to your inbox
+              {autoSaveQuizResult
+                ? "Result saved for your workspace — check your inbox and email"
+                : "Result saved — check your inbox and email"}
             </div>
           )}
-          <Button size="default" className="w-full gap-2 h-10 sm:h-11" onClick={onRetake}>
+          <Button
+            size="default"
+            className={cn(
+              "w-full gap-2 h-10 sm:h-11",
+              resultAccent.hasDeckAccent &&
+                "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+            )}
+            onClick={onRetake}
+          >
             <RotateCcw className="h-4 w-4" />
             Retake Quiz
           </Button>
@@ -807,8 +1087,8 @@ function QuizResultCard({
               <AlertDialogTitle>Save quiz result?</AlertDialogTitle>
               <AlertDialogDescription>
                 {teamId
-                  ? "Your result will be saved and a copy will be sent to your workspace owner's inbox."
-                  : "Your result will be saved and a copy will appear in your inbox."}
+                  ? "Your result will be saved. You and your workspace owner will each get a copy in your app inbox and by email, including a link to view and download the result."
+                  : "Your result will be saved. You will get a copy in your inbox and by email with a link to view and download it."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -827,10 +1107,15 @@ function QuizResultCard({
           {questions.map((q, i) => {
             const perCard = perCardMap.get(q.cardId);
             const sel = selectedByIndex[i];
-            const selectedText = sel !== null && sel !== undefined ? q.options[sel] : null;
+            const selectedRaw = sel !== null && sel !== undefined ? q.options[sel] : null;
             const wasCorrect = perCard?.correct ?? false;
             const wasAnswered = perCard?.answered ?? false;
             const correctText = perCard?.correctText ?? q.options[q.correctIndex];
+            const selectedDisplay =
+              selectedRaw !== null && selectedRaw !== undefined
+                ? formatQuizOptionForDisplay(selectedRaw)
+                : null;
+            const correctDisplay = formatQuizOptionForDisplay(correctText ?? "");
             return (
               <li
                 key={`${q.cardId}-${i}`}
@@ -868,13 +1153,13 @@ function QuizResultCard({
                               : "text-muted-foreground italic"
                         }
                       >
-                        {selectedText ?? "Unanswered"}
+                        {selectedDisplay ?? "Unanswered"}
                       </span>
                     </p>
                     {!wasCorrect && (
                       <p className="text-xs break-words">
                         <span className="text-muted-foreground">Correct answer: </span>
-                        <span className="text-emerald-400">{correctText}</span>
+                        <span className="text-emerald-400">{correctDisplay}</span>
                       </p>
                     )}
                   </div>

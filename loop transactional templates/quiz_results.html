@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Quiz Results</title>
+</head>
+<body style="margin:0; padding:0; font-family: Arial, sans-serif; background-color:#f4f6f8;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:20px;">
+    <tr>
+      <td align="center">
+
+        <!-- Container -->
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+
+          <!-- Header with Logo -->
+          <tr>
+            <td style="background:#0f172a; text-align:center; padding:20px;">
+              <img src="YOUR_LOGO_URL"
+                   alt="Flipvise Studio"
+                   style="max-width:180px; height:auto; display:block; margin:0 auto;" />
+            </td>
+          </tr>
+
+          <!-- Title Bar -->
+          <tr>
+            <td style="background:#4F46E5; color:#ffffff; padding:16px; text-align:center; font-size:20px; font-weight:bold;">
+              Quiz Results
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:30px; color:#333333; font-size:15px; line-height:1.6;">
+
+              <p>Dear {{userName}},</p>
+
+              {% if isOwnerCopy == 1 %}
+              <p>A quiz attempt has been completed by <strong>{{memberName}}</strong>. Below is a summary of the results:</p>
+              {% else %}
+              <p>Thank you for completing your quiz. Here is your performance summary:</p>
+              {% endif %}
+
+              <!-- Results Card -->
+              <table width="100%" cellpadding="10" cellspacing="0" style="margin:20px 0; border:1px solid #e5e7eb; border-radius:8px;">
+                <tr>
+                  <td><strong>Deck Name:</strong></td>
+                  <td>{{deckName}}</td>
+                </tr>
+                <tr>
+                  <td><strong>Total Questions:</strong></td>
+                  <td>{{total}}</td>
+                </tr>
+                <tr>
+                  <td><strong>Correct Answers:</strong></td>
+                  <td style="color:#16a34a;">{{correct}}</td>
+                </tr>
+                <tr>
+                  <td><strong>Incorrect Answers:</strong></td>
+                  <td style="color:#dc2626;">{{incorrect}}</td>
+                </tr>
+                <tr>
+                  <td><strong>Unanswered:</strong></td>
+                  <td>{{unanswered}}</td>
+                </tr>
+                <tr>
+                  <td><strong>Score:</strong></td>
+                  <td style="font-weight:bold;">{{percent}}%</td>
+                </tr>
+                <tr>
+                  <td><strong>Time Taken:</strong></td>
+                  <td>{{elapsedSeconds}} seconds</td>
+                </tr>
+              </table>
+
+              <!-- Dynamic Feedback -->
+              {% if percent >= 80 %}
+              <p style="color:#16a34a;"><strong>Excellent performance!</strong> Keep up the great work.</p>
+              {% elseif percent >= 50 %}
+              <p style="color:#d97706;"><strong>Good effort.</strong> You're on the right track—keep practicing.</p>
+              {% else %}
+              <p style="color:#dc2626;"><strong>Needs improvement.</strong> Consider reviewing the material and trying again.</p>
+              {% endif %}
+
+              {% if isOwnerCopy == 1 %}
+              <p>You can review this attempt to better understand performance trends and progress.</p>
+              {% else %}
+              <p>We encourage you to revisit the deck and improve your score.</p>
+              {% endif %}
+
+              <!-- CTA Button -->
+              {% if isOwnerCopy == 0 %}
+              <div style="text-align:center; margin:30px 0;">
+                <a href="https://learn.flipvisestudio.com"
+                   style="background:#4F46E5; color:#ffffff; padding:12px 20px; text-decoration:none; border-radius:6px; font-weight:bold;">
+                   Continue Learning
+                </a>
+              </div>
+              {% endif %}
+
+              <p>If you have any questions, feel free to contact support.</p>
+
+              <p>Kind regards,<br/>
+              <strong>Flipvise Team</strong></p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f9fafb; padding:15px; text-align:center; font-size:12px; color:#6b7280;">
+              © 2026 Flipvise. All rights reserved.
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

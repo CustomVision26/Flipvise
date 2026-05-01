@@ -1,5 +1,10 @@
 import { db } from "@/db";
-import { quizResults, quizResultInboxMessages, teams, type PerCardSnapshot } from "@/db/schema";
+import {
+  quizResults,
+  quizResultInboxMessages,
+  teams,
+  type PerCardSnapshot,
+} from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -29,7 +34,11 @@ export type SaveQuizResultInput = {
   perCard: PerCardSnapshot[];
 };
 
-/** Persists a quiz result and creates one inbox message for the appropriate recipient. */
+/**
+ * Persists a quiz result and creates inbox messages:
+ * - Always one row for the quiz-taker.
+ * - For team-deck quizzes, a second row for the workspace owner when the taker is not the owner.
+ */
 export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQuizResultOutput> {
   const [saved] = await db
     .insert(quizResults)
@@ -48,7 +57,6 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQu
     })
     .returning();
 
-  let recipientUserId = input.userId;
   let ownerUserId: string | null = null;
   let teamName: string | null = null;
 
@@ -58,18 +66,42 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQu
       .from(teams)
       .where(eq(teams.id, input.teamId));
     if (team) {
-      recipientUserId = team.ownerUserId;
       ownerUserId = team.ownerUserId;
       teamName = team.name;
     }
   }
 
-  await db.insert(quizResultInboxMessages).values({
-    recipientUserId,
-    quizResultId: saved.id,
-  });
+  const inboxRecipients: string[] = [input.userId];
+  if (ownerUserId && ownerUserId !== input.userId) {
+    inboxRecipients.push(ownerUserId);
+  }
+
+  await db.insert(quizResultInboxMessages).values(
+    inboxRecipients.map((recipientUserId) => ({
+      recipientUserId,
+      quizResultId: saved.id,
+    })),
+  );
 
   return { result: saved, ownerUserId, teamName };
+}
+
+/** Quiz result row if `viewerUserId` is the taker or the team owner (for team results). */
+export async function getQuizResultByIdForViewer(
+  resultId: number,
+  viewerUserId: string,
+): Promise<QuizResultRow | null> {
+  const [row] = await db.select().from(quizResults).where(eq(quizResults.id, resultId));
+  if (!row) return null;
+  if (row.userId === viewerUserId) return row;
+  if (row.teamId !== null) {
+    const [team] = await db
+      .select({ ownerUserId: teams.ownerUserId })
+      .from(teams)
+      .where(eq(teams.id, row.teamId));
+    if (team?.ownerUserId === viewerUserId) return row;
+  }
+  return null;
 }
 
 /** All saved quiz results for a given user (their own history). */

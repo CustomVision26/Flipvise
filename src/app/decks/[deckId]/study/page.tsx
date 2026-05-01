@@ -9,7 +9,7 @@ import {
   buildResolvedTeamWorkspaceQueryString,
   resolveTeamWorkspaceFromSearchParams,
 } from "@/lib/resolve-team-workspace-url";
-import { StudySession } from "./study-session";
+import { StudySessionLoader } from "./study-session-loader";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 
 interface StudyPageProps {
@@ -102,13 +102,14 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         </div>
       </div>
 
-      <StudySession
+      <StudySessionLoader
         cards={cards}
         deckId={id}
         deckName={deck.name}
         teamId={deck.teamId ?? null}
         allowsQuizStudy={effective75}
         deckGradient={deck.gradient ?? null}
+        autoSaveQuizResult={fromTeamWorkspaceUrl}
       />
     </div>
   );

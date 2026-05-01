@@ -140,6 +140,8 @@ export type QuizResultEmailPayload = {
    */
   memberName: string;
   deckName: string;
+  /** Team workspace display name; empty string when the quiz is not on a team deck. */
+  teamName: string;
   correct: number;
   incorrect: number;
   unanswered: number;
@@ -152,32 +154,73 @@ export type QuizResultEmailPayload = {
    * Pass as 1/0 because Loops dataVariables only accept string | number.
    */
   isOwnerCopy: 0 | 1;
+  /** Absolute URL to view or download the result in the app (signed-in). */
+  viewUrl: string;
+  /** Full subject line text (Loops Subject field can be `{DATA_VARIABLE:subjectLine}` only). */
+  subjectLine: string;
+  /** Short motivational line for the template (e.g. quote excerpt or tier message). */
+  performanceMessage: string;
+  /**
+   * Which transactional template ID to use (`LOOPS_QUIZ_RESULT_*` env vars).
+   * - `taker`: personal deck, workspace owner on a team deck, or any save where the OWNER Loops template does not apply.
+   * - `owner`: **only** team-workspace save when taker is an invited member/admin (two sends). See `.cursor/rules/loops-quiz-result-email.mdc`.
+   */
+  loopsTemplateRole: "taker" | "owner";
 };
+
+function resolveQuizResultTransactionalId(templateRole: "taker" | "owner"): string | null {
+  const legacy = process.env.LOOPS_QUIZ_RESULT_TRANSACTIONAL_ID?.trim();
+  const takerId = process.env.LOOPS_QUIZ_RESULT_TAKER_TRANSACTIONAL_ID?.trim();
+  const ownerId = process.env.LOOPS_QUIZ_RESULT_OWNER_TRANSACTIONAL_ID?.trim();
+  if (templateRole === "owner") {
+    return ownerId || legacy || null;
+  }
+  return takerId || legacy || null;
+}
 
 /**
  * Sends a quiz-result transactional email via Loops.
- * Template ID is read from LOOPS_QUIZ_RESULT_TRANSACTIONAL_ID.
- * Silently no-ops when the variable is absent or Loops is unconfigured.
  *
- * Pass `pdfBuffer` to include the quiz result PDF as an email attachment.
+ * Template selection uses `payload.loopsTemplateRole`:
+ * - `taker` → `LOOPS_QUIZ_RESULT_TAKER_TRANSACTIONAL_ID`, else legacy `LOOPS_QUIZ_RESULT_TRANSACTIONAL_ID`.
+ * - `owner` → `LOOPS_QUIZ_RESULT_OWNER_TRANSACTIONAL_ID`, else legacy (team-workspace save, invited member/admin only — two sends; see `sendQuizResultEmails`).
+ *
+ * Silently no-ops when no transactional ID resolves or Loops is unconfigured.
+ *
+ * Pass `pdfBuffer` only when `LOOPS_QUIZ_RESULT_ATTACH_PDF=true`; otherwise omit (default).
  */
 export async function loopsSendQuizResultEmail(
   payload: QuizResultEmailPayload,
   pdfBuffer?: Buffer,
 ): Promise<void> {
-  const transactionalId = process.env.LOOPS_QUIZ_RESULT_TRANSACTIONAL_ID;
-  if (!transactionalId) return;
+  if (!process.env.LOOPS_API_KEY?.trim()) {
+    console.warn("[QuizEmail] Loops send skipped: LOOPS_API_KEY is not set.");
+    return;
+  }
+
+  const transactionalId = resolveQuizResultTransactionalId(payload.loopsTemplateRole);
+  if (!transactionalId) {
+    const hint =
+      payload.loopsTemplateRole === "owner"
+        ? "Set LOOPS_QUIZ_RESULT_OWNER_TRANSACTIONAL_ID or LOOPS_QUIZ_RESULT_TRANSACTIONAL_ID."
+        : "Set LOOPS_QUIZ_RESULT_TAKER_TRANSACTIONAL_ID or LOOPS_QUIZ_RESULT_TRANSACTIONAL_ID.";
+    console.warn(`[QuizEmail] Loops send skipped (${payload.loopsTemplateRole} template): ${hint}`);
+    return;
+  }
+
+  const attachPdf = isQuizResultPdfAttachmentEnabled();
 
   const safeName = payload.deckName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-  const attachments: EmailAttachment[] | undefined = pdfBuffer
-    ? [
-        {
-          filename: `quiz_result_${safeName}.pdf`,
-          contentType: "application/pdf",
-          data: pdfBuffer.toString("base64"),
-        },
-      ]
-    : undefined;
+  const attachments: EmailAttachment[] | undefined =
+    attachPdf && pdfBuffer
+      ? [
+          {
+            filename: `quiz_result_${safeName}.pdf`,
+            contentType: "application/pdf",
+            data: pdfBuffer.toString("base64"),
+          },
+        ]
+      : undefined;
 
   await loopsSendTransactional(
     payload.email,
@@ -186,6 +229,7 @@ export async function loopsSendQuizResultEmail(
       userName: payload.userName,
       memberName: payload.memberName,
       deckName: payload.deckName,
+      teamName: payload.teamName,
       correct: payload.correct,
       incorrect: payload.incorrect,
       unanswered: payload.unanswered,
@@ -193,6 +237,9 @@ export async function loopsSendQuizResultEmail(
       percent: payload.percent,
       elapsedSeconds: payload.elapsedSeconds,
       isOwnerCopy: payload.isOwnerCopy,
+      viewUrl: payload.viewUrl,
+      subjectLine: payload.subjectLine,
+      performanceMessage: payload.performanceMessage,
     },
     attachments,
   );
@@ -202,6 +249,17 @@ export async function loopsSendQuizResultEmail(
 // Send a transactional email by its Loops template ID
 // ---------------------------------------------------------------------------
 
+/**
+ * Quiz-result emails attach a PDF only when `LOOPS_QUIZ_RESULT_ATTACH_PDF=true` (opt-in).
+ * Default is off so Loops free/low tiers and CPU are not burned generating PDFs.
+ */
+export function isQuizResultPdfAttachmentEnabled(): boolean {
+  const raw = process.env.LOOPS_QUIZ_RESULT_ATTACH_PDF;
+  if (raw == null || raw === "") return false;
+  const s = raw.replace(/^\uFEFF/, "").trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes";
+}
+
 type EmailAttachment = {
   /** File name shown to the recipient (e.g. "quiz_result.pdf"). */
   filename: string;
@@ -210,6 +268,34 @@ type EmailAttachment = {
   data: string;
 };
 
+/** Loops returns 400 with path `attachments` when the workspace plan disallows API attachments. */
+function isLoopsLikeErr(err: unknown): err is {
+  statusCode: number;
+  message?: string;
+  json?: { path?: string; message?: string } | null;
+  rawBody?: string;
+} {
+  return Boolean(
+    err &&
+      typeof err === "object" &&
+      "statusCode" in err &&
+      typeof (err as { statusCode: unknown }).statusCode === "number",
+  );
+}
+
+function isLoopsAttachmentsDisallowedError(err: unknown): boolean {
+  if (!isLoopsLikeErr(err) || err.statusCode !== 400) return false;
+  const j = err.json ?? undefined;
+  if (j && typeof j === "object" && "path" in j && (j as { path: string }).path === "attachments") {
+    return true;
+  }
+  const msg =
+    (j && typeof j === "object" && "message" in j && typeof (j as { message: unknown }).message === "string"
+      ? (j as { message: string }).message
+      : err.message) ?? "";
+  return /attachment/i.test(msg) && /not allowed|upgrade|plan/i.test(msg);
+}
+
 export async function loopsSendTransactional(
   email: string,
   transactionalId: string,
@@ -217,7 +303,10 @@ export async function loopsSendTransactional(
   attachments?: EmailAttachment[],
 ): Promise<void> {
   const client = getClient();
-  if (!client) return;
+  if (!client) {
+    console.warn("[Loops] sendTransactional skipped: LOOPS_API_KEY is not set.");
+    return;
+  }
 
   try {
     await client.sendTransactionalEmail({
@@ -226,7 +315,33 @@ export async function loopsSendTransactional(
       ...(dataVariables ? { dataVariables } : {}),
       ...(attachments?.length ? { attachments } : {}),
     });
-  } catch (err) {
-    console.error(`[Loops] sendTransactionalEmail(${transactionalId}) failed:`, err);
+  } catch (firstErr) {
+    let reportErr: unknown = firstErr;
+
+    if (attachments?.length && isLoopsAttachmentsDisallowedError(firstErr)) {
+      console.warn(
+        "[Loops] Attachments not allowed on your Loops plan — retrying email without PDF. Enable transactional attachments in Loops or leave quiz PDF attachments off (default). Set LOOPS_QUIZ_RESULT_ATTACH_PDF=true only if your Loops plan supports API attachments.",
+      );
+      try {
+        await client.sendTransactionalEmail({
+          transactionalId,
+          email,
+          ...(dataVariables ? { dataVariables } : {}),
+        });
+        return;
+      } catch (retryErr) {
+        reportErr = retryErr;
+      }
+    }
+
+    if (isLoopsLikeErr(reportErr)) {
+      console.error(
+        `[Loops] sendTransactionalEmail(${transactionalId}) HTTP ${reportErr.statusCode}:`,
+        reportErr.message,
+        reportErr.json ?? reportErr.rawBody,
+      );
+    } else {
+      console.error(`[Loops] sendTransactionalEmail(${transactionalId}) failed:`, reportErr);
+    }
   }
 }
