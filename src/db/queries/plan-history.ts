@@ -7,30 +7,14 @@ import {
   listProrationLinesWithReceiptForUser,
   type ProrationLineWithReceipt,
 } from "@/db/queries/billing-proration";
+import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-types";
 import {
   TEAM_PLAN_LABELS,
   isTeamPlanId,
   type TeamPlanId,
 } from "@/lib/team-plans";
 
-export type PlanHistoryTypeLabel =
-  | "Paid subscription"
-  | "Proration"
-  | "Complimentary (admin)"
-  | "Complimentary (affiliate)";
-
-export type PlanHistoryRow = {
-  id: string;
-  planName: string;
-  planType: PlanHistoryTypeLabel;
-  statusLabel: string;
-  /** ISO 8601 */
-  startAt: string;
-  /** ISO 8601; null when the row represents an open-ended period */
-  endAt: string | null;
-  /** Stripe hosted invoice or PDF; null for non-billed rows */
-  receiptUrl: string | null;
-};
+export type { PlanHistoryRow, PlanHistoryTypeLabel };
 
 function slugToPlanDisplayName(slug: string | null | undefined): string {
   if (!slug || slug === "free") return "Free";

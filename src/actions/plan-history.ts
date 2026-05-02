@@ -1,12 +1,10 @@
 "use server";
 
 import { auth, currentUser } from "@/lib/clerk-auth";
-import {
-  getMergedPlanHistoryForUser,
-  type PlanHistoryRow,
-} from "@/db/queries/plan-history";
+import { getMergedPlanHistoryForUser } from "@/db/queries/plan-history";
+import type { PlanHistoryRow } from "@/lib/plan-history-types";
 
-export type { PlanHistoryRow };
+export type { PlanHistoryRow } from "@/lib/plan-history-types";
 
 export async function loadUserPlanHistoryAction(): Promise<PlanHistoryRow[]> {
   const { userId } = await auth();

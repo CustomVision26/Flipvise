@@ -41,15 +41,28 @@ interface TeamInviteFormProps {
   aggregatedMemberEmailSuggestions?: string[];
   /** Initial workspace selection (usually matches the page “Select a team” control). */
   defaultWorkspaceId: number;
+  /**
+   * Normalized email → suggested display name from existing members and prior invitations
+   * across this subscriber’s workspaces.
+   */
+  inviteDisplayHintsByEmail?: Record<string, string>;
+  /**
+   * Workspace subscriber’s primary email (lowercase). Inviting this address is blocked in the UI
+   * (owner is already on the workspace).
+   */
+  subscriberOwnerPrimaryEmail?: string | null;
 }
 
 export function TeamInviteForm({
   workspaces,
   aggregatedMemberEmailSuggestions,
   defaultWorkspaceId,
+  inviteDisplayHintsByEmail = {},
+  subscriberOwnerPrimaryEmail = null,
 }: TeamInviteFormProps) {
   const [teamId, setTeamId] = React.useState(String(defaultWorkspaceId));
   const [email, setEmail] = React.useState("");
+  const [inviteeDisplayName, setInviteeDisplayName] = React.useState("");
   const [role, setRole] = React.useState<"team_admin" | "team_member">("team_member");
   const [inviteUrl, setInviteUrl] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -60,6 +73,16 @@ export function TeamInviteForm({
     setTeamId(String(defaultWorkspaceId));
   }, [defaultWorkspaceId]);
 
+  function applyInviteDisplayHintForEmail(addr: string) {
+    const key = addr.trim().toLowerCase();
+    if (!key) {
+      setInviteeDisplayName("");
+      return;
+    }
+    const hint = inviteDisplayHintsByEmail[key];
+    setInviteeDisplayName(hint ?? "");
+  }
+
   React.useEffect(() => {
     setEmailPickerOpen(false);
   }, [teamId]);
@@ -69,19 +92,35 @@ export function TeamInviteForm({
   const allAtCapacity = workspaces.length > 0 && workspaces.every((w) => w.atCapacity);
   const formDisabled = allAtCapacity || pending;
   const usesAggregatedMemberSuggestions = aggregatedMemberEmailSuggestions != null;
-  const suggestionEmails = usesAggregatedMemberSuggestions
+  const rawSuggestionEmails = usesAggregatedMemberSuggestions
     ? aggregatedMemberEmailSuggestions
     : (selectedWorkspace?.acceptedMemberEmails ?? []);
+  const suggestionEmails = React.useMemo(() => {
+    if (subscriberOwnerPrimaryEmail == null || subscriberOwnerPrimaryEmail === "") {
+      return rawSuggestionEmails;
+    }
+    const block = subscriberOwnerPrimaryEmail.toLowerCase();
+    return rawSuggestionEmails.filter((addr) => addr.toLowerCase() !== block);
+  }, [rawSuggestionEmails, subscriberOwnerPrimaryEmail]);
   const emailFilter = email.trim().toLowerCase();
   const filteredMemberEmails = React.useMemo(() => {
     if (!emailFilter) return suggestionEmails;
     return suggestionEmails.filter((addr) => addr.toLowerCase().includes(emailFilter));
   }, [suggestionEmails, emailFilter]);
 
-  const submitDisabled = formDisabled || selectedAtCapacity;
+  const normalizedTypedEmail = email.trim().toLowerCase();
+  const invitesSubscriberOwnerEmail =
+    subscriberOwnerPrimaryEmail != null &&
+    subscriberOwnerPrimaryEmail !== "" &&
+    normalizedTypedEmail === subscriberOwnerPrimaryEmail;
+
+  const submitDisabled = formDisabled || selectedAtCapacity || invitesSubscriberOwnerEmail;
   const emailFilled = email.trim().length > 0;
   const disabledSubmitExplanation = React.useMemo(() => {
     if (!emailFilled) return null;
+    if (invitesSubscriberOwnerEmail) {
+      return "You cannot invite the workspace subscriber using their own email address.";
+    }
     if (pending) {
       return "Sending the invitation—please wait.";
     }
@@ -92,7 +131,13 @@ export function TeamInviteForm({
       return "This workspace is at its member limit. Remove a member or cancel a pending invitation before sending another.";
     }
     return null;
-  }, [emailFilled, pending, allAtCapacity, selectedAtCapacity]);
+  }, [
+    emailFilled,
+    invitesSubscriberOwnerEmail,
+    pending,
+    allAtCapacity,
+    selectedAtCapacity,
+  ]);
   const showSubmitTooltip = submitDisabled && disabledSubmitExplanation != null;
 
   async function onSubmit(e: React.FormEvent) {
@@ -103,15 +148,28 @@ export function TeamInviteForm({
       setError("This workspace is at capacity. Remove a member or cancel a pending invite to send another.");
       return;
     }
+    if (invitesSubscriberOwnerEmail) {
+      setError("You cannot invite the workspace subscriber using their own email address.");
+      return;
+    }
     setPending(true);
     try {
+      const parsedWorkspaceId = Number.parseInt(String(teamId), 10);
+      if (!Number.isFinite(parsedWorkspaceId) || parsedWorkspaceId < 1) {
+        setError("Choose a valid workspace.");
+        return;
+      }
+      const trimmedName = inviteeDisplayName.trim();
       const res = await inviteTeamMemberAction({
-        teamId: Number(teamId),
-        email,
+        // Decimal string keeps RSC / dev traces JSON-serializable (avoids bigint wire encoding for ids).
+        teamId: String(parsedWorkspaceId),
+        email: email.trim(),
         role,
+        ...(trimmedName.length > 0 ? { inviteeDisplayName: trimmedName } : {}),
       });
       setInviteUrl(res.inviteUrl);
       setEmail("");
+      setInviteeDisplayName("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -178,6 +236,7 @@ export function TeamInviteForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => applyInviteDisplayHintForEmail(email)}
             disabled={formDisabled}
             placeholder="invitemember@gmail.com"
             className="min-w-0 flex-1"
@@ -223,6 +282,7 @@ export function TeamInviteForm({
                       className="h-auto w-full justify-start whitespace-normal break-all px-2 py-1.5 text-left font-normal text-sm"
                       onClick={() => {
                         setEmail(addr);
+                        applyInviteDisplayHintForEmail(addr);
                         setEmailPickerOpen(false);
                       }}
                     >
@@ -234,6 +294,29 @@ export function TeamInviteForm({
             </PopoverContent>
           </Popover>
         </div>
+        {invitesSubscriberOwnerEmail && (
+          <p className="text-sm text-destructive" role="alert">
+            You cannot invite the workspace subscriber using their own email address.
+          </p>
+        )}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="team-invite-invitee-name">Invitee name</Label>
+        <Input
+          id="team-invite-invitee-name"
+          type="text"
+          autoComplete="name"
+          value={inviteeDisplayName}
+          onChange={(e) => setInviteeDisplayName(e.target.value)}
+          disabled={formDisabled}
+          placeholder="Shown in your invitation records"
+          maxLength={255}
+          className="w-full"
+        />
+        <p className="text-muted-foreground text-xs">
+          Optional. If this email already matches a member or a prior invite on your workspaces, we fill
+          this in when you finish editing the email field.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="team-invite-role">Role</Label>

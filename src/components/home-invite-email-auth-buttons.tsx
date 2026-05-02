@@ -1,9 +1,21 @@
 "use client";
 
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 
 export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
+  const { isSignedIn, isLoaded } = useAuth();
+  if (!isLoaded) {
+    return (
+      <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
+        <Button variant="outline" disabled>
+          Sign In
+        </Button>
+        <Button disabled>Sign Up</Button>
+      </div>
+    );
+  }
+  if (isSignedIn) return null;
   return (
     <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
       <SignInButton

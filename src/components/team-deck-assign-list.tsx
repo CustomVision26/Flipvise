@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { CircleHelp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,19 +29,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { InferSelectModel } from "drizzle-orm";
-import { decks, teamDeckAssignments, teamMembers } from "@/db/schema";
+import type {
+  DeckRow,
+  TeamDeckAssignmentRow,
+  TeamMemberRow,
+} from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 
-type MemberRow = InferSelectModel<typeof teamMembers>;
-type DeckRow = InferSelectModel<typeof decks>;
-type AssignmentRow = InferSelectModel<typeof teamDeckAssignments>;
+type MemberRow = TeamMemberRow;
+type AssignmentRow = TeamDeckAssignmentRow;
 
 export type TeamAssignWorkspaceSnapshot = {
   id: number;
   name: string;
   /** Subscriber who owns this workspace — deck transfers are only allowed between matching owners. */
   ownerUserId: string;
+  /** All rows in `team_members` for this workspace (includes team admins). */
+  allMembers: MemberRow[];
   normalMembers: MemberRow[];
   decks: DeckRow[];
   assignments: AssignmentRow[];
@@ -51,6 +55,11 @@ interface TeamDeckAssignListProps {
   workspaces: TeamAssignWorkspaceSnapshot[];
   defaultWorkspaceId: number;
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
+  /** When set, switching tabs updates the route (`assign-decks-to-members` vs `move-deck-to-another-ws`). */
+  deckManagerTabUrls?: {
+    assignMembersHref: string;
+    moveDeckHref: string;
+  };
 }
 
 function memberOptionLabel(
@@ -114,8 +123,23 @@ export function TeamDeckAssignList({
   workspaces,
   defaultWorkspaceId,
   userFieldDisplayById,
+  deckManagerTabUrls,
 }: TeamDeckAssignListProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const activeDeckManagerTab =
+    deckManagerTabUrls != null && pathname.includes("/move-deck-to-another-ws")
+      ? "move-deck"
+      : "assign-members";
+
+  function onDeckManagerTabChange(value: string) {
+    if (!deckManagerTabUrls) return;
+    const href =
+      value === "move-deck"
+        ? deckManagerTabUrls.moveDeckHref
+        : deckManagerTabUrls.assignMembersHref;
+    router.replace(href);
+  }
   const [workspaceId, setWorkspaceId] = React.useState(String(defaultWorkspaceId));
   const [memberUserId, setMemberUserId] = React.useState(NO_MEMBER);
   const [deckId, setDeckId] = React.useState(NO_DECK);
@@ -323,7 +347,15 @@ export function TeamDeckAssignList({
   }
 
   return (
-    <Tabs defaultValue="assign-members" className="w-full max-w-2xl gap-4">
+    <Tabs
+      {...(deckManagerTabUrls
+        ? {
+            value: activeDeckManagerTab,
+            onValueChange: onDeckManagerTabChange,
+          }
+        : { defaultValue: "assign-members" })}
+      className="w-full max-w-2xl gap-4"
+    >
       <TabsList
         variant="line"
         className="h-auto w-full min-w-0 flex-wrap justify-start gap-0 border-b border-border bg-transparent p-0"

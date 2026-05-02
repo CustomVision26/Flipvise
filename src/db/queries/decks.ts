@@ -1,9 +1,7 @@
 import { db } from "@/db";
-import { decks, cards } from "@/db/schema";
+import { decks, cards, type DeckRow } from "@/db/schema";
 import { and, count, eq, isNull } from "drizzle-orm";
-import type { InferSelectModel } from "drizzle-orm";
-
-export type DeckRow = InferSelectModel<typeof decks>;
+export type { DeckRow };
 
 /** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` columns). */
 export const deckRowSelectWithoutCover = {

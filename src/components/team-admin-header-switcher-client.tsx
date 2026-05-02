@@ -3,6 +3,23 @@
 import { Suspense, useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { TeamSwitcherDropdown } from "@/components/team-switcher-dropdown";
+import {
+  buildTeamAdminAssignDecksToMembersPath,
+  buildTeamAdminInviteHistoryPath,
+  buildTeamAdminInvitePendingPath,
+  buildTeamAdminInviteSendPath,
+  buildTeamAdminMoveDeckToAnotherWsPath,
+  buildTeamAdminPath,
+  buildTeamAdminQuizResultsPath,
+  buildTeamAdminWsHistoryPath,
+  isTeamAdminInviteHistoryPath,
+  TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH,
+  TEAM_ADMIN_INVITE_PENDING_PATH,
+  TEAM_ADMIN_INVITE_SEND_PATH,
+  TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH,
+  TEAM_ADMIN_QUIZ_RESULTS_PATH,
+  TEAM_ADMIN_WS_HISTORY_PATH,
+} from "@/lib/team-admin-url";
 
 export type TeamAdminHeaderSwitcherTeam = {
   id: number;
@@ -66,7 +83,7 @@ function TeamAdminHeaderSwitcherInner({
       : displayedTeams[0]!.id;
   }, [searchParams, displayedTeams]);
 
-  if (pathname !== "/dashboard/team-admin") return null;
+  if (!pathname.startsWith("/dashboard/team-admin")) return null;
   if (displayedTeams.length === 0) return null;
 
   return (
@@ -85,6 +102,23 @@ function TeamAdminHeaderSwitcherInner({
         selectedId={selectedId}
         ariaDescribedBy="team-admin-header-team-switcher-hint"
         showManageWorkspaces={displayedTeams.some((t) => t.ownerUserId === userId)}
+        buildTeamChangeHref={
+          pathname.startsWith(TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH)
+            ? buildTeamAdminAssignDecksToMembersPath
+            : pathname.startsWith(TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH)
+              ? buildTeamAdminMoveDeckToAnotherWsPath
+              : pathname.startsWith(TEAM_ADMIN_WS_HISTORY_PATH)
+                ? buildTeamAdminWsHistoryPath
+                : pathname.startsWith(TEAM_ADMIN_QUIZ_RESULTS_PATH)
+                  ? buildTeamAdminQuizResultsPath
+                  : pathname.startsWith(TEAM_ADMIN_INVITE_PENDING_PATH)
+                  ? buildTeamAdminInvitePendingPath
+                  : isTeamAdminInviteHistoryPath(pathname)
+                    ? buildTeamAdminInviteHistoryPath
+                    : pathname.startsWith(TEAM_ADMIN_INVITE_SEND_PATH)
+                      ? buildTeamAdminInviteSendPath
+                      : buildTeamAdminPath
+        }
       />
     </>
   );

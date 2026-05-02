@@ -31,11 +31,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { InferSelectModel } from "drizzle-orm";
-import { teamMembers } from "@/db/schema";
+import type { TeamMemberRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 
-type MemberRow = InferSelectModel<typeof teamMembers>;
+type MemberRow = TeamMemberRow;
 
 interface TeamMemberTableProps {
   teamId: number;

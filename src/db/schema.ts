@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   json,
 } from 'drizzle-orm/pg-core';
+import type { InferSelectModel } from 'drizzle-orm';
 
 export const supportCategoryEnum = pgEnum('support_category', [
   'general_support',
@@ -120,6 +121,8 @@ export const teamInvitations = pgTable('team_invitations', {
   /** Clerk user id of the member or owner who sent the invite. */
   invitedByUserId: varchar({ length: 255 }),
   email: varchar({ length: 255 }).notNull(),
+  /** Optional label the inviter sets for this email (shown in admin records; not required for delivery). */
+  inviteeDisplayName: varchar({ length: 255 }),
   role: teamMemberRoleEnum().notNull(),
   token: varchar({ length: 64 }).notNull().unique(),
   status: teamInvitationStatusEnum().notNull().default('pending'),
@@ -421,3 +424,9 @@ export const cards = pgTable('cards', {
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });
+
+/** Row shapes for client `import type` — avoids bundling table refs into client runtime chunks. */
+export type TeamInvitationRow = InferSelectModel<typeof teamInvitations>;
+export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
+export type DeckRow = InferSelectModel<typeof decks>;
+export type TeamDeckAssignmentRow = InferSelectModel<typeof teamDeckAssignments>;

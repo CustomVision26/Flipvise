@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { loadUserPlanHistoryAction } from "@/actions/plan-history";
-import type { PlanHistoryRow } from "@/actions/plan-history";
+import type { PlanHistoryRow } from "@/lib/plan-history-types";
 import { CreditCard, ExternalLink, Loader2, Zap } from "lucide-react";
 
 const PLAN_LABELS: Record<string, string> = {

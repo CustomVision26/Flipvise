@@ -35,6 +35,8 @@ interface TeamSwitcherDropdownProps {
   triggerTooltip?: string;
   /** Subscriber owner — link to workspace CRUD + history. */
   showManageWorkspaces?: boolean;
+  /** When on Deck Manager assign page, keep the same subpath when switching workspace. */
+  buildTeamChangeHref?: (teamId: number) => string;
 }
 
 export function TeamSwitcherDropdown({
@@ -43,10 +45,13 @@ export function TeamSwitcherDropdown({
   ariaDescribedBy,
   triggerTooltip = "Choose which team to manage. Members, invites, and deck access on this page follow the team you select.",
   showManageWorkspaces = false,
+  buildTeamChangeHref,
 }: TeamSwitcherDropdownProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+
+  const hrefForTeam = buildTeamChangeHref ?? buildTeamAdminPath;
 
   const selected = teams.find((t) => t.id === selectedId) ?? teams[0];
 
@@ -72,7 +77,7 @@ export function TeamSwitcherDropdown({
     setOpen(false);
     setQuery("");
     requestAnimationFrame(() => {
-      router.push(buildTeamAdminPath(teamId));
+      router.push(hrefForTeam(teamId));
       router.refresh();
     });
   }

@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
 import { randomBytes } from "node:crypto";
-import { z } from "zod";
+import { z, type input } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { syncPlatformAdminTeamTierInvitedMetadata } from "@/lib/platform-admin-team-tier-metadata";
 import {
@@ -46,6 +46,8 @@ import {
   isTeamInviteExpired,
   TEAM_INVITE_EXPIRY_DAYS,
 } from "@/lib/team-invite-expiry";
+import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
+import { loopsSendTeamInvitationEmail } from "@/lib/loops";
 import type { InferSelectModel } from "drizzle-orm";
 import { teamInvitations } from "@/db/schema";
 
@@ -133,16 +135,31 @@ export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {
     previousTeamName: null,
   });
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard/workspaces");
   revalidatePath("/onboarding/team");
   return { teamId: id, ownerUserId: userId };
 }
 
+/** Normalize workspace id from Server Action payload (string is JSON-safe for dev traces; RSC may deliver bigint). */
+function parseInviteTeamId(val: unknown): number {
+  if (typeof val === "bigint") return Number(val);
+  if (typeof val === "number" && Number.isFinite(val)) return Math.trunc(val);
+  if (typeof val === "string") {
+    const t = val.trim();
+    if (/^\d+$/.test(t)) return parseInt(t, 10);
+  }
+  return NaN;
+}
+
 const inviteSchema = z.object({
-  teamId: z.number().int().positive(),
+  teamId: z
+    .union([z.string(), z.number(), z.bigint()])
+    .transform(parseInviteTeamId)
+    .pipe(z.number().int().positive()),
   email: z.string().email(),
   role: z.enum(["team_admin", "team_member"]),
+  inviteeDisplayName: z.string().max(255).optional(),
 });
 
 async function assertCanManageTeam(userId: string, teamId: number) {
@@ -194,7 +211,7 @@ export async function updateTeamWorkspaceNameAction(
   });
 
   revalidatePath("/dashboard/workspaces");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard");
 }
 
@@ -223,7 +240,7 @@ export async function deleteTeamWorkspaceAction(
   }
 
   revalidatePath("/dashboard/workspaces");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard");
 }
 
@@ -242,7 +259,7 @@ async function clerkUserHasNormalizedEmail(
   }
 }
 
-export async function inviteTeamMemberAction(data: z.infer<typeof inviteSchema>) {
+export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
@@ -290,6 +307,7 @@ export async function inviteTeamMemberAction(data: z.infer<typeof inviteSchema>)
     Date.now() + 1000 * 60 * 60 * 24 * TEAM_INVITE_EXPIRY_DAYS,
   );
 
+  const trimmedInviteName = parsed.data.inviteeDisplayName?.trim();
   await insertTeamInvitation(
     team.id,
     normalizedEmail,
@@ -297,16 +315,37 @@ export async function inviteTeamMemberAction(data: z.infer<typeof inviteSchema>)
     token,
     expiresAt,
     userId,
+    trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : null,
   );
 
   const base =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
-  revalidatePath("/dashboard/team-admin");
+  const inviteUrl = `${base}/invite/team/${token}`;
+  const dashboardInboxUrl = `${base}/dashboard/inbox`;
+
+  const inviterName = await getClerkUserDisplayNameById(userId);
+  const roleLabel = parsed.data.role === "team_admin" ? "Team admin" : "Member";
+  const inviteeLabel =
+    trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : "";
+
+  await loopsSendTeamInvitationEmail({
+    inviteeEmail: normalizedEmail,
+    inviteeDisplayName: inviteeLabel,
+    workspaceName: team.name,
+    roleLabel,
+    inviterName,
+    acceptInvitationUrl: inviteUrl,
+    dashboardInboxUrl,
+    expiresInDays: TEAM_INVITE_EXPIRY_DAYS,
+    subjectLine: `You're invited to ${team.name}`,
+  });
+
+  revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  return { inviteUrl: `${base}/invite/team/${token}` };
+  return { inviteUrl };
 }
 
 const acceptSchema = z.object({
@@ -328,7 +367,7 @@ export async function acceptTeamInvitationAction(data: z.infer<typeof acceptSche
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 
   const qs = new URLSearchParams();
   qs.set("team_invite", "accepted");
@@ -369,7 +408,7 @@ export async function acceptTeamInvitationByIdAction(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
   return { teamId: inv.teamId };
 }
 
@@ -398,7 +437,7 @@ export async function rejectTeamInvitationByIdAction(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const revokeTeamInvitationSchema = z.object({
@@ -441,7 +480,7 @@ export async function revokeTeamInvitationAction(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const assignDeckSchema = z.object({
@@ -477,7 +516,7 @@ export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSc
     parsed.data.memberUserId,
   );
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const unassignDeckSchema = z.object({
@@ -501,7 +540,7 @@ export async function unassignDeckFromMemberAction(data: z.infer<typeof unassign
     parsed.data.memberUserId,
   );
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const transferTeamDeckWorkspaceSchema = z
@@ -535,7 +574,7 @@ export async function transferTeamDeckWorkspaceAction(
     toTeamId: parsed.data.toTeamId,
   });
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const roleSchema = z.object({
@@ -562,7 +601,7 @@ export async function updateTeamMemberRoleAction(data: z.infer<typeof roleSchema
     // best-effort
   }
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const removeMemberSchema = z.object({
@@ -588,7 +627,7 @@ export async function removeTeamMemberAction(data: z.infer<typeof removeMemberSc
     // best-effort
   }
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const cancelInviteSchema = z.object({
@@ -606,7 +645,7 @@ export async function cancelTeamInvitationAction(data: z.infer<typeof cancelInvi
   await assertCanManageTeam(userId, parsed.data.teamId);
   await deleteInvitation(parsed.data.invitationId, parsed.data.teamId);
 
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 export async function setTeamContextCookieAction(teamId: number | null) {

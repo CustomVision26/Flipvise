@@ -6,6 +6,8 @@ import {
   teamInvitations,
   teamMembers,
   teams,
+  type TeamInvitationRow,
+  type TeamMemberRow,
 } from "@/db/schema";
 import {
   deckRowSelectWithoutCover,
@@ -25,6 +27,7 @@ import {
   getTableColumns,
   gt,
   inArray,
+  isNotNull,
   lte,
   ne,
   or,
@@ -32,9 +35,71 @@ import {
 } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
-export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
+export type { TeamMemberRow, TeamInvitationRow };
 
 export type TeamMemberRole = "team_admin" | "team_member";
+
+/** When `team_invitations` is missing `inviteeDisplayName` (migration not run). */
+const teamInvitationRowSelectLegacy = {
+  id: teamInvitations.id,
+  teamId: teamInvitations.teamId,
+  invitedByUserId: teamInvitations.invitedByUserId,
+  email: teamInvitations.email,
+  role: teamInvitations.role,
+  token: teamInvitations.token,
+  status: teamInvitations.status,
+  expiresAt: teamInvitations.expiresAt,
+  createdAt: teamInvitations.createdAt,
+} as const;
+
+export function isMissingTeamInvitationInviteeDisplayNameColumnError(
+  error: unknown,
+): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current && typeof current === "object"; depth++) {
+    const o = current as Record<string, unknown>;
+    const message = typeof o.message === "string" ? o.message : "";
+    if (
+      /inviteeDisplayName|invitee_display_name/i.test(message) &&
+      (/does not exist/i.test(message) || /42703/i.test(String(o.code ?? "")))
+    ) {
+      return true;
+    }
+    current = o.cause;
+  }
+  const flat = String(error);
+  if (
+    /42703/i.test(flat) &&
+    /team_invitations/i.test(flat) &&
+    /invitee/i.test(flat)
+  ) {
+    return true;
+  }
+  if (
+    /inviteeDisplayName|invitee_display_name/i.test(flat) &&
+    /does not exist/i.test(flat)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+let warnedMissingInviteeDisplayNameColumn = false;
+
+function warnMissingInviteeDisplayNameColumnOnce() {
+  if (process.env.NODE_ENV !== "development") return;
+  if (warnedMissingInviteeDisplayNameColumn) return;
+  warnedMissingInviteeDisplayNameColumn = true;
+  console.warn(
+    "[db] team_invitations is missing inviteeDisplayName. Run: npm run db:migrate:local (or db:push:local) or apply drizzle/0017_team_invitation_invitee_display_name.sql",
+  );
+}
+
+function withDefaultInviteeDisplayName(
+  row: Omit<TeamInvitationRow, "inviteeDisplayName">,
+): TeamInvitationRow {
+  return { ...row, inviteeDisplayName: null };
+}
 
 /** When `team_members` is missing `updatedAt` / adder columns (migration not run). */
 const teamMemberRowSelectLegacy = {
@@ -240,54 +305,115 @@ export async function listTeamMembers(teamId: number) {
 /** Pending invites that are still valid (not past `expiresAt`). */
 export async function listPendingInvitations(teamId: number) {
   const now = new Date();
-  return db
-    .select()
-    .from(teamInvitations)
-    .where(
-      and(
-        eq(teamInvitations.teamId, teamId),
-        eq(teamInvitations.status, "pending"),
-        gt(teamInvitations.expiresAt, now),
-      ),
-    )
-    .orderBy(desc(teamInvitations.createdAt));
+  const whereClause = and(
+    eq(teamInvitations.teamId, teamId),
+    eq(teamInvitations.status, "pending"),
+    gt(teamInvitations.expiresAt, now),
+  );
+  try {
+    return await db
+      .select()
+      .from(teamInvitations)
+      .where(whereClause)
+      .orderBy(desc(teamInvitations.createdAt));
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    const rows = await db
+      .select(teamInvitationRowSelectLegacy)
+      .from(teamInvitations)
+      .where(whereClause)
+      .orderBy(desc(teamInvitations.createdAt));
+    return rows.map(withDefaultInviteeDisplayName);
+  }
+}
+
+/** Latest stored invitee label per normalized email across the given teams (by invitation `createdAt`). */
+export async function getLatestInviteeDisplayNamesForTeamIds(teamIds: number[]) {
+  if (teamIds.length === 0) return {} as Record<string, string>;
+  try {
+    const rows = await db
+      .select({
+        email: teamInvitations.email,
+        inviteeDisplayName: teamInvitations.inviteeDisplayName,
+        createdAt: teamInvitations.createdAt,
+      })
+      .from(teamInvitations)
+      .where(
+        and(
+          inArray(teamInvitations.teamId, teamIds),
+          isNotNull(teamInvitations.inviteeDisplayName),
+        ),
+      )
+      .orderBy(desc(teamInvitations.createdAt));
+
+    const out: Record<string, string> = {};
+    for (const r of rows) {
+      const key = r.email.toLowerCase();
+      if (out[key]) continue;
+      const name = r.inviteeDisplayName?.trim();
+      if (name) out[key] = name;
+    }
+    return out;
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    return {};
+  }
 }
 
 /** Past invitations for this team: terminal statuses, or pending but already expired. */
 export async function listTeamInvitationHistoryForTeam(teamId: number) {
   const now = new Date();
-  return db
-    .select()
-    .from(teamInvitations)
-    .where(
-      and(
-        eq(teamInvitations.teamId, teamId),
-        or(
-          ne(teamInvitations.status, "pending"),
-          and(eq(teamInvitations.status, "pending"), lte(teamInvitations.expiresAt, now)),
-        ),
-      ),
-    )
-    .orderBy(desc(teamInvitations.createdAt));
+  const whereClause = and(
+    eq(teamInvitations.teamId, teamId),
+    or(
+      ne(teamInvitations.status, "pending"),
+      and(eq(teamInvitations.status, "pending"), lte(teamInvitations.expiresAt, now)),
+    ),
+  );
+  try {
+    return await db
+      .select()
+      .from(teamInvitations)
+      .where(whereClause)
+      .orderBy(desc(teamInvitations.createdAt));
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    const rows = await db
+      .select(teamInvitationRowSelectLegacy)
+      .from(teamInvitations)
+      .where(whereClause)
+      .orderBy(desc(teamInvitations.createdAt));
+    return rows.map(withDefaultInviteeDisplayName);
+  }
 }
 
 /** Pending invite for this workspace and email that has not yet expired. */
 export async function getActivePendingInvitationForTeamEmail(teamId: number, email: string) {
   const normalized = email.toLowerCase();
   const now = new Date();
-  const rows = await db
-    .select()
-    .from(teamInvitations)
-    .where(
-      and(
-        eq(teamInvitations.teamId, teamId),
-        eq(teamInvitations.email, normalized),
-        eq(teamInvitations.status, "pending"),
-        gt(teamInvitations.expiresAt, now),
-      ),
-    )
-    .limit(1);
-  return rows[0] ?? null;
+  const whereClause = and(
+    eq(teamInvitations.teamId, teamId),
+    eq(teamInvitations.email, normalized),
+    eq(teamInvitations.status, "pending"),
+    gt(teamInvitations.expiresAt, now),
+  );
+  try {
+    const rows = await db.select().from(teamInvitations).where(whereClause).limit(1);
+    return rows[0] ?? null;
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    const rows = await db
+      .select(teamInvitationRowSelectLegacy)
+      .from(teamInvitations)
+      .where(whereClause)
+      .limit(1);
+    const row = rows[0];
+    return row ? withDefaultInviteeDisplayName(row) : null;
+  }
 }
 
 export async function getDecksForTeam(
@@ -595,11 +721,19 @@ export async function userHasTeamAdminDashboardAccess(userId: string): Promise<b
 }
 
 export async function getInvitationByToken(token: string) {
-  const rows = await db
-    .select()
-    .from(teamInvitations)
-    .where(eq(teamInvitations.token, token));
-  return rows[0] ?? null;
+  try {
+    const rows = await db.select().from(teamInvitations).where(eq(teamInvitations.token, token));
+    return rows[0] ?? null;
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    const rows = await db
+      .select(teamInvitationRowSelectLegacy)
+      .from(teamInvitations)
+      .where(eq(teamInvitations.token, token));
+    const row = rows[0];
+    return row ? withDefaultInviteeDisplayName(row) : null;
+  }
 }
 
 export async function insertTeam(
@@ -709,16 +843,38 @@ export async function insertTeamInvitation(
   token: string,
   expiresAt: Date,
   invitedByUserId: string,
+  inviteeDisplayName?: string | null,
 ) {
-  await db.insert(teamInvitations).values({
-    teamId,
-    invitedByUserId,
-    email: email.toLowerCase(),
-    role,
-    token,
-    expiresAt,
-    status: "pending",
-  });
+  const label = inviteeDisplayName?.trim();
+  try {
+    await db.insert(teamInvitations).values({
+      teamId,
+      invitedByUserId,
+      email: email.toLowerCase(),
+      inviteeDisplayName: label && label.length > 0 ? label : null,
+      role,
+      token,
+      expiresAt,
+      status: "pending",
+    });
+  } catch (e) {
+    if (
+      !isMissingTeamInvitationInviteeDisplayNameColumnError(e) ||
+      (label && label.length > 0)
+    ) {
+      throw e;
+    }
+    warnMissingInviteeDisplayNameColumnOnce();
+    await db.insert(teamInvitations).values({
+      teamId,
+      invitedByUserId,
+      email: email.toLowerCase(),
+      role,
+      token,
+      expiresAt,
+      status: "pending",
+    });
+  }
 }
 
 export async function deleteInvitation(invitationId: number, teamId: number) {
@@ -781,15 +937,43 @@ export async function countPendingInvitationsForEmail(
 /** Invitations sent to this email (any status), newest first — for personal inbox. */
 export async function listTeamInvitationsForInviteeEmail(inviteeEmail: string) {
   const normalized = inviteeEmail.toLowerCase();
-  return db
-    .select({
-      invitation: teamInvitations,
-      team: teams,
-    })
-    .from(teamInvitations)
-    .innerJoin(teams, eq(teamInvitations.teamId, teams.id))
-    .where(eq(teamInvitations.email, normalized))
-    .orderBy(desc(teamInvitations.createdAt));
+  try {
+    return db
+      .select({
+        invitation: teamInvitations,
+        team: teams,
+      })
+      .from(teamInvitations)
+      .innerJoin(teams, eq(teamInvitations.teamId, teams.id))
+      .where(eq(teamInvitations.email, normalized))
+      .orderBy(desc(teamInvitations.createdAt));
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    const rows = await db
+      .select({
+        ...teamInvitationRowSelectLegacy,
+        team: teams,
+      })
+      .from(teamInvitations)
+      .innerJoin(teams, eq(teamInvitations.teamId, teams.id))
+      .where(eq(teamInvitations.email, normalized))
+      .orderBy(desc(teamInvitations.createdAt));
+    return rows.map((r) => ({
+      invitation: withDefaultInviteeDisplayName({
+        id: r.id,
+        teamId: r.teamId,
+        invitedByUserId: r.invitedByUserId,
+        email: r.email,
+        role: r.role,
+        token: r.token,
+        status: r.status,
+        expiresAt: r.expiresAt,
+        createdAt: r.createdAt,
+      }),
+      team: r.team,
+    }));
+  }
 }
 
 export async function getTeamInvitationRowForInviteeEmail(
@@ -797,17 +981,24 @@ export async function getTeamInvitationRowForInviteeEmail(
   inviteeEmail: string,
 ) {
   const normalized = inviteeEmail.toLowerCase();
-  const rows = await db
-    .select()
-    .from(teamInvitations)
-    .where(
-      and(
-        eq(teamInvitations.id, invitationId),
-        eq(teamInvitations.email, normalized),
-      ),
-    )
-    .limit(1);
-  return rows[0] ?? null;
+  const whereClause = and(
+    eq(teamInvitations.id, invitationId),
+    eq(teamInvitations.email, normalized),
+  );
+  try {
+    const rows = await db.select().from(teamInvitations).where(whereClause).limit(1);
+    return rows[0] ?? null;
+  } catch (e) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
+    warnMissingInviteeDisplayNameColumnOnce();
+    const rows = await db
+      .select(teamInvitationRowSelectLegacy)
+      .from(teamInvitations)
+      .where(whereClause)
+      .limit(1);
+    const row = rows[0];
+    return row ? withDefaultInviteeDisplayName(row) : null;
+  }
 }
 
 export async function listAssignmentsForTeam(teamId: number) {

@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import type { InferSelectModel } from "drizzle-orm";
-import { teamInvitations } from "@/db/schema";
+import type { TeamInvitationRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import { revokeTeamInvitationAction } from "@/actions/teams";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type InvitationRow = InferSelectModel<typeof teamInvitations>;
+type InvitationRow = TeamInvitationRow;
 
 function formatInviteTimestamp(d: Date) {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -72,11 +71,14 @@ function roleLabel(role: "team_admin" | "team_member") {
 export function TeamActiveInvitationsTable({
   teamId,
   ownerUserId,
+  workspaceName,
   invitations,
   userFieldDisplayById,
 }: {
   teamId: number;
   ownerUserId: string;
+  /** Workspace shown in the dashboard team selector; all rows are for this workspace. */
+  workspaceName: string;
   invitations: InvitationRow[];
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
 }) {
@@ -122,6 +124,7 @@ export function TeamActiveInvitationsTable({
         <TableHeader>
           <TableRow>
             <TableHead>Email</TableHead>
+            <TableHead>Workspace</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Sent</TableHead>
             <TableHead className="whitespace-nowrap">Days until expiry</TableHead>
@@ -134,6 +137,9 @@ export function TeamActiveInvitationsTable({
             <TableRow key={inv.id}>
               <TableCell className="max-w-[min(100%,220px)] font-mono text-xs break-all">
                 {inv.email}
+              </TableCell>
+              <TableCell className="max-w-[min(100%,200px)] truncate text-sm" title={workspaceName}>
+                {workspaceName}
               </TableCell>
               <TableCell>{roleLabel(inv.role)}</TableCell>
               <TableCell className="whitespace-nowrap text-muted-foreground text-xs">
@@ -201,10 +207,13 @@ export function TeamActiveInvitationsTable({
 
 export function TeamInvitationHistoryTable({
   ownerUserId,
+  workspaceName,
   rows,
   userFieldDisplayById,
 }: {
   ownerUserId: string;
+  /** Display name of the workspace each invitation targeted (history is loaded per workspace). */
+  workspaceName: string;
   rows: InvitationRow[];
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
 }) {
@@ -217,6 +226,7 @@ export function TeamInvitationHistoryTable({
       <TableHeader>
         <TableRow>
           <TableHead>Email</TableHead>
+          <TableHead>Workspace</TableHead>
           <TableHead>Role</TableHead>
           <TableHead>Sent</TableHead>
           <TableHead>Expires</TableHead>
@@ -229,6 +239,9 @@ export function TeamInvitationHistoryTable({
           <TableRow key={inv.id}>
             <TableCell className="max-w-[min(100%,220px)] font-mono text-xs break-all">
               {inv.email}
+            </TableCell>
+            <TableCell className="max-w-[min(100%,200px)] truncate text-sm" title={workspaceName}>
+              {workspaceName}
             </TableCell>
             <TableCell>{roleLabel(inv.role)}</TableCell>
             <TableCell className="whitespace-nowrap text-muted-foreground text-xs">

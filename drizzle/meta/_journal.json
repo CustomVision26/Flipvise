@@ -120,6 +120,13 @@
       "when": 1777400000000,
       "tag": "0016_billing_proration",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777480000000,
+      "tag": "0017_team_invitation_invitee_display_name",
+      "breakpoints": true
     }
   ]
 }

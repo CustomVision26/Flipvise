@@ -1,0 +1,1 @@
+ALTER TABLE "team_invitations" ADD COLUMN "inviteeDisplayName" varchar(255);

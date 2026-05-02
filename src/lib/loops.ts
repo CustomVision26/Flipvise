@@ -246,6 +246,70 @@ export async function loopsSendQuizResultEmail(
 }
 
 // ---------------------------------------------------------------------------
+// Team workspace invitation (transactional)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data variables sent to Loops for `LOOPS_TEAM_INVITATION_TRANSACTIONAL_ID`.
+ * Use the same keys in your transactional template (case-sensitive).
+ *
+ * | Variable | Purpose |
+ * |----------|---------|
+ * | `subjectLine` | Full subject line (set Subject in Loops to `{DATA_VARIABLE:subjectLine}`). |
+ * | `acceptInvitationUrl` | **Primary link** — opens the invite landing page; signing in with the invited email lets them accept (`/invite/team/{token}`). |
+ * | `dashboardInboxUrl` | Link to `/dashboard/inbox` when they already have an account (invitation also appears in-app). |
+ * | `inviteeEmail` | Normalized recipient email. |
+ * | `inviteeName` | Optional label from the invite form; empty string if omitted. |
+ * | `workspaceName` | Team workspace display name. |
+ * | `roleLabel` | `"Member"` or `"Team admin"`. |
+ * | `inviterName` | Display name of the person who sent the invite. |
+ * | `expiresInDays` | Number of days until the invite link expires (matches app policy). |
+ */
+export type TeamInvitationEmailPayload = {
+  inviteeEmail: string;
+  inviteeDisplayName: string;
+  workspaceName: string;
+  /** `"Member"` or `"Team admin"` */
+  roleLabel: string;
+  inviterName: string;
+  /** Absolute URL to `/invite/team/{token}` — use as the main “Accept invitation” button href. */
+  acceptInvitationUrl: string;
+  /** Absolute URL to `/dashboard/inbox` for signed-in users who see the invite in-app. */
+  dashboardInboxUrl: string;
+  expiresInDays: number;
+  subjectLine: string;
+};
+
+export async function loopsSendTeamInvitationEmail(
+  payload: TeamInvitationEmailPayload,
+): Promise<void> {
+  if (!process.env.LOOPS_API_KEY?.trim()) {
+    // Intentionally quiet: many dev environments omit Loops; invite still succeeds in-app.
+    return;
+  }
+
+  const transactionalId = process.env.LOOPS_TEAM_INVITATION_TRANSACTIONAL_ID?.trim();
+  if (!transactionalId) {
+    console.warn(
+      "[TeamInviteEmail] LOOPS_API_KEY is set but LOOPS_TEAM_INVITATION_TRANSACTIONAL_ID is missing — invitation emails will not send. Add your transactional template ID from Loops (Settings → API → transactional emails).",
+    );
+    return;
+  }
+
+  await loopsSendTransactional(payload.inviteeEmail, transactionalId, {
+    subjectLine: payload.subjectLine,
+    acceptInvitationUrl: payload.acceptInvitationUrl,
+    dashboardInboxUrl: payload.dashboardInboxUrl,
+    inviteeEmail: payload.inviteeEmail,
+    inviteeName: payload.inviteeDisplayName,
+    workspaceName: payload.workspaceName,
+    roleLabel: payload.roleLabel,
+    inviterName: payload.inviterName,
+    expiresInDays: payload.expiresInDays,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Send a transactional email by its Loops template ID
 // ---------------------------------------------------------------------------
 

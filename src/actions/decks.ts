@@ -85,7 +85,7 @@ export async function createDeckAction(
 
   revalidatePath("/dashboard");
   if (teamId !== undefined || teamWorkspaceOnly === true) {
-    revalidatePath("/dashboard/team-admin");
+    revalidatePath("/dashboard/team-admin", "layout");
   }
 
   return { deckId };
@@ -199,7 +199,7 @@ export async function uploadDeckCoverImageAction(
 
   revalidatePath(`/decks/${parsed.data.deckId}`);
   revalidatePath("/dashboard");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 
   return { url };
 }
@@ -249,7 +249,7 @@ export async function removeDeckCoverImageAction(data: RemoveDeckCoverImageInput
 
   revalidatePath(`/decks/${parsed.data.deckId}`);
   revalidatePath("/dashboard");
-  revalidatePath("/dashboard/team-admin");
+  revalidatePath("/dashboard/team-admin", "layout");
 }
 
 const deleteDeckSchema = z.object({
