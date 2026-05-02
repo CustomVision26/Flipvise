@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { getAffiliateByToken } from "@/db/queries/affiliates";
 import { acceptAffiliateInviteAction } from "@/actions/affiliates";
+import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import {
   Card,
   CardContent,
@@ -63,9 +64,15 @@ export default async function AffiliateAcceptPage({ searchParams }: Props) {
     return <Result icon="error" title="Invite Cancelled" message="This affiliate invite has been cancelled or revoked. Please contact your affiliate manager for assistance." />;
   }
 
-  // Invite has expired
-  if (new Date(affiliate.endsAt) < new Date()) {
-    return <Result icon="error" title="Invite Expired" message="This affiliate invite has passed its end date. Please request a new invite." />;
+  // Pending: invite link past acceptance deadline
+  if (affiliate.status === "pending" && isAffiliateInviteExpired(affiliate.inviteExpiresAt)) {
+    return (
+      <Result
+        icon="error"
+        title="Invite Link Expired"
+        message={`This invite had to be accepted by ${formatDate(affiliate.inviteExpiresAt)}. Please ask your affiliate manager to send a new invite.`}
+      />
+    );
   }
 
   // Check authentication

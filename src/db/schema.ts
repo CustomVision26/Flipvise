@@ -181,6 +181,11 @@ export const adminPlanAssignmentLogs = pgTable('admin_plan_assignment_logs', {
   planName: varchar({ length: 128 }),
   /** Human-readable previous plan name before the change. Null when no prior plan exists. */
   previousPlanName: varchar({ length: 128 }),
+  /**
+   * How the plan change was applied (Assign plan on All users). Null for legacy rows / ban logs.
+   * `stripe_proration` — subscription price swapped with proration; `clerk_metadata_only` — metadata grant only.
+   */
+  planApplicationPath: varchar({ length: 32 }),
   assignedByUserId: varchar({ length: 255 }).notNull(),
   assignedByName: varchar({ length: 255 }).notNull(),
   createdAt: timestamp().notNull().defaultNow(),
@@ -301,6 +306,10 @@ export const affiliates = pgTable('affiliates', {
   status: affiliateStatusEnum().notNull().default('pending'),
   /** Unique token sent in the invite link; used to accept the invitation. */
   token: varchar({ length: 64 }).unique(),
+  /**
+   * After this instant, the invite link and accept action are rejected (plan grant `endsAt` is separate).
+   */
+  inviteExpiresAt: timestamp().notNull(),
   /** Set when the invitee accepts the invitation. */
   inviteAcceptedAt: timestamp(),
   revokedAt: timestamp(),
@@ -348,14 +357,14 @@ export type PerCardSnapshot = {
 
 /**
  * Tracks when a user explicitly marks an inbox item as read.
- * Works across all item types (quiz_result, team_invite, billing, affiliate).
+ * `itemType` / `itemId` match unified inbox keys (e.g. `admin_plan_log` + log id, `affiliate_notice` + `revoked-{id}`).
  */
 export const inboxReads = pgTable(
   'inbox_reads',
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     userId: varchar({ length: 255 }).notNull(),
-    /** Discriminator: 'quiz_result' | 'team_invite' | 'billing' | 'affiliate' */
+    /** Discriminator: quiz_result, team_invite, billing, affiliate, affiliate_notice, admin_plan_log */
     itemType: varchar({ length: 64 }).notNull(),
     /** The numeric ID of the item as a string. */
     itemId: varchar({ length: 255 }).notNull(),

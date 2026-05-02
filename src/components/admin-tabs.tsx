@@ -81,6 +81,8 @@ interface AdminTabsProps {
   supportStats: SupportStats;
   plansConfig: PlanConfig[];
   affiliates: SerializedAffiliate[];
+  /** Server default (env) — used as the initial value for “accept link” days in the invite form. */
+  affiliateInviteDefaultExpiresInDays: number;
 }
 
 function formatDate(dateStr: string | null | undefined) {
@@ -155,6 +157,7 @@ export function AdminTabs({
   supportStats,
   plansConfig,
   affiliates,
+  affiliateInviteDefaultExpiresInDays,
 }: AdminTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1563,7 +1566,10 @@ export function AdminTabs({
 
       {/* ── Marketing Affiliates ── */}
       {activeSection === "marketing-affiliates" ? (
-        <AdminAffiliatesPanel affiliates={affiliates} />
+        <AdminAffiliatesPanel
+          affiliates={affiliates}
+          defaultInviteExpiresInDays={affiliateInviteDefaultExpiresInDays}
+        />
       ) : null}
       </div>
     </div>

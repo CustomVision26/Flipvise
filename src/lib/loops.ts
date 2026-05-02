@@ -310,6 +310,135 @@ export async function loopsSendTeamInvitationEmail(
 }
 
 // ---------------------------------------------------------------------------
+// Marketing affiliate invitation (transactional)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data variables for `LOOPS_AFFILIATE_INVITATION_TRANSACTIONAL_ID`.
+ * Define the same keys in Loops (case-sensitive).
+ *
+ * | Variable | Purpose |
+ * |----------|---------|
+ * | `subjectLine` | Full subject (Loops Subject can be `{DATA_VARIABLE:subjectLine}`). |
+ * | `acceptAffiliateUrl` | Primary CTA — `/affiliate/accept?token=…` (sign in with invited email to accept). |
+ * | `dashboardInboxUrl` | `/dashboard/inbox` for users who already see the invite in-app. |
+ * | `inviteeEmail` | Invited address (normalized). |
+ * | `affiliateName` | Display name for this affiliate arrangement. |
+ * | `planAssigned` | Plan slug (e.g. `pro`, `pro_team_basic`). |
+ * | `planLabel` | Human-readable plan name. |
+ * | `affiliateEndsAt` | Grant end date copy for the email body. |
+ * | `inviteExpiresInDays` | Number of days the accept link stays valid (matches server policy). |
+ * | `inviteExpiresAt` | Human-readable date/time when the accept link expires. |
+ * | `inviterName` | Platform admin who sent the invite. |
+ */
+export type AffiliateInvitationEmailPayload = {
+  inviteeEmail: string;
+  affiliateName: string;
+  planAssigned: string;
+  planLabel: string;
+  /** e.g. "May 2, 2027" */
+  affiliateEndsAt: string;
+  /** Integer day count for the invite acceptance window. */
+  inviteExpiresInDays: number;
+  /** e.g. "May 16, 2026" — when the link stops working if not accepted. */
+  inviteExpiresAt: string;
+  inviterName: string;
+  acceptAffiliateUrl: string;
+  dashboardInboxUrl: string;
+  subjectLine: string;
+};
+
+export async function loopsSendAffiliateInvitationEmail(
+  payload: AffiliateInvitationEmailPayload,
+): Promise<void> {
+  if (!process.env.LOOPS_API_KEY?.trim()) {
+    return;
+  }
+
+  const transactionalId = process.env.LOOPS_AFFILIATE_INVITATION_TRANSACTIONAL_ID?.trim();
+  if (!transactionalId) {
+    console.warn(
+      "[AffiliateInviteEmail] LOOPS_API_KEY is set but LOOPS_AFFILIATE_INVITATION_TRANSACTIONAL_ID is missing — affiliate invitation emails will not send. Add the transactional template ID from Loops (Settings → API → transactional emails).",
+    );
+    return;
+  }
+
+  await loopsSendTransactional(payload.inviteeEmail, transactionalId, {
+    subjectLine: payload.subjectLine,
+    acceptAffiliateUrl: payload.acceptAffiliateUrl,
+    dashboardInboxUrl: payload.dashboardInboxUrl,
+    inviteeEmail: payload.inviteeEmail,
+    affiliateName: payload.affiliateName,
+    planAssigned: payload.planAssigned,
+    planLabel: payload.planLabel,
+    affiliateEndsAt: payload.affiliateEndsAt,
+    inviteExpiresInDays: payload.inviteExpiresInDays,
+    inviteExpiresAt: payload.inviteExpiresAt,
+    inviterName: payload.inviterName,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Marketing affiliate arrangement updated (active / post-acceptance)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data variables for `LOOPS_AFFILIATE_ARRANGEMENT_UPDATE_TRANSACTIONAL_ID`.
+ * Use the same keys in Loops (case-sensitive).
+ *
+ * | Variable | Purpose |
+ * |----------|---------|
+ * | `subjectLine` | Full subject (e.g. `{DATA_VARIABLE:subjectLine}`). |
+ * | `affiliateName` | Arrangement display name. |
+ * | `planAssigned` | Plan slug. |
+ * | `planLabel` | Human-readable plan. |
+ * | `affiliateEndsAt` | New grant end date (long format). |
+ * | `previousAffiliateEndsAt` | Prior grant end date (long format). |
+ * | `dashboardInboxUrl` | Link to `/dashboard/inbox`. |
+ * | `inviteeEmail` | Recipient. |
+ * | `inviterName` | Admin who saved the update. |
+ */
+export type AffiliateArrangementUpdateEmailPayload = {
+  inviteeEmail: string;
+  affiliateName: string;
+  planAssigned: string;
+  planLabel: string;
+  affiliateEndsAt: string;
+  previousAffiliateEndsAt: string;
+  inviterName: string;
+  dashboardInboxUrl: string;
+  subjectLine: string;
+};
+
+export async function loopsSendAffiliateArrangementUpdateEmail(
+  payload: AffiliateArrangementUpdateEmailPayload,
+): Promise<void> {
+  if (!process.env.LOOPS_API_KEY?.trim()) {
+    return;
+  }
+
+  const transactionalId = process.env.LOOPS_AFFILIATE_ARRANGEMENT_UPDATE_TRANSACTIONAL_ID?.trim();
+  if (!transactionalId) {
+    console.warn(
+      "[AffiliateArrangementUpdateEmail] LOOPS_API_KEY is set but LOOPS_AFFILIATE_ARRANGEMENT_UPDATE_TRANSACTIONAL_ID is missing — arrangement update emails will not send.",
+    );
+    return;
+  }
+
+  await loopsSendTransactional(payload.inviteeEmail, transactionalId, {
+    subjectLine: payload.subjectLine,
+    affiliateName: payload.affiliateName,
+    planAssigned: payload.planAssigned,
+    planLabel: payload.planLabel,
+    affiliateEndsAt: payload.affiliateEndsAt,
+    previousAffiliateEndsAt: payload.previousAffiliateEndsAt,
+    dashboardInboxUrl: payload.dashboardInboxUrl,
+    inviteeEmail: payload.inviteeEmail,
+    inviterName: payload.inviterName,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Send a transactional email by its Loops template ID
 // ---------------------------------------------------------------------------
 

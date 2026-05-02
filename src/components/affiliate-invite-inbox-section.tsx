@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Megaphone, CheckCircle2, Clock } from "lucide-react";
 import { acceptAffiliateInviteAction } from "@/actions/affiliates";
+import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { useRouter } from "next/navigation";
 import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
 
@@ -63,6 +64,8 @@ function PendingAffiliateCard({ invite }: { invite: SerializedAffiliate }) {
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const inviteLinkExpired = isAffiliateInviteExpired(new Date(invite.inviteExpiresAt));
+
   function handleAccept() {
     if (!invite.token) return;
     setError(null);
@@ -106,8 +109,17 @@ function PendingAffiliateCard({ invite }: { invite: SerializedAffiliate }) {
         </p>
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          Valid until {formatDate(invite.endsAt)}
+          Accept invite by {formatDate(invite.inviteExpiresAt)}
         </p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Clock className="h-3 w-3" />
+          Plan access until {formatDate(invite.endsAt)}
+        </p>
+        {inviteLinkExpired && (
+          <p className="text-xs text-destructive">
+            This invite link has expired. Ask your affiliate manager for a new invite.
+          </p>
+        )}
         {error && (
           <p className="text-xs text-destructive rounded bg-destructive/10 px-2 py-1">
             {error}
@@ -118,7 +130,7 @@ function PendingAffiliateCard({ invite }: { invite: SerializedAffiliate }) {
         <Button
           size="sm"
           onClick={handleAccept}
-          disabled={isPending || !invite.token}
+          disabled={isPending || !invite.token || inviteLinkExpired}
         >
           {isPending ? "Accepting…" : "Accept Invite"}
         </Button>

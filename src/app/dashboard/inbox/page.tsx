@@ -15,6 +15,10 @@ import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { listBillingInvoicesForUser } from "@/db/queries/billing";
 import { getAllAffiliatesByEmailOrUserId } from "@/db/queries/affiliates";
 import { getInboxReadsForUser } from "@/db/queries/inbox-reads";
+import { listAdminPlanAssignmentInboxLogsForUser } from "@/db/queries/admin";
+import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
+import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
+import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 
 // UI
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -38,12 +42,14 @@ export default async function DashboardInboxPage() {
     teamInviteRows,
     billingRows,
     affiliateRows,
+    adminPlanLogRows,
     readSet,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
     tryTeamQuery(() => listTeamInvitationsForInviteeEmail(inboxEmail), []),
     listBillingInvoicesForUser(userId, inboxEmail),
     getAllAffiliatesByEmailOrUserId(inboxEmail, userId),
+    listAdminPlanAssignmentInboxLogsForUser(userId, 100),
     getInboxReadsForUser(userId),
   ]);
 
@@ -205,27 +211,69 @@ export default async function DashboardInboxPage() {
   // 4. Affiliate invites
   for (const affiliate of affiliateRows) {
     const key = `affiliate:${affiliate.id}`;
-    const autoRead = affiliate.status !== "pending";
+    const inviteExpired =
+      affiliate.status === "pending" &&
+      isAffiliateInviteExpired(affiliate.inviteExpiresAt);
+    const autoRead = affiliate.status !== "pending" || inviteExpired;
     const isRead = readSet.has(key) || autoRead;
+
+    const planEnds = new Date(affiliate.endsAt).toLocaleDateString();
+    const acceptBy = new Date(affiliate.inviteExpiresAt).toLocaleDateString();
+    const revokedOn = affiliate.revokedAt
+      ? new Date(affiliate.revokedAt).toLocaleDateString()
+      : null;
 
     items.push({
       type: "affiliate",
       key,
       title: `Affiliate Invitation — ${affiliate.affiliateName}`,
-      description: `Plan: ${affiliate.planAssigned} · expires ${new Date(affiliate.endsAt).toLocaleDateString()}`,
+      description:
+        affiliate.status === "pending" && !inviteExpired
+          ? `Plan: ${affiliate.planAssigned} · accept by ${acceptBy} · plan ends ${planEnds}`
+          : affiliate.status === "pending" && inviteExpired
+            ? `Plan: ${affiliate.planAssigned} · invite link expired ${acceptBy}`
+            : affiliate.status === "revoked"
+              ? revokedOn
+                ? `Revoked on ${revokedOn}. This marketing affiliate arrangement is no longer active.`
+                : "Revoked. This marketing affiliate arrangement is no longer active."
+              : affiliate.status === "active" && new Date(affiliate.endsAt) < new Date()
+                ? `Plan: ${affiliate.planAssigned} · scheduled access ended ${planEnds}`
+                : `Plan: ${affiliate.planAssigned} · plan access ends ${planEnds}`,
       dateIso: affiliate.createdAt.toISOString(),
       isRead,
-      requiresAction: affiliate.status === "pending",
+      requiresAction:
+        affiliate.status === "pending" && !inviteExpired && Boolean(affiliate.token),
       payload: {
         affiliateId: affiliate.id,
         token: affiliate.token ?? null,
         affiliateName: affiliate.affiliateName,
         planAssigned: affiliate.planAssigned,
         endsAtIso: affiliate.endsAt.toISOString(),
+        inviteExpiresAtIso: affiliate.inviteExpiresAt.toISOString(),
         status: affiliate.status as "pending" | "active" | "revoked",
         inviteAcceptedAtIso: affiliate.inviteAcceptedAt?.toISOString() ?? null,
       },
     });
+  }
+
+  items.push(...buildAffiliateNoticeInboxItems(affiliateRows, readSet));
+
+  for (const row of adminPlanLogRows) {
+    if (row.action !== "plan_assigned" && row.action !== "plan_removed") continue;
+    items.push(
+      adminPlanAssignmentLogToInboxItem(
+        {
+          id: row.id,
+          action: row.action,
+          planName: row.planName,
+          previousPlanName: row.previousPlanName,
+          assignedByName: row.assignedByName,
+          createdAt: row.createdAt,
+          planApplicationPath: row.planApplicationPath,
+        },
+        readSet,
+      ),
+    );
   }
 
   const unreadCount = items.filter((i) => !i.isRead).length;
@@ -245,7 +293,7 @@ export default async function DashboardInboxPage() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Quiz results, team invitations, billing receipts, and affiliate invites.
+            Quiz results, team invitations, billing, affiliate invites and notices, and administrator plan updates.
           </p>
         </div>
         <Link

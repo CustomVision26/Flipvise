@@ -11,6 +11,8 @@ import {
   Users,
   Receipt,
   Megaphone,
+  CircleAlert,
+  Shield,
   MailOpen,
   CheckCheck,
   History,
@@ -62,6 +64,8 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   team_invite: <Users className="size-4 text-blue-400" aria-hidden />,
   billing: <Receipt className="size-4 text-emerald-400" aria-hidden />,
   affiliate: <Megaphone className="size-4 text-amber-400" aria-hidden />,
+  affiliate_notice: <CircleAlert className="size-4 text-orange-400" aria-hidden />,
+  admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
 };
 
 type SortKey = "newest" | "oldest" | "type";
@@ -74,6 +78,8 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         quiz_result: 1,
         billing: 2,
         affiliate: 3,
+        affiliate_notice: 4,
+        admin_plan_log: 5,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -160,6 +166,18 @@ function AffiliateActions({
 
   if (item.payload.status !== "pending" || !item.payload.token) return null;
 
+  const inviteExpired =
+    new Date(item.payload.inviteExpiresAtIso).getTime() < Date.now();
+
+  if (inviteExpired) {
+    return (
+      <p className="text-xs text-muted-foreground max-w-[220px] text-right sm:text-left">
+        This invite link expired on{" "}
+        {formatDate(item.payload.inviteExpiresAtIso)}. Ask for a new invite.
+      </p>
+    );
+  }
+
   function handleAccept() {
     startPending(async () => {
       try {
@@ -234,12 +252,52 @@ function InboxItemRow({
               </Badge>
             )}
             {item.type === "team_invite" && inviteOutcomeBadge(item.payload.outcome)}
-            {item.type === "affiliate" && item.payload.status !== "pending" && (
+            {item.type === "affiliate" && item.payload.status === "pending" && (
+              new Date(item.payload.inviteExpiresAtIso).getTime() < Date.now() ? (
+                <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
+                  Link expired
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="shrink-0 text-xs">
+                  Action needed
+                </Badge>
+              )
+            )}
+            {item.type === "affiliate" && item.payload.status !== "pending" && (() => {
+              const periodEnded =
+                item.payload.status === "active" &&
+                new Date(item.payload.endsAtIso).getTime() < Date.now();
+              return (
+                <Badge
+                  variant={item.payload.status === "active" && !periodEnded ? "default" : "outline"}
+                  className="shrink-0 text-xs capitalize"
+                >
+                  {periodEnded ? "Period ended" : item.payload.status}
+                </Badge>
+              );
+            })()}
+            {item.type === "affiliate_notice" && (
               <Badge
-                variant={item.payload.status === "active" ? "default" : "outline"}
-                className="shrink-0 text-xs capitalize"
+                variant="outline"
+                className="shrink-0 text-xs border-orange-500/40 text-orange-400"
               >
-                {item.payload.status}
+                {item.payload.kind === "expired"
+                  ? "Period ended"
+                  : item.payload.kind === "revoked_access"
+                    ? "Access removed"
+                    : "Invite withdrawn"}
+              </Badge>
+            )}
+            {item.type === "admin_plan_log" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-xs border-sky-500/40 text-sky-400"
+              >
+                {item.payload.planApplicationPath === "stripe_proration"
+                  ? "Proration"
+                  : item.payload.action === "plan_removed"
+                    ? "Plan cleared"
+                    : "Direct update"}
               </Badge>
             )}
             {item.type === "billing" && (

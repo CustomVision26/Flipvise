@@ -49,6 +49,7 @@ import { isTeamPlanId, limitsForPlan, TEAM_PLAN_LABELS } from "@/lib/team-plans"
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import { listAffiliates } from "@/db/queries/affiliates";
+import { getAffiliateInviteExpiryDays } from "@/lib/affiliate-invite-expiry";
 import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
 import {
   serializeSupportTicketRow,
@@ -568,6 +569,7 @@ export default async function AdminPage() {
     planAssigned: a.planAssigned,
     startedAt: a.startedAt.toISOString(),
     endsAt: a.endsAt.toISOString(),
+    inviteExpiresAt: a.inviteExpiresAt.toISOString(),
     addedByUserId: a.addedByUserId,
     addedByName: a.addedByName,
     status: a.status as "pending" | "active" | "revoked",
@@ -685,6 +687,7 @@ export default async function AdminPage() {
         supportStats={supportStats}
         plansConfig={plansConfig}
         affiliates={serializedAffiliates}
+        affiliateInviteDefaultExpiresInDays={getAffiliateInviteExpiryDays()}
       />
     </div>
   );

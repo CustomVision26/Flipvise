@@ -127,6 +127,20 @@
       "when": 1777480000000,
       "tag": "0017_team_invitation_invitee_display_name",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777560000000,
+      "tag": "0018_affiliate_invite_expires_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777640000000,
+      "tag": "0019_admin_plan_log_application_path",
+      "breakpoints": true
     }
   ]
 }

@@ -570,8 +570,31 @@ export async function logAdminPlanAssignment(data: {
   previousPlanName: string | null;
   assignedByUserId: string;
   assignedByName: string;
+  /** Set for plan_assigned / plan_removed from Assign plan (Stripe proration vs metadata-only). */
+  planApplicationPath?: "stripe_proration" | "clerk_metadata_only" | null;
 }) {
-  return db.insert(adminPlanAssignmentLogs).values(data);
+  return db.insert(adminPlanAssignmentLogs).values({
+    ...data,
+    planApplicationPath: data.planApplicationPath ?? null,
+  });
+}
+
+/** Plan assignment / removal rows for the dashboard inbox (target user). */
+export async function listAdminPlanAssignmentInboxLogsForUser(
+  targetUserId: string,
+  limit = 100,
+) {
+  return db
+    .select()
+    .from(adminPlanAssignmentLogs)
+    .where(
+      and(
+        eq(adminPlanAssignmentLogs.targetUserId, targetUserId),
+        inArray(adminPlanAssignmentLogs.action, ["plan_assigned", "plan_removed"]),
+      ),
+    )
+    .orderBy(desc(adminPlanAssignmentLogs.createdAt))
+    .limit(limit);
 }
 
 export type AdminPrivilegeLogAction =

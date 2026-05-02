@@ -34,3 +34,20 @@ export async function markAllInboxItemsRead(
     .values(items.map((i) => ({ userId, itemType: i.itemType, itemId: i.itemId })))
     .onConflictDoNothing();
 }
+
+/** Removes a read marker so the item surfaces as unread again (e.g. after admin re-notifies). */
+export async function deleteInboxReadForUserItem(
+  userId: string,
+  itemType: string,
+  itemId: string,
+): Promise<void> {
+  await db
+    .delete(inboxReads)
+    .where(
+      and(
+        eq(inboxReads.userId, userId),
+        eq(inboxReads.itemType, itemType),
+        eq(inboxReads.itemId, itemId),
+      ),
+    );
+}

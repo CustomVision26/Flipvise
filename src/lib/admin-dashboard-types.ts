@@ -112,6 +112,8 @@ export type SerializedAffiliate = {
   planAssigned: string;
   startedAt: string;
   endsAt: string;
+  /** When the accept link stops working (pending invites). */
+  inviteExpiresAt: string;
   addedByUserId: string;
   addedByName: string;
   status: "pending" | "active" | "revoked";

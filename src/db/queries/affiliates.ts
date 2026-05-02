@@ -12,6 +12,7 @@ export async function insertAffiliate(data: {
   affiliateName: string;
   planAssigned: string;
   endsAt: Date;
+  inviteExpiresAt: Date;
   addedByUserId: string;
   addedByName: string;
   token: string;
@@ -25,6 +26,7 @@ export async function insertAffiliate(data: {
       affiliateName: data.affiliateName,
       planAssigned: data.planAssigned,
       endsAt: data.endsAt,
+      inviteExpiresAt: data.inviteExpiresAt,
       addedByUserId: data.addedByUserId,
       addedByName: data.addedByName,
       token: data.token,
@@ -145,6 +147,10 @@ export async function updateAffiliateById(
     endsAt: Date;
     /** Re-resolved Clerk user ID after an email change; undefined = no change. */
     invitedUserId?: string | null;
+    /** When set (e.g. pending invite edited), extends the accept-by deadline. */
+    inviteExpiresAt?: Date;
+    /** When set, replaces the accept token (e.g. re-invite after link expiry). */
+    token?: string | null;
   },
 ) {
   await db
@@ -157,6 +163,10 @@ export async function updateAffiliateById(
       ...(data.invitedUserId !== undefined
         ? { invitedUserId: data.invitedUserId }
         : {}),
+      ...(data.inviteExpiresAt !== undefined
+        ? { inviteExpiresAt: data.inviteExpiresAt }
+        : {}),
+      ...(data.token !== undefined ? { token: data.token } : {}),
     })
     .where(eq(affiliates.id, id));
 }

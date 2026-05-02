@@ -93,8 +93,9 @@ function previousPlanSlugFromMeta(meta: Record<string, unknown>): string | null 
 }
 
 /**
- * Overwrites the target user's Clerk public metadata plan flags for testing / support.
- * Does not create or cancel Clerk Billing subscriptions.
+ * Applies a plan to the target user via `applyPlanUpgrade` (Stripe proration when applicable,
+ * otherwise Clerk admin-plan metadata). Logs to `admin_plan_assignment_logs` (surfaced in the
+ * user’s dashboard inbox) and does not use the marketing-affiliate invite flow.
  */
 export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignmentInput) {
   const { userId, caller } = await requirePlatformAdminActor();
@@ -129,7 +130,7 @@ export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignme
 
   // Apply the plan — prorates an active Stripe subscription when one exists;
   // falls back to a Clerk-metadata-only write when there is none.
-  await applyPlanUpgrade(targetUserId, assignment);
+  const planResult = await applyPlanUpgrade(targetUserId, assignment);
 
   await logAdminPlanAssignment({
     targetUserId,
@@ -140,9 +141,12 @@ export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignme
     previousPlanName: planSlugToDisplayName(previousSlug),
     assignedByUserId: userId,
     assignedByName: callerName,
+    planApplicationPath: planResult.path,
   });
 
   revalidatePath("/admin");
+  revalidatePath("/dashboard/inbox");
+  revalidatePath("/dashboard");
 }
 
 const toggleAdminRoleSchema = z.object({

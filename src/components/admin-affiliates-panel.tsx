@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition, useMemo, useEffect, useRef, Fragment } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -50,11 +52,17 @@ import {
 } from "@/actions/affiliates";
 import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
 import { ADMIN_PLAN_DROPDOWN_OPTIONS } from "@/lib/admin-assignable-plans";
+import {
+  DEFAULT_AFFILIATE_INVITE_EXPIRY_DAYS,
+  isAffiliateInviteExpired,
+} from "@/lib/affiliate-invite-expiry";
 import type { TeamPlanId } from "@/lib/team-plans";
 import { useRouter } from "next/navigation";
 
 interface AdminAffiliatesPanelProps {
   affiliates: SerializedAffiliate[];
+  /** Initial “accept link” window (days); matches server `AFFILIATE_INVITE_EXPIRY_DAYS` default. */
+  defaultInviteExpiresInDays: number;
 }
 
 type AffiliatePlanValue = "pro" | TeamPlanId;
@@ -121,7 +129,7 @@ function useEmailLookup(email: string) {
 
 // ── Accept link copy button ───────────────────────────────────────────────────
 
-function AcceptLinkButton({ token }: { token: string }) {
+function AcceptLinkButton({ token, disabled }: { token: string; disabled?: boolean }) {
   const [copied, setCopied] = useState(false);
   const link = `${typeof window !== "undefined" ? window.location.origin : ""}/affiliate/accept?token=${token}`;
 
@@ -130,6 +138,7 @@ function AcceptLinkButton({ token }: { token: string }) {
       size="sm"
       variant="outline"
       className="text-xs h-7 px-2"
+      disabled={disabled || !token}
       onClick={() => {
         navigator.clipboard.writeText(link).then(() => {
           setCopied(true);
@@ -145,7 +154,10 @@ function AcceptLinkButton({ token }: { token: string }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) {
+export function AdminAffiliatesPanel({
+  affiliates,
+  defaultInviteExpiresInDays,
+}: AdminAffiliatesPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -157,6 +169,9 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePlan, setInvitePlan] = useState<AffiliatePlanValue>("pro");
   const [inviteEndsAt, setInviteEndsAt] = useState("");
+  const [inviteExpiresInDaysStr, setInviteExpiresInDaysStr] = useState(() =>
+    String(defaultInviteExpiresInDays),
+  );
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   // Email lookup (inside invite dialog)
@@ -170,6 +185,9 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
   const [editEmail, setEditEmail] = useState("");
   const [editPlan, setEditPlan] = useState<AffiliatePlanValue>("pro");
   const [editEndsAt, setEditEndsAt] = useState("");
+  const [editInviteExpiresInDaysStr, setEditInviteExpiresInDaysStr] = useState(() =>
+    String(defaultInviteExpiresInDays),
+  );
   const [editError, setEditError] = useState<string | null>(null);
 
   // Revoke confirm dialog
@@ -212,6 +230,7 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
     setInviteEmail("");
     setInvitePlan("pro");
     setInviteEndsAt("");
+    setInviteExpiresInDaysStr(String(defaultInviteExpiresInDays));
     setInviteError(null);
   }
 
@@ -221,6 +240,15 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
     setEditEmail(a.invitedEmail);
     setEditPlan(a.planAssigned as AffiliatePlanValue);
     setEditEndsAt(toDateInputValue(a.endsAt));
+    if (a.status === "pending") {
+      const createdMs = new Date(a.createdAt).getTime();
+      const expiresMs = new Date(a.inviteExpiresAt).getTime();
+      const spanDays = Math.round((expiresMs - createdMs) / (86400 * 1000));
+      const clamped = Math.min(365, Math.max(1, Number.isFinite(spanDays) ? spanDays : defaultInviteExpiresInDays));
+      setEditInviteExpiresInDaysStr(String(clamped));
+    } else {
+      setEditInviteExpiresInDaysStr(String(defaultInviteExpiresInDays));
+    }
     setEditError(null);
   }
 
@@ -231,6 +259,11 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
     if (!inviteName.trim()) { setInviteError("Name is required."); return; }
     if (!inviteEmail.trim()) { setInviteError("Email is required."); return; }
     if (!inviteEndsAt) { setInviteError("End date is required."); return; }
+    const days = Math.round(parseInt(inviteExpiresInDaysStr.trim(), 10));
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      setInviteError("Accept link expiry must be between 1 and 365 days.");
+      return;
+    }
     if (new Date(inviteEndsAt) <= new Date()) {
       setInviteError("End date must be in the future.");
       return;
@@ -242,6 +275,7 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
           invitedEmail: inviteEmail.trim(),
           planAssigned: invitePlan,
           endsAt: new Date(inviteEndsAt).toISOString(),
+          inviteExpiresInDays: days,
         });
         setInviteOpen(false);
         resetInviteForm();
@@ -258,6 +292,14 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
     if (!editName.trim()) { setEditError("Name is required."); return; }
     if (!editEmail.trim()) { setEditError("Email is required."); return; }
     if (!editEndsAt) { setEditError("End date is required."); return; }
+    const editDays = Math.round(parseInt(editInviteExpiresInDaysStr.trim(), 10));
+    if (
+      editTarget.status === "pending" &&
+      (!Number.isFinite(editDays) || editDays < 1 || editDays > 365)
+    ) {
+      setEditError("Accept link expiry must be between 1 and 365 days.");
+      return;
+    }
     startTransition(async () => {
       try {
         await updateAffiliateAction({
@@ -266,6 +308,9 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
           invitedEmail: editEmail.trim(),
           planAssigned: editPlan,
           endsAt: new Date(editEndsAt).toISOString(),
+          ...(editTarget.status === "pending"
+            ? { inviteExpiresInDays: editDays }
+            : {}),
         });
         setEditTarget(null);
         setExpandedId(null);
@@ -398,6 +443,8 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
                 filtered.map((a) => {
                   const isExpired =
                     a.status === "active" && new Date(a.endsAt) < new Date();
+                  const inviteLinkExpired =
+                    a.status === "pending" && isAffiliateInviteExpired(new Date(a.inviteExpiresAt));
                   const isExpanded = expandedId === a.id;
 
                   return (
@@ -441,12 +488,20 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
                         <TableCell>
                           {a.status === "pending" && (
                             <div>
-                              <Badge variant="outline" className="text-xs border-amber-500 text-amber-500">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Pending
-                              </Badge>
+                              {inviteLinkExpired ? (
+                                <Badge variant="outline" className="text-xs border-destructive text-destructive">
+                                  Link expired
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs border-amber-500 text-amber-500">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              )}
                               <p className="text-xs text-muted-foreground mt-1">
-                                Awaiting acceptance
+                                {inviteLinkExpired
+                                  ? `Accept link ended ${formatDate(a.inviteExpiresAt)}`
+                                  : `Accept by ${formatDate(a.inviteExpiresAt)}`}
                               </p>
                             </div>
                           )}
@@ -498,10 +553,22 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
                                 :
                               </span>
 
-                              {/* Pending: Copy invite link + Cancel */}
+                              {/* Pending: Edit details + copy link + cancel */}
                               {a.status === "pending" && (
                                 <>
-                                  <AcceptLinkButton token={a.token ?? ""} />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditDialog(a);
+                                    }}
+                                    disabled={isPending}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                    Edit
+                                  </Button>
+                                  <AcceptLinkButton token={a.token ?? ""} disabled={inviteLinkExpired} />
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -666,6 +733,27 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
             </div>
 
             <div className="space-y-1.5">
+              <Label htmlFor="invite-link-expires-days" className="text-sm font-medium">
+                Accept link expires in (days)
+              </Label>
+              <Input
+                id="invite-link-expires-days"
+                type="number"
+                min={1}
+                max={365}
+                inputMode="numeric"
+                value={inviteExpiresInDaysStr}
+                onChange={(e) => setInviteExpiresInDaysStr(e.target.value)}
+                disabled={isPending}
+                className="tabular-nums"
+              />
+              <p className="text-xs text-muted-foreground">
+                How long the invitee can use the email or inbox link to accept (1–365). Default when
+                you open this form is {defaultInviteExpiresInDays} (from server settings).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-sm font-medium flex items-center gap-1.5">
                 <CalendarClock className="h-4 w-4 text-muted-foreground" />
                 Affiliation End Date
@@ -718,6 +806,30 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
             </DialogDescription>
           </DialogHeader>
 
+          {editTarget?.status === "pending" &&
+            isAffiliateInviteExpired(new Date(editTarget.inviteExpiresAt)) && (
+              <Alert className="border-amber-500/40 bg-amber-500/5">
+                <Clock className="h-4 w-4 text-amber-500" aria-hidden />
+                <AlertTitle>Invite link expired</AlertTitle>
+                <AlertDescription>
+                  Saving generates a new accept link, emails the invitee via Loops (when configured),
+                  and marks the inbox item unread for them so they see the renewed invite.
+                </AlertDescription>
+              </Alert>
+            )}
+
+          {editTarget?.status === "active" &&
+            new Date(editTarget.endsAt).getTime() < Date.now() && (
+              <Alert className="border-primary/30 bg-primary/5">
+                <CalendarClock className="h-4 w-4 text-primary" aria-hidden />
+                <AlertTitle>Affiliation period ended</AlertTitle>
+                <AlertDescription>
+                  Set a new affiliation end date in the future and save. The invitee receives a Loops
+                  update (when configured) and their inbox entry is surfaced again as unread.
+                </AlertDescription>
+              </Alert>
+            )}
+
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Full Name</label>
@@ -747,6 +859,29 @@ export function AdminAffiliatesPanel({ affiliates }: AdminAffiliatesPanelProps) 
               </label>
               <Input type="date" value={editEndsAt} onChange={(e) => setEditEndsAt(e.target.value)} disabled={isPending} />
             </div>
+            {editTarget?.status === "pending" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-invite-link-expires-days" className="text-sm font-medium">
+                  Accept link expires in (days)
+                </Label>
+                <Input
+                  id="edit-invite-link-expires-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  inputMode="numeric"
+                  value={editInviteExpiresInDaysStr}
+                  onChange={(e) => setEditInviteExpiresInDaysStr(e.target.value)}
+                  disabled={isPending}
+                  className="tabular-nums"
+                />
+                <p className="text-xs text-muted-foreground">
+                  On save, the accept-by deadline is set from <span className="font-medium text-foreground">now</span>{" "}
+                  using this many days (1–365). Current deadline:{" "}
+                  {formatDate(editTarget.inviteExpiresAt)}.
+                </p>
+              </div>
+            )}
             {editError && (
               <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">{editError}</p>
             )}
