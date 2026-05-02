@@ -22,7 +22,7 @@ import {
 } from "@/db/queries/teams";
 import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
-import { buildResolvedTeamWorkspaceQueryString } from "@/lib/resolve-team-workspace-url";
+import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
 import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
 import { TeamAdminManageTabs } from "@/components/team-admin-manage-tabs";
@@ -87,28 +87,17 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
   const teamsForSubscriber = teams.filter(
     (t) => t.ownerUserId === subscriberForWorkspace,
   );
-  const teamQueryMatches =
-    Number.isFinite(rawFromQuery) && rawFromQuery === selected.id;
-  const useridMatches = useridParam === subscriberForWorkspace;
 
-  const expectedPlanQuery = isTeamPlanId(selected.planSlug)
-    ? selected.planSlug
-    : null;
-  const planNorm = planParam?.toLowerCase() ?? "";
-  const planQueryMatches =
-    expectedPlanQuery === null
-      ? planNorm === ""
-      : planNorm === expectedPlanQuery.toLowerCase() || planNorm === "pro";
+  const parsedTeamFromUrl =
+    Number.isFinite(rawFromQuery) && teamIdSet.has(rawFromQuery) ? rawFromQuery : null;
+  const hasLegacyUserid = Boolean(useridParam?.trim());
+  const hasLegacyPlan = Boolean(planParam);
+  const teamMismatch =
+    parsedTeamFromUrl !== null && parsedTeamFromUrl !== selected.id;
+  const missingCanonicalTeamParam = parsedTeamFromUrl === null;
 
-  /** Canonical URL: subscriber (`userid`) + workspace (`team`) + team-tier `plan` when applicable. */
-  if (!teamQueryMatches || !useridMatches || !planQueryMatches) {
-    redirect(
-      buildTeamAdminPath(
-        subscriberForWorkspace,
-        selected.id,
-        expectedPlanQuery,
-      ),
-    );
+  if (hasLegacyUserid || hasLegacyPlan || teamMismatch || missingCanonicalTeamParam) {
+    redirect(buildTeamAdminPath(selected.id));
   }
 
   const limits = isTeamPlanId(selected.planSlug)
@@ -176,16 +165,9 @@ export default async function TeamAdminDashboardPage({ searchParams }: PageProps
     getClerkUserFieldDisplaysByIds(
       [...new Set([...memberTableUserIds, ...assignMemberUserIds, ...invitationInviterUserIds])],
     ),
-    (async () =>
-      isTeamPlanId(selected.planSlug)
-        ? `/dashboard?${await buildResolvedTeamWorkspaceQueryString(userId, {
-            teamId: selected.id,
-            ownerUserId: selected.ownerUserId,
-            canEditTeamDecks: true,
-            isAssignedMemberPreview: false,
-            workspacePlanQuery: selected.planSlug,
-          })}`
-        : "/dashboard")(),
+    isTeamPlanId(selected.planSlug)
+      ? buildTeamWorkspaceDashboardPath({ teamId: selected.id })
+      : "/dashboard",
     Promise.all(
       teamsForSubscriber.map(async (t) => {
         const lim = isTeamPlanId(t.planSlug)

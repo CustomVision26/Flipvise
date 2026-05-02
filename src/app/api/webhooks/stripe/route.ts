@@ -2,6 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { upsertBillingInvoiceRecord } from "@/db/queries/billing";
+import { replaceProrationLinesForStripeInvoice } from "@/db/queries/billing-proration";
 import {
   upsertStripeSubscription,
   markStripeSubscriptionStatus,
@@ -437,7 +438,48 @@ export async function POST(req: NextRequest) {
               : null,
           discountAmountCents: invoiceDiscountCents(invoice),
           discountLabel: invoiceDiscountLabel(invoice),
+          stripeBillingReason: stringOrNull(invoice.billing_reason),
         });
+
+        try {
+          const currency = stringOrNull(invoice.currency);
+          const prorationPayload: Array<{
+            stripeLineId: string;
+            amountCents: number | null;
+            currency: string | null;
+            description: string | null;
+            periodStart: Date | null;
+            periodEnd: Date | null;
+          }> = [];
+          for (const line of invoice.lines?.data ?? []) {
+            const isProration = Boolean(
+              (line as { proration?: boolean }).proration,
+            );
+            if (!isProration) continue;
+            const period = line.period;
+            prorationPayload.push({
+              stripeLineId: line.id,
+              amountCents: typeof line.amount === "number" ? line.amount : null,
+              currency,
+              description: stringOrNull(line.description),
+              periodStart:
+                typeof period?.start === "number"
+                  ? new Date(period.start * 1000)
+                  : null,
+              periodEnd:
+                typeof period?.end === "number"
+                  ? new Date(period.end * 1000)
+                  : null,
+            });
+          }
+          await replaceProrationLinesForStripeInvoice({
+            userId,
+            stripeInvoiceId: invoice.id,
+            lines: prorationPayload,
+          });
+        } catch {
+          // Best-effort — invoice row already persisted.
+        }
         break;
       }
       default:

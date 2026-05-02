@@ -29,9 +29,9 @@ export default async function LegacyTeamDashboardRedirect({
       const row = await getTeamById(teamNum);
       const plan =
         row != null && isTeamPlanId(row.planSlug) ? row.planSlug : undefined;
-      redirect(buildTeamAdminPath(userId, teamNum, plan));
+      redirect(buildTeamAdminPath(teamNum));
     }
-    redirect(buildTeamAdminPath(userId));
+    redirect(buildTeamAdminPath());
   }
-  redirect(buildTeamAdminPath(userId));
+  redirect(buildTeamAdminPath());
 }

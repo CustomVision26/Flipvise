@@ -155,14 +155,10 @@ async function getActiveSessionData(): Promise<Map<string, number>> {
 }
 
 export default async function AdminPage() {
-  const { userId, isPro, activeTeamPlan } = await getAccessContext();
+  const { userId } = await getAccessContext();
   if (!userId) redirect("/");
 
-  const personalDashboardLink = personalDashboardHref(
-    userId,
-    activeTeamPlan,
-    isPro,
-  );
+  const personalDashboardLink = personalDashboardHref();
 
   await reconcilePlatformSuperadminClerkMetadata(clerkClient, userId);
 
@@ -437,9 +433,6 @@ export default async function AdminPage() {
       name: workspace.teamName,
       href: buildTeamWorkspaceDashboardPath({
         teamId: workspace.teamId,
-        ownerUserId: workspace.ownerUserId,
-        teamMemberUrlParam: 0,
-        plan: workspace.planSlug,
       }),
       ownerName: fullName,
       inviteeTotal: workspace.inviteeTotal,

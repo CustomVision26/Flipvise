@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { billingInvoices } from "@/db/schema";
-import { and, countDistinct, desc, eq, or } from "drizzle-orm";
+import { countDistinct, desc, eq, or } from "drizzle-orm";
 
 type InvoiceLike = {
   id?: string | null;
@@ -74,6 +74,58 @@ function isMissingColumnError(error: unknown): boolean {
   return /42703/.test(String(error));
 }
 
+/** Columns without optional `stripeBillingReason` (safe if that migration is not applied). */
+function selectBillingInvoicesWithoutStripeReason() {
+  return {
+    id: billingInvoices.id,
+    externalId: billingInvoices.externalId,
+    source: billingInvoices.source,
+    userId: billingInvoices.userId,
+    userEmail: billingInvoices.userEmail,
+    planSlug: billingInvoices.planSlug,
+    invoiceNumber: billingInvoices.invoiceNumber,
+    status: billingInvoices.status,
+    amountCents: billingInvoices.amountCents,
+    subtotalCents: billingInvoices.subtotalCents,
+    taxAmountCents: billingInvoices.taxAmountCents,
+    currency: billingInvoices.currency,
+    hostedInvoiceUrl: billingInvoices.hostedInvoiceUrl,
+    invoicePdfUrl: billingInvoices.invoicePdfUrl,
+    periodStart: billingInvoices.periodStart,
+    periodEnd: billingInvoices.periodEnd,
+    paidAt: billingInvoices.paidAt,
+    discountAmountCents: billingInvoices.discountAmountCents,
+    discountLabel: billingInvoices.discountLabel,
+    createdAt: billingInvoices.createdAt,
+    updatedAt: billingInvoices.updatedAt,
+  };
+}
+
+/** Core columns if discount* columns are also missing. */
+function selectBillingInvoicesLegacyMinimal() {
+  return {
+    id: billingInvoices.id,
+    externalId: billingInvoices.externalId,
+    source: billingInvoices.source,
+    userId: billingInvoices.userId,
+    userEmail: billingInvoices.userEmail,
+    planSlug: billingInvoices.planSlug,
+    invoiceNumber: billingInvoices.invoiceNumber,
+    status: billingInvoices.status,
+    amountCents: billingInvoices.amountCents,
+    subtotalCents: billingInvoices.subtotalCents,
+    taxAmountCents: billingInvoices.taxAmountCents,
+    currency: billingInvoices.currency,
+    hostedInvoiceUrl: billingInvoices.hostedInvoiceUrl,
+    invoicePdfUrl: billingInvoices.invoicePdfUrl,
+    periodStart: billingInvoices.periodStart,
+    periodEnd: billingInvoices.periodEnd,
+    paidAt: billingInvoices.paidAt,
+    createdAt: billingInvoices.createdAt,
+    updatedAt: billingInvoices.updatedAt,
+  };
+}
+
 export async function upsertBillingInvoiceRecord(input: {
   externalId: string;
   source: "invoice" | "payment_attempt";
@@ -93,6 +145,7 @@ export async function upsertBillingInvoiceRecord(input: {
   paidAt?: Date | null;
   discountAmountCents?: number | null;
   discountLabel?: string | null;
+  stripeBillingReason?: string | null;
 }) {
   const now = new Date();
   try {
@@ -117,6 +170,7 @@ export async function upsertBillingInvoiceRecord(input: {
         paidAt: input.paidAt ?? null,
         discountAmountCents: input.discountAmountCents ?? null,
         discountLabel: input.discountLabel ?? null,
+        stripeBillingReason: input.stripeBillingReason ?? null,
         updatedAt: now,
       })
       .onConflictDoUpdate({
@@ -139,6 +193,7 @@ export async function upsertBillingInvoiceRecord(input: {
           paidAt: input.paidAt ?? null,
           discountAmountCents: input.discountAmountCents ?? null,
           discountLabel: input.discountLabel ?? null,
+          stripeBillingReason: input.stripeBillingReason ?? null,
           updatedAt: now,
         },
       });
@@ -185,41 +240,39 @@ export async function listBillingInvoicesForAdmin(limit = 1000) {
       .limit(limit);
   } catch (error) {
     if (isMissingBillingInvoicesTableError(error)) return [];
-    // New columns (discountAmountCents, discountLabel) not yet migrated — fall back to
-    // selecting only the original columns and pad nulls for the missing ones.
-    if (isMissingColumnError(error)) {
-      const rows = await db
-        .select({
-          id: billingInvoices.id,
-          externalId: billingInvoices.externalId,
-          source: billingInvoices.source,
-          userId: billingInvoices.userId,
-          userEmail: billingInvoices.userEmail,
-          planSlug: billingInvoices.planSlug,
-          invoiceNumber: billingInvoices.invoiceNumber,
-          status: billingInvoices.status,
-          amountCents: billingInvoices.amountCents,
-          subtotalCents: billingInvoices.subtotalCents,
-          taxAmountCents: billingInvoices.taxAmountCents,
-          currency: billingInvoices.currency,
-          hostedInvoiceUrl: billingInvoices.hostedInvoiceUrl,
-          invoicePdfUrl: billingInvoices.invoicePdfUrl,
-          periodStart: billingInvoices.periodStart,
-          periodEnd: billingInvoices.periodEnd,
-          paidAt: billingInvoices.paidAt,
-          createdAt: billingInvoices.createdAt,
-          updatedAt: billingInvoices.updatedAt,
-        })
-        .from(billingInvoices)
-        .orderBy(desc(billingInvoices.createdAt))
-        .limit(limit);
-      return rows.map((row) => ({
-        ...row,
-        discountAmountCents: null as number | null,
-        discountLabel: null as string | null,
-      }));
-    }
-    throw error;
+    if (!isMissingColumnError(error)) throw error;
+  }
+
+  try {
+    const rows = await db
+      .select(selectBillingInvoicesWithoutStripeReason())
+      .from(billingInvoices)
+      .orderBy(desc(billingInvoices.createdAt))
+      .limit(limit);
+    return rows.map((row) => ({
+      ...row,
+      stripeBillingReason: null as string | null,
+    }));
+  } catch (error2) {
+    if (isMissingBillingInvoicesTableError(error2)) return [];
+    if (!isMissingColumnError(error2)) throw error2;
+  }
+
+  try {
+    const rows = await db
+      .select(selectBillingInvoicesLegacyMinimal())
+      .from(billingInvoices)
+      .orderBy(desc(billingInvoices.createdAt))
+      .limit(limit);
+
+    return rows.map((row) => ({
+      ...row,
+      discountAmountCents: null as number | null,
+      discountLabel: null as string | null,
+      stripeBillingReason: null as string | null,
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -242,18 +295,50 @@ export async function countPaidSubscribersFromDB(): Promise<number> {
 
 export async function listBillingInvoicesForUser(userId: string, userEmail?: string | null) {
   const email = userEmail?.toLowerCase() ?? null;
+  const whereClause = email
+    ? or(eq(billingInvoices.userId, userId), eq(billingInvoices.userEmail, email))
+    : eq(billingInvoices.userId, userId);
+
   try {
     return await db
       .select()
       .from(billingInvoices)
-      .where(
-        email
-          ? or(eq(billingInvoices.userId, userId), eq(billingInvoices.userEmail, email))
-          : and(eq(billingInvoices.userId, userId)),
-      )
+      .where(whereClause)
       .orderBy(desc(billingInvoices.createdAt));
   } catch (error) {
     if (isMissingBillingInvoicesTableError(error)) return [];
-    throw error;
+    if (!isMissingColumnError(error)) throw error;
+  }
+
+  try {
+    const rows = await db
+      .select(selectBillingInvoicesWithoutStripeReason())
+      .from(billingInvoices)
+      .where(whereClause)
+      .orderBy(desc(billingInvoices.createdAt));
+    return rows.map((row) => ({
+      ...row,
+      stripeBillingReason: null as string | null,
+    }));
+  } catch (error2) {
+    if (isMissingBillingInvoicesTableError(error2)) return [];
+    if (!isMissingColumnError(error2)) throw error2;
+  }
+
+  try {
+    const rows = await db
+      .select(selectBillingInvoicesLegacyMinimal())
+      .from(billingInvoices)
+      .where(whereClause)
+      .orderBy(desc(billingInvoices.createdAt));
+
+    return rows.map((row) => ({
+      ...row,
+      discountAmountCents: null as number | null,
+      discountLabel: null as string | null,
+      stripeBillingReason: null as string | null,
+    }));
+  } catch {
+    return [];
   }
 }

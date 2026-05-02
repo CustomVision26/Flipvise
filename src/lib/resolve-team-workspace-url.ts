@@ -26,33 +26,34 @@ function firstString(
 }
 
 /**
- * Validates team workspace query params against the signed-in user.
- * `userid` must match the team owner; access is never granted from URL alone.
+ * Validates team workspace access: `team` id plus optional legacy `userid` / `plan`
+ * (when present they must match the DB). Access is never granted from URL alone —
+ * membership is checked for non-owners.
  */
 export async function resolveTeamWorkspaceFromSearchParams(
   userId: string,
   sp: Record<string, string | string[] | undefined>,
 ): Promise<ResolvedTeamWorkspaceUrl | null> {
   const teamStr = firstString(sp, ["team"]);
-  const ownerParam = firstString(sp, ["userid", "userId"]);
-  const plan = firstString(sp, ["plan", "Plan"]);
-
-  if (!teamStr || !ownerParam || !plan) return null;
-  if (!isWorkspaceSubscriberPlanQueryParam(plan)) return null;
+  if (!teamStr) return null;
 
   const teamId = Number(teamStr);
   if (!Number.isFinite(teamId) || teamId <= 0) return null;
 
   const team = await getTeamById(teamId);
   if (!team || !isTeamPlanId(team.planSlug)) return null;
-  if (team.ownerUserId !== ownerParam) return null;
 
-  const planNorm = plan.trim().toLowerCase();
-  if (
-    isTeamPlanId(planNorm) &&
-    planNorm !== team.planSlug.toLowerCase()
-  ) {
-    return null;
+  const ownerParam = firstString(sp, ["userid", "userId"]);
+  const plan = firstString(sp, ["plan", "Plan"]);
+
+  if (ownerParam != null && team.ownerUserId !== ownerParam) return null;
+
+  if (plan != null) {
+    if (!isWorkspaceSubscriberPlanQueryParam(plan)) return null;
+    const planNorm = plan.trim().toLowerCase();
+    if (isTeamPlanId(planNorm) && planNorm !== team.planSlug.toLowerCase()) {
+      return null;
+    }
   }
 
   const workspacePlanQuery = team.planSlug;
@@ -90,16 +91,49 @@ export async function resolveTeamWorkspaceFromSearchParams(
 }
 
 /**
- * True only when params look like a full team workspace URL (`team` + owner `userid` + `plan`),
- * so a personal bookmark like `/dashboard?userid=<clerkId>` is not mistaken for a broken team link.
+ * True when a `team` query is present and numeric (workspace or invalid attempt).
+ * Used so `/dashboard?team=…` is not confused with personal-dashboard query cleanup.
  */
 export function searchParamsLooksLikeTeamWorkspace(
   sp: Record<string, string | string[] | undefined>,
 ): boolean {
   const teamStr = firstString(sp, ["team"]);
-  const ownerParam = firstString(sp, ["userid", "userId"]);
-  const plan = firstString(sp, ["plan", "Plan"]);
-  return teamStr != null && ownerParam != null && plan != null;
+  if (!teamStr) return false;
+  const teamId = Number(teamStr);
+  return Number.isFinite(teamId) && teamId > 0;
+}
+
+/**
+ * Legacy workspace URLs included `userid`, `plan`, and `teamMemberId`. When present
+ * alongside `team`, redirect to the minimal `?team=` URL after a successful resolve.
+ */
+export function teamWorkspaceSearchParamsHaveLegacyIdentityFields(
+  sp: Record<string, string | string[] | undefined>,
+): boolean {
+  if (!searchParamsLooksLikeTeamWorkspace(sp)) return false;
+  return (
+    firstString(sp, ["userid", "userId"]) != null ||
+    firstString(sp, ["plan", "Plan"]) != null ||
+    firstString(sp, ["teamMemberId"]) != null
+  );
+}
+
+/**
+ * If the URL carries `userid` / `plan` without a `team` workspace query, return a path
+ * with those removed. Preserves other params such as `team_invite=accepted`.
+ * Returns `null` when no redirect is needed.
+ */
+export function canonicalDashboardPathRemovingSensitiveQuery(
+  sp: Record<string, string | string[] | undefined>,
+): string | null {
+  if (searchParamsLooksLikeTeamWorkspace(sp)) return null;
+  const hasUid = firstString(sp, ["userid", "userId"]) != null;
+  const hasPlan = firstString(sp, ["plan", "Plan"]) != null;
+  if (!hasUid && !hasPlan) return null;
+  const next = new URLSearchParams();
+  const teamInvite = firstString(sp, ["team_invite"]);
+  if (teamInvite) next.set("team_invite", teamInvite);
+  return next.toString() ? `/dashboard?${next.toString()}` : "/dashboard";
 }
 
 /** Parses a request query string (e.g. `proxy` `x-search` header: `?team=1&…`). */
@@ -118,22 +152,20 @@ export function parseSearchParamsRecordFromSearchString(
 }
 
 /**
- * `team` id from the same URL shape `/dashboard` uses for a team workspace link.
- * No DB access — combine with the signed-in user’s allowed workspace ids.
+ * `team` id from workspace URLs (`/dashboard`, `/decks/...`). No DB access —
+ * combine with the signed-in user’s allowed workspace ids in the layout.
  */
 export function teamWorkspaceTeamIdFromUrlShapeIfValid(
   sp: Record<string, string | string[] | undefined>,
 ): number | null {
   if (!searchParamsLooksLikeTeamWorkspace(sp)) return null;
-  const plan = firstString(sp, ["plan", "Plan"]);
-  if (!plan || !isWorkspaceSubscriberPlanQueryParam(plan)) return null;
   const teamStr = firstString(sp, ["team"]);
   const teamId = Number(teamStr);
   if (!Number.isFinite(teamId) || teamId <= 0) return null;
   return teamId;
 }
 
-/** `userid` without a full team workspace query must match the signed-in user. */
+/** `userid` without a `team=` workspace query must match the signed-in user. */
 export function shouldRedirectUnauthorizedDashboardUseridParam(
   sessionUserId: string,
   sp: Record<string, string | string[] | undefined>,
@@ -144,20 +176,11 @@ export function shouldRedirectUnauthorizedDashboardUseridParam(
   return uid !== sessionUserId;
 }
 
-/** Canonical workspace query for the signed-in user (owner → `teamMemberId=0`). */
+/** Canonical workspace query for deck/study/dashboard links — `team` only. */
 export async function buildResolvedTeamWorkspaceQueryString(
   userId: string,
   tw: ResolvedTeamWorkspaceUrl,
 ): Promise<string> {
-  let teamMemberUrlParam = 0;
-  if (userId !== tw.ownerUserId) {
-    const row = await getMemberRecord(tw.teamId, userId);
-    teamMemberUrlParam = row?.id ?? 0;
-  }
-  return buildTeamWorkspaceQueryString({
-    teamId: tw.teamId,
-    ownerUserId: tw.ownerUserId,
-    teamMemberUrlParam,
-    plan: tw.workspacePlanQuery,
-  });
+  void userId;
+  return buildTeamWorkspaceQueryString({ teamId: tw.teamId });
 }

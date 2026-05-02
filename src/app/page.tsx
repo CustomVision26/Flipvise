@@ -28,8 +28,8 @@ interface HomePageProps {
 }
 
 export default async function Home({ searchParams }: HomePageProps) {
-  const { userId, isPro, activeTeamPlan } = await getAccessContext();
-  if (userId) redirect(personalDashboardHref(userId, activeTeamPlan, isPro));
+  const { userId } = await getAccessContext();
+  if (userId) redirect(personalDashboardHref());
   const sp = await searchParams;
   const inviteEmailForAuth = parseInviteEmailFromSearchParams(sp.invite_email);
   return (

@@ -14,22 +14,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
-import { isTeamPlanId } from "@/lib/team-plans";
 
 export type TeamSwitcherTeam = {
   id: number;
   name: string;
-  /** Team-tier subscriber (Clerk id) for `?userid=` on team admin. */
+  /** Team-tier subscriber (team row `ownerUserId`) — for display / grouping only. */
   ownerUserId: string;
-  /** That workspace’s team-tier Clerk plan id for `plan=` (optional). */
+  /** Legacy `plan=` value from DB; not used in URLs anymore. */
   workspacePlanQuery?: string;
 };
 
@@ -57,6 +50,10 @@ export function TeamSwitcherDropdown({
 
   const selected = teams.find((t) => t.id === selectedId) ?? teams[0];
 
+  if (teams.length === 0) {
+    return null;
+  }
+
   const q = query.trim().toLowerCase();
   const filteredTeams = React.useMemo(() => {
     if (q === "") return teams;
@@ -70,51 +67,38 @@ export function TeamSwitcherDropdown({
 
   function selectTeam(teamId: number) {
     const row = teams.find((t) => t.id === teamId);
-    const subscriberUserId = row?.ownerUserId;
-    if (!subscriberUserId) return;
-    const planForUrl =
-      row?.workspacePlanQuery != null &&
-      isTeamPlanId(row.workspacePlanQuery)
-        ? row.workspacePlanQuery
-        : undefined;
-    router.push(buildTeamAdminPath(subscriberUserId, teamId, planForUrl));
-    router.refresh();
+    if (!row) return;
+    // Close the menu before navigation so portal teardown does not race React commit.
     setOpen(false);
     setQuery("");
+    requestAnimationFrame(() => {
+      router.push(buildTeamAdminPath(teamId));
+      router.refresh();
+    });
   }
 
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger
-            render={(tipProps) => (
-              <DropdownMenuTrigger
-                {...tipProps}
-                render={(menuProps) => (
-                  <Button
-                    {...menuProps}
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "h-9 min-w-[12rem] max-w-full justify-between gap-2 px-3 font-normal",
-                      menuProps.className,
-                    )}
-                    aria-label={`Current team: ${selected?.name ?? "Team"}. Open menu to switch teams.`}
-                    aria-describedby={ariaDescribedBy}
-                  >
-                    <span className="truncate text-left">{selected?.name ?? "Team"}</span>
-                    <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </Button>
-                )}
-              />
+      {/* Do not nest Tooltip + DropdownMenuTrigger (two Base UI portals on one control breaks React teardown). */}
+      <DropdownMenuTrigger
+        render={(menuProps) => (
+          <Button
+            {...menuProps}
+            variant="outline"
+            size="sm"
+            title={triggerTooltip}
+            className={cn(
+              "h-9 min-w-[12rem] max-w-full justify-between gap-2 px-3 font-normal",
+              menuProps.className,
             )}
-          />
-          <TooltipContent side="bottom" className="max-w-xs text-left">
-            <p>{triggerTooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+            aria-label={`Current team: ${selected?.name ?? "Team"}. Open menu to switch teams.`}
+            aria-describedby={ariaDescribedBy}
+          >
+            <span className="truncate text-left">{selected?.name ?? "Team"}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </Button>
+        )}
+      />
       <DropdownMenuContent align="start" className="w-72 p-0 sm:w-80 max-w-[calc(100vw-2rem)]">
         <div
           className="border-b border-border p-2"
@@ -172,9 +156,11 @@ export function TeamSwitcherDropdown({
                 <DropdownMenuItem
                   className="cursor-pointer gap-2"
                   onClick={() => {
-                    router.push("/dashboard/workspaces");
                     setOpen(false);
                     setQuery("");
+                    requestAnimationFrame(() => {
+                      router.push("/dashboard/workspaces");
+                    });
                   }}
                 >
                   <Settings2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />

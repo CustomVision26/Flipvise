@@ -2,12 +2,23 @@
 
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { ManageBillingButton } from "@/components/manage-billing-button";
-import { CreditCard, ExternalLink, Zap } from "lucide-react";
+import { loadUserPlanHistoryAction } from "@/actions/plan-history";
+import type { PlanHistoryRow } from "@/actions/plan-history";
+import { CreditCard, ExternalLink, Loader2, Zap } from "lucide-react";
 
 const PLAN_LABELS: Record<string, string> = {
   pro: "Pro",
@@ -24,8 +35,46 @@ const STATUS_LABELS: Record<string, string> = {
   expired: "Expired",
 };
 
+function formatDateTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export function UserBillingPage() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
+  const [planHistory, setPlanHistory] = useState<PlanHistoryRow[] | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!user?.id) {
+      setPlanHistory([]);
+      return;
+    }
+
+    let cancelled = false;
+    setPlanHistory(null);
+    setHistoryError(null);
+    loadUserPlanHistoryAction()
+      .then((rows) => {
+        if (!cancelled) setPlanHistory(rows);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHistoryError("Could not load plan history.");
+          setPlanHistory([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, user?.id]);
   const meta = (user?.publicMetadata ?? {}) as Record<string, unknown>;
 
   const billingPlan = meta.billingPlan as string | undefined;
@@ -148,6 +197,95 @@ export function UserBillingPage() {
               View plans
             </Link>
           </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Plan history
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Paid subscriptions, complimentary access, and affiliate grants linked
+            to your account.
+          </p>
+        </div>
+
+        {planHistory === null && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Loader2 className="size-4 animate-spin shrink-0" />
+            Loading history…
+          </div>
+        )}
+
+        {historyError && (
+          <p className="text-xs text-destructive">{historyError}</p>
+        )}
+
+        {planHistory && planHistory.length === 0 && !historyError && (
+          <p className="text-sm text-muted-foreground py-2">
+            No plan history recorded yet.
+          </p>
+        )}
+
+        {planHistory && planHistory.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap">Plan</TableHead>
+                <TableHead className="whitespace-nowrap">Type</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[140px]">
+                  Started
+                </TableHead>
+                <TableHead className="whitespace-nowrap min-w-[140px]">
+                  Ended
+                </TableHead>
+                <TableHead className="whitespace-nowrap text-right w-[1%]">
+                  Receipt
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {planHistory.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-medium max-w-[200px]">
+                    {row.planName}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {row.planType}
+                  </TableCell>
+                  <TableCell>{row.statusLabel}</TableCell>
+                  <TableCell className="text-muted-foreground tabular-nums">
+                    {formatDateTime(row.startAt)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground tabular-nums">
+                    {row.endAt ? formatDateTime(row.endAt) : "Ongoing"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {row.receiptUrl ? (
+                      <a
+                        href={row.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                          buttonVariants({ variant: "link", size: "sm" }),
+                          "inline-flex items-center gap-1 h-auto min-h-0 py-0 px-0 font-normal",
+                        )}
+                      >
+                        View
+                        <ExternalLink className="size-3.5 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

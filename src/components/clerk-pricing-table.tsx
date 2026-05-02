@@ -34,7 +34,7 @@ const pricingAppearance = {
 export function ClerkPricingTable({
   newSubscriptionRedirectUrl = "/auth/continue",
 }: {
-  /** Where Clerk’s checkout “Continue” sends the user — prefer `/dashboard?userid=…&plan=…` or `/auth/continue` to resolve it. */
+  /** Where Clerk’s checkout “Continue” sends the user — use `/auth/continue` or `/dashboard` (session-backed). */
   newSubscriptionRedirectUrl?: string;
 }) {
   return (

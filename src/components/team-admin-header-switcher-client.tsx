@@ -8,23 +8,30 @@ export type TeamAdminHeaderSwitcherTeam = {
   id: number;
   name: string;
   ownerUserId: string;
-  /** Clerk team plan id for that workspace’s row — used in team-admin `plan=` when team-tier. */
+  /** Clerk team plan id for that workspace’s row — UI only; team-admin URLs use `?team=` only. */
   workspacePlanQuery?: string;
 };
 
 /**
- * `userid` in `/dashboard/team-admin?userid=…` is the team-tier subscriber (team row
- * `ownerUserId`). The list from the server can include `team_admin` access to other
- * subscribers’ workspaces; the switcher only lists teams owned by that subscriber.
+ * Scope the team-admin switcher: when `?team=` is set, only teams owned by that
+ * workspace’s subscriber; otherwise fall back to legacy `userid=` or single-owner list.
  */
 function teamAdminWorkspaceTeamsForUrl(
   teams: TeamAdminHeaderSwitcherTeam[],
   userId: string,
   searchParams: URLSearchParams,
 ): TeamAdminHeaderSwitcherTeam[] {
-  const fromUrl = searchParams.get("userid")?.trim();
-  if (fromUrl) {
-    return teams.filter((t) => t.ownerUserId === fromUrl);
+  const rawTeam = searchParams.get("team")?.trim();
+  const teamIdFromUrl = rawTeam ? Number(rawTeam) : NaN;
+  if (Number.isFinite(teamIdFromUrl) && teamIdFromUrl > 0) {
+    const anchor = teams.find((t) => t.id === teamIdFromUrl);
+    if (anchor) {
+      return teams.filter((t) => t.ownerUserId === anchor.ownerUserId);
+    }
+  }
+  const fromUserid = searchParams.get("userid")?.trim();
+  if (fromUserid) {
+    return teams.filter((t) => t.ownerUserId === fromUserid);
   }
   const uniqueOwners = new Set(teams.map((t) => t.ownerUserId));
   if (uniqueOwners.size <= 1) {

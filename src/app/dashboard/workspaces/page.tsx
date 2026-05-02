@@ -39,13 +39,7 @@ export default async function ManageWorkspacesPage() {
   const defaultTeamForAdminLink = [...ownedTeams].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
   )[0]!;
-  const teamAdminBackHref = buildTeamAdminPath(
-    userId,
-    defaultTeamForAdminLink.id,
-    isTeamPlanId(defaultTeamForAdminLink.planSlug)
-      ? defaultTeamForAdminLink.planSlug
-      : null,
-  );
+  const teamAdminBackHref = buildTeamAdminPath(defaultTeamForAdminLink.id);
 
   return (
     <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">

@@ -151,34 +151,23 @@ export function AssignUserPlanButton({
     <>
       <div className="inline-flex flex-col items-start gap-0.5">
         <DropdownMenu>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger
-                render={(tipProps) => (
-                  <DropdownMenuTrigger
-                    {...tipProps}
-                    render={(menuProps) => (
-                      <Button
-                        {...menuProps}
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        className={cn("gap-0.5 min-w-0", menuProps.className)}
-                        disabled={isPending}
-                        aria-label="Open assign plan menu"
-                      >
-                        {isPending ? "…" : "Assign plan"}
-                        <ChevronDown className="h-3 w-3 opacity-80" aria-hidden />
-                      </Button>
-                    )}
-                  />
-                )}
-              />
-              <TooltipContent className="max-w-xs text-left" side="top">
-                <p>Please refresh page after selecting a plan</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <DropdownMenuTrigger
+            render={(menuProps) => (
+              <Button
+                {...menuProps}
+                type="button"
+                variant="outline"
+                size="xs"
+                title="Please refresh page after selecting a plan"
+                className={cn("gap-0.5 min-w-0", menuProps.className)}
+                disabled={isPending}
+                aria-label="Open assign plan menu"
+              >
+                {isPending ? "…" : "Assign plan"}
+                <ChevronDown className="h-3 w-3 opacity-80" aria-hidden />
+              </Button>
+            )}
+          />
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>Clear &amp; personal</DropdownMenuLabel>

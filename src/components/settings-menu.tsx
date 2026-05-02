@@ -7,11 +7,6 @@ import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -68,26 +63,20 @@ export function SettingsMenu({
   return (
     <>
       <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <DropdownMenuTrigger
-                render={(props) => (
-                  <Button
-                    {...props}
-                    variant="outline"
-                    size="icon"
-                    className={cn("shrink-0", props.className)}
-                    aria-label="Settings"
-                  >
-                    <Settings className="size-4" aria-hidden />
-                  </Button>
-                )}
-              />
-            }
-          />
-          <TooltipContent side="bottom">Settings</TooltipContent>
-        </Tooltip>
+        <DropdownMenuTrigger
+          render={(props) => (
+            <Button
+              {...props}
+              variant="outline"
+              size="icon"
+              title="Settings"
+              className={cn("shrink-0", props.className)}
+              aria-label="Settings"
+            >
+              <Settings className="size-4" aria-hidden />
+            </Button>
+          )}
+        />
         <DropdownMenuContent align="end" className="min-w-[240px]">
           <DropdownMenuGroup>
             <DropdownMenuLabel className="text-foreground">

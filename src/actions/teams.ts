@@ -10,7 +10,6 @@ import { getAccessContext } from "@/lib/access";
 import { syncPlatformAdminTeamTierInvitedMetadata } from "@/lib/platform-admin-team-tier-metadata";
 import {
   limitsForPlan,
-  personalDashboardPlanQueryValue,
   type TeamPlanId,
 } from "@/lib/team-plans";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
@@ -331,13 +330,8 @@ export async function acceptTeamInvitationAction(data: z.infer<typeof acceptSche
   revalidatePath("/dashboard/inbox");
   revalidatePath("/dashboard/team-admin");
 
-  const ctx = await getAccessContext();
-  const plan = personalDashboardPlanQueryValue(ctx.activeTeamPlan, ctx.isPro);
-  const qs = new URLSearchParams({
-    userid: userId,
-    plan,
-    team_invite: "accepted",
-  });
+  const qs = new URLSearchParams();
+  qs.set("team_invite", "accepted");
   const redirectUrl = `/dashboard?${qs.toString()}`;
 
   return { teamId: inv.teamId, redirectUrl };

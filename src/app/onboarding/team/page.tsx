@@ -24,7 +24,7 @@ export default async function TeamOnboardingPage() {
 
   const existing = await tryTeamQuery(() => countTeamsForOwner(userId), 0);
   if (existing > 0) {
-    redirect(buildTeamAdminPath(userId));
+    redirect(buildTeamAdminPath());
   }
 
   try {

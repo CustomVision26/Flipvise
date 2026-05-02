@@ -120,10 +120,10 @@ export default async function PaidSubscribersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { userId, isPro, activeTeamPlan } = await getAccessContext();
+  const { userId } = await getAccessContext();
   if (!userId) redirect("/");
 
-  const personalDashboardLink = personalDashboardHref(userId, activeTeamPlan, isPro);
+  const personalDashboardLink = personalDashboardHref();
 
   // Auth: must be a platform admin
   const { data: clerkUsers } = await clerkClient.users.getUserList({

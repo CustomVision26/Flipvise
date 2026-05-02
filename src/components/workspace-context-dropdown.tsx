@@ -39,7 +39,7 @@ interface WorkspaceContextDropdownProps {
   totalEligibleTeamCount?: number;
   /** Selected team workspace, or null for personal (no cookie). */
   activeTeamId: number | null;
-  /** Personal `/dashboard` URL; may include `?userid=` for the signed-in Clerk user. */
+  /** Personal `/dashboard` URL (no sensitive query string). */
   personalWorkspaceHref?: string;
   /** Plan label next to "Personal" (e.g. Team Gold, Pro, Free). */
   personalPlanLabel?: string;
@@ -149,9 +149,6 @@ export function WorkspaceContextDropdown({
       router.push(
         buildTeamWorkspaceDashboardPath({
           teamId: team.id,
-          ownerUserId: team.ownerUserId,
-          teamMemberUrlParam: team.teamMemberUrlParam,
-          plan: team.planUrlValue,
         }),
       );
       router.refresh();
@@ -169,11 +166,7 @@ export function WorkspaceContextDropdown({
 
   function teamWorkspaceMenuItem(t: TeamWorkspaceNavTeam) {
     const isActive = t.id === activeTeamId;
-    const teamAdminHref = buildTeamAdminPath(
-      t.ownerUserId,
-      t.id,
-      isTeamPlanId(t.planUrlValue) ? t.planUrlValue : undefined,
-    );
+    const teamAdminHref = buildTeamAdminPath(t.id);
     return (
       <DropdownMenuItem
         key={t.id}

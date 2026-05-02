@@ -41,7 +41,7 @@ interface HeaderUserSectionProps {
   /** Full count of eligible team workspaces (may exceed `workspaceTeams` for free personal). */
   workspaceTeamsTotalEligible?: number;
   activeWorkspaceTeamId?: number | null;
-  /** Personal workspace target when clearing team cookie (`userid` + `plan` for team-tier switcher users). */
+  /** Personal workspace target when clearing team cookie (clean `/dashboard`; session is authoritative). */
   personalWorkspaceHref?: string;
   /** Shown next to "Personal" in the workspace dropdown (e.g. Team Gold, Pro, Free). */
   personalPlanLabelForWorkspace?: string;

@@ -1,9 +1,15 @@
-/** Query string keys for team-tier workspace URLs on `/dashboard` and `/decks/.../study`. */
-
+/**
+ * Team workspace URLs use only `team=<numeric id>` (session + DB enforce access).
+ * Legacy keys (`userid`, `plan`, `teamMemberId`) are still accepted for redirects
+ * until bookmarks expire.
+ */
 export const TEAM_WORKSPACE_QUERY = {
   team: "team",
+  /** @deprecated Legacy URL — ignored when building new links. */
   userid: "userid",
+  /** @deprecated Legacy URL — ignored when building new links. */
   plan: "plan",
+  /** @deprecated Legacy URL — ignored when building new links. */
   teamMemberId: "teamMemberId",
 } as const;
 
@@ -11,11 +17,11 @@ export type TeamWorkspaceNavTeam = {
   id: number;
   name: string;
   ownerUserId: string;
-  /** `0` in the URL means the subscriber (owner); invited users use their `team_members.id`. */
+  /** `0` for the subscriber owner; else the viewer’s `team_members.id` (not sent in URLs). */
   teamMemberUrlParam: number;
   /** Team subscription label (e.g. Team Basic) from `teams.planSlug`. */
   planLabel: string;
-  /** Value for the `plan` query on team workspace links (Clerk team plan id or `pro`). */
+  /** Clerk team plan id or `pro` — switcher / display only; URLs use `?team=` only. */
   planUrlValue: string;
   /** Resolved owner display name for the workspace switcher. */
   ownerDisplayName: string;
@@ -28,27 +34,13 @@ export type TeamWorkspaceNavTeam = {
   isSubscriberOwned: boolean;
 };
 
-export function buildTeamWorkspaceQueryString(input: {
-  teamId: number;
-  ownerUserId: string;
-  teamMemberUrlParam: number;
-  /** Personal Pro uses `pro`; team workspaces should pass the team’s Clerk plan id when known. */
-  plan?: string;
-}): string {
+export function buildTeamWorkspaceQueryString(input: { teamId: number }): string {
   const p = new URLSearchParams();
   p.set(TEAM_WORKSPACE_QUERY.team, String(input.teamId));
-  p.set(TEAM_WORKSPACE_QUERY.userid, input.ownerUserId);
-  p.set(TEAM_WORKSPACE_QUERY.plan, input.plan ?? "pro");
-  p.set(TEAM_WORKSPACE_QUERY.teamMemberId, String(input.teamMemberUrlParam));
   return p.toString();
 }
 
-export function buildTeamWorkspaceDashboardPath(input: {
-  teamId: number;
-  ownerUserId: string;
-  teamMemberUrlParam: number;
-  plan?: string;
-}): string {
+export function buildTeamWorkspaceDashboardPath(input: { teamId: number }): string {
   return `/dashboard?${buildTeamWorkspaceQueryString(input)}`;
 }
 

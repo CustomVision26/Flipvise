@@ -12,7 +12,7 @@ export default async function PricingPage() {
   const { userId, activeTeamPlan, isPro, isAdmin } = await getAccessContext();
 
   const personalDashboardLink =
-    userId == null ? "/" : personalDashboardHref(userId, activeTeamPlan, isPro);
+    userId == null ? "/" : personalDashboardHref();
 
   const currentPaidPlan: string | null =
     activeTeamPlan ?? (isPro ? "pro" : null);

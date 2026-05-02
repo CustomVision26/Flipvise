@@ -15,8 +15,9 @@ import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-acc
 import {
   buildResolvedTeamWorkspaceQueryString,
   resolveTeamWorkspaceFromSearchParams,
+  teamWorkspaceSearchParamsHaveLegacyIdentityFields,
 } from "@/lib/resolve-team-workspace-url";
-import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
+import { withTeamWorkspaceQuery, buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
 import { EditDeckDialog } from "./edit-deck-dialog";
 import { DeleteAllCardsDialog } from "./delete-all-cards-dialog";
@@ -44,6 +45,17 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
 
   const sp = await searchParams;
   const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
+  if (
+    teamWorkspaceUrl != null &&
+    teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)
+  ) {
+    redirect(
+      withTeamWorkspaceQuery(
+        `/decks/${id}`,
+        buildTeamWorkspaceQueryString({ teamId: teamWorkspaceUrl.teamId }),
+      ),
+    );
+  }
   const workspaceQs =
     teamWorkspaceUrl != null
       ? await buildResolvedTeamWorkspaceQueryString(userId, teamWorkspaceUrl)

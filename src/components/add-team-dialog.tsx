@@ -61,7 +61,7 @@ export function AddTeamDialog({
 
     setIsPending(true);
     try {
-      const { teamId, ownerUserId } = await createTeamAction({
+      const { teamId } = await createTeamAction({
         name: trimmed,
         planSlug,
       });
@@ -70,9 +70,6 @@ export function AddTeamDialog({
       router.push(
         buildTeamWorkspaceDashboardPath({
           teamId,
-          ownerUserId,
-          teamMemberUrlParam: 0,
-          plan: planSlug,
         }),
       );
       router.refresh();

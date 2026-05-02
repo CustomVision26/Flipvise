@@ -249,10 +249,34 @@ export const billingInvoices = pgTable(
     discountAmountCents: integer(),
     /** Human-readable coupon/discount label (e.g. "LAUNCH50 — 50% off"). */
     discountLabel: varchar({ length: 255 }),
+    /** Stripe-only: invoice.billing_reason (e.g. subscription_cycle, subscription_update). */
+    stripeBillingReason: varchar({ length: 64 }),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },
   (t) => [uniqueIndex('billing_invoices_external_id_uidx').on(t.externalId)],
+);
+
+/**
+ * Stripe invoice line items marked proration=true (plan changes, credits).
+ * Parent receipt URLs live on billing_invoices (same stripeInvoiceId as externalId).
+ */
+export const billingProrationLines = pgTable(
+  'billing_proration_lines',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    /** Stripe invoice id in_… */
+    stripeInvoiceId: varchar({ length: 255 }).notNull(),
+    /** Stripe line item id il_… */
+    stripeLineId: varchar({ length: 255 }).notNull().unique(),
+    amountCents: integer(),
+    currency: varchar({ length: 16 }),
+    description: text(),
+    periodStart: timestamp(),
+    periodEnd: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
 );
 
 export const affiliateStatusEnum = pgEnum('affiliate_status', ['pending', 'active', 'revoked']);

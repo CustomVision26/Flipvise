@@ -525,7 +525,8 @@ export type WorkspaceNavTeamsResult = {
 };
 
 /**
- * Header workspace switcher: owner uses `teamMemberUrlParam` 0; invited users use `team_members.id`.
+ * Header workspace switcher: `teamMemberUrlParam` is 0 for the subscriber owner, else the
+ * viewer’s `team_members.id` (for display grouping). Workspace URLs use only `?team=<id>`.
  * Eligible teams match {@link getEligibleWorkspaceTeamsForUser} (owners: all owned; co-admins: managed
  * teams only; members: assigned workspaces). Personal Pro (or admin unlock) lists every eligible team;
  * Free personal shows at most {@link FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT} (oldest first).

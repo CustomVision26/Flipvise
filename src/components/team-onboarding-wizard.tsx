@@ -24,13 +24,10 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
     setError(null);
     setPending(true);
     try {
-      const { teamId, ownerUserId } = await createTeamAction({ name, planSlug });
+      const { teamId } = await createTeamAction({ name, planSlug });
       router.push(
         buildTeamWorkspaceDashboardPath({
           teamId,
-          ownerUserId,
-          teamMemberUrlParam: 0,
-          plan: planSlug,
         }),
       );
       router.refresh();

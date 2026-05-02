@@ -103,6 +103,21 @@ export async function getAllAffiliatesByEmailOrUserId(
     .orderBy(desc(affiliates.createdAt));
 }
 
+/** Affiliate rows linked to this Clerk user (by email and/or invitedUserId). */
+export async function listAffiliatesForPlanHistory(
+  userId: string,
+  emailLower: string | null,
+) {
+  if (emailLower) {
+    return getAllAffiliatesByEmailOrUserId(emailLower, userId);
+  }
+  return db
+    .select()
+    .from(affiliates)
+    .where(eq(affiliates.invitedUserId, userId))
+    .orderBy(desc(affiliates.createdAt));
+}
+
 export async function acceptAffiliateByToken(token: string, userId: string) {
   await db
     .update(affiliates)

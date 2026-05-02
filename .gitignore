@@ -54,8 +54,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
+# production DB URL for local `npm run db:migrate:prod` (Neon / Vercel Postgres)
+.env.db.prod
 .env
 .env.old
 .env.production.reference

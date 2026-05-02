@@ -156,7 +156,7 @@ export async function createStripeCheckoutSessionAction(
   const couponId = await activeCouponIdForPlan(plan);
 
   const appUrl = resolveAppUrl();
-  const successUrl = `${appUrl}/dashboard?userid=${encodeURIComponent(userId)}&plan=${encodeURIComponent(plan)}`;
+  const successUrl = `${appUrl}/dashboard`;
   const cancelUrl = `${appUrl}/pricing`;
 
   let session;

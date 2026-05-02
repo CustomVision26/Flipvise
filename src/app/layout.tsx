@@ -151,7 +151,7 @@ export default async function RootLayout({
 
   const dashboardHrefWithUserQuery =
     userId != null
-      ? personalDashboardHref(userId, activeTeamPlan, isPro)
+      ? personalDashboardHref()
       : "/dashboard";
   const personalWorkspaceHref =
     userId != null && showWorkspaceSwitcher

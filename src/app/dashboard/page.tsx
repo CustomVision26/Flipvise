@@ -11,9 +11,11 @@ import Link from "next/link";
 import { Layers, BookOpen } from "lucide-react";
 import {
   buildResolvedTeamWorkspaceQueryString,
+  canonicalDashboardPathRemovingSensitiveQuery,
   resolveTeamWorkspaceFromSearchParams,
   searchParamsLooksLikeTeamWorkspace,
   shouldRedirectUnauthorizedDashboardUseridParam,
+  teamWorkspaceSearchParamsHaveLegacyIdentityFields,
 } from "@/lib/resolve-team-workspace-url";
 import {
   Card,
@@ -184,6 +186,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   if (searchParamsLooksLikeTeamWorkspace(sp) && !teamWorkspaceUrl) {
     redirect("/dashboard");
   }
+
+  if (
+    teamWorkspaceUrl != null &&
+    teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)
+  ) {
+    redirect(`/dashboard?team=${teamWorkspaceUrl.teamId}`);
+  }
+
+  const canonicalDash = canonicalDashboardPathRemovingSensitiveQuery(sp);
+  if (canonicalDash) redirect(canonicalDash);
 
   if (teamWorkspaceUrl != null) {
     await tryTeamQuery(
