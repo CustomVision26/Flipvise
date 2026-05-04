@@ -191,6 +191,29 @@ export const adminPlanAssignmentLogs = pgTable('admin_plan_assignment_logs', {
   createdAt: timestamp().notNull().defaultNow(),
 });
 
+export const adminPlanAssignmentInviteStatusEnum = pgEnum('admin_plan_assignment_invite_status', [
+  'pending',
+  'accepted',
+  'declined',
+  'superseded',
+]);
+
+/** Pending admin plan offers — applied only after the target user accepts in the inbox. */
+export const adminPlanAssignmentInvites = pgTable('admin_plan_assignment_invites', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  targetUserId: varchar({ length: 255 }).notNull(),
+  assignedByUserId: varchar({ length: 255 }).notNull(),
+  assignedByName: varchar({ length: 255 }).notNull(),
+  targetUserName: varchar({ length: 255 }).notNull(),
+  /** Plan slug (same values as AdminPlanAssignment). */
+  assignment: varchar({ length: 64 }).notNull(),
+  /** Snapshot of target effective plan slug when the admin sent the offer (for inbox copy). */
+  previousPlanSlug: varchar({ length: 64 }),
+  status: adminPlanAssignmentInviteStatusEnum().notNull().default('pending'),
+  createdAt: timestamp().notNull().defaultNow(),
+  respondedAt: timestamp(),
+});
+
 export const deactivated = pgTable('deactivated', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   userId: varchar({ length: 255 }).notNull().unique(),
@@ -364,7 +387,7 @@ export const inboxReads = pgTable(
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     userId: varchar({ length: 255 }).notNull(),
-    /** Discriminator: quiz_result, team_invite, billing, affiliate, affiliate_notice, admin_plan_log */
+    /** Discriminator: quiz_result, team_invite, billing, affiliate, affiliate_notice, admin_plan_log, admin_plan_invite */
     itemType: varchar({ length: 64 }).notNull(),
     /** The numeric ID of the item as a string. */
     itemId: varchar({ length: 255 }).notNull(),

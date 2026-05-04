@@ -16,9 +16,11 @@ import { listBillingInvoicesForUser } from "@/db/queries/billing";
 import { getAllAffiliatesByEmailOrUserId } from "@/db/queries/affiliates";
 import { getInboxReadsForUser } from "@/db/queries/inbox-reads";
 import { listAdminPlanAssignmentInboxLogsForUser } from "@/db/queries/admin";
+import { listAdminPlanInvitesForInbox } from "@/db/queries/admin-plan-invites";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
+import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
 
 // UI
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -43,6 +45,7 @@ export default async function DashboardInboxPage() {
     billingRows,
     affiliateRows,
     adminPlanLogRows,
+    adminPlanInviteRows,
     readSet,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
@@ -50,6 +53,7 @@ export default async function DashboardInboxPage() {
     listBillingInvoicesForUser(userId, inboxEmail),
     getAllAffiliatesByEmailOrUserId(inboxEmail, userId),
     listAdminPlanAssignmentInboxLogsForUser(userId, 100),
+    tryTeamQuery(() => listAdminPlanInvitesForInbox(userId, 80), []),
     getInboxReadsForUser(userId),
   ]);
 
@@ -258,6 +262,11 @@ export default async function DashboardInboxPage() {
 
   items.push(...buildAffiliateNoticeInboxItems(affiliateRows, readSet));
 
+  for (const row of adminPlanInviteRows) {
+    if (row.status === "accepted") continue;
+    items.push(adminPlanInviteRowToInboxItem(row, readSet));
+  }
+
   for (const row of adminPlanLogRows) {
     if (row.action !== "plan_assigned" && row.action !== "plan_removed") continue;
     items.push(
@@ -293,7 +302,7 @@ export default async function DashboardInboxPage() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Quiz results, team invitations, billing, affiliate invites and notices, and administrator plan updates.
+            Quiz results, team invitations, billing, affiliate invites and notices, administrator plan requests, and completed plan changes.
           </p>
         </div>
         <Link

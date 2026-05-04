@@ -141,6 +141,13 @@
       "when": 1777640000000,
       "tag": "0019_admin_plan_log_application_path",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777720000000,
+      "tag": "0020_admin_plan_assignment_invites",
+      "breakpoints": true
     }
   ]
 }

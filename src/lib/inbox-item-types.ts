@@ -1,5 +1,6 @@
 import type { QuizResultSummary } from "@/components/view-quiz-result-dialog";
 import type { TeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
+import type { AdminPlanAssignment } from "@/lib/admin-assignable-plans";
 
 export type InboxItemType =
   | "quiz_result"
@@ -7,7 +8,8 @@ export type InboxItemType =
   | "billing"
   | "affiliate"
   | "affiliate_notice"
-  | "admin_plan_log";
+  | "admin_plan_log"
+  | "admin_plan_invite";
 
 // ── Type-specific payload shapes ──────────────────────────────────────────────
 
@@ -63,6 +65,15 @@ export type AdminPlanLogPayload = {
   planApplicationPath: "stripe_proration" | "clerk_metadata_only" | null;
 };
 
+export type AdminPlanInvitePayload = {
+  inviteId: number;
+  assignedByName: string;
+  offeredPlanSlug: AdminPlanAssignment;
+  offeredPlanLabel: string;
+  previousPlanLabel: string;
+  status: "pending" | "declined" | "superseded";
+};
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type UnifiedInboxItem =
@@ -89,6 +100,16 @@ export type UnifiedInboxItem =
       isRead: boolean;
       requiresAction: false;
       payload: AdminPlanLogPayload;
+    }
+  | {
+      type: "admin_plan_invite";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: boolean;
+      payload: AdminPlanInvitePayload;
     };
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
@@ -98,4 +119,5 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   affiliate: "Affiliate Invite",
   affiliate_notice: "Affiliate notice",
   admin_plan_log: "Plan update",
+  admin_plan_invite: "Plan request",
 };

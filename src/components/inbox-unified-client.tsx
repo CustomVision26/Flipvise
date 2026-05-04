@@ -26,6 +26,10 @@ import {
   rejectTeamInvitationByIdAction,
 } from "@/actions/teams";
 import { acceptAffiliateInviteAction } from "@/actions/affiliates";
+import {
+  acceptAdminPlanInviteAction,
+  declineAdminPlanInviteAction,
+} from "@/actions/admin-plan-invite";
 import { ViewQuizResultDialog } from "@/components/view-quiz-result-dialog";
 import type { UnifiedInboxItem, InboxItemType } from "@/lib/inbox-item-types";
 import { INBOX_TYPE_LABELS } from "@/lib/inbox-item-types";
@@ -65,6 +69,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   billing: <Receipt className="size-4 text-emerald-400" aria-hidden />,
   affiliate: <Megaphone className="size-4 text-amber-400" aria-hidden />,
   affiliate_notice: <CircleAlert className="size-4 text-orange-400" aria-hidden />,
+  admin_plan_invite: <Shield className="size-4 text-violet-400" aria-hidden />,
   admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
 };
 
@@ -75,11 +80,12 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
     if (sort === "type") {
       const typeOrder: Record<InboxItemType, number> = {
         team_invite: 0,
-        quiz_result: 1,
-        billing: 2,
-        affiliate: 3,
-        affiliate_notice: 4,
-        admin_plan_log: 5,
+        admin_plan_invite: 1,
+        quiz_result: 2,
+        billing: 3,
+        affiliate: 4,
+        affiliate_notice: 5,
+        admin_plan_log: 6,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -147,6 +153,64 @@ function TeamInviteActions({
           onClick={handleDecline}
         >
           Decline
+        </Button>
+      </div>
+      {error && <p className="text-xs text-rose-500">{error}</p>}
+    </div>
+  );
+}
+
+function AdminPlanInviteActions({
+  item,
+  onMutate,
+}: {
+  item: UnifiedInboxItem & { type: "admin_plan_invite" };
+  onMutate: () => void;
+}) {
+  const [pending, setPending] = useState<"accept" | "decline" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (item.payload.status !== "pending") return null;
+
+  async function handleAccept() {
+    setPending("accept");
+    setError(null);
+    try {
+      await acceptAdminPlanInviteAction({ inviteId: item.payload.inviteId });
+      onMutate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to accept");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function handleDecline() {
+    setPending("decline");
+    setError(null);
+    try {
+      await declineAdminPlanInviteAction({ inviteId: item.payload.inviteId });
+      onMutate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to decline");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-2">
+        <Button size="sm" disabled={pending !== null} onClick={handleAccept}>
+          {pending === "accept" ? "Accepting…" : "Accept"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending !== null}
+          onClick={handleDecline}
+        >
+          {pending === "decline" ? "Declining…" : "Decline"}
         </Button>
       </div>
       {error && <p className="text-xs text-rose-500">{error}</p>}
@@ -288,6 +352,21 @@ function InboxItemRow({
                     : "Invite withdrawn"}
               </Badge>
             )}
+            {item.type === "admin_plan_invite" && item.payload.status === "pending" && (
+              <Badge variant="secondary" className="shrink-0 text-xs">
+                Action needed
+              </Badge>
+            )}
+            {item.type === "admin_plan_invite" && item.payload.status === "declined" && (
+              <Badge variant="destructive" className="shrink-0 text-xs">
+                Declined
+              </Badge>
+            )}
+            {item.type === "admin_plan_invite" && item.payload.status === "superseded" && (
+              <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
+                Replaced
+              </Badge>
+            )}
             {item.type === "admin_plan_log" && (
               <Badge
                 variant="outline"
@@ -357,6 +436,10 @@ function InboxItemRow({
               </a>
             )}
           </div>
+        )}
+
+        {item.type === "admin_plan_invite" && (
+          <AdminPlanInviteActions item={item} onMutate={onMutate} />
         )}
 
         {item.type === "affiliate" && (

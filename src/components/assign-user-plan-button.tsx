@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { applyAdminUserPlanAssignmentAction } from "@/actions/admin";
+import { createAdminPlanAssignmentInviteAction } from "@/actions/admin";
 import { AdminUserIdentityBlock } from "@/components/admin-user-identity-block";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,7 +134,7 @@ export function AssignUserPlanButton({
     setError(null);
     startTransition(async () => {
       try {
-        await applyAdminUserPlanAssignmentAction({
+        await createAdminPlanAssignmentInviteAction({
           targetUserId,
           assignment: pending,
         });
@@ -220,11 +220,11 @@ export function AssignUserPlanButton({
       >
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm plan assignment</AlertDialogTitle>
+            <AlertDialogTitle>Send plan assignment request</AlertDialogTitle>
             <AlertDialogDescription>
-              This updates Clerk <strong>public metadata</strong> for the user
-              below. It does <strong>not</strong> create or cancel paid
-              subscriptions in the Clerk Dashboard.
+              The user will get an inbox message and must <strong>accept</strong> before any plan
+              change is applied. If they have an active Stripe subscription, accepting may update
+              their subscription with proration.
             </AlertDialogDescription>
             <div className="space-y-3 text-left text-sm text-muted-foreground">
               {/* ── Resolution context ── */}
@@ -271,32 +271,18 @@ export function AssignUserPlanButton({
                   <>
                     <div className="border-t border-border my-1" />
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-muted-foreground">After assignment</span>
+                      <span className="text-muted-foreground">Plan if accepted</span>
                       <span className="font-semibold text-foreground">
-                        {pending === "free"
-                          ? billingStatus === "active" || billingStatus === "trialing"
-                            ? `${billingPlan ?? "billing plan"} (billing wins)`
-                            : "Free"
-                          : billingStatus === "active" || billingStatus === "trialing"
-                          ? "Newer timestamp wins"
-                          : labelForAdminPlanAssignment(pending)}
+                        {labelForAdminPlanAssignment(pending)}
                       </span>
                     </div>
                   </>
                 )}
               </div>
 
-              {pending && (
-                <p className="text-foreground font-medium">
-                  Assigning: {labelForAdminPlanAssignment(pending)}
-                </p>
-              )}
               <p>
-                The in-app and admin &ldquo;Plan&rdquo; row reads these fields. Real
-                billing and invoices are unchanged. The user may need a new
-                session for Clerk&rsquo;s <code className="text-xs">has()</code> plan
-                checks to match&mdash;ask them to sign out and back in if
-                entitlements look wrong.
+                Nothing changes on their account until they open the dashboard inbox and click{" "}
+                <strong>Accept</strong>. They can also decline the request.
               </p>
               <AdminUserIdentityBlock
                 name={targetUserName}
@@ -326,7 +312,7 @@ export function AssignUserPlanButton({
               }}
               disabled={isPending}
             >
-              {isPending ? "Applying…" : "Apply assignment"}
+              {isPending ? "Sending…" : "Send request"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

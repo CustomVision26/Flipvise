@@ -1,4 +1,3 @@
-import dynamic from "next/dynamic";
 import { createClerkClient } from "@clerk/backend";
 import { promises as fs } from "fs";
 import path from "path";
@@ -63,27 +62,9 @@ import type {
   SerializedUser,
 } from "@/lib/admin-dashboard-types";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AdminTabsDynamic } from "@/components/admin-tabs-dynamic";
 import { Users, CreditCard, Layers, ArrowLeft, ShieldCheck } from "lucide-react";
 import { PaidSubscribersCard } from "@/components/paid-subscribers-card";
-
-const AdminTabs = dynamic(
-  () => import("@/components/admin-tabs").then((m) => m.AdminTabs),
-  {
-    ssr: true,
-    loading: () => (
-      <div
-        className="rounded-tl-none border border-t-0 p-4 space-y-3"
-        aria-busy
-        aria-label="Loading admin panel"
-      >
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-9 w-full max-w-md" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    ),
-  },
-);
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -675,7 +656,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Tabbed panel — All Users / Admin Roles / Audit Log */}
-      <AdminTabs
+      <AdminTabsDynamic
         currentUserId={userId}
         callerIsSuperadmin={callerIsSuperadmin}
         users={serializedUsers}

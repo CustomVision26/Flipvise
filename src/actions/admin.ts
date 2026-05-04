@@ -16,10 +16,13 @@ import {
 } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { isAdminPlanAssignment } from "@/lib/admin-assignable-plans";
-import { applyPlanUpgrade } from "@/lib/apply-plan-upgrade";
 import { countTeamsForOwner, insertTeam } from "@/db/queries/teams";
 import { insertTeamWorkspaceEvent } from "@/db/queries/team-workspace-events";
-import { isTeamPlanId, limitsForPlan, TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
+import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
+import {
+  insertAdminPlanAssignmentInvite,
+  supersedePendingAdminPlanInvitesForUser,
+} from "@/db/queries/admin-plan-invites";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -78,13 +81,6 @@ const applyPlanAssignmentSchema = z.object({
 
 type ApplyPlanAssignmentInput = z.infer<typeof applyPlanAssignmentSchema>;
 
-function planSlugToDisplayName(slug: string | null | undefined): string {
-  if (!slug || slug === "free") return "Free";
-  if (slug === "pro") return "Pro";
-  if (isTeamPlanId(slug)) return TEAM_PLAN_LABELS[slug as TeamPlanId];
-  return slug;
-}
-
 function previousPlanSlugFromMeta(meta: Record<string, unknown>): string | null {
   const adminPlan = typeof meta.adminPlan === "string" ? meta.adminPlan : null;
   const plan = typeof meta.plan === "string" ? meta.plan : null;
@@ -93,11 +89,10 @@ function previousPlanSlugFromMeta(meta: Record<string, unknown>): string | null 
 }
 
 /**
- * Applies a plan to the target user via `applyPlanUpgrade` (Stripe proration when applicable,
- * otherwise Clerk admin-plan metadata). Logs to `admin_plan_assignment_logs` (surfaced in the
- * user’s dashboard inbox) and does not use the marketing-affiliate invite flow.
+ * Creates a plan assignment request in the target user's inbox. Nothing is applied until they accept.
+ * Older pending requests for the same user are marked superseded.
  */
-export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignmentInput) {
+export async function createAdminPlanAssignmentInviteAction(data: ApplyPlanAssignmentInput) {
   const { userId, caller } = await requirePlatformAdminActor();
 
   const parsed = applyPlanAssignmentSchema.safeParse(data);
@@ -120,28 +115,19 @@ export async function applyAdminUserPlanAssignmentAction(data: ApplyPlanAssignme
     [target.firstName, target.lastName].filter(Boolean).join(" ") ||
     target.username ||
     targetUserId;
-  const targetEmail =
-    target.emailAddresses.find((e) => e.id === target.primaryEmailAddressId)
-      ?.emailAddress ?? null;
   const callerName =
     [caller.firstName, caller.lastName].filter(Boolean).join(" ") ||
     caller.username ||
     userId;
 
-  // Apply the plan — prorates an active Stripe subscription when one exists;
-  // falls back to a Clerk-metadata-only write when there is none.
-  const planResult = await applyPlanUpgrade(targetUserId, assignment);
-
-  await logAdminPlanAssignment({
+  await supersedePendingAdminPlanInvitesForUser(targetUserId);
+  await insertAdminPlanAssignmentInvite({
     targetUserId,
-    targetUserName: targetName,
-    targetUserEmail: targetEmail,
-    action: assignment === "free" ? "plan_removed" : "plan_assigned",
-    planName: planSlugToDisplayName(assignment),
-    previousPlanName: planSlugToDisplayName(previousSlug),
     assignedByUserId: userId,
     assignedByName: callerName,
-    planApplicationPath: planResult.path,
+    targetUserName: targetName,
+    assignment,
+    previousPlanSlug: previousSlug,
   });
 
   revalidatePath("/admin");

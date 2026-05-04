@@ -1,0 +1,6 @@
+Reading config file 'C:\Users\Lenovo\Documents\Project Folder\UdemyCourse\Flipvise\drizzle.config.local.ts'
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+[dotenv@17.3.1] injecting env (26) from .env.local -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+Using '@neondatabase/serverless' driver for database querying
+ Warning  '@neondatabase/serverless' can only connect to remote Neon/Vercel Postgres/Supabase instances through a websocket
+[⣷] applying migrations...[2K[1G[⣯] applying migrations...[2K[1G[⣟] applying migrations...[2K[1G[⣟] applying migrations...
