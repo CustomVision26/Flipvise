@@ -33,13 +33,18 @@ export async function insertAdminPlanAssignmentInvite(data: {
   });
 }
 
+/** When migration `0020_admin_plan_assignment_invites` is not applied yet, returns []. */
 export async function listAdminPlanInvitesForInbox(targetUserId: string, limit = 80) {
-  return db
-    .select()
-    .from(adminPlanAssignmentInvites)
-    .where(eq(adminPlanAssignmentInvites.targetUserId, targetUserId))
-    .orderBy(desc(adminPlanAssignmentInvites.createdAt))
-    .limit(limit);
+  try {
+    return await db
+      .select()
+      .from(adminPlanAssignmentInvites)
+      .where(eq(adminPlanAssignmentInvites.targetUserId, targetUserId))
+      .orderBy(desc(adminPlanAssignmentInvites.createdAt))
+      .limit(limit);
+  } catch {
+    return [];
+  }
 }
 
 export async function getPendingAdminPlanInviteForUser(inviteId: number, targetUserId: string) {

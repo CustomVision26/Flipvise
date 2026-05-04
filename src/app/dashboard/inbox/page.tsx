@@ -53,7 +53,7 @@ export default async function DashboardInboxPage() {
     listBillingInvoicesForUser(userId, inboxEmail),
     getAllAffiliatesByEmailOrUserId(inboxEmail, userId),
     listAdminPlanAssignmentInboxLogsForUser(userId, 100),
-    tryTeamQuery(() => listAdminPlanInvitesForInbox(userId, 80), []),
+    listAdminPlanInvitesForInbox(userId, 80),
     getInboxReadsForUser(userId),
   ]);
 
