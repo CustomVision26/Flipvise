@@ -4,6 +4,7 @@ import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { UserBillingPage } from "@/components/user-billing-page";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { SettingsMenu } from "@/components/settings-menu";
@@ -100,14 +101,18 @@ export function HeaderUserSection({
       ? "Pro"
       : "Free";
 
-  const fullPlanTooltip =
-    activeTeamPlan != null
-      ? `${planName} plan`
-      : isPro
-        ? adminGranted
-          ? "Pro plan (complimentary)"
-          : "Pro plan"
-        : "Free plan";
+  const fullPlanTooltip = useMemo(() => {
+    if (activeTeamPlan != null) {
+      return `${planName} plan`;
+    }
+    if (isPro) {
+      if (adminGranted) {
+        return "Pro plan (complimentary)";
+      }
+      return "Pro plan";
+    }
+    return "Free plan";
+  }, [activeTeamPlan, planName, isPro, adminGranted]);
 
   if (!userId) {
     return null;

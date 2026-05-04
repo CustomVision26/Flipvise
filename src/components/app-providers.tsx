@@ -46,9 +46,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <ThemeStorageNormalize>
-        <ClerkWithTheme>
-          {children}
-        </ClerkWithTheme>
+        <ClerkWithTheme>{children}</ClerkWithTheme>
       </ThemeStorageNormalize>
     </ThemeProvider>
   );

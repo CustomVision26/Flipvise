@@ -290,19 +290,14 @@ export function WorkspaceContextDropdown({
                           aria-hidden
                         />
                         <span className="min-w-0 leading-snug">
-                          Showing {teams.length} of {totalEligibleTeamCount} team workspaces (Free
-                          personal shows up to {FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT}). Hover for
-                          details — upgrade to Personal Pro to access every team linked to your
-                          account.
+                          {`Showing ${teams.length} of ${totalEligibleTeamCount} team workspaces (Free personal shows up to ${FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT}). Hover for details — upgrade to Personal Pro to access every team linked to your account.`}
                         </span>
                       </button>
                     )}
                   />
                   <TooltipContent side="left" className="max-w-xs flex flex-col gap-2 text-xs">
                     <p className="text-background">
-                      Personal Pro unlocks the full list of team workspaces associated with your
-                      email across Flipvise. Upgrade to switch among all your teams without this
-                      limit.
+                      Personal Pro unlocks the full list of team workspaces associated with your email across Flipvise. Upgrade to switch among all your teams without this limit.
                     </p>
                     <Link
                       href="/pricing"

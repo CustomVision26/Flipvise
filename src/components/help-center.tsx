@@ -31,7 +31,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -859,7 +859,9 @@ export function HelpCenter() {
         >
           <HelpCircle className="h-[18px] w-[18px]" />
         </TooltipTrigger>
-        <TooltipContent side="bottom">Help Center</TooltipContent>
+        <TooltipContent side="bottom">
+          Help Center
+        </TooltipContent>
       </Tooltip>
       <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">

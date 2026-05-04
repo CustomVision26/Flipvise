@@ -9,14 +9,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+function inboxNavLabel(unreadCount: number): string {
+  const clamped = Math.min(unreadCount, 99);
+  if (clamped === 0) return "Inbox";
+  return `Inbox (${clamped} pending)`;
+}
+
 /** Header icon that links to `/dashboard/inbox` (team invitations). */
 export function InboxNavIconButton({
   unreadCount = 0,
 }: {
   unreadCount?: number;
 }) {
+  const label = inboxNavLabel(unreadCount);
   const clampedCount = Math.min(unreadCount, 99);
-  const label = clampedCount > 0 ? `Inbox (${clampedCount} pending)` : "Inbox";
 
   return (
     <Tooltip>

@@ -44,7 +44,7 @@ interface SettingsMenuProps {
   hasCustomColors?: boolean;
 }
 
-export function SettingsMenu({ 
+export function SettingsMenu({
   currentProTheme = "neutral",
   currentFreeTheme = "neutral",
   isPro = false,
@@ -108,7 +108,9 @@ export function SettingsMenu({
                 <DropdownMenuLabel className="text-foreground">
                   Interface Background
                   {hasCustomColors && (
-                    <span className="text-xs text-muted-foreground ml-1">(12 colors)</span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      (12 colors)
+                    </span>
                   )}
                 </DropdownMenuLabel>
                 <div className="px-2 py-1.5">
@@ -182,9 +184,7 @@ export function SettingsMenu({
 
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuLabel className="text-foreground">
-              Device
-            </DropdownMenuLabel>
+            <DropdownMenuLabel className="text-foreground">Device</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => setMicDialogOpen(true)}
               className="cursor-pointer gap-2"
