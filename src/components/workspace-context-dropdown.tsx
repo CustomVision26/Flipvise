@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSession } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronDown, Info, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,10 +40,16 @@ interface WorkspaceContextDropdownProps {
   totalEligibleTeamCount?: number;
   /** Selected team workspace, or null for personal (no cookie). */
   activeTeamId: number | null;
-  /** Personal `/dashboard` URL (no sensitive query string). */
+  /** Personal dashboard URL (may include `?userid=` / `plan=` for bookmarks; must match session). */
   personalWorkspaceHref?: string;
   /** Plan label next to "Personal" (e.g. Team Gold, Pro, Free). */
   personalPlanLabel?: string;
+  /** When the workspace list has no subscriber-owned team-tier row, use this for Team Dash (from layout / team-admin scope). */
+  teamDashFallback?: {
+    teamId: number;
+    planSlug: string;
+    teamMemberUrlParam: number;
+  } | null;
 }
 
 export function WorkspaceContextDropdown({
@@ -51,15 +58,17 @@ export function WorkspaceContextDropdown({
   activeTeamId,
   personalWorkspaceHref = "/dashboard",
   personalPlanLabel = "Free",
+  teamDashFallback = null,
 }: WorkspaceContextDropdownProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { session, isLoaded: sessionLoaded } = useSession();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [pending, setPending] = React.useState(false);
 
   const selectedTeam = teams.find((t) => t.id === activeTeamId);
-  const personalPrimaryLabel = "Personal";
+  const personalPrimaryLabel = "Personal Dash";
   const triggerLabel =
     activeTeamId === null || selectedTeam === undefined
       ? `${personalPrimaryLabel} · ${personalPlanLabel}`
@@ -72,6 +81,7 @@ export function WorkspaceContextDropdown({
   const personalMatches =
     q === "" ||
     "personal".includes(q) ||
+    personalPrimaryLabel.toLowerCase().includes(q) ||
     personalPlanLabel.toLowerCase().includes(q);
   const filteredTeams = React.useMemo(() => {
     if (q === "") return teams;
@@ -92,6 +102,31 @@ export function WorkspaceContextDropdown({
       (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
     );
   }, [teams]);
+
+  const subscriberOwnedTeamTierWorkspaces = React.useMemo(() => {
+    return teams.filter(
+      (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
+    );
+  }, [teams]);
+
+  const teamDashTarget = React.useMemo(() => {
+    if (subscriberOwnedTeamTierWorkspaces.length > 0) {
+      const activeOwned = activeTeamId
+        ? subscriberOwnedTeamTierWorkspaces.find((t) => t.id === activeTeamId)
+        : undefined;
+      return activeOwned ?? subscriberOwnedTeamTierWorkspaces[0] ?? null;
+    }
+
+    if (teamDashFallback != null) {
+      return {
+        id: teamDashFallback.teamId,
+        planUrlValue: teamDashFallback.planSlug,
+        teamMemberUrlParam: teamDashFallback.teamMemberUrlParam,
+      };
+    }
+
+    return null;
+  }, [subscriberOwnedTeamTierWorkspaces, activeTeamId, teamDashFallback]);
 
   /** Team workspaces this session user owns (same subscriber as Personal), filtered — only used when {@link subscriberOwnsTeamTierWorkspace}. */
   const subscriberOwnTeamsFiltered = React.useMemo(() => {
@@ -127,31 +162,62 @@ export function WorkspaceContextDropdown({
     (personalMatches && subscriberOwnsTeamTierWorkspace) ||
     (subscriberOwnsTeamTierWorkspace && subscriberOwnTeamsFiltered.length > 0);
 
+  async function refreshSessionCookieForAction() {
+    try {
+      await session?.getToken();
+    } catch {
+      // Session may be stale; server action will fail and we recover in catch.
+    }
+  }
+
   async function selectPersonal() {
+    if (!sessionLoaded) return;
     setPending(true);
     try {
+      await refreshSessionCookieForAction();
       await setTeamContextCookieAction(null);
       setOpen(false);
       setQuery("");
-      router.push(personalWorkspaceHref);
-      router.refresh();
+      requestAnimationFrame(() => {
+        router.push(personalWorkspaceHref);
+        router.refresh();
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === "Unauthorized") {
+        router.push("/");
+        return;
+      }
+      throw err;
     } finally {
       setPending(false);
     }
   }
 
   async function selectTeam(team: TeamWorkspaceNavTeam) {
+    if (!sessionLoaded) return;
     setPending(true);
     try {
+      await refreshSessionCookieForAction();
       await setTeamContextCookieAction(team.id);
       setOpen(false);
       setQuery("");
-      router.push(
-        buildTeamWorkspaceDashboardPath({
-          teamId: team.id,
-        }),
-      );
-      router.refresh();
+      requestAnimationFrame(() => {
+        router.push(
+          buildTeamWorkspaceDashboardPath({
+            teamId: team.id,
+            ownerUserId: team.ownerUserId,
+            planSlug: team.planUrlValue,
+            teamMemberUrlParam: team.teamMemberUrlParam,
+          }),
+        );
+        router.refresh();
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === "Unauthorized") {
+        router.push("/");
+        return;
+      }
+      throw err;
     } finally {
       setPending(false);
     }
@@ -166,7 +232,7 @@ export function WorkspaceContextDropdown({
 
   function teamWorkspaceMenuItem(t: TeamWorkspaceNavTeam) {
     const isActive = t.id === activeTeamId;
-    const teamAdminHref = buildTeamAdminPath(t.id);
+    const teamAdminHref = buildTeamAdminPath(t.id, t.teamMemberUrlParam);
     return (
       <DropdownMenuItem
         key={t.id}
@@ -175,7 +241,7 @@ export function WorkspaceContextDropdown({
           void selectTeam(t);
         }}
         className="cursor-pointer gap-2 items-start py-2 pr-1.5"
-        disabled={pending}
+        disabled={pending || !sessionLoaded}
       >
         <Check
           className={cn(
@@ -225,7 +291,7 @@ export function WorkspaceContextDropdown({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
-        disabled={pending}
+        disabled={pending || !sessionLoaded}
         render={(props) => (
           <Button
             {...props}
@@ -265,7 +331,7 @@ export function WorkspaceContextDropdown({
               placeholder="Search workspaces…"
               className="h-9 bg-background pl-9"
               autoComplete="off"
-              disabled={pending}
+              disabled={pending || !sessionLoaded}
               aria-label="Search workspaces"
             />
           </div>
@@ -316,7 +382,7 @@ export function WorkspaceContextDropdown({
               <DropdownMenuItem
                 onClick={() => void selectPersonal()}
                 className="cursor-pointer gap-2"
-                disabled={pending}
+                disabled={pending || !sessionLoaded}
               >
                 <Check
                   className={cn(
@@ -332,6 +398,31 @@ export function WorkspaceContextDropdown({
                 </span>
               </DropdownMenuItem>
             )}
+            {teamDashTarget != null && (
+                <div className="px-2 pb-1 pt-0.5">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-9 w-full text-xs font-medium"
+                    nativeButton={false}
+                    render={
+                      <Link
+                        href={buildTeamAdminPath(
+                          teamDashTarget.id,
+                          teamDashTarget.teamMemberUrlParam,
+                        )}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                          setOpen(false);
+                          setQuery("");
+                        }}
+                      />
+                    }
+                  >
+                    Team Admin Dash
+                  </Button>
+                </div>
+              )}
             {subscriberOwnsTeamTierWorkspace &&
               subscriberOwnTeamsFiltered.map((t) => teamWorkspaceMenuItem(t))}
             {/* ── Divider + label before invited workspaces (user doesn't own team-tier) ── */}

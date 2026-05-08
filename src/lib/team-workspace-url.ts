@@ -1,15 +1,11 @@
 /**
- * Team workspace URLs use only `team=<numeric id>` (session + DB enforce access).
- * Legacy keys (`userid`, `plan`, `teamMemberId`) are still accepted for redirects
- * until bookmarks expire.
+ * Team workspace dashboard links use `team`, `userid` (subscriber owner), `plan`, and `teamMemberId`
+ * (`0` = owner; else the viewer’s `team_members.id`). Access is still enforced server-side.
  */
 export const TEAM_WORKSPACE_QUERY = {
   team: "team",
-  /** @deprecated Legacy URL — ignored when building new links. */
   userid: "userid",
-  /** @deprecated Legacy URL — ignored when building new links. */
   plan: "plan",
-  /** @deprecated Legacy URL — ignored when building new links. */
   teamMemberId: "teamMemberId",
 } as const;
 
@@ -21,7 +17,7 @@ export type TeamWorkspaceNavTeam = {
   teamMemberUrlParam: number;
   /** Team subscription label (e.g. Team Basic) from `teams.planSlug`. */
   planLabel: string;
-  /** Clerk team plan id or `pro` — switcher / display only; URLs use `?team=` only. */
+  /** Clerk team plan id or `pro` — used in workspace dashboard query strings. */
   planUrlValue: string;
   /** Resolved owner display name for the workspace switcher. */
   ownerDisplayName: string;
@@ -40,8 +36,18 @@ export function buildTeamWorkspaceQueryString(input: { teamId: number }): string
   return p.toString();
 }
 
-export function buildTeamWorkspaceDashboardPath(input: { teamId: number }): string {
-  return `/dashboard?${buildTeamWorkspaceQueryString(input)}`;
+export function buildTeamWorkspaceDashboardPath(input: {
+  teamId: number;
+  ownerUserId: string;
+  planSlug: string;
+  teamMemberUrlParam: number;
+}): string {
+  const p = new URLSearchParams();
+  p.set(TEAM_WORKSPACE_QUERY.team, String(input.teamId));
+  p.set(TEAM_WORKSPACE_QUERY.userid, input.ownerUserId);
+  p.set(TEAM_WORKSPACE_QUERY.plan, input.planSlug);
+  p.set(TEAM_WORKSPACE_QUERY.teamMemberId, String(input.teamMemberUrlParam));
+  return `/dashboard?${p.toString()}`;
 }
 
 /** Append `?` or `&` and workspace query to a path that may already have a query. */

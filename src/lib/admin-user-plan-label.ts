@@ -5,7 +5,7 @@ import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
  * admin role (super/co-admin) → subscribed product (`publicMetadata.plan` or
  * `teamPlanId`) → `adminGranted` → active Stripe with no plan slug → Free.
  *
- * Superadmin/co-admin are roles, but both include Pro access automatically.
+ * Superadmin/co-admin are roles; both include Pro Plus–level gated features automatically (e.g. listen-to-card).
  */
 export function getAdminUserPlanColumnLabel(input: {
   isSuperadmin: boolean;
@@ -18,7 +18,7 @@ export function getAdminUserPlanColumnLabel(input: {
   const { isSuperadmin, isCoAdmin, adminGranted, planMeta, stripeSubscriptionActive } =
     input;
   if (isSuperadmin || isCoAdmin) {
-    return "Pro";
+    return "Pro Plus";
   }
 
   const p = planMeta?.trim();

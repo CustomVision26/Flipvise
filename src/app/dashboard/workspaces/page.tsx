@@ -39,7 +39,7 @@ export default async function ManageWorkspacesPage() {
   const defaultTeamForAdminLink = [...ownedTeams].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
   )[0]!;
-  const teamAdminBackHref = buildTeamAdminPath(defaultTeamForAdminLink.id);
+  const teamAdminBackHref = buildTeamAdminPath(defaultTeamForAdminLink.id, 0);
 
   return (
     <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
@@ -59,7 +59,7 @@ export default async function ManageWorkspacesPage() {
           )}
         >
           <ArrowLeft className="size-4" aria-hidden />
-          Back to workspace dashboard
+          Back To Team Dashboard
         </Link>
       </div>
 

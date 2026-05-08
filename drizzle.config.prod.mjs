@@ -6,6 +6,9 @@ import { defineConfig } from "drizzle-kit";
  * Production database URL for `npm run db:migrate:prod` / `db:push:prod` from your machine.
  * Create `.env.db.prod` in the repo root (gitignored) with e.g. `DATABASE_URL=postgresql://...`
  * — do not commit that file.
+ *
+ * This file is `.mjs` so `next build` TypeScript checking (production installs without devDependencies)
+ * does not require `drizzle-kit` typings.
  */
 config({ path: resolve(process.cwd(), ".env.db.prod") });
 
@@ -14,6 +17,6 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    url: process.env.DATABASE_URL,
   },
 });

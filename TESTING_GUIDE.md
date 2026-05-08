@@ -31,13 +31,15 @@
 
 1. **As Free User:**
    - Create a deck
-   - Try to add 9th card
-   - Should see error: "Free plan limit: 8 cards per deck. Upgrade to Pro..."
+   - Try to add a 6th card
+   - Should see an error citing the free cap (**5** cards per deck) and Pricing / upgrade
 
-2. **As Pro User with `75_cards_per_deck`:**
+2. **As Pro user:**
    - Create a deck
-   - Can add up to 75 cards
-   - Dashboard shows "75 cards per deck" in usage indicators
+   - Can add up to **30** cards per deck on personal decks
+
+3. **As Pro Plus (or team-tier subscriber personal workspace):**
+   - Can add up to **52** cards per deck (see usage indicators on the dashboard)
 
 ## Testing AI Generation
 
@@ -45,10 +47,10 @@
    - Open a deck
    - AI Generate button should show upgrade prompt
 
-2. **As Pro User with `ai_flashcard_generation` + `75_cards_per_deck`:**
+2. **As Pro (or higher) with `ai_flashcard_generation` and a sufficient per-deck cap:**
    - Open a deck with description
    - Click AI Generate button
-   - Select card count (5, 10, 15... up to 75)
+   - Select card count within your tier’s per-deck limit (e.g. up to **30** on Pro, **52** on Pro Plus)
    - Cards generate successfully
 
 ## How to Grant Pro Access for Testing
@@ -71,8 +73,8 @@ Admins automatically get all Pro features.
 
 ## Feature Checklist
 
-- [x] `unlimited_decks` - No 3-deck limit for Pro users
-- [x] `75_cards_per_deck` - 75 cards per deck for Pro users
+- [x] Paid tiers — Higher personal deck caps than free (**10** Pro, **15** Pro Plus); enforced via `maxPersonalDecks` (see `personal-plan-limits.ts`)
+- [x] `75_cards_per_deck` (legacy JWT flag name) — May still appear in Clerk; numeric per-deck caps are **30** (Pro) and **52** (Pro Plus) in code
 - [x] `ai_flashcard_generation` - AI card generation for Pro users
 - [x] `priority_support` - Priority support dialog access for Pro users
 - [x] `12_interface_colors` - 12 color themes for Pro users with this feature

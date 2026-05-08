@@ -10,6 +10,7 @@ import { getAccessContext } from "@/lib/access";
 import { syncPlatformAdminTeamTierInvitedMetadata } from "@/lib/platform-admin-team-tier-metadata";
 import {
   limitsForPlan,
+  isTeamPlanId,
   TEAM_PLAN_IDS,
   type TeamPlanId,
 } from "@/lib/team-plans";
@@ -30,13 +31,14 @@ import {
   insertTeamMember,
   insertDeckAssignment,
   deleteDeckAssignment,
-  transferTeamDeckBetweenWorkspaces,
+  attachPersonalDeckToOwnedTeamWorkspace,
   markInvitationAccepted,
   markInvitationRejected,
   revokePendingTeamInvitation,
   updateTeamMemberRole,
   getDecksForTeam,
   listTeamMembers,
+  roleReceivesDeckAssignments,
 } from "@/db/queries/teams";
 import {
   deleteTeamByOwner,
@@ -497,8 +499,8 @@ export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSc
   await assertCanManageTeam(userId, parsed.data.teamId);
 
   const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
-  if (!member || member.role !== "team_member") {
-    throw new Error("Assignments apply only to normal team members.");
+  if (!member || !roleReceivesDeckAssignments(member.role)) {
+    throw new Error("Assignments apply only to team members and team admins.");
   }
 
   const team = await getTeamById(parsed.data.teamId);
@@ -512,6 +514,7 @@ export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSc
     parsed.data.teamId,
     parsed.data.deckId,
     parsed.data.memberUserId,
+    userId,
   );
 
   revalidatePath("/dashboard/team-admin", "layout");
@@ -530,7 +533,7 @@ export async function unassignDeckFromMemberAction(data: z.infer<typeof unassign
   const parsed = unassignDeckSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  await assertCanManageTeam(userId, parsed.data.teamId);
+  await assertTeamOwner(userId, parsed.data.teamId);
 
   await deleteDeckAssignment(
     parsed.data.teamId,
@@ -541,37 +544,46 @@ export async function unassignDeckFromMemberAction(data: z.infer<typeof unassign
   revalidatePath("/dashboard/team-admin", "layout");
 }
 
-const transferTeamDeckWorkspaceSchema = z
-  .object({
-    deckId: z.number().int().positive(),
-    fromTeamId: z.number().int().positive(),
-    toTeamId: z.number().int().positive(),
-  })
-  .refine((d) => d.fromTeamId !== d.toTeamId, {
-    message: "Choose a different destination workspace.",
-  });
+const linkPersonalDeckToWorkspaceSchema = z.object({
+  teamId: z.number().int().positive(),
+  deckId: z.number().int().positive(),
+});
 
-export async function transferTeamDeckWorkspaceAction(
-  data: z.infer<typeof transferTeamDeckWorkspaceSchema>,
+export async function linkPersonalDeckToTeamWorkspaceAction(
+  data: z.infer<typeof linkPersonalDeckToWorkspaceSchema>,
 ) {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
-  const parsed = transferTeamDeckWorkspaceSchema.safeParse(data);
-  if (!parsed.success) {
-    const msg = parsed.error.issues[0]?.message ?? "Invalid input";
-    throw new Error(msg);
+  const parsed = linkPersonalDeckToWorkspaceSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await getTeamById(parsed.data.teamId);
+  if (!team || team.ownerUserId !== userId) {
+    throw new Error("Only the workspace subscriber can link personal decks.");
   }
 
-  await assertCanManageTeam(userId, parsed.data.fromTeamId);
-  await assertCanManageTeam(userId, parsed.data.toTeamId);
+  await assertCanManageTeam(userId, parsed.data.teamId);
 
-  await transferTeamDeckBetweenWorkspaces({
+  if (isTeamPlanId(team.planSlug)) {
+    const limits = limitsForPlan(team.planSlug);
+    const inWorkspace = await getDecksForTeam(team.id, team.ownerUserId);
+    const alreadyCounted = inWorkspace.some((d) => d.id === parsed.data.deckId);
+    if (!alreadyCounted && inWorkspace.length >= limits.maxDecksPerWorkspace) {
+      throw new Error(
+        `Workspace deck limit reached — up to ${limits.maxDecksPerWorkspace} decks in this workspace on your plan.`,
+      );
+    }
+  }
+
+  await attachPersonalDeckToOwnedTeamWorkspace({
+    teamId: parsed.data.teamId,
     deckId: parsed.data.deckId,
-    fromTeamId: parsed.data.fromTeamId,
-    toTeamId: parsed.data.toTeamId,
+    subscriberUserId: userId,
   });
 
+  revalidatePath("/dashboard");
+  revalidatePath(`/decks/${parsed.data.deckId}`);
   revalidatePath("/dashboard/team-admin", "layout");
 }
 

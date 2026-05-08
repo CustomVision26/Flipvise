@@ -90,6 +90,7 @@ interface FlashcardStudyProps {
   deckId: number;
   deckName: string;
   deckGradient?: string | null;
+  hasAiReading?: boolean;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -104,7 +105,13 @@ function shuffleArray<T>(arr: T[]): T[] {
 const FLIP_DURATION_MS = 560;
 const SLIDE_MS = 260;
 
-export function FlashcardStudy({ cards, deckId, deckName, deckGradient }: FlashcardStudyProps) {
+export function FlashcardStudy({
+  cards,
+  deckId,
+  deckName,
+  deckGradient,
+  hasAiReading = false,
+}: FlashcardStudyProps) {
   const router = useRouter();
   const cardGradient = getGradientBySlug(deckGradient);
   const hasGradient = cardGradient.slug !== "none";
@@ -453,7 +460,7 @@ export function FlashcardStudy({ cards, deckId, deckName, deckGradient }: Flashc
               <span className="text-muted-foreground hidden sm:inline">incorrect</span>
             </div>
           </div>
-          <VoiceSelector voice={voice} onChange={setVoice} />
+          {hasAiReading ? <VoiceSelector voice={voice} onChange={setVoice} /> : null}
         </div>
       </div>
 
@@ -577,7 +584,7 @@ export function FlashcardStudy({ cards, deckId, deckName, deckGradient }: Flashc
       </div>
 
       {/* Listen row — outside the card so clicks never trigger the flip */}
-      {(currentCard.front || currentCard.back) && (
+      {hasAiReading && (currentCard.front || currentCard.back) && (
         <div className="flex items-center justify-center gap-3">
           {!isFlipped && currentCard.front && (
             <SpeakButton

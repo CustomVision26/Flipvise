@@ -1,11 +1,18 @@
 /**
  * Subscriber team admin (`/dashboard/team-admin` and nested routes).
- * URLs use only `team=<workspace id>`; the signed-in user must own or co-admin the team.
+ * URLs use `team=<workspace id>` and `teamMemberId=`:
+ * - **`teamMemberId=0`** — subscriber / workspace owner: full personal deck library on Personal
+ *   Dashboard, every workspace they created, Team Admin for all subscriber-owned workspaces.
+ * - **Non-zero** — viewer’s `team_members.id` (invited co-admin or member): Team Admin and nav are
+ *   scoped to invited workspaces; on `/dashboard?team=` they only see decks **assigned** to them.
+ * The signed-in user must own or co-admin the team.
  *
  * Primary surfaces: `/members`, `/ws-history`, `/quiz-results`, `/invite-members/send-invite` (and sibling invite URLs including `/invite-members/invitation-history`), Deck Manager under `/deck-manager/…`.
  */
 
 const TEAM_ADMIN_TEAM_PARAM = "team";
+/** Bookmark param — viewer’s `team_members.id`, or `0` for subscriber owner (matches workspace nav). */
+const TEAM_ADMIN_TEAM_MEMBER_PARAM = "teamMemberId";
 
 /** Primary dashboard — members tab content (`?team=`). */
 export const TEAM_ADMIN_MEMBERS_PATH = "/dashboard/team-admin/members";
@@ -36,11 +43,7 @@ export const TEAM_ADMIN_INVITE_HISTORY_LEGACY_PATH =
 export const TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH =
   "/dashboard/team-admin/deck-manager/assign-decks-to-members";
 
-/** Deck Manager — move deck between subscriber-owned workspaces (bookmarkable). */
-export const TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH =
-  "/dashboard/team-admin/deck-manager/move-deck-to-another-ws";
-
-/** True when `pathname` is under Deck Manager (assign or move-deck). */
+/** True when `pathname` is under Deck Manager. */
 export function isTeamAdminDeckManagerPath(pathname: string): boolean {
   return pathname.startsWith("/dashboard/team-admin/deck-manager");
 }
@@ -101,58 +104,98 @@ export function isTeamAdminInviteMembersSubPath(pathname: string): boolean {
   );
 }
 
-export function buildTeamAdminSearchParams(teamId?: number | null): string {
-  if (teamId == null || !Number.isFinite(teamId) || teamId <= 0) return "";
+export function buildTeamAdminQueryString(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
   const p = new URLSearchParams();
-  p.set(TEAM_ADMIN_TEAM_PARAM, String(teamId));
+  if (teamId != null && Number.isFinite(teamId) && teamId > 0) {
+    p.set(TEAM_ADMIN_TEAM_PARAM, String(teamId));
+  }
+  if (
+    teamMemberId != null &&
+    Number.isFinite(teamMemberId) &&
+    teamMemberId >= 0
+  ) {
+    p.set(TEAM_ADMIN_TEAM_MEMBER_PARAM, String(teamMemberId));
+  }
   return p.toString();
 }
 
-export function buildTeamAdminMembersPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
+/** Alias for callers that historically only named `team` (+ optional `teamMemberId`). */
+export function buildTeamAdminSearchParams(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  return buildTeamAdminQueryString(teamId, teamMemberId);
+}
+
+export function buildTeamAdminMembersPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_MEMBERS_PATH}?${qs}` : TEAM_ADMIN_MEMBERS_PATH;
 }
 
-export function buildTeamAdminWsHistoryPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
+export function buildTeamAdminWsHistoryPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_WS_HISTORY_PATH}?${qs}` : TEAM_ADMIN_WS_HISTORY_PATH;
 }
 
-export function buildTeamAdminQuizResultsPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
+export function buildTeamAdminQuizResultsPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_QUIZ_RESULTS_PATH}?${qs}` : TEAM_ADMIN_QUIZ_RESULTS_PATH;
 }
 
-export function buildTeamAdminInviteSendPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
+export function buildTeamAdminInviteSendPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_INVITE_SEND_PATH}?${qs}` : TEAM_ADMIN_INVITE_SEND_PATH;
 }
 
-export function buildTeamAdminInvitePendingPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
-  return qs ? `${TEAM_ADMIN_INVITE_PENDING_PATH}?${qs}` : TEAM_ADMIN_INVITE_PENDING_PATH;
+export function buildTeamAdminInvitePendingPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs
+    ? `${TEAM_ADMIN_INVITE_PENDING_PATH}?${qs}`
+    : TEAM_ADMIN_INVITE_PENDING_PATH;
 }
 
-export function buildTeamAdminInviteHistoryPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
-  return qs ? `${TEAM_ADMIN_INVITE_HISTORY_PATH}?${qs}` : TEAM_ADMIN_INVITE_HISTORY_PATH;
+export function buildTeamAdminInviteHistoryPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs
+    ? `${TEAM_ADMIN_INVITE_HISTORY_PATH}?${qs}`
+    : TEAM_ADMIN_INVITE_HISTORY_PATH;
 }
 
-/** Canonical link to the team admin dashboard (members). Alias of {@link buildTeamAdminMembersPath}. */
-export function buildTeamAdminPath(teamId?: number | null): string {
-  return buildTeamAdminMembersPath(teamId);
+/** Canonical link to the team admin dashboard (members). */
+export function buildTeamAdminPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  return buildTeamAdminMembersPath(teamId, teamMemberId);
 }
 
-export function buildTeamAdminAssignDecksToMembersPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
+export function buildTeamAdminAssignDecksToMembersPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs
     ? `${TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH}?${qs}`
     : TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH;
-}
-
-export function buildTeamAdminMoveDeckToAnotherWsPath(teamId?: number | null): string {
-  const qs = buildTeamAdminSearchParams(teamId);
-  return qs
-    ? `${TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH}?${qs}`
-    : TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH;
 }

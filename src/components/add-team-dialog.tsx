@@ -24,7 +24,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTeamAction } from "@/actions/teams";
-import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import type { TeamPlanId } from "@/lib/team-plans";
 
 interface AddTeamDialogProps {
@@ -61,17 +60,13 @@ export function AddTeamDialog({
 
     setIsPending(true);
     try {
-      const { teamId } = await createTeamAction({
+      await createTeamAction({
         name: trimmed,
         planSlug,
       });
       setOpen(false);
       setName("");
-      router.push(
-        buildTeamWorkspaceDashboardPath({
-          teamId,
-        }),
-      );
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create team.");

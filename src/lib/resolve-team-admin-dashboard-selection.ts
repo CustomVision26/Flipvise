@@ -1,5 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { teams } from "@/db/schema";
+import { getMemberRecord } from "@/db/queries/teams";
 
 export type TeamAdminDashboardTeamRow = InferSelectModel<typeof teams>;
 
@@ -10,23 +11,52 @@ export type ResolveTeamAdminDashboardSelectionResult =
       selected: TeamAdminDashboardTeamRow;
       teamsForSubscriber: TeamAdminDashboardTeamRow[];
       subscriberTeamIds: number[];
+      /** `0` when the viewer is the workspace/subscriber owner; else `team_members.id` for invited roles. */
+      viewerTeamMemberUrlParam: number;
     };
 
+/** `0` = subscriber owner (full personal library + all owned workspaces); non-zero = invited row id. */
+export async function teamMemberUrlParamForTeamAdmin(
+  team: TeamAdminDashboardTeamRow,
+  viewerUserId: string,
+): Promise<number> {
+  if (team.ownerUserId === viewerUserId) return 0;
+  const row = await getMemberRecord(team.id, viewerUserId);
+  return row?.id ?? 0;
+}
+
+function parseTeamMemberIdQuery(raw: string | undefined): number | null {
+  if (raw == null || String(raw).trim() === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 /**
- * Resolves the active workspace for team-admin routes from `?team=`, team cookie, and legacy params.
+ * Resolves the active workspace for team-admin routes from `?team=`, `?teamMemberId=`, cookie, and legacy params.
  * When the URL is not canonical, returns a redirect target (caller runs `redirect(to)`).
  */
-export function resolveTeamAdminDashboardSelection(
+export async function resolveTeamAdminDashboardSelection(
   manageTeams: TeamAdminDashboardTeamRow[],
   input: {
+    viewerUserId: string;
     teamParam: string | undefined;
+    teamMemberIdParam?: string | undefined;
     cookieTeamRaw: string | undefined;
     useridParam?: string;
     planParam?: string;
-    buildCanonicalPath: (teamId: number) => string;
+    buildCanonicalPath: (teamId: number, teamMemberUrlParam: number) => string;
   },
-): ResolveTeamAdminDashboardSelectionResult {
-  const { teamParam, cookieTeamRaw, useridParam, planParam, buildCanonicalPath } = input;
+): Promise<ResolveTeamAdminDashboardSelectionResult> {
+  const {
+    viewerUserId,
+    teamParam,
+    teamMemberIdParam,
+    cookieTeamRaw,
+    useridParam,
+    planParam,
+    buildCanonicalPath,
+  } = input;
 
   const rawFromQuery =
     teamParam != null && teamParam !== "" && !Number.isNaN(Number(teamParam))
@@ -69,8 +99,26 @@ export function resolveTeamAdminDashboardSelection(
     parsedTeamFromUrl !== null && parsedTeamFromUrl !== selected.id;
   const missingCanonicalTeamParam = parsedTeamFromUrl === null;
 
-  if (hasLegacyUserid || hasLegacyPlan || teamMismatch || missingCanonicalTeamParam) {
-    return { outcome: "redirect", to: buildCanonicalPath(selected.id) };
+  const expectedTeamMemberId = await teamMemberUrlParamForTeamAdmin(
+    selected,
+    viewerUserId,
+  );
+  const parsedTeamMemberFromUrl = parseTeamMemberIdQuery(teamMemberIdParam);
+  const missingOrMismatchTeamMember =
+    parsedTeamMemberFromUrl === null ||
+    parsedTeamMemberFromUrl !== expectedTeamMemberId;
+
+  if (
+    hasLegacyUserid ||
+    hasLegacyPlan ||
+    teamMismatch ||
+    missingCanonicalTeamParam ||
+    missingOrMismatchTeamMember
+  ) {
+    return {
+      outcome: "redirect",
+      to: buildCanonicalPath(selected.id, expectedTeamMemberId),
+    };
   }
 
   return {
@@ -78,5 +126,6 @@ export function resolveTeamAdminDashboardSelection(
     selected,
     teamsForSubscriber,
     subscriberTeamIds,
+    viewerTeamMemberUrlParam: expectedTeamMemberId,
   };
 }

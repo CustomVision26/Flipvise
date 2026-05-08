@@ -2,7 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import { getAccessContext } from "@/lib/access";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
-import { personalDashboardHref } from "@/lib/personal-dashboard-url";
+import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
@@ -116,10 +116,18 @@ export default async function PaidSubscribersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { userId } = await getAccessContext();
+  const access = await getAccessContext();
+  const { userId, activeTeamPlan, isPro, hasClerkPersonalPro, hasClerkPersonalProPlus } =
+    access;
   if (!userId) redirect("/");
 
-  const personalDashboardLink = personalDashboardHref();
+  const personalDashboardLink = personalDashboardHrefWithUserPlanQuery({
+    userId,
+    activeTeamPlan,
+    isPro,
+    hasClerkPersonalPro,
+    hasClerkPersonalProPlus,
+  });
 
   // Auth: must be a platform admin
   const { data: clerkUsers } = await clerkClient.users.getUserList({

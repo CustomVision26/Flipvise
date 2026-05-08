@@ -1,31 +1,41 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { getAccessContext } from "@/lib/access";
-import { personalDashboardHref } from "@/lib/personal-dashboard-url";
-import { PricingBackToDashboardButton } from "@/components/pricing-back-to-dashboard-button";
-import {
-  PricingContent,
-  type PlanConfig,
-} from "@/components/pricing-content";
+import { resolvePricingBackToDashboardHref } from "@/lib/pricing-back-dashboard-href";
+import { PricingContent } from "@/components/pricing-content";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolvePricingPageHighlightId } from "@/lib/pricing-page-current-plan";
+import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
 import {
   fetchStripePricingForPaidPlans,
   mergePlansConfigWithStripePricing,
 } from "@/lib/stripe-pricing-display";
-import plansConfigData from "@/data/plans-config.json";
 
 /** Stripe price snapshots must run at request time (env + live amounts). */
 export const dynamic = "force-dynamic";
 
 export default async function PricingPage() {
   const access = await getAccessContext();
-  const { userId, activeTeamPlan } = access;
+  const {
+    userId,
+    activeTeamPlan,
+    isPro,
+    hasClerkPersonalPro,
+    hasClerkPersonalProPlus,
+  } = access;
 
-  const personalDashboardLink =
-    userId == null ? "/" : personalDashboardHref();
+  const backHref =
+    userId != null
+      ? await resolvePricingBackToDashboardHref({
+          userId,
+          activeTeamPlan,
+          isPro,
+          hasClerkPersonalPro,
+          hasClerkPersonalProPlus,
+        })
+      : "/";
 
   const stripeSubRow =
     userId != null ? await getActiveStripeSubscription(userId) : null;
@@ -35,9 +45,10 @@ export default async function PricingPage() {
     stripeSubRow?.planSlug,
   );
 
+  const plansFromDisk = await readPlansConfigFromDisk();
   const stripePricing = await fetchStripePricingForPaidPlans();
   const plansForUi = mergePlansConfigWithStripePricing(
-    plansConfigData as PlanConfig[],
+    plansFromDisk,
     stripePricing,
   );
 
@@ -50,21 +61,15 @@ export default async function PricingPage() {
 
         {/* Back navigation */}
         <div className="flex justify-center">
-          {userId != null && activeTeamPlan !== null ? (
-            <PricingBackToDashboardButton href={personalDashboardLink}>
-              Back to Dashboard
-            </PricingBackToDashboardButton>
-          ) : (
-            <Link
-              href={personalDashboardLink}
-              className={
-                buttonVariants({ variant: "ghost", size: "sm" }) + " gap-2"
-              }
-            >
-              <ArrowLeft className="size-4" />
-              {userId ? "Back to Dashboard" : "Back to Home"}
-            </Link>
-          )}
+          <Link
+            href={backHref}
+            className={
+              buttonVariants({ variant: "ghost", size: "sm" }) + " gap-2"
+            }
+          >
+            <ArrowLeft className="size-4" />
+            {userId ? "Back to Dashboard" : "Back to Home"}
+          </Link>
         </div>
 
         {/* Heading */}

@@ -53,9 +53,11 @@ interface EditDeckDialogProps {
     coverImageUrl?: string | null;
     gradient?: string | null;
   };
+  /** Team-tier subscriber decks (scoped or migrated) may upload covers. */
+  allowCoverUpload: boolean;
 }
 
-export function EditDeckDialog({ deck }: EditDeckDialogProps) {
+export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(deck.name);
@@ -68,7 +70,7 @@ export function EditDeckDialog({ deck }: EditDeckDialogProps) {
   const [isPending, startTransition] = useTransition();
   const coverFileRef = useRef<HTMLInputElement>(null);
 
-  const showTeamDeckCover = deck.teamId !== null;
+  const showTeamDeckCover = allowCoverUpload;
 
   const nameSpeech = useSpeechRecognition((t) =>
     setName((prev) => (prev ? prev + " " + t.trim() : t.trim())),

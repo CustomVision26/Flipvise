@@ -24,11 +24,13 @@ export function TeamMemberDeckActions({
   deckName,
   cardCount,
   workspaceQueryString = "",
+  hasAiReading = false,
 }: {
   deckId: number;
   deckName: string;
   cardCount: number;
   workspaceQueryString?: string;
+  hasAiReading?: boolean;
 }) {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewCards, setPreviewCards] = React.useState<PreviewCard[]>([]);
@@ -86,6 +88,7 @@ export function TeamMemberDeckActions({
         cards={previewCards}
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
+        hasAiReading={hasAiReading}
       />
     </>
   );

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { decks, cards, type DeckRow } from "@/db/schema";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 export type { DeckRow };
 
 /** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` columns). */
@@ -64,7 +64,7 @@ export async function countPersonalDecksForUser(userId: string) {
   const [row] = await db
     .select({ n: count() })
     .from(decks)
-    .where(and(eq(decks.userId, userId), isNull(decks.teamId)));
+    .where(eq(decks.userId, userId));
   return Number(row?.n ?? 0);
 }
 
@@ -94,7 +94,7 @@ export async function getDecksByUserWithCardCount(userId: string) {
     );
 }
 
-/** Personal dashboard — excludes decks tied to a team workspace (`teamId` set). */
+/** Personal dashboard — entire deck library for the Clerk user (`decks.userId`). */
 export async function getPersonalDecksByUserWithCardCount(userId: string) {
   return db
     .select({
@@ -109,7 +109,7 @@ export async function getPersonalDecksByUserWithCardCount(userId: string) {
     })
     .from(decks)
     .leftJoin(cards, eq(cards.deckId, decks.id))
-    .where(and(eq(decks.userId, userId), isNull(decks.teamId)))
+    .where(eq(decks.userId, userId))
     .groupBy(
       decks.id,
       decks.userId,
@@ -119,6 +119,11 @@ export async function getPersonalDecksByUserWithCardCount(userId: string) {
       decks.createdAt,
       decks.updatedAt,
     );
+}
+
+/** All decks authored by user (same rows as Personal dashboard) — for admin pickers subtracting workspace lists. */
+export async function getOwnedDecksByUserWithCardCount(userId: string) {
+  return getPersonalDecksByUserWithCardCount(userId);
 }
 
 export async function getDeckById(deckId: number, userId: string): Promise<DeckRow | null> {

@@ -1,4 +1,4 @@
-import { getTeamById } from "@/db/queries/teams";
+import { getTeamById, getTeamsByOwner } from "@/db/queries/teams";
 import { isTeamPlanId } from "@/lib/team-plans";
 
 /**
@@ -8,8 +8,12 @@ import { isTeamPlanId } from "@/lib/team-plans";
  */
 export async function deckHasTeamTierProFeatures(deck: {
   teamId: number | null;
+  userId: string;
 }): Promise<boolean> {
-  if (deck.teamId == null) return false;
-  const team = await getTeamById(deck.teamId);
-  return team != null && isTeamPlanId(team.planSlug);
+  if (deck.teamId != null) {
+    const team = await getTeamById(deck.teamId);
+    return team != null && isTeamPlanId(team.planSlug);
+  }
+  const owned = await getTeamsByOwner(deck.userId);
+  return owned.some((t) => isTeamPlanId(t.planSlug));
 }

@@ -50,10 +50,10 @@ Your `/pricing` page currently shows:
 
 ### Step 4: Add Features to Pro Plan
 
-Add these features to your Pro plan:
-- ✅ `unlimited_decks` - Remove 3-deck limit
+Add these features to your Pro plan (JWT / entitlement flags; **numeric** deck and card caps are enforced in app code — see `src/lib/personal-plan-limits.ts`):
+- ✅ `unlimited_decks` - Legacy flag for paid deck entitlement (actual caps: **10** decks / **30** cards per deck on Pro)
 - ✅ `ai_flashcard_generation` - Enable AI card generation
-- ✅ `75_cards_per_deck` - Increase card limit from 8 to 75
+- ✅ `75_cards_per_deck` - Legacy flag for paid per-deck card entitlement (actual caps: **30** on Pro, **52** on Pro Plus)
 - ✅ `priority_support` - Enable priority support access
 - ✅ `12_interface_colors` - Unlock 12 color themes
 
@@ -101,7 +101,7 @@ Once you complete the setup:
 4. **Subscription created** → User automatically gets:
    - Pro plan assigned
    - All Pro features unlocked
-   - Access to unlimited decks, AI generation, priority support, etc.
+   - Access to paid-tier deck/card limits (e.g. **10**/**30** on Pro), AI generation, priority support, etc., per your Stripe plan and app limits
 5. **Features immediately available** in your app
 
 ## 🎯 Current Pricing Page Behavior

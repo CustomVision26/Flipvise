@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/clerk-auth";
 import { getTeamById } from "@/db/queries/teams";
-import { isTeamPlanId } from "@/lib/team-plans";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
+import { teamMemberUrlParamForTeamAdmin } from "@/lib/resolve-team-admin-dashboard-selection";
 
 /**
  * Legacy URL — team admin dashboard moved to `/dashboard/team-admin`.
@@ -27,9 +27,10 @@ export default async function LegacyTeamDashboardRedirect({
     const teamNum = Number(team);
     if (Number.isFinite(teamNum) && !Number.isNaN(teamNum)) {
       const row = await getTeamById(teamNum);
-      const plan =
-        row != null && isTeamPlanId(row.planSlug) ? row.planSlug : undefined;
-      redirect(buildTeamAdminPath(teamNum));
+      if (row) {
+        const tm = await teamMemberUrlParamForTeamAdmin(row, userId);
+        redirect(buildTeamAdminPath(teamNum, tm));
+      }
     }
     redirect(buildTeamAdminPath());
   }

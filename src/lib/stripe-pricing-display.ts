@@ -110,26 +110,40 @@ function majorCurrencyAmount(price: Stripe.Price): number | null {
   return roundMajor(smallest / divisor);
 }
 
-/** "$/mo" when the user picks Monthly — derives from the Price’s recurring cadence. */
-function displayMonthlyMajorFromMonthlyEnvPrice(price: Stripe.Price): number | null {
+/**
+ * Stripe charges `unit_amount` once per billing cycle (`interval` × `interval_count`).
+ * Convert that to an average major-unit amount per month for the pricing UI.
+ *
+ * Examples:
+ * - month × 1 → per-cycle amount is already monthly.
+ * - year × 1 → per-cycle amount is annual → ÷ 12.
+ * - month × 12 → billed once per year with an annual total → ÷ 12 (fixes incorrect Annual toggle).
+ */
+function monthsPerBillingCycle(rec: Stripe.Price.Recurring): number {
+  const n = rec.interval_count ?? 1;
+  switch (rec.interval) {
+    case "month":
+      return n;
+    case "year":
+      return 12 * n;
+    case "week":
+      return (n * 7) / (365 / 12);
+    case "day":
+      return n / (365 / 12);
+    default:
+      return 1;
+  }
+}
+
+/** Average $/month for a subscription Price (monthly + yearly env IDs both use this). */
+function majorPerMonthFromSubscriptionPrice(price: Stripe.Price): number | null {
   const perCycle = majorCurrencyAmount(price);
   if (perCycle == null || !price.currency) return null;
   const rec = price.recurring;
   if (!rec) return perCycle;
-  if (rec.interval === "month") return perCycle;
-  if (rec.interval === "year") return roundMajor(perCycle / 12);
-  return perCycle;
-}
-
-/** "$/mo billed annually" — derives from the yearly Price’s cadence. */
-function displayMonthlyEquivalentFromYearlyEnvPrice(price: Stripe.Price): number | null {
-  const perCycle = majorCurrencyAmount(price);
-  if (perCycle == null || !price.currency) return null;
-  const rec = price.recurring;
-  if (!rec) return null;
-  if (rec.interval === "year") return roundMajor(perCycle / 12);
-  if (rec.interval === "month") return perCycle;
-  return roundMajor(perCycle / 12);
+  const months = monthsPerBillingCycle(rec);
+  if (!Number.isFinite(months) || months <= 0) return null;
+  return roundMajor(perCycle / months);
 }
 
 async function retrievePrice(priceId: string): Promise<Stripe.Price> {
@@ -161,7 +175,7 @@ export async function fetchStripePricingForPaidPlans(): Promise<
       try {
         if (monthlyId) {
           const p = await retrievePrice(monthlyId);
-          monthlyMajor = displayMonthlyMajorFromMonthlyEnvPrice(p);
+          monthlyMajor = majorPerMonthFromSubscriptionPrice(p);
           if (p.currency) currency = p.currency;
         }
       } catch {
@@ -172,7 +186,7 @@ export async function fetchStripePricingForPaidPlans(): Promise<
         if (yearlyId) {
           const p = await retrievePrice(yearlyId);
           yearlyMonthlyEquivalentMajor =
-            displayMonthlyEquivalentFromYearlyEnvPrice(p);
+            majorPerMonthFromSubscriptionPrice(p);
           if (!currency && p.currency) currency = p.currency;
         }
       } catch {
@@ -216,12 +230,19 @@ export function mergePlansConfigWithStripePricing<
 
     return {
       ...plan,
+      /**
+       * `plans-config.json` (edited in `/admin/plans`) is the marketing source of truth for
+       * features and display prices. Stripe fills price gaps only when catalog omits an amount (`null`).
+       * Checkout writes the same feature bullets into `subscription_data.description` for Stripe invoices.
+       */
       monthlyPrice:
-        s.monthlyMajor != null ? s.monthlyMajor : plan.monthlyPrice,
+        plan.monthlyPrice != null
+          ? plan.monthlyPrice
+          : (s.monthlyMajor ?? plan.monthlyPrice),
       yearlyMonthlyPrice:
-        s.yearlyMonthlyEquivalentMajor != null
-          ? s.yearlyMonthlyEquivalentMajor
-          : plan.yearlyMonthlyPrice,
+        plan.yearlyMonthlyPrice != null
+          ? plan.yearlyMonthlyPrice
+          : (s.yearlyMonthlyEquivalentMajor ?? plan.yearlyMonthlyPrice),
     };
   });
 }

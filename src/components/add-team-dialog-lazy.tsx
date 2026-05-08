@@ -1,15 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { AddTeamDialog } from "@/components/add-team-dialog";
 import type { TeamPlanId } from "@/lib/team-plans";
-
-const AddTeamDialog = dynamic(
-  () =>
-    import("@/components/add-team-dialog").then((mod) => ({
-      default: mod.AddTeamDialog,
-    })),
-  { ssr: false },
-);
 
 export type AddTeamDialogLazyProps = {
   planSlug: TeamPlanId;
@@ -18,7 +10,9 @@ export type AddTeamDialogLazyProps = {
   triggerTooltip?: string;
 };
 
-/** Client-only lazy boundary so Server Components can render “Add workspace” without `dynamic(..., { ssr: false })`. */
+/**
+ * Client boundary for Server Components — no nested `dynamic({ ssr: false })` (Turbopack-safe).
+ */
 export function AddTeamDialogLazy(props: AddTeamDialogLazyProps) {
   return <AddTeamDialog {...props} />;
 }

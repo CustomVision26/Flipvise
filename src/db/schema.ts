@@ -141,10 +141,32 @@ export const teamDeckAssignments = pgTable(
       .notNull()
       .references(() => decks.id, { onDelete: 'cascade' }),
     memberUserId: varchar({ length: 255 }).notNull(),
+    /** Clerk user id of owner/co-admin who created this assignment (null for rows before audit). */
+    assignedByUserId: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex('team_deck_assign_uidx').on(t.teamId, t.deckId, t.memberUserId),
   ],
+);
+
+/**
+ * Subscriber-owned decks (`decks.userId` = workspace `teams.ownerUserId`) may be linked to
+ * multiple owned workspaces; `decks.teamId` stays null for that pattern. Native team-scoped
+ * decks may still use `decks.teamId` until normalized via link + null.
+ */
+export const deckWorkspaceLinks = pgTable(
+  'deck_workspace_links',
+  {
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    deckId: integer()
+      .notNull()
+      .references(() => decks.id, { onDelete: 'cascade' }),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('deck_workspace_links_team_deck_uidx').on(t.teamId, t.deckId)],
 );
 
 export const adminPrivilegeActionEnum = pgEnum('admin_privilege_action', [

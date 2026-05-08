@@ -11,13 +11,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getCardsByDeckUnscoped } from "@/db/queries/cards";
+import { isDeckLinkedToWorkspace } from "@/db/queries/teams";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   buildResolvedTeamWorkspaceQueryString,
   resolveTeamWorkspaceFromSearchParams,
   teamWorkspaceSearchParamsHaveLegacyIdentityFields,
 } from "@/lib/resolve-team-workspace-url";
-import { withTeamWorkspaceQuery, buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
+import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
 import { EditDeckDialog } from "./edit-deck-dialog";
 import { DeleteAllCardsDialog } from "./delete-all-cards-dialog";
@@ -53,12 +54,11 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
     teamWorkspaceUrl != null &&
     teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)
   ) {
-    redirect(
-      withTeamWorkspaceQuery(
-        `/decks/${id}`,
-        buildTeamWorkspaceQueryString({ teamId: teamWorkspaceUrl.teamId }),
-      ),
+    const fullQs = await buildResolvedTeamWorkspaceQueryString(
+      userId,
+      teamWorkspaceUrl,
     );
+    redirect(withTeamWorkspaceQuery(`/decks/${id}`, fullQs));
   }
   const workspaceQs =
     teamWorkspaceUrl != null
@@ -76,10 +76,11 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
 
   const deck = bundle.deck;
   const { heading: teamDeckHeading, teamTierPro } = await getTeamDeckContext(deck);
-  const fromTeamWorkspaceUrl =
+  const inWorkspaceContext =
     teamWorkspaceUrl != null &&
-    deck.teamId != null &&
-    deck.teamId === teamWorkspaceUrl.teamId;
+    ((deck.teamId != null && deck.teamId === teamWorkspaceUrl.teamId) ||
+      (await isDeckLinkedToWorkspace(teamWorkspaceUrl.teamId, deck.id)));
+  const fromTeamWorkspaceUrl = inWorkspaceContext;
   const dashboardHref =
     fromTeamWorkspaceUrl && workspaceQs
       ? `/dashboard?${workspaceQs}`
@@ -154,7 +155,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               deckCardLimit={deckCardLimit}
             />
             <div className="flex flex-wrap gap-2">
-              <EditDeckDialog deck={deck} />
+              <EditDeckDialog deck={deck} allowCoverUpload={teamTierPro} />
               {cards.length > 0 && (
                 <DeleteAllCardsDialog deckId={id} cardCount={cards.length} />
               )}

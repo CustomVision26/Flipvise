@@ -49,7 +49,7 @@ interface AddCardDialogProps {
   trigger?: React.ReactElement;
   isAtLimit?: boolean;
   hasAI?: boolean;
-  /** Pro personal (75 cards / deck) — Free users only get the standard card format in this dialog. */
+  /** Paid tiers — Free users only get the standard card format in this dialog. */
   allowsMultipleChoiceFormat?: boolean;
 }
 

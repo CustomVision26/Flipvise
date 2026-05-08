@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
@@ -7,17 +8,17 @@ import { HeaderLogo } from "@/components/header-logo";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
-import { isTeamPlanId } from "@/lib/team-plans";
-import { personalDashboardHref } from "@/lib/personal-dashboard-url";
+import { isTeamPlanId, TEAM_PLAN_LABELS } from "@/lib/team-plans";
+import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import {
   countPendingInvitationsForEmail,
+  getTeamMembershipsForUser,
   getTeamsForTeamDashboard,
   getWorkspaceNavTeamsForUser,
   userHasTeamAdminDashboardAccess,
 } from "@/db/queries/teams";
 import { currentUser } from "@/lib/clerk-auth";
-import { TeamAdminHeaderSwitcherClient } from "@/components/team-admin-header-switcher-client";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { shouldHideHelpCenter } from "@/lib/team-help";
 import {
@@ -36,6 +37,12 @@ import {
   teamWorkspaceTeamIdFromUrlShapeIfValid,
 } from "@/lib/resolve-team-workspace-url";
 import "./globals.css";
+
+/** Turbopack: avoid static SSR import of this client chunk from the root layout (fixes “module factory is not available”). */
+const TeamAdminHeaderSwitcherClient = dynamic(
+  () => import("@/components/team-admin-header-switcher-client"),
+  { loading: () => null },
+);
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -67,7 +74,16 @@ export default async function RootLayout({
 }>) {
   // Batch 1: session + cookies + headers — all independent, run in parallel
   const [
-    { userId, isPro, adminGranted, isAdmin, activeTeamPlan, hasCustomColors },
+    {
+      userId,
+      isPro,
+      adminGranted,
+      isAdmin,
+      activeTeamPlan,
+      hasCustomColors,
+      hasClerkPersonalPro,
+      hasClerkPersonalProPlus,
+    },
     cookieStore,
     headerStore,
   ] = await Promise.all([
@@ -97,16 +113,25 @@ export default async function RootLayout({
                   name: string;
                   ownerUserId: string;
                   workspacePlanQuery?: string;
+                  teamMemberUrlParam: number;
                 }[],
               };
             }
             const teams = await getTeamsForTeamDashboard(userId);
+            const memberships = await getTeamMembershipsForUser(userId);
+            const membershipByTeamId = new Map(
+              memberships.map((m) => [m.teamId, m] as const),
+            );
             return {
               teamAdminHeaderTeams: teams.map((t) => ({
                 id: t.id,
                 name: t.name,
                 ownerUserId: t.ownerUserId,
                 workspacePlanQuery: isTeamPlanId(t.planSlug) ? t.planSlug : undefined,
+                teamMemberUrlParam:
+                  t.ownerUserId === userId
+                    ? 0
+                    : (membershipByTeamId.get(t.id)?.id ?? 0),
               })),
             };
           }, { teamAdminHeaderTeams: [] })
@@ -143,15 +168,48 @@ export default async function RootLayout({
   const teamAdminHeaderTeams = teamAdminHeaderPayload.teamAdminHeaderTeams;
   const workspaceTeams = workspaceNav.teams;
   const workspaceTeamsTotalEligible = workspaceNav.totalEligibleCount;
-  const showWorkspaceSwitcher = workspaceTeamsTotalEligible > 0;
+  /** Team-tier subscribers often have zero `workspaceTeams` (owned tier workspaces are omitted from nav). Still show Personal · Team X + Team Admin link like invited-workspace users. */
+  const showWorkspaceSwitcher =
+    workspaceTeamsTotalEligible > 0 ||
+    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan));
 
-  // Team plan subscribers receive Pro on their personal workspace — show "Pro" here,
-  // not the team plan name (which belongs only to the team owner dashboard).
-  const personalPlanLabelForWorkspace = isPro ? "Pro" : "Free";
+  /** Next to “Personal Dash” — real team tier name when on a team subscription, else Pro/Free. */
+  const personalPlanLabelForWorkspace =
+    activeTeamPlan != null
+      ? TEAM_PLAN_LABELS[activeTeamPlan]
+      : isPro
+        ? "Pro"
+        : "Free";
+
+  /** When the workspace nav lacks subscriber-owned team rows, still link Team Dash from admin scope. */
+  const teamDashFallback =
+    userId != null &&
+    activeTeamPlan != null &&
+    isTeamPlanId(activeTeamPlan) &&
+    teamAdminHeaderTeams.length > 0
+      ? (() => {
+          const match = teamAdminHeaderTeams.find(
+            (t) => t.workspacePlanQuery === activeTeamPlan,
+          );
+          const pick = match ?? teamAdminHeaderTeams[0];
+          const planSlug = pick.workspacePlanQuery ?? activeTeamPlan;
+          return {
+            teamId: pick.id,
+            planSlug,
+            teamMemberUrlParam: pick.teamMemberUrlParam,
+          };
+        })()
+      : null;
 
   const dashboardHrefWithUserQuery =
     userId != null
-      ? personalDashboardHref()
+      ? personalDashboardHrefWithUserPlanQuery({
+          userId,
+          activeTeamPlan,
+          isPro,
+          hasClerkPersonalPro,
+          hasClerkPersonalProPlus,
+        })
       : "/dashboard";
   const personalWorkspaceHref =
     userId != null && showWorkspaceSwitcher
@@ -226,6 +284,7 @@ export default async function RootLayout({
                         personalPlanLabelForWorkspace={
                           personalPlanLabelForWorkspace
                         }
+                        teamDashFallback={teamDashFallback}
                         resolvedIsPro={isPro}
                         resolvedActiveTeamPlan={activeTeamPlan}
                         resolvedHasCustomColors={hasCustomColors}

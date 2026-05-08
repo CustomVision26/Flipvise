@@ -4,13 +4,14 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
+import { isDeckLinkedToWorkspace } from "@/db/queries/teams";
 import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   buildResolvedTeamWorkspaceQueryString,
   resolveTeamWorkspaceFromSearchParams,
   teamWorkspaceSearchParamsHaveLegacyIdentityFields,
 } from "@/lib/resolve-team-workspace-url";
-import { withTeamWorkspaceQuery, buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
+import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { StudySessionLoader } from "./study-session-loader";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import {
@@ -24,7 +25,7 @@ interface StudyPageProps {
 }
 
 export default async function StudyPage({ params, searchParams }: StudyPageProps) {
-  const { userId, maxCardsPerDeck } = await getAccessContext();
+  const { userId, maxCardsPerDeck, hasAiReading } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -37,12 +38,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     teamWorkspaceUrl != null &&
     teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)
   ) {
-    redirect(
-      withTeamWorkspaceQuery(
-        `/decks/${id}/study`,
-        buildTeamWorkspaceQueryString({ teamId: teamWorkspaceUrl.teamId }),
-      ),
+    const fullQs = await buildResolvedTeamWorkspaceQueryString(
+      userId,
+      teamWorkspaceUrl,
     );
+    redirect(withTeamWorkspaceQuery(`/decks/${id}/study`, fullQs));
   }
   const workspaceQs =
     teamWorkspaceUrl != null
@@ -71,8 +71,8 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   const fromTeamWorkspaceUrl =
     teamWorkspaceUrl != null &&
-    deck.teamId != null &&
-    deck.teamId === teamWorkspaceUrl.teamId;
+    ((deck.teamId != null && deck.teamId === teamWorkspaceUrl.teamId) ||
+      (await isDeckLinkedToWorkspace(teamWorkspaceUrl.teamId, deck.id)));
 
   let studyBackHref: string;
   let studyBackLabel: string;
@@ -131,6 +131,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         allowsQuizStudy={allowsQuizStudy}
         deckGradient={deck.gradient ?? null}
         autoSaveQuizResult={fromTeamWorkspaceUrl}
+        hasAiReading={hasAiReading}
       />
     </div>
   );

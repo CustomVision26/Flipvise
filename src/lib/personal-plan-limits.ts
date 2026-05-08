@@ -1,12 +1,12 @@
 /** Personal workspace (non-team-deck) numeric caps — enforced server-side in actions. */
 
-export const FREE_PERSONAL_DECK_LIMIT = 3;
+export const FREE_PERSONAL_DECK_LIMIT = 2;
 export const FREE_CARDS_PER_DECK_LIMIT = 5;
 
-export const PRO_PERSONAL_DECK_LIMIT = 15;
+export const PRO_PERSONAL_DECK_LIMIT = 10;
 export const PRO_CARDS_PER_DECK_LIMIT = 30;
 
-export const PRO_PLUS_PERSONAL_DECK_LIMIT = 25;
+export const PRO_PLUS_PERSONAL_DECK_LIMIT = 15;
 export const PRO_PLUS_CARDS_PER_DECK_LIMIT = 52;
 
 /** Paid individual tiers only (team-tier personal workspace uses Pro Plus caps). */

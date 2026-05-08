@@ -1,13 +1,19 @@
 import { getMemberRecord, getTeamById } from "@/db/queries/teams";
 import { isTeamPlanId, isWorkspaceSubscriberPlanQueryParam } from "@/lib/team-plans";
-import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
+import { TEAM_WORKSPACE_QUERY } from "@/lib/team-workspace-url";
 
 export type ResolvedTeamWorkspaceUrl = {
   teamId: number;
   ownerUserId: string;
-  /** Owner or `team_admin` — full deck/study/deck editor access. */
+  /**
+   * Subscriber/workspace owner — team-tier workspaces redirect this viewer to Personal Dashboard
+   * (all decks, all owned workspaces). Kept for the redirect guard only.
+   */
   canEditTeamDecks: boolean;
-  /** `team_member` role — dashboard/study are read-oriented; deck editor is blocked. */
+  /**
+   * Invited `team_member` or `team_admin` — `/dashboard?team=` shows only decks assigned to them.
+   * Management uses `/dashboard/team-admin` (URLs use `teamMemberId`; `0` = owner).
+   */
   isAssignedMemberPreview: boolean;
   /** Canonical `plan=` for workspace URLs — matches DB team tier when applicable. */
   workspacePlanQuery: string;
@@ -75,8 +81,8 @@ export async function resolveTeamWorkspaceFromSearchParams(
     return {
       teamId,
       ownerUserId: team.ownerUserId,
-      canEditTeamDecks: true,
-      isAssignedMemberPreview: false,
+      canEditTeamDecks: false,
+      isAssignedMemberPreview: true,
       workspacePlanQuery,
     };
   }
@@ -104,8 +110,8 @@ export function searchParamsLooksLikeTeamWorkspace(
 }
 
 /**
- * Legacy workspace URLs included `userid`, `plan`, and `teamMemberId`. When present
- * alongside `team`, redirect to the minimal `?team=` URL after a successful resolve.
+ * Workspace URLs may include `userid`, `plan`, and `teamMemberId` alongside `team`
+ * (bookmark shape). Deck/dashboard handlers normalize to the full query when needed.
  */
 export function teamWorkspaceSearchParamsHaveLegacyIdentityFields(
   sp: Record<string, string | string[] | undefined>,
@@ -121,15 +127,25 @@ export function teamWorkspaceSearchParamsHaveLegacyIdentityFields(
 /**
  * If the URL carries `userid` / `plan` without a `team` workspace query, return a path
  * with those removed. Preserves other params such as `team_invite=accepted`.
+ * When `viewerUserId` is set and matches `userid` / `userId`, no redirect is applied (intentional in-app links).
  * Returns `null` when no redirect is needed.
  */
 export function canonicalDashboardPathRemovingSensitiveQuery(
   sp: Record<string, string | string[] | undefined>,
+  viewerUserId?: string,
 ): string | null {
   if (searchParamsLooksLikeTeamWorkspace(sp)) return null;
-  const hasUid = firstString(sp, ["userid", "userId"]) != null;
+  const uid = firstString(sp, ["userid", "userId"]);
+  const hasUid = uid != null;
   const hasPlan = firstString(sp, ["plan", "Plan"]) != null;
   if (!hasUid && !hasPlan) return null;
+  if (
+    viewerUserId != null &&
+    uid != null &&
+    uid === viewerUserId
+  ) {
+    return null;
+  }
   const next = new URLSearchParams();
   const teamInvite = firstString(sp, ["team_invite"]);
   if (teamInvite) next.set("team_invite", teamInvite);
@@ -176,11 +192,20 @@ export function shouldRedirectUnauthorizedDashboardUseridParam(
   return uid !== sessionUserId;
 }
 
-/** Canonical workspace query for deck/study/dashboard links — `team` only. */
+/** Canonical workspace query for deck/study/dashboard links. */
 export async function buildResolvedTeamWorkspaceQueryString(
-  userId: string,
+  viewerUserId: string,
   tw: ResolvedTeamWorkspaceUrl,
 ): Promise<string> {
-  void userId;
-  return buildTeamWorkspaceQueryString({ teamId: tw.teamId });
+  let teamMemberUrlParam = 0;
+  if (tw.ownerUserId !== viewerUserId) {
+    const member = await getMemberRecord(tw.teamId, viewerUserId);
+    teamMemberUrlParam = member?.id ?? 0;
+  }
+  const p = new URLSearchParams();
+  p.set(TEAM_WORKSPACE_QUERY.team, String(tw.teamId));
+  p.set(TEAM_WORKSPACE_QUERY.userid, tw.ownerUserId);
+  p.set(TEAM_WORKSPACE_QUERY.plan, tw.workspacePlanQuery);
+  p.set(TEAM_WORKSPACE_QUERY.teamMemberId, String(teamMemberUrlParam));
+  return p.toString();
 }

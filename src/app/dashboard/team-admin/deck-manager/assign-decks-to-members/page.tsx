@@ -12,24 +12,32 @@ import {
 } from "@/components/ui/card";
 import {
   getDecksForTeam,
+  getDecksForTeamWithCardCount,
   getTeamsForTeamDashboard,
   listAssignmentsForTeam,
   listTeamMembers,
+  roleReceivesDeckAssignments,
 } from "@/db/queries/teams";
-import { isTeamPlanId } from "@/lib/team-plans";
+import { getOwnedDecksByUserWithCardCount } from "@/db/queries/decks";
 import {
   buildTeamAdminAssignDecksToMembersPath,
-  buildTeamAdminMoveDeckToAnotherWsPath,
   buildTeamAdminPath,
 } from "@/lib/team-admin-url";
-import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
 import { TeamDeckAssignList } from "@/components/team-deck-assign-list";
-import { MainDashboardButton } from "@/components/main-dashboard-button";
+import { TeamAdminDashboardNavActions } from "@/components/team-admin-dashboard-nav-actions";
+import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
+import { getAccessContext } from "@/lib/access";
+import { personalDashboardPlanQueryValue } from "@/lib/team-plans";
 
 interface PageProps {
-  searchParams: Promise<{ team?: string; userid?: string; plan?: string }>;
+  searchParams: Promise<{
+    team?: string;
+    teamMemberId?: string;
+    userid?: string;
+    plan?: string;
+  }>;
 }
 
 export default async function TeamAdminAssignDecksToMembersPage({ searchParams }: PageProps) {
@@ -43,6 +51,8 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
 
   const sp = await searchParams;
   const teamParam = sp.team;
+  const teamMemberIdParam =
+    typeof sp.teamMemberId === "string" ? sp.teamMemberId : undefined;
   const useridParam = typeof sp.userid === "string" ? sp.userid : undefined;
   const planParam =
     typeof sp.plan === "string" && sp.plan.trim() !== "" ? sp.plan.trim() : undefined;
@@ -50,8 +60,10 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
   const cookieStore = await cookies();
   const cookieRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
 
-  const resolution = resolveTeamAdminDashboardSelection(teams, {
+  const resolution = await resolveTeamAdminDashboardSelection(teams, {
+    viewerUserId: userId,
     teamParam,
+    teamMemberIdParam,
     cookieTeamRaw: cookieRaw,
     useridParam,
     planParam,
@@ -60,40 +72,77 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
   if (resolution.outcome === "redirect") {
     redirect(resolution.to);
   }
-  const { selected, teamsForSubscriber } = resolution;
+  const { selected, teamsForSubscriber, viewerTeamMemberUrlParam } = resolution;
 
-  const assignWorkspaceSnapshots = await Promise.all(
-    teamsForSubscriber.map(async (t) => {
-      const [allMembers, decks, assignments] = await Promise.all([
-        listTeamMembers(t.id),
-        getDecksForTeam(t.id, t.ownerUserId),
-        listAssignmentsForTeam(t.id),
-      ]);
-      return {
-        id: t.id,
-        name: t.name,
-        ownerUserId: t.ownerUserId,
-        normalMembers: allMembers.filter((m) => m.role === "team_member"),
-        allMembers,
-        decks,
-        assignments,
-      };
-    }),
-  );
+  const [assignWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
+    Promise.all(
+      teamsForSubscriber.map(async (t) => {
+        const [allMembers, decks, assignments] = await Promise.all([
+          listTeamMembers(t.id),
+          getDecksForTeam(t.id, t.ownerUserId),
+          listAssignmentsForTeam(t.id),
+        ]);
+        return {
+          id: t.id,
+          name: t.name,
+          ownerUserId: t.ownerUserId,
+          normalMembers: allMembers.filter((m) => roleReceivesDeckAssignments(m.role)),
+          allMembers,
+          decks,
+          assignments,
+        };
+      }),
+    ),
+    getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
+  ]);
 
   const assignMemberUserIds = assignWorkspaceSnapshots.flatMap((w) =>
     w.allMembers.map((m) => m.userId),
   );
+  const assignmentSignerUserIds = assignWorkspaceSnapshots.flatMap((w) =>
+    w.assignments
+      .map((a) => a.assignedByUserId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const workspaceOwnerUserIds = assignWorkspaceSnapshots.map((w) => w.ownerUserId);
   const userFieldDisplayById = await getClerkUserFieldDisplaysByIds([
-    ...new Set(assignMemberUserIds),
+    ...new Set([...assignMemberUserIds, ...assignmentSignerUserIds, ...workspaceOwnerUserIds]),
   ]);
 
-  const mainDashboardHref = isTeamPlanId(selected.planSlug)
-    ? buildTeamWorkspaceDashboardPath({ teamId: selected.id })
-    : "/dashboard";
+  const selectedWsDecks =
+    assignWorkspaceSnapshots.find((w) => w.id === selected.id)?.decks ?? [];
+  const decksListedForWorkspace = new Set(selectedWsDecks.map((d) => d.id));
+  const subscriberPersonalUnlinkedDecks =
+    selected.ownerUserId === userId
+      ? (await getOwnedDecksByUserWithCardCount(selected.ownerUserId)).map((d) => ({
+          id: d.id,
+          name: d.name,
+          alreadyLinked: decksListedForWorkspace.has(d.id),
+        }))
+      : undefined;
 
-  const assignHref = buildTeamAdminAssignDecksToMembersPath(selected.id);
-  const moveHref = buildTeamAdminMoveDeckToAnotherWsPath(selected.id);
+  const access = await getAccessContext();
+  const personalStripeSlug = access.hasClerkPersonalProPlus
+    ? ("pro_plus" as const)
+    : access.hasClerkPersonalPro
+      ? ("pro" as const)
+      : null;
+  const personalPlanQuery = personalDashboardPlanQueryValue(
+    access.activeTeamPlan,
+    access.isPro,
+    personalStripeSlug,
+  );
+  const personalDashboardParams = new URLSearchParams({ userid: userId });
+  if (personalPlanQuery !== "") personalDashboardParams.set("plan", personalPlanQuery);
+  const mainDashboardHref = `/dashboard?${personalDashboardParams.toString()}`;
+  const workspaceDashboardParams = new URLSearchParams({
+    team: String(selected.id),
+    userid: selected.ownerUserId,
+    plan: selected.planSlug,
+    teamMemberId: String(viewerTeamMemberUrlParam),
+  });
+  const workspaceDashboardHref = `/dashboard?${workspaceDashboardParams.toString()}`;
+  const isOwner = selected.ownerUserId === userId;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
@@ -101,7 +150,7 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
         <div className="min-w-0 space-y-2">
           <p className="text-muted-foreground text-sm">
             <Link
-              href={buildTeamAdminPath(selected.id)}
+              href={buildTeamAdminPath(selected.id, viewerTeamMemberUrlParam)}
               className="underline-offset-4 hover:text-foreground hover:underline"
             >
               Team Admin
@@ -119,23 +168,31 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
             Workspace: {selected.name}
           </p>
           <p className="text-muted-foreground text-sm sm:text-base">
-            Normal members only see decks you assign; team admins see all team decks. Move decks
-            between workspaces you manage using the tab below.
+            Subscribers manage flashcards from the Personal Dashboard, then attach decks here to
+            their workspace before assigning team members or team admins — subscribers also see every
+            linked deck without an assignment row.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 self-start">
-          <MainDashboardButton
-            teamId={isTeamPlanId(selected.planSlug) ? selected.id : null}
-            href={mainDashboardHref}
-          />
-        </div>
+        <TeamAdminDashboardNavActions
+          mainDashboardHref={mainDashboardHref}
+          workspaceDashboardHref={workspaceDashboardHref}
+          workspaceTeamId={selected.id}
+          isOwner={isOwner}
+          workspacePlanSlug={selected.planSlug}
+          className="self-start"
+        />
       </div>
+
+      <TeamAdminWorkspaceDeckCardTotals
+        teamDecksWithCardCounts={teamDecksWithCardCounts}
+        planSlug={selected.planSlug}
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>Deck Manager</CardTitle>
           <CardDescription>
-            Assign decks to members or transfer decks between subscriber-owned workspaces.
+            Link decks from Personal and assign workspace decks to members or co-admins.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -143,7 +200,7 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
             workspaces={assignWorkspaceSnapshots}
             defaultWorkspaceId={selected.id}
             userFieldDisplayById={userFieldDisplayById}
-            deckManagerTabUrls={{ assignMembersHref: assignHref, moveDeckHref: moveHref }}
+            subscriberPersonalUnlinkedDecks={subscriberPersonalUnlinkedDecks}
           />
         </CardContent>
       </Card>

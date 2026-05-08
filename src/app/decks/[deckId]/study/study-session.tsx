@@ -29,11 +29,13 @@ export interface StudySessionProps {
   deckId: number;
   deckName: string;
   teamId: number | null;
-  /** Pro personal (75 cards / deck) — Free users cannot open Quiz mode in the UI. */
+  /** Paid tiers — Free users cannot open Quiz mode in the UI. */
   allowsQuizStudy?: boolean;
   deckGradient?: string | null;
   /** Team workspace study URL — quiz results are saved automatically after submit. */
   autoSaveQuizResult?: boolean;
+  /** Pro Plus / team / platform admin — listen-to-card (TTS). Not available on Free or Pro. */
+  hasAiReading?: boolean;
 }
 
 export function StudySession({
@@ -44,6 +46,7 @@ export function StudySession({
   allowsQuizStudy = true,
   deckGradient,
   autoSaveQuizResult = false,
+  hasAiReading = false,
 }: StudySessionProps) {
   const [tab, setTab] = useState<"review" | "quiz">("review");
   const effectiveTab = allowsQuizStudy ? tab : "review";
@@ -110,7 +113,13 @@ export function StudySession({
           )}
         </TabsList>
         <TabsContent value="review" className="flex flex-1 flex-col">
-          <FlashcardStudy cards={cards} deckId={deckId} deckName={deckName} deckGradient={deckGradient ?? null} />
+          <FlashcardStudy
+            cards={cards}
+            deckId={deckId}
+            deckName={deckName}
+            deckGradient={deckGradient ?? null}
+            hasAiReading={hasAiReading}
+          />
         </TabsContent>
         <TabsContent value="quiz" className="flex flex-1 flex-col">
           <QuizStudy
@@ -120,6 +129,7 @@ export function StudySession({
             teamId={teamId}
             deckGradient={deckGradient ?? null}
             autoSaveQuizResult={autoSaveQuizResult}
+            hasAiReading={hasAiReading}
           />
         </TabsContent>
       </Tabs>

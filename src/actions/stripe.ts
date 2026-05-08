@@ -27,52 +27,8 @@ const createCheckoutSessionSchema = z.object({
 });
 type CreateCheckoutSessionInput = z.infer<typeof createCheckoutSessionSchema>;
 
-/**
- * Human-readable feature list per plan.
- * This is written into subscription_data.description so it appears on
- * every Stripe-generated invoice and receipt under the plan name.
- */
-const PLAN_FEATURES: Record<PaidPlanId, string[]> = {
-  pro: [
-    "Up to 15 decks",
-    "AI flashcard generation",
-    "Up to 30 cards per deck",
-    "Standard reviews and quiz",
-    "Multiple interface colors",
-  ],
-  pro_plus: [
-    "Up to 25 decks",
-    "AI flashcard generation",
-    "Up to 52 cards per deck",
-    "Standard reviews and quiz",
-    "Multiple interface colors",
-    "AI reading",
-  ],
-  pro_plus_team_basic: [
-    "Everything in Pro Plus for your personal workspace",
-    "Up to 2 team workspaces",
-    "Up to 5 members per workspace",
-    "Team deck sharing",
-    "Team progress tracking",
-  ],
-  pro_plus_team_gold: [
-    "Everything in Team Basic",
-    "Up to 5 team workspaces",
-    "Up to 15 members per workspace",
-  ],
-  pro_plus_platinum_plan: [
-    "Everything in Team Gold",
-    "Up to 10 team workspaces",
-    "Up to 25 members per workspace",
-  ],
-  pro_plus_enterprise: [
-    "Everything in Platinum",
-    "Up to 20 team workspaces",
-    "Up to 40 members per workspace",
-  ],
-};
-
-const PLAN_DISPLAY_NAMES: Record<PaidPlanId, string> = {
+/** Last-resort copy if `plans-config.json` is missing a paid row (should not happen in production). */
+const PLAN_DISPLAY_NAMES_FALLBACK: Record<PaidPlanId, string> = {
   pro: "Pro",
   pro_plus: "Pro Plus",
   pro_plus_team_basic: "Team Basic",
@@ -81,11 +37,88 @@ const PLAN_DISPLAY_NAMES: Record<PaidPlanId, string> = {
   pro_plus_enterprise: "Enterprise",
 };
 
-/** Builds the subscription description shown on invoices. */
-function planDescription(plan: PaidPlanId, period: BillingPeriod): string {
-  const name = PLAN_DISPLAY_NAMES[plan];
+const PLAN_FEATURES_FALLBACK: Record<PaidPlanId, string[]> = {
+  pro: [
+    "10 decks",
+    "AI flashcard generation",
+    "30 cards per deck",
+    "Standard reviews and quiz",
+    "Multiple interface colors",
+  ],
+  pro_plus: [
+    "15 decks",
+    "AI flashcard generation",
+    "52 cards per deck",
+    "Standard reviews and quiz",
+    "Multiple interface colors",
+    "AI reading",
+  ],
+  pro_plus_team_basic: [
+    "Pro Plus features on your personal workspace",
+    "Up to 2 team workspaces",
+    "Up to 5 members per workspace",
+    "Team membership",
+    "Deck sharing",
+    "Team progress tracker",
+  ],
+  pro_plus_team_gold: [
+    "Pro Plus features on your personal workspace",
+    "Up to 5 team workspaces",
+    "Up to 15 members per workspace",
+    "Team membership",
+    "Deck sharing",
+    "Team progress tracker",
+  ],
+  pro_plus_platinum_plan: [
+    "Pro Plus features on your personal workspace",
+    "Up to 10 team workspaces",
+    "Up to 25 members per workspace",
+    "Team membership",
+    "Deck sharing",
+    "Team progress tracker",
+  ],
+  pro_plus_enterprise: [
+    "Pro Plus features on your personal workspace",
+    "Up to 20 team workspaces",
+    "Up to 35 members per workspace",
+    "Team membership",
+    "Deck sharing",
+    "Team progress tracker",
+  ],
+};
+
+async function readPlansConfig(): Promise<PlanConfig[]> {
+  const raw = await fs.readFile(
+    path.join(process.cwd(), "src", "data", "plans-config.json"),
+    "utf-8",
+  );
+  return JSON.parse(raw) as PlanConfig[];
+}
+
+function couponIdFromPlansConfig(plans: PlanConfig[], planId: string): string | null {
+  const plan = plans.find((p) => p.id === planId);
+  const discount = plan?.discount;
+  if (discount?.active && discount.stripeCouponId.trim()) {
+    return discount.stripeCouponId.trim();
+  }
+  return null;
+}
+
+/**
+ * Matches `/pricing` and admin Plans editor: pulls `name` + `features` from `plans-config.json`
+ * so Stripe invoices/receipts stay in sync with the cards UI.
+ */
+function subscriptionDescriptionFromPlansConfig(
+  plan: PaidPlanId,
+  period: BillingPeriod,
+  plans: PlanConfig[],
+): string {
+  const row = plans.find((p) => p.id === plan);
+  const name = row?.name?.trim() || PLAN_DISPLAY_NAMES_FALLBACK[plan];
+  const featureList =
+    row?.features?.length ? row.features : PLAN_FEATURES_FALLBACK[plan];
   const billing = period === "yearly" ? "Annual" : "Monthly";
-  const features = PLAN_FEATURES[plan].map((f) => `• ${f}`).join("\n");
+  const features = featureList.map((f) => `• ${f}`).join("\n");
   return `Flipvise ${name} — ${billing}\n\n${features}`;
 }
 
@@ -99,25 +132,6 @@ function priceIdForPlan(plan: PaidPlanId, period: BillingPeriod): string {
     );
   }
   return priceId;
-}
-
-/** Returns the active Stripe coupon ID for a plan, or null if no discount applies. */
-async function activeCouponIdForPlan(planId: string): Promise<string | null> {
-  try {
-    const raw = await fs.readFile(
-      path.join(process.cwd(), "src", "data", "plans-config.json"),
-      "utf-8",
-    );
-    const plans = JSON.parse(raw) as PlanConfig[];
-    const plan = plans.find((p) => p.id === planId);
-    const discount = plan?.discount;
-    if (discount?.active && discount.stripeCouponId.trim()) {
-      return discount.stripeCouponId.trim();
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function envVarForPlan(plan: PaidPlanId, period: BillingPeriod): string {
@@ -134,9 +148,16 @@ export async function createStripeCheckoutSessionAction(
   if (!parsed.success) throw new Error("Invalid input");
   const { plan, period } = parsed.data;
 
+  let plansConfig: PlanConfig[] = [];
+  try {
+    plansConfig = await readPlansConfig();
+  } catch {
+    // Same resilience as legacy coupon loader — checkout can proceed with fallbacks.
+  }
+
   const priceId = priceIdForPlan(plan, period);
-  const description = planDescription(plan, period);
-  const couponId = await activeCouponIdForPlan(plan);
+  const description = subscriptionDescriptionFromPlansConfig(plan, period, plansConfig);
+  const couponId = couponIdFromPlansConfig(plansConfig, plan);
 
   const appUrl = resolveAppUrl();
   const successUrl = `${appUrl}/dashboard`;

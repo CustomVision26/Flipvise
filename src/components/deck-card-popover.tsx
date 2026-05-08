@@ -85,6 +85,8 @@ interface DeckCardPopoverProps {
   variant?: "full" | "team-preview";
   /** Main dashboard — team-tier subscribers: preview row shows first-card image + CTA. */
   teamTierPreviewPromo?: boolean;
+  /** Listen-to-card in deck preview — Pro Plus / team / platform admin only. */
+  hasAiReading?: boolean;
 }
 
 export function DeckCardPopover({
@@ -93,6 +95,7 @@ export function DeckCardPopover({
   workspaceQueryString,
   variant = "full",
   teamTierPreviewPromo = false,
+  hasAiReading = false,
 }: DeckCardPopoverProps) {
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const [teamWorkspaceDialogOpen, setTeamWorkspaceDialogOpen] =
@@ -552,6 +555,7 @@ export function DeckCardPopover({
         cards={previewCards}
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
+        hasAiReading={hasAiReading}
       />
 
       {/* Delete confirmation dialog — full variant only */}

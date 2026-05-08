@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getAccessContext } from "@/lib/access";
 
 const bodySchema = z.object({
   text: z.string().min(1).max(4096),
@@ -10,9 +10,15 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const { userId, hasAiReading } = await getAccessContext();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!hasAiReading) {
+    return NextResponse.json(
+      { error: "Flashcard audio is available on Pro Plus and team plans." },
+      { status: 403 },
+    );
   }
 
   const body = await req.json().catch(() => null);

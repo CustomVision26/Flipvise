@@ -147,7 +147,10 @@ export function metadataPlanSlugFromPublicMeta(
   const t = typeof meta.teamPlanId === "string" ? meta.teamPlanId.trim() : "";
   if (t) return t;
   const p = typeof meta.plan === "string" ? meta.plan.trim() : "";
-  return p || undefined;
+  if (p) return p;
+  // Stripe `billingPlan` / admin `adminPlan` may be set before computed `plan` / `teamPlanId` sync.
+  const resolved = resolveEffectivePlan(meta as Record<string, unknown>);
+  return resolved != null && resolved.trim() !== "" ? resolved.trim() : undefined;
 }
 
 export function parsePlanSourceUpdatedAtMs(

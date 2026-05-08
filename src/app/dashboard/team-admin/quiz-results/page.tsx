@@ -4,7 +4,12 @@ import { buildTeamAdminQuizResultsPath } from "@/lib/team-admin-url";
 export default async function TeamAdminQuizResultsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string; userid?: string; plan?: string }>;
+  searchParams: Promise<{
+    team?: string;
+    teamMemberId?: string;
+    userid?: string;
+    plan?: string;
+  }>;
 }) {
   return (
     <TeamAdminDashboardView

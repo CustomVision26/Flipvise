@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
 import { proBillingFeatureBundleSatisfied } from "@/lib/pro-billing-feature-bundle";
@@ -87,11 +89,20 @@ function stripeSlugForPersonalTier(resolution: PersonalPlanResolution): string |
   return resolution.effectiveStripeSlug;
 }
 
+function isClerkBackendRateLimitError(error: unknown): boolean {
+  if (!isClerkAPIResponseError(error)) return false;
+  const msg = error.message.toLowerCase();
+  return msg.includes("too many requests") || msg.includes("rate limit");
+}
+
 /**
  * Returns the full access context for the current user, combining Stripe-backed billing metadata,
  * Clerk JWT features, admin-granted access, and the admin role itself.
+ *
+ * Wrapped in React `cache()` so layout + nested Server Components share one Clerk/Billing round-trip
+ * per request (avoids Backend API rate limits during dev prefetch/HMR).
  */
-export async function getAccessContext(): Promise<AccessContext> {
+export const getAccessContext = cache(async function getAccessContext(): Promise<AccessContext> {
   const { userId, has } = await auth();
 
   if (!userId) {
@@ -117,8 +128,15 @@ export async function getAccessContext(): Promise<AccessContext> {
 
   const superadminAllowListed = isPlatformSuperadminAllowListed(userId);
 
-  const user = await clerkClient.users.getUser(userId);
-  const meta = user.publicMetadata as PublicMeta;
+  let meta: PublicMeta;
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    meta = user.publicMetadata as PublicMeta;
+  } catch (error) {
+    if (!isClerkBackendRateLimitError(error)) throw error;
+    // Degrade to JWT-only resolution when Clerk Backend returns 429 (still better than hard-failing the tree).
+    meta = {} as PublicMeta;
+  }
   const planResolution = await resolvePersonalPlanMetadataVsBilling({
     clerkClient,
     userId,
@@ -133,7 +151,6 @@ export async function getAccessContext(): Promise<AccessContext> {
   const paidProFromHas = Boolean(has({ plan: "pro" }));
   const paidProPlusFromHas = Boolean(has({ plan: "pro_plus" }));
   const paidAI = Boolean(has({ feature: "ai_flashcard_generation" }));
-  const paidAiReading = Boolean(has({ feature: "ai_reading" }));
   const paidPrioritySupport = Boolean(has({ feature: "priority_support" }));
   const paidCustomColors = Boolean(has({ feature: "12_interface_colors" }));
   const proFeatureBundle = proBillingFeatureBundleSatisfied(has);
@@ -170,12 +187,11 @@ export async function getAccessContext(): Promise<AccessContext> {
   const jwtPersonalProFullBundle =
     proFeatureBundle && planResolution.billingJwtPersonalPro;
 
+  /** Flashcard speaker (TTS) — Pro Plus (personal), team-tier subscribers, platform admins only; not Free or Pro. */
   function aiReadingForTier(stripeSlug: string | undefined | null): boolean {
     if (unlocked) return true;
     if (teamPlanForFeatures !== null) return true;
-    const p = personalPaidSlugFromStripeSlug(stripeSlug);
-    if (p === "pro_plus") return true;
-    return paidAiReading;
+    return personalPaidSlugFromStripeSlug(stripeSlug) === "pro_plus";
   }
 
   // Platform admins automatically receive every paid feature.
@@ -206,6 +222,8 @@ export async function getAccessContext(): Promise<AccessContext> {
   }
 
   // Team-tier subscriber personal workspace matches Pro Plus caps.
+  // Team-tier subscribers: personal workspace uses Pro Plus caps; grant full premium
+  // feature bundle without relying on Clerk JWT feature flags (session templates vary).
   if (teamPlanForFeatures !== null && !superadminAllowListed) {
     const lim = personalWorkspaceLimits({
       unlocked: false,
@@ -221,7 +239,7 @@ export async function getAccessContext(): Promise<AccessContext> {
       has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
       hasAI: true,
       hasAiReading: true,
-      hasPrioritySupport: paidPrioritySupport,
+      hasPrioritySupport: true,
       hasCustomColors: true,
       adminGranted: false,
       isAdmin: false,
@@ -292,7 +310,7 @@ export async function getAccessContext(): Promise<AccessContext> {
           has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
           hasAI: true,
           hasAiReading: true,
-          hasPrioritySupport: paidPrioritySupport,
+          hasPrioritySupport: true,
           hasCustomColors: true,
           adminGranted: false,
           isAdmin: false,
@@ -369,4 +387,4 @@ export async function getAccessContext(): Promise<AccessContext> {
     hasClerkPersonalPro: jwtPaid && paidProFromHas,
     hasClerkPersonalProPlus: jwtPaid && paidProPlusFromHas,
   };
-}
+});

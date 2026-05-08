@@ -162,7 +162,7 @@ export async function toggleAdminRoleAction(data: ToggleAdminRoleInput) {
 
   const previousMeta = target.publicMetadata as Record<string, unknown> | undefined;
 
-  // Co-admin Pro unlock comes from `role === "admin"` (`getAccessContext` / client header).
+  // Co-admin Pro Plus unlock comes from `role === "admin"` (`getAccessContext` / client header).
   // Capture complimentary `adminGranted` in `preAdminGrantSnapshot` so revoking admin restores
   // the prior grant state; Clerk Billing + `has()` continue to control paid plan and expiration.
   const publicMetadata = grant

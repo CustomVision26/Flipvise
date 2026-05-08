@@ -1,3 +1,6 @@
+import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
+import { PRO_PLUS_PERSONAL_DECK_LIMIT } from "@/lib/personal-plan-limits";
+
 /** Clerk Billing plan ids for team tiers — configure matching plans + features in Clerk Dashboard. */
 export const TEAM_PLAN_IDS = [
   "pro_plus_team_basic",
@@ -46,12 +49,29 @@ export function resolveActiveTeamPlanFromHas(
 
 export const TEAM_PLAN_LIMITS: Record<
   TeamPlanId,
-  { maxTeams: number; maxMembersPerTeam: number }
+  { maxTeams: number; maxMembersPerTeam: number; maxDecksPerWorkspace: number }
 > = {
-  pro_plus_team_basic: { maxTeams: 2, maxMembersPerTeam: 5 },
-  pro_plus_team_gold: { maxTeams: 5, maxMembersPerTeam: 15 },
-  pro_plus_platinum_plan: { maxTeams: 10, maxMembersPerTeam: 25 },
-  pro_plus_enterprise: { maxTeams: 20, maxMembersPerTeam: 40 },
+  /** Decks per workspace match Pro Plus personal ({@link PRO_PLUS_PERSONAL_DECK_LIMIT}); tiers differ by workspaces count + members. */
+  pro_plus_team_basic: {
+    maxTeams: 2,
+    maxMembersPerTeam: 5,
+    maxDecksPerWorkspace: PRO_PLUS_PERSONAL_DECK_LIMIT,
+  },
+  pro_plus_team_gold: {
+    maxTeams: 5,
+    maxMembersPerTeam: 15,
+    maxDecksPerWorkspace: PRO_PLUS_PERSONAL_DECK_LIMIT,
+  },
+  pro_plus_platinum_plan: {
+    maxTeams: 10,
+    maxMembersPerTeam: 25,
+    maxDecksPerWorkspace: PRO_PLUS_PERSONAL_DECK_LIMIT,
+  },
+  pro_plus_enterprise: {
+    maxTeams: 20,
+    maxMembersPerTeam: 35,
+    maxDecksPerWorkspace: PRO_PLUS_PERSONAL_DECK_LIMIT,
+  },
 };
 
 export function isTeamPlanId(slug: string): boolean {
@@ -83,7 +103,17 @@ export function isWorkspaceSubscriberPlanQueryParam(plan: string): boolean {
 export function limitsForPlan(planSlug: string) {
   const canonical = canonicalTeamPlanId(planSlug);
   if (canonical) return TEAM_PLAN_LIMITS[canonical];
-  return { maxTeams: 0, maxMembersPerTeam: 0 };
+  return { maxTeams: 0, maxMembersPerTeam: 0, maxDecksPerWorkspace: 0 };
+}
+
+/**
+ * Max flashcards across all subscriber-owned decks in a team workspace if each deck is filled to
+ * the team-tier per-deck cap ({@link CARDS_PER_DECK_LIMIT_PRO_PLUS}).
+ */
+export function workspaceCardsCapacityForPlan(planSlug: string): number {
+  const lim = limitsForPlan(planSlug);
+  if (!lim.maxDecksPerWorkspace) return 0;
+  return lim.maxDecksPerWorkspace * CARDS_PER_DECK_LIMIT_PRO_PLUS;
 }
 
 export function labelForTeamPlanSlug(slug: string): string | undefined {

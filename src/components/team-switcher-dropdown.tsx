@@ -24,6 +24,8 @@ export type TeamSwitcherTeam = {
   ownerUserId: string;
   /** Legacy `plan=` value from DB; not used in URLs anymore. */
   workspacePlanQuery?: string;
+  /** Viewer’s `team_members.id`, or `0` when subscriber owner — included in `/members` URLs. */
+  teamMemberUrlParam: number;
 };
 
 interface TeamSwitcherDropdownProps {
@@ -36,7 +38,7 @@ interface TeamSwitcherDropdownProps {
   /** Subscriber owner — link to workspace CRUD + history. */
   showManageWorkspaces?: boolean;
   /** When on Deck Manager assign page, keep the same subpath when switching workspace. */
-  buildTeamChangeHref?: (teamId: number) => string;
+  buildTeamChangeHref?: (teamId: number, teamMemberUrlParam: number) => string;
 }
 
 export function TeamSwitcherDropdown({
@@ -51,7 +53,11 @@ export function TeamSwitcherDropdown({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
 
-  const hrefForTeam = buildTeamChangeHref ?? buildTeamAdminPath;
+  const hrefBuilder = buildTeamChangeHref ?? buildTeamAdminPath;
+
+  function hrefForTeamRow(team: TeamSwitcherTeam): string {
+    return hrefBuilder(team.id, team.teamMemberUrlParam);
+  }
 
   const selected = teams.find((t) => t.id === selectedId) ?? teams[0];
 
@@ -70,14 +76,13 @@ export function TeamSwitcherDropdown({
     if (!next) setQuery("");
   }
 
-  function selectTeam(teamId: number) {
-    const row = teams.find((t) => t.id === teamId);
-    if (!row) return;
+  function selectTeam(team: TeamSwitcherTeam) {
+    if (!teams.some((t) => t.id === team.id)) return;
     // Close the menu before navigation so portal teardown does not race React commit.
     setOpen(false);
     setQuery("");
     requestAnimationFrame(() => {
-      router.push(hrefForTeam(teamId));
+      router.push(hrefForTeamRow(team));
       router.refresh();
     });
   }
@@ -136,7 +141,7 @@ export function TeamSwitcherDropdown({
               return (
                 <DropdownMenuItem
                   key={t.id}
-                  onClick={() => selectTeam(t.id)}
+                  onClick={() => selectTeam(t)}
                   className="cursor-pointer gap-2"
                 >
                   <Check

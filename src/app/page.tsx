@@ -2,7 +2,7 @@ import { Show } from "@clerk/nextjs";
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { getAccessContext } from "@/lib/access";
-import { personalDashboardHref } from "@/lib/personal-dashboard-url";
+import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import Image from "next/image";
 import { SignInBtn, SignUpBtn } from "@/components/auth-buttons";
 import { HomeInviteEmailAuthButtons } from "@/components/home-invite-email-auth-buttons";
@@ -28,8 +28,18 @@ interface HomePageProps {
 }
 
 export default async function Home({ searchParams }: HomePageProps) {
-  const { userId } = await getAccessContext();
-  if (userId) redirect(personalDashboardHref());
+  const access = await getAccessContext();
+  if (access.userId) {
+    redirect(
+      personalDashboardHrefWithUserPlanQuery({
+        userId: access.userId,
+        activeTeamPlan: access.activeTeamPlan,
+        isPro: access.isPro,
+        hasClerkPersonalPro: access.hasClerkPersonalPro,
+        hasClerkPersonalProPlus: access.hasClerkPersonalProPlus,
+      }),
+    );
+  }
   const sp = await searchParams;
   const inviteEmailForAuth = parseInviteEmailFromSearchParams(sp.invite_email);
   return (

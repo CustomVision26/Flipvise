@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import {
   cards,
+  deckWorkspaceLinks,
   decks,
   teamDeckAssignments,
   teamInvitations,
@@ -28,9 +29,11 @@ import {
   count,
   desc,
   eq,
+  exists,
   getTableColumns,
   gt,
   inArray,
+  isNull,
   isNotNull,
   lte,
   ne,
@@ -42,6 +45,67 @@ import type { InferSelectModel } from "drizzle-orm";
 export type { TeamMemberRow, TeamInvitationRow };
 
 export type TeamMemberRole = "team_admin" | "team_member";
+
+/** Invited members with this role can receive workspace deck assignments (Study view). */
+export function roleReceivesDeckAssignments(role: TeamMemberRole): boolean {
+  return role === "team_member" || role === "team_admin";
+}
+
+let warnedMissingDeckWorkspaceLinksTable = false;
+function warnMissingDeckWorkspaceLinksTableOnce() {
+  if (warnedMissingDeckWorkspaceLinksTable) return;
+  warnedMissingDeckWorkspaceLinksTable = true;
+  console.warn(
+    "[db] `deck_workspace_links` is missing — apply Drizzle migration 0022_deck_workspace_links. Using legacy team deck visibility until then.",
+  );
+}
+
+/** When `deck_workspace_links` is not migrated — avoid referencing the table. */
+function isMissingDeckWorkspaceLinksTableError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  for (let depth = 0; depth < 8 && current != null && !seen.has(current); depth++) {
+    seen.add(current);
+    if (typeof current === "object" && current !== null && "code" in current) {
+      const code = String((current as { code?: string | number }).code);
+      const msg = String(
+        (current as { message?: string }).message ??
+          (current instanceof Error ? current.message : ""),
+      );
+      if (code === "42P01" && /deck_workspace_links/i.test(msg)) return true;
+    }
+    const msg =
+      current instanceof Error
+        ? current.message
+        : typeof current === "object" &&
+            current !== null &&
+            "message" in current &&
+            typeof (current as { message?: unknown }).message === "string"
+          ? (current as { message: string }).message
+          : String(current);
+    const lower = msg.toLowerCase();
+    if (
+      lower.includes("deck_workspace_links") &&
+      (lower.includes("does not exist") ||
+        lower.includes("undefined_table") ||
+        lower.includes("42p01") ||
+        lower.includes("failed query"))
+    ) {
+      return true;
+    }
+    const next =
+      current instanceof Error
+        ? current.cause
+        : typeof current === "object" &&
+            current !== null &&
+            "cause" in current
+          ? (current as { cause?: unknown }).cause
+          : undefined;
+    current = next;
+  }
+  return false;
+}
 
 /** When `team_invitations` is missing `inviteeDisplayName` (migration not run). */
 const teamInvitationRowSelectLegacy = {
@@ -420,22 +484,90 @@ export async function getActivePendingInvitationForTeamEmail(teamId: number, ema
   }
 }
 
+/** Deck appears in this subscriber workspace library via explicit link (multi-workspace sharing). */
+function decksLinkedToSubscriberWorkspaceWhere(teamId: number) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(deckWorkspaceLinks)
+      .where(
+        and(
+          eq(deckWorkspaceLinks.teamId, teamId),
+          eq(deckWorkspaceLinks.deckId, decks.id),
+        ),
+      ),
+  );
+}
+
+/** Decks surfaced for Team Admin assign/move: FK-scoped, link-scoped, plus subscriber decks already assigned here. */
+function decksForSubscriberWorkspaceWhere(teamId: number, ownerUserId: string) {
+  return and(
+    eq(decks.userId, ownerUserId),
+    or(
+      eq(decks.teamId, teamId),
+      decksLinkedToSubscriberWorkspaceWhere(teamId),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(teamDeckAssignments)
+          .where(
+            and(
+              eq(teamDeckAssignments.teamId, teamId),
+              eq(teamDeckAssignments.deckId, decks.id),
+            ),
+          ),
+      ),
+    ),
+  );
+}
+
+/** Before `deck_workspace_links` exists — only `decks.teamId` and assignment rows define workspace visibility. */
+function decksForSubscriberWorkspaceWhereWithoutWorkspaceLinks(
+  teamId: number,
+  ownerUserId: string,
+) {
+  return and(
+    eq(decks.userId, ownerUserId),
+    or(
+      eq(decks.teamId, teamId),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(teamDeckAssignments)
+          .where(
+            and(
+              eq(teamDeckAssignments.teamId, teamId),
+              eq(teamDeckAssignments.deckId, decks.id),
+            ),
+          ),
+      ),
+    ),
+  );
+}
+
 export async function getDecksForTeam(
   teamId: number,
   ownerUserId: string,
 ): Promise<DeckRow[]> {
+  async function run(where: ReturnType<typeof decksForSubscriberWorkspaceWhere>): Promise<DeckRow[]> {
+    try {
+      return await db.select().from(decks).where(where);
+    } catch (e) {
+      if (!isMissingDeckCoverColumnError(e)) throw e;
+      const rows = await db
+        .select(deckRowSelectWithoutCover)
+        .from(decks)
+        .where(where);
+      return rows.map((r) => ({ ...r, coverImageUrl: null, gradient: null }));
+    }
+  }
+
   try {
-    return await db
-      .select()
-      .from(decks)
-      .where(and(eq(decks.teamId, teamId), eq(decks.userId, ownerUserId)));
+    return await run(decksForSubscriberWorkspaceWhere(teamId, ownerUserId));
   } catch (e) {
-    if (!isMissingDeckCoverColumnError(e)) throw e;
-    const rows = await db
-      .select(deckRowSelectWithoutCover)
-      .from(decks)
-      .where(and(eq(decks.teamId, teamId), eq(decks.userId, ownerUserId)));
-    return rows.map((r) => ({ ...r, coverImageUrl: null, gradient: null }));
+    if (!isMissingDeckWorkspaceLinksTableError(e)) throw e;
+    warnMissingDeckWorkspaceLinksTableOnce();
+    return run(decksForSubscriberWorkspaceWhereWithoutWorkspaceLinks(teamId, ownerUserId));
   }
 }
 
@@ -443,29 +575,38 @@ export async function getDecksForTeamWithCardCount(
   teamId: number,
   ownerUserId: string,
 ) {
-  return db
-    .select({
-      id: decks.id,
-      userId: decks.userId,
-      name: decks.name,
-      description: decks.description,
-      coverImageUrl: decks.coverImageUrl,
-      createdAt: decks.createdAt,
-      updatedAt: decks.updatedAt,
-      cardCount: count(cards.id),
-    })
-    .from(decks)
-    .leftJoin(cards, eq(cards.deckId, decks.id))
-    .where(and(eq(decks.teamId, teamId), eq(decks.userId, ownerUserId)))
-    .groupBy(
-      decks.id,
-      decks.userId,
-      decks.name,
-      decks.description,
-      decks.coverImageUrl,
-      decks.createdAt,
-      decks.updatedAt,
-    );
+  const build = (where: ReturnType<typeof decksForSubscriberWorkspaceWhere>) =>
+    db
+      .select({
+        id: decks.id,
+        userId: decks.userId,
+        name: decks.name,
+        description: decks.description,
+        coverImageUrl: decks.coverImageUrl,
+        createdAt: decks.createdAt,
+        updatedAt: decks.updatedAt,
+        cardCount: count(cards.id),
+      })
+      .from(decks)
+      .leftJoin(cards, eq(cards.deckId, decks.id))
+      .where(where)
+      .groupBy(
+        decks.id,
+        decks.userId,
+        decks.name,
+        decks.description,
+        decks.coverImageUrl,
+        decks.createdAt,
+        decks.updatedAt,
+      );
+
+  try {
+    return await build(decksForSubscriberWorkspaceWhere(teamId, ownerUserId));
+  } catch (e) {
+    if (!isMissingDeckWorkspaceLinksTableError(e)) throw e;
+    warnMissingDeckWorkspaceLinksTableOnce();
+    return build(decksForSubscriberWorkspaceWhereWithoutWorkspaceLinks(teamId, ownerUserId));
+  }
 }
 
 export async function getAssignedDecksForMember(
@@ -536,6 +677,25 @@ export async function getAssignedDecksForMemberWithCardCount(
     );
 }
 
+export async function isDeckLinkedToWorkspace(
+  teamId: number,
+  deckId: number,
+): Promise<boolean> {
+  try {
+    const [row] = await db
+      .select({ one: sql`1` })
+      .from(deckWorkspaceLinks)
+      .where(
+        and(eq(deckWorkspaceLinks.teamId, teamId), eq(deckWorkspaceLinks.deckId, deckId)),
+      )
+      .limit(1);
+    return row != null;
+  } catch (e) {
+    if (isMissingDeckWorkspaceLinksTableError(e)) return false;
+    throw e;
+  }
+}
+
 export async function resolveDeckViewerAccess(
   deckId: number,
   viewerUserId: string,
@@ -547,8 +707,88 @@ export async function resolveDeckViewerAccess(
     return { kind: "owner" };
   }
 
+  /** Subscriber-owned decks with `teamId` unset are shared only via assignments. */
   if (!deck.teamId) {
-    return null;
+    try {
+      const [memberPick] = await db
+        .select({ teamId: teamDeckAssignments.teamId })
+        .from(teamDeckAssignments)
+        .innerJoin(teams, eq(teams.id, teamDeckAssignments.teamId))
+        .where(
+          and(
+            eq(teamDeckAssignments.deckId, deck.id),
+            eq(teamDeckAssignments.memberUserId, viewerUserId),
+            eq(teams.ownerUserId, deck.userId),
+          ),
+        )
+        .limit(1);
+
+      if (memberPick) {
+        const memberRecord = await getMemberRecord(memberPick.teamId, viewerUserId);
+        if (memberRecord?.role === "team_member") {
+          return { kind: "team_member", teamId: memberPick.teamId };
+        }
+      }
+
+      let adminByLink: { teamId: number } | undefined;
+      try {
+        const rows = await db
+          .select({ teamId: deckWorkspaceLinks.teamId })
+          .from(deckWorkspaceLinks)
+          .innerJoin(teams, eq(teams.id, deckWorkspaceLinks.teamId))
+          .innerJoin(
+            teamMembers,
+            and(
+              eq(teamMembers.teamId, deckWorkspaceLinks.teamId),
+              eq(teamMembers.userId, viewerUserId),
+              eq(teamMembers.role, "team_admin"),
+            ),
+          )
+          .where(
+            and(
+              eq(deckWorkspaceLinks.deckId, deck.id),
+              eq(teams.ownerUserId, deck.userId),
+            ),
+          )
+          .limit(1);
+        adminByLink = rows[0];
+      } catch (e) {
+        if (!isMissingDeckWorkspaceLinksTableError(e)) throw e;
+        warnMissingDeckWorkspaceLinksTableOnce();
+      }
+
+      if (adminByLink) {
+        return { kind: "team_admin", teamId: adminByLink.teamId };
+      }
+
+      const [adminPick] = await db
+        .select({ teamId: teamMembers.teamId })
+        .from(teamMembers)
+        .innerJoin(
+          teamDeckAssignments,
+          and(
+            eq(teamDeckAssignments.teamId, teamMembers.teamId),
+            eq(teamDeckAssignments.deckId, deck.id),
+          ),
+        )
+        .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+        .where(
+          and(
+            eq(teamMembers.userId, viewerUserId),
+            eq(teamMembers.role, "team_admin"),
+            eq(teams.ownerUserId, deck.userId),
+          ),
+        )
+        .limit(1);
+
+      if (adminPick) {
+        return { kind: "team_admin", teamId: adminPick.teamId };
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   try {
@@ -561,10 +801,6 @@ export async function resolveDeckViewerAccess(
 
     const member = await getMemberRecord(deck.teamId, viewerUserId);
     if (!member) return null;
-
-    if (member.role === "team_admin") {
-      return { kind: "team_admin", teamId: deck.teamId };
-    }
 
     const assignedRows = await db
       .select()
@@ -580,7 +816,15 @@ export async function resolveDeckViewerAccess(
 
     if (assignedRows.length === 0) return null;
 
-    return { kind: "team_member", teamId: deck.teamId };
+    if (member.role === "team_admin") {
+      return { kind: "team_admin", teamId: deck.teamId };
+    }
+
+    if (member.role === "team_member") {
+      return { kind: "team_member", teamId: deck.teamId };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -650,15 +894,17 @@ function planLabelForTeam(planSlug: string): string {
 export type WorkspaceNavTeamsResult = {
   /** Teams the user may select (limited for free personal accounts). */
   teams: TeamWorkspaceNavTeam[];
-  /** All team-tier workspaces eligible for the switcher (owner / co-admin / member-only rows). */
+  /** Count of workspaces shown through the switcher (excludes subscriber-owned team tiers). */
   totalEligibleCount: number;
 };
 
 /**
  * Header workspace switcher: `teamMemberUrlParam` is 0 for the subscriber owner, else the
- * viewer’s `team_members.id` (for display grouping). Workspace URLs use only `?team=<id>`.
- * Eligible teams match {@link getEligibleWorkspaceTeamsForUser} (owners: all owned; co-admins: managed
- * teams only; members: assigned workspaces). Personal Pro (or admin unlock) lists every eligible team;
+ * viewer’s `team_members.id` (for display grouping). Workspace dashboard URLs include
+ * `team`, `userid`, `plan`, and `teamMemberId`.
+ * Subscriber-owned **team-tier** workspaces are intentionally omitted — those subscribers author decks on
+ * the Personal Dashboard only and manage sharing from Team Admin ({@link getEligibleWorkspaceTeamsForUser}
+ * still lists them for assign/move logic). Personal Pro (or admin unlock) lists every eligible team;
  * Free personal shows at most {@link FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT} (oldest first).
  */
 export async function getWorkspaceNavTeamsForUser(
@@ -666,13 +912,18 @@ export async function getWorkspaceNavTeamsForUser(
   options: { personalProUnlocked: boolean },
 ): Promise<WorkspaceNavTeamsResult> {
   const eligible = await getEligibleWorkspaceTeamsForUser(userId);
-  const totalEligibleCount = eligible.length;
+  const eligibleForSwitcher = eligible.filter((t) => {
+    const isSubscriberOwnedTeamTier =
+      t.ownerUserId === userId && isTeamPlanId(t.planSlug);
+    return !isSubscriberOwnedTeamTier;
+  });
+  const totalEligibleCount = eligibleForSwitcher.length;
   const memberships = await getTeamMembershipsForUser(userId);
   const membershipByTeamId = new Map(
     memberships.map((m) => [m.teamId, m] as const),
   );
 
-  const ownerIds = [...new Set(eligible.map((t) => t.ownerUserId))];
+  const ownerIds = [...new Set(eligibleForSwitcher.map((t) => t.ownerUserId))];
   const ownerDisplayNameById = new Map<string, string>();
   await Promise.all(
     ownerIds.map(async (oid) => {
@@ -680,7 +931,7 @@ export async function getWorkspaceNavTeamsForUser(
     }),
   );
 
-  const full = eligible.map((t) => {
+  const full = eligibleForSwitcher.map((t) => {
     const teamMemberUrlParam =
       t.ownerUserId === userId
         ? 0
@@ -1005,22 +1256,122 @@ export async function getTeamInvitationRowForInviteeEmail(
   }
 }
 
-export async function listAssignmentsForTeam(teamId: number) {
-  return db
-    .select()
-    .from(teamDeckAssignments)
-    .where(eq(teamDeckAssignments.teamId, teamId));
+/** Projection when `team_deck_assignments` is missing audit columns (migration 0023 not applied). */
+const teamDeckAssignmentListSelectLegacy = {
+  teamId: teamDeckAssignments.teamId,
+  deckId: teamDeckAssignments.deckId,
+  memberUserId: teamDeckAssignments.memberUserId,
+} as const;
+
+let warnedMissingTeamDeckAssignmentAuditColumns = false;
+function warnMissingTeamDeckAssignmentAuditColumnsOnce() {
+  if (warnedMissingTeamDeckAssignmentAuditColumns) return;
+  warnedMissingTeamDeckAssignmentAuditColumns = true;
+  console.warn(
+    "[db] `team_deck_assignments` is missing `assignedByUserId` / `createdAt` — apply migration `0023_team_deck_assignment_signed`.",
+  );
+}
+
+function isMissingTeamDeckAssignmentAuditColumnError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const o = current as Record<string, unknown>;
+    const code = o.code;
+    const message = typeof o.message === "string" ? o.message : "";
+    if (code === "42703" || code === 42703) {
+      if (
+        /assignedByUserId|createdAt/i.test(message) ||
+        (/column/i.test(message) && /does not exist/i.test(message))
+      ) {
+        return true;
+      }
+    }
+    if (
+      /assignedByUserId|createdAt/i.test(message) &&
+      (/does not exist/i.test(message) || /undefined column/i.test(message))
+    ) {
+      return true;
+    }
+    current = o.cause;
+  }
+  const flat = String(error);
+  if (
+    /Failed query:/i.test(flat) &&
+    /insert into/i.test(flat) &&
+    /team_deck_assignments/i.test(flat) &&
+    (/assignedByUserId/i.test(flat) ||
+      /"createdAt"/i.test(flat) ||
+      /column .* does not exist/i.test(flat))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Normalized assignment row for admin UI (supports DB before migration 0023). */
+export type TeamDeckAssignmentListRow = {
+  teamId: number;
+  deckId: number;
+  memberUserId: string;
+  assignedByUserId: string | null;
+  createdAt: Date | null;
+};
+
+export async function listAssignmentsForTeam(
+  teamId: number,
+): Promise<TeamDeckAssignmentListRow[]> {
+  try {
+    const rows = await db
+      .select()
+      .from(teamDeckAssignments)
+      .where(eq(teamDeckAssignments.teamId, teamId));
+    return rows.map((r) => ({
+      teamId: r.teamId,
+      deckId: r.deckId,
+      memberUserId: r.memberUserId,
+      assignedByUserId: r.assignedByUserId ?? null,
+      createdAt: r.createdAt ?? null,
+    }));
+  } catch (e) {
+    if (!isMissingTeamDeckAssignmentAuditColumnError(e)) throw e;
+    warnMissingTeamDeckAssignmentAuditColumnsOnce();
+    const rows = await db
+      .select(teamDeckAssignmentListSelectLegacy)
+      .from(teamDeckAssignments)
+      .where(eq(teamDeckAssignments.teamId, teamId));
+    return rows.map((r) => ({
+      ...r,
+      assignedByUserId: null,
+      createdAt: null,
+    }));
+  }
 }
 
 export async function insertDeckAssignment(
   teamId: number,
   deckId: number,
   memberUserId: string,
+  assignedByUserId: string,
 ) {
-  await db
-    .insert(teamDeckAssignments)
-    .values({ teamId, deckId, memberUserId })
-    .onConflictDoNothing();
+  const createdAt = new Date();
+  try {
+    // Drizzle `.insert(teamDeckAssignments).values(...)` still lists every schema column and uses
+    // SQL DEFAULT for omitted fields; that breaks unmigrated DBs and can skip bound parameters.
+    // Parameterized SQL inserts exactly what we intend (see team_members legacy insert above).
+    await db.execute(
+      sql`INSERT INTO "team_deck_assignments" ("teamId", "deckId", "memberUserId", "assignedByUserId", "createdAt")
+          VALUES (${teamId}, ${deckId}, ${memberUserId}, ${assignedByUserId}, ${createdAt})
+          ON CONFLICT ("teamId", "deckId", "memberUserId") DO NOTHING`,
+    );
+  } catch (e) {
+    if (!isMissingTeamDeckAssignmentAuditColumnError(e)) throw e;
+    warnMissingTeamDeckAssignmentAuditColumnsOnce();
+    await db.execute(
+      sql`INSERT INTO "team_deck_assignments" ("teamId", "deckId", "memberUserId")
+          VALUES (${teamId}, ${deckId}, ${memberUserId})
+          ON CONFLICT ("teamId", "deckId", "memberUserId") DO NOTHING`,
+    );
+  }
 }
 
 export async function deleteDeckAssignment(
@@ -1040,36 +1391,63 @@ export async function deleteDeckAssignment(
 }
 
 /**
- * Moves a team-scoped deck to another workspace owned by the same subscriber.
- * Clears all member assignments for that deck (re-assign on the destination workspace).
+ * Link a subscriber-owned personal deck to a workspace they own. The same deck may be linked to
+ * multiple owned workspaces (`deck_workspace_links`); `decks.teamId` stays null for that pattern.
  */
-export async function transferTeamDeckBetweenWorkspaces(params: {
+export async function attachPersonalDeckToOwnedTeamWorkspace(params: {
   deckId: number;
-  fromTeamId: number;
-  toTeamId: number;
-}) {
-  const { deckId, fromTeamId, toTeamId } = params;
-  if (fromTeamId === toTeamId) return;
-
-  const fromTeam = await getTeamById(fromTeamId);
-  const toTeam = await getTeamById(toTeamId);
-  if (!fromTeam || !toTeam) throw new Error("Team not found.");
-  if (fromTeam.ownerUserId !== toTeam.ownerUserId) {
-    throw new Error(
-      "Decks can only be moved between workspaces owned by the same subscriber.",
-    );
+  teamId: number;
+  subscriberUserId: string;
+}): Promise<void> {
+  const team = await getTeamById(params.teamId);
+  if (!team) throw new Error("Team not found.");
+  if (team.ownerUserId !== params.subscriberUserId) {
+    throw new Error("Only the subscriber can attach personal decks.");
   }
 
-  const deck = await getDeckRowById(deckId);
-  if (!deck || deck.teamId !== fromTeamId || deck.userId !== fromTeam.ownerUserId) {
-    throw new Error("Deck not found in the source workspace.");
+  const deck = await getDeckRowById(params.deckId);
+  if (!deck) throw new Error("Deck not found.");
+  if (deck.userId !== team.ownerUserId) {
+    throw new Error("Deck does not belong to this subscriber.");
   }
 
-  await db.transaction(async (tx) => {
-    await tx.delete(teamDeckAssignments).where(eq(teamDeckAssignments.deckId, deckId));
-    await tx
-      .update(decks)
-      .set({ teamId: toTeamId, updatedAt: new Date() })
-      .where(and(eq(decks.id, deckId), eq(decks.teamId, fromTeamId)));
-  });
+  const alreadyLinkedHere = await isDeckLinkedToWorkspace(params.teamId, params.deckId);
+  if (alreadyLinkedHere && deck.teamId == null) {
+    return;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      if (deck.teamId != null) {
+        const priorTeam = await getTeamById(deck.teamId);
+        if (!priorTeam || priorTeam.ownerUserId !== deck.userId) {
+          throw new Error("Deck is scoped to a workspace that is not owned by this subscriber.");
+        }
+        await tx
+          .insert(deckWorkspaceLinks)
+          .values({ teamId: deck.teamId, deckId: deck.id })
+          .onConflictDoNothing({
+            target: [deckWorkspaceLinks.teamId, deckWorkspaceLinks.deckId],
+          });
+        await tx
+          .update(decks)
+          .set({ teamId: null, updatedAt: new Date() })
+          .where(and(eq(decks.id, deck.id), eq(decks.userId, deck.userId)));
+      }
+
+      await tx
+        .insert(deckWorkspaceLinks)
+        .values({ teamId: params.teamId, deckId: params.deckId })
+        .onConflictDoNothing({
+          target: [deckWorkspaceLinks.teamId, deckWorkspaceLinks.deckId],
+        });
+    });
+  } catch (e) {
+    if (isMissingDeckWorkspaceLinksTableError(e)) {
+      throw new Error(
+        "Linking decks to multiple workspaces requires migration `0022_deck_workspace_links`. Apply Drizzle migrations to your database, then try again.",
+      );
+    }
+    throw e;
+  }
 }

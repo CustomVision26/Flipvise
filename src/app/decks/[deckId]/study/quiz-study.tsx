@@ -85,6 +85,7 @@ interface QuizStudyProps {
   deckGradient?: string | null;
   /** Set when study was opened from a team workspace URL — result is saved right after submit. */
   autoSaveQuizResult?: boolean;
+  hasAiReading?: boolean;
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -258,6 +259,7 @@ export function QuizStudy({
   teamId,
   deckGradient = null,
   autoSaveQuizResult = false,
+  hasAiReading = false,
 }: QuizStudyProps) {
   const router = useRouter();
   const deckAccent = useMemo(() => getDeckQuizAccent(deckGradient), [deckGradient]);
@@ -572,7 +574,7 @@ export function QuizStudy({
               <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {formatClock(remainingSeconds)}
             </div>
-            <VoiceSelector voice={voice} onChange={setVoice} />
+            {hasAiReading ? <VoiceSelector voice={voice} onChange={setVoice} /> : null}
           </div>
           <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
             <span>
@@ -678,9 +680,9 @@ export function QuizStudy({
             >
               Select the best answer
             </span>
-            {current.question && (
+            {current.question && hasAiReading ? (
               <SpeakButton text={current.question} voice={voice} stopKey={currentIndex} />
-            )}
+            ) : null}
           </div>
         </div>
         {current.questionImageUrl && (
@@ -762,7 +764,9 @@ export function QuizStudy({
                   <span className="break-words">{displayText}</span>
                 </span>
               </Button>
-              <SpeakButton text={displayText} voice={voice} stopKey={currentIndex} />
+              {hasAiReading ? (
+                <SpeakButton text={displayText} voice={voice} stopKey={currentIndex} />
+              ) : null}
             </div>
           );
         })}

@@ -110,6 +110,7 @@ interface DeckGridProps {
   deckPopoverVariant?: "full" | "team-preview";
   /** Team Clerk plan — richer “preview cards” entry with first-card image + CTA. */
   teamTierPreviewPromo?: boolean;
+  hasAiReading?: boolean;
 }
 
 export function DeckGrid({
@@ -118,6 +119,7 @@ export function DeckGrid({
   workspaceQueryString,
   deckPopoverVariant = "full",
   teamTierPreviewPromo = false,
+  hasAiReading = false,
 }: DeckGridProps) {
   const [sort, setSort] = useState<SortOption>("newest");
   const [pageSize, setPageSize] = useState<PageSize>(9);
@@ -218,6 +220,7 @@ export function DeckGrid({
             workspaceQueryString={workspaceQueryString}
             variant={deckPopoverVariant}
             teamTierPreviewPromo={teamTierPreviewPromo}
+            hasAiReading={hasAiReading}
           />
         ))}
       </div>

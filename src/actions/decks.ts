@@ -11,9 +11,11 @@ import {
   updateDeck,
 } from "@/db/queries/decks";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
-import { getTeamById, getMemberRecord } from "@/db/queries/teams";
+import { getTeamById, getDecksForTeam } from "@/db/queries/teams";
 import { getAccessContext } from "@/lib/access";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
+import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
+import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 
 const createDeckSchema = z
   .object({
@@ -65,10 +67,16 @@ export async function createDeckAction(
   async function insertTeamDeckForTeamId(tid: number): Promise<number> {
     const team = await getTeamById(tid);
     if (!team) throw new Error("Invalid team");
-    const isOwner = team.ownerUserId === sessionUserId;
-    const membership = await getMemberRecord(tid, sessionUserId);
-    const isTeamAdmin = membership?.role === "team_admin";
-    if (!isOwner && !isTeamAdmin) throw new Error("Forbidden");
+    if (team.ownerUserId !== sessionUserId) throw new Error("Forbidden");
+    if (isTeamPlanId(team.planSlug)) {
+      const limits = limitsForPlan(team.planSlug);
+      const inWorkspace = await getDecksForTeam(team.id, team.ownerUserId);
+      if (inWorkspace.length >= limits.maxDecksPerWorkspace) {
+        throw new Error(
+          `Workspace deck limit reached — up to ${limits.maxDecksPerWorkspace} decks in this workspace on your plan. See Pricing to upgrade.`,
+        );
+      }
+    }
     return createDeck(team.ownerUserId, name, description, tid, gradient);
   }
 
@@ -131,8 +139,8 @@ const uploadDeckCoverImageSchema = z.object({
 type UploadDeckCoverImageInput = z.infer<typeof uploadDeckCoverImageSchema>;
 
 /**
- * Upload a cover image for a **team workspace** deck (`teamId` set).
- * Replaces any existing cover; persists immediately.
+ * Upload or replace the deck cover — allowed when {@link deckHasTeamTierProFeatures} is true
+ * for the subscriber’s deck (`team-tier` workspaces).
  */
 export async function uploadDeckCoverImageAction(
   data: UploadDeckCoverImageInput,
@@ -150,8 +158,10 @@ export async function uploadDeckCoverImageAction(
   }
 
   const deck = bundle.deck;
-  if (deck.teamId === null) {
-    throw new Error("Cover image is only available for team workspace decks.");
+  if (!(await deckHasTeamTierProFeatures(deck))) {
+    throw new Error(
+      "Cover images are available on decks for subscribers with a team-tier workspace.",
+    );
   }
 
   const file = formData.get("image");
@@ -210,7 +220,7 @@ const removeDeckCoverImageSchema = z.object({
 
 type RemoveDeckCoverImageInput = z.infer<typeof removeDeckCoverImageSchema>;
 
-/** Remove the cover image from a team workspace deck. */
+/** Remove the subscriber’s team-tier deck cover image. */
 export async function removeDeckCoverImageAction(data: RemoveDeckCoverImageInput) {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
@@ -224,8 +234,10 @@ export async function removeDeckCoverImageAction(data: RemoveDeckCoverImageInput
   }
 
   const deck = bundle.deck;
-  if (deck.teamId === null) {
-    throw new Error("Cover image is only available for team workspace decks.");
+  if (!(await deckHasTeamTierProFeatures(deck))) {
+    throw new Error(
+      "Cover images are available on decks for subscribers with a team-tier workspace.",
+    );
   }
 
   if (deck.coverImageUrl) {

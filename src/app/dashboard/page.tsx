@@ -33,7 +33,6 @@ import { getPersonalDecksByUserWithCardCount } from "@/db/queries/decks";
 import {
   countTeamsForOwner,
   getAssignedDecksForMemberWithCardCount,
-  getDecksForTeamWithCardCount,
   getTeamById,
   getTeamMembershipsForUser,
 } from "@/db/queries/teams";
@@ -176,6 +175,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     isPro,
     activeTeamPlan,
     isAdmin,
+    hasAiReading,
   } = await getAccessContext();
   if (!userId) redirect("/");
 
@@ -184,18 +184,37 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect("/dashboard");
   }
   const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
+
+  /** Team Admin / bookmark URLs with legacy `userid`/`plan`/`teamMemberId` — keep query string on the subscriber-owned workspace dashboard. */
+  const keepSubscriberOwnerLegacyWorkspaceBookmark =
+    teamWorkspaceUrl != null &&
+    teamWorkspaceUrl.canEditTeamDecks &&
+    teamWorkspaceUrl.ownerUserId === userId &&
+    teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp);
+
+  /** Team-tier subscriber owners author on Personal Dashboard — never a duplicate team deck dashboard. */
+  if (
+    teamWorkspaceUrl?.canEditTeamDecks &&
+    teamWorkspaceUrl.ownerUserId === userId &&
+    !keepSubscriberOwnerLegacyWorkspaceBookmark
+  ) {
+    const next = new URLSearchParams();
+    const ti = sp.team_invite;
+    const inviteRaw = Array.isArray(ti) ? ti[0] : ti;
+    if (
+      typeof inviteRaw === "string" &&
+      inviteRaw.trim() !== ""
+    ) {
+      next.set("team_invite", inviteRaw.trim());
+    }
+    redirect(next.size ? `/dashboard?${next.toString()}` : "/dashboard");
+  }
+
   if (searchParamsLooksLikeTeamWorkspace(sp) && !teamWorkspaceUrl) {
     redirect("/dashboard");
   }
 
-  if (
-    teamWorkspaceUrl != null &&
-    teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)
-  ) {
-    redirect(`/dashboard?team=${teamWorkspaceUrl.teamId}`);
-  }
-
-  const canonicalDash = canonicalDashboardPathRemovingSensitiveQuery(sp);
+  const canonicalDash = canonicalDashboardPathRemovingSensitiveQuery(sp, userId);
   if (canonicalDash) redirect(canonicalDash);
 
   if (teamWorkspaceUrl != null) {
@@ -215,99 +234,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const cookieStore = await cookies();
   const teamCtxRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
   const teamCtxId = teamCtxRaw ? Number(teamCtxRaw) : NaN;
-
-  if (teamWorkspaceUrl?.canEditTeamDecks) {
-    const [teamHeadingRow, teamDecksRaw] = await Promise.all([
-      tryTeamQuery(() => getTeamById(teamWorkspaceUrl.teamId), null),
-      tryTeamQuery(
-        () =>
-          getDecksForTeamWithCardCount(
-            teamWorkspaceUrl.teamId,
-            teamWorkspaceUrl.ownerUserId,
-          ),
-        [],
-      ),
-    ]);
-    const teamWorkspaceTierExtras = teamWorkspaceHasTierExtras(
-      ownSubscriberTeamTierExtras,
-      teamHeadingRow,
-    );
-    const [teamDecks, teamHeadingOwnerName] = await Promise.all([
-      teamWorkspaceTierExtras
-        ? mergePreviewThumbsForDecks(teamDecksRaw)
-        : Promise.resolve(teamDecksRaw),
-      teamHeadingRow
-        ? getClerkUserDisplayNameById(teamHeadingRow.ownerUserId)
-        : Promise.resolve(null),
-    ]);
-    const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
-    const teamHeadingGroupName = teamHeadingRow?.name ?? null;
-    return (
-      <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            {teamWorkspaceTierExtras ? (
-              <DashboardTeamHeading
-                showTeamTierExtras
-                ownerName={teamHeadingOwnerName}
-                teamName={teamHeadingGroupName}
-              />
-            ) : (
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
-            )}
-            {teamWorkspaceTierExtras ? (
-              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                Team workspace — manage team decks
-              </p>
-            ) : (
-              <DashboardTeamWorkspaceSubline
-                teamName={teamHeadingGroupName}
-                ownerName={teamHeadingOwnerName}
-                tailText="Team workspace — manage team decks"
-              />
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <AddDeckDialog
-              triggerLabel="Add new deck"
-              triggerTooltip="New Team Deck"
-              isAtLimit={false}
-              teamId={teamWorkspaceUrl.teamId}
-              forTeamWorkspace
-              speechToTextEnabled={teamWorkspaceTierExtras}
-              deckFrontImageUploadEnabled={teamWorkspaceTierExtras}
-            />
-          </div>
-        </div>
-        {teamDecks.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-14 sm:py-24 text-center px-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
-              <Layers className="h-7 w-7 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-foreground text-sm">No team decks yet</p>
-              <p className="text-muted-foreground text-xs max-w-xs">Create your first team deck to get started sharing flashcards with your team.</p>
-            </div>
-            <AddDeckDialog
-              triggerLabel="Create a team deck"
-              isAtLimit={false}
-              teamId={teamWorkspaceUrl.teamId}
-              forTeamWorkspace
-              speechToTextEnabled={teamWorkspaceTierExtras}
-              deckFrontImageUploadEnabled={teamWorkspaceTierExtras}
-            />
-          </div>
-        ) : (
-          <DeckGrid
-            decks={teamDecks}
-            initialView={initialView}
-            workspaceQueryString={workspaceQueryString}
-            teamTierPreviewPromo={teamWorkspaceTierExtras}
-          />
-        )}
-      </div>
-    );
-  }
 
   if (teamWorkspaceUrl?.isAssignedMemberPreview) {
     const [assignedHeadingRow, assignedRaw] = await Promise.all([
@@ -378,6 +304,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             workspaceQueryString={workspaceQueryString}
             deckPopoverVariant="team-preview"
             teamTierPreviewPromo={teamWorkspaceTierExtras}
+            hasAiReading={hasAiReading}
           />
         )}
       </div>
@@ -465,6 +392,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       deckName={d.name}
                       cardCount={d.cardCount}
                       workspaceQueryString={workspaceQueryString}
+                      hasAiReading={hasAiReading}
                     />
                   </CardContent>
                 </Card>
@@ -603,7 +531,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <ul className="space-y-1.5 text-sm">
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
-                  <span>From 15 decks (Pro) — up to 25 with Pro Plus</span>
+                  <span>From 10 decks (Pro) — up to 15 with Pro Plus</span>
                 </li>
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
@@ -666,6 +594,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           decks={decks}
           initialView={initialView}
           teamTierPreviewPromo={ownSubscriberTeamTierExtras}
+          hasAiReading={hasAiReading}
         />
       )}
 

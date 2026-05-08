@@ -6,7 +6,7 @@
     "yearlyMonthlyPrice": null,
     "description": "Get started with flashcard study — no credit card needed.",
     "features": [
-      "Up to 3 decks",
+      "Up to 2 decks",
       "Up to 5 cards per deck",
       "Manual card creation",
       "3 interface color themes",
@@ -28,7 +28,7 @@
     "yearlyMonthlyPrice": 10,
     "description": "Solid limits for individual learners who want AI and richer decks.",
     "features": [
-      "15 decks",
+      "10 decks",
       "AI flashcard generation",
       "30 cards per deck",
       "Standard reviews and quiz",
@@ -47,11 +47,11 @@
   {
     "id": "pro_plus",
     "name": "Pro Plus",
-    "monthlyPrice": 22,
-    "yearlyMonthlyPrice": 15,
+    "monthlyPrice": 40,
+    "yearlyMonthlyPrice": 30,
     "description": "Higher limits plus AI Reading for power users.",
     "features": [
-      "25 decks",
+      "15 decks",
       "AI flashcard generation",
       "52 cards per deck",
       "Standard reviews and quiz",
@@ -71,8 +71,8 @@
   {
     "id": "pro_plus_team_basic",
     "name": "Team Basic",
-    "monthlyPrice": 35,
-    "yearlyMonthlyPrice": 25,
+    "monthlyPrice": 60,
+    "yearlyMonthlyPrice": 50,
     "description": "Collaborate with a small study group — personal workspace gets Pro Plus limits.",
     "features": [
       "Pro Plus features on your personal workspace",
@@ -95,8 +95,8 @@
   {
     "id": "pro_plus_team_gold",
     "name": "Team Gold",
-    "monthlyPrice": 75,
-    "yearlyMonthlyPrice": 65,
+    "monthlyPrice": 95,
+    "yearlyMonthlyPrice": 85,
     "description": "Scale team learning across multiple workspaces.",
     "features": [
       "Pro Plus features on your personal workspace",
@@ -119,8 +119,8 @@
   {
     "id": "pro_plus_platinum_plan",
     "name": "Platinum",
-    "monthlyPrice": 250,
-    "yearlyMonthlyPrice": 230,
+    "monthlyPrice": 160,
+    "yearlyMonthlyPrice": 150,
     "description": "Power user plan for large teams and institutions.",
     "features": [
       "Pro Plus features on your personal workspace",
@@ -143,13 +143,13 @@
   {
     "id": "pro_plus_enterprise",
     "name": "Enterprise",
-    "monthlyPrice": 500,
-    "yearlyMonthlyPrice": 450,
+    "monthlyPrice": 260,
+    "yearlyMonthlyPrice": 250,
     "description": "Full-scale deployment for large organizations.",
     "features": [
       "Pro Plus features on your personal workspace",
       "Up to 20 team workspaces",
-      "Up to 40 members per workspace",
+      "Up to 35 members per workspace",
       "Team membership",
       "Deck sharing",
       "Team progress tracker"

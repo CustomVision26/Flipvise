@@ -5,10 +5,10 @@ import { createClerkClient } from "@clerk/backend";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { promises as fs } from "fs";
-import path from "path";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import type { PlanConfig } from "@/components/pricing-content";
+import { plansConfigFilePath } from "@/lib/plans-config-disk";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -49,17 +49,17 @@ async function requireAdmin() {
   return userId;
 }
 
-function plansConfigPath() {
-  return path.join(process.cwd(), "src", "data", "plans-config.json");
-}
-
 async function readPlansConfig(): Promise<PlanConfig[]> {
-  const raw = await fs.readFile(plansConfigPath(), "utf-8");
+  const raw = await fs.readFile(plansConfigFilePath(), "utf-8");
   return JSON.parse(raw) as PlanConfig[];
 }
 
 async function writePlansConfig(plans: PlanConfig[]) {
-  await fs.writeFile(plansConfigPath(), JSON.stringify(plans, null, 2), "utf-8");
+  await fs.writeFile(
+    plansConfigFilePath(),
+    JSON.stringify(plans, null, 2),
+    "utf-8",
+  );
 }
 
 export async function updatePlanAction(input: {

@@ -27,6 +27,7 @@ interface DeckPreviewCarouselProps {
   cards: CardData[];
   open: boolean;
   onClose: () => void;
+  hasAiReading?: boolean;
 }
 
 export function DeckPreviewCarousel({
@@ -34,6 +35,7 @@ export function DeckPreviewCarousel({
   cards,
   open,
   onClose,
+  hasAiReading = false,
 }: DeckPreviewCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animKey, setAnimKey] = useState(0);
@@ -141,8 +143,7 @@ export function DeckPreviewCarousel({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 ml-3">
-          {/* Voice selector */}
-          <VoiceSelector voice={voice} onChange={setVoice} />
+          {hasAiReading ? <VoiceSelector voice={voice} onChange={setVoice} /> : null}
 
           <Button
             variant="outline"
@@ -209,6 +210,7 @@ export function DeckPreviewCarousel({
                     card={card}
                     animKey={i === currentIndex ? animKey : -1}
                     voice={voice}
+                    hasAiReading={hasAiReading}
                   />
                 </div>
               </div>
@@ -283,10 +285,12 @@ function CardSlide({
   card,
   animKey,
   voice,
+  hasAiReading,
 }: {
   card: CardData;
   animKey: number;
   voice: TtsVoice;
+  hasAiReading: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
@@ -309,9 +313,9 @@ function CardSlide({
               AI
             </Badge>
           )}
-          {card.front && (
+          {card.front && hasAiReading ? (
             <SpeakButton text={card.front} stopKey={animKey} voice={voice} className="ml-auto" />
-          )}
+          ) : null}
         </div>
         {card.front ? (
           <p className="text-foreground text-base sm:text-lg font-medium leading-relaxed whitespace-pre-line">
@@ -354,9 +358,9 @@ function CardSlide({
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             Answer
           </span>
-          {card.back && (
+          {card.back && hasAiReading ? (
             <SpeakButton text={card.back} stopKey={animKey} voice={voice} className="ml-auto" />
-          )}
+          ) : null}
         </div>
         {card.back ? (
           <p className="text-foreground text-sm sm:text-base leading-relaxed whitespace-pre-line">

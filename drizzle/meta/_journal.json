@@ -148,6 +148,20 @@
       "when": 1777720000000,
       "tag": "0020_admin_plan_assignment_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1777880000000,
+      "tag": "0022_deck_workspace_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1777960000000,
+      "tag": "0023_team_deck_assignment_signed",
+      "breakpoints": true
     }
   ]
 }

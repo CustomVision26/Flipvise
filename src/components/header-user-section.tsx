@@ -19,6 +19,7 @@ import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import {
   type TeamPlanId,
   TEAM_PLAN_LABELS,
+  isTeamPlanId,
 } from "@/lib/team-plans";
 import type { WorkspaceTeamOption } from "@/components/workspace-context-dropdown";
 import { WorkspaceContextDropdown } from "@/components/workspace-context-dropdown";
@@ -42,10 +43,16 @@ interface HeaderUserSectionProps {
   /** Full count of eligible team workspaces (may exceed `workspaceTeams` for free personal). */
   workspaceTeamsTotalEligible?: number;
   activeWorkspaceTeamId?: number | null;
-  /** Personal workspace target when clearing team cookie (clean `/dashboard`; session is authoritative). */
+  /** Personal dashboard target when selecting “Personal Dash” (may include `?userid=` / `plan=`). */
   personalWorkspaceHref?: string;
-  /** Shown next to "Personal" in the workspace dropdown (e.g. Team Gold, Pro, Free). */
+  /** Shown next to "Personal Dash" in the workspace dropdown (team tier display name, Pro, or Free). */
   personalPlanLabelForWorkspace?: string;
+  /** When nav has no owned team-tier row, Team Dash href still targets this admin workspace. */
+  teamDashFallback?: {
+    teamId: number;
+    planSlug: string;
+    teamMemberUrlParam: number;
+  } | null;
   /** Server-resolved effective Pro state from `getAccessContext()`. */
   resolvedIsPro?: boolean;
   /** Server-resolved active team plan from `getAccessContext()`. */
@@ -66,6 +73,7 @@ export function HeaderUserSection({
   activeWorkspaceTeamId = null,
   personalWorkspaceHref = "/dashboard",
   personalPlanLabelForWorkspace = "Free",
+  teamDashFallback = null,
   resolvedIsPro = false,
   resolvedActiveTeamPlan = null,
   resolvedHasCustomColors = false,
@@ -174,40 +182,39 @@ export function HeaderUserSection({
           <TooltipContent side="bottom">{fullPlanTooltip}</TooltipContent>
         </Tooltip>
         {showWorkspaceSwitcher &&
-          workspaceTeams.length > 0 &&
+          (workspaceTeams.length > 0 ||
+            (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))) &&
           !hideWorkspaceSwitcherOnWorkspaceManagement &&
           !hideWorkspaceSwitcherOnTeamRoute &&
           !hideWorkspaceSwitcherOnPricingForTeamTier && (
-          <span className="order-2 inline-flex max-w-full min-w-0 shrink">
-            <WorkspaceContextDropdown
-              teams={workspaceTeams}
-              totalEligibleTeamCount={workspaceTeamsTotalEligible}
-              activeTeamId={activeWorkspaceTeamId}
-              personalWorkspaceHref={personalWorkspaceHref}
-              personalPlanLabel={personalPlanLabelForWorkspace}
-            />
-          </span>
-        )}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span className="order-3 inline-flex shrink-0 items-center" />
-            }
-          >
-            <UserButton>
-              <UserButton.UserProfilePage
-                label="Billing"
-                url="billing"
-                labelIcon={<CreditCard className="size-4" />}
-              >
-                <UserBillingPage />
-              </UserButton.UserProfilePage>
-            </UserButton>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">Account</TooltipContent>
-        </Tooltip>
+            <span className="order-2 inline-flex max-w-full min-w-0 shrink">
+              <WorkspaceContextDropdown
+                teams={workspaceTeams}
+                totalEligibleTeamCount={workspaceTeamsTotalEligible}
+                activeTeamId={activeWorkspaceTeamId}
+                personalWorkspaceHref={personalWorkspaceHref}
+                personalPlanLabel={personalPlanLabelForWorkspace}
+                teamDashFallback={teamDashFallback}
+              />
+            </span>
+          )}
+        {/* Avoid Tooltip wrapping UserButton (both use portals) — teardown race → removeChild on null parent. */}
+        <span
+          className="order-3 inline-flex shrink-0 items-center"
+          title="Account"
+        >
+          <UserButton>
+            <UserButton.UserProfilePage
+              label="Billing"
+              url="billing"
+              labelIcon={<CreditCard className="size-4" />}
+            >
+              <UserBillingPage />
+            </UserButton.UserProfilePage>
+          </UserButton>
+        </span>
       </div>
-      <SettingsMenu 
+      <SettingsMenu
         currentProTheme={currentProTheme}
         currentFreeTheme={currentFreeTheme}
         isPro={isPro}

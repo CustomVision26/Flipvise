@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTeamAction } from "@/actions/teams";
-import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import type { TeamPlanId } from "@/lib/team-plans";
 
 interface TeamOnboardingWizardProps {
@@ -24,12 +23,8 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
     setError(null);
     setPending(true);
     try {
-      const { teamId } = await createTeamAction({ name, planSlug });
-      router.push(
-        buildTeamWorkspaceDashboardPath({
-          teamId,
-        }),
-      );
+      await createTeamAction({ name, planSlug });
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create team");
@@ -58,7 +53,7 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
         </p>
       )}
       <Button type="submit" disabled={pending}>
-        {pending ? "Creating…" : "Continue to team dashboard"}
+        {pending ? "Creating…" : "Continue to Personal dashboard"}
       </Button>
     </form>
   );

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
-import { Users, Layers, LayoutGrid } from "lucide-react";
+import { Users, LayoutGrid } from "lucide-react";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import {
   getDecksForTeam,
+  getDecksForTeamWithCardCount,
   getTeamsForTeamDashboard,
   listAssignmentsForTeam,
   listPendingInvitations,
@@ -20,8 +21,14 @@ import {
   countMembersForTeam,
   countPendingInvitationsForTeam,
   getLatestInviteeDisplayNamesForTeamIds,
+  roleReceivesDeckAssignments,
 } from "@/db/queries/teams";
-import { canonicalTeamPlanId, isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
+import {
+  canonicalTeamPlanId,
+  isTeamPlanId,
+  limitsForPlan,
+  personalDashboardPlanQueryValue,
+} from "@/lib/team-plans";
 import {
   buildTeamAdminAssignDecksToMembersPath,
   buildTeamAdminInviteHistoryPath,
@@ -32,22 +39,28 @@ import {
   buildTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
-import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
 import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
 import { TeamAdminManageTabs } from "@/components/team-admin-manage-tabs";
-import { MainDashboardButton } from "@/components/main-dashboard-button";
+import { TeamAdminDashboardNavActions } from "@/components/team-admin-dashboard-nav-actions";
 import {
   getClerkPrimaryEmailsByUserIds,
   getClerkUserDisplayNameById,
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
 import { AddTeamDialogLazy } from "@/components/add-team-dialog-lazy";
+import { getAccessContext } from "@/lib/access";
+import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
 
 interface PageProps {
-  searchParams: Promise<{ team?: string; userid?: string; plan?: string }>;
-  /** Used when redirecting to canonical `?team=` — must match the current route (members vs ws-history). */
-  buildCanonicalPath?: (teamId: number) => string;
+  searchParams: Promise<{
+    team?: string;
+    teamMemberId?: string;
+    userid?: string;
+    plan?: string;
+  }>;
+  /** Used when redirecting to canonical `?team=&teamMemberId=` — must match the current route (members vs ws-history). */
+  buildCanonicalPath?: (teamId: number, teamMemberUrlParam: number) => string;
 }
 
 export default async function TeamAdminDashboardView({
@@ -64,6 +77,8 @@ export default async function TeamAdminDashboardView({
 
   const sp = await searchParams;
   const teamParam = sp.team;
+  const teamMemberIdParam =
+    typeof sp.teamMemberId === "string" ? sp.teamMemberId : undefined;
   const useridParam = typeof sp.userid === "string" ? sp.userid : undefined;
   const planParam =
     typeof sp.plan === "string" && sp.plan.trim() !== "" ? sp.plan.trim() : undefined;
@@ -71,8 +86,10 @@ export default async function TeamAdminDashboardView({
   const cookieStore = await cookies();
   const cookieRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
 
-  const resolution = resolveTeamAdminDashboardSelection(teams, {
+  const resolution = await resolveTeamAdminDashboardSelection(teams, {
+    viewerUserId: userId,
     teamParam,
+    teamMemberIdParam,
     cookieTeamRaw: cookieRaw,
     useridParam,
     planParam,
@@ -81,11 +98,12 @@ export default async function TeamAdminDashboardView({
   if (resolution.outcome === "redirect") {
     redirect(resolution.to);
   }
-  const { selected, teamsForSubscriber, subscriberTeamIds } = resolution;
+  const { selected, teamsForSubscriber, subscriberTeamIds, viewerTeamMemberUrlParam } =
+    resolution;
 
   const limits = isTeamPlanId(selected.planSlug)
     ? limitsForPlan(selected.planSlug)
-    : { maxTeams: 0, maxMembersPerTeam: 0 };
+    : { maxTeams: 0, maxMembersPerTeam: 0, maxDecksPerWorkspace: 0 };
 
   const [
     [
@@ -94,7 +112,7 @@ export default async function TeamAdminDashboardView({
       invitations,
       invitationHistory,
       workspaceHistory,
-      teamDecks,
+      teamDecksWithCardCounts,
       ownerDisplayName,
       teamQuizResults,
     ],
@@ -106,7 +124,7 @@ export default async function TeamAdminDashboardView({
       listPendingInvitations(selected.id),
       listTeamInvitationHistoryForTeam(selected.id),
       listTeamWorkspaceEventsForTeam(selected.ownerUserId, selected.id),
-      getDecksForTeam(selected.id, selected.ownerUserId),
+      getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
       getClerkUserDisplayNameById(selected.ownerUserId),
       getQuizResultsForTeam(selected.id),
     ]),
@@ -121,7 +139,7 @@ export default async function TeamAdminDashboardView({
           id: t.id,
           name: t.name,
           ownerUserId: t.ownerUserId,
-          normalMembers: allMembers.filter((m) => m.role === "team_member"),
+          normalMembers: allMembers.filter((m) => roleReceivesDeckAssignments(m.role)),
           allMembers,
           decks,
           assignments,
@@ -139,18 +157,30 @@ export default async function TeamAdminDashboardView({
   const assignMemberUserIds = assignWorkspaceSnapshots.flatMap((w) =>
     w.allMembers.map((m) => m.userId),
   );
+  const assignmentSignerUserIds = assignWorkspaceSnapshots.flatMap((w) =>
+    w.assignments
+      .map((a) => a.assignedByUserId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const workspaceOwnerUserIds = assignWorkspaceSnapshots.map((w) => w.ownerUserId);
   const invitationInviterUserIds = [
     ...invitations.map((i) => i.invitedByUserId),
     ...invitationHistory.map((i) => i.invitedByUserId),
   ].filter((id): id is string => Boolean(id));
-  const [userFieldDisplayById, mainDashboardHref, inviteWorkspaceOptions, invitationStoredDisplayNames] =
+  const [userFieldDisplayById, access, inviteWorkspaceOptions, invitationStoredDisplayNames] =
     await Promise.all([
       getClerkUserFieldDisplaysByIds(
-        [...new Set([...memberTableUserIds, ...assignMemberUserIds, ...invitationInviterUserIds])],
+        [
+          ...new Set([
+            ...memberTableUserIds,
+            ...assignMemberUserIds,
+            ...assignmentSignerUserIds,
+            ...workspaceOwnerUserIds,
+            ...invitationInviterUserIds,
+          ]),
+        ],
       ),
-      isTeamPlanId(selected.planSlug)
-        ? buildTeamWorkspaceDashboardPath({ teamId: selected.id })
-        : "/dashboard",
+      getAccessContext(),
       Promise.all(
         teamsForSubscriber.map(async (t) => {
           const lim = isTeamPlanId(t.planSlug)
@@ -174,6 +204,30 @@ export default async function TeamAdminDashboardView({
       ),
       getLatestInviteeDisplayNamesForTeamIds(subscriberTeamIds),
     ]);
+
+  const personalStripeSlug = access.hasClerkPersonalProPlus
+    ? ("pro_plus" as const)
+    : access.hasClerkPersonalPro
+      ? ("pro" as const)
+      : null;
+
+  const personalPlanQuery = personalDashboardPlanQueryValue(
+    access.activeTeamPlan,
+    access.isPro,
+    personalStripeSlug,
+  );
+  const personalDashboardParams = new URLSearchParams({ userid: userId });
+  if (personalPlanQuery !== "") personalDashboardParams.set("plan", personalPlanQuery);
+
+  const mainDashboardHref = `/dashboard?${personalDashboardParams.toString()}`;
+
+  const workspaceDashboardParams = new URLSearchParams({
+    team: String(selected.id),
+    userid: selected.ownerUserId,
+    plan: selected.planSlug,
+    teamMemberId: String(viewerTeamMemberUrlParam),
+  });
+  const workspaceDashboardHref = `/dashboard?${workspaceDashboardParams.toString()}`;
 
   const memberEmailToDisplayHint: Record<string, string> = {};
   for (const snap of assignWorkspaceSnapshots) {
@@ -208,9 +262,9 @@ export default async function TeamAdminDashboardView({
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <div className="min-w-0 space-y-2">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 flex-1 space-y-2">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Team Admin Dashboard</h1>
             <p
               className="text-lg font-semibold tracking-tight text-foreground sm:text-xl truncate min-w-0"
@@ -228,26 +282,41 @@ export default async function TeamAdminDashboardView({
               Manage teams, members, and deck access for your subscription.
             </p>
           </div>
-          <div className="flex flex-shrink-0 flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              {isOwner && isTeamPlanId(selected.planSlug) && (
-                <AddTeamDialogLazy
-                  planSlug={canonicalTeamPlanId(selected.planSlug)!}
-                  isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
-                />
-              )}
+          {isOwner && isTeamPlanId(selected.planSlug) && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end sm:pt-0.5">
+              <AddTeamDialogLazy
+                planSlug={canonicalTeamPlanId(selected.planSlug)!}
+                isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
+              />
             </div>
-          </div>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2 self-start">
-          <MainDashboardButton
-            teamId={isTeamPlanId(selected.planSlug) ? selected.id : null}
-            href={mainDashboardHref}
-          />
-        </div>
+
+        <Card className="border-border/80 bg-muted/20 shadow-none">
+          <CardHeader className="space-y-1 px-4 pb-2 pt-4 sm:px-5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Quick navigation
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground sm:text-sm">
+              {isOwner
+                ? "Jump to your Personal Dashboard."
+                : "Jump to your Personal Dashboard or the main dashboard scoped to this workspace."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 px-4 pb-4 sm:flex-row sm:flex-wrap sm:gap-3 sm:px-5">
+            <TeamAdminDashboardNavActions
+              mainDashboardHref={mainDashboardHref}
+              workspaceDashboardHref={workspaceDashboardHref}
+              workspaceTeamId={selected.id}
+              isOwner={isOwner}
+              workspacePlanSlug={selected.planSlug}
+              className="sm:justify-start"
+            />
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -282,32 +351,37 @@ export default async function TeamAdminDashboardView({
             <CardDescription className="mt-0.5">Members in this workspace</CardDescription>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Decks
-              </CardTitle>
-              <Layers className="h-4 w-4 text-muted-foreground" aria-hidden />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">{teamDecks.length}</p>
-            <CardDescription className="mt-0.5">Flashcard decks in this workspace</CardDescription>
-          </CardContent>
-        </Card>
+        <TeamAdminWorkspaceDeckCardTotals
+          teamDecksWithCardCounts={teamDecksWithCardCounts}
+          planSlug={selected.planSlug}
+        />
       </div>
 
       <TeamAdminManageTabs
         key={selected.id}
         teamId={selected.id}
-        deckManagerHref={buildTeamAdminAssignDecksToMembersPath(selected.id)}
-        membersHref={buildTeamAdminMembersPath(selected.id)}
-        workspaceHistoryHref={buildTeamAdminWsHistoryPath(selected.id)}
-        inviteSendHref={buildTeamAdminInviteSendPath(selected.id)}
-        invitePendingHref={buildTeamAdminInvitePendingPath(selected.id)}
-        inviteHistoryHref={buildTeamAdminInviteHistoryPath(selected.id)}
-        quizResultsHref={buildTeamAdminQuizResultsPath(selected.id)}
+        deckManagerHref={buildTeamAdminAssignDecksToMembersPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
+        membersHref={buildTeamAdminMembersPath(selected.id, viewerTeamMemberUrlParam)}
+        workspaceHistoryHref={buildTeamAdminWsHistoryPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
+        inviteSendHref={buildTeamAdminInviteSendPath(selected.id, viewerTeamMemberUrlParam)}
+        invitePendingHref={buildTeamAdminInvitePendingPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
+        inviteHistoryHref={buildTeamAdminInviteHistoryPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
+        quizResultsHref={buildTeamAdminQuizResultsPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
         teamName={selected.name}
         ownerUserId={selected.ownerUserId}
         teamCreatedAt={selected.createdAt}

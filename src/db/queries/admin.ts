@@ -243,11 +243,15 @@ export async function getUserTeamPlanAssociationsByUserIds(
 }
 
 export async function getAdminPrivilegeLogs(limit = 100) {
-  return db
-    .select()
-    .from(adminPrivilegeLogs)
-    .orderBy(desc(adminPrivilegeLogs.createdAt))
-    .limit(limit);
+  try {
+    return await db
+      .select()
+      .from(adminPrivilegeLogs)
+      .orderBy(desc(adminPrivilegeLogs.createdAt))
+      .limit(limit);
+  } catch {
+    return [];
+  }
 }
 
 export async function getTeamWorkspaceCountsByOwnerUserIds(
@@ -548,11 +552,15 @@ export async function getWorkspaceDetailsByOwnerUserIds(
 }
 
 export async function getAdminPlanAssignmentLogs(limit = 500) {
-  return db
-    .select()
-    .from(adminPlanAssignmentLogs)
-    .orderBy(desc(adminPlanAssignmentLogs.createdAt))
-    .limit(limit);
+  try {
+    return await db
+      .select()
+      .from(adminPlanAssignmentLogs)
+      .orderBy(desc(adminPlanAssignmentLogs.createdAt))
+      .limit(limit);
+  } catch {
+    return [];
+  }
 }
 
 export type AdminPlanAssignmentAction =

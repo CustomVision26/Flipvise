@@ -8,7 +8,6 @@ import {
   buildTeamAdminInviteHistoryPath,
   buildTeamAdminInvitePendingPath,
   buildTeamAdminInviteSendPath,
-  buildTeamAdminMoveDeckToAnotherWsPath,
   buildTeamAdminPath,
   buildTeamAdminQuizResultsPath,
   buildTeamAdminWsHistoryPath,
@@ -16,7 +15,6 @@ import {
   TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH,
   TEAM_ADMIN_INVITE_PENDING_PATH,
   TEAM_ADMIN_INVITE_SEND_PATH,
-  TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH,
   TEAM_ADMIN_QUIZ_RESULTS_PATH,
   TEAM_ADMIN_WS_HISTORY_PATH,
 } from "@/lib/team-admin-url";
@@ -25,8 +23,10 @@ export type TeamAdminHeaderSwitcherTeam = {
   id: number;
   name: string;
   ownerUserId: string;
-  /** Clerk team plan id for that workspace’s row — UI only; team-admin URLs use `?team=` only. */
+  /** Clerk team plan id for that workspace’s row — UI only; team-admin URLs use `?team=` (and optional `teamMemberId=`). */
   workspacePlanQuery?: string;
+  /** Viewer’s `team_members.id`, or `0` when subscriber owner — matches workspace nav. */
+  teamMemberUrlParam: number;
 };
 
 /**
@@ -98,6 +98,7 @@ function TeamAdminHeaderSwitcherInner({
           name: t.name,
           ownerUserId: t.ownerUserId,
           workspacePlanQuery: t.workspacePlanQuery,
+          teamMemberUrlParam: t.teamMemberUrlParam,
         }))}
         selectedId={selectedId}
         ariaDescribedBy="team-admin-header-team-switcher-hint"
@@ -105,9 +106,7 @@ function TeamAdminHeaderSwitcherInner({
         buildTeamChangeHref={
           pathname.startsWith(TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH)
             ? buildTeamAdminAssignDecksToMembersPath
-            : pathname.startsWith(TEAM_ADMIN_MOVE_DECK_TO_ANOTHER_WS_PATH)
-              ? buildTeamAdminMoveDeckToAnotherWsPath
-              : pathname.startsWith(TEAM_ADMIN_WS_HISTORY_PATH)
+            : pathname.startsWith(TEAM_ADMIN_WS_HISTORY_PATH)
                 ? buildTeamAdminWsHistoryPath
                 : pathname.startsWith(TEAM_ADMIN_QUIZ_RESULTS_PATH)
                   ? buildTeamAdminQuizResultsPath
@@ -139,3 +138,5 @@ export function TeamAdminHeaderSwitcherClient({
     </Suspense>
   );
 }
+
+export default TeamAdminHeaderSwitcherClient;
