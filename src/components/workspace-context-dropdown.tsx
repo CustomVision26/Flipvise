@@ -26,11 +26,6 @@ import { shouldHidePlatformAdminNav } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 export type WorkspaceTeamOption = TeamWorkspaceNavTeam;
 
@@ -339,40 +334,31 @@ export function WorkspaceContextDropdown({
         <div className="max-h-64 overflow-y-scroll p-1 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent]">
           <DropdownMenuGroup>
             {teamsNavLimited && (
-              <div className="px-2 pb-2">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={(props) => (
-                      <button
-                        type="button"
-                        {...props}
-                        className={cn(
-                          "flex w-full items-start gap-2 rounded-md border border-border bg-muted/40 px-2 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/60",
-                          props.className,
-                        )}
-                      >
-                        <Info
-                          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-                          aria-hidden
-                        />
-                        <span className="min-w-0 leading-snug">
-                          {`Showing ${teams.length} of ${totalEligibleTeamCount} team workspaces (Free personal shows up to ${FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT}). Hover for details — upgrade to Personal Pro to access every team linked to your account.`}
-                        </span>
-                      </button>
-                    )}
+              <div className="space-y-2 px-2 pb-2">
+                {/* Do not nest Tooltip inside DropdownMenuContent — dual portals tear down out of order → removeChild(null). */}
+                <div
+                  className="flex w-full items-start gap-2 rounded-md border border-border bg-muted/40 px-2 py-2 text-left text-xs text-muted-foreground"
+                  title="Personal Pro unlocks the full list of team workspaces associated with your email across Flipvise. Upgrade to switch among all your teams without this limit."
+                >
+                  <Info
+                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
                   />
-                  <TooltipContent side="left" className="max-w-xs flex flex-col gap-2 text-xs">
-                    <p className="text-background">
-                      Personal Pro unlocks the full list of team workspaces associated with your email across Flipvise. Upgrade to switch among all your teams without this limit.
-                    </p>
-                    <Link
-                      href="/pricing"
-                      className="font-medium text-background underline underline-offset-2 hover:opacity-90"
-                    >
-                      View Pro plans
-                    </Link>
-                  </TooltipContent>
-                </Tooltip>
+                  <span className="min-w-0 leading-snug">
+                    {`Showing ${teams.length} of ${totalEligibleTeamCount} team workspaces (Free personal shows up to ${FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT}). Upgrade to Personal Pro to access every team linked to your account.`}
+                  </span>
+                </div>
+                <Link
+                  href="/pricing"
+                  className="block text-center text-xs font-medium text-primary underline underline-offset-4 hover:opacity-90"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => {
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                >
+                  View Pro plans
+                </Link>
               </div>
             )}
             <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
