@@ -24,7 +24,11 @@ import { DeleteAllCardsDialog } from "./delete-all-cards-dialog";
 import { StudyLink } from "./study-link";
 import { GenerateCardsButton } from "./generate-cards-button";
 import { CardGrid } from "./card-grid";
-import { getCardsPerDeckLimit } from "@/lib/deck-limits";
+import {
+  CARDS_PER_DECK_LIMIT_FREE,
+  CARDS_PER_DECK_LIMIT_PRO_PLUS,
+  resolveDeckCardCap,
+} from "@/lib/deck-limits";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import { CARDS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { getGradientBySlug } from "@/lib/deck-gradients";
@@ -36,7 +40,7 @@ interface DeckPageProps {
 }
 
 export default async function DeckPage({ params, searchParams }: DeckPageProps) {
-  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
+  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -85,10 +89,13 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
   const initialView = resolveViewMode(cookieStore.get(CARDS_VIEW_COOKIE)?.value);
 
   const aiGeneratedCount = cards.filter((c) => c.aiGenerated).length;
-  const effective75 = has75CardsPerDeck || teamTierPro;
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const paidDeckCards = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
   const effectiveAI = hasAI || teamTierPro;
-  const isFreePlan = !effective75;
-  const deckCardLimit = getCardsPerDeckLimit(effective75);
+  const isFreePlan = !paidDeckCards;
   const isAtCardLimit = cards.length >= deckCardLimit;
 
   const deckGradient = getGradientBySlug(deck.gradient);
@@ -144,7 +151,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               totalCardCount={cards.length}
               aiGeneratedCount={aiGeneratedCount}
               hasAI={effectiveAI}
-              has75CardsPerDeck={effective75}
+              deckCardLimit={deckCardLimit}
             />
             <div className="flex flex-wrap gap-2">
               <EditDeckDialog deck={deck} />
@@ -186,7 +193,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             {cards.length} / {deckCardLimit} cards
             <span className={cn("font-normal", hasGradient ? "text-white/70" : "text-muted-foreground")}>
               {" "}
-              ({isFreePlan ? "Free plan" : "Pro plan"})
+              ({isFreePlan ? "Free plan" : "Paid plan"})
             </span>
           </span>
           <span aria-hidden className="select-none">·</span>
@@ -205,13 +212,13 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               <>
                 Card limit reached for this deck ({deckCardLimit} max on Free).{" "}
                 <Link href="/pricing" className={cn("underline underline-offset-3", hasGradient && "text-white")}>
-                  Upgrade to Pro
+                  Upgrade on Pricing
                 </Link>{" "}
-                for up to {getCardsPerDeckLimit(true)} cards per deck.
+                for up to {CARDS_PER_DECK_LIMIT_PRO_PLUS} cards per deck.
               </>
             ) : (
               <>
-                Card limit reached for this deck ({deckCardLimit} max on Pro). Delete cards to add
+                Card limit reached for this deck ({deckCardLimit} max on your plan). Delete cards to add
                 more.
               </>
             )}
@@ -227,7 +234,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             deckId={id}
             isAtLimit={isAtCardLimit}
             hasAI={effectiveAI}
-            allowsMultipleChoiceFormat={effective75}
+            allowsMultipleChoiceFormat={paidDeckCards}
           />
         </div>
 
@@ -252,7 +259,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               deckId={id}
               isAtLimit={isAtCardLimit}
               hasAI={effectiveAI}
-              allowsMultipleChoiceFormat={effective75}
+              allowsMultipleChoiceFormat={paidDeckCards}
               trigger={<Button>Add your first card</Button>}
             />
           </div>

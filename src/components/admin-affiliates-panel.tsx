@@ -51,12 +51,14 @@ import {
   type EmailLookupResult,
 } from "@/actions/affiliates";
 import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
-import { ADMIN_PLAN_DROPDOWN_OPTIONS } from "@/lib/admin-assignable-plans";
+import {
+  ADMIN_PLAN_DROPDOWN_OPTIONS,
+  type AffiliatePlanValue,
+} from "@/lib/admin-assignable-plans";
 import {
   DEFAULT_AFFILIATE_INVITE_EXPIRY_DAYS,
   isAffiliateInviteExpired,
 } from "@/lib/affiliate-invite-expiry";
-import type { TeamPlanId } from "@/lib/team-plans";
 import { useRouter } from "next/navigation";
 
 interface AdminAffiliatesPanelProps {
@@ -65,7 +67,6 @@ interface AdminAffiliatesPanelProps {
   defaultInviteExpiresInDays: number;
 }
 
-type AffiliatePlanValue = "pro" | TeamPlanId;
 type StatusFilter = "all" | "pending" | "active" | "revoked";
 
 function formatDate(dateStr: string | null | undefined) {

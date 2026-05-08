@@ -1,4 +1,4 @@
-import { TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 /**
  * Resolves a single line for the admin users table "Plan" column, in order:
@@ -23,13 +23,7 @@ export function getAdminUserPlanColumnLabel(input: {
 
   const p = planMeta?.trim();
   if (p) {
-    if (p === "pro") {
-      return "Pro";
-    }
-    if (isTeamPlanId(p)) {
-      return TEAM_PLAN_LABELS[p as TeamPlanId];
-    }
-    return p;
+    return displayNameForBillingPlanSlug(p);
   }
 
   if (adminGranted) {

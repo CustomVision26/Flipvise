@@ -43,7 +43,7 @@ type CreateDeckInput = z.infer<typeof createDeckSchema>;
 export async function createDeckAction(
   data: CreateDeckInput,
 ): Promise<{ deckId: number }> {
-  const { userId, hasUnlimitedDecks } = await getAccessContext();
+  const { userId, maxPersonalDecks } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = createDeckSchema.safeParse(data);
@@ -53,11 +53,11 @@ export async function createDeckAction(
   const { name, description, gradient, teamId, personalOnly, teamWorkspaceOnly } = parsed.data;
 
   async function insertPersonalDeckForSessionUser(): Promise<number> {
-    if (!hasUnlimitedDecks) {
-      const personalCount = await countPersonalDecksForUser(sessionUserId);
-      if (personalCount >= 3) {
-        throw new Error("Free plan limit reached. Upgrade to Pro for unlimited decks.");
-      }
+    const personalCount = await countPersonalDecksForUser(sessionUserId);
+    if (personalCount >= maxPersonalDecks) {
+      throw new Error(
+        `Deck limit reached — up to ${maxPersonalDecks} personal deck(s) on your plan. See Pricing to upgrade.`,
+      );
     }
     return createDeck(sessionUserId, name, description, null, gradient);
   }

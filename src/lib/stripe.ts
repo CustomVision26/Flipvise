@@ -6,14 +6,6 @@ if (!stripeSecretKeyRaw) {
 }
 const stripeSecretKey: string = stripeSecretKeyRaw;
 
-const STRIPE_PRICE_ENV_VARS = [
-  "STRIPE_PRO_PRICE_ID",
-  "STRIPE_PRO_TEAM_BASIC_PRICE_ID",
-  "STRIPE_PRO_TEAM_GOLD_PRICE_ID",
-  "STRIPE_PRO_PLATINUM_PLAN_PRICE_ID",
-  "STRIPE_PRO_ENTERPRISE_PRICE_ID",
-] as const;
-
 function stripeKeyMode(value: string): "test" | "live" | "unknown" {
   if (value.startsWith("sk_test_") || value.startsWith("pk_test_")) return "test";
   if (value.startsWith("sk_live_") || value.startsWith("pk_live_")) return "live";
@@ -43,17 +35,8 @@ function validateStripeEnv(): void {
     }
   }
 
-  for (const envVar of STRIPE_PRICE_ENV_VARS) {
-    const value = process.env[envVar]?.trim();
-    if (!value) {
-      throw new Error(`Missing Stripe price env var: ${envVar}.`);
-    }
-    if (!value.startsWith("price_")) {
-      throw new Error(
-        `Invalid ${envVar}: expected Stripe Price ID starting with "price_" but got "${value}".`,
-      );
-    }
-  }
+  // Price IDs (`STRIPE_*_PRICE_ID`) are validated when Checkout runs — not here — so the app can
+  // boot with canonical `STRIPE_PRO_PLUS_*` vars without legacy `STRIPE_PRO_TEAM_*` aliases filled in.
 }
 
 validateStripeEnv();
@@ -61,6 +44,9 @@ validateStripeEnv();
 /** Pinned to the version bundled with the installed `stripe` package (`stripe/esm/apiVersion.d.ts`). */
 export const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2026-04-22.dahlia",
+  /** Pricing page retrieves many Prices; allow slow networks without silent timeouts. */
+  timeout: 25_000,
+  maxNetworkRetries: 2,
 });
 
 export function resolveAppUrl(): string {

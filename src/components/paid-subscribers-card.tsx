@@ -24,6 +24,7 @@ import type {
   SerializedAdminSubscription,
   SerializedAdminInvoice,
 } from "@/lib/admin-dashboard-types";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -40,12 +41,7 @@ function userInitials(name: string): string {
 }
 
 function formatPlanLabel(slug: string): string {
-  if (!slug || slug.toLowerCase() === "free") return "Free";
-  if (slug === "pro") return "Pro";
-  return slug
-    .split(/[_-]/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  return displayNameForBillingPlanSlug(slug);
 }
 
 function fmtDate(iso: string | null | undefined): string {

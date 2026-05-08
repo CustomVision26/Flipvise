@@ -44,7 +44,8 @@ import {
   buildAdminInvoiceRows,
   buildAdminSubscriptionRows,
 } from "@/lib/billing-dashboard";
-import { isTeamPlanId, limitsForPlan, TEAM_PLAN_LABELS } from "@/lib/team-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import { listAffiliates } from "@/db/queries/affiliates";
@@ -71,10 +72,7 @@ const clerkClient = createClerkClient({
 });
 
 function adminPlanLabelFromSlug(slug: string | undefined): string {
-  if (!slug) return "Free";
-  if (slug === "pro") return "Pro";
-  if (isTeamPlanId(slug)) return TEAM_PLAN_LABELS[slug];
-  return slug;
+  return displayNameForBillingPlanSlug(slug ?? null);
 }
 
 function resolveCurrentPersonalPlanStartTimeIso(input: {
@@ -246,7 +244,10 @@ export default async function AdminPage() {
     const stripePlanSlug = stripeActive ? (meta?.billingPlan ?? null) : null;
     // Use whichever source has an active paid plan
     const effectiveSlug = clerkBillingSlug ?? stripePlanSlug;
-    const isPaidPro = effectiveSlug === "pro" || isTeamPlanId(effectiveSlug ?? "");
+    const isPaidPro =
+      effectiveSlug === "pro" ||
+      effectiveSlug === "pro_plus" ||
+      isTeamPlanId(effectiveSlug ?? "");
     const isAdminGranted = meta?.adminGranted === true;
     const isAdminRole =
       meta?.role === "admin" || meta?.role === "superadmin";
@@ -342,6 +343,7 @@ export default async function AdminPage() {
 
     const isPaidPro =
       planOrTeamSlug === "pro" ||
+      planOrTeamSlug === "pro_plus" ||
       (planOrTeamSlug != null &&
         planOrTeamSlug.length > 0 &&
         isTeamPlanId(planOrTeamSlug)) ||

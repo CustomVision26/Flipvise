@@ -13,7 +13,7 @@ import {
 } from "@/db/queries/admin-plan-invites";
 import { logAdminPlanAssignment } from "@/db/queries/admin";
 import { markInboxItemRead } from "@/db/queries/inbox-reads";
-import { isTeamPlanId, TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -24,10 +24,7 @@ const acceptDeclineSchema = z.object({
 });
 
 function planSlugToDisplayName(slug: string | null | undefined): string {
-  if (!slug || slug === "free") return "Free";
-  if (slug === "pro") return "Pro";
-  if (isTeamPlanId(slug)) return TEAM_PLAN_LABELS[slug as TeamPlanId];
-  return slug;
+  return displayNameForBillingPlanSlug(slug);
 }
 
 function previousPlanSlugFromMeta(meta: Record<string, unknown>): string | null {

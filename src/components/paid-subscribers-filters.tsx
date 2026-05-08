@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 const MONTH_LABELS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -19,11 +20,7 @@ const MONTH_LABELS = [
 ] as const;
 
 function formatPlanLabel(slug: string): string {
-  if (slug === "pro") return "Pro";
-  return slug
-    .split(/[_-]/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  return displayNameForBillingPlanSlug(slug);
 }
 
 type Props = {

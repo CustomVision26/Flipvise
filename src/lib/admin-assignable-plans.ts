@@ -1,22 +1,30 @@
-import { TEAM_PLAN_IDS, TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import {
+  TEAM_PLAN_IDS,
+  TEAM_PLAN_LABELS,
+  canonicalTeamPlanId,
+  isTeamPlanId,
+} from "@/lib/team-plans";
 import { ADMIN_PLAN_KEY } from "@/lib/plan-metadata-billing-resolution";
 
 const BASE = [
   { id: "free" as const, label: "Free (clear plan flags)" },
   { id: "pro" as const, label: "Pro" },
+  { id: "pro_plus" as const, label: "Pro Plus" },
 ] as const;
 
 export const ADMIN_PLAN_DROPDOWN_OPTIONS = {
   base: BASE,
-  team: TEAM_PLAN_IDS.map((id) => ({ id, label: TEAM_PLAN_LABELS[id as TeamPlanId] })),
+  team: TEAM_PLAN_IDS.map((id) => ({ id, label: TEAM_PLAN_LABELS[id] })),
 } as const;
 
 export type AdminPlanAssignment =
   | (typeof BASE)[number]["id"]
   | (typeof TEAM_PLAN_IDS)[number];
 
+export type AffiliatePlanValue = Exclude<AdminPlanAssignment, "free">;
+
 export function isAdminPlanAssignment(value: string): value is AdminPlanAssignment {
-  if (value === "free" || value === "pro") {
+  if (value === "free" || value === "pro" || value === "pro_plus") {
     return true;
   }
   return isTeamPlanId(value);
@@ -45,11 +53,19 @@ export function publicMetadataPatchForAdminPlanAssignment(
         teamRole: null,
         adminGranted: null,
       };
+    case "pro_plus":
+      return {
+        [ADMIN_PLAN_KEY]: "pro_plus",
+        teamPlanId: null,
+        teamRole: null,
+        adminGranted: null,
+      };
     default:
       if (isTeamPlanId(assignment)) {
+        const canon = canonicalTeamPlanId(assignment)!;
         return {
-          [ADMIN_PLAN_KEY]: assignment,
-          teamPlanId: assignment,
+          [ADMIN_PLAN_KEY]: canon,
+          teamPlanId: canon,
           teamRole: "team_admin",
           adminGranted: null,
         };
@@ -65,7 +81,8 @@ export function labelForAdminPlanAssignment(
     if (row.id === a) return row.label;
   }
   if (isTeamPlanId(a)) {
-    return TEAM_PLAN_LABELS[a];
+    const canon = canonicalTeamPlanId(a)!;
+    return TEAM_PLAN_LABELS[canon];
   }
   return a;
 }

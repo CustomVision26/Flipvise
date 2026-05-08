@@ -7,7 +7,7 @@
     "description": "Get started with flashcard study — no credit card needed.",
     "features": [
       "Up to 3 decks",
-      "Up to 8 cards per deck",
+      "Up to 5 cards per deck",
       "Manual card creation",
       "3 interface color themes",
       "Study mode"
@@ -26,16 +26,15 @@
     "name": "Pro",
     "monthlyPrice": 15,
     "yearlyMonthlyPrice": 10,
-    "description": "Everything you need for serious flashcard learning.",
+    "description": "Solid limits for individual learners who want AI and richer decks.",
     "features": [
-      "Unlimited Decks",
-      "AI Flashcard Generation",
-      "75 cards Per Deck",
-      "Priority support",
-      "Standard Reviews and Quiz",
-      "Multiple Interface Colors"
+      "15 decks",
+      "AI flashcard generation",
+      "30 cards per deck",
+      "Standard reviews and quiz",
+      "Multiple interface colors"
     ],
-    "highlighted": true,
+    "highlighted": false,
     "discount": {
       "active": true,
       "type": "percentage",
@@ -43,21 +42,45 @@
       "label": "Summer Launch",
       "stripeCouponId": "SummerLaunch"
     },
-    "discontinueAt": "2026-05-09"
+    "discontinueAt": null
   },
   {
-    "id": "pro_team_basic",
+    "id": "pro_plus",
+    "name": "Pro Plus",
+    "monthlyPrice": 22,
+    "yearlyMonthlyPrice": 15,
+    "description": "Higher limits plus AI Reading for power users.",
+    "features": [
+      "25 decks",
+      "AI flashcard generation",
+      "52 cards per deck",
+      "Standard reviews and quiz",
+      "Multiple interface colors",
+      "AI reading"
+    ],
+    "highlighted": true,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    },
+    "discontinueAt": null
+  },
+  {
+    "id": "pro_plus_team_basic",
     "name": "Team Basic",
     "monthlyPrice": 35,
     "yearlyMonthlyPrice": 25,
-    "description": "Collaborate with a small study group.",
+    "description": "Collaborate with a small study group — personal workspace gets Pro Plus limits.",
     "features": [
-      "Pro Plan features",
+      "Pro Plus features on your personal workspace",
       "Up to 2 team workspaces",
       "Up to 5 members per workspace",
-      "Team deck sharing",
-      "Team Management Abilities",
-      "Track Member Progress"
+      "Team membership",
+      "Deck sharing",
+      "Team progress tracker"
     ],
     "highlighted": false,
     "discount": {
@@ -70,18 +93,18 @@
     "discontinueAt": null
   },
   {
-    "id": "pro_team_gold",
+    "id": "pro_plus_team_gold",
     "name": "Team Gold",
     "monthlyPrice": 75,
     "yearlyMonthlyPrice": 65,
-    "description": "Scale your team learning across multiple workspaces.",
+    "description": "Scale team learning across multiple workspaces.",
     "features": [
-      "Pro Plan features",
+      "Pro Plus features on your personal workspace",
       "Up to 5 team workspaces",
       "Up to 15 members per workspace",
-      "Team deck sharing",
-      "Team Management Abilities",
-      "Track Member Progress"
+      "Team membership",
+      "Deck sharing",
+      "Team progress tracker"
     ],
     "highlighted": false,
     "discount": {
@@ -94,18 +117,18 @@
     "discontinueAt": null
   },
   {
-    "id": "pro_platinum_plan",
+    "id": "pro_plus_platinum_plan",
     "name": "Platinum",
     "monthlyPrice": 250,
     "yearlyMonthlyPrice": 230,
     "description": "Power user plan for large teams and institutions.",
     "features": [
-      "Pro Plan features",
+      "Pro Plus features on your personal workspace",
       "Up to 10 team workspaces",
       "Up to 25 members per workspace",
-      "Team deck sharing",
-      "Team Management Abilities",
-      "Track Member Progress"
+      "Team membership",
+      "Deck sharing",
+      "Team progress tracker"
     ],
     "highlighted": false,
     "discount": {
@@ -118,18 +141,18 @@
     "discontinueAt": null
   },
   {
-    "id": "pro_enterprise",
+    "id": "pro_plus_enterprise",
     "name": "Enterprise",
     "monthlyPrice": 500,
     "yearlyMonthlyPrice": 450,
     "description": "Full-scale deployment for large organizations.",
     "features": [
-      "Pro Plan features",
+      "Pro Plus features on your personal workspace",
       "Up to 20 team workspaces",
-      "Up to 35 members per workspace",
-      "Team deck sharing",
-      "Team Management Abilities",
-      "Track Member Progress"
+      "Up to 40 members per workspace",
+      "Team membership",
+      "Deck sharing",
+      "Team progress tracker"
     ],
     "highlighted": false,
     "discount": {

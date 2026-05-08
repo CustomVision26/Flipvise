@@ -23,8 +23,8 @@ import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-acc
 import {
   AI_GENERATION_CAP_PER_DECK,
   CARDS_PER_DECK_LIMIT_FREE,
-  CARDS_PER_DECK_LIMIT_PRO,
-  getCardsPerDeckLimit,
+  CARDS_PER_DECK_LIMIT_PRO_PLUS,
+  resolveDeckCardCap,
 } from "@/lib/deck-limits";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 
@@ -345,7 +345,7 @@ export async function uploadCardImageAction(
 }
 
 export async function createCardAction(data: CreateCardInput) {
-  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
+  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = createCardSchema.safeParse(data);
@@ -358,16 +358,19 @@ export async function createCardAction(data: CreateCardInput) {
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effective75 = has75CardsPerDeck || teamTierPro;
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
   const effectiveAI = hasAI || teamTierPro;
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
-  const deckCardLimit = getCardsPerDeckLimit(effective75);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
-      effective75
-        ? `Pro plan limit: ${CARDS_PER_DECK_LIMIT_PRO} cards per deck. Delete cards to add more.`
-        : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade to Pro for up to ${CARDS_PER_DECK_LIMIT_PRO} cards per deck.`,
+      paidCardTier
+        ? `Plan limit: ${deckCardLimit} cards per deck for this workspace. Delete cards to add more.`
+        : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade on Pricing for higher limits (up to ${CARDS_PER_DECK_LIMIT_PRO_PLUS} on Pro Plus).`,
     );
   }
 
@@ -545,7 +548,7 @@ export async function deleteAllCardsAction(data: DeleteAllCardsInput) {
 }
 
 export async function generateCardsAction(data: GenerateCardsInput) {
-  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
+  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = generateCardsSchema.safeParse(data);
@@ -556,7 +559,11 @@ export async function generateCardsAction(data: GenerateCardsInput) {
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
   const effectiveAI = hasAI || teamTierPro;
-  const effective75 = has75CardsPerDeck || teamTierPro;
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
 
   if (!effectiveAI) throw new Error("AI flashcard generation requires a Pro plan.");
 
@@ -569,12 +576,11 @@ export async function generateCardsAction(data: GenerateCardsInput) {
     );
   }
 
-  const deckCardLimit = getCardsPerDeckLimit(effective75);
   const remainingDeckSlots = deckCardLimit - existingCards.length;
   if (count > remainingDeckSlots) {
     throw new Error(
-      effective75
-        ? `Not enough room in this deck (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left; max ${CARDS_PER_DECK_LIMIT_PRO} per deck).`
+      paidCardTier
+        ? `Not enough room in this deck (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left; max ${deckCardLimit} per deck).`
         : `Not enough room in this deck on the Free plan (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left).`,
     );
   }
@@ -840,7 +846,7 @@ type UpdateMultipleChoiceCardInput = {
 type GenerateMultipleChoiceInput = z.infer<typeof generateMultipleChoiceSchema>;
 
 export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceCardInput) {
-  const { userId, has75CardsPerDeck } = await getAccessContext();
+  const { userId, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = createMultipleChoiceCardSchema.safeParse(data);
@@ -853,21 +859,24 @@ export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceC
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effective75 = has75CardsPerDeck || teamTierPro;
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
 
-  if (!effective75) {
+  if (!paidCardTier) {
     throw new Error(
       "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
     );
   }
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
-  const deckCardLimit = getCardsPerDeckLimit(effective75);
   if (existingCards.length >= deckCardLimit) {
     throw new Error(
-      effective75
-        ? `Pro plan limit: ${CARDS_PER_DECK_LIMIT_PRO} cards per deck. Delete cards to add more.`
-        : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade to Pro for up to ${CARDS_PER_DECK_LIMIT_PRO} cards per deck.`,
+      paidCardTier
+        ? `Plan limit: ${deckCardLimit} cards per deck for this workspace. Delete cards to add more.`
+        : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade on Pricing for higher limits (up to ${CARDS_PER_DECK_LIMIT_PRO_PLUS} on Pro Plus).`,
     );
   }
 
@@ -937,7 +946,7 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
 export async function generateMultipleChoiceAction(
   data: GenerateMultipleChoiceInput,
 ): Promise<{ correctAnswer: string; distractors: [string, string, string] }> {
-  const { userId, hasAI, has75CardsPerDeck } = await getAccessContext();
+  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = generateMultipleChoiceSchema.safeParse(data);
@@ -947,10 +956,14 @@ export async function generateMultipleChoiceAction(
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effective75 = has75CardsPerDeck || teamTierPro;
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
   const effectiveAI = hasAI || teamTierPro;
 
-  if (!effective75) {
+  if (!paidCardTier) {
     throw new Error(
       "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
     );

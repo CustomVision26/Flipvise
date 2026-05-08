@@ -3,17 +3,15 @@
 import { useState, useTransition } from "react";
 import { createStripeCheckoutSessionAction } from "@/actions/stripe";
 import { Button } from "@/components/ui/button";
-import { TEAM_PLAN_IDS, type TeamPlanId } from "@/lib/team-plans";
+import { STRIPE_PAID_PLAN_IDS, type StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const PAID_PLANS = ["pro", ...TEAM_PLAN_IDS] as const;
-type PaidPlanId = "pro" | TeamPlanId;
+type PaidPlanId = StripePaidPlanId;
 type BillingPeriod = "monthly" | "yearly";
 
 function isPaidPlanId(value: string): value is PaidPlanId {
-  return (PAID_PLANS as readonly string[]).includes(value);
+  return (STRIPE_PAID_PLAN_IDS as readonly string[]).includes(value);
 }
-
 export function StripeCheckoutButton({
   plan = "pro",
   label = "Upgrade to Pro",

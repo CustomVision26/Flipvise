@@ -3,25 +3,46 @@ import Link from "next/link";
 import { getAccessContext } from "@/lib/access";
 import { personalDashboardHref } from "@/lib/personal-dashboard-url";
 import { PricingBackToDashboardButton } from "@/components/pricing-back-to-dashboard-button";
-import { PricingContent } from "@/components/pricing-content";
+import {
+  PricingContent,
+  type PlanConfig,
+} from "@/components/pricing-content";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import { resolvePricingPageHighlightId } from "@/lib/pricing-page-current-plan";
+import {
+  fetchStripePricingForPaidPlans,
+  mergePlansConfigWithStripePricing,
+} from "@/lib/stripe-pricing-display";
+import plansConfigData from "@/data/plans-config.json";
+
+/** Stripe price snapshots must run at request time (env + live amounts). */
+export const dynamic = "force-dynamic";
 
 export default async function PricingPage() {
-  const { userId, activeTeamPlan, isPro, isAdmin } = await getAccessContext();
+  const access = await getAccessContext();
+  const { userId, activeTeamPlan } = access;
 
   const personalDashboardLink =
     userId == null ? "/" : personalDashboardHref();
 
-  const currentPaidPlan: string | null =
-    activeTeamPlan ?? (isPro ? "pro" : null);
+  const stripeSubRow =
+    userId != null ? await getActiveStripeSubscription(userId) : null;
+
+  const currentPlanHighlightId = resolvePricingPageHighlightId(
+    access,
+    stripeSubRow?.planSlug,
+  );
+
+  const stripePricing = await fetchStripePricingForPaidPlans();
+  const plansForUi = mergePlansConfigWithStripePricing(
+    plansConfigData as PlanConfig[],
+    stripePricing,
+  );
 
   // Check for an active Stripe subscription so we can surface the portal link.
-  const hasStripeSubscription =
-    userId != null
-      ? (await getActiveStripeSubscription(userId)) !== null
-      : false;
+  const hasStripeSubscription = stripeSubRow !== null;
 
   return (
     <div className="min-h-screen bg-background py-8 sm:py-16 px-3 sm:px-4">
@@ -55,8 +76,8 @@ export default async function PricingPage() {
             Simple, Transparent Pricing
           </h1>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-xl mx-auto px-4">
-            Start for free. Upgrade anytime to unlock AI-powered flashcard
-            generation, unlimited decks, and team collaboration.
+            Start for free. Upgrade anytime for higher deck limits, AI flashcards,
+            optional AI reading on Pro Plus, and team workspaces.
           </p>
         </div>
 
@@ -84,7 +105,8 @@ export default async function PricingPage() {
         {/* Pricing cards */}
         <PricingContent
           userId={userId}
-          currentPaidPlan={currentPaidPlan}
+          currentPlanHighlightId={currentPlanHighlightId}
+          plans={plansForUi}
         />
 
       </div>

@@ -14,10 +14,10 @@ import {
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Clock, Megaphone } from "lucide-react";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 function planLabel(slug: string): string {
-  if (slug === "pro") return "Pro";
-  return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return displayNameForBillingPlanSlug(slug);
 }
 
 function formatDate(d: Date): string {

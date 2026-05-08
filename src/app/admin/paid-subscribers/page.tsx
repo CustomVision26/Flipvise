@@ -5,6 +5,7 @@ import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { personalDashboardHref } from "@/lib/personal-dashboard-url";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import type { SerializedAdminSubscription, SerializedAdminInvoice } from "@/lib/admin-dashboard-types";
@@ -71,12 +72,7 @@ function formatPrice(amountCents: number | null, currency: string | null): strin
 }
 
 function formatPlanLabel(slug: string): string {
-  if (!slug || slug.toLowerCase() === "free") return "Free";
-  if (slug === "pro") return "Pro";
-  return slug
-    .split(/[_-]/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  return displayNameForBillingPlanSlug(slug);
 }
 
 type StatusVariant = "default" | "destructive" | "secondary" | "outline";

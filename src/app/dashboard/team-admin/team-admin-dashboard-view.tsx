@@ -21,7 +21,7 @@ import {
   countPendingInvitationsForTeam,
   getLatestInviteeDisplayNamesForTeamIds,
 } from "@/db/queries/teams";
-import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
+import { canonicalTeamPlanId, isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 import {
   buildTeamAdminAssignDecksToMembersPath,
   buildTeamAdminInviteHistoryPath,
@@ -232,7 +232,7 @@ export default async function TeamAdminDashboardView({
             <div className="flex flex-wrap items-center gap-2">
               {isOwner && isTeamPlanId(selected.planSlug) && (
                 <AddTeamDialogLazy
-                  planSlug={selected.planSlug}
+                  planSlug={canonicalTeamPlanId(selected.planSlug)!}
                   isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
                 />
               )}

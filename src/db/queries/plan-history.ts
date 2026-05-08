@@ -8,19 +8,12 @@ import {
   type ProrationLineWithReceipt,
 } from "@/db/queries/billing-proration";
 import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-types";
-import {
-  TEAM_PLAN_LABELS,
-  isTeamPlanId,
-  type TeamPlanId,
-} from "@/lib/team-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 export type { PlanHistoryRow, PlanHistoryTypeLabel };
 
 function slugToPlanDisplayName(slug: string | null | undefined): string {
-  if (!slug || slug === "free") return "Free";
-  if (slug === "pro") return "Pro";
-  if (isTeamPlanId(slug)) return TEAM_PLAN_LABELS[slug as TeamPlanId];
-  return slug;
+  return displayNameForBillingPlanSlug(slug);
 }
 
 function invoiceStatusLabel(status: string): string {

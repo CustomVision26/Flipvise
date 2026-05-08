@@ -25,16 +25,17 @@ import {
   PLAN_SOURCE_UPDATED_AT_KEY,
   resolveEffectivePlan,
 } from "@/lib/plan-metadata-billing-resolution";
-import { isTeamPlanId, TEAM_PLAN_IDS } from "@/lib/team-plans";
+import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 import { updateOwnedTeamsPlanSlug } from "@/db/queries/teams";
+import {
+  STRIPE_PAID_PLAN_IDS,
+  type StripePaidPlanId,
+} from "@/lib/billing-plan-ids";
+import { resolveStripePriceIdForPlan } from "@/lib/stripe-plan-price-env";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
 });
-
-/** All plan slugs that have corresponding Stripe price env vars. */
-const STRIPE_PAID_PLAN_IDS = ["pro", ...TEAM_PLAN_IDS] as const;
-type StripePaidPlanId = (typeof STRIPE_PAID_PLAN_IDS)[number];
 
 function isStripePaidPlan(slug: string): slug is StripePaidPlanId {
   return (STRIPE_PAID_PLAN_IDS as readonly string[]).includes(slug);
@@ -45,24 +46,7 @@ function priceIdForPlanAndPeriod(
   plan: StripePaidPlanId,
   period: "monthly" | "yearly",
 ): string | null {
-  const monthlyByPlan: Record<StripePaidPlanId, string> = {
-    pro: "STRIPE_PRO_PRICE_ID",
-    pro_team_basic: "STRIPE_PRO_TEAM_BASIC_PRICE_ID",
-    pro_team_gold: "STRIPE_PRO_TEAM_GOLD_PRICE_ID",
-    pro_platinum_plan: "STRIPE_PRO_PLATINUM_PLAN_PRICE_ID",
-    pro_enterprise: "STRIPE_PRO_ENTERPRISE_PRICE_ID",
-  };
-  const yearlyByPlan: Record<StripePaidPlanId, string> = {
-    pro: "STRIPE_PRO_YEARLY_PRICE_ID",
-    pro_team_basic: "STRIPE_PRO_TEAM_BASIC_YEARLY_PRICE_ID",
-    pro_team_gold: "STRIPE_PRO_TEAM_GOLD_YEARLY_PRICE_ID",
-    pro_platinum_plan: "STRIPE_PRO_PLATINUM_PLAN_YEARLY_PRICE_ID",
-    pro_enterprise: "STRIPE_PRO_ENTERPRISE_YEARLY_PRICE_ID",
-  };
-  const envVar =
-    period === "monthly" ? monthlyByPlan[plan] : yearlyByPlan[plan];
-  const value = process.env[envVar]?.trim();
-  return value && value.startsWith("price_") ? value : null;
+  return resolveStripePriceIdForPlan(plan, period);
 }
 
 /**
@@ -112,9 +96,11 @@ async function applyPlanToClerkMetadata(
     } as Record<string, unknown>,
   });
 
-  // Sync all workspaces owned by this user so their plan limits reflect the
-  // new effective plan immediately (e.g. Team Gold → Team Basic reduces limits).
-  await updateOwnedTeamsPlanSlug(userId, resolvedPlan ?? "pro");
+  const canonicalTeam =
+    resolvedPlan !== null ? canonicalTeamPlanId(resolvedPlan) : null;
+  if (canonicalTeam) {
+    await updateOwnedTeamsPlanSlug(userId, canonicalTeam);
+  }
 }
 
 export type ApplyPlanUpgradeResult =

@@ -10,6 +10,7 @@ import { getAccessContext } from "@/lib/access";
 import { syncPlatformAdminTeamTierInvitedMetadata } from "@/lib/platform-admin-team-tier-metadata";
 import {
   limitsForPlan,
+  TEAM_PLAN_IDS,
   type TeamPlanId,
 } from "@/lib/team-plans";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
@@ -92,12 +93,9 @@ async function completeAcceptTeamInvitation(
 
 const createTeamSchema = z.object({
   name: z.string().min(1).max(255),
-  planSlug: z.enum([
-    "pro_team_basic",
-    "pro_team_gold",
-    "pro_platinum_plan",
-    "pro_enterprise",
-  ]),
+  planSlug: z
+    .string()
+    .refine((v): v is TeamPlanId => (TEAM_PLAN_IDS as readonly string[]).includes(v)),
 });
 
 export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {

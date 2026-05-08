@@ -13,6 +13,10 @@ import {
 import { withTeamWorkspaceQuery, buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 import { StudySessionLoader } from "./study-session-loader";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
+import {
+  CARDS_PER_DECK_LIMIT_FREE,
+  resolveDeckCardCap,
+} from "@/lib/deck-limits";
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -20,7 +24,7 @@ interface StudyPageProps {
 }
 
 export default async function StudyPage({ params, searchParams }: StudyPageProps) {
-  const { userId, has75CardsPerDeck } = await getAccessContext();
+  const { userId, maxCardsPerDeck } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -50,7 +54,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   const { deck, access } = bundle;
   const { heading: teamDeckHeading, teamTierPro } = await getTeamDeckContext(deck);
-  const effective75 = has75CardsPerDeck || teamTierPro;
+  const deckCap = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const allowsQuizStudy = deckCap > CARDS_PER_DECK_LIMIT_FREE;
   const cards = await getCardsForDeckViewer(id, userId);
   if (cards.length === 0) {
     if (access.kind === "team_member") {
@@ -120,7 +128,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         deckId={id}
         deckName={deck.name}
         teamId={deck.teamId ?? null}
-        allowsQuizStudy={effective75}
+        allowsQuizStudy={allowsQuizStudy}
         deckGradient={deck.gradient ?? null}
         autoSaveQuizResult={fromTeamWorkspaceUrl}
       />

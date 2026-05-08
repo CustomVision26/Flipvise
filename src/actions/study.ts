@@ -6,6 +6,10 @@ import { getCardsForDeckViewer } from "@/db/queries/cards";
 import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import {
+  CARDS_PER_DECK_LIMIT_FREE,
+  resolveDeckCardCap,
+} from "@/lib/deck-limits";
+import {
   pickQuoteForPercent,
   type QuizQuote,
   type QuizTier,
@@ -79,7 +83,7 @@ function normalize(text: string): string {
 export async function submitQuizResultAction(
   data: SubmitQuizResultInput,
 ): Promise<QuizResult> {
-  const { userId, has75CardsPerDeck } = await getAccessContext();
+  const { userId, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = submitQuizResultSchema.safeParse(data);
@@ -91,9 +95,13 @@ export async function submitQuizResultAction(
   if (!deckAccess) throw new Error("Deck not found");
 
   const teamTierPro = await deckHasTeamTierProFeatures(deckAccess.deck);
-  if (!has75CardsPerDeck && !teamTierPro) {
+  const deckCap = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  if (deckCap <= CARDS_PER_DECK_LIMIT_FREE) {
     throw new Error(
-      "Quiz study requires Pro. Upgrade your personal plan on the Pricing page.",
+      "Quiz study requires a paid plan. Upgrade your personal plan on the Pricing page.",
     );
   }
 

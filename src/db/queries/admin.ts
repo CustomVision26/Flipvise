@@ -10,10 +10,10 @@ import {
   teams,
 } from "@/db/schema";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
-import { TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 function teamPlanLabelForAdmin(slug: string): string {
-  return isTeamPlanId(slug) ? TEAM_PLAN_LABELS[slug as TeamPlanId] : slug;
+  return displayNameForBillingPlanSlug(slug);
 }
 
 export async function getAdminOverviewStats() {

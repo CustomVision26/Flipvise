@@ -16,6 +16,7 @@ import { acceptAffiliateInviteAction } from "@/actions/affiliates";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { useRouter } from "next/navigation";
 import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 interface Props {
   affiliates: SerializedAffiliate[];
@@ -31,8 +32,7 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 function planLabel(slug: string): string {
-  if (slug === "pro") return "Pro";
-  return slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return displayNameForBillingPlanSlug(slug);
 }
 
 function statusBadge(status: "pending" | "active" | "revoked") {

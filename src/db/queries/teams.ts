@@ -15,7 +15,11 @@ import {
   isMissingDeckCoverColumnError,
   type DeckRow,
 } from "@/db/queries/decks";
-import { isTeamPlanId, TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
+import {
+  canonicalTeamPlanId,
+  isTeamPlanId,
+  labelForTeamPlanSlug,
+} from "@/lib/team-plans";
 import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
@@ -640,7 +644,7 @@ export async function getEligibleWorkspaceTeamsForUser(userId: string) {
 }
 
 function planLabelForTeam(planSlug: string): string {
-  return isTeamPlanId(planSlug) ? TEAM_PLAN_LABELS[planSlug as TeamPlanId] : planSlug;
+  return labelForTeamPlanSlug(planSlug) ?? planSlug;
 }
 
 export type WorkspaceNavTeamsResult = {
@@ -690,7 +694,7 @@ export async function getWorkspaceNavTeamsForUser(
       ownerUserId: t.ownerUserId,
       teamMemberUrlParam,
       planLabel: planLabelForTeam(t.planSlug),
-      planUrlValue: isTeamPlanId(t.planSlug) ? t.planSlug : "pro",
+      planUrlValue: canonicalTeamPlanId(t.planSlug) ?? "pro",
       ownerDisplayName: ownerDisplayNameById.get(t.ownerUserId) ?? "Subscriber",
       canAccessTeamAdmin,
       isSubscriberOwned: t.ownerUserId === userId,

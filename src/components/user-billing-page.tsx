@@ -18,15 +18,8 @@ import { cn } from "@/lib/utils";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { loadUserPlanHistoryAction } from "@/actions/plan-history";
 import type { PlanHistoryRow } from "@/lib/plan-history-types";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { CreditCard, ExternalLink, Loader2, Zap } from "lucide-react";
-
-const PLAN_LABELS: Record<string, string> = {
-  pro: "Pro",
-  pro_team_basic: "Team Basic",
-  pro_team_gold: "Team Gold",
-  pro_platinum_plan: "Platinum",
-  pro_enterprise: "Enterprise",
-};
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Active",
@@ -83,7 +76,7 @@ export function UserBillingPage() {
 
   const resolvedPlan = (meta.plan as string | undefined) ?? null;
   const isPaid = !!resolvedPlan;
-  const planLabel = resolvedPlan ? (PLAN_LABELS[resolvedPlan] ?? resolvedPlan) : "Free";
+  const planLabel = resolvedPlan ? displayNameForBillingPlanSlug(resolvedPlan) : "Free";
 
   const isActive = billingStatus === "active" || billingStatus === "trialing";
   const hasStripeSubscription = !!billingPlan && isActive;

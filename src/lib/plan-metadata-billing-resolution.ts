@@ -1,6 +1,6 @@
 import type { ClerkClient } from "@clerk/backend";
 import {
-  TEAM_PLAN_LABELS,
+  canonicalTeamPlanId,
   isTeamPlanId,
   resolveActiveTeamPlanFromHas,
   type TeamPlanId,
@@ -198,7 +198,12 @@ export function billingActivePlanSlug(
 
     const slugFromPlan =
       typeof planObj?.slug === "string" ? planObj.slug.trim() : "";
-    if (slugFromPlan) return slugFromPlan;
+    if (slugFromPlan) {
+      if (slugFromPlan === "pro" || slugFromPlan === "pro_plus") return slugFromPlan;
+      const canonicalTeam = canonicalTeamPlanId(slugFromPlan);
+      if (canonicalTeam) return canonicalTeam;
+      return slugFromPlan;
+    }
 
     const idFromPlan = typeof planObj?.id === "string" ? planObj.id.trim() : "";
     const pidRaw = row.plan_id ?? row.planId;
@@ -206,7 +211,9 @@ export function billingActivePlanSlug(
 
     for (const candidate of [idFromPlan, idFromRow]) {
       if (!candidate) continue;
-      if (candidate === "pro" || isTeamPlanId(candidate)) return candidate;
+      if (candidate === "pro" || candidate === "pro_plus") return candidate;
+      const canonicalTeam = canonicalTeamPlanId(candidate);
+      if (canonicalTeam) return canonicalTeam;
     }
   }
   return undefined;
@@ -228,10 +235,12 @@ export async function fetchUserBillingSubscriptionSafe(
 export type PersonalPlanResolution = {
   /** Team tier taken from the winning source, else null. */
   activeTeamPlan: TeamPlanId | null;
-  /** Personal Pro (`plan === "pro"`) from the winning source (no team tier). */
+  /** Paid slug implies personal Pro / Pro Plus or team tier (`resolutionFromSlug`). */
   personalPro: boolean;
-  /** JWT / Clerk Billing `has({ plan: "pro" })` before metadata reconciliation. */
+  /** JWT: subscribed to individual Pro / Pro Plus (never team-tier plan id). */
   billingJwtPersonalPro: boolean;
+  /** Raw slug from Billing vs metadata reconciliation (`chosenSlug`) — drives individual tier. */
+  effectiveStripeSlug: string | undefined;
   /** Whether metadata `planSourceUpdatedAt` was compared to Billing API timestamps. */
   comparedMetadataToBilling: boolean;
   /** When comparison ran, which side controlled the personal / team tier slug. */
@@ -244,17 +253,25 @@ type HasFn = (a: { plan: string } | { feature: string }) => boolean | undefined;
 
 function paidPersonalFromHas(has: HasFn): {
   personalPro: boolean;
+  personalPaidSlug: "pro" | "pro_plus" | null;
   teamPlan: TeamPlanId | null;
 } {
+  const hasPro = Boolean(has({ plan: "pro" }));
+  const hasProPlus = Boolean(has({ plan: "pro_plus" }));
+  let personalPaidSlug: "pro" | "pro_plus" | null = null;
+  if (hasProPlus) personalPaidSlug = "pro_plus";
+  else if (hasPro) personalPaidSlug = "pro";
+
   return {
-    personalPro: Boolean(has({ plan: "pro" })),
+    personalPro: hasPro || hasProPlus,
+    personalPaidSlug,
     teamPlan: resolveActiveTeamPlanFromHas(has),
   };
 }
 
 function slugImpliesPersonalProOrTeam(slug: string | undefined): boolean {
   if (!slug) return false;
-  if (slug === "pro") return true;
+  if (slug === "pro" || slug === "pro_plus") return true;
   return isTeamPlanId(slug);
 }
 
@@ -268,8 +285,8 @@ function legacyMetadataOverridesJwt(
   has: HasFn,
 ): boolean {
   if (!slugImpliesPersonalProOrTeam(metaSlug)) return false;
-  const { personalPro, teamPlan } = paidPersonalFromHas(has);
-  return !personalPro && teamPlan === null;
+  const jwt = paidPersonalFromHas(has);
+  return !jwt.personalPro && jwt.teamPlan === null;
 }
 
 function resolutionFromSlug(
@@ -278,10 +295,11 @@ function resolutionFromSlug(
   if (!slug) {
     return { activeTeamPlan: null, personalPro: false };
   }
-  if (isTeamPlanId(slug)) {
-    return { activeTeamPlan: slug, personalPro: true };
+  const canonicalTeam = canonicalTeamPlanId(slug);
+  if (canonicalTeam) {
+    return { activeTeamPlan: canonicalTeam, personalPro: true };
   }
-  if (slug === "pro") {
+  if (slug === "pro" || slug === "pro_plus") {
     return { activeTeamPlan: null, personalPro: true };
   }
   return { activeTeamPlan: null, personalPro: false };
@@ -326,7 +344,7 @@ export async function resolvePersonalPlanMetadataVsBilling(input: {
       if (jwt.teamPlan !== null) {
         chosenSlug = jwt.teamPlan;
       } else if (jwt.personalPro) {
-        chosenSlug = "pro";
+        chosenSlug = jwt.personalPaidSlug ?? "pro";
       } else if (legacyMetadataOverridesJwt(metaSlug, has)) {
         winner = "metadata";
         chosenSlug = metaSlug;
@@ -343,7 +361,7 @@ export async function resolvePersonalPlanMetadataVsBilling(input: {
     if (jwt.teamPlan !== null) {
       chosenSlug = jwt.teamPlan;
     } else if (jwt.personalPro) {
-      chosenSlug = "pro";
+      chosenSlug = jwt.personalPaidSlug ?? "pro";
     } else {
       chosenSlug = undefined;
     }
@@ -352,6 +370,7 @@ export async function resolvePersonalPlanMetadataVsBilling(input: {
   const fromSlug = resolutionFromSlug(chosenSlug);
   return {
     ...fromSlug,
+    effectiveStripeSlug: chosenSlug,
     billingJwtPersonalPro: jwt.personalPro,
     comparedMetadataToBilling,
     winner,

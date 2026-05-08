@@ -39,7 +39,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { TeamWorkspaceEventRow } from "@/db/queries/team-workspace-events";
-import { isTeamPlanId, TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
 
 function formatEventTime(d: Date | string) {
   const dt = typeof d === "string" ? new Date(d) : d;
@@ -47,7 +48,7 @@ function formatEventTime(d: Date | string) {
 }
 
 function planLabel(slug: string) {
-  return isTeamPlanId(slug) ? TEAM_PLAN_LABELS[slug as TeamPlanId] : slug;
+  return displayNameForBillingPlanSlug(slug);
 }
 
 export type ManageWorkspacesTeamRow = {

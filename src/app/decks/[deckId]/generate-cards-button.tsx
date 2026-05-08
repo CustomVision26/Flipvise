@@ -21,7 +21,7 @@ import { generateCardsAction } from "@/actions/cards";
 import {
   AI_GENERATION_CAP_PER_DECK,
   buildAiBatchOptions,
-  getCardsPerDeckLimit,
+  CARDS_PER_DECK_LIMIT_FREE,
 } from "@/lib/deck-limits";
 
 interface GenerateCardsButtonProps {
@@ -30,7 +30,7 @@ interface GenerateCardsButtonProps {
   totalCardCount: number;
   aiGeneratedCount: number;
   hasAI: boolean;
-  has75CardsPerDeck: boolean;
+  deckCardLimit: number;
 }
 
 export function GenerateCardsButton({
@@ -39,7 +39,7 @@ export function GenerateCardsButton({
   totalCardCount,
   aiGeneratedCount,
   hasAI,
-  has75CardsPerDeck,
+  deckCardLimit,
 }: GenerateCardsButtonProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -47,8 +47,8 @@ export function GenerateCardsButton({
 
   const manualCardCount = totalCardCount - aiGeneratedCount;
   const remainingAiSlots = AI_GENERATION_CAP_PER_DECK - aiGeneratedCount;
-  const deckCardLimit = getCardsPerDeckLimit(has75CardsPerDeck);
   const remainingDeckSlots = deckCardLimit - totalCardCount;
+  const paidDeckCards = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
 
   const batchOptions = useMemo(
     () => buildAiBatchOptions(remainingAiSlots, remainingDeckSlots),
@@ -125,7 +125,7 @@ export function GenerateCardsButton({
           <p className="text-foreground font-medium text-[10px] sm:text-sm">
             {aiGeneratedCount} AI · {manualCardCount} manual · {Math.max(0, remainingDeckSlots)} slot
             {Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} left (
-            {deckCardLimit} max, {has75CardsPerDeck ? "Pro" : "Free"})
+            {deckCardLimit} max, {paidDeckCards ? "Paid plan" : "Free"})
           </p>
         </AlertDescription>
       </Alert>
@@ -192,9 +192,9 @@ export function GenerateCardsButton({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-64 text-center text-xs sm:text-sm">
             {remainingDeckSlots <= 0
-              ? has75CardsPerDeck
-                ? `This deck is full (${deckCardLimit} cards on Pro). Delete cards to free space.`
-                : `This deck is full on the Free plan (${deckCardLimit} cards). Upgrade to Pro for more room per deck, or delete cards.`
+              ? paidDeckCards
+                ? `This deck is full (${deckCardLimit} cards on your plan). Delete cards to free space.`
+                : `This deck is full on the Free plan (${deckCardLimit} cards). Upgrade on Pricing for more room per deck, or delete cards.`
               : "No valid batch size left for AI generation with current limits."}
           </TooltipContent>
         </Tooltip>

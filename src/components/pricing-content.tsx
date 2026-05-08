@@ -17,10 +17,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { TeamPlanId } from "@/lib/team-plans";
+import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
 import plansConfigData from "@/data/plans-config.json";
 
-type PaidPlanId = "pro" | TeamPlanId;
+type PaidPlanId = StripePaidPlanId;
 type BillingPeriod = "monthly" | "yearly";
 type AnyPlanId = "free" | PaidPlanId;
 
@@ -217,10 +217,17 @@ function PlanCard({
 
 export function PricingContent({
   userId,
-  currentPaidPlan,
+  currentPlanHighlightId,
+  plans = PLANS,
 }: {
   userId: string | null;
-  currentPaidPlan: string | null;
+  /**
+   * Which tier shows “Current plan”. `null` = visitor or no badge (e.g. admin unlock).
+   * `"free"` = authenticated free tier.
+   */
+  currentPlanHighlightId: "free" | PaidPlanId | null;
+  /** Optional — defaults to static JSON; `/pricing` passes Stripe-synced rows. */
+  plans?: PlanConfig[];
 }) {
   const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -229,10 +236,10 @@ export function PricingContent({
   const [, startTransition] = useTransition();
 
   const visiblePlans = selectedPlanId
-    ? PLANS.filter((p) => p.id === selectedPlanId)
-    : PLANS;
+    ? plans.filter((p) => p.id === selectedPlanId)
+    : plans;
 
-  const selectedPlan = PLANS.find((p) => p.id === selectedPlanId) ?? null;
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
 
   function handleCheckout(planId: PaidPlanId) {
     setErrors({});
@@ -254,8 +261,9 @@ export function PricingContent({
   }
 
   const isCurrentPlan = (planId: string) => {
-    if (planId === "free") return currentPaidPlan === null;
-    return currentPaidPlan === planId;
+    if (currentPlanHighlightId === null) return false;
+    if (planId === "free") return currentPlanHighlightId === "free";
+    return currentPlanHighlightId === planId;
   };
 
   return (
@@ -317,7 +325,7 @@ export function PricingContent({
               All Plans
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {PLANS.map((plan) => (
+            {plans.map((plan) => (
               <DropdownMenuItem
                 key={plan.id}
                 onClick={() => setSelectedPlanId(plan.id)}

@@ -46,10 +46,10 @@ import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { syncTeamContextCookieForUser } from "@/lib/team-context-cookie-server";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { isTeamPlanId } from "@/lib/team-plans";
-
-const DECK_LIMIT = 3;
-const CARDS_PER_DECK_LIMIT = 8;
-
+import {
+  FREE_CARDS_PER_DECK_LIMIT,
+  FREE_PERSONAL_DECK_LIMIT,
+} from "@/lib/personal-plan-limits";
 /** Team-tier deck extras (speech, images): own Clerk team plan or a subscriber’s team-tier workspace. */
 function teamWorkspaceHasTierExtras(
   hasOwnTeamPlan: boolean,
@@ -171,7 +171,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const {
     userId,
     hasUnlimitedDecks,
-    has75CardsPerDeck,
+    maxPersonalDecks,
+    maxCardsPerDeck,
     isPro,
     activeTeamPlan,
     isAdmin,
@@ -488,11 +489,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     activeTeamPlan && teamCount === 0 && !isAdmin,
   );
   const isFreePlan = !hasUnlimitedDecks;
-  const isAtLimit = isFreePlan && decks.length >= DECK_LIMIT;
+  const isAtLimit = isFreePlan && decks.length >= FREE_PERSONAL_DECK_LIMIT;
   const deckUsagePercent = isFreePlan
-    ? Math.min((decks.length / DECK_LIMIT) * 100, 100)
+    ? Math.min((decks.length / FREE_PERSONAL_DECK_LIMIT) * 100, 100)
     : 0;
-  const cardsPerDeckLimit = has75CardsPerDeck ? 75 : CARDS_PER_DECK_LIMIT;
+  const cardsPerDeckLimitDisplay = isFreePlan
+    ? FREE_CARDS_PER_DECK_LIMIT
+    : maxCardsPerDeck;
 
   let personalViewerName: string | null = null;
   if (ownSubscriberTeamTierExtras && dashboardSessionUser) {
@@ -566,7 +569,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">Decks</span>
                   <span className="text-muted-foreground tabular-nums">
-                    {decks.length} / {DECK_LIMIT}
+                    {decks.length} / {FREE_PERSONAL_DECK_LIMIT}
                   </span>
                 </div>
                 <Progress value={deckUsagePercent} />
@@ -574,13 +577,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <p className="text-xs text-muted-foreground">
                 Each deck is limited to{" "}
                 <span className="text-foreground font-semibold">
-                  {cardsPerDeckLimit} cards
+                  {cardsPerDeckLimitDisplay} cards
                 </span>{" "}
                 on the Free plan.
               </p>
               {isAtLimit && (
                 <p className="text-xs text-destructive font-medium">
-                  You&apos;ve reached the 3-deck limit. Upgrade to add more.
+                  You&apos;ve reached the free deck limit. Upgrade to add more.
                 </p>
               )}
             </CardContent>
@@ -593,22 +596,22 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                   Upgrade to Pro
                 </CardTitle>
-                <Badge className="text-xs">Pro</Badge>
+                <Badge className="text-xs">Paid plans</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <ul className="space-y-1.5 text-sm">
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
-                  <span>Unlimited decks</span>
+                  <span>From 15 decks (Pro) — up to 25 with Pro Plus</span>
                 </li>
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
-                  <span>75 cards per deck</span>
+                  <span>30–52 cards per deck by tier</span>
                 </li>
                 <li className="flex items-center gap-2 text-foreground">
                   <span className="text-primary">✓</span>
-                  <span>AI flashcard generation</span>
+                  <span>AI flashcard generation · AI Reading on Pro Plus</span>
                 </li>
               </ul>
             </CardContent>
@@ -617,7 +620,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 href="/pricing"
                 className={buttonVariants({ size: "sm" }) + " w-full justify-center"}
               >
-                View Pro Plans
+                View plans
               </Link>
             </CardFooter>
           </Card>
@@ -630,12 +633,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <AlertTitle>Deck limit reached</AlertTitle>
           <AlertDescription>
             Free plan allows up to{" "}
-            <strong>{DECK_LIMIT} decks</strong> with{" "}
-            <strong>{cardsPerDeckLimit} cards</strong> per deck.{" "}
+            <strong>{FREE_PERSONAL_DECK_LIMIT} decks</strong> with{" "}
+            <strong>{FREE_CARDS_PER_DECK_LIMIT} cards</strong> per deck.{" "}
             <Link href="/pricing" className="underline underline-offset-3 hover:text-foreground">
-              Upgrade to Pro
+              Upgrade
             </Link>{" "}
-            for unlimited decks and 75 cards per deck.
+            for higher limits.
           </AlertDescription>
         </Alert>
       )}
@@ -669,7 +672,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {/* Pro plan — already subscribed */}
       {isPro && (
         <p className="text-xs text-muted-foreground text-center">
-          You&apos;re on the <span className="text-foreground font-medium">Pro plan</span> — enjoy unlimited decks and 75 cards per deck.
+          You&apos;re on a{" "}
+          <span className="text-foreground font-medium">paid plan</span> — up to{" "}
+          {maxPersonalDecks} personal deck
+          {maxPersonalDecks === 1 ? "" : "s"} and {maxCardsPerDeck} cards per deck.
         </p>
       )}
     </div>

@@ -2,10 +2,22 @@ import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
 import { proBillingFeatureBundleSatisfied } from "@/lib/pro-billing-feature-bundle";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
-import { TEAM_PLAN_IDS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import {
+  canonicalTeamPlanId,
+  resolveActiveTeamPlanFromHas,
+  isTeamPlanId,
+  type TeamPlanId,
+} from "@/lib/team-plans";
+import {
+  FREE_PERSONAL_DECK_LIMIT,
+  FREE_CARDS_PER_DECK_LIMIT,
+  limitsForPersonalIndividualTier,
+  proPlusPersonalLimits,
+} from "@/lib/personal-plan-limits";
 import {
   metadataPlanSlugFromPublicMeta,
   resolvePersonalPlanMetadataVsBilling,
+  type PersonalPlanResolution,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 
@@ -20,43 +32,86 @@ type PublicMeta = PlanPublicMetadata & {
   preAdminGrantSnapshot?: { adminGranted: boolean };
 };
 
-/**
- * Returns the full access context for the current user, combining Clerk
- * Billing subscriptions, admin-granted Pro access, and the admin role itself.
- *
- * Admin accounts receive all Pro features automatically — no manual grant
- * or active subscription is required.
- *
- * Personal Pro vs Free also reconciles `publicMetadata` (admin "Assign plan")
- * with Clerk Billing using `planSourceUpdatedAt` vs subscription timestamps.
- */
-function resolveActiveTeamPlan(
-  has: (a: { plan: string } | { feature: string }) => boolean | undefined,
-): TeamPlanId | null {
-  for (const plan of TEAM_PLAN_IDS) {
-    if (has({ plan })) return plan;
-  }
+export type AccessContext = {
+  userId: string | null;
+  isPro: boolean;
+  /** Max personal (non-team-workspace) decks the user may create. */
+  maxPersonalDecks: number;
+  /** Max cards per deck on personal decks (team-tier decks use Pro Plus cap via {@link resolveDeckCardCap}). */
+  maxCardsPerDeck: number;
+  /** Legacy: true when personal deck cap is above the Free tier (paid / admin / team). */
+  hasUnlimitedDecks: boolean;
+  /** Legacy: true when card cap is above the Free tier. */
+  has75CardsPerDeck: boolean;
+  hasAI: boolean;
+  /** Pro Plus semantic feature — text-to-speech / reading aids gated in UI. */
+  hasAiReading: boolean;
+  hasPrioritySupport: boolean;
+  hasCustomColors: boolean;
+  adminGranted: boolean;
+  isAdmin: boolean;
+  isSuperadmin: boolean;
+  activeTeamPlan: TeamPlanId | null;
+  /** JWT carries individual `pro` (not Pro Plus). */
+  hasClerkPersonalPro: boolean;
+  /** JWT carries individual `pro_plus`. */
+  hasClerkPersonalProPlus: boolean;
+};
+
+function personalPaidSlugFromStripeSlug(
+  slug: string | undefined | null,
+): "pro" | "pro_plus" | null {
+  if (slug === "pro" || slug === "pro_plus") return slug;
   return null;
 }
 
-export async function getAccessContext() {
+function personalWorkspaceLimits(input: {
+  unlocked: boolean;
+  activeTeamPlan: TeamPlanId | null;
+  stripeSlug: string | undefined | null;
+}): { maxPersonalDecks: number; maxCardsPerDeck: number } {
+  if (input.unlocked || input.activeTeamPlan !== null) {
+    return proPlusPersonalLimits();
+  }
+  const personal = personalPaidSlugFromStripeSlug(input.stripeSlug);
+  if (personal === "pro_plus") return limitsForPersonalIndividualTier("pro_plus");
+  if (personal === "pro") return limitsForPersonalIndividualTier("pro");
+  return {
+    maxPersonalDecks: FREE_PERSONAL_DECK_LIMIT,
+    maxCardsPerDeck: FREE_CARDS_PER_DECK_LIMIT,
+  };
+}
+
+function stripeSlugForPersonalTier(resolution: PersonalPlanResolution): string | undefined {
+  if (resolution.activeTeamPlan !== null) return undefined;
+  return resolution.effectiveStripeSlug;
+}
+
+/**
+ * Returns the full access context for the current user, combining Stripe-backed billing metadata,
+ * Clerk JWT features, admin-granted access, and the admin role itself.
+ */
+export async function getAccessContext(): Promise<AccessContext> {
   const { userId, has } = await auth();
 
   if (!userId) {
     return {
-      userId: null as null,
+      userId: null,
       isPro: false,
+      maxPersonalDecks: FREE_PERSONAL_DECK_LIMIT,
+      maxCardsPerDeck: FREE_CARDS_PER_DECK_LIMIT,
       hasUnlimitedDecks: false,
-      hasAI: false,
       has75CardsPerDeck: false,
+      hasAI: false,
+      hasAiReading: false,
       hasPrioritySupport: false,
       hasCustomColors: false,
       adminGranted: false,
       isAdmin: false,
       isSuperadmin: false,
-      activeTeamPlan: null as TeamPlanId | null,
-      /** Clerk Billing personal `pro` plan — distinct from team-tier plans. */
+      activeTeamPlan: null,
       hasClerkPersonalPro: false,
+      hasClerkPersonalProPlus: false,
     };
   }
 
@@ -75,12 +130,12 @@ export async function getAccessContext() {
     planResolution.winner === "metadata" &&
     metadataPlanSlugFromPublicMeta(meta) == null;
 
-  const paidProFromHas = has({ plan: "pro" });
-  const paidUnlimitedDecks = has({ feature: "unlimited_decks" });
-  const paidAI = has({ feature: "ai_flashcard_generation" });
-  const paid75Cards = has({ feature: "75_cards_per_deck" });
-  const paidPrioritySupport = has({ feature: "priority_support" });
-  const paidCustomColors = has({ feature: "12_interface_colors" });
+  const paidProFromHas = Boolean(has({ plan: "pro" }));
+  const paidProPlusFromHas = Boolean(has({ plan: "pro_plus" }));
+  const paidAI = Boolean(has({ feature: "ai_flashcard_generation" }));
+  const paidAiReading = Boolean(has({ feature: "ai_reading" }));
+  const paidPrioritySupport = Boolean(has({ feature: "priority_support" }));
+  const paidCustomColors = Boolean(has({ feature: "12_interface_colors" }));
   const proFeatureBundle = proBillingFeatureBundleSatisfied(has);
 
   const liveRole = meta?.role;
@@ -94,7 +149,7 @@ export async function getAccessContext() {
   const effectivePersonalPro =
     planResolution.personalPro && effectiveTeamPlan === null;
 
-  const jwtTeamPlan = resolveActiveTeamPlan(has);
+  const jwtTeamPlan = resolveActiveTeamPlanFromHas(has);
 
   const teamPlanForFeatures =
     planResolution.winner === "metadata"
@@ -102,42 +157,6 @@ export async function getAccessContext() {
       : planResolution.activeTeamPlan !== null
         ? planResolution.activeTeamPlan
         : jwtTeamPlan;
-
-  // Platform admins automatically receive every Pro feature.
-  if (unlocked) {
-    return {
-      userId,
-      isPro: true,
-      hasUnlimitedDecks: true,
-      hasAI: true,
-      has75CardsPerDeck: true,
-      hasPrioritySupport: true,
-      hasCustomColors: true,
-      adminGranted,
-      isAdmin,
-      isSuperadmin,
-      activeTeamPlan: teamPlanForFeatures,
-      hasClerkPersonalPro: paidProFromHas,
-    };
-  }
-
-  // Team-tier workspace: JWT can lag; when Billing API wins, merge subscription slug with JWT.
-  if (teamPlanForFeatures !== null && !superadminAllowListed) {
-    return {
-      userId,
-      isPro: true,
-      hasUnlimitedDecks: true,
-      hasAI: true,
-      has75CardsPerDeck: true,
-      hasPrioritySupport: true,
-      hasCustomColors: true,
-      adminGranted: false,
-      isAdmin: false,
-      isSuperadmin: false,
-      activeTeamPlan: teamPlanForFeatures,
-      hasClerkPersonalPro: paidProFromHas,
-    };
-  }
 
   const billingApiDrovePersonalPro =
     planResolution.comparedMetadataToBilling &&
@@ -151,6 +170,68 @@ export async function getAccessContext() {
   const jwtPersonalProFullBundle =
     proFeatureBundle && planResolution.billingJwtPersonalPro;
 
+  function aiReadingForTier(stripeSlug: string | undefined | null): boolean {
+    if (unlocked) return true;
+    if (teamPlanForFeatures !== null) return true;
+    const p = personalPaidSlugFromStripeSlug(stripeSlug);
+    if (p === "pro_plus") return true;
+    return paidAiReading;
+  }
+
+  // Platform admins automatically receive every paid feature.
+  if (unlocked) {
+    const lim = personalWorkspaceLimits({
+      unlocked: true,
+      activeTeamPlan: teamPlanForFeatures,
+      stripeSlug: stripeSlugForPersonalTier(planResolution),
+    });
+    return {
+      userId,
+      isPro: true,
+      maxPersonalDecks: lim.maxPersonalDecks,
+      maxCardsPerDeck: lim.maxCardsPerDeck,
+      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+      hasAI: true,
+      hasAiReading: true,
+      hasPrioritySupport: true,
+      hasCustomColors: true,
+      adminGranted,
+      isAdmin,
+      isSuperadmin,
+      activeTeamPlan: teamPlanForFeatures,
+      hasClerkPersonalPro: paidProFromHas,
+      hasClerkPersonalProPlus: paidProPlusFromHas,
+    };
+  }
+
+  // Team-tier subscriber personal workspace matches Pro Plus caps.
+  if (teamPlanForFeatures !== null && !superadminAllowListed) {
+    const lim = personalWorkspaceLimits({
+      unlocked: false,
+      activeTeamPlan: teamPlanForFeatures,
+      stripeSlug: stripeSlugForPersonalTier(planResolution),
+    });
+    return {
+      userId,
+      isPro: true,
+      maxPersonalDecks: lim.maxPersonalDecks,
+      maxCardsPerDeck: lim.maxCardsPerDeck,
+      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+      hasAI: true,
+      hasAiReading: true,
+      hasPrioritySupport: paidPrioritySupport,
+      hasCustomColors: true,
+      adminGranted: false,
+      isAdmin: false,
+      isSuperadmin: false,
+      activeTeamPlan: teamPlanForFeatures,
+      hasClerkPersonalPro: paidProFromHas,
+      hasClerkPersonalProPlus: paidProPlusFromHas,
+    };
+  }
+
   if (effectivePersonalPro && !superadminAllowListed) {
     const grantFullPersonalPro =
       jwtPersonalProFullBundle ||
@@ -158,28 +239,34 @@ export async function getAccessContext() {
       billingApiDrovePersonalPro;
 
     if (grantFullPersonalPro) {
+      const stripeSlug = stripeSlugForPersonalTier(planResolution);
+      const lim = personalWorkspaceLimits({
+        unlocked: false,
+        activeTeamPlan: null,
+        stripeSlug,
+      });
       return {
         userId,
         isPro: true,
-        hasUnlimitedDecks: true,
+        maxPersonalDecks: lim.maxPersonalDecks,
+        maxCardsPerDeck: lim.maxCardsPerDeck,
+        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
-        has75CardsPerDeck: true,
-        hasPrioritySupport: true,
-        hasCustomColors: true,
+        hasAiReading: aiReadingForTier(stripeSlug),
+        hasPrioritySupport: paidPrioritySupport,
+        hasCustomColors: paidCustomColors || Boolean(stripeSlug),
         adminGranted: false,
         isAdmin: false,
         isSuperadmin: false,
         activeTeamPlan: null,
-        hasClerkPersonalPro: planResolution.billingJwtPersonalPro,
+        hasClerkPersonalPro: paidProFromHas,
+        hasClerkPersonalProPlus: paidProPlusFromHas,
       };
     }
   }
 
-  // Billing metadata fallback: when plan/teamPlanId were not propagated to metadata
-  // (e.g. webhook set billingPlan/billingStatus but the resolved computed fields are absent),
-  // read the Stripe-sourced fields directly so team-tier subscribers always get their
-  // correct access level on the personal workspace. Only applies when the primary
-  // resolution path found no paid plan and no admin override forced free.
+  // Billing metadata fallback when computed `plan` metadata is stale but Stripe keys are fresh.
   if (!unlocked && !metadataForcedPersonalFree && !superadminAllowListed) {
     const rawBillingPlan =
       typeof meta.billingPlan === "string" ? meta.billingPlan.trim() || null : null;
@@ -190,35 +277,54 @@ export async function getAccessContext() {
 
     if (isBillingActiveRaw && rawBillingPlan !== null) {
       if (isTeamPlanId(rawBillingPlan)) {
+        const canonical = canonicalTeamPlanId(rawBillingPlan)!;
+        const lim = personalWorkspaceLimits({
+          unlocked: false,
+          activeTeamPlan: canonical,
+          stripeSlug: undefined,
+        });
         return {
           userId,
           isPro: true,
-          hasUnlimitedDecks: true,
+          maxPersonalDecks: lim.maxPersonalDecks,
+          maxCardsPerDeck: lim.maxCardsPerDeck,
+          hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+          has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
           hasAI: true,
-          has75CardsPerDeck: true,
-          hasPrioritySupport: true,
+          hasAiReading: true,
+          hasPrioritySupport: paidPrioritySupport,
           hasCustomColors: true,
           adminGranted: false,
           isAdmin: false,
           isSuperadmin: false,
-          activeTeamPlan: rawBillingPlan as TeamPlanId,
+          activeTeamPlan: canonical,
           hasClerkPersonalPro: paidProFromHas,
+          hasClerkPersonalProPlus: paidProPlusFromHas,
         };
       }
-      if (rawBillingPlan === "pro") {
+      if (rawBillingPlan === "pro" || rawBillingPlan === "pro_plus") {
+        const lim = personalWorkspaceLimits({
+          unlocked: false,
+          activeTeamPlan: null,
+          stripeSlug: rawBillingPlan,
+        });
         return {
           userId,
           isPro: true,
-          hasUnlimitedDecks: true,
+          maxPersonalDecks: lim.maxPersonalDecks,
+          maxCardsPerDeck: lim.maxCardsPerDeck,
+          hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+          has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
           hasAI: true,
-          has75CardsPerDeck: true,
-          hasPrioritySupport: true,
+          hasAiReading: aiReadingForTier(rawBillingPlan),
+          hasPrioritySupport: paidPrioritySupport,
           hasCustomColors: true,
           adminGranted: false,
           isAdmin: false,
           isSuperadmin: false,
           activeTeamPlan: null,
-          hasClerkPersonalPro: planResolution.billingJwtPersonalPro,
+          hasClerkPersonalPro: paidProFromHas,
+          hasClerkPersonalProPlus: paidProPlusFromHas,
         };
       }
     }
@@ -226,18 +332,41 @@ export async function getAccessContext() {
 
   const jwtPaid = !metadataForcedPersonalFree;
 
+  let inferredStripeSlug = stripeSlugForPersonalTier(planResolution);
+  if (inferredStripeSlug === undefined && jwtPaid) {
+    if (paidProPlusFromHas) inferredStripeSlug = "pro_plus";
+    else if (paidProFromHas) inferredStripeSlug = "pro";
+  }
+
+  const lim = personalWorkspaceLimits({
+    unlocked: false,
+    activeTeamPlan: null,
+    stripeSlug: inferredStripeSlug,
+  });
+
+  const isProJwt =
+    jwtPaid && (paidProFromHas || paidProPlusFromHas || proFeatureBundle);
+
   return {
     userId,
-    isPro: (jwtPaid ? paidProFromHas : false) || unlocked,
-    hasUnlimitedDecks: (jwtPaid ? paidUnlimitedDecks : false) || unlocked,
-    hasAI: (jwtPaid ? paidAI : false) || unlocked,
-    has75CardsPerDeck: (jwtPaid ? paid75Cards : false) || unlocked,
-    hasPrioritySupport: (jwtPaid ? paidPrioritySupport : false) || unlocked,
-    hasCustomColors: (jwtPaid ? paidCustomColors : false) || unlocked,
+    isPro: isProJwt || unlocked,
+    maxPersonalDecks: lim.maxPersonalDecks,
+    maxCardsPerDeck: lim.maxCardsPerDeck,
+    hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+    has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+    hasAI:
+      jwtPaid &&
+      (paidAI || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
+    hasAiReading: aiReadingForTier(inferredStripeSlug),
+    hasPrioritySupport: jwtPaid && paidPrioritySupport,
+    hasCustomColors:
+      jwtPaid &&
+      (paidCustomColors || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
     adminGranted,
     isAdmin,
     isSuperadmin,
     activeTeamPlan: null,
     hasClerkPersonalPro: jwtPaid && paidProFromHas,
+    hasClerkPersonalProPlus: jwtPaid && paidProPlusFromHas,
   };
 }

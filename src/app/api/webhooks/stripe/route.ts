@@ -15,7 +15,14 @@ import {
   type BillingStatusValue,
 } from "@/lib/plan-metadata-billing-resolution";
 import { stripe } from "@/lib/stripe";
-import { isTeamPlanId, TEAM_PLAN_IDS, type TeamPlanId } from "@/lib/team-plans";
+import {
+  canonicalTeamPlanId,
+  isTeamPlanId,
+} from "@/lib/team-plans";
+import {
+  STRIPE_PAID_PLAN_IDS,
+  type StripePaidPlanId,
+} from "@/lib/billing-plan-ids";
 import { updateOwnedTeamsPlanSlug } from "@/db/queries/teams";
 import { loopsSendEvent, loopsUpdateContact } from "@/lib/loops";
 
@@ -25,8 +32,8 @@ const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
-const PAID_PLAN_IDS = ["pro", ...TEAM_PLAN_IDS] as const;
-type PaidPlanId = "pro" | TeamPlanId;
+const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
+type PaidPlanId = StripePaidPlanId;
 
 function getStripeWebhookSecret(): string {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -161,7 +168,11 @@ async function setStripeBillingState(
   // so workspace limits (maxTeams / maxMembersPerTeam) always match the active
   // Stripe subscription rather than the plan at workspace creation time.
   try {
-    await updateOwnedTeamsPlanSlug(userId, resolvedPlan ?? "pro");
+    const canonicalTeam =
+      resolvedPlan !== null ? canonicalTeamPlanId(resolvedPlan) : null;
+    if (canonicalTeam) {
+      await updateOwnedTeamsPlanSlug(userId, canonicalTeam);
+    }
   } catch {
     // Best-effort — billing state already written above; a retry or
     // subsequent plan change will bring the workspace row back in sync.
@@ -182,7 +193,11 @@ async function getClerkUserEmail(userId: string): Promise<string | null> {
 
 function asPaidPlanId(value: unknown): PaidPlanId | null {
   if (typeof value !== "string") return null;
-  return (PAID_PLAN_IDS as readonly string[]).includes(value) ? (value as PaidPlanId) : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if ((PAID_PLAN_IDS as readonly string[]).includes(trimmed)) return trimmed as PaidPlanId;
+  const canonTeam = canonicalTeamPlanId(trimmed);
+  return canonTeam ?? null;
 }
 
 async function resolvePaidPlanFromCustomer(customerId: string): Promise<PaidPlanId | null> {
