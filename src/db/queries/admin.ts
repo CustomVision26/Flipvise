@@ -161,6 +161,15 @@ export async function getUserTeamPlanAssociationsByUserIds(
 ): Promise<Map<string, UserTeamPlanAdminRow>> {
   if (userIds.length === 0) return new Map();
 
+  function emptyAssociationMap(): Map<string, UserTeamPlanAdminRow> {
+    const m = new Map<string, UserTeamPlanAdminRow>();
+    for (const id of userIds) {
+      m.set(id, { label: null, hasActiveTeamAccess: false });
+    }
+    return m;
+  }
+
+  try {
   const asOwner = await db
     .select({ userId: teams.ownerUserId })
     .from(teams)
@@ -240,6 +249,9 @@ export async function getUserTeamPlanAssociationsByUserIds(
     }
   }
   return out;
+  } catch {
+    return emptyAssociationMap();
+  }
 }
 
 export async function getAdminPrivilegeLogs(limit = 100) {
@@ -259,19 +271,25 @@ export async function getTeamWorkspaceCountsByOwnerUserIds(
 ): Promise<Map<string, number>> {
   if (userIds.length === 0) return new Map();
 
-  const rows = await db
-    .select({
-      ownerUserId: teams.ownerUserId,
-      workspaceCount: count(teams.id),
-    })
-    .from(teams)
-    .where(inArray(teams.ownerUserId, userIds))
-    .groupBy(teams.ownerUserId);
-
   const out = new Map<string, number>();
   for (const id of userIds) {
     out.set(id, 0);
   }
+
+  let rows: { ownerUserId: string; workspaceCount: number }[] = [];
+  try {
+    rows = await db
+      .select({
+        ownerUserId: teams.ownerUserId,
+        workspaceCount: count(teams.id),
+      })
+      .from(teams)
+      .where(inArray(teams.ownerUserId, userIds))
+      .groupBy(teams.ownerUserId);
+  } catch {
+    return out;
+  }
+
   for (const row of rows) {
     out.set(row.ownerUserId, Number(row.workspaceCount ?? 0));
   }
@@ -283,33 +301,40 @@ export async function getTeamInviteeTotalsByOwnerUserIds(
 ): Promise<Map<string, number>> {
   if (userIds.length === 0) return new Map();
 
-  const memberRows = await db
-    .select({
-      ownerUserId: teams.ownerUserId,
-      total: count(teamMembers.id),
-    })
-    .from(teams)
-    .leftJoin(teamMembers, eq(teamMembers.teamId, teams.id))
-    .where(inArray(teams.ownerUserId, userIds))
-    .groupBy(teams.ownerUserId);
-
-  const pendingInviteRows = await db
-    .select({
-      ownerUserId: teams.ownerUserId,
-      total: count(teamInvitations.id),
-    })
-    .from(teams)
-    .leftJoin(
-      teamInvitations,
-      and(eq(teamInvitations.teamId, teams.id), eq(teamInvitations.status, "pending")),
-    )
-    .where(inArray(teams.ownerUserId, userIds))
-    .groupBy(teams.ownerUserId);
-
   const out = new Map<string, number>();
   for (const id of userIds) {
     out.set(id, 0);
   }
+
+  let memberRows: { ownerUserId: string; total: number }[] = [];
+  let pendingInviteRows: { ownerUserId: string; total: number }[] = [];
+  try {
+    memberRows = await db
+      .select({
+        ownerUserId: teams.ownerUserId,
+        total: count(teamMembers.id),
+      })
+      .from(teams)
+      .leftJoin(teamMembers, eq(teamMembers.teamId, teams.id))
+      .where(inArray(teams.ownerUserId, userIds))
+      .groupBy(teams.ownerUserId);
+
+    pendingInviteRows = await db
+      .select({
+        ownerUserId: teams.ownerUserId,
+        total: count(teamInvitations.id),
+      })
+      .from(teams)
+      .leftJoin(
+        teamInvitations,
+        and(eq(teamInvitations.teamId, teams.id), eq(teamInvitations.status, "pending")),
+      )
+      .where(inArray(teams.ownerUserId, userIds))
+      .groupBy(teams.ownerUserId);
+  } catch {
+    return out;
+  }
+
   for (const row of memberRows) {
     out.set(row.ownerUserId, Number(row.total ?? 0));
   }

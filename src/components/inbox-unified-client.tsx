@@ -33,6 +33,7 @@ import {
 import { ViewQuizResultDialog } from "@/components/view-quiz-result-dialog";
 import type { UnifiedInboxItem, InboxItemType } from "@/lib/inbox-item-types";
 import { INBOX_TYPE_LABELS } from "@/lib/inbox-item-types";
+const INBOX_PAGE_SIZE = 10;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -474,6 +475,7 @@ function ItemList({
   sortKey,
   onSortChange,
   rightAction,
+  paginationAriaLabel,
 }: {
   items: UnifiedInboxItem[];
   emptyMessage: string;
@@ -483,8 +485,28 @@ function ItemList({
   sortKey: SortKey;
   onSortChange: (v: SortKey) => void;
   rightAction?: React.ReactNode;
+  paginationAriaLabel: string;
 }) {
   const sorted = useMemo(() => sortItems(items, sortKey), [items, sortKey]);
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / INBOX_PAGE_SIZE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [sortKey, items.length]);
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const pageItems = useMemo(() => {
+    const start = (page - 1) * INBOX_PAGE_SIZE;
+    return sorted.slice(start, start + INBOX_PAGE_SIZE);
+  }, [sorted, page]);
+
+  const showingFrom = sorted.length === 0 ? 0 : (page - 1) * INBOX_PAGE_SIZE + 1;
+  const showingTo = Math.min(page * INBOX_PAGE_SIZE, sorted.length);
+  const showPagination = sorted.length > INBOX_PAGE_SIZE;
 
   return (
     <div className="space-y-3">
@@ -529,18 +551,55 @@ function ItemList({
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
         </div>
       ) : (
-        <ol className="space-y-2.5">
-          {sorted.map((item) => (
-            <li key={item.key}>
-              <InboxItemRow
-                item={item}
-                showMarkRead={showMarkRead}
-                onMarkRead={onMarkRead}
-                onMutate={onMutate}
-              />
-            </li>
-          ))}
-        </ol>
+        <>
+          <ol className="space-y-2.5">
+            {pageItems.map((item) => (
+              <li key={item.key}>
+                <InboxItemRow
+                  item={item}
+                  showMarkRead={showMarkRead}
+                  onMarkRead={onMarkRead}
+                  onMutate={onMutate}
+                />
+              </li>
+            ))}
+          </ol>
+          {showPagination && (
+            <nav
+              className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"
+              aria-label={paginationAriaLabel}
+            >
+              <p className="text-xs text-muted-foreground tabular-nums text-center sm:text-left">
+                Showing {showingFrom}–{showingTo} of {sorted.length}
+              </p>
+              <div className="flex items-center justify-center gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1 text-xs min-w-[5.25rem]"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground tabular-nums px-2 min-w-[5.5rem] text-center">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1 text-xs min-w-[5.25rem]"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </nav>
+          )}
+        </>
       )}
     </div>
   );
@@ -655,6 +714,7 @@ export function InboxUnifiedClient({ items }: { items: UnifiedInboxItem[] }) {
           onMutate={handleMutate}
           sortKey={inboxSort}
           onSortChange={setInboxSort}
+          paginationAriaLabel="Inbox unread messages pagination"
           rightAction={
             unreadItems.length > 1 ? (
               <Button
@@ -682,6 +742,7 @@ export function InboxUnifiedClient({ items }: { items: UnifiedInboxItem[] }) {
           onMutate={handleMutate}
           sortKey={historySort}
           onSortChange={setHistorySort}
+          paginationAriaLabel="Inbox history messages pagination"
         />
       </TabsContent>
     </Tabs>

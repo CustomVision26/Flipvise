@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,7 @@ import {
   PanelLeftOpen,
   LayoutList,
   Megaphone,
+  History,
 } from "lucide-react";
 import {
   AdminSupportPanel,
@@ -182,30 +184,30 @@ export function AdminTabs({
     | "subscription"
     | "invoices"
     | "admin-roles"
-    | "audit-log"
     | "support-center"
     | "plans"
-    | "marketing-affiliates"
-    | "plan-history" =
+    | "marketing-affiliates" =
     pathname === "/admin/team-workspaces"
       ? "workspace-admin"
       : pathname === "/admin/subscription"
         ? "subscription"
         : pathname === "/admin/invoices"
           ? "invoices"
-      : pathname === "/admin/admin-roles"
+      : pathname === "/admin/admin-roles" || pathname === "/admin/audit-log"
         ? "admin-roles"
-        : pathname === "/admin/audit-log"
-          ? "audit-log"
-          : pathname === "/admin/support-center"
-            ? "support-center"
-            : pathname === "/admin/plans"
+        : pathname === "/admin/support-center"
+          ? "support-center"
+            : pathname === "/admin/plans" || pathname === "/admin/plan-history"
               ? "plans"
               : pathname === "/admin/marketing-affiliates"
                 ? "marketing-affiliates"
-                : pathname === "/admin/plan-history"
-                  ? "plan-history"
-                  : "all-users";
+                : "all-users";
+
+  const plansSubTab =
+    pathname === "/admin/plan-history" ? "plan-history" : "pricing-plans";
+
+  const adminRolesSubTab =
+    pathname === "/admin/audit-log" ? "audit-log" : "roles";
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -368,16 +370,6 @@ export function AdminTabs({
               <span className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
                 Admin Roles
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/audit-log")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "audit-log" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
-            >
-              <span className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Audit Log
                 {logs.length > 0 ? (
                   <Badge className="ml-auto text-xs" variant="secondary">
                     {logs.length}
@@ -408,6 +400,11 @@ export function AdminTabs({
               <span className="flex items-center gap-2">
                 <LayoutList className="h-4 w-4" />
                 Plans
+                {planAssignmentLogs.length > 0 ? (
+                  <Badge className="ml-auto text-xs" variant="secondary">
+                    {planAssignmentLogs.length}
+                  </Badge>
+                ) : null}
               </span>
             </button>
             <button
@@ -433,21 +430,6 @@ export function AdminTabs({
                     </span>
                   ) : null;
                 })()}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/plan-history")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "plan-history" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
-            >
-              <span className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Plan History
-                {planAssignmentLogs.length > 0 ? (
-                  <Badge className="ml-auto text-xs" variant="secondary">
-                    {planAssignmentLogs.length}
-                  </Badge>
-                ) : null}
               </span>
             </button>
           </CardContent>
@@ -1306,237 +1288,179 @@ export function AdminTabs({
         </Card>
       ) : null}
 
-      {/* ── Admin Role Management ── */}
+      {/* ── Admin roles + privilege audit (sub-tabs; URLs /admin/admin-roles & /admin/audit-log) ── */}
       {activeSection === "admin-roles" ? (
         <Card className="rounded-tl-none border-t-0">
           <CardHeader>
-            <CardTitle>Admin Role Management</CardTitle>
+            <CardTitle>Admin roles</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Only the platform owner can grant or revoke co-admin roles. Every
-              change is recorded in the Privilege Audit Log tab.
+              Manage co-admins from the Roles tab and review privilege changes in Audit log.
             </p>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Current Role</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow
-                    key={user.id}
-                    className={user.isBanned ? "opacity-50" : ""}
-                  >
-                    <TableCell className="font-medium whitespace-nowrap">
-                      <span className="flex items-center gap-2">
-                        {user.fullName}
-                        {user.isBanned && (
-                          <Badge variant="outline" className="text-xs py-0 border-destructive text-destructive">
-                            Banned
-                          </Badge>
-                        )}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                      {user.email ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex items-center gap-1.5">
-                        {user.isSuperadmin ? (
-                          <>
-                            <ShieldCheck className="h-4 w-4 text-primary" />
-                            <Badge variant="default" className="text-xs">
-                              Owner/Superadmin
-                            </Badge>
-                          </>
-                        ) : user.isAdmin ? (
-                          <>
-                            <ShieldCheck className="h-4 w-4 text-destructive" />
-                            <Badge variant="destructive" className="text-xs">
-                              Co-admin
-                            </Badge>
-                          </>
-                        ) : (
-                          <>
-                            <ShieldOff className="h-4 w-4 text-muted-foreground" />
-                            <Badge variant="secondary" className="text-xs">
-                              User
-                            </Badge>
-                          </>
-                        )}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <ToggleAdminRoleButton
-                        targetUserId={user.id}
-                        targetUserName={user.fullName}
-                        targetUserEmail={user.email}
-                        isCoAdmin={user.isAdmin && !user.isSuperadmin}
-                        targetIsSuperadmin={user.isSuperadmin}
-                        isSelf={user.id === currentUserId}
-                        callerIsSuperadmin={callerIsSuperadmin}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : null}
+          <CardContent>
+            <Tabs
+              value={adminRolesSubTab}
+              onValueChange={(v) =>
+                router.push(v === "audit-log" ? "/admin/audit-log" : "/admin/admin-roles")
+              }
+              className="w-full gap-4"
+            >
+              <TabsList variant="line" className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit">
+                <TabsTrigger value="roles" className="gap-1.5">
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                  Roles
+                </TabsTrigger>
+                <TabsTrigger value="audit-log" className="gap-1.5">
+                  <ClipboardList className="h-4 w-4 shrink-0" />
+                  Audit log
+                  {logs.length > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                      {logs.length}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
 
-      {/* ── Privilege Audit Log ── */}
-      {activeSection === "audit-log" ? (
-        <Card className="rounded-tl-none border-t-0">
-          <CardHeader>
-            <CardTitle>Admin Privilege Audit Log</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              A full record of every admin role grant and revocation, showing
-              who made each change and when.
-            </p>
-          </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            {logs.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground">
-                No privilege changes recorded yet.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Target User</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Granted By</TableHead>
-                    <TableHead>Date &amp; Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {log.targetUserName}
-                      </TableCell>
-                      <TableCell>
-                        {log.action === "granted" || log.action === "superadmin_granted" ? (
-                          <Badge
-                            variant={log.action === "superadmin_granted" ? "default" : "secondary"}
-                            className="text-xs gap-1"
+              <TabsContent value="roles" className="mt-4 flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Only the platform owner can grant or revoke co-admin roles. Every change is
+                  listed under the Audit log tab.
+                </p>
+                <div className="-mx-1 overflow-x-auto sm:mx-0">
+                  <div className="inline-block min-w-full rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Current Role</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow
+                            key={user.id}
+                            className={user.isBanned ? "opacity-50" : ""}
                           >
-                            <ShieldCheck className="h-3 w-3" />
-                            {log.action === "superadmin_granted"
-                              ? "Owner role"
-                              : "Co-admin granted"}
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs gap-1">
-                            <ShieldOff className="h-3 w-3" />
-                            {log.action === "superadmin_revoked"
-                              ? "Owner revoked"
-                              : "Co-admin revoked"}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {log.grantedByName}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {formatDateTime(log.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+                            <TableCell className="font-medium whitespace-nowrap">
+                              <span className="flex items-center gap-2">
+                                {user.fullName}
+                                {user.isBanned && (
+                                  <Badge variant="outline" className="text-xs py-0 border-destructive text-destructive">
+                                    Banned
+                                  </Badge>
+                                )}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {user.email ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <span className="flex items-center gap-1.5">
+                                {user.isSuperadmin ? (
+                                  <>
+                                    <ShieldCheck className="h-4 w-4 text-primary" />
+                                    <Badge variant="default" className="text-xs">
+                                      Owner/Superadmin
+                                    </Badge>
+                                  </>
+                                ) : user.isAdmin ? (
+                                  <>
+                                    <ShieldCheck className="h-4 w-4 text-destructive" />
+                                    <Badge variant="destructive" className="text-xs">
+                                      Co-admin
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ShieldOff className="h-4 w-4 text-muted-foreground" />
+                                    <Badge variant="secondary" className="text-xs">
+                                      User
+                                    </Badge>
+                                  </>
+                                )}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <ToggleAdminRoleButton
+                                targetUserId={user.id}
+                                targetUserName={user.fullName}
+                                targetUserEmail={user.email}
+                                isCoAdmin={user.isAdmin && !user.isSuperadmin}
+                                targetIsSuperadmin={user.isSuperadmin}
+                                isSelf={user.id === currentUserId}
+                                callerIsSuperadmin={callerIsSuperadmin}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </TabsContent>
 
-      {/* ── Plan Assignment History ── */}
-      {activeSection === "plan-history" ? (
-        <Card className="rounded-tl-none border-t-0">
-          <CardHeader>
-            <CardTitle>Plan Assignment &amp; Ban History</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              A full record of every plan assignment and user ban/unban performed by admins,
-              showing the user affected, previous and new plan, and who made the change.
-            </p>
-          </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            {planAssignmentLogs.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground">
-                No plan or ban actions recorded yet. Changes will appear here automatically after any
-                plan assignment or user ban.
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Previous Plan</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>New Plan</TableHead>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>Date &amp; Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {planAssignmentLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>
-                        <div className="font-medium whitespace-nowrap">{log.targetUserName}</div>
-                        {log.targetUserEmail ? (
-                          <div className="text-xs text-muted-foreground">{log.targetUserEmail}</div>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {log.action === "user_banned" || log.action === "user_unbanned"
-                          ? <span className="text-muted-foreground/60">—</span>
-                          : (log.previousPlanName ?? "Free")}
-                      </TableCell>
-                      <TableCell>
-                        {log.action === "plan_assigned" ? (
-                          <Badge variant="secondary" className="text-xs gap-1 whitespace-nowrap">
-                            <ShieldCheck className="h-3 w-3" />
-                            Plan Assigned
-                          </Badge>
-                        ) : log.action === "plan_removed" ? (
-                          <Badge variant="outline" className="text-xs gap-1 whitespace-nowrap">
-                            <ShieldOff className="h-3 w-3" />
-                            Plan Removed
-                          </Badge>
-                        ) : log.action === "user_banned" ? (
-                          <Badge variant="destructive" className="text-xs gap-1 whitespace-nowrap">
-                            <ShieldOff className="h-3 w-3" />
-                            User Banned
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs gap-1 whitespace-nowrap border-emerald-500 text-emerald-500">
-                            <ShieldCheck className="h-3 w-3" />
-                            User Unbanned
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">
-                        {log.action === "user_banned" || log.action === "user_unbanned"
-                          ? <span className="text-muted-foreground/60">—</span>
-                          : <span className="font-medium">{log.planName ?? "Free"}</span>}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {log.assignedByName}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {formatDateTime(log.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+              <TabsContent value="audit-log" className="mt-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  A full record of every admin role grant and revocation, showing who made each
+                  change and when.
+                </p>
+                <div className="overflow-x-auto rounded-md border">
+                  {logs.length === 0 ? (
+                    <p className="p-6 text-sm text-muted-foreground">
+                      No privilege changes recorded yet.
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Target User</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Granted By</TableHead>
+                          <TableHead>Date &amp; Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {logs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="font-medium whitespace-nowrap">
+                              {log.targetUserName}
+                            </TableCell>
+                            <TableCell>
+                              {log.action === "granted" || log.action === "superadmin_granted" ? (
+                                <Badge
+                                  variant={log.action === "superadmin_granted" ? "default" : "secondary"}
+                                  className="text-xs gap-1"
+                                >
+                                  <ShieldCheck className="h-3 w-3" />
+                                  {log.action === "superadmin_granted"
+                                    ? "Owner role"
+                                    : "Co-admin granted"}
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs gap-1">
+                                  <ShieldOff className="h-3 w-3" />
+                                  {log.action === "superadmin_revoked"
+                                    ? "Owner revoked"
+                                    : "Co-admin revoked"}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {log.grantedByName}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {formatDateTime(log.createdAt)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       ) : null}
@@ -1548,18 +1472,128 @@ export function AdminTabs({
       </div>
       ) : null}
 
-      {/* ── Plans Editor ── */}
+      {/* ── Plans (pricing editor + assignment history) ── */}
       {activeSection === "plans" ? (
         <Card className="rounded-tl-none border-t-0">
           <CardHeader>
-            <CardTitle>Pricing Plans</CardTitle>
+            <CardTitle>Plans</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Edit plan names, prices, descriptions, and features. Changes are saved to the pricing
-              page immediately after clicking Save on each plan card.
+              Manage public pricing and review admin-driven plan assignments and bans.
             </p>
           </CardHeader>
           <CardContent>
-            <AdminPlansEditor initialPlans={plansConfig} />
+            <Tabs
+              value={plansSubTab}
+              onValueChange={(v) =>
+                router.push(
+                  v === "plan-history" ? "/admin/plan-history" : "/admin/plans",
+                )
+              }
+              className="w-full gap-4"
+            >
+              <TabsList variant="line" className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit">
+                <TabsTrigger value="pricing-plans" className="gap-1.5">
+                  <LayoutList className="h-4 w-4 shrink-0" />
+                  Pricing plans
+                </TabsTrigger>
+                <TabsTrigger value="plan-history" className="gap-1.5">
+                  <History className="h-4 w-4 shrink-0" />
+                  Plan history
+                  {planAssignmentLogs.length > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                      {planAssignmentLogs.length}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pricing-plans" className="mt-4 flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Edit plan names, prices, descriptions, and features. Changes are saved to the pricing
+                  page immediately after clicking Save on each plan card.
+                </p>
+                <AdminPlansEditor initialPlans={plansConfig} />
+              </TabsContent>
+
+              <TabsContent value="plan-history" className="mt-4 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  A full record of every plan assignment and user ban/unban performed by admins,
+                  showing the user affected, previous and new plan, and who made the change.
+                </p>
+                <div className="overflow-x-auto rounded-md border">
+                  {planAssignmentLogs.length === 0 ? (
+                    <p className="p-6 text-sm text-muted-foreground">
+                      No plan or ban actions recorded yet. Changes will appear here automatically after any
+                      plan assignment or user ban.
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Previous Plan</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead>New Plan</TableHead>
+                          <TableHead>Admin</TableHead>
+                          <TableHead>Date &amp; Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {planAssignmentLogs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell>
+                              <div className="font-medium whitespace-nowrap">{log.targetUserName}</div>
+                              {log.targetUserEmail ? (
+                                <div className="text-xs text-muted-foreground">{log.targetUserEmail}</div>
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {log.action === "user_banned" || log.action === "user_unbanned"
+                                ? <span className="text-muted-foreground/60">—</span>
+                                : (log.previousPlanName ?? "Free")}
+                            </TableCell>
+                            <TableCell>
+                              {log.action === "plan_assigned" ? (
+                                <Badge variant="secondary" className="text-xs gap-1 whitespace-nowrap">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  Plan Assigned
+                                </Badge>
+                              ) : log.action === "plan_removed" ? (
+                                <Badge variant="outline" className="text-xs gap-1 whitespace-nowrap">
+                                  <ShieldOff className="h-3 w-3" />
+                                  Plan Removed
+                                </Badge>
+                              ) : log.action === "user_banned" ? (
+                                <Badge variant="destructive" className="text-xs gap-1 whitespace-nowrap">
+                                  <ShieldOff className="h-3 w-3" />
+                                  User Banned
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs gap-1 whitespace-nowrap border-emerald-500 text-emerald-500">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  User Unbanned
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm whitespace-nowrap">
+                              {log.action === "user_banned" || log.action === "user_unbanned"
+                                ? <span className="text-muted-foreground/60">—</span>
+                                : <span className="font-medium">{log.planName ?? "Free"}</span>}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {log.assignedByName}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                              {formatDateTime(log.createdAt)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       ) : null}

@@ -133,7 +133,7 @@ export function HeaderUserSection({
     <div className="flex items-center gap-1 sm:gap-2">
       {isAdmin && !hidePlatformAdminLink && (
         <Link
-          href="/admin"
+          href="/admin/all-users"
           className={cn(
             buttonVariants({ variant: "outline", size: "sm" }),
             "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",

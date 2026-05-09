@@ -64,6 +64,7 @@ import type {
 } from "@/lib/admin-dashboard-types";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import { AdminTabsDynamic } from "@/components/admin-tabs-dynamic";
+import { AdminOverviewStatsCollapsible } from "@/components/admin-overview-stats-collapsible";
 import { Users, CreditCard, Layers, ArrowLeft, ShieldCheck } from "lucide-react";
 import { PaidSubscribersCard } from "@/components/paid-subscribers-card";
 
@@ -288,10 +289,11 @@ export default async function AdminDashboardPage() {
       accent: "",
     },
     {
-      label: "Admin-Approved Pro",
+      label: "Admin-granted Pro Plus",
       value: adminApprovedCount + adminRoleProCount,
       icon: ShieldCheck,
-      description: "Pro access granted by admin",
+      description:
+        "Co-admins and superadmins get Pro Plus–level features when elevated; includes other complimentary admin grants.",
       accent: "text-blue-500",
     },
   ];
@@ -621,52 +623,54 @@ export default async function AdminDashboardPage() {
         </Link>
       </div>
 
-      {/* Overview stat cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {/* Static metric cards (first 3) */}
-        {statsCards.slice(0, 3).map(({ label, value, icon: Icon, description, accent }) => (
-          <Card key={label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
-                {label}
-              </CardTitle>
-              <Icon className={`h-3 w-3 sm:h-4 sm:w-4 shrink-0 ${accent || "text-muted-foreground"}`} />
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl sm:text-3xl font-bold ${accent}`}>
-                {value.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{description}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Overview stat cards — collapsible on selected admin deep-links */}
+      <AdminOverviewStatsCollapsible>
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {/* Static metric cards (first 3) */}
+          {statsCards.slice(0, 3).map(({ label, value, icon: Icon, description, accent }) => (
+            <Card key={label}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
+                  {label}
+                </CardTitle>
+                <Icon className={`h-3 w-3 sm:h-4 sm:w-4 shrink-0 ${accent || "text-muted-foreground"}`} />
+              </CardHeader>
+              <CardContent>
+                <p className={`text-2xl sm:text-3xl font-bold ${accent}`}>
+                  {value.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{description}</p>
+              </CardContent>
+            </Card>
+          ))}
 
-        {/* Paid Subscribers — single-click → full page, double-click → preview dialog */}
-        <PaidSubscribersCard
-          paidSubscriberCount={paidSubscriberCount}
-          dbPaidSubscriberCount={dbPaidSubscriberCount}
-          subscriptions={serializedSubscriptions}
-          invoices={serializedInvoices}
-        />
+          {/* Paid Subscribers — single-click → full page, double-click → preview dialog */}
+          <PaidSubscribersCard
+            paidSubscriberCount={paidSubscriberCount}
+            dbPaidSubscriberCount={dbPaidSubscriberCount}
+            subscriptions={serializedSubscriptions}
+            invoices={serializedInvoices}
+          />
 
-        {/* Remaining static cards (Admin-Approved Pro) */}
-        {statsCards.slice(3).map(({ label, value, icon: Icon, description, accent }) => (
-          <Card key={label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
-                {label}
-              </CardTitle>
-              <Icon className={`h-3 w-3 sm:h-4 sm:w-4 shrink-0 ${accent || "text-muted-foreground"}`} />
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl sm:text-3xl font-bold ${accent}`}>
-                {value.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{description}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          {/* Remaining static cards (admin-granted / complimentary tier) */}
+          {statsCards.slice(3).map(({ label, value, icon: Icon, description, accent }) => (
+            <Card key={label}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
+                  {label}
+                </CardTitle>
+                <Icon className={`h-3 w-3 sm:h-4 sm:w-4 shrink-0 ${accent || "text-muted-foreground"}`} />
+              </CardHeader>
+              <CardContent>
+                <p className={`text-2xl sm:text-3xl font-bold ${accent}`}>
+                  {value.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{description}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </AdminOverviewStatsCollapsible>
 
       {/* Tabbed panel — All Users / Admin Roles / Audit Log */}
       <AdminTabsDynamic

@@ -74,6 +74,28 @@ function isMissingColumnError(error: unknown): boolean {
   return /42703/.test(String(error));
 }
 
+/** Neon / pool saturation — Drizzle surfaces as "Failed query:" with retryable cause. */
+function isTransientDbPoolError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 10 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    if (obj["neon:retryable"] === true) return true;
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      /too many database connection attempts/i.test(message) ||
+      /failed to acquire permit/i.test(message)
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return (
+    /too many database connection attempts/i.test(flat) ||
+    /failed to acquire permit/i.test(flat)
+  );
+}
+
 /** Columns without optional `stripeBillingReason` (safe if that migration is not applied). */
 function selectBillingInvoicesWithoutStripeReason() {
   return {
@@ -240,6 +262,7 @@ export async function listBillingInvoicesForAdmin(limit = 1000) {
       .limit(limit);
   } catch (error) {
     if (isMissingBillingInvoicesTableError(error)) return [];
+    if (isTransientDbPoolError(error)) return [];
     if (!isMissingColumnError(error)) throw error;
   }
 
@@ -255,6 +278,7 @@ export async function listBillingInvoicesForAdmin(limit = 1000) {
     }));
   } catch (error2) {
     if (isMissingBillingInvoicesTableError(error2)) return [];
+    if (isTransientDbPoolError(error2)) return [];
     if (!isMissingColumnError(error2)) throw error2;
   }
 
@@ -289,6 +313,7 @@ export async function countPaidSubscribersFromDB(): Promise<number> {
     return result?.count ?? 0;
   } catch (error) {
     if (isMissingBillingInvoicesTableError(error)) return 0;
+    if (isTransientDbPoolError(error)) return 0;
     throw error;
   }
 }
