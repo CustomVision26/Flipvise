@@ -13,12 +13,8 @@ import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import {
   countPendingInvitationsForEmail,
-  getTeamMembershipsForUser,
-  getTeamsForTeamDashboard,
-  getWorkspaceNavTeamsForUser,
-  userHasTeamAdminDashboardAccess,
+  getRootLayoutTeamNavPayload,
 } from "@/db/queries/teams";
-import { currentUser } from "@/lib/clerk-auth";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { shouldHideHelpCenter } from "@/lib/team-help";
 import {
@@ -80,9 +76,10 @@ export default async function RootLayout({
       adminGranted,
       isAdmin,
       activeTeamPlan,
-      hasCustomColors,
+      hasProPlusInterfacePalette,
       hasClerkPersonalPro,
       hasClerkPersonalProPlus,
+      primaryEmail,
     },
     cookieStore,
     headerStore,
@@ -99,75 +96,34 @@ export default async function RootLayout({
   const pathnameHeader = headerStore.get("x-pathname") ?? "";
   const xSearch = headerStore.get("x-search") ?? "";
 
-  // Batch 2: all DB queries — independent of each other, run in parallel
-  const [teamAdminHeaderPayload, workspaceNav, hideHelpCenter, inboxUnreadCount] =
-    await Promise.all([
-      // Team admin header teams
-      userId != null
-        ? tryTeamQuery(async () => {
-            const canAccess = await userHasTeamAdminDashboardAccess(userId);
-            if (!canAccess) {
-              return {
-                teamAdminHeaderTeams: [] as {
-                  id: number;
-                  name: string;
-                  ownerUserId: string;
-                  workspacePlanQuery?: string;
-                  teamMemberUrlParam: number;
-                }[],
-              };
-            }
-            const teams = await getTeamsForTeamDashboard(userId);
-            const memberships = await getTeamMembershipsForUser(userId);
-            const membershipByTeamId = new Map(
-              memberships.map((m) => [m.teamId, m] as const),
-            );
-            return {
-              teamAdminHeaderTeams: teams.map((t) => ({
-                id: t.id,
-                name: t.name,
-                ownerUserId: t.ownerUserId,
-                workspacePlanQuery: isTeamPlanId(t.planSlug) ? t.planSlug : undefined,
-                teamMemberUrlParam:
-                  t.ownerUserId === userId
-                    ? 0
-                    : (membershipByTeamId.get(t.id)?.id ?? 0),
-              })),
-            };
-          }, { teamAdminHeaderTeams: [] })
-        : Promise.resolve({ teamAdminHeaderTeams: [] }),
+  // Batch 2: layout nav + help + inbox — team bootstrap is shared (no duplicate Drizzle loads).
+  const [teamNavPayload, hideHelpCenter, inboxUnreadCount] = await Promise.all([
+    userId != null
+      ? tryTeamQuery(
+          () =>
+            getRootLayoutTeamNavPayload(userId, { personalProUnlocked: isPro }),
+          {
+            teamAdminHeaderTeams: [],
+            workspaceNav: { teams: [], totalEligibleCount: 0 },
+          },
+        )
+      : Promise.resolve({
+          teamAdminHeaderTeams: [],
+          workspaceNav: { teams: [], totalEligibleCount: 0 },
+        }),
 
-      // Workspace nav
-      userId != null
-        ? tryTeamQuery(
-            () => getWorkspaceNavTeamsForUser(userId, { personalProUnlocked: isPro }),
-            { teams: [], totalEligibleCount: 0 },
-          )
-        : Promise.resolve({ teams: [], totalEligibleCount: 0 }),
+    userId != null && !isAdmin && !adminGranted
+      ? shouldHideHelpCenter(userId, teamContext)
+      : Promise.resolve(false),
 
-      // Help center visibility
-      userId != null && !isAdmin && !adminGranted
-        ? shouldHideHelpCenter(userId, teamContext)
-        : Promise.resolve(false),
+    userId != null && primaryEmail != null && primaryEmail !== ""
+      ? countPendingInvitationsForEmail(primaryEmail).catch(() => 0)
+      : Promise.resolve(0),
+  ]);
 
-      // Inbox unread count
-      userId != null
-        ? (async () => {
-            try {
-              const sessionUser = await currentUser();
-              const email = sessionUser?.primaryEmailAddress?.emailAddress ?? null;
-              if (!email) return 0;
-              return await countPendingInvitationsForEmail(email);
-            } catch {
-              return 0;
-            }
-          })()
-        : Promise.resolve(0),
-    ]);
-
-  const teamAdminHeaderTeams = teamAdminHeaderPayload.teamAdminHeaderTeams;
-  const workspaceTeams = workspaceNav.teams;
-  const workspaceTeamsTotalEligible = workspaceNav.totalEligibleCount;
+  const teamAdminHeaderTeams = teamNavPayload.teamAdminHeaderTeams;
+  const workspaceTeams = teamNavPayload.workspaceNav.teams;
+  const workspaceTeamsTotalEligible = teamNavPayload.workspaceNav.totalEligibleCount;
   /** Team-tier subscribers often have zero `workspaceTeams` (owned tier workspaces are omitted from nav). Still show Personal · Team X + Team Admin link like invited-workspace users. */
   const showWorkspaceSwitcher =
     workspaceTeamsTotalEligible > 0 ||
@@ -232,8 +188,15 @@ export default async function RootLayout({
   /** URL wins over cookie so the switcher matches `/dashboard?team=…` on first paint (layout runs before the page sets the cookie). */
   const activeWorkspaceTeamId = activeFromUrl ?? activeFromCookie;
 
-  const proUiTheme = resolveProUiThemeDataAttribute(isPro, proCookieValue);
-  const proUiThemeSelection = resolveProUiThemeSelection(proCookieValue);
+  const proUiTheme = resolveProUiThemeDataAttribute(
+    isPro,
+    proCookieValue,
+    hasProPlusInterfacePalette,
+  );
+  const proUiThemeSelection = resolveProUiThemeSelection(
+    proCookieValue,
+    hasProPlusInterfacePalette,
+  );
   const freeUiTheme = resolveFreeUiThemeDataAttribute(isPro, freeCookieValue);
   const freeUiThemeSelection = resolveFreeUiThemeSelection(freeCookieValue);
   const appliedTheme = isPro ? proUiTheme : freeUiTheme;
@@ -287,7 +250,9 @@ export default async function RootLayout({
                         teamDashFallback={teamDashFallback}
                         resolvedIsPro={isPro}
                         resolvedActiveTeamPlan={activeTeamPlan}
-                        resolvedHasCustomColors={hasCustomColors}
+                        resolvedHasProPlusInterfacePalette={
+                          hasProPlusInterfacePalette
+                        }
                         inboxUnreadCount={inboxUnreadCount}
                       />
                     </div>

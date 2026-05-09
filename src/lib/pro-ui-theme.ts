@@ -3,9 +3,16 @@ import { z } from "zod";
 /** Cookie storing Pro users’ UI base color (shadcn-style names; light + dark in `globals.css`). */
 export const PRO_UI_THEME_COOKIE = "pro_ui_theme";
 
+/** Pro (personal) tier: first N presets from {@link PRO_UI_THEME_OPTIONS}. */
+export const PRO_INTERFACE_BACKGROUND_COLOR_COUNT = 8;
+
+/** Pro Plus (and team / admin): full preset list length. */
+export const PRO_PLUS_INTERFACE_BACKGROUND_COLOR_COUNT = 12;
+
 /**
  * Base color presets aligned with shadcn registry names (dark theme tints).
  * `neutral` restores the default app palette (cookie cleared).
+ * Order matters: the first {@link PRO_INTERFACE_BACKGROUND_COLOR_COUNT} entries are the Pro tier subset; the full list is Pro Plus.
  */
 export const PRO_UI_THEME_OPTIONS = [
   { id: "neutral", label: "Neutral (default)" },
@@ -24,6 +31,20 @@ export const PRO_UI_THEME_OPTIONS = [
 
 export type ProUiThemeId = (typeof PRO_UI_THEME_OPTIONS)[number]["id"];
 
+export function proUiThemeOptionsForTier(
+  hasProPlusInterfacePalette: boolean,
+): readonly (typeof PRO_UI_THEME_OPTIONS)[number][] {
+  if (hasProPlusInterfacePalette) return PRO_UI_THEME_OPTIONS;
+  return PRO_UI_THEME_OPTIONS.slice(0, PRO_INTERFACE_BACKGROUND_COLOR_COUNT);
+}
+
+export function isProUiThemeAllowedForTier(
+  theme: ProUiThemeId,
+  hasProPlusInterfacePalette: boolean,
+): boolean {
+  return proUiThemeOptionsForTier(hasProPlusInterfacePalette).some((o) => o.id === theme);
+}
+
 export const setProUiThemeSchema = z.object({
   theme: z
     .string()
@@ -40,15 +61,26 @@ export function isProUiThemeId(value: string | undefined): value is ProUiThemeId
 export function resolveProUiThemeDataAttribute(
   isPro: boolean,
   cookieValue: string | undefined,
+  hasProPlusInterfacePalette: boolean,
 ): string | undefined {
   if (!isPro || !cookieValue || !isProUiThemeId(cookieValue) || cookieValue === "neutral") {
+    return undefined;
+  }
+  if (!isProUiThemeAllowedForTier(cookieValue, hasProPlusInterfacePalette)) {
     return undefined;
   }
   return cookieValue;
 }
 
 /** Current selection for the dropdown (includes neutral). */
-export function resolveProUiThemeSelection(cookieValue: string | undefined): ProUiThemeId {
-  if (cookieValue && isProUiThemeId(cookieValue)) return cookieValue;
+export function resolveProUiThemeSelection(
+  cookieValue: string | undefined,
+  hasProPlusInterfacePalette: boolean,
+): ProUiThemeId {
+  if (cookieValue && isProUiThemeId(cookieValue)) {
+    if (isProUiThemeAllowedForTier(cookieValue, hasProPlusInterfacePalette)) {
+      return cookieValue;
+    }
+  }
   return "neutral";
 }

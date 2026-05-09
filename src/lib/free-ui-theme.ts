@@ -3,8 +3,11 @@ import { z } from "zod";
 /** Cookie storing Free users' UI base color selection. */
 export const FREE_UI_THEME_COOKIE = "free_ui_theme";
 
+/** Free tier: number of interface color choices in Account → Appearance. */
+export const FREE_INTERFACE_BACKGROUND_COLOR_COUNT = 3;
+
 /**
- * Base color presets for free users (limited to 3 options).
+ * Base color presets for free users (limited to {@link FREE_INTERFACE_BACKGROUND_COLOR_COUNT} options).
  * `neutral` is the default app palette.
  */
 export const FREE_UI_THEME_OPTIONS = [

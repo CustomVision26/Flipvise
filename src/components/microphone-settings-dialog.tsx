@@ -222,11 +222,14 @@ function PlatformInstructions({
 interface MicrophoneSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When opened from Clerk UserProfile / another high z-index shell, stack above it. */
+  nestedModal?: boolean;
 }
 
 export function MicrophoneSettingsDialog({
   open,
   onOpenChange,
+  nestedModal = false,
 }: MicrophoneSettingsDialogProps) {
   const [env, setEnv] = React.useState<DetectedEnv | null>(null);
   const [permission, setPermission] = React.useState<MicPermissionState>("unknown");
@@ -357,7 +360,10 @@ export function MicrophoneSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg mx-4 sm:mx-auto max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        nestedModal={nestedModal}
+        className="w-[calc(100vw-2rem)] max-w-lg mx-4 sm:mx-auto max-h-[85vh] overflow-y-auto"
+      >
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle className="text-lg sm:text-xl">Microphone</DialogTitle>

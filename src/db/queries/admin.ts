@@ -18,16 +18,16 @@ function teamPlanLabelForAdmin(slug: string): string {
 
 export async function getAdminOverviewStats() {
   const [deckStats] = await db
-    .select({ totalDecks: count(decks.id) })
+    .select({ totalDecks: count() })
     .from(decks);
 
   const [cardStats] = await db
-    .select({ totalCards: count(cards.id) })
+    .select({ totalCards: count() })
     .from(cards);
 
   return {
-    totalDecks: deckStats?.totalDecks ?? 0,
-    totalCards: cardStats?.totalCards ?? 0,
+    totalDecks: Number(deckStats?.totalDecks ?? 0),
+    totalCards: Number(cardStats?.totalCards ?? 0),
   };
 }
 

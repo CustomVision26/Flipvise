@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { SettingsMenu } from "@/components/settings-menu";
+import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
 import { HelpCenter } from "@/components/help-center";
 import {
   Tooltip,
@@ -30,7 +30,7 @@ import {
 } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
-import { CreditCard, Shield } from "lucide-react";
+import { CreditCard, Palette, Shield } from "lucide-react";
 
 interface HeaderUserSectionProps {
   currentProTheme?: ProUiThemeId;
@@ -57,8 +57,8 @@ interface HeaderUserSectionProps {
   resolvedIsPro?: boolean;
   /** Server-resolved active team plan from `getAccessContext()`. */
   resolvedActiveTeamPlan?: TeamPlanId | null;
-  /** Server-resolved custom color entitlement from `getAccessContext()`. */
-  resolvedHasCustomColors?: boolean;
+  /** Server-resolved Pro Plus interface palette (12 colors) vs Pro-only (8), from `getAccessContext()`. */
+  resolvedHasProPlusInterfacePalette?: boolean;
   /** Count of open (pending + non-expired) inbox invitations for the nav badge. */
   inboxUnreadCount?: number;
 }
@@ -76,7 +76,7 @@ export function HeaderUserSection({
   teamDashFallback = null,
   resolvedIsPro = false,
   resolvedActiveTeamPlan = null,
-  resolvedHasCustomColors = false,
+  resolvedHasProPlusInterfacePalette = false,
   inboxUnreadCount = 0,
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
@@ -109,17 +109,18 @@ export function HeaderUserSection({
       ? "Pro"
       : "Free";
 
-  const fullPlanTooltip = useMemo(() => {
+  const planNameLinkTooltip = useMemo(() => {
+    let planLabel: string;
     if (activeTeamPlan != null) {
-      return `${planName} plan`;
+      planLabel = `${planName} plan`;
+    } else if (isPro) {
+      planLabel = adminGranted
+        ? "Pro plan (complimentary)"
+        : "Pro plan";
+    } else {
+      planLabel = "Free plan";
     }
-    if (isPro) {
-      if (adminGranted) {
-        return "Pro plan (complimentary)";
-      }
-      return "Pro plan";
-    }
-    return "Free plan";
+    return `${planLabel} — Opens the pricing page`;
   }, [activeTeamPlan, planName, isPro, adminGranted]);
 
   if (!userId) {
@@ -159,7 +160,7 @@ export function HeaderUserSection({
             </Link>
           )}
         />
-        <TooltipContent side="bottom">{fullPlanTooltip}</TooltipContent>
+        <TooltipContent side="bottom">{planNameLinkTooltip}</TooltipContent>
       </Tooltip>
       <div className="flex min-w-0 flex-row items-center gap-2">
         <Tooltip>
@@ -179,7 +180,7 @@ export function HeaderUserSection({
               </Link>
             )}
           />
-          <TooltipContent side="bottom">{fullPlanTooltip}</TooltipContent>
+          <TooltipContent side="bottom">{planNameLinkTooltip}</TooltipContent>
         </Tooltip>
         {showWorkspaceSwitcher &&
           (workspaceTeams.length > 0 ||
@@ -205,6 +206,18 @@ export function HeaderUserSection({
         >
           <UserButton>
             <UserButton.UserProfilePage
+              label="Appearance"
+              url="appearance"
+              labelIcon={<Palette className="size-4" />}
+            >
+              <UserAppearanceSettingsPage
+                currentProTheme={currentProTheme}
+                currentFreeTheme={currentFreeTheme}
+                isPro={isPro}
+                hasProPlusInterfacePalette={resolvedHasProPlusInterfacePalette}
+              />
+            </UserButton.UserProfilePage>
+            <UserButton.UserProfilePage
               label="Billing"
               url="billing"
               labelIcon={<CreditCard className="size-4" />}
@@ -214,12 +227,6 @@ export function HeaderUserSection({
           </UserButton>
         </span>
       </div>
-      <SettingsMenu
-        currentProTheme={currentProTheme}
-        currentFreeTheme={currentFreeTheme}
-        isPro={isPro}
-        hasCustomColors={resolvedHasCustomColors}
-      />
       <InboxNavIconButton unreadCount={inboxUnreadCount} />
       {!hideHelpCenter && <HelpCenter />}
     </div>

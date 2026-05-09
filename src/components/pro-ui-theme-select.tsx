@@ -11,17 +11,24 @@ import {
 } from "@/components/ui/select";
 import { setProUiThemeAction } from "@/actions/pro-ui-theme";
 import {
-  PRO_UI_THEME_OPTIONS,
+  proUiThemeOptionsForTier,
   type ProUiThemeId,
 } from "@/lib/pro-ui-theme";
 
 interface ProUiThemeSelectProps {
   currentTheme: ProUiThemeId;
+  /** When false (personal Pro only), first 8 presets; when true, full 12. */
+  hasProPlusInterfacePalette?: boolean;
 }
 
-export function ProUiThemeSelect({ currentTheme }: ProUiThemeSelectProps) {
+export function ProUiThemeSelect({
+  currentTheme,
+  hasProPlusInterfacePalette = false,
+}: ProUiThemeSelectProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const options = proUiThemeOptionsForTier(hasProPlusInterfacePalette);
 
   return (
     <div className="flex w-full max-w-xs flex-col gap-2">
@@ -44,7 +51,7 @@ export function ProUiThemeSelect({ currentTheme }: ProUiThemeSelectProps) {
           <SelectValue placeholder="Choose a color" />
         </SelectTrigger>
         <SelectContent>
-          {PRO_UI_THEME_OPTIONS.map((opt) => (
+          {options.map((opt) => (
             <SelectItem key={opt.id} value={opt.id}>
               {opt.label}
             </SelectItem>

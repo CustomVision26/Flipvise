@@ -856,9 +856,14 @@ export async function getTeamsForTeamDashboard(userId: string) {
  *   `team_member`-only rows on other workspaces from the same subscriber (stale or accidental invites).
  * - **Pure team members** (no ownership, no `team_admin`) see each `team_member` workspace for study.
  */
-export async function getEligibleWorkspaceTeamsForUser(userId: string) {
-  const manageTeams = await getTeamsForTeamDashboard(userId);
-  const memberships = await getTeamMembershipsForUser(userId);
+export async function getEligibleWorkspaceTeamsForUser(
+  userId: string,
+  bootstrap?: HeaderTeamsBootstrap,
+) {
+  const manageTeams =
+    bootstrap?.manageTeams ?? (await getTeamsForTeamDashboard(userId));
+  const memberships =
+    bootstrap?.memberships ?? (await getTeamMembershipsForUser(userId));
 
   const ownsTeamTierWorkspace = manageTeams.some(
     (t) => t.ownerUserId === userId && isTeamPlanId(t.planSlug),
@@ -898,6 +903,20 @@ export type WorkspaceNavTeamsResult = {
   totalEligibleCount: number;
 };
 
+/** One Drizzle snapshot shared between team-admin header + workspace nav in root layout. */
+export type HeaderTeamsBootstrap = {
+  manageTeams: InferSelectModel<typeof teams>[];
+  memberships: InferSelectModel<typeof teamMembers>[];
+};
+
+export type RootLayoutTeamAdminHeaderTeam = {
+  id: number;
+  name: string;
+  ownerUserId: string;
+  workspacePlanQuery?: string;
+  teamMemberUrlParam: number;
+};
+
 /**
  * Header workspace switcher: `teamMemberUrlParam` is 0 for the subscriber owner, else the
  * viewer’s `team_members.id` (for display grouping). Workspace dashboard URLs include
@@ -910,15 +929,17 @@ export type WorkspaceNavTeamsResult = {
 export async function getWorkspaceNavTeamsForUser(
   userId: string,
   options: { personalProUnlocked: boolean },
+  bootstrap?: HeaderTeamsBootstrap,
 ): Promise<WorkspaceNavTeamsResult> {
-  const eligible = await getEligibleWorkspaceTeamsForUser(userId);
+  const eligible = await getEligibleWorkspaceTeamsForUser(userId, bootstrap);
   const eligibleForSwitcher = eligible.filter((t) => {
     const isSubscriberOwnedTeamTier =
       t.ownerUserId === userId && isTeamPlanId(t.planSlug);
     return !isSubscriberOwnedTeamTier;
   });
   const totalEligibleCount = eligibleForSwitcher.length;
-  const memberships = await getTeamMembershipsForUser(userId);
+  const memberships =
+    bootstrap?.memberships ?? (await getTeamMembershipsForUser(userId));
   const membershipByTeamId = new Map(
     memberships.map((m) => [m.teamId, m] as const),
   );
@@ -957,6 +978,46 @@ export async function getWorkspaceNavTeamsForUser(
     : full.slice(0, FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT);
 
   return { teams, totalEligibleCount };
+}
+
+/**
+ * Single bootstrap for root layout: avoids repeating {@link getTeamsForTeamDashboard} /
+ * {@link getTeamMembershipsForUser} and skips redundant {@link userHasTeamAdminDashboardAccess} queries.
+ */
+export async function getRootLayoutTeamNavPayload(
+  userId: string,
+  options: { personalProUnlocked: boolean },
+): Promise<{
+  teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[];
+  workspaceNav: WorkspaceNavTeamsResult;
+}> {
+  const [manageTeams, memberships] = await Promise.all([
+    getTeamsForTeamDashboard(userId),
+    getTeamMembershipsForUser(userId),
+  ]);
+  const bootstrap: HeaderTeamsBootstrap = { manageTeams, memberships };
+  const workspaceNav = await getWorkspaceNavTeamsForUser(userId, options, bootstrap);
+
+  if (manageTeams.length === 0) {
+    return { teamAdminHeaderTeams: [], workspaceNav };
+  }
+
+  const membershipByTeamId = new Map(
+    memberships.map((m) => [m.teamId, m] as const),
+  );
+
+  const teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[] = manageTeams.map(
+    (t) => ({
+      id: t.id,
+      name: t.name,
+      ownerUserId: t.ownerUserId,
+      workspacePlanQuery: isTeamPlanId(t.planSlug) ? t.planSlug : undefined,
+      teamMemberUrlParam:
+        t.ownerUserId === userId ? 0 : (membershipByTeamId.get(t.id)?.id ?? 0),
+    }),
+  );
+
+  return { teamAdminHeaderTeams, workspaceNav };
 }
 
 export async function userHasTeamAdminDashboardAccess(userId: string): Promise<boolean> {

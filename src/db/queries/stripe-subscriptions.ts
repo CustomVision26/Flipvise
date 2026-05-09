@@ -2,6 +2,65 @@ import { db } from "@/db";
 import { stripeSubscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+/** Table missing (migration `0015_stripe_subscriptions` not applied) — common in fresh local DBs. */
+function isMissingStripeSubscriptionsTableError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      /stripe_subscriptions/i.test(message) &&
+      /(does not exist|undefined table|relation .* does not exist)/i.test(message)
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return (
+    (/42P01/i.test(flat) || /does not exist/i.test(flat)) &&
+    /stripe_subscriptions/i.test(flat)
+  );
+}
+
+/** Older DBs or mismatched schema (e.g. wrong column names). */
+function isStripeSubscriptionsSchemaMismatch(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    if (obj.code === "42703") {
+      const message = typeof obj.message === "string" ? obj.message : "";
+      if (/stripe_subscriptions/i.test(message)) return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return /42703/.test(flat) && /stripe_subscriptions/i.test(flat);
+}
+
+function isRecoverableStripeSubscriptionsReadError(error: unknown): boolean {
+  if (isMissingStripeSubscriptionsTableError(error)) return true;
+  if (isStripeSubscriptionsSchemaMismatch(error)) return true;
+  let current: unknown = error;
+  for (let depth = 0; depth < 10 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    if (obj["neon:retryable"] === true) return true;
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      /too many database connection attempts/i.test(message) ||
+      /failed to acquire permit/i.test(message)
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return (
+    /too many database connection attempts/i.test(flat) ||
+    /failed to acquire permit/i.test(flat)
+  );
+}
+
 export type UpsertStripeSubscriptionInput = {
   userId: string;
   stripeCustomerId: string;
@@ -51,15 +110,20 @@ export async function upsertStripeSubscription(
  * Only returns rows with status "active" or "trialing".
  */
 export async function getActiveStripeSubscription(userId: string) {
-  const rows = await db
-    .select()
-    .from(stripeSubscriptions)
-    .where(eq(stripeSubscriptions.userId, userId));
+  try {
+    const rows = await db
+      .select()
+      .from(stripeSubscriptions)
+      .where(eq(stripeSubscriptions.userId, userId));
 
-  const row = rows[0] ?? null;
-  if (!row) return null;
-  if (row.status !== "active" && row.status !== "trialing") return null;
-  return row;
+    const row = rows[0] ?? null;
+    if (!row) return null;
+    if (row.status !== "active" && row.status !== "trialing") return null;
+    return row;
+  } catch (error) {
+    if (isRecoverableStripeSubscriptionsReadError(error)) return null;
+    throw error;
+  }
 }
 
 /**
@@ -69,11 +133,18 @@ export async function getActiveStripeSubscription(userId: string) {
 export async function getStripeSubscriptionBySubscriptionId(
   stripeSubscriptionId: string,
 ) {
-  const rows = await db
-    .select()
-    .from(stripeSubscriptions)
-    .where(eq(stripeSubscriptions.stripeSubscriptionId, stripeSubscriptionId));
-  return rows[0] ?? null;
+  try {
+    const rows = await db
+      .select()
+      .from(stripeSubscriptions)
+      .where(
+        eq(stripeSubscriptions.stripeSubscriptionId, stripeSubscriptionId),
+      );
+    return rows[0] ?? null;
+  } catch (error) {
+    if (isRecoverableStripeSubscriptionsReadError(error)) return null;
+    throw error;
+  }
 }
 
 /** Mark a subscription row as canceled/expired by subscription ID. */

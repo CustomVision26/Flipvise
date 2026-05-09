@@ -5,17 +5,24 @@ import { revalidatePath } from "next/cache";
 import { getAccessContext } from "@/lib/access";
 import {
   PRO_UI_THEME_COOKIE,
+  isProUiThemeAllowedForTier,
   setProUiThemeSchema,
   type SetProUiThemeInput,
 } from "@/lib/pro-ui-theme";
 
 export async function setProUiThemeAction(data: SetProUiThemeInput) {
-  const { userId, isPro } = await getAccessContext();
+  const { userId, isPro, hasProPlusInterfacePalette } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
   if (!isPro) throw new Error("Interface colors are available on the Pro plan.");
 
   const parsed = setProUiThemeSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid theme");
+
+  if (!isProUiThemeAllowedForTier(parsed.data.theme, hasProPlusInterfacePalette)) {
+    throw new Error(
+      "That interface color requires Pro Plus. Upgrade to unlock all colors, or pick one of your Pro presets.",
+    );
+  }
 
   const cookieStore = await cookies();
   if (parsed.data.theme === "neutral") {

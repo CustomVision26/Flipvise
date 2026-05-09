@@ -21,6 +21,9 @@ import type { PlanHistoryRow } from "@/lib/plan-history-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { CreditCard, ExternalLink, Loader2, Zap } from "lucide-react";
 
+/** Canonical in-app pricing page (see `src/app/pricing/page.tsx`). */
+const PRICING_PAGE_PATH = "/pricing" as const;
+
 const STATUS_LABELS: Record<string, string> = {
   active: "Active",
   trialing: "Trial",
@@ -145,11 +148,23 @@ export function UserBillingPage() {
               Update payment method, download invoices, or cancel your plan via
               the Stripe Customer Portal.
             </p>
-            <ManageBillingButton
-              label="Open billing portal"
-              variant="outline"
-              size="sm"
-            />
+            <div className="flex flex-wrap gap-2">
+              <ManageBillingButton
+                label="Open billing portal"
+                variant="outline"
+                size="sm"
+              />
+              <Link
+                href={PRICING_PAGE_PATH}
+                className={cn(
+                  buttonVariants({ variant: "secondary", size: "sm" }),
+                  "gap-2",
+                )}
+              >
+                <ExternalLink className="size-3.5" aria-hidden />
+                View plans
+              </Link>
+            </div>
           </div>
         )}
 
@@ -162,13 +177,13 @@ export function UserBillingPage() {
               Unlock AI flashcard generation, custom themes, and more.
             </p>
             <Link
-              href="/pricing"
+              href={PRICING_PAGE_PATH}
               className={cn(
                 buttonVariants({ variant: "default", size: "sm" }),
                 "w-fit gap-2",
               )}
             >
-              <Zap className="size-3.5" />
+              <Zap className="size-3.5" aria-hidden />
               View plans
             </Link>
           </div>
@@ -180,13 +195,13 @@ export function UserBillingPage() {
               Change or upgrade plan
             </p>
             <Link
-              href="/pricing"
+              href={PRICING_PAGE_PATH}
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
                 "w-fit gap-2",
               )}
             >
-              <ExternalLink className="size-3.5" />
+              <ExternalLink className="size-3.5" aria-hidden />
               View plans
             </Link>
           </div>

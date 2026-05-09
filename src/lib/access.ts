@@ -2,7 +2,10 @@ import { cache } from "react";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
-import { proBillingFeatureBundleSatisfied } from "@/lib/pro-billing-feature-bundle";
+import {
+  legacyUnlimitedStyleProBundleSatisfied,
+  proBillingFeatureBundleSatisfied,
+} from "@/lib/pro-billing-feature-bundle";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import {
   canonicalTeamPlanId,
@@ -50,6 +53,11 @@ export type AccessContext = {
   hasAiReading: boolean;
   hasPrioritySupport: boolean;
   hasCustomColors: boolean;
+  /**
+   * When true, Interface background offers the full Pro Plus preset list (12); when false but {@link isPro}
+   * is true, Pro tier presets only (8). Free users use the free-tier interface color list (3) instead.
+   */
+  hasProPlusInterfacePalette: boolean;
   adminGranted: boolean;
   isAdmin: boolean;
   isSuperadmin: boolean;
@@ -58,6 +66,8 @@ export type AccessContext = {
   hasClerkPersonalPro: boolean;
   /** JWT carries individual `pro_plus`. */
   hasClerkPersonalProPlus: boolean;
+  /** Primary email from Clerk Backend `getUser` (same fetch as metadata). Used by layout inbox badge without a second Clerk round-trip. */
+  primaryEmail: string | null;
 };
 
 function personalPaidSlugFromStripeSlug(
@@ -95,6 +105,20 @@ function isClerkBackendRateLimitError(error: unknown): boolean {
   return msg.includes("too many requests") || msg.includes("rate limit");
 }
 
+/** Clerk Backend `User` — avoid importing heavy types; used only for inbox badge email reuse in layout. */
+function primaryEmailFromClerkBackendUser(user: {
+  primaryEmailAddressId?: string | null;
+  emailAddresses?: { id: string; emailAddress: string }[] | null;
+}): string | null {
+  const list = user.emailAddresses ?? [];
+  const pid = user.primaryEmailAddressId;
+  const primary =
+    pid != null && pid !== ""
+      ? list.find((e) => e.id === pid)
+      : undefined;
+  return (primary ?? list[0])?.emailAddress ?? null;
+}
+
 /**
  * Returns the full access context for the current user, combining Stripe-backed billing metadata,
  * Clerk JWT features, admin-granted access, and the admin role itself.
@@ -117,21 +141,25 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       hasAiReading: false,
       hasPrioritySupport: false,
       hasCustomColors: false,
+      hasProPlusInterfacePalette: false,
       adminGranted: false,
       isAdmin: false,
       isSuperadmin: false,
       activeTeamPlan: null,
       hasClerkPersonalPro: false,
       hasClerkPersonalProPlus: false,
+      primaryEmail: null,
     };
   }
 
   const superadminAllowListed = isPlatformSuperadminAllowListed(userId);
 
+  let primaryEmail: string | null = null;
   let meta: PublicMeta;
   try {
     const user = await clerkClient.users.getUser(userId);
     meta = user.publicMetadata as PublicMeta;
+    primaryEmail = primaryEmailFromClerkBackendUser(user);
   } catch (error) {
     if (!isClerkBackendRateLimitError(error)) throw error;
     // Degrade to JWT-only resolution when Clerk Backend returns 429 (still better than hard-failing the tree).
@@ -212,12 +240,14 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       hasAiReading: true,
       hasPrioritySupport: true,
       hasCustomColors: true,
+      hasProPlusInterfacePalette: true,
       adminGranted,
       isAdmin,
       isSuperadmin,
       activeTeamPlan: teamPlanForFeatures,
       hasClerkPersonalPro: paidProFromHas,
       hasClerkPersonalProPlus: paidProPlusFromHas,
+      primaryEmail,
     };
   }
 
@@ -241,12 +271,14 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       hasAiReading: true,
       hasPrioritySupport: true,
       hasCustomColors: true,
+      hasProPlusInterfacePalette: true,
       adminGranted: false,
       isAdmin: false,
       isSuperadmin: false,
       activeTeamPlan: teamPlanForFeatures,
       hasClerkPersonalPro: paidProFromHas,
       hasClerkPersonalProPlus: paidProPlusFromHas,
+      primaryEmail,
     };
   }
 
@@ -274,12 +306,15 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
         hasAiReading: aiReadingForTier(stripeSlug),
         hasPrioritySupport: paidPrioritySupport,
         hasCustomColors: paidCustomColors || Boolean(stripeSlug),
+        hasProPlusInterfacePalette:
+          paidCustomColors || personalPaidSlugFromStripeSlug(stripeSlug) === "pro_plus",
         adminGranted: false,
         isAdmin: false,
         isSuperadmin: false,
         activeTeamPlan: null,
         hasClerkPersonalPro: paidProFromHas,
         hasClerkPersonalProPlus: paidProPlusFromHas,
+        primaryEmail,
       };
     }
   }
@@ -312,12 +347,14 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
           hasAiReading: true,
           hasPrioritySupport: true,
           hasCustomColors: true,
+          hasProPlusInterfacePalette: true,
           adminGranted: false,
           isAdmin: false,
           isSuperadmin: false,
           activeTeamPlan: canonical,
           hasClerkPersonalPro: paidProFromHas,
           hasClerkPersonalProPlus: paidProPlusFromHas,
+          primaryEmail,
         };
       }
       if (rawBillingPlan === "pro" || rawBillingPlan === "pro_plus") {
@@ -337,12 +374,15 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
           hasAiReading: aiReadingForTier(rawBillingPlan),
           hasPrioritySupport: paidPrioritySupport,
           hasCustomColors: true,
+          hasProPlusInterfacePalette:
+            rawBillingPlan === "pro_plus" || paidCustomColors,
           adminGranted: false,
           isAdmin: false,
           isSuperadmin: false,
           activeTeamPlan: null,
           hasClerkPersonalPro: paidProFromHas,
           hasClerkPersonalProPlus: paidProPlusFromHas,
+          primaryEmail,
         };
       }
     }
@@ -365,6 +405,23 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   const isProJwt =
     jwtPaid && (paidProFromHas || paidProPlusFromHas || proFeatureBundle);
 
+  let jwtProPlusInterfacePalette = false;
+  if (jwtPaid) {
+    const personalSlug = personalPaidSlugFromStripeSlug(inferredStripeSlug);
+    if (personalSlug === "pro" && !paidCustomColors) {
+      jwtProPlusInterfacePalette = false;
+    } else {
+      jwtProPlusInterfacePalette =
+        paidProPlusFromHas ||
+        paidCustomColors ||
+        Boolean(has({ feature: "pro_plus_plan_features" })) ||
+        personalSlug === "pro_plus" ||
+        (!paidProFromHas &&
+          !paidProPlusFromHas &&
+          legacyUnlimitedStyleProBundleSatisfied(has));
+    }
+  }
+
   return {
     userId,
     isPro: isProJwt || unlocked,
@@ -380,11 +437,13 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     hasCustomColors:
       jwtPaid &&
       (paidCustomColors || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
+    hasProPlusInterfacePalette: jwtProPlusInterfacePalette,
     adminGranted,
     isAdmin,
     isSuperadmin,
     activeTeamPlan: null,
     hasClerkPersonalPro: jwtPaid && paidProFromHas,
     hasClerkPersonalProPlus: jwtPaid && paidProPlusFromHas,
+    primaryEmail,
   };
 });
