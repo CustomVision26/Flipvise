@@ -95,7 +95,10 @@ export async function ensureAffiliatePlanStripeCoupon(opts: {
   try {
     const existing = await stripe.coupons.retrieve(id);
     if (redeemBy != null && existing.redeem_by !== redeemBy) {
-      await stripe.coupons.update(id, { redeem_by: redeemBy });
+      // Stripe’s generated `CouponUpdateParams` omits `redeem_by` in some SDK versions, but the API accepts it.
+      await stripe.coupons.update(id, { redeem_by: redeemBy } as Parameters<
+        typeof stripe.coupons.update
+      >[1]);
     }
     return id;
   } catch (err) {
@@ -124,9 +127,7 @@ function isPaidPlanId(id: string): id is PaidPlanId {
 async function resolveAffiliateFromCombinedPromotionInput(
   lowerTrimmed: string,
   plansConfig: PlanConfig[],
-): Promise<
-  Awaited<ReturnType<typeof getAffiliateByPromotionalCode>>
-> {
+): Promise<Awaited<ReturnType<typeof getAffiliateByPromotionalCode>> | null> {
   const bases = new Set<string>();
   for (const p of plansConfig) {
     if (p.id === "free") continue;

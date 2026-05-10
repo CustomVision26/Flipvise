@@ -120,24 +120,38 @@ function resolveCurrentPersonalPlanStartTimeIso(input: {
  * many `Promise.all` DB calls at once can exceed Neon limits and fail with
  * "Too many database connection attempts are currently ongoing".
  */
-async function runDbTasksWithConcurrencyLimit<T>(
-  factories: ReadonlyArray<() => Promise<T>>,
+type FactoryResult<F> = F extends () => Promise<infer R> ? Awaited<R> : never;
+
+/** Recursively builds `[R0, R1, ...]` from a tuple of async factories (for array destructuring). */
+type ResultsTuple<T extends readonly unknown[]> = T extends readonly [
+  infer Head extends () => Promise<unknown>,
+  ...infer Tail,
+]
+  ? Tail extends readonly (() => Promise<unknown>)[]
+    ? [FactoryResult<Head>, ...ResultsTuple<Tail>]
+    : [FactoryResult<Head>]
+  : [];
+
+async function runDbTasksWithConcurrencyLimit<
+  T extends readonly (() => Promise<unknown>)[],
+>(
+  factories: T,
   limit: number,
-): Promise<T[]> {
-  const results: T[] = new Array(factories.length);
+): Promise<ResultsTuple<T>> {
+  const results: unknown[] = new Array(factories.length);
   let next = 0;
 
   async function worker(): Promise<void> {
     while (true) {
       const i = next++;
       if (i >= factories.length) return;
-      results[i] = await factories[i]();
+      results[i] = await factories[i]!();
     }
   }
 
   const n = Math.min(Math.max(1, limit), factories.length);
   await Promise.all(Array.from({ length: n }, () => worker()));
-  return results;
+  return results as ResultsTuple<T>;
 }
 
 /** Max concurrent Neon HTTP queries for the admin dashboard warm-up batch. */
@@ -233,7 +247,7 @@ export default async function AdminDashboardPage() {
       () => listBillingInvoicesForAdmin(2000),
       () => countPaidSubscribersFromDB(),
       () => listAffiliates(),
-    ],
+    ] as const,
     ADMIN_DASHBOARD_DB_CONCURRENCY,
   );
 
