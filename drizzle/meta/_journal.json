@@ -162,6 +162,20 @@
       "when": 1777960000000,
       "tag": "0023_team_deck_assignment_signed",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778040000000,
+      "tag": "0024_affiliate_promo_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778120000000,
+      "tag": "0026_affiliate_broadcast_inbox",
+      "breakpoints": true
     }
   ]
 }

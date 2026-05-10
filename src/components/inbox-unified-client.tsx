@@ -19,20 +19,27 @@ import {
   Inbox,
   ArrowDownUp,
   ExternalLink,
+  Mail,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { markInboxItemReadAction, markAllInboxItemsReadAction } from "@/actions/inbox";
 import {
   acceptTeamInvitationByIdAction,
   rejectTeamInvitationByIdAction,
 } from "@/actions/teams";
-import { acceptAffiliateInviteAction } from "@/actions/affiliates";
+import { acceptAffiliateInviteAction, acceptAffiliateArrangementChangeAction } from "@/actions/affiliates";
 import {
   acceptAdminPlanInviteAction,
   declineAdminPlanInviteAction,
 } from "@/actions/admin-plan-invite";
 import { ViewQuizResultDialog } from "@/components/view-quiz-result-dialog";
 import type { UnifiedInboxItem, InboxItemType } from "@/lib/inbox-item-types";
-import { INBOX_TYPE_LABELS } from "@/lib/inbox-item-types";
 const INBOX_PAGE_SIZE = 10;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -69,6 +76,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   team_invite: <Users className="size-4 text-blue-400" aria-hidden />,
   billing: <Receipt className="size-4 text-emerald-400" aria-hidden />,
   affiliate: <Megaphone className="size-4 text-amber-400" aria-hidden />,
+  affiliate_broadcast: <Mail className="size-4 text-amber-400" aria-hidden />,
   affiliate_notice: <CircleAlert className="size-4 text-orange-400" aria-hidden />,
   admin_plan_invite: <Shield className="size-4 text-violet-400" aria-hidden />,
   admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
@@ -85,8 +93,9 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         quiz_result: 2,
         billing: 3,
         affiliate: 4,
-        affiliate_notice: 5,
-        admin_plan_log: 6,
+        affiliate_broadcast: 5,
+        affiliate_notice: 6,
+        admin_plan_log: 7,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -229,38 +238,117 @@ function AffiliateActions({
   const [pending, startPending] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  if (item.payload.status !== "pending" || !item.payload.token) return null;
+  const arrangementConfirmToken = item.payload.arrangementChangeToken ?? null;
+  const arrangementOpen =
+    item.payload.status === "active" &&
+    Boolean(arrangementConfirmToken) &&
+    item.payload.arrangementConfirmationOpen;
 
-  const inviteExpired =
-    new Date(item.payload.inviteExpiresAtIso).getTime() < Date.now();
+  if (item.payload.status === "pending" && item.payload.token) {
+    const inviteExpired = item.payload.inviteAcceptLinkExpired;
 
-  if (inviteExpired) {
+    if (inviteExpired) {
+      return (
+        <p className="text-xs text-muted-foreground max-w-[220px] text-right sm:text-left">
+          This invite link expired on{" "}
+          {formatDate(item.payload.inviteExpiresAtIso)}. Ask for a new invite.
+        </p>
+      );
+    }
+
+    function handleAcceptInvite() {
+      startPending(async () => {
+        try {
+          await acceptAffiliateInviteAction({ token: item.payload.token! });
+          onMutate();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Failed to accept");
+        }
+      });
+    }
+
     return (
-      <p className="text-xs text-muted-foreground max-w-[220px] text-right sm:text-left">
-        This invite link expired on{" "}
-        {formatDate(item.payload.inviteExpiresAtIso)}. Ask for a new invite.
-      </p>
+      <div className="flex flex-col gap-1.5">
+        <Button size="sm" disabled={pending} onClick={handleAcceptInvite}>
+          {pending ? "Accepting…" : "Accept invite"}
+        </Button>
+        {error && <p className="text-xs text-rose-500">{error}</p>}
+      </div>
     );
   }
 
-  function handleAccept() {
-    startPending(async () => {
-      try {
-        await acceptAffiliateInviteAction({ token: item.payload.token! });
-        onMutate();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to accept");
-      }
-    });
+  if (arrangementOpen) {
+    function handleConfirmArrangement() {
+      startPending(async () => {
+        try {
+          await acceptAffiliateArrangementChangeAction({
+            token: arrangementConfirmToken!,
+          });
+          onMutate();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Failed to confirm");
+        }
+      });
+    }
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Button size="sm" disabled={pending} onClick={handleConfirmArrangement}>
+          {pending ? "Confirming…" : "Confirm arrangement change"}
+        </Button>
+        {error && <p className="text-xs text-rose-500">{error}</p>}
+      </div>
+    );
   }
 
+  return null;
+}
+
+function AffiliateBroadcastDialog({
+  item,
+}: {
+  item: UnifiedInboxItem & { type: "affiliate_broadcast" };
+}) {
+  const p = item.payload;
+  const detailsLabel =
+    p.variant === "general"
+      ? "Public promotions (reference)"
+      : "Your combined checkout codes (reference)";
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <Button size="sm" disabled={pending} onClick={handleAccept}>
-        {pending ? "Accepting…" : "Accept invite"}
-      </Button>
-      {error && <p className="text-xs text-rose-500">{error}</p>}
-    </div>
+    <Dialog>
+      <DialogTrigger
+        render={<Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" />}
+      >
+        Read full message
+      </DialogTrigger>
+      <DialogContent className="flex max-h-[min(85vh,36rem)] flex-col gap-0 overflow-hidden sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-left leading-snug">{p.subject}</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-2 pr-1">
+          <div>
+            <p className="mb-1 text-xs font-medium text-muted-foreground">Message</p>
+            <p className="text-sm whitespace-pre-wrap text-foreground">{p.messageBody}</p>
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium text-muted-foreground">{detailsLabel}</p>
+            <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
+              {p.detailsBlock}
+            </pre>
+          </div>
+          <a
+            href={p.pricingPageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex w-fit items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+          >
+            <ExternalLink className="size-3" aria-hidden />
+            Open pricing page
+          </a>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -318,7 +406,7 @@ function InboxItemRow({
             )}
             {item.type === "team_invite" && inviteOutcomeBadge(item.payload.outcome)}
             {item.type === "affiliate" && item.payload.status === "pending" && (
-              new Date(item.payload.inviteExpiresAtIso).getTime() < Date.now() ? (
+              item.payload.inviteAcceptLinkExpired ? (
                 <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
                   Link expired
                 </Badge>
@@ -328,19 +416,31 @@ function InboxItemRow({
                 </Badge>
               )
             )}
-            {item.type === "affiliate" && item.payload.status !== "pending" && (() => {
-              const periodEnded =
-                item.payload.status === "active" &&
-                new Date(item.payload.endsAtIso).getTime() < Date.now();
+            {item.type === "affiliate" && item.payload.status === "active" && (() => {
+              if (item.payload.arrangementConfirmationOpen) {
+                return (
+                  <Badge variant="secondary" className="shrink-0 text-xs">
+                    Confirmation needed
+                  </Badge>
+                );
+              }
+              const periodEnded = item.payload.grantPeriodEnded;
               return (
                 <Badge
-                  variant={item.payload.status === "active" && !periodEnded ? "default" : "outline"}
+                  variant={
+                    item.payload.status === "active" && !periodEnded ? "default" : "outline"
+                  }
                   className="shrink-0 text-xs capitalize"
                 >
                   {periodEnded ? "Period ended" : item.payload.status}
                 </Badge>
               );
             })()}
+            {item.type === "affiliate" && item.payload.status === "revoked" && (
+              <Badge variant="outline" className="shrink-0 text-xs capitalize">
+                revoked
+              </Badge>
+            )}
             {item.type === "affiliate_notice" && (
               <Badge
                 variant="outline"
@@ -383,6 +483,14 @@ function InboxItemRow({
             {item.type === "billing" && (
               <Badge variant="outline" className="shrink-0 text-xs capitalize">
                 {item.payload.status}
+              </Badge>
+            )}
+            {item.type === "affiliate_broadcast" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-amber-500/35 text-xs text-amber-400"
+              >
+                {item.payload.variant === "general" ? "Public promos" : "Your codes"}
               </Badge>
             )}
           </div>
@@ -445,6 +553,10 @@ function InboxItemRow({
 
         {item.type === "affiliate" && (
           <AffiliateActions item={item} onMutate={onMutate} />
+        )}
+
+        {item.type === "affiliate_broadcast" && (
+          <AffiliateBroadcastDialog item={item} />
         )}
 
         {/* Mark as read */}

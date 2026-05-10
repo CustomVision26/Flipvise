@@ -7,6 +7,7 @@ import {
   upsertStripeSubscription,
   markStripeSubscriptionStatus,
 } from "@/db/queries/stripe-subscriptions";
+import { incrementAffiliatePaidReferral } from "@/db/queries/affiliates";
 import {
   BILLING_PLAN_KEY,
   BILLING_STATUS_KEY,
@@ -306,6 +307,15 @@ export async function POST(req: NextRequest) {
             await loopsUpdateContact(email, { userId, userGroup: selectedPlan });
             await loopsSendEvent(email, "plan_upgraded", { userId, userGroup: selectedPlan });
           })();
+        }
+
+        const affiliateIdRaw = stringOrNull(session.metadata?.affiliateId);
+        if (affiliateIdRaw && /^\d+$/.test(affiliateIdRaw)) {
+          try {
+            await incrementAffiliatePaidReferral(Number(affiliateIdRaw));
+          } catch {
+            // best-effort; attribution is non-blocking for billing writes
+          }
         }
         break;
       }

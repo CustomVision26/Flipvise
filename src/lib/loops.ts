@@ -317,6 +317,9 @@ export async function loopsSendTeamInvitationEmail(
  * Data variables for `LOOPS_AFFILIATE_INVITATION_TRANSACTIONAL_ID`.
  * Define the same keys in Loops (case-sensitive).
  *
+ * **`inviteAffiliateAction` / reopened expired pending edits:** transactional email sends only when the invitee email
+ * has **no** Clerk match at save time — registered invitees rely on dashboard inbox (`clearAffiliateInboxUnreadForInvitee`).
+ *
  * | Variable | Purpose |
  * |----------|---------|
  * | `subjectLine` | Full subject (Loops Subject can be `{DATA_VARIABLE:subjectLine}`). |
@@ -386,6 +389,9 @@ export async function loopsSendAffiliateInvitationEmail(
  * Data variables for `LOOPS_AFFILIATE_ARRANGEMENT_UPDATE_TRANSACTIONAL_ID`.
  * Use the same keys in Loops (case-sensitive).
  *
+ * **Deployment note:** `updateAffiliateAction` defers active plan/end changes via in-app inbox only
+ * (this helper is not wired there). Kept for forks or re-enabling transactional mail.
+ *
  * | Variable | Purpose |
  * |----------|---------|
  * | `subjectLine` | Full subject (e.g. `{DATA_VARIABLE:subjectLine}`). |
@@ -397,6 +403,10 @@ export async function loopsSendAffiliateInvitationEmail(
  * | `dashboardInboxUrl` | Link to `/dashboard/inbox`. |
  * | `inviteeEmail` | Recipient. |
  * | `inviterName` | Admin who saved the update. |
+ * | `confirmArrangementChangeUrl` | Affiliate confirms via `/affiliate/confirm-arrangement?token=` before the plan/date change applies. |
+ * | `confirmationExpiresAt` | When that link expires (long format). |
+ * | `currentPlanLabel` | Human-readable plan still in effect until they accept. |
+ * | `currentEndsAtFormatted` | Affiliation end date still in effect until they accept. |
  */
 export type AffiliateArrangementUpdateEmailPayload = {
   inviteeEmail: string;
@@ -408,6 +418,10 @@ export type AffiliateArrangementUpdateEmailPayload = {
   inviterName: string;
   dashboardInboxUrl: string;
   subjectLine: string;
+  confirmArrangementChangeUrl: string;
+  confirmationExpiresAt: string;
+  currentPlanLabel: string;
+  currentEndsAtFormatted: string;
 };
 
 export async function loopsSendAffiliateArrangementUpdateEmail(
@@ -435,6 +449,10 @@ export async function loopsSendAffiliateArrangementUpdateEmail(
     dashboardInboxUrl: payload.dashboardInboxUrl,
     inviteeEmail: payload.inviteeEmail,
     inviterName: payload.inviterName,
+    confirmArrangementChangeUrl: payload.confirmArrangementChangeUrl,
+    confirmationExpiresAt: payload.confirmationExpiresAt,
+    currentPlanLabel: payload.currentPlanLabel,
+    currentEndsAtFormatted: payload.currentEndsAtFormatted,
   });
 }
 
@@ -533,6 +551,11 @@ export async function loopsSendTransactional(
         reportErr.message,
         reportErr.json ?? reportErr.rawBody,
       );
+      if (reportErr.statusCode === 404) {
+        console.warn(
+          "[Loops] 404 usually means the transactional is still a draft: open Loops → Transactional emails, open this template, finish the message, then click Publish. Confirm the env transactional ID matches this published template (same workspace as LOOPS_API_KEY).",
+        );
+      }
     } else {
       console.error(`[Loops] sendTransactionalEmail(${transactionalId}) failed:`, reportErr);
     }

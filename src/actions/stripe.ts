@@ -15,6 +15,10 @@ import {
   readStripePriceIdFromEnv,
   stripePriceEnvPairForPlan,
 } from "@/lib/stripe-plan-price-env";
+import {
+  resolveCheckoutDiscount,
+  resolveStripeCheckoutDiscountPayload,
+} from "@/lib/stripe-checkout-discount";
 
 const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
 type PaidPlanId = StripePaidPlanId;
@@ -24,6 +28,7 @@ type BillingPeriod = (typeof BILLING_PERIODS)[number];
 const createCheckoutSessionSchema = z.object({
   plan: z.enum(PAID_PLAN_IDS).default("pro"),
   period: z.enum(BILLING_PERIODS).default("monthly"),
+  promotionCode: z.string().max(128).optional(),
 });
 type CreateCheckoutSessionInput = z.infer<typeof createCheckoutSessionSchema>;
 
@@ -95,15 +100,6 @@ async function readPlansConfig(): Promise<PlanConfig[]> {
   return JSON.parse(raw) as PlanConfig[];
 }
 
-function couponIdFromPlansConfig(plans: PlanConfig[], planId: string): string | null {
-  const plan = plans.find((p) => p.id === planId);
-  const discount = plan?.discount;
-  if (discount?.active && discount.stripeCouponId.trim()) {
-    return discount.stripeCouponId.trim();
-  }
-  return null;
-}
-
 /**
  * Matches `/pricing` and admin Plans editor: pulls `name` + `features` from `plans-config.json`
  * so Stripe invoices/receipts stay in sync with the cards UI.
@@ -146,7 +142,7 @@ export async function createStripeCheckoutSessionAction(
 
   const parsed = createCheckoutSessionSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
-  const { plan, period } = parsed.data;
+  const { plan, period, promotionCode } = parsed.data;
 
   let plansConfig: PlanConfig[] = [];
   try {
@@ -157,11 +153,30 @@ export async function createStripeCheckoutSessionAction(
 
   const priceId = priceIdForPlan(plan, period);
   const description = subscriptionDescriptionFromPlansConfig(plan, period, plansConfig);
-  const couponId = couponIdFromPlansConfig(plansConfig, plan);
+
+  const discountResolution = await resolveCheckoutDiscount({
+    planId: plan,
+    promotionCodeInput: promotionCode,
+    plansConfig,
+  });
+
+  const checkoutDiscount =
+    discountResolution.couponId != null
+      ? await resolveStripeCheckoutDiscountPayload(discountResolution.couponId)
+      : null;
 
   const appUrl = resolveAppUrl();
   const successUrl = `${appUrl}/dashboard`;
   const cancelUrl = `${appUrl}/pricing`;
+
+  const subscriptionMetadata: Record<string, string> = {
+    clerkUserId: userId,
+    plan,
+    period,
+  };
+  if (discountResolution.affiliateId != null) {
+    subscriptionMetadata.affiliateId = String(discountResolution.affiliateId);
+  }
 
   let session;
   try {
@@ -173,27 +188,20 @@ export async function createStripeCheckoutSessionAction(
           quantity: 1,
         },
       ],
-      ...(couponId
-        ? { discounts: [{ coupon: couponId }] }
-        : { allow_promotion_codes: true }),
+      ...(checkoutDiscount ? { discounts: [checkoutDiscount] } : {}),
+      ...(discountResolution.allowPromotionCodes
+        ? { allow_promotion_codes: true }
+        : {}),
       subscription_data: {
         description,
-        metadata: {
-          clerkUserId: userId,
-          plan,
-          period,
-        },
+        metadata: subscriptionMetadata,
       },
       automatic_tax: { enabled: true },
       billing_address_collection: "required",
       tax_id_collection: { enabled: true },
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: {
-        clerkUserId: userId,
-        plan,
-        period,
-      },
+      metadata: subscriptionMetadata,
     });
   } catch (error) {
     if (

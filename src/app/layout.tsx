@@ -15,6 +15,7 @@ import {
   countPendingInvitationsForEmail,
   getRootLayoutTeamNavPayload,
 } from "@/db/queries/teams";
+import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { shouldHideHelpCenter } from "@/lib/team-help";
 import {
@@ -116,8 +117,13 @@ export default async function RootLayout({
       ? shouldHideHelpCenter(userId, teamContext)
       : Promise.resolve(false),
 
-    userId != null && primaryEmail != null && primaryEmail !== ""
-      ? countPendingInvitationsForEmail(primaryEmail).catch(() => 0)
+    userId != null
+      ? Promise.all([
+          primaryEmail != null && primaryEmail !== ""
+            ? countPendingInvitationsForEmail(primaryEmail).catch(() => 0)
+            : Promise.resolve(0),
+          tryTeamQuery(() => countUnreadAffiliateBroadcastInboxForUser(userId), 0),
+        ]).then(([invites, affiliateBroadcasts]) => invites + affiliateBroadcasts)
       : Promise.resolve(0),
   ]);
 

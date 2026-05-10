@@ -1512,7 +1512,7 @@ export function AdminTabs({
                   Edit plan names, prices, descriptions, and features. Changes are saved to the pricing
                   page immediately after clicking Save on each plan card.
                 </p>
-                <AdminPlansEditor initialPlans={plansConfig} />
+                <AdminPlansEditor initialPlans={plansConfig} affiliates={affiliates} />
               </TabsContent>
 
               <TabsContent value="plan-history" className="mt-4 space-y-4">

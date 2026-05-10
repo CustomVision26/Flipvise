@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Trash2, GripVertical, Save, Check, X, Tag, CalendarOff } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, Check, X, Tag, CalendarOff, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { PlanConfig, PlanDiscount } from "@/components/pricing-content";
+import type { PlanConfig, PlanDiscount, PlanAffiliateDiscount } from "@/components/pricing-content";
 import { updatePlanAction } from "@/actions/admin-plans";
+import { affiliateStripeCouponId } from "@/lib/affiliate-stripe-coupon";
+import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
+import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
+import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
 
 interface AdminPlansEditorProps {
   initialPlans: PlanConfig[];
+  affiliates: SerializedAffiliate[];
 }
 
 function PlanEditor({
@@ -29,7 +34,19 @@ function PlanEditor({
   plan: PlanConfig;
   onSaved: (updated: PlanConfig) => void;
 }) {
-  const [draft, setDraft] = useState<PlanConfig>({ ...plan, features: [...plan.features] });
+  const [draft, setDraft] = useState<PlanConfig>(() => ({
+    ...plan,
+    features: [...plan.features],
+    ...(plan.id === "free"
+      ? {}
+      : {
+          affiliateDiscount: plan.affiliateDiscount ?? {
+            active: false,
+            value: 0,
+            label: "",
+          },
+        }),
+  }));
   const [isDirty, setIsDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [saveState, setSaveState] = useState<"idle" | "success" | "error">("idle");
@@ -40,6 +57,18 @@ function PlanEditor({
     setIsDirty(true);
     setSaveState("idle");
   }
+
+  function patchAffiliateDiscount(patch: Partial<PlanAffiliateDiscount>) {
+    const current: PlanAffiliateDiscount = draft.affiliateDiscount ?? {
+      active: false,
+      value: 0,
+      label: "",
+    };
+    update({ affiliateDiscount: { ...current, ...patch } });
+  }
+
+  const baseStripeId = (draft.discount?.stripeCouponId ?? "").trim();
+  const canExplainAffiliateCodes = baseStripeId.length > 0;
 
   function updateFeature(index: number, value: string) {
     const features = [...draft.features];
@@ -81,7 +110,19 @@ function PlanEditor({
   }
 
   function handleReset() {
-    setDraft({ ...plan, features: [...plan.features] });
+    setDraft({
+      ...plan,
+      features: [...plan.features],
+      ...(plan.id === "free"
+        ? {}
+        : {
+            affiliateDiscount: plan.affiliateDiscount ?? {
+              active: false,
+              value: 0,
+              label: "",
+            },
+          }),
+    });
     setIsDirty(false);
     setSaveState("idle");
     setErrorMsg(null);
@@ -409,9 +450,9 @@ function PlanEditor({
 
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">
-                Stripe Coupon ID{" "}
+                Stripe coupon / promotion code id{" "}
                 <span className="text-muted-foreground/60">
-                  (from Stripe Dashboard → Coupons — applied to invoices & receipts)
+                  (coupon id, or customer-facing code if you add a Promotion code on that coupon)
                 </span>
               </Label>
               <Input
@@ -428,9 +469,17 @@ function PlanEditor({
                   })
                 }
                 className="h-8 text-sm font-mono"
-                placeholder="e.g. PROMO_LAUNCH25"
+                placeholder="e.g. SummerLaunch26 or internal coupon id"
               />
             </div>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              In Stripe: create the <span className="text-foreground/90">percent / amount</span> as a{" "}
+              <span className="text-foreground">Coupon</span>, then add a{" "}
+              <span className="text-foreground">Promotion code</span> on that coupon when customers
+              should type a public code. Checkout accepts either the coupon id or that code. Match{" "}
+              <span className="text-foreground/90">Redeem by</span> on the coupon or code to the plan
+              end date below if you use one.
+            </p>
 
             {draft.discount?.active && draft.discount.value > 0 && (
               <div className="text-xs text-amber-400 bg-amber-500/10 rounded-md px-3 py-2 border border-amber-500/20">
@@ -438,6 +487,99 @@ function PlanEditor({
                   ? `${draft.discount.value}% discount`
                   : `$${draft.discount.value} off`}
                 {draft.discount.label ? ` — "${draft.discount.label}"` : ""}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isFree && (
+          <div className="space-y-3 rounded-lg border border-dashed border-violet-500/30 bg-violet-500/[0.04] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Megaphone className="size-3.5 text-violet-400 shrink-0" />
+                <Label className="text-xs font-medium leading-tight">
+                  Affiliate discount (separate from general promo)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Switch
+                  id={`aff-aff-${plan.id}`}
+                  checked={!!draft.affiliateDiscount?.active}
+                  onCheckedChange={(val) => patchAffiliateDiscount({ active: val })}
+                />
+                <Label
+                  htmlFor={`aff-aff-${plan.id}`}
+                  className={`text-xs cursor-pointer ${draft.affiliateDiscount?.active ? "text-violet-300" : "text-muted-foreground"}`}
+                >
+                  {draft.affiliateDiscount?.active ? "On" : "Off"}
+                </Label>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Affiliates share a combined code:{" "}
+              <span className="font-mono text-foreground">
+                {canExplainAffiliateCodes ? baseStripeId : "«coupon»"}«promo id»
+              </span>
+              . Customers enter it on the pricing page before subscribing. Uses this percent off via an
+              auto-managed Stripe coupon (separate from the general promo coupon above).
+              {draft.discontinueAt
+                ? " Stripe redeem-by for that affiliate coupon follows the plan end date you set below."
+                : null}
+            </p>
+            {!canExplainAffiliateCodes ? (
+              <p className="text-xs text-amber-400 bg-amber-500/10 rounded-md px-3 py-2 border border-amber-500/20">
+                Set the Stripe coupon id in the general discount section (you can leave &quot;Active&quot;
+                off) so combined codes can be parsed for this tier.
+              </p>
+            ) : null}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Percent off (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={draft.affiliateDiscount?.value ?? 0}
+                  onChange={(e) =>
+                    patchAffiliateDiscount({ value: Number(e.target.value) })
+                  }
+                  className="h-8 text-sm tabular-nums"
+                  disabled={!draft.affiliateDiscount?.active}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Label (optional)</Label>
+                <Input
+                  value={draft.affiliateDiscount?.label ?? ""}
+                  onChange={(e) => patchAffiliateDiscount({ label: e.target.value })}
+                  className="h-8 text-sm"
+                  disabled={!draft.affiliateDiscount?.active}
+                  placeholder="e.g. Partner rate"
+                />
+              </div>
+            </div>
+            {draft.affiliateDiscount?.active &&
+              (draft.affiliateDiscount.value ?? 0) > 0 &&
+              isStripePaidPlanId(plan.id) && (
+              <div className="text-xs text-violet-300 bg-violet-500/10 rounded-md px-3 py-2 border border-violet-500/20 space-y-1">
+                <p>
+                  Affiliate checkouts apply {draft.affiliateDiscount.value}% off for this plan via Stripe
+                  coupon id{" "}
+                  <span className="font-mono">
+                    {affiliateStripeCouponId(
+                      plan.id,
+                      Math.round(draft.affiliateDiscount.value),
+                      draft.discontinueAt ?? null,
+                    )}
+                  </span>
+                  .
+                </p>
+                {draft.discontinueAt ? (
+                  <p className="text-violet-200/90">
+                    New checkouts stop after the plan end date (UTC end of{" "}
+                    {draft.discontinueAt}) — same window as this tier&apos;s discontinuation.
+                  </p>
+                ) : null}
               </div>
             )}
           </div>
@@ -503,7 +645,7 @@ function PlanEditor({
   );
 }
 
-export function AdminPlansEditor({ initialPlans }: AdminPlansEditorProps) {
+export function AdminPlansEditor({ initialPlans, affiliates }: AdminPlansEditorProps) {
   const [plans, setPlans] = useState<PlanConfig[]>(initialPlans);
   const [activeTab, setActiveTab] = useState<string>(initialPlans[0]?.id ?? "");
 
@@ -548,8 +690,19 @@ export function AdminPlansEditor({ initialPlans }: AdminPlansEditorProps) {
 
       {/* Active plan editor */}
       {activePlan && (
-        <div className="pt-4">
+        <div className="pt-4 space-y-4">
           <PlanEditor key={activePlan.id} plan={activePlan} onSaved={handlePlanSaved} />
+          {activePlan.id !== "free" ? (
+            <div className="space-y-2 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-foreground">Affiliate messaging (Loops)</h3>
+              <p className="text-sm text-muted-foreground">
+                General promo posts to every registered user&apos;s dashboard inbox; affiliate code posts
+                go to active affiliates only (no Loops email). Requires the affiliate broadcast inbox
+                table in the database.
+              </p>
+              <AdminAffiliatePromoBroadcast affiliates={affiliates} />
+            </div>
+          ) : null}
         </div>
       )}
     </div>

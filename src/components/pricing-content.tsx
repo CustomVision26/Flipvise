@@ -7,6 +7,7 @@ import { createStripeCheckoutSessionAction } from "@/actions/stripe";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -32,6 +33,15 @@ export type PlanDiscount = {
   stripeCouponId: string;
 };
 
+/** Separate from the public “general” discount — used with combined Stripe coupon + affiliate promotional code at checkout. */
+export type PlanAffiliateDiscount = {
+  active: boolean;
+  /** Percentage off subscription when checkout uses the combined code. */
+  value: number;
+  /** Optional label for admin UI only. */
+  label?: string;
+};
+
 export type PlanConfig = {
   id: string;
   name: string;
@@ -41,6 +51,7 @@ export type PlanConfig = {
   features: string[];
   highlighted?: boolean;
   discount?: PlanDiscount;
+  affiliateDiscount?: PlanAffiliateDiscount;
   /** ISO date string (YYYY-MM-DD) — when set, marks the date this plan will be discontinued. */
   discontinueAt?: string | null;
 };
@@ -233,6 +244,7 @@ export function PricingContent({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [promotionCode, setPromotionCode] = useState("");
   const [, startTransition] = useTransition();
 
   const visiblePlans = selectedPlanId
@@ -249,6 +261,9 @@ export function PricingContent({
         const result = await createStripeCheckoutSessionAction({
           plan: planId,
           period,
+          ...(promotionCode.trim()
+            ? { promotionCode: promotionCode.trim() }
+            : {}),
         });
         window.location.href = result.url;
       } catch (e) {
@@ -348,6 +363,30 @@ export function PricingContent({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {userId ? (
+        <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 max-w-xl mx-auto sm:mx-0">
+          <Label htmlFor="checkout-promo" className="text-sm font-medium">
+            Promotion code <span className="text-muted-foreground font-normal">(optional)</span>
+          </Label>
+          <Input
+            id="checkout-promo"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="e.g. SummerLaunch or SummerLaunchyourcode"
+            value={promotionCode}
+            onChange={(e) => setPromotionCode(e.target.value)}
+            className="font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Enter the public code for the tier you&apos;re buying, or a combined affiliate code (
+            <span className="font-mono text-foreground">base</span> from any tier that lists the promo +{" "}
+            <span className="font-mono text-foreground">affiliate id</span>). The correct affiliate discount for the
+            plan you click will apply. Leave blank to use that tier&apos;s default pricing.
+          </p>
+        </div>
+      ) : null}
 
       {/* Plan cards grid */}
       <div

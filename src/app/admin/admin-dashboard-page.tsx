@@ -64,7 +64,11 @@ import type {
 } from "@/lib/admin-dashboard-types";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import { AdminTabsDynamic } from "@/components/admin-tabs-dynamic";
-import { AdminOverviewStatsCollapsible } from "@/components/admin-overview-stats-collapsible";
+import {
+  AdminOverviewMetricsPanel,
+  AdminOverviewMetricsProvider,
+  AdminOverviewMetricsToggle,
+} from "@/components/admin-overview-stats-collapsible";
 import { Users, CreditCard, Layers, ArrowLeft, ShieldCheck } from "lucide-react";
 import { PaidSubscribersCard } from "@/components/paid-subscribers-card";
 
@@ -110,6 +114,34 @@ function resolveCurrentPersonalPlanStartTimeIso(input: {
 
   return chosenMs != null ? new Date(chosenMs).toISOString() : new Date(nowMs).toISOString();
 }
+
+/**
+ * Neon serverless HTTP driver acquires a DB "permit" per in-flight query. Running
+ * many `Promise.all` DB calls at once can exceed Neon limits and fail with
+ * "Too many database connection attempts are currently ongoing".
+ */
+async function runDbTasksWithConcurrencyLimit<T>(
+  factories: ReadonlyArray<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  const results: T[] = new Array(factories.length);
+  let next = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const i = next++;
+      if (i >= factories.length) return;
+      results[i] = await factories[i]();
+    }
+  }
+
+  const n = Math.min(Math.max(1, limit), factories.length);
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return results;
+}
+
+/** Max concurrent Neon HTTP queries for the admin dashboard warm-up batch. */
+const ADMIN_DASHBOARD_DB_CONCURRENCY = 4;
 
 async function getActiveSessionData(): Promise<Map<string, number>> {
   try {
@@ -174,32 +206,36 @@ export default async function AdminDashboardPage() {
     persistedBillingInvoices,
     dbPaidSubscriberCount,
     rawAffiliates,
-  ] = await Promise.all([
-    getAdminOverviewStats(),
-    getDeckStatsByUser(),
-    getUserTeamPlanAssociationsByUserIds(
-      userIds,
-      clerkUsers.map((u) => {
-        const primary =
-          u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)
-            ?.emailAddress ?? null;
-        return { userId: u.id, email: primary };
-      }),
-    ),
-    getTeamOwnerPlanLabelsByUserIds(userIds),
-    getTeamOwnerPlanSlugsByUserIds(userIds),
-    getTeamWorkspaceCountsByOwnerUserIds(userIds),
-    getTeamInviteeTotalsByOwnerUserIds(userIds),
-    getWorkspaceDetailsByOwnerUserIds(userIds),
-    getActiveSessionData(),
-    getAdminPrivilegeLogs(100),
-    getAdminPlanAssignmentLogs(500),
-    getAllSupportTickets(),
-    getSupportTicketStats(),
-    listBillingInvoicesForAdmin(2000),
-    countPaidSubscribersFromDB(),
-    listAffiliates(),
-  ]);
+  ] = await runDbTasksWithConcurrencyLimit(
+    [
+      () => getAdminOverviewStats(),
+      () => getDeckStatsByUser(),
+      () =>
+        getUserTeamPlanAssociationsByUserIds(
+          userIds,
+          clerkUsers.map((u) => {
+            const primary =
+              u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)
+                ?.emailAddress ?? null;
+            return { userId: u.id, email: primary };
+          }),
+        ),
+      () => getTeamOwnerPlanLabelsByUserIds(userIds),
+      () => getTeamOwnerPlanSlugsByUserIds(userIds),
+      () => getTeamWorkspaceCountsByOwnerUserIds(userIds),
+      () => getTeamInviteeTotalsByOwnerUserIds(userIds),
+      () => getWorkspaceDetailsByOwnerUserIds(userIds),
+      () => getActiveSessionData(),
+      () => getAdminPrivilegeLogs(100),
+      () => getAdminPlanAssignmentLogs(500),
+      () => getAllSupportTickets(),
+      () => getSupportTicketStats(),
+      () => listBillingInvoicesForAdmin(2000),
+      () => countPaidSubscribersFromDB(),
+      () => listAffiliates(),
+    ],
+    ADMIN_DASHBOARD_DB_CONCURRENCY,
+  );
 
   // Verify platform admin from the live Clerk API — sessionClaims can lag after
   // publicMetadata is updated in the Dashboard until the JWT rotates.
@@ -576,6 +612,13 @@ export default async function AdminDashboardPage() {
     revokedAt: a.revokedAt ? a.revokedAt.toISOString() : null,
     revokedByName: a.revokedByName ?? null,
     createdAt: a.createdAt.toISOString(),
+    promotionalCode: a.promotionalCode,
+    paidReferralsTotal: a.paidReferralsTotal ?? 0,
+    paidReferralsMonth: a.paidReferralsMonth ?? 0,
+    paidReferralsMonthKey: a.paidReferralsMonthKey ?? null,
+    pendingPlanAssigned: a.pendingPlanAssigned ?? null,
+    pendingEndsAt: a.pendingEndsAt?.toISOString() ?? null,
+    arrangementChangeExpiresAt: a.arrangementChangeExpiresAt?.toISOString() ?? null,
   }));
 
   // Serialize DB log rows (dates → ISO strings).
@@ -605,27 +648,34 @@ export default async function AdminDashboardPage() {
     }));
 
   return (
-    <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Monitor and manage all users across Flipvise
-          </p>
+    <AdminOverviewMetricsProvider>
+      <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+              Monitor and manage all users across Flipvise
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto sm:justify-end">
+            <AdminOverviewMetricsToggle />
+            <Link
+              href={personalDashboardLink}
+              className={
+                buttonVariants({ variant: "outline", size: "sm" }) +
+                " shrink-0 text-xs sm:text-sm h-8 sm:h-9"
+              }
+            >
+              <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" aria-hidden />
+              Personal Dashboard
+            </Link>
+          </div>
         </div>
-        <Link
-          href={personalDashboardLink}
-          className={buttonVariants({ variant: "outline", size: "sm" }) + " shrink-0 text-xs sm:text-sm h-8 sm:h-9"}
-        >
-          <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" aria-hidden />
-          Personal Dashboard
-        </Link>
-      </div>
 
-      {/* Overview stat cards — collapsible on selected admin deep-links */}
-      <AdminOverviewStatsCollapsible>
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {/* Overview stat cards — collapsible on selected admin deep-links */}
+        <AdminOverviewMetricsPanel>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {/* Static metric cards (first 3) */}
           {statsCards.slice(0, 3).map(({ label, value, icon: Icon, description, accent }) => (
             <Card key={label}>
@@ -669,24 +719,25 @@ export default async function AdminDashboardPage() {
               </CardContent>
             </Card>
           ))}
-        </div>
-      </AdminOverviewStatsCollapsible>
+          </div>
+        </AdminOverviewMetricsPanel>
 
-      {/* Tabbed panel — All Users / Admin Roles / Audit Log */}
-      <AdminTabsDynamic
-        currentUserId={userId}
-        callerIsSuperadmin={callerIsSuperadmin}
-        users={serializedUsers}
-        logs={serializedLogs}
-        planAssignmentLogs={serializedPlanAssignmentLogs}
-        subscriptions={serializedSubscriptions}
-        invoices={serializedInvoices}
-        supportTickets={serializedTickets}
-        supportStats={supportStats}
-        plansConfig={plansConfig}
-        affiliates={serializedAffiliates}
-        affiliateInviteDefaultExpiresInDays={getAffiliateInviteExpiryDays()}
-      />
-    </div>
+        {/* Tabbed panel — All Users / Admin Roles / Audit Log */}
+        <AdminTabsDynamic
+          currentUserId={userId}
+          callerIsSuperadmin={callerIsSuperadmin}
+          users={serializedUsers}
+          logs={serializedLogs}
+          planAssignmentLogs={serializedPlanAssignmentLogs}
+          subscriptions={serializedSubscriptions}
+          invoices={serializedInvoices}
+          supportTickets={serializedTickets}
+          supportStats={supportStats}
+          plansConfig={plansConfig}
+          affiliates={serializedAffiliates}
+          affiliateInviteDefaultExpiresInDays={getAffiliateInviteExpiryDays()}
+        />
+      </div>
+    </AdminOverviewMetricsProvider>
   );
 }

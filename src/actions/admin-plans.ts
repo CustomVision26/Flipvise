@@ -22,6 +22,12 @@ const PlanDiscountSchema = z.object({
   stripeCouponId: z.string(),
 });
 
+const PlanAffiliateDiscountSchema = z.object({
+  active: z.boolean(),
+  value: z.number().min(0).max(100),
+  label: z.string().optional(),
+});
+
 const PlanConfigSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -31,6 +37,7 @@ const PlanConfigSchema = z.object({
   features: z.array(z.string().min(1)).min(1),
   highlighted: z.boolean().optional(),
   discount: PlanDiscountSchema.optional(),
+  affiliateDiscount: PlanAffiliateDiscountSchema.optional(),
   discontinueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
@@ -62,17 +69,7 @@ async function writePlansConfig(plans: PlanConfig[]) {
   );
 }
 
-export async function updatePlanAction(input: {
-  plan: {
-    id: string;
-    name: string;
-    monthlyPrice: number | null;
-    yearlyMonthlyPrice: number | null;
-    description: string;
-    features: string[];
-    highlighted?: boolean;
-  };
-}) {
+export async function updatePlanAction(input: z.infer<typeof UpdatePlanInput>) {
   await requireAdmin();
 
   const parsed = UpdatePlanInput.safeParse(input);

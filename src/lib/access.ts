@@ -66,7 +66,7 @@ export type AccessContext = {
   hasClerkPersonalPro: boolean;
   /** JWT carries individual `pro_plus`. */
   hasClerkPersonalProPlus: boolean;
-  /** Primary email from Clerk Backend `getUser` (same fetch as metadata). Used by layout inbox badge without a second Clerk round-trip. */
+  /** Primary email from Clerk Backend `getUser` (same fetch as metadata). Used by layout for team-invite inbox count alongside broadcast unread queries. */
   primaryEmail: string | null;
 };
 

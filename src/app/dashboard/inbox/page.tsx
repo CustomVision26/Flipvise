@@ -17,6 +17,7 @@ import { getAllAffiliatesByEmailOrUserId } from "@/db/queries/affiliates";
 import { getInboxReadsForUser } from "@/db/queries/inbox-reads";
 import { listAdminPlanAssignmentInboxLogsForUser } from "@/db/queries/admin";
 import { listAdminPlanInvitesForInbox } from "@/db/queries/admin-plan-invites";
+import { listAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
@@ -27,6 +28,12 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { InboxUnifiedClient } from "@/components/inbox-unified-client";
 import type { UnifiedInboxItem } from "@/lib/inbox-item-types";
 import type { QuizResultSummary } from "@/components/view-quiz-result-dialog";
+
+function truncateInboxPreview(text: string, max = 160): string {
+  const s = text.replace(/\s+/g, " ").trim();
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
+}
 
 export default async function DashboardInboxPage() {
   const sessionUser = await currentUser();
@@ -46,6 +53,7 @@ export default async function DashboardInboxPage() {
     affiliateRows,
     adminPlanLogRows,
     adminPlanInviteRows,
+    affiliateBroadcastRows,
     readSet,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
@@ -54,6 +62,7 @@ export default async function DashboardInboxPage() {
     getAllAffiliatesByEmailOrUserId(inboxEmail, userId),
     listAdminPlanAssignmentInboxLogsForUser(userId, 100),
     listAdminPlanInvitesForInbox(userId, 80),
+    tryTeamQuery(() => listAffiliateBroadcastInboxForUser(userId), []),
     getInboxReadsForUser(userId),
   ]);
 
@@ -212,13 +221,71 @@ export default async function DashboardInboxPage() {
     });
   }
 
+  for (const row of affiliateBroadcastRows) {
+    const variant = row.variant === "codes" ? "codes" : "general";
+    const key = `affiliate_broadcast:${row.id}`;
+    const isRead = readSet.has(key);
+    items.push({
+      type: "affiliate_broadcast",
+      key,
+      title: row.subject,
+      description: truncateInboxPreview(row.messageBody),
+      dateIso: row.createdAt.toISOString(),
+      isRead,
+      requiresAction: false,
+      payload: {
+        broadcastId: row.id,
+        variant,
+        subject: row.subject,
+        messageBody: row.messageBody,
+        detailsBlock: row.detailsBlock,
+        pricingPageUrl: row.pricingPageUrl,
+      },
+    });
+  }
+
+  const inboxRenderedAt = new Date();
+
   // 4. Affiliate invites
   for (const affiliate of affiliateRows) {
     const key = `affiliate:${affiliate.id}`;
     const inviteExpired =
       affiliate.status === "pending" &&
-      isAffiliateInviteExpired(affiliate.inviteExpiresAt);
-    const autoRead = affiliate.status !== "pending" || inviteExpired;
+      isAffiliateInviteExpired(affiliate.inviteExpiresAt, inboxRenderedAt);
+
+    const arrangementConfirmationOpen =
+      affiliate.status === "active" &&
+      Boolean(
+        affiliate.arrangementChangeToken &&
+          affiliate.pendingPlanAssigned &&
+          affiliate.pendingEndsAt &&
+          affiliate.arrangementChangeExpiresAt &&
+          !isAffiliateInviteExpired(
+            affiliate.arrangementChangeExpiresAt,
+            inboxRenderedAt,
+          ),
+      );
+
+    const arrangementOfferStale =
+      affiliate.status === "active" &&
+      Boolean(
+        affiliate.arrangementChangeToken &&
+          affiliate.pendingPlanAssigned &&
+          affiliate.pendingEndsAt &&
+          affiliate.arrangementChangeExpiresAt &&
+          isAffiliateInviteExpired(
+            affiliate.arrangementChangeExpiresAt,
+            inboxRenderedAt,
+          ),
+      );
+
+    const grantPeriodEnded =
+      affiliate.status === "active" &&
+      affiliate.endsAt.getTime() < inboxRenderedAt.getTime();
+
+    const autoRead =
+      (affiliate.status !== "pending" || inviteExpired) && !arrangementConfirmationOpen;
+
     const isRead = readSet.has(key) || autoRead;
 
     const planEnds = new Date(affiliate.endsAt).toLocaleDateString();
@@ -227,26 +294,41 @@ export default async function DashboardInboxPage() {
       ? new Date(affiliate.revokedAt).toLocaleDateString()
       : null;
 
+    let title = `Affiliate Invitation — ${affiliate.affiliateName}`;
+    if (arrangementConfirmationOpen || arrangementOfferStale) {
+      title = `Affiliate arrangement — ${affiliate.affiliateName}`;
+    }
+
+    const proposedPlan = affiliate.pendingPlanAssigned ?? affiliate.planAssigned;
+    const proposedEnds = affiliate.pendingEndsAt
+      ? new Date(affiliate.pendingEndsAt).toLocaleDateString()
+      : planEnds;
+
     items.push({
       type: "affiliate",
       key,
-      title: `Affiliate Invitation — ${affiliate.affiliateName}`,
+      title,
       description:
-        affiliate.status === "pending" && !inviteExpired
-          ? `Plan: ${affiliate.planAssigned} · accept by ${acceptBy} · plan ends ${planEnds}`
-          : affiliate.status === "pending" && inviteExpired
-            ? `Plan: ${affiliate.planAssigned} · invite link expired ${acceptBy}`
-            : affiliate.status === "revoked"
-              ? revokedOn
-                ? `Revoked on ${revokedOn}. This marketing affiliate arrangement is no longer active.`
-                : "Revoked. This marketing affiliate arrangement is no longer active."
-              : affiliate.status === "active" && new Date(affiliate.endsAt) < new Date()
-                ? `Plan: ${affiliate.planAssigned} · scheduled access ended ${planEnds}`
-                : `Plan: ${affiliate.planAssigned} · plan access ends ${planEnds}`,
+        arrangementConfirmationOpen
+          ? `Proposed: ${proposedPlan}, ends ${proposedEnds}. Current: ${affiliate.planAssigned}, ends ${planEnds}. Confirm before ${new Date(affiliate.arrangementChangeExpiresAt!).toLocaleDateString()}.`
+          : arrangementOfferStale
+            ? `A proposed arrangement change expired without confirmation (${proposedPlan}, ends ${proposedEnds}). Current live grant is still ${affiliate.planAssigned}, ends ${planEnds}. Ask your affiliate contact for an updated proposal if needed.`
+            : affiliate.status === "pending" && !inviteExpired
+              ? `Plan: ${affiliate.planAssigned} · accept by ${acceptBy} · plan ends ${planEnds}`
+              : affiliate.status === "pending" && inviteExpired
+                ? `Plan: ${affiliate.planAssigned} · invite link expired ${acceptBy}`
+                : affiliate.status === "revoked"
+                  ? revokedOn
+                    ? `Revoked on ${revokedOn}. This marketing affiliate arrangement is no longer active.`
+                    : "Revoked. This marketing affiliate arrangement is no longer active."
+                  : affiliate.status === "active" && grantPeriodEnded
+                    ? `Plan: ${affiliate.planAssigned} · scheduled access ended ${planEnds}`
+                    : `Plan: ${affiliate.planAssigned} · plan access ends ${planEnds}`,
       dateIso: affiliate.createdAt.toISOString(),
       isRead,
       requiresAction:
-        affiliate.status === "pending" && !inviteExpired && Boolean(affiliate.token),
+        (affiliate.status === "pending" && !inviteExpired && Boolean(affiliate.token)) ||
+        arrangementConfirmationOpen,
       payload: {
         affiliateId: affiliate.id,
         token: affiliate.token ?? null,
@@ -256,6 +338,14 @@ export default async function DashboardInboxPage() {
         inviteExpiresAtIso: affiliate.inviteExpiresAt.toISOString(),
         status: affiliate.status as "pending" | "active" | "revoked",
         inviteAcceptedAtIso: affiliate.inviteAcceptedAt?.toISOString() ?? null,
+        arrangementChangeToken: affiliate.arrangementChangeToken ?? null,
+        arrangementConfirmationExpiresAtIso:
+          affiliate.arrangementChangeExpiresAt?.toISOString() ?? null,
+        pendingPlanAssigned: affiliate.pendingPlanAssigned ?? null,
+        pendingEndsAtIso: affiliate.pendingEndsAt?.toISOString() ?? null,
+        inviteAcceptLinkExpired: inviteExpired,
+        grantPeriodEnded,
+        arrangementConfirmationOpen,
       },
     });
   }
@@ -302,7 +392,8 @@ export default async function DashboardInboxPage() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Quiz results, team invitations, billing, affiliate invites and notices, administrator plan requests, and completed plan changes.
+            Quiz results, team invitations, billing, affiliate invites and notices, affiliate admin
+            broadcasts, administrator plan requests, and completed plan changes.
           </p>
         </div>
         <Link

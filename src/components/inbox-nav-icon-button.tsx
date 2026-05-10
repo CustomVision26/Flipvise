@@ -15,7 +15,7 @@ function inboxNavLabel(unreadCount: number): string {
   return `Inbox (${clamped} pending)`;
 }
 
-/** Header icon that links to `/dashboard/inbox` (team invitations). */
+/** Header icon that links to `/dashboard/inbox` (pending items include team invites and unread messages). */
 export function InboxNavIconButton({
   unreadCount = 0,
 }: {

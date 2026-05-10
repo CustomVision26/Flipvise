@@ -39,10 +39,15 @@
       "active": true,
       "type": "percentage",
       "value": 20,
-      "label": "Summer Launch",
-      "stripeCouponId": "SummerLaunch"
+      "label": "Summer Launch 2026",
+      "stripeCouponId": "SummerLaunch26"
     },
-    "discontinueAt": null
+    "affiliateDiscount": {
+      "active": true,
+      "value": 18,
+      "label": " "
+    },
+    "discontinueAt": "2026-05-16"
   },
   {
     "id": "pro_plus",
@@ -60,13 +65,18 @@
     ],
     "highlighted": true,
     "discount": {
-      "active": false,
+      "active": true,
       "type": "percentage",
-      "value": 0,
-      "label": "",
-      "stripeCouponId": ""
+      "value": 10,
+      "label": "Summer Launch 2026",
+      "stripeCouponId": "SummerLaunchProPlus26"
     },
-    "discontinueAt": null
+    "affiliateDiscount": {
+      "active": true,
+      "value": 12,
+      "label": "Affiliate rate"
+    },
+    "discontinueAt": "2026-05-18"
   },
   {
     "id": "pro_plus_team_basic",
@@ -89,6 +99,11 @@
       "value": 0,
       "label": "",
       "stripeCouponId": ""
+    },
+    "affiliateDiscount": {
+      "active": false,
+      "value": 0,
+      "label": ""
     },
     "discontinueAt": null
   },
@@ -114,6 +129,11 @@
       "label": "",
       "stripeCouponId": ""
     },
+    "affiliateDiscount": {
+      "active": false,
+      "value": 0,
+      "label": ""
+    },
     "discontinueAt": null
   },
   {
@@ -138,6 +158,11 @@
       "label": "",
       "stripeCouponId": ""
     },
+    "affiliateDiscount": {
+      "active": false,
+      "value": 0,
+      "label": ""
+    },
     "discontinueAt": null
   },
   {
@@ -161,6 +186,11 @@
       "value": 0,
       "label": "",
       "stripeCouponId": ""
+    },
+    "affiliateDiscount": {
+      "active": false,
+      "value": 0,
+      "label": ""
     },
     "discontinueAt": null
   }

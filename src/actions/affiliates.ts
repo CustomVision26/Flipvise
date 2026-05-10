@@ -7,10 +7,14 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import {
   insertAffiliate,
+  commitAffiliateConfirmedArrangementChange,
+  allocateUniqueAffiliatePromotionalCode,
+  listAffiliatesMatchingInviteEmail,
   revokeAffiliateById,
   getAffiliateById,
   updateAffiliateById,
   getAffiliateByToken,
+  getAffiliateByArrangementChangeToken,
   acceptAffiliateByToken,
   cancelAffiliateInvite,
 } from "@/db/queries/affiliates";
@@ -29,7 +33,6 @@ import {
   isAffiliateInviteExpired,
 } from "@/lib/affiliate-invite-expiry";
 import {
-  loopsSendAffiliateArrangementUpdateEmail,
   loopsSendAffiliateInvitationEmail,
 } from "@/lib/loops";
 import { resolveAppUrl } from "@/lib/stripe";
@@ -40,6 +43,7 @@ import {
 } from "@/lib/plan-metadata-billing-resolution";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { applyPlanUpgrade } from "@/lib/apply-plan-upgrade";
+import { resolveAffiliateInviteEmailConflict } from "@/lib/affiliate-invite-email-conflict";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -150,13 +154,27 @@ export async function lookupAffiliateEmailAction(
         : planSlug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
       : "Free";
 
-    const name =
-      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-      user.username ||
-      user.primaryEmailAddress?.emailAddress ||
-      "Unknown";
+    const requestedNorm = parsed.data.email.trim().toLowerCase();
+    const fullNameFromClerk = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+    const rawUsername = (user.username ?? "").trim();
+    const usernameLooksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawUsername);
+    /** Avoid using the invite address (or duplicate of it) as a “display name”. */
+    const usernameIsDistinct =
+      rawUsername &&
+      !usernameLooksLikeEmail &&
+      rawUsername.toLowerCase() !== requestedNorm;
 
-    return { found: true, name, currentPlan: planLabel };
+    let name = fullNameFromClerk || (usernameIsDistinct ? rawUsername : "");
+    const trimmedCandidate = name.trim();
+    const candidateIsDupEmail =
+      trimmedCandidate &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedCandidate) &&
+      trimmedCandidate.toLowerCase() === requestedNorm;
+    if (candidateIsDupEmail) {
+      name = "";
+    }
+
+    return { found: true, name: name.trim(), currentPlan: planLabel };
   } catch {
     return { found: false };
   }
@@ -187,6 +205,12 @@ export async function inviteAffiliateAction(data: InviteAffiliateInput) {
   const endsAtDate = new Date(endsAt);
   if (endsAtDate <= new Date()) throw new Error("End date must be in the future");
 
+  const duplicates = await listAffiliatesMatchingInviteEmail(normalizedInviteeEmail);
+  const inviteConflictResolved = resolveAffiliateInviteEmailConflict(duplicates);
+  if (inviteConflictResolved) {
+    throw new Error(`${inviteConflictResolved.title} ${inviteConflictResolved.detail}`);
+  }
+
   // Resolve Clerk user for this email (may not exist yet)
   const invitedUserId = await findClerkUserIdByEmail(normalizedInviteeEmail);
 
@@ -194,8 +218,13 @@ export async function inviteAffiliateAction(data: InviteAffiliateInput) {
   const token = randomBytes(32).toString("hex");
   const inviteExpiresAt = computeAffiliateInviteExpiresAtFromDays(inviteExpiresInDays);
 
+  const promotionalCode = await allocateUniqueAffiliatePromotionalCode(affiliateName);
+
+  /** Registered Clerk user → invitation via app inbox only (no Loops transactional). */
+  const registeredClerkInvitee = Boolean(invitedUserId);
+
   // Persist the affiliate as PENDING — plan is NOT applied until accepted
-  await insertAffiliate({
+  const affiliateId = await insertAffiliate({
     invitedEmail: normalizedInviteeEmail,
     invitedUserId,
     affiliateName,
@@ -205,34 +234,46 @@ export async function inviteAffiliateAction(data: InviteAffiliateInput) {
     addedByUserId: userId,
     addedByName: callerName,
     token,
+    promotionalCode,
     status: "pending",
   });
+  if (!affiliateId) throw new Error("Could not save affiliate invitation");
 
   const base = resolveAppUrl();
   const acceptAffiliateUrl = `${base}/affiliate/accept?token=${encodeURIComponent(token)}`;
   const dashboardInboxUrl = `${base}/dashboard/inbox`;
   const plan = planAssigned as AdminPlanAssignment;
 
-  await loopsSendAffiliateInvitationEmail({
-    inviteeEmail: normalizedInviteeEmail,
-    affiliateName,
-    planAssigned,
-    planLabel: labelForAdminPlanAssignment(plan),
-    affiliateEndsAt: endsAtDate.toLocaleDateString(undefined, {
-      dateStyle: "long",
-    }),
-    inviteExpiresInDays,
-    inviteExpiresAt: inviteExpiresAt.toLocaleDateString(undefined, {
-      dateStyle: "long",
-    }),
-    inviterName: callerName,
-    acceptAffiliateUrl,
-    dashboardInboxUrl,
-    subjectLine: `You're invited as a Flipvise affiliate — ${affiliateName}`,
-  });
+  if (!registeredClerkInvitee) {
+    await loopsSendAffiliateInvitationEmail({
+      inviteeEmail: normalizedInviteeEmail,
+      affiliateName,
+      planAssigned,
+      planLabel: labelForAdminPlanAssignment(plan),
+      affiliateEndsAt: endsAtDate.toLocaleDateString(undefined, {
+        dateStyle: "long",
+      }),
+      inviteExpiresInDays,
+      inviteExpiresAt: inviteExpiresAt.toLocaleDateString(undefined, {
+        dateStyle: "long",
+      }),
+      inviterName: callerName,
+      acceptAffiliateUrl,
+      dashboardInboxUrl,
+      subjectLine: `You're invited as a Flipvise affiliate — ${affiliateName}`,
+    });
+  }
+
+  await clearAffiliateInboxUnreadForInvitee(
+    affiliateId,
+    normalizedInviteeEmail,
+    invitedUserId,
+  );
 
   revalidatePath("/admin");
   revalidatePath("/admin/marketing-affiliates");
+  revalidatePath("/dashboard/inbox");
+  revalidatePath("/dashboard");
 }
 
 // ─── Accept ───────────────────────────────────────────────────────────────────
@@ -287,13 +328,76 @@ export async function acceptAffiliateInviteAction(data: AcceptAffiliateInput) {
   revalidatePath("/affiliate/accept");
 }
 
+const acceptAffiliateArrangementChangeSchema = z.object({
+  token: z.string().min(1),
+});
+export type AcceptAffiliateArrangementChangeInput = z.infer<
+  typeof acceptAffiliateArrangementChangeSchema
+>;
+
+/** Applies staged plan/end-date after the affiliate confirms via link or inbox. */
+export async function acceptAffiliateArrangementChangeAction(
+  data: AcceptAffiliateArrangementChangeInput,
+) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("You must be signed in to confirm this update");
+
+  const parsed = acceptAffiliateArrangementChangeSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid token");
+
+  const affiliate = await getAffiliateByArrangementChangeToken(parsed.data.token);
+  if (!affiliate) throw new Error("Confirmation link is invalid or was already used");
+  if (affiliate.status !== "active") {
+    throw new Error("This arrangement is no longer active");
+  }
+  if (!affiliate.pendingPlanAssigned || !affiliate.pendingEndsAt) {
+    throw new Error("There is no pending change to confirm");
+  }
+  if (!affiliate.arrangementChangeExpiresAt) {
+    throw new Error("Confirmation link is invalid");
+  }
+  if (affiliate.arrangementChangeExpiresAt.getTime() < Date.now()) {
+    throw new Error(
+      "This confirmation link has expired. Ask your affiliate manager to send an updated arrangement.",
+    );
+  }
+
+  const clerkUser = await clerkClient.users.getUser(userId);
+  const userEmails = clerkUser.emailAddresses.map((e) => e.emailAddress.toLowerCase());
+  if (!userEmails.includes(affiliate.invitedEmail.toLowerCase())) {
+    throw new Error(
+      "This update was proposed for a different email address. " +
+        "Please sign in with the account that matches " +
+        affiliate.invitedEmail,
+    );
+  }
+
+  if (!isAdminPlanAssignment(affiliate.pendingPlanAssigned)) {
+    throw new Error("Invalid pending arrangement data");
+  }
+
+  const pendingPlan = affiliate.pendingPlanAssigned as AdminPlanAssignment;
+
+  await commitAffiliateConfirmedArrangementChange(
+    affiliate.id,
+    affiliate.pendingPlanAssigned,
+    affiliate.pendingEndsAt,
+  );
+
+  await applyPlanUpgrade(userId, pendingPlan);
+
+  revalidatePath("/dashboard/inbox");
+  revalidatePath("/affiliate/confirm-arrangement");
+  revalidatePath("/dashboard");
+}
+
 // ─── Cancel pending invite ────────────────────────────────────────────────────
 
 const cancelAffiliateSchema = z.object({ affiliateId: z.number().int().positive() });
 export type CancelAffiliateInput = z.infer<typeof cancelAffiliateSchema>;
 
 export async function cancelAffiliateInviteAction(data: CancelAffiliateInput) {
-  const { userId, callerName } = await requirePlatformAdminActor();
+  await requirePlatformAdminActor();
 
   const parsed = cancelAffiliateSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -320,6 +424,8 @@ const updateAffiliateSchema = z.object({
   endsAt: z.string().refine((v) => !isNaN(Date.parse(v)), "Invalid date"),
   /** When the row is still pending, resets the accept link deadline from “now” using this many days. */
   inviteExpiresInDays: z.number().int().min(1).max(365).optional(),
+  /** When pending, mirrors the “Accept link expires in (days)” value when the modal opened — used to rotate token only when needed. */
+  previousInviteExpiresInDays: z.number().int().min(1).max(365).optional(),
 });
 
 export type UpdateAffiliateInput = z.infer<typeof updateAffiliateSchema>;
@@ -360,112 +466,218 @@ export async function updateAffiliateAction(data: UpdateAffiliateInput) {
   const parsed = updateAffiliateSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input: " + parsed.error.message);
 
-  const { affiliateId, affiliateName, invitedEmail, planAssigned, endsAt, inviteExpiresInDays } =
+  const { affiliateId, affiliateName, invitedEmail, planAssigned, endsAt, inviteExpiresInDays, previousInviteExpiresInDays } =
     parsed.data;
 
   const normalizedInviteeEmail = invitedEmail.trim().toLowerCase();
-  const newEndsAtDate = new Date(endsAt);
-  if (newEndsAtDate <= new Date()) {
-    throw new Error("End date must be in the future");
-  }
 
   const existing = await getAffiliateById(affiliateId);
   if (!existing) throw new Error("Affiliate not found");
   if (existing.status === "revoked") throw new Error("Cannot edit a revoked affiliate");
 
-  const emailChanged = normalizedInviteeEmail !== existing.invitedEmail.toLowerCase();
+  /** Active affiliates cannot change identity from this UI; server-enforced per row. */
+  const lockedActiveIdentity = existing.status === "active";
+  const resolvedAffiliateName = lockedActiveIdentity
+    ? existing.affiliateName
+    : affiliateName.trim();
+  const resolvedInviteeEmailNorm = lockedActiveIdentity
+    ? existing.invitedEmail.trim().toLowerCase()
+    : normalizedInviteeEmail;
+
+  if (!resolvedAffiliateName) {
+    throw new Error("Affiliate name is required");
+  }
+
+  const newEndsAtDate = new Date(endsAt);
+  if (newEndsAtDate <= new Date()) {
+    throw new Error("End date must be in the future");
+  }
+
+  const proposedPlan = planAssigned as AdminPlanAssignment;
+
+  const emailChanged = resolvedInviteeEmailNorm !== existing.invitedEmail.toLowerCase();
 
   const newClerkUserId = emailChanged
-    ? await findClerkUserIdByEmail(normalizedInviteeEmail)
+    ? await findClerkUserIdByEmail(resolvedInviteeEmailNorm)
     : existing.invitedUserId ?? null;
 
   if (emailChanged && existing.invitedUserId && existing.status === "active") {
     await applyAffiliatePlanToClerk(existing.invitedUserId, "free");
   }
 
+  const substantiveArrangementChange =
+    planAssigned !== existing.planAssigned ||
+    newEndsAtDate.getTime() !== existing.endsAt.getTime();
+
+  const deferActiveArrangementConfirmation =
+    existing.status === "active" && substantiveArrangementChange;
+
+  const base = resolveAppUrl();
+  const dashboardInboxUrl = `${base}/dashboard/inbox`;
+
+  if (deferActiveArrangementConfirmation) {
+    const arrangementToken = randomBytes(32).toString("hex");
+    const arrangementExpiry = computeAffiliateInviteExpiresAtFromDays(
+      getAffiliateInviteExpiryDays(),
+    );
+
+    const arrangementUpdated = await updateAffiliateById(
+      affiliateId,
+      {
+        affiliateName: resolvedAffiliateName,
+        invitedEmail: resolvedInviteeEmailNorm,
+        planAssigned: existing.planAssigned,
+        endsAt: existing.endsAt,
+        invitedUserId: emailChanged ? newClerkUserId : undefined,
+        pendingPlanAssigned: planAssigned,
+        pendingEndsAt: newEndsAtDate,
+        arrangementChangeToken: arrangementToken,
+        arrangementChangeExpiresAt: arrangementExpiry,
+      },
+      { onlyIfStatus: "active" },
+    );
+    if (!arrangementUpdated) {
+      throw new Error(
+        "Could not save this arrangement proposal — the affiliate may have changed. Refresh Marketing Affiliates.",
+      );
+    }
+
+    const updated = await getAffiliateById(affiliateId);
+    if (!updated) throw new Error("Affiliate not found");
+
+    await clearAffiliateInboxUnreadForInvitee(
+      affiliateId,
+      resolvedInviteeEmailNorm,
+      updated.invitedUserId,
+    );
+
+    if (updated.status === "active" && updated.endsAt.getTime() > Date.now()) {
+      await clearAffiliateExpiredInboxNoticeRead(
+        affiliateId,
+        existing.invitedEmail.toLowerCase(),
+        existing.invitedUserId,
+      );
+      await clearAffiliateExpiredInboxNoticeRead(
+        affiliateId,
+        resolvedInviteeEmailNorm,
+        updated.invitedUserId,
+      );
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/marketing-affiliates");
+    revalidatePath("/dashboard/inbox");
+    revalidatePath("/dashboard");
+    return;
+  }
+
   const inviteWasExpired =
     existing.status === "pending" &&
     isAffiliateInviteExpired(existing.inviteExpiresAt);
 
-  const newToken =
-    existing.status === "pending" && inviteWasExpired
-      ? randomBytes(32).toString("hex")
-      : undefined;
+  const inviteExpiryDaysChanged =
+    existing.status === "pending" &&
+    inviteExpiresInDays != null &&
+    previousInviteExpiresInDays != null &&
+    inviteExpiresInDays !== previousInviteExpiresInDays;
 
-  await updateAffiliateById(affiliateId, {
-    affiliateName,
-    invitedEmail: normalizedInviteeEmail,
-    planAssigned,
-    endsAt: newEndsAtDate,
-    invitedUserId: emailChanged ? newClerkUserId : undefined,
-    ...(existing.status === "pending"
-      ? {
-          inviteExpiresAt: computeAffiliateInviteExpiresAtFromDays(
-            inviteExpiresInDays ?? getAffiliateInviteExpiryDays(),
-          ),
-        }
-      : {}),
-    ...(newToken !== undefined ? { token: newToken } : {}),
-  });
+  const pendingInviteDetailsChanged =
+    existing.status === "pending" &&
+    (planAssigned !== existing.planAssigned ||
+      newEndsAtDate.getTime() !== existing.endsAt.getTime() ||
+      resolvedInviteeEmailNorm !== existing.invitedEmail.trim().toLowerCase() ||
+      inviteExpiryDaysChanged);
+
+  /** Invalidate the previous accept URL when the pending proposal or expiry window materially changes. */
+  const regeneratePendingInviteToken =
+    existing.status === "pending" &&
+    (inviteWasExpired || pendingInviteDetailsChanged);
+
+  const newToken = regeneratePendingInviteToken ? randomBytes(32).toString("hex") : undefined;
+
+  const statusGuard = existing.status === "pending" ? ("pending" as const) : ("active" as const);
+
+  const rowUpdated = await updateAffiliateById(
+    affiliateId,
+    {
+      affiliateName: resolvedAffiliateName,
+      invitedEmail: resolvedInviteeEmailNorm,
+      planAssigned,
+      endsAt: newEndsAtDate,
+      invitedUserId: emailChanged ? newClerkUserId : undefined,
+      ...(existing.status === "pending"
+        ? {
+            ...(regeneratePendingInviteToken
+              ? {
+                  inviteExpiresAt: computeAffiliateInviteExpiresAtFromDays(
+                    inviteExpiresInDays ?? getAffiliateInviteExpiryDays(),
+                  ),
+                }
+              : {}),
+          }
+        : {}),
+      ...(newToken !== undefined ? { token: newToken } : {}),
+      ...(existing.status === "active"
+        ? {
+            pendingPlanAssigned: null,
+            pendingEndsAt: null,
+            arrangementChangeToken: null,
+            arrangementChangeExpiresAt: null,
+          }
+        : {}),
+    },
+    { onlyIfStatus: statusGuard },
+  );
+
+  if (!rowUpdated) {
+    if (existing.status === "pending") {
+      throw new Error(
+        "This invitation was already accepted before Save could finish. Reload Marketing Affiliates — nothing was emailed and these edits were not applied.",
+      );
+    }
+    throw new Error(
+      "Could not save — the affiliate may have been revoked. Refresh Marketing Affiliates.",
+    );
+  }
 
   const updated = await getAffiliateById(affiliateId);
   if (!updated) throw new Error("Affiliate not found");
 
   if (existing.status === "active" && newClerkUserId) {
-    await applyAffiliatePlanToClerk(
-      newClerkUserId,
-      planAssigned as AdminPlanAssignment,
-    );
+    await applyAffiliatePlanToClerk(newClerkUserId, proposedPlan);
   }
 
-  const base = resolveAppUrl();
-  const dashboardInboxUrl = `${base}/dashboard/inbox`;
-
-  if (existing.status === "pending" && inviteWasExpired && updated.token) {
+  if (
+    existing.status === "pending" &&
+    regeneratePendingInviteToken &&
+    Boolean(updated.token)
+  ) {
     const plan = updated.planAssigned as AdminPlanAssignment;
     const daysUsed = inviteExpiresInDays ?? getAffiliateInviteExpiryDays();
-    await loopsSendAffiliateInvitationEmail({
-      inviteeEmail: normalizedInviteeEmail,
-      affiliateName: updated.affiliateName,
-      planAssigned: updated.planAssigned,
-      planLabel: labelForAdminPlanAssignment(plan),
-      affiliateEndsAt: updated.endsAt.toLocaleDateString(undefined, { dateStyle: "long" }),
-      inviteExpiresInDays: daysUsed,
-      inviteExpiresAt: updated.inviteExpiresAt.toLocaleDateString(undefined, {
-        dateStyle: "long",
-      }),
-      inviterName: callerName,
-      acceptAffiliateUrl: `${base}/affiliate/accept?token=${encodeURIComponent(updated.token)}`,
-      dashboardInboxUrl,
-      subjectLine: `You're invited as a Flipvise affiliate — ${updated.affiliateName}`,
-    });
-    await clearAffiliateInboxUnreadForInvitee(
-      affiliateId,
-      normalizedInviteeEmail,
-      updated.invitedUserId,
-    );
-  }
+    const inviteeResolvedClerkId =
+      updated.invitedUserId ?? (await findClerkUserIdByEmail(resolvedInviteeEmailNorm));
 
-  const endsAtChanged = existing.endsAt.getTime() !== updated.endsAt.getTime();
-  const planChanged = existing.planAssigned !== updated.planAssigned;
-  if (existing.status === "active" && (endsAtChanged || planChanged)) {
-    const plan = updated.planAssigned as AdminPlanAssignment;
-    await loopsSendAffiliateArrangementUpdateEmail({
-      inviteeEmail: normalizedInviteeEmail,
-      affiliateName: updated.affiliateName,
-      planAssigned: updated.planAssigned,
-      planLabel: labelForAdminPlanAssignment(plan),
-      affiliateEndsAt: updated.endsAt.toLocaleDateString(undefined, { dateStyle: "long" }),
-      previousAffiliateEndsAt: existing.endsAt.toLocaleDateString(undefined, {
-        dateStyle: "long",
-      }),
-      inviterName: callerName,
-      dashboardInboxUrl,
-      subjectLine: "Your Flipvise affiliate arrangement was updated",
-    });
+    if (!inviteeResolvedClerkId) {
+      await loopsSendAffiliateInvitationEmail({
+        inviteeEmail: resolvedInviteeEmailNorm,
+        affiliateName: updated.affiliateName,
+        planAssigned: updated.planAssigned,
+        planLabel: labelForAdminPlanAssignment(plan),
+        affiliateEndsAt: updated.endsAt.toLocaleDateString(undefined, { dateStyle: "long" }),
+        inviteExpiresInDays: daysUsed,
+        inviteExpiresAt: updated.inviteExpiresAt.toLocaleDateString(undefined, {
+          dateStyle: "long",
+        }),
+        inviterName: callerName,
+        acceptAffiliateUrl: `${base}/affiliate/accept?token=${encodeURIComponent(updated.token)}`,
+        dashboardInboxUrl,
+        subjectLine: `You're invited as a Flipvise affiliate — ${updated.affiliateName}`,
+      });
+    }
+
     await clearAffiliateInboxUnreadForInvitee(
       affiliateId,
-      normalizedInviteeEmail,
+      resolvedInviteeEmailNorm,
       updated.invitedUserId,
     );
   }
@@ -478,7 +690,7 @@ export async function updateAffiliateAction(data: UpdateAffiliateInput) {
     );
     await clearAffiliateExpiredInboxNoticeRead(
       affiliateId,
-      normalizedInviteeEmail,
+      resolvedInviteeEmailNorm,
       updated.invitedUserId,
     );
   }

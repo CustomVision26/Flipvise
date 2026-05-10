@@ -1,9 +1,35 @@
 import { db } from "@/db";
 import { affiliates } from "@/db/schema";
-import { eq, desc, or, and } from "drizzle-orm";
+import { eq, desc, or, and, sql, inArray } from "drizzle-orm";
+import {
+  buildAffiliatePromotionalCandidate,
+  slugifyAffiliatePromoBase,
+} from "@/lib/affiliate-promotional-code";
 
 export async function listAffiliates() {
   return db.select().from(affiliates).orderBy(desc(affiliates.createdAt));
+}
+
+/** Case-insensitive match for duplicate-invite prevention (stored email may vary in casing). */
+export async function listAffiliatesMatchingInviteEmail(lowerTrimmed: string) {
+  const norm = lowerTrimmed.trim().toLowerCase();
+  return db
+    .select()
+    .from(affiliates)
+    .where(sql`LOWER(TRIM(${affiliates.invitedEmail})) = ${norm}`);
+}
+
+/** Unique promotional code for new affiliate rows (lowercase). */
+export async function allocateUniqueAffiliatePromotionalCode(
+  affiliateName: string,
+): Promise<string> {
+  const base = slugifyAffiliatePromoBase(affiliateName);
+  for (let attempt = 0; attempt < 48; attempt++) {
+    const candidate = buildAffiliatePromotionalCandidate(base);
+    const existing = await getAffiliateByPromotionalCode(candidate);
+    if (!existing) return candidate;
+  }
+  throw new Error("Could not generate a unique promotional code. Try a different name.");
 }
 
 export async function insertAffiliate(data: {
@@ -16,6 +42,7 @@ export async function insertAffiliate(data: {
   addedByUserId: string;
   addedByName: string;
   token: string;
+  promotionalCode: string;
   status?: "pending" | "active";
 }) {
   const rows = await db
@@ -30,10 +57,63 @@ export async function insertAffiliate(data: {
       addedByUserId: data.addedByUserId,
       addedByName: data.addedByName,
       token: data.token,
+      promotionalCode: data.promotionalCode.toLowerCase(),
       status: data.status ?? "pending",
     })
     .returning({ id: affiliates.id });
   return rows[0]?.id ?? null;
+}
+
+export async function getAffiliateByPromotionalCode(code: string) {
+  const norm = code.trim().toLowerCase();
+  const rows = await db
+    .select()
+    .from(affiliates)
+    .where(eq(affiliates.promotionalCode, norm));
+  return rows[0] ?? null;
+}
+
+/**
+ * Increments paid-subscription counts for attribution from Stripe checkout metadata.
+ * Rolls the monthly counter when the calendar month changes.
+ */
+export async function incrementAffiliatePaidReferral(affiliateId: number) {
+  const row = await getAffiliateById(affiliateId);
+  if (!row) return;
+
+  const key = new Date().toISOString().slice(0, 7);
+  const prevKey = row.paidReferralsMonthKey ?? null;
+  const sameMonth = prevKey === key;
+  const nextMonth = sameMonth ? (row.paidReferralsMonth ?? 0) + 1 : 1;
+
+  await db
+    .update(affiliates)
+    .set({
+      paidReferralsTotal: (row.paidReferralsTotal ?? 0) + 1,
+      paidReferralsMonth: nextMonth,
+      paidReferralsMonthKey: key,
+    })
+    .where(eq(affiliates.id, affiliateId));
+}
+
+export async function listActiveAffiliatesForBroadcast(opts?: {
+  affiliateIds?: number[];
+}) {
+  const activeOnly = eq(affiliates.status, "active");
+  const ids = opts?.affiliateIds?.filter((n) => Number.isFinite(n) && n > 0) ?? [];
+  const whereClause =
+    ids.length > 0 ? and(activeOnly, inArray(affiliates.id, ids)) : activeOnly;
+  return db
+    .select({
+      id: affiliates.id,
+      invitedEmail: affiliates.invitedEmail,
+      invitedUserId: affiliates.invitedUserId,
+      affiliateName: affiliates.affiliateName,
+      promotionalCode: affiliates.promotionalCode,
+    })
+    .from(affiliates)
+    .where(whereClause)
+    .orderBy(desc(affiliates.createdAt));
 }
 
 export async function revokeAffiliateById(
@@ -48,6 +128,10 @@ export async function revokeAffiliateById(
       revokedAt: new Date(),
       revokedByUserId,
       revokedByName,
+      pendingPlanAssigned: null,
+      pendingEndsAt: null,
+      arrangementChangeToken: null,
+      arrangementChangeExpiresAt: null,
     })
     .where(eq(affiliates.id, id));
 }
@@ -66,6 +150,32 @@ export async function getAffiliateByToken(token: string) {
     .from(affiliates)
     .where(eq(affiliates.token, token));
   return rows[0] ?? null;
+}
+
+export async function getAffiliateByArrangementChangeToken(token: string) {
+  const rows = await db
+    .select()
+    .from(affiliates)
+    .where(eq(affiliates.arrangementChangeToken, token));
+  return rows[0] ?? null;
+}
+
+export async function commitAffiliateConfirmedArrangementChange(
+  id: number,
+  planAssigned: string,
+  endsAt: Date,
+) {
+  await db
+    .update(affiliates)
+    .set({
+      planAssigned,
+      endsAt,
+      pendingPlanAssigned: null,
+      pendingEndsAt: null,
+      arrangementChangeToken: null,
+      arrangementChangeExpiresAt: null,
+    })
+    .where(eq(affiliates.id, id));
 }
 
 /** Returns pending affiliate invites addressed to this email or userId. */
@@ -151,9 +261,20 @@ export async function updateAffiliateById(
     inviteExpiresAt?: Date;
     /** When set, replaces the accept token (e.g. re-invite after link expiry). */
     token?: string | null;
+    pendingPlanAssigned?: string | null;
+    pendingEndsAt?: Date | null;
+    arrangementChangeToken?: string | null;
+    arrangementChangeExpiresAt?: Date | null;
   },
-) {
-  await db
+  /** When set, update only succeeds if the row currently has this status (accept-race guard). */
+  options?: { onlyIfStatus?: "pending" | "active" },
+): Promise<boolean> {
+  const whereClause =
+    options?.onlyIfStatus !== undefined
+      ? and(eq(affiliates.id, id), eq(affiliates.status, options.onlyIfStatus))
+      : eq(affiliates.id, id);
+
+  const rows = await db
     .update(affiliates)
     .set({
       affiliateName: data.affiliateName,
@@ -167,6 +288,19 @@ export async function updateAffiliateById(
         ? { inviteExpiresAt: data.inviteExpiresAt }
         : {}),
       ...(data.token !== undefined ? { token: data.token } : {}),
+      ...(data.pendingPlanAssigned !== undefined
+        ? { pendingPlanAssigned: data.pendingPlanAssigned }
+        : {}),
+      ...(data.pendingEndsAt !== undefined ? { pendingEndsAt: data.pendingEndsAt } : {}),
+      ...(data.arrangementChangeToken !== undefined
+        ? { arrangementChangeToken: data.arrangementChangeToken }
+        : {}),
+      ...(data.arrangementChangeExpiresAt !== undefined
+        ? { arrangementChangeExpiresAt: data.arrangementChangeExpiresAt }
+        : {}),
     })
-    .where(eq(affiliates.id, id));
+    .where(whereClause)
+    .returning({ id: affiliates.id });
+
+  return rows.length > 0;
 }

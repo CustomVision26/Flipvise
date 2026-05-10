@@ -123,6 +123,18 @@ export type SerializedAffiliate = {
   revokedAt: string | null;
   revokedByName: string | null;
   createdAt: string;
+  /** Unique id for combined promotion codes (lowercase). */
+  promotionalCode: string;
+  /** Lifetime paid subscriptions attributed through affiliate checkout metadata. */
+  paidReferralsTotal: number;
+  /** Paid referrals attributed in the calendar month `paidReferralsMonthKey`. */
+  paidReferralsMonth: number;
+  /** `YYYY-MM` for the monthly counter, or null if none yet. */
+  paidReferralsMonthKey: string | null;
+  /** Staged proposed plan slug (active affiliates awaiting confirmation only). */
+  pendingPlanAssigned: string | null;
+  pendingEndsAt: string | null;
+  arrangementChangeExpiresAt: string | null;
 };
 
 export type SerializedPlanAssignmentLog = {

@@ -7,6 +7,7 @@ export type InboxItemType =
   | "team_invite"
   | "billing"
   | "affiliate"
+  | "affiliate_broadcast"
   | "affiliate_notice"
   | "admin_plan_log"
   | "admin_plan_invite";
@@ -45,6 +46,17 @@ export type AffiliatePayload = {
   inviteExpiresAtIso: string;
   status: "pending" | "active" | "revoked";
   inviteAcceptedAtIso: string | null;
+  /** Pending plan/end change awaiting affiliate confirmation (active only). */
+  arrangementChangeToken?: string | null;
+  arrangementConfirmationExpiresAtIso?: string | null;
+  pendingPlanAssigned?: string | null;
+  pendingEndsAtIso?: string | null;
+  /** Pending invite: invite link past deadline (server snapshot). */
+  inviteAcceptLinkExpired: boolean;
+  /** Active: grant end date in the past (server snapshot). */
+  grantPeriodEnded: boolean;
+  /** Active: staged arrangement can still be confirmed (server snapshot). */
+  arrangementConfirmationOpen: boolean;
 };
 
 export type AffiliateNoticePayload = {
@@ -54,6 +66,15 @@ export type AffiliateNoticePayload = {
   planAssigned: string;
   /** Revoked at, invite period end, or scheduled grant end (ISO). */
   eventAtIso: string;
+};
+
+export type AffiliateBroadcastPayload = {
+  broadcastId: number;
+  variant: "general" | "codes";
+  subject: string;
+  messageBody: string;
+  detailsBlock: string;
+  pricingPageUrl: string;
 };
 
 export type AdminPlanLogPayload = {
@@ -81,6 +102,16 @@ export type UnifiedInboxItem =
   | { type: "team_invite"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: boolean; payload: TeamInvitePayload }
   | { type: "billing"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: false; payload: BillingPayload }
   | { type: "affiliate"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: boolean; payload: AffiliatePayload }
+  | {
+      type: "affiliate_broadcast";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: false;
+      payload: AffiliateBroadcastPayload;
+    }
   | {
       type: "affiliate_notice";
       key: string;
@@ -117,6 +148,7 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   team_invite: "Team Invitation",
   billing: "Billing",
   affiliate: "Affiliate Invite",
+  affiliate_broadcast: "Affiliate message",
   affiliate_notice: "Affiliate notice",
   admin_plan_log: "Plan update",
   admin_plan_invite: "Plan request",

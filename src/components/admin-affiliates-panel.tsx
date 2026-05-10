@@ -41,6 +41,7 @@ import {
   CheckCircle2,
   Copy,
   Check,
+  AlertCircle,
 } from "lucide-react";
 import {
   inviteAffiliateAction,
@@ -59,6 +60,7 @@ import {
   DEFAULT_AFFILIATE_INVITE_EXPIRY_DAYS,
   isAffiliateInviteExpired,
 } from "@/lib/affiliate-invite-expiry";
+import { resolveAffiliateInviteEmailConflict } from "@/lib/affiliate-invite-email-conflict";
 import { useRouter } from "next/navigation";
 
 interface AdminAffiliatesPanelProps {
@@ -161,6 +163,8 @@ export function AdminAffiliatesPanel({
 }: AdminAffiliatesPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  /** Stable “now” for period-ended banners (avoid Date.now during render purity lint). */
+  const [panelsNowMs] = useState(() => Date.now());
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -174,14 +178,67 @@ export function AdminAffiliatesPanel({
     String(defaultInviteExpiresInDays),
   );
   const [inviteError, setInviteError] = useState<string | null>(null);
+  /** Tracks last Clerk-driven autofill so we can strip stale names when the email changes. */
+  const inviteAutofillFingerprintRef = useRef<{ email: string; name: string } | null>(null);
 
   // Email lookup (inside invite dialog)
   const { result: emailLookup, loading: emailLookupLoading } = useEmailLookup(
     inviteOpen ? inviteEmail : "",
   );
 
+  const normalizedInviteEmail = inviteEmail.trim().toLowerCase();
+  const affiliateRowsMatchingInviteEmail = useMemo(() => {
+    if (!normalizedInviteEmail) return [];
+    return affiliates.filter(
+      (a) => a.invitedEmail.trim().toLowerCase() === normalizedInviteEmail,
+    );
+  }, [affiliates, normalizedInviteEmail]);
+
+  const inviteEmailConflict = useMemo(
+    () => resolveAffiliateInviteEmailConflict(affiliateRowsMatchingInviteEmail),
+    [affiliateRowsMatchingInviteEmail],
+  );
+
+  useEffect(() => {
+    if (!inviteOpen || emailLookupLoading) return;
+    const e = inviteEmail.trim().toLowerCase();
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    if (!valid) return;
+
+    if (emailLookup?.found) {
+      const name = emailLookup.name.trim();
+      const isUselessDisplayName =
+        name.length === 0 ||
+        name.toLowerCase() === e ||
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name);
+
+      if (isUselessDisplayName) {
+        if (inviteAutofillFingerprintRef.current?.email === e) {
+          inviteAutofillFingerprintRef.current = null;
+        }
+        return;
+      }
+
+      const fp = inviteAutofillFingerprintRef.current;
+      if (!fp || fp.email !== e || fp.name !== name) {
+        inviteAutofillFingerprintRef.current = { email: e, name };
+        setInviteName(name);
+      }
+      return;
+    }
+
+    if (emailLookup && emailLookup.found === false) {
+      const fp = inviteAutofillFingerprintRef.current;
+      inviteAutofillFingerprintRef.current = null;
+      if (fp && fp.email !== e) {
+        setInviteName((prev) => (prev === fp.name ? "" : prev));
+      }
+    }
+  }, [inviteOpen, inviteEmail, emailLookupLoading, emailLookup]);
+
   // Edit dialog
   const [editTarget, setEditTarget] = useState<SerializedAffiliate | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPlan, setEditPlan] = useState<AffiliatePlanValue>("pro");
@@ -190,6 +247,52 @@ export function AdminAffiliatesPanel({
     String(defaultInviteExpiresInDays),
   );
   const [editError, setEditError] = useState<string | null>(null);
+
+  /** Pending edit: capture "accept link expires in (days)" at open → server rotates token only when this value (or plan/date/email) changed. */
+  const pendingInviteExpiryDaysBaselineRef = useRef<number | null>(null);
+
+  /** Edit dialog: Clerk autofill fingerprint (same semantics as invite). */
+  const editAutofillFingerprintRef = useRef<{ email: string; name: string } | null>(null);
+  const { result: editEmailLookup, loading: editEmailLookupLoading } = useEmailLookup(
+    editOpen && editTarget?.status === "pending" ? editEmail : "",
+  );
+
+  useEffect(() => {
+    if (!editOpen || editTarget?.status !== "pending" || editEmailLookupLoading) return;
+    const e = editEmail.trim().toLowerCase();
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    if (!valid) return;
+
+    if (editEmailLookup?.found) {
+      const name = editEmailLookup.name.trim();
+      const isUselessDisplayName =
+        name.length === 0 ||
+        name.toLowerCase() === e ||
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name);
+
+      if (isUselessDisplayName) {
+        if (editAutofillFingerprintRef.current?.email === e) {
+          editAutofillFingerprintRef.current = null;
+        }
+        return;
+      }
+
+      const fp = editAutofillFingerprintRef.current;
+      if (!fp || fp.email !== e || fp.name !== name) {
+        editAutofillFingerprintRef.current = { email: e, name };
+        setEditName(name);
+      }
+      return;
+    }
+
+    if (editEmailLookup && editEmailLookup.found === false) {
+      const fp = editAutofillFingerprintRef.current;
+      editAutofillFingerprintRef.current = null;
+      if (fp && fp.email !== e) {
+        setEditName((prev) => (prev === fp.name ? "" : prev));
+      }
+    }
+  }, [editOpen, editTarget?.status, editEmail, editEmailLookupLoading, editEmailLookup]);
 
   // Revoke confirm dialog
   const [revokeTarget, setRevokeTarget] = useState<SerializedAffiliate | null>(null);
@@ -233,30 +336,45 @@ export function AdminAffiliatesPanel({
     setInviteEndsAt("");
     setInviteExpiresInDaysStr(String(defaultInviteExpiresInDays));
     setInviteError(null);
+    inviteAutofillFingerprintRef.current = null;
   }
 
   function openEditDialog(a: SerializedAffiliate) {
+    editAutofillFingerprintRef.current = null;
     setEditTarget(a);
     setEditName(a.affiliateName);
     setEditEmail(a.invitedEmail);
-    setEditPlan(a.planAssigned as AffiliatePlanValue);
-    setEditEndsAt(toDateInputValue(a.endsAt));
+    const stagedPlan =
+      a.status === "active" && a.pendingPlanAssigned
+        ? (a.pendingPlanAssigned as AffiliatePlanValue)
+        : (a.planAssigned as AffiliatePlanValue);
+    const stagedEndsIso =
+      a.status === "active" && a.pendingEndsAt ? a.pendingEndsAt : a.endsAt;
+    setEditPlan(stagedPlan);
+    setEditEndsAt(toDateInputValue(stagedEndsIso));
     if (a.status === "pending") {
       const createdMs = new Date(a.createdAt).getTime();
       const expiresMs = new Date(a.inviteExpiresAt).getTime();
       const spanDays = Math.round((expiresMs - createdMs) / (86400 * 1000));
       const clamped = Math.min(365, Math.max(1, Number.isFinite(spanDays) ? spanDays : defaultInviteExpiresInDays));
       setEditInviteExpiresInDaysStr(String(clamped));
+      pendingInviteExpiryDaysBaselineRef.current = clamped;
     } else {
       setEditInviteExpiresInDaysStr(String(defaultInviteExpiresInDays));
+      pendingInviteExpiryDaysBaselineRef.current = null;
     }
     setEditError(null);
+    setEditOpen(true);
   }
 
   // ── Action handlers ────────────────────────────────────────────────────────
 
   function handleInviteSubmit() {
     setInviteError(null);
+    if (inviteEmailConflict) {
+      setInviteError(`${inviteEmailConflict.title} ${inviteEmailConflict.detail}`);
+      return;
+    }
     if (!inviteName.trim()) { setInviteError("Name is required."); return; }
     if (!inviteEmail.trim()) { setInviteError("Email is required."); return; }
     if (!inviteEndsAt) { setInviteError("End date is required."); return; }
@@ -279,7 +397,6 @@ export function AdminAffiliatesPanel({
           inviteExpiresInDays: days,
         });
         setInviteOpen(false);
-        resetInviteForm();
         router.refresh();
       } catch (err) {
         setInviteError(err instanceof Error ? err.message : "Failed to add affiliate.");
@@ -290,8 +407,12 @@ export function AdminAffiliatesPanel({
   function handleEditSubmit() {
     if (!editTarget) return;
     setEditError(null);
-    if (!editName.trim()) { setEditError("Name is required."); return; }
-    if (!editEmail.trim()) { setEditError("Email is required."); return; }
+    const affiliateNameSubmit =
+      editTarget.status === "active" ? editTarget.affiliateName.trim() : editName.trim();
+    const invitedEmailSubmit =
+      editTarget.status === "active" ? editTarget.invitedEmail.trim() : editEmail.trim();
+    if (!affiliateNameSubmit) { setEditError("Name is required."); return; }
+    if (!invitedEmailSubmit) { setEditError("Email is required."); return; }
     if (!editEndsAt) { setEditError("End date is required."); return; }
     const editDays = Math.round(parseInt(editInviteExpiresInDaysStr.trim(), 10));
     if (
@@ -305,15 +426,20 @@ export function AdminAffiliatesPanel({
       try {
         await updateAffiliateAction({
           affiliateId: editTarget.id,
-          affiliateName: editName.trim(),
-          invitedEmail: editEmail.trim(),
+          affiliateName: affiliateNameSubmit,
+          invitedEmail: invitedEmailSubmit,
           planAssigned: editPlan,
           endsAt: new Date(editEndsAt).toISOString(),
           ...(editTarget.status === "pending"
-            ? { inviteExpiresInDays: editDays }
+            ? {
+                inviteExpiresInDays: editDays,
+                ...(pendingInviteExpiryDaysBaselineRef.current != null
+                  ? { previousInviteExpiresInDays: pendingInviteExpiryDaysBaselineRef.current }
+                  : {}),
+              }
             : {}),
         });
-        setEditTarget(null);
+        setEditOpen(false);
         setExpandedId(null);
         router.refresh();
       } catch (err) {
@@ -424,7 +550,10 @@ export function AdminAffiliatesPanel({
             <TableHeader>
               <TableRow>
                 <TableHead>Affiliate</TableHead>
+                <TableHead>Promo ID</TableHead>
                 <TableHead>Plan</TableHead>
+                <TableHead className="text-right tabular-nums">Referrals (mo)</TableHead>
+                <TableHead className="text-right tabular-nums">Referrals (total)</TableHead>
                 <TableHead>Started</TableHead>
                 <TableHead>Ends</TableHead>
                 <TableHead>Added By</TableHead>
@@ -434,7 +563,7 @@ export function AdminAffiliatesPanel({
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                     {affiliates.length === 0
                       ? "No affiliates yet. Click \"Invite Affiliate\" to add the first one."
                       : "No affiliates match the current filters."}
@@ -447,6 +576,13 @@ export function AdminAffiliatesPanel({
                   const inviteLinkExpired =
                     a.status === "pending" && isAffiliateInviteExpired(new Date(a.inviteExpiresAt));
                   const isExpanded = expandedId === a.id;
+                  const hasPendingArrangement =
+                    a.status === "active" &&
+                    Boolean(
+                      a.pendingPlanAssigned &&
+                        a.pendingEndsAt &&
+                        a.arrangementChangeExpiresAt,
+                    );
 
                   return (
                     <Fragment key={a.id}>
@@ -468,9 +604,20 @@ export function AdminAffiliatesPanel({
                           <div className="text-xs text-muted-foreground">{a.invitedEmail}</div>
                         </TableCell>
                         <TableCell>
+                          <code className="text-xs font-mono bg-muted/60 px-1.5 py-0.5 rounded">
+                            {a.promotionalCode}
+                          </code>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="secondary" className="text-xs">
                             {planLabel(a.planAssigned)}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-sm tabular-nums">
+                          {a.status === "active" ? a.paidReferralsMonth : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm tabular-nums">
+                          {a.paidReferralsTotal}
                         </TableCell>
                         <TableCell className="text-sm whitespace-nowrap">
                           {formatDate(a.startedAt)}
@@ -517,9 +664,23 @@ export function AdminAffiliatesPanel({
                                   <CheckCircle2 className="h-3 w-3 mr-1" />
                                   Active
                                 </Badge>
-                                {a.inviteAcceptedAt && (
+                                {hasPendingArrangement && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs ml-1 border-amber-500/50 text-amber-600"
+                                  >
+                                    Awaiting confirmation
+                                  </Badge>
+                                )}
+                                {a.inviteAcceptedAt && !hasPendingArrangement && (
                                   <p className="text-xs text-muted-foreground mt-1">
                                     Accepted {formatDate(a.inviteAcceptedAt)}
+                                  </p>
+                                )}
+                                {hasPendingArrangement && a.arrangementChangeExpiresAt && (
+                                  <p className="text-xs text-amber-600/90 mt-1">
+                                    Proposed change — confirm by{" "}
+                                    {formatDate(a.arrangementChangeExpiresAt)}
                                   </p>
                                 )}
                               </div>
@@ -544,7 +705,7 @@ export function AdminAffiliatesPanel({
                       {/* ── Expanded action row ── */}
                       {isExpanded && (
                         <TableRow className="bg-muted/20 hover:bg-muted/20">
-                          <TableCell colSpan={6} className="py-3 px-4">
+                          <TableCell colSpan={9} className="py-3 px-4">
                             <div className="flex items-center gap-3 flex-wrap">
                               <span className="text-xs text-muted-foreground mr-1">
                                 Actions for{" "}
@@ -648,21 +809,27 @@ export function AdminAffiliatesPanel({
       {/* ── Invite Dialog ── */}
       <Dialog
         open={inviteOpen}
-        onOpenChange={(o) => { setInviteOpen(o); if (!o) resetInviteForm(); }}
+        onOpenChange={setInviteOpen}
+        onOpenChangeComplete={(open) => {
+          if (!open) resetInviteForm();
+        }}
       >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(92vh,44rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 space-y-2 px-4 pt-4 pr-12">
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
               Invite Affiliate
             </DialogTitle>
             <DialogDescription>
-              The invitee will receive a link in their app inbox to accept the
-              invitation. Their plan activates only after they accept.
+              The affiliate plan activates only after the invitee accepts. If they already have a
+              Flipvise account (email matches Clerk), only their app inbox receives the invite — no outgoing
+              email. If no account exists yet, Loops sends an invitation email to their address (when configured).
+              They accept from inbox or via the emailed link once they join.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-2 [scrollbar-gutter:stable]">
+          <div className="space-y-4 pb-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Full Name</label>
               <Input
@@ -671,6 +838,9 @@ export function AdminAffiliatesPanel({
                 onChange={(e) => setInviteName(e.target.value)}
                 disabled={isPending}
               />
+              <p className="text-xs text-muted-foreground">
+                If the email belongs to an existing Flipvise account, the name is filled from their profile automatically.
+              </p>
             </div>
 
             {/* Email with account preview */}
@@ -692,13 +862,17 @@ export function AdminAffiliatesPanel({
                     <>
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                       <span>
-                        <span className="font-medium text-foreground">{emailLookup.name}</span>
+                        <span className="font-medium text-foreground">
+                          {emailLookup.name.trim() || "Registered account"}
+                        </span>
                         {" — "}
                         <span className="text-muted-foreground">
                           Current plan:{" "}
-                          <span className="text-foreground font-medium">
-                            {emailLookup.currentPlan}
-                          </span>
+                          <span className="text-foreground font-medium">{emailLookup.currentPlan}</span>
+                          .
+                          Invitation is delivered in their{" "}
+                          <span className="font-medium text-foreground">dashboard inbox only</span> —
+                          affiliate plan activates when they accept there.
                         </span>
                       </span>
                     </>
@@ -706,7 +880,8 @@ export function AdminAffiliatesPanel({
                     <>
                       <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                       <span className="text-muted-foreground">
-                        No account found — invite will be held until they sign up.
+                        No Flipvise account on this email — <span className="font-medium text-foreground">Send Invite</span>{" "}
+                        triggers a Loops invitation email when configured; they choose the affiliate grant only after accepting.
                       </span>
                     </>
                   )}
@@ -714,9 +889,38 @@ export function AdminAffiliatesPanel({
               )}
             </div>
 
+            {inviteEmailConflict && (
+              <Alert variant={inviteEmailConflict.variant}>
+                <AlertCircle className="h-4 w-4" aria-hidden />
+                <AlertTitle>{inviteEmailConflict.title}</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>{inviteEmailConflict.detail}</p>
+                  {inviteEmailConflict.affiliateId != null && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-1"
+                      disabled={isPending}
+                      onClick={() => {
+                        const id = inviteEmailConflict.affiliateId;
+                        const q = inviteEmail.trim();
+                        setInviteOpen(false);
+                        setSearch(q);
+                        setExpandedId(id);
+                      }}
+                    >
+                      Show in table
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Plan to Assign</label>
               <Select
+                modal={false}
                 value={invitePlan}
                 onValueChange={(v) => { if (v) setInvitePlan(v as AffiliatePlanValue); }}
               >
@@ -777,16 +981,20 @@ export function AdminAffiliatesPanel({
               </p>
             )}
           </div>
+          </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="shrink-0 flex justify-end gap-2 border-t border-border px-4 py-4">
             <Button
               variant="outline"
-              onClick={() => { setInviteOpen(false); resetInviteForm(); }}
+              onClick={() => setInviteOpen(false)}
               disabled={isPending}
             >
               Cancel
             </Button>
-            <Button onClick={handleInviteSubmit} disabled={isPending}>
+            <Button
+              onClick={handleInviteSubmit}
+              disabled={isPending || !!inviteEmailConflict}
+            >
               {isPending ? "Sending…" : "Send Invite"}
             </Button>
           </div>
@@ -794,9 +1002,20 @@ export function AdminAffiliatesPanel({
       </Dialog>
 
       {/* ── Edit Dialog ── */}
-      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditError(null); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+      <Dialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onOpenChangeComplete={(open) => {
+          if (!open) {
+            setEditTarget(null);
+            setEditError(null);
+            editAutofillFingerprintRef.current = null;
+            pendingInviteExpiryDaysBaselineRef.current = null;
+          }
+        }}
+      >
+        <DialogContent className="flex max-h-[min(92vh,44rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 space-y-2 px-4 pt-4 pr-12">
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5" />
               Edit Affiliate
@@ -807,42 +1026,118 @@ export function AdminAffiliatesPanel({
             </DialogDescription>
           </DialogHeader>
 
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-2 [scrollbar-gutter:stable]">
+          {editTarget?.status === "pending" && (
+              <Alert className="mb-4 border-border bg-muted/30">
+                <Megaphone className="h-4 w-4 text-muted-foreground" aria-hidden />
+                <AlertTitle>Pending invitation</AlertTitle>
+                <AlertDescription>
+                  You may assign a different plan, change affiliation end date, invite email, or accept-link duration.
+                  <span className="font-medium text-foreground"> Saving </span>
+                  rotates the acceptance token (prior links stop working). Invitees{" "}
+                  <span className="font-medium text-foreground">without</span> a Flipvise (Clerk) account receive a Loops invitation
+                  when configured; <span className="font-medium text-foreground">with</span> an account receive{" "}
+                  <span className="font-medium text-foreground">dashboard inbox only</span>. Plan access still starts only after accept.
+                  If they accept before your save completes, Save shows an error and does not send a duplicate email or overwrite active state.
+                </AlertDescription>
+              </Alert>
+            )}
+
           {editTarget?.status === "pending" &&
             isAffiliateInviteExpired(new Date(editTarget.inviteExpiresAt)) && (
-              <Alert className="border-amber-500/40 bg-amber-500/5">
+              <Alert className="mb-4 border-amber-500/40 bg-amber-500/5">
                 <Clock className="h-4 w-4 text-amber-500" aria-hidden />
                 <AlertTitle>Invite link expired</AlertTitle>
                 <AlertDescription>
-                  Saving generates a new accept link, emails the invitee via Loops (when configured),
-                  and marks the inbox item unread for them so they see the renewed invite.
+                  Saving issues a replacement accept link and a fresh deadline counted from now. Invitees without a Clerk
+                  account get a renewed Loops message when configured; registered invitees are notified via inbox only.
                 </AlertDescription>
               </Alert>
             )}
 
           {editTarget?.status === "active" &&
-            new Date(editTarget.endsAt).getTime() < Date.now() && (
-              <Alert className="border-primary/30 bg-primary/5">
+            new Date(editTarget.endsAt).getTime() < panelsNowMs && (
+              <Alert className="mb-4 border-primary/30 bg-primary/5">
                 <CalendarClock className="h-4 w-4 text-primary" aria-hidden />
                 <AlertTitle>Affiliation period ended</AlertTitle>
                 <AlertDescription>
-                  Set a new affiliation end date in the future and save. The invitee receives a Loops
-                  update (when configured) and their inbox entry is surfaced again as unread.
+                  Set a new affiliation end date in the future and save. The invitee gets an in-app inbox
+                  confirmation request; their plan updates only after they accept.
                 </AlertDescription>
               </Alert>
             )}
 
-          <div className="space-y-4 py-2">
+          {editTarget?.status === "active" &&
+            editTarget.pendingPlanAssigned &&
+            editTarget.pendingEndsAt &&
+            editTarget.arrangementChangeExpiresAt && (
+              <Alert className="mb-4 border-amber-500/40 bg-amber-500/5">
+                <AlertCircle className="h-4 w-4 text-amber-500" aria-hidden />
+                <AlertTitle>Confirmation pending</AlertTitle>
+                <AlertDescription>
+                  The affiliate has not yet confirmed the proposed plan/end date. Saving again replaces
+                  that request and marks their inbox item unread. Clearing the proposal: set plan and end
+                  date back to the current live values and save.
+                </AlertDescription>
+              </Alert>
+            )}
+
+          <div className="space-y-4 pb-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Full Name</label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} disabled={isPending} />
+              <Label className="text-sm font-medium text-foreground">Full Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                disabled={isPending || editTarget?.status === "active"}
+                readOnly={editTarget?.status === "active"}
+                aria-readonly={editTarget?.status === "active" || undefined}
+              />
+              {editTarget?.status === "active" && (
+                <p className="text-xs text-muted-foreground">
+                  Name and email are fixed for accepted affiliates. Invite a new contact to use a different email.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Email Address</label>
-              <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} disabled={isPending} />
+              <Label className="text-sm font-medium text-foreground">Email Address</Label>
+              <Input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                disabled={isPending || editTarget?.status === "active"}
+                readOnly={editTarget?.status === "active"}
+                aria-readonly={editTarget?.status === "active" || undefined}
+              />
+              {editTarget?.status === "pending" && editEmail.includes("@") && (
+                <div className="text-xs rounded-md border px-3 py-2 min-h-[2rem] flex items-center gap-2">
+                  {editEmailLookupLoading ? (
+                    <span className="text-muted-foreground">Looking up account…</span>
+                  ) : editEmailLookup === null ? null : editEmailLookup.found ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      <span>
+                        <span className="font-medium text-foreground">
+                          {editEmailLookup.name.trim() || "Registered account"}
+                        </span>
+                        {" — "}
+                        <span className="text-muted-foreground">
+                          Current plan:{" "}
+                          <span className="text-foreground font-medium">{editEmailLookup.currentPlan}</span>
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      <span className="text-muted-foreground">No Clerk account on this email — name is manual only.</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Plan Assigned</label>
-              <Select value={editPlan} onValueChange={(v) => { if (v) setEditPlan(v as AffiliatePlanValue); }}>
+              <Select modal={false} value={editPlan} onValueChange={(v) => { if (v) setEditPlan(v as AffiliatePlanValue); }}>
                 <SelectTrigger className="w-full" disabled={isPending}>
                   <SelectValue />
                 </SelectTrigger>
@@ -852,6 +1147,12 @@ export function AdminAffiliatesPanel({
                   ))}
                 </SelectContent>
               </Select>
+              {editTarget?.status === "active" && (
+                <p className="text-xs text-muted-foreground">
+                  Changing plan or end date adds an in-app inbox confirmation for the affiliate. Nothing changes
+                  on their account until they accept.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium flex items-center gap-1.5">
@@ -887,9 +1188,10 @@ export function AdminAffiliatesPanel({
               <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">{editError}</p>
             )}
           </div>
+          </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => { setEditTarget(null); setEditError(null); }} disabled={isPending}>Cancel</Button>
+          <div className="shrink-0 flex justify-end gap-2 border-t border-border px-4 py-4">
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isPending}>Cancel</Button>
             <Button onClick={handleEditSubmit} disabled={isPending}>
               {isPending ? "Saving…" : "Save Changes"}
             </Button>
@@ -899,8 +1201,8 @@ export function AdminAffiliatesPanel({
 
       {/* ── Cancel Invite Dialog ── */}
       <Dialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) { setCancelTarget(null); setCancelError(null); } }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
+          <DialogHeader className="pr-10">
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <UserX className="h-5 w-5" />
               Cancel Invite
@@ -929,8 +1231,8 @@ export function AdminAffiliatesPanel({
 
       {/* ── Revoke Dialog ── */}
       <Dialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeError(null); } }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
+          <DialogHeader className="pr-10">
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <ShieldOff className="h-5 w-5" />
               Revoke Affiliation

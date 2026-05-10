@@ -7,6 +7,7 @@ import {
   timestamp,
   pgEnum,
   uniqueIndex,
+  index,
   json,
 } from 'drizzle-orm/pg-core';
 import type { InferSelectModel } from 'drizzle-orm';
@@ -361,7 +362,45 @@ export const affiliates = pgTable('affiliates', {
   revokedByUserId: varchar({ length: 255 }),
   revokedByName: varchar({ length: 255 }),
   createdAt: timestamp().notNull().defaultNow(),
+  /**
+   * Unique code used in combined Stripe promotion strings (e.g. SummerLaunch + this code).
+   * Stored lowercase; allocated when the affiliate row is created.
+   */
+  promotionalCode: varchar({ length: 64 }).notNull().unique(),
+  /** Lifetime count of paid subscriptions attributed via checkout metadata. */
+  paidReferralsTotal: integer().notNull().default(0),
+  /** Paid referrals in the month keyed by `paidReferralsMonthKey`. */
+  paidReferralsMonth: integer().notNull().default(0),
+  /** Calendar month for `paidReferralsMonth`, format `YYYY-MM`. */
+  paidReferralsMonthKey: varchar({ length: 7 }),
+  /** Proposed plan after admin edits an active affiliate; applied only after confirmation. */
+  pendingPlanAssigned: varchar({ length: 64 }),
+  pendingEndsAt: timestamp(),
+  /** Token for `/affiliate/confirm-arrangement?token=` (separate from pending-invite token). */
+  arrangementChangeToken: varchar({ length: 64 }).unique(),
+  arrangementChangeExpiresAt: timestamp(),
 });
+
+/**
+ * Admin promo inbox broadcasts (`recipientUserId` = Clerk user id). General variant may fan out to all users;
+ * codes variant is affiliate-targeted.
+ */
+export const affiliateBroadcastInboxMessages = pgTable(
+  'affiliate_broadcast_inbox_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    /** `general` — public coupon summary; `codes` — combined promotional codes. */
+    variant: varchar({ length: 16 }).notNull(),
+    subject: varchar({ length: 200 }).notNull(),
+    messageBody: text().notNull(),
+    /** Public promo summary or per-affiliate combined-code lines (shown in inbox). */
+    detailsBlock: text().notNull(),
+    pricingPageUrl: text().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('affiliate_broadcast_inbox_messages_recipient_idx').on(t.recipientUserId)],
+);
 
 /**
  * One row per Clerk user who has (or had) a Stripe subscription.
@@ -402,7 +441,7 @@ export type PerCardSnapshot = {
 
 /**
  * Tracks when a user explicitly marks an inbox item as read.
- * `itemType` / `itemId` match unified inbox keys (e.g. `admin_plan_log` + log id, `affiliate_notice` + `revoked-{id}`).
+ * `itemType` / `itemId` match unified inbox keys (e.g. `admin_plan_log` + log id, `affiliate_notice` + `revoked-{id}`, `affiliate_broadcast` + message id).
  */
 export const inboxReads = pgTable(
   'inbox_reads',
