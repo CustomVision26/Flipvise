@@ -650,8 +650,9 @@ export async function updateAffiliateAction(data: UpdateAffiliateInput) {
   if (
     existing.status === "pending" &&
     regeneratePendingInviteToken &&
-    Boolean(updated.token)
+    updated.token
   ) {
+    const inviteToken = updated.token;
     const plan = updated.planAssigned as AdminPlanAssignment;
     const daysUsed = inviteExpiresInDays ?? getAffiliateInviteExpiryDays();
     const inviteeResolvedClerkId =
@@ -669,7 +670,7 @@ export async function updateAffiliateAction(data: UpdateAffiliateInput) {
           dateStyle: "long",
         }),
         inviterName: callerName,
-        acceptAffiliateUrl: `${base}/affiliate/accept?token=${encodeURIComponent(updated.token)}`,
+        acceptAffiliateUrl: `${base}/affiliate/accept?token=${encodeURIComponent(inviteToken)}`,
         dashboardInboxUrl,
         subjectLine: `You're invited as a Flipvise affiliate — ${updated.affiliateName}`,
       });
