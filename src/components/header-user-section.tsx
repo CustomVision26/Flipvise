@@ -9,11 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
 import { HelpCenter } from "@/components/help-center";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import {
@@ -143,45 +138,30 @@ export function HeaderUserSection({
           Platform Admin
         </Link>
       )}
-      <Tooltip>
-        <TooltipTrigger
-          render={(props) => (
-            <Link
-              href="/pricing"
-              {...props}
-              className={cn("lg:hidden inline-flex", props.className)}
-            >
-              <Badge
-                variant={isPro ? "default" : "secondary"}
-                className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2 cursor-pointer hover:opacity-80 transition-opacity"
-              >
-                {isPro ? "Pro" : "Free"}
-              </Badge>
-            </Link>
-          )}
-        />
-        <TooltipContent side="bottom">{planNameLinkTooltip}</TooltipContent>
-      </Tooltip>
+      <Link
+        href="/pricing"
+        title={planNameLinkTooltip}
+        className="lg:hidden inline-flex"
+      >
+        <Badge
+          variant={isPro ? "default" : "secondary"}
+          className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2 cursor-pointer hover:opacity-80 transition-opacity"
+        >
+          {isPro ? "Pro" : "Free"}
+        </Badge>
+      </Link>
       <div className="flex min-w-0 flex-row items-center gap-2">
-        <Tooltip>
-          <TooltipTrigger
-            render={(props) => (
-              <Link
-                href="/pricing"
-                {...props}
-                className={cn(
-                  "order-1 hidden min-w-0 max-w-[11rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors lg:inline-flex",
-                  isPro && "text-foreground",
-                  "xl:max-w-[16rem]",
-                  props.className,
-                )}
-              >
-                {planName}
-              </Link>
-            )}
-          />
-          <TooltipContent side="bottom">{planNameLinkTooltip}</TooltipContent>
-        </Tooltip>
+        <Link
+          href="/pricing"
+          title={planNameLinkTooltip}
+          className={cn(
+            "order-1 hidden min-w-0 max-w-[11rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors lg:inline-flex",
+            isPro && "text-foreground",
+            "xl:max-w-[16rem]",
+          )}
+        >
+          {planName}
+        </Link>
         {showWorkspaceSwitcher &&
           (workspaceTeams.length > 0 ||
             (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))) &&

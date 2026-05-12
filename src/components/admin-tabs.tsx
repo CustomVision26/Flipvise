@@ -21,7 +21,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -717,64 +716,58 @@ export function AdminTabs({
                     const isExpanded = expandedWorkspaceUserId === user.id;
                     return (
                       <Fragment key={user.id}>
-                        {/* Tooltips use the root layout TooltipProvider only — avoid a Provider per row
-                            (many Base UI portals/providers caused removeChild DOM crashes). */}
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <TableRow
-                                onDoubleClick={() =>
-                                  setExpandedWorkspaceUserId((current) =>
-                                    current === user.id ? null : user.id,
-                                  )
-                                }
-                                className="cursor-pointer"
+                        {/*
+                         * Avoid Tooltip on the row: cells include AssignUserPlanButton (DropdownMenu portals).
+                         * Row tooltip + nested portals tear down out of order → React removeChild(null) crashes.
+                         */}
+                        <TableRow
+                          onDoubleClick={() =>
+                            setExpandedWorkspaceUserId((current) =>
+                              current === user.id ? null : user.id,
+                            )
+                          }
+                          className="cursor-pointer"
+                          title="Double-click to view workspaces created by this user."
+                        >
+                          <TableCell className="font-medium whitespace-nowrap">{user.fullName}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                            {user.email ?? "—"}
+                          </TableCell>
+                          <TableCell className="max-w-[12rem]">
+                            <Badge
+                              className="text-xs font-normal whitespace-normal text-left h-auto min-h-7 max-w-full py-1 leading-snug"
+                              variant={user.planDisplayName === "Free" ? "secondary" : "default"}
+                            >
+                              {user.planDisplayName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {user.workspaceCreatedCount}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {user.workspaceTotalCount ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {user.totalInviteesCount}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <AssignUserPlanButton
+                                targetUserId={user.id}
+                                targetUserName={user.fullName}
+                                targetUserEmail={user.email}
+                                isSelf={user.id === currentUserId}
+                                targetIsPlatformOwner={user.isSuperadmin}
+                                currentResolvedPlan={user.currentPersonalPlan}
+                                billingPlan={user.billingPlan}
+                                billingStatus={user.billingStatus}
+                                billingPlanUpdatedAt={user.billingPlanUpdatedAt}
+                                adminPlan={user.adminPlan}
+                                adminPlanUpdatedAt={user.adminPlanUpdatedAt}
                               />
-                            }
-                          >
-                            <TableCell className="font-medium whitespace-nowrap">{user.fullName}</TableCell>
-                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                              {user.email ?? "—"}
-                            </TableCell>
-                            <TableCell className="max-w-[12rem]">
-                              <Badge
-                                className="text-xs font-normal whitespace-normal text-left h-auto min-h-7 max-w-full py-1 leading-snug"
-                                variant={user.planDisplayName === "Free" ? "secondary" : "default"}
-                              >
-                                {user.planDisplayName}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {user.workspaceCreatedCount}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {user.workspaceTotalCount ?? "—"}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {user.totalInviteesCount}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1.5">
-                                <AssignUserPlanButton
-                                  targetUserId={user.id}
-                                  targetUserName={user.fullName}
-                                  targetUserEmail={user.email}
-                                  isSelf={user.id === currentUserId}
-                                  targetIsPlatformOwner={user.isSuperadmin}
-                                  currentResolvedPlan={user.currentPersonalPlan}
-                                  billingPlan={user.billingPlan}
-                                  billingStatus={user.billingStatus}
-                                  billingPlanUpdatedAt={user.billingPlanUpdatedAt}
-                                  adminPlan={user.adminPlan}
-                                  adminPlanUpdatedAt={user.adminPlanUpdatedAt}
-                                />
-                              </div>
-                            </TableCell>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            Double-click to view workspaces created by this user.
-                          </TooltipContent>
-                        </Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                         {isExpanded ? (
                           <TableRow>
                             <TableCell colSpan={7} className="bg-muted/20">

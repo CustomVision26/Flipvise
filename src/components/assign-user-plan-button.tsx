@@ -26,7 +26,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -102,30 +101,28 @@ export function AssignUserPlanButton({
 
   if (targetIsPlatformOwner) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger
-            render={(p) => (
-              <span {...p} className={cn("inline-flex", p.className)} tabIndex={0} />
-            )}
+      <Tooltip>
+        <TooltipTrigger
+          render={(p) => (
+            <span {...p} className={cn("inline-flex", p.className)} tabIndex={0} />
+          )}
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled
+            className="gap-0.5"
+            aria-label="Assign plan (not available for platform owner)"
           >
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              disabled
-              className="gap-0.5"
-              aria-label="Assign plan (not available for platform owner)"
-            >
-              <ShieldAlert className="h-3.5 w-3.5" />
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>The platform owner&apos;s plan metadata cannot be changed here.</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+            <ShieldAlert className="h-3.5 w-3.5" />
+            <ChevronDown className="h-3 w-3 opacity-50" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>The platform owner&apos;s plan metadata cannot be changed here.</p>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

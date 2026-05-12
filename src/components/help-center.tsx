@@ -21,11 +21,6 @@ import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -845,24 +840,18 @@ export function HelpCenter() {
 
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-              aria-label="Open Help Center"
-              onClick={() => setOpen(true)}
-            />
-          }
-        >
-          <HelpCircle className="h-[18px] w-[18px]" />
-        </TooltipTrigger>
-        <TooltipContent side="bottom">
-          Help Center
-        </TooltipContent>
-      </Tooltip>
+      {/* Native title avoids Tooltip portal + Sheet portal tearing down together (removeChild race). */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 rounded-full"
+        aria-label="Open Help Center"
+        title="Help Center"
+        onClick={() => setOpen(true)}
+      >
+        <HelpCircle className="h-[18px] w-[18px]" />
+      </Button>
       <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 py-5 border-b border-border shrink-0">
