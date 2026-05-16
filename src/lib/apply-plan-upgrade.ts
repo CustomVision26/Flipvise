@@ -23,6 +23,7 @@ import {
   setStripeBillingState,
   upsertStripeSubscriptionFromStripeSub,
 } from "@/lib/stripe-billing-sync";
+import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import {
   publicMetadataPatchForAdminPlanAssignment,
   isAdminPlanAssignment,
@@ -279,6 +280,15 @@ async function swapStripeSubscriptionPlan(input: {
   await stripe.customers.update(input.stripeCustomerId, {
     metadata: { clerkUserId: input.userId, plan: input.planSlug },
   });
+
+  try {
+    await syncRecentStripeInvoicesForUser(input.userId, {
+      customerId: input.stripeCustomerId,
+      limit: 12,
+    });
+  } catch (error) {
+    console.error("[swapStripeSubscriptionPlan] invoice sync:", error);
+  }
 
   return newPriceId;
 }

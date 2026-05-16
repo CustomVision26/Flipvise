@@ -16,6 +16,8 @@ export type ProrationLineWithReceipt = {
   hostedInvoiceUrl: string | null;
   invoicePdfUrl: string | null;
   invoiceStatus: string | null;
+  invoicePlanSlug: string | null;
+  invoiceNumber: string | null;
 };
 
 function isMissingProrationTableError(error: unknown): boolean {
@@ -97,6 +99,8 @@ export async function listProrationLinesWithReceiptForUser(
         hostedInvoiceUrl: billingInvoices.hostedInvoiceUrl,
         invoicePdfUrl: billingInvoices.invoicePdfUrl,
         invoiceStatus: billingInvoices.status,
+        invoicePlanSlug: billingInvoices.planSlug,
+        invoiceNumber: billingInvoices.invoiceNumber,
       })
       .from(billingProrationLines)
       .leftJoin(
@@ -120,6 +124,8 @@ export async function listProrationLinesWithReceiptForUser(
       hostedInvoiceUrl: r.hostedInvoiceUrl,
       invoicePdfUrl: r.invoicePdfUrl,
       invoiceStatus: r.invoiceStatus,
+      invoicePlanSlug: r.invoicePlanSlug,
+      invoiceNumber: r.invoiceNumber,
     }));
   } catch (error) {
     if (isMissingProrationTableError(error)) return [];

@@ -8,6 +8,7 @@ import {
   getManageableStripeSubscription,
 } from "@/db/queries/stripe-subscriptions";
 import { syncActiveSubscriptionFromStripeForUser } from "@/lib/stripe-billing-sync";
+import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
   fetchCancelSubscriptionPreview,
@@ -58,6 +59,13 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
     }
 
     const email = await resolveUserEmail(userId);
+
+    try {
+      await syncRecentStripeInvoicesForUser(userId);
+    } catch (error) {
+      console.error("[loadBillingTabDataAction] invoice sync:", error);
+    }
+
     const activeSub =
       (await getActiveStripeSubscription(userId)) ??
       (await getManageableStripeSubscription(userId));
@@ -116,6 +124,11 @@ export async function syncBillingAfterCheckoutAction(): Promise<{
   if (!userId) throw new Error("Unauthorized");
 
   const result = await syncActiveSubscriptionFromStripeForUser(userId);
+  try {
+    await syncRecentStripeInvoicesForUser(userId);
+  } catch (error) {
+    console.error("[syncBillingAfterCheckoutAction] invoice sync:", error);
+  }
   const planLabel =
     result.planSlug != null
       ? displayNameForBillingPlanSlug(result.planSlug)

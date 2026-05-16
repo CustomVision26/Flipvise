@@ -344,12 +344,19 @@ export function UserBillingPage() {
                         href={row.receiptUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title={
+                          row.receiptLabel
+                            ? `Receipt ${row.receiptLabel} — ${row.planName}`
+                            : row.planName
+                        }
                         className={cn(
                           buttonVariants({ variant: "link", size: "sm" }),
                           "inline-flex items-center gap-1 h-auto min-h-0 py-0 px-0 font-normal",
                         )}
                       >
-                        View
+                        {row.receiptLabel
+                          ? `Receipt ${row.receiptLabel}`
+                          : "View receipt"}
                         <ExternalLink className="size-3.5 shrink-0" />
                       </a>
                     ) : (

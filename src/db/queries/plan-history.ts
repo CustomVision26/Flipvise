@@ -9,6 +9,7 @@ import {
 } from "@/db/queries/billing-proration";
 import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { receiptPlanTitle } from "@/lib/stripe-receipt-plan-title";
 
 export type { PlanHistoryRow, PlanHistoryTypeLabel };
 
@@ -33,25 +34,47 @@ function receiptUrlFromStoredInvoice(input: {
   return input.hostedInvoiceUrl ?? input.invoicePdfUrl ?? null;
 }
 
-function formatMoney(amountCents: number | null, currency: string | null): string {
-  if (amountCents == null) return "—";
-  const code = (currency ?? "usd").toUpperCase();
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: code,
-    }).format(amountCents / 100);
-  } catch {
-    return `${(amountCents / 100).toFixed(2)} ${code}`;
+function groupProrationLinesByInvoice(
+  lines: ProrationLineWithReceipt[],
+): Map<string, ProrationLineWithReceipt[]> {
+  const byInvoice = new Map<string, ProrationLineWithReceipt[]>();
+  for (const line of lines) {
+    const group = byInvoice.get(line.stripeInvoiceId) ?? [];
+    group.push(line);
+    byInvoice.set(line.stripeInvoiceId, group);
   }
+  return byInvoice;
 }
 
-function formatProrationLinePlanName(line: ProrationLineWithReceipt): string {
-  const money = formatMoney(line.amountCents, line.currency);
-  const desc = line.description?.trim();
-  if (!desc) return money;
-  const short = desc.length > 72 ? `${desc.slice(0, 69)}…` : desc;
-  return `${money} · ${short}`;
+function prorationInvoicePlanName(lines: ProrationLineWithReceipt[]): string {
+  const descriptions = lines.map((l) => l.description);
+  const slug = lines.find((l) => l.invoicePlanSlug?.trim())?.invoicePlanSlug ?? null;
+  return receiptPlanTitle(slug, descriptions);
+}
+
+function prorationInvoicePeriod(lines: ProrationLineWithReceipt[]): {
+  start: Date | null;
+  end: Date | null;
+} {
+  let start: Date | null = null;
+  let end: Date | null = null;
+  for (const line of lines) {
+    if (line.periodStart) {
+      if (!start || line.periodStart.getTime() < start.getTime()) {
+        start = line.periodStart;
+      }
+    }
+    if (line.periodEnd) {
+      if (!end || line.periodEnd.getTime() > end.getTime()) {
+        end = line.periodEnd;
+      }
+    }
+  }
+  if (!start) {
+    const created = lines[0]?.createdAt;
+    start = created instanceof Date ? created : created ? new Date(created) : null;
+  }
+  return { start, end };
 }
 
 type AssignmentLogRow = {
@@ -220,7 +243,7 @@ async function buildMergedPlanHistoryForUser(
     if (!startIso) continue;
 
     const endIso = toIsoString(inv.periodEnd);
-    const planName = slugToPlanDisplayName(inv.planSlug);
+    const planName = receiptPlanTitle(inv.planSlug);
 
     const planType: PlanHistoryTypeLabel =
       inv.source === "invoice" && billingReason === "subscription_update"
@@ -235,26 +258,30 @@ async function buildMergedPlanHistoryForUser(
       startAt: startIso,
       endAt: endIso,
       receiptUrl,
+      receiptLabel: inv.invoiceNumber?.trim() || null,
     });
   }
 
-  for (const line of prorationLines) {
-    const startIso = toIsoString(
-      line.periodStart ?? line.createdAt,
-    );
+  const prorationByInvoice = groupProrationLinesByInvoice(prorationLines);
+  for (const [stripeInvoiceId, lines] of prorationByInvoice) {
+    const { start, end } = prorationInvoicePeriod(lines);
+    const startIso = toIsoString(start);
     if (!startIso) continue;
-    const endIso = toIsoString(line.periodEnd);
-    const receiptUrl = receiptUrlFromStoredInvoice(line);
+    const endIso = toIsoString(end);
+    const first = lines[0]!;
+    const receiptUrl = receiptUrlFromStoredInvoice(first);
+    const receiptNumber = first.invoiceNumber?.trim() || null;
     rows.push({
-      id: `prl-${line.id}`,
-      planName: formatProrationLinePlanName(line),
+      id: `prl-inv-${stripeInvoiceId}`,
+      planName: prorationInvoicePlanName(lines),
       planType: "Proration",
-      statusLabel: line.invoiceStatus
-        ? invoiceStatusLabel(line.invoiceStatus)
+      statusLabel: first.invoiceStatus
+        ? invoiceStatusLabel(first.invoiceStatus)
         : "—",
       startAt: startIso,
       endAt: endIso,
       receiptUrl,
+      receiptLabel: receiptNumber,
     });
   }
 
@@ -273,6 +300,7 @@ async function buildMergedPlanHistoryForUser(
       startAt: startIso,
       endAt: toIsoString(seg.end),
       receiptUrl: null,
+      receiptLabel: null,
     });
   }
 
@@ -311,6 +339,7 @@ async function buildMergedPlanHistoryForUser(
       startAt: startIso,
       endAt: endIso,
       receiptUrl: null,
+      receiptLabel: null,
     });
   }
 

@@ -15,4 +15,6 @@ export type PlanHistoryRow = {
   endAt: string | null;
   /** Stripe hosted invoice or PDF; null for non-billed rows */
   receiptUrl: string | null;
+  /** Stripe receipt / invoice number for receipt link label (e.g. 2815-9731) */
+  receiptLabel: string | null;
 };
