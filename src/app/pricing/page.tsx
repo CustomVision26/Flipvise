@@ -1,23 +1,44 @@
+import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { getAccessContext } from "@/lib/access";
+import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
+import { getAccessContext, guestAccessContext } from "@/lib/access";
 import { resolvePricingBackToDashboardHref } from "@/lib/pricing-back-dashboard-href";
 import { PricingContent } from "@/components/pricing-content";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolvePricingPageHighlightId } from "@/lib/pricing-page-current-plan";
+import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
 import {
   fetchStripePricingForPaidPlans,
   mergePlansConfigWithStripePricing,
 } from "@/lib/stripe-pricing-display";
+import type { PlanConfig } from "@/components/pricing-content";
 
 /** Stripe price snapshots must run at request time (env + live amounts). */
 export const dynamic = "force-dynamic";
 
+async function loadPlansForPricingUi(): Promise<PlanConfig[]> {
+  try {
+    const plansFromDisk = await readPlansConfigFromDisk();
+    const stripePricing = await fetchStripePricingForPaidPlans();
+    return mergePlansConfigWithStripePricing(plansFromDisk, stripePricing);
+  } catch (error) {
+    console.error("[PricingPage] loadPlansForPricingUi:", error);
+    return readPlansConfigFromDisk();
+  }
+}
+
 export default async function PricingPage() {
-  const access = await getAccessContext();
+  let access = guestAccessContext();
+  try {
+    access = await getAccessContext();
+  } catch (error) {
+    console.error("[PricingPage] getAccessContext:", error);
+  }
+
   const {
     userId,
     activeTeamPlan,
@@ -26,9 +47,9 @@ export default async function PricingPage() {
     hasClerkPersonalProPlus,
   } = access;
 
-  const backHref =
+  const personalDashboardHref =
     userId != null
-      ? await resolvePricingBackToDashboardHref({
+      ? personalDashboardHrefWithUserPlanQuery({
           userId,
           activeTeamPlan,
           isPro,
@@ -37,26 +58,45 @@ export default async function PricingPage() {
         })
       : "/";
 
-  const stripeSubRow =
-    userId != null ? await getActiveStripeSubscription(userId) : null;
+  let backHref = userId != null ? personalDashboardHref : "/";
+  if (userId != null) {
+    try {
+      backHref = await resolvePricingBackToDashboardHref({
+        userId,
+        activeTeamPlan,
+        isPro,
+        hasClerkPersonalPro,
+        hasClerkPersonalProPlus,
+      });
+    } catch (error) {
+      console.error("[PricingPage] resolvePricingBackToDashboardHref:", error);
+      backHref = personalDashboardHref;
+    }
+  }
+
+  let stripeSubRow: Awaited<ReturnType<typeof getActiveStripeSubscription>> = null;
+  if (userId != null) {
+    try {
+      stripeSubRow = await getActiveStripeSubscription(userId);
+    } catch (error) {
+      console.error("[PricingPage] getActiveStripeSubscription:", error);
+    }
+  }
 
   const currentPlanHighlightId = resolvePricingPageHighlightId(
     access,
     stripeSubRow?.planSlug,
   );
 
-  const plansFromDisk = await readPlansConfigFromDisk();
-  const stripePricing = await fetchStripePricingForPaidPlans();
-  const plansForUi = mergePlansConfigWithStripePricing(
-    plansFromDisk,
-    stripePricing,
-  );
+  const plansForUi = await loadPlansForPricingUi();
 
-  // Check for an active Stripe subscription so we can surface the portal link.
   const hasStripeSubscription = stripeSubRow !== null;
 
   return (
     <div className="min-h-screen bg-background py-8 sm:py-16 px-3 sm:px-4">
+      <Suspense fallback={null}>
+        <StripeCheckoutToast />
+      </Suspense>
       <div className="max-w-6xl mx-auto space-y-6 sm:space-y-10">
 
         {/* Back navigation */}

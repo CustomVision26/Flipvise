@@ -36,7 +36,7 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": true,
+      "active": false,
       "type": "percentage",
       "value": 20,
       "label": "Summer Launch 2026",
@@ -65,7 +65,7 @@
     ],
     "highlighted": true,
     "discount": {
-      "active": true,
+      "active": false,
       "type": "percentage",
       "value": 10,
       "label": "Summer Launch 2026",

@@ -106,6 +106,29 @@ export async function upsertStripeSubscription(
 }
 
 /**
+ * Stripe row the user can manage (portal, cancel at period end). Includes past_due;
+ * excludes fully ended subscriptions.
+ */
+export async function getManageableStripeSubscription(userId: string) {
+  try {
+    const rows = await db
+      .select()
+      .from(stripeSubscriptions)
+      .where(eq(stripeSubscriptions.userId, userId));
+
+    const row = rows[0] ?? null;
+    if (!row) return null;
+    if (row.status === "canceled" || row.status === "incomplete_expired") {
+      return null;
+    }
+    return row;
+  } catch (error) {
+    if (isRecoverableStripeSubscriptionsReadError(error)) return null;
+    throw error;
+  }
+}
+
+/**
  * Returns the active Stripe subscription for a user, or null if none exists.
  * Only returns rows with status "active" or "trialing".
  */

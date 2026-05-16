@@ -14,7 +14,15 @@
 
 import { createClerkClient } from "@clerk/backend";
 import { stripe } from "@/lib/stripe";
-import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import {
+  getActiveStripeSubscription,
+  getManageableStripeSubscription,
+  markStripeSubscriptionStatus,
+} from "@/db/queries/stripe-subscriptions";
+import {
+  setStripeBillingState,
+  upsertStripeSubscriptionFromStripeSub,
+} from "@/lib/stripe-billing-sync";
 import {
   publicMetadataPatchForAdminPlanAssignment,
   isAdminPlanAssignment,
@@ -107,6 +115,198 @@ export type ApplyPlanUpgradeResult =
   | { path: "stripe_proration"; newPriceId: string }
   | { path: "clerk_metadata_only" };
 
+export type ApplyPlanUpgradeOptions = {
+  /** Checkout billing toggle; defaults to the existing subscription’s interval. */
+  period?: "monthly" | "yearly";
+};
+
+/** Stripe statuses that allow `subscriptions.update` (price swap / proration). */
+const UPDATABLE_STRIPE_SUBSCRIPTION_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+]);
+
+export type UpgradableStripeSubscription = {
+  subscriptionId: string;
+  customerId: string;
+  itemId: string;
+  status: string;
+};
+
+/**
+ * Loads the user’s subscription row and confirms with Stripe that it can be updated in place.
+ * Returns null when the sub is canceled (or missing) so Checkout can start a new subscription.
+ */
+export async function fetchUpgradableStripeSubscription(
+  userId: string,
+): Promise<UpgradableStripeSubscription | null> {
+  const row =
+    (await getActiveStripeSubscription(userId)) ??
+    (await getManageableStripeSubscription(userId));
+
+  if (!row?.stripeSubscriptionId || !row.stripeCustomerId) {
+    return null;
+  }
+
+  let sub;
+  try {
+    sub = await stripe.subscriptions.retrieve(row.stripeSubscriptionId, {
+      expand: ["items.data.price"],
+    });
+  } catch {
+    return null;
+  }
+
+  if (!UPDATABLE_STRIPE_SUBSCRIPTION_STATUSES.has(sub.status)) {
+    if (sub.status === "canceled" || sub.status === "incomplete_expired") {
+      try {
+        await markStripeSubscriptionStatus(row.stripeSubscriptionId, sub.status);
+      } catch {
+        // best-effort — stale DB row
+      }
+    }
+    return null;
+  }
+
+  const itemId = sub.items?.data?.[0]?.id ?? row.stripeSubscriptionItemId?.trim();
+  if (!itemId) return null;
+
+  const customerId =
+    typeof sub.customer === "string"
+      ? sub.customer
+      : (sub.customer?.id ?? row.stripeCustomerId);
+
+  return {
+    subscriptionId: row.stripeSubscriptionId,
+    customerId,
+    itemId,
+    status: sub.status,
+  };
+}
+
+function priceIdOnSubscriptionItem(
+  item: { price?: string | { id?: string } | null } | undefined,
+): string | null {
+  const p = item?.price;
+  if (typeof p === "string") return p;
+  if (p && typeof p === "object" && typeof p.id === "string") return p.id;
+  return null;
+}
+
+/** Ends duplicate active subscriptions on the same Stripe customer (keeps one canonical sub). */
+async function cancelOtherActiveSubscriptionsForCustomer(
+  customerId: string,
+  keepSubscriptionId: string,
+): Promise<void> {
+  const listed = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 30,
+  });
+  for (const sub of listed.data) {
+    if (sub.id === keepSubscriptionId) continue;
+    if (
+      sub.status === "active" ||
+      sub.status === "trialing" ||
+      sub.status === "past_due"
+    ) {
+      try {
+        await stripe.subscriptions.cancel(sub.id);
+      } catch (error) {
+        console.error("[cancelOtherActiveSubscriptionsForCustomer]", sub.id, error);
+      }
+    }
+  }
+}
+
+async function swapStripeSubscriptionPlan(input: {
+  userId: string;
+  planSlug: StripePaidPlanId;
+  period: "monthly" | "yearly";
+  stripeSubscriptionId: string;
+  stripeSubscriptionItemId: string;
+  stripeCustomerId: string;
+}): Promise<string> {
+  const newPriceId = priceIdForPlanAndPeriod(input.planSlug, input.period);
+  if (!newPriceId) {
+    throw new Error(
+      `No Stripe price configured for plan "${input.planSlug}" (${input.period}).`,
+    );
+  }
+
+  const current = await stripe.subscriptions.retrieve(input.stripeSubscriptionId, {
+    expand: ["items.data.price"],
+  });
+  if (!UPDATABLE_STRIPE_SUBSCRIPTION_STATUSES.has(current.status)) {
+    throw new Error(
+      "Your previous subscription has ended. Use checkout to start a new subscription.",
+    );
+  }
+  const currentPriceId = priceIdOnSubscriptionItem(current.items?.data?.[0]);
+  const currentPlanMeta = current.metadata?.plan?.trim();
+  if (
+    currentPriceId === newPriceId &&
+    currentPlanMeta === input.planSlug
+  ) {
+    throw new Error("You are already on this plan.");
+  }
+
+  const updated = await stripe.subscriptions.update(input.stripeSubscriptionId, {
+    items: [{ id: input.stripeSubscriptionItemId, price: newPriceId }],
+    proration_behavior: "create_prorations",
+    cancel_at_period_end: false,
+    metadata: {
+      clerkUserId: input.userId,
+      plan: input.planSlug,
+    },
+  });
+
+  await cancelOtherActiveSubscriptionsForCustomer(
+    input.stripeCustomerId,
+    input.stripeSubscriptionId,
+  );
+
+  const billingStatus =
+    updated.status === "trialing" ? "trialing" : "active";
+  await setStripeBillingState(input.userId, input.planSlug, billingStatus);
+  await upsertStripeSubscriptionFromStripeSub(
+    input.userId,
+    updated,
+    input.planSlug,
+  );
+
+  await stripe.customers.update(input.stripeCustomerId, {
+    metadata: { clerkUserId: input.userId, plan: input.planSlug },
+  });
+
+  return newPriceId;
+}
+
+/**
+ * Pricing checkout: upgrade an existing paid subscription in place (proration) instead
+ * of creating a second Checkout subscription.
+ */
+export async function tryUpgradeExistingStripeSubscription(input: {
+  userId: string;
+  planSlug: StripePaidPlanId;
+  period: "monthly" | "yearly";
+}): Promise<{ upgraded: true; planSlug: StripePaidPlanId } | null> {
+  const live = await fetchUpgradableStripeSubscription(input.userId);
+  if (!live) return null;
+
+  await swapStripeSubscriptionPlan({
+    userId: input.userId,
+    planSlug: input.planSlug,
+    period: input.period,
+    stripeSubscriptionId: live.subscriptionId,
+    stripeSubscriptionItemId: live.itemId,
+    stripeCustomerId: live.customerId,
+  });
+
+  return { upgraded: true, planSlug: input.planSlug };
+}
+
 /**
  * Apply a plan change for a user.
  *
@@ -123,45 +323,27 @@ export type ApplyPlanUpgradeResult =
 export async function applyPlanUpgrade(
   userId: string,
   planSlug: string,
+  options?: ApplyPlanUpgradeOptions,
 ): Promise<ApplyPlanUpgradeResult> {
   const adminPlan = isAdminPlanAssignment(planSlug) ? planSlug : "free";
 
-  // Only attempt Stripe proration when the target is a real paid plan.
   if (planSlug !== "free" && isStripePaidPlan(planSlug)) {
-    const existingSub = await getActiveStripeSubscription(userId);
-
-    if (
-      existingSub?.stripeSubscriptionId &&
-      existingSub?.stripeSubscriptionItemId
-    ) {
-      const period = await detectBillingPeriod(
-        existingSub.stripeSubscriptionId,
-      );
-      const newPriceId = priceIdForPlanAndPeriod(planSlug, period);
-
-      if (newPriceId) {
-        // Swap the price with immediate proration.
-        // Stripe fires customer.subscription.updated → webhook updates Clerk.
-        await stripe.subscriptions.update(existingSub.stripeSubscriptionId, {
-          items: [
-            {
-              id: existingSub.stripeSubscriptionItemId,
-              price: newPriceId,
-            },
-          ],
-          proration_behavior: "create_prorations",
-          metadata: {
-            clerkUserId: userId,
-            plan: planSlug,
-          },
-        });
-
-        return { path: "stripe_proration", newPriceId };
-      }
+    const live = await fetchUpgradableStripeSubscription(userId);
+    if (live) {
+      const period =
+        options?.period ?? (await detectBillingPeriod(live.subscriptionId));
+      const newPriceId = await swapStripeSubscriptionPlan({
+        userId,
+        planSlug,
+        period,
+        stripeSubscriptionId: live.subscriptionId,
+        stripeSubscriptionItemId: live.itemId,
+        stripeCustomerId: live.customerId,
+      });
+      return { path: "stripe_proration", newPriceId };
     }
   }
 
-  // Fallback: complimentary grant or no active Stripe subscription.
   await applyPlanToClerkMetadata(userId, adminPlan);
   return { path: "clerk_metadata_only" };
 }

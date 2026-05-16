@@ -220,14 +220,19 @@ export async function listAffiliatesForPlanHistory(
   userId: string,
   emailLower: string | null,
 ) {
-  if (emailLower) {
-    return getAllAffiliatesByEmailOrUserId(emailLower, userId);
+  try {
+    if (emailLower) {
+      return await getAllAffiliatesByEmailOrUserId(emailLower, userId);
+    }
+    return await db
+      .select()
+      .from(affiliates)
+      .where(eq(affiliates.invitedUserId, userId))
+      .orderBy(desc(affiliates.createdAt));
+  } catch (error) {
+    console.error("[plan-history] listAffiliatesForPlanHistory:", error);
+    return [];
   }
-  return db
-    .select()
-    .from(affiliates)
-    .where(eq(affiliates.invitedUserId, userId))
-    .orderBy(desc(affiliates.createdAt));
 }
 
 export async function acceptAffiliateByToken(token: string, userId: string) {

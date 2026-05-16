@@ -119,6 +119,30 @@ function primaryEmailFromClerkBackendUser(user: {
   return (primary ?? list[0])?.emailAddress ?? null;
 }
 
+/** Signed-out / degraded access — safe fallback when Clerk or billing resolution fails. */
+export function guestAccessContext(): AccessContext {
+  return {
+    userId: null,
+    isPro: false,
+    maxPersonalDecks: FREE_PERSONAL_DECK_LIMIT,
+    maxCardsPerDeck: FREE_CARDS_PER_DECK_LIMIT,
+    hasUnlimitedDecks: false,
+    has75CardsPerDeck: false,
+    hasAI: false,
+    hasAiReading: false,
+    hasPrioritySupport: false,
+    hasCustomColors: false,
+    hasProPlusInterfacePalette: false,
+    adminGranted: false,
+    isAdmin: false,
+    isSuperadmin: false,
+    activeTeamPlan: null,
+    hasClerkPersonalPro: false,
+    hasClerkPersonalProPlus: false,
+    primaryEmail: null,
+  };
+}
+
 /**
  * Returns the full access context for the current user, combining Stripe-backed billing metadata,
  * Clerk JWT features, admin-granted access, and the admin role itself.
@@ -130,26 +154,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   const { userId, has } = await auth();
 
   if (!userId) {
-    return {
-      userId: null,
-      isPro: false,
-      maxPersonalDecks: FREE_PERSONAL_DECK_LIMIT,
-      maxCardsPerDeck: FREE_CARDS_PER_DECK_LIMIT,
-      hasUnlimitedDecks: false,
-      has75CardsPerDeck: false,
-      hasAI: false,
-      hasAiReading: false,
-      hasPrioritySupport: false,
-      hasCustomColors: false,
-      hasProPlusInterfacePalette: false,
-      adminGranted: false,
-      isAdmin: false,
-      isSuperadmin: false,
-      activeTeamPlan: null,
-      hasClerkPersonalPro: false,
-      hasClerkPersonalProPlus: false,
-      primaryEmail: null,
-    };
+    return guestAccessContext();
   }
 
   const superadminAllowListed = isPlatformSuperadminAllowListed(userId);
@@ -245,8 +250,9 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       isAdmin,
       isSuperadmin,
       activeTeamPlan: teamPlanForFeatures,
-      hasClerkPersonalPro: paidProFromHas,
-      hasClerkPersonalProPlus: paidProPlusFromHas,
+      hasClerkPersonalPro: paidProFromHas && !paidProPlusFromHas,
+      /** Personal URLs / plan query use Pro Plus for platform-admin complimentary tier. */
+      hasClerkPersonalProPlus: true,
       primaryEmail,
     };
   }

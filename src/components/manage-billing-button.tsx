@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
+import { toast } from "sonner";
 import { createBillingPortalSessionAction } from "@/actions/stripe";
 import { Button } from "@/components/ui/button";
 import { Loader2, CreditCard } from "lucide-react";
@@ -20,42 +21,36 @@ export function ManageBillingButton({
   className,
 }: ManageBillingButtonProps) {
   const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
 
   function handleClick() {
-    setError(null);
     startTransition(async () => {
       try {
         const { url } = await createBillingPortalSessionAction();
         window.location.href = url;
       } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Could not open billing portal.",
-        );
+        toast.error("Could not open billing portal", {
+          description:
+            e instanceof Error ? e.message : "Please try again in a moment.",
+        });
       }
     });
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      <Button
-        type="button"
-        variant={variant}
-        size={size}
-        disabled={isPending}
-        onClick={handleClick}
-        className={cn("gap-2", className)}
-      >
-        {isPending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <CreditCard className="size-4" />
-        )}
-        {isPending ? "Opening portal…" : label}
-      </Button>
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
+    <Button
+      type="button"
+      variant={variant}
+      size={size}
+      disabled={isPending}
+      onClick={handleClick}
+      className={cn("gap-2", className)}
+    >
+      {isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <CreditCard className="size-4" />
       )}
-    </div>
+      {isPending ? "Opening portal…" : label}
+    </Button>
   );
 }

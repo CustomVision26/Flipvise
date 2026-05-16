@@ -41,3 +41,20 @@ export function personalDashboardHrefWithUserPlanQuery(
   if (planQuery !== "") params.set("plan", planQuery);
   return `/dashboard?${params.toString()}`;
 }
+
+/**
+ * Stripe Checkout `success_url` — same `userid` / `plan` shape as the workspace switcher,
+ * plus `checkout=success` for post-payment sync toast.
+ */
+export function personalDashboardHrefAfterCheckoutSuccess(input: {
+  userId: string;
+  purchasedPlanSlug: string;
+}): string {
+  const slug = input.purchasedPlanSlug.trim();
+  const params = new URLSearchParams({
+    userid: input.userId,
+    checkout: "success",
+  });
+  if (slug) params.set("plan", slug);
+  return `/dashboard?${params.toString()}`;
+}

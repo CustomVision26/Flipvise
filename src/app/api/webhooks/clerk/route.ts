@@ -11,6 +11,7 @@ import {
   upsertBillingInvoiceRecord,
   upsertBillingInvoicesFromSubscription,
 } from "@/db/queries/billing";
+import { purgeAllUserData } from "@/db/queries/user-deletion";
 import {
   loopsCreateContact,
   loopsDeleteContact,
@@ -216,7 +217,15 @@ export async function POST(req: NextRequest) {
   // -------------------------------------------------------------------------
   if (evt.type === "user.deleted") {
     const data = evt.data as ClerkUserEventData;
+    const userId = data?.id;
     const email = extractPrimaryEmail(data);
+    if (userId) {
+      try {
+        await purgeAllUserData(userId, { skipStripeCancellation: true });
+      } catch (error) {
+        console.error("[clerk webhook] purgeAllUserData failed:", error);
+      }
+    }
     if (email) {
       void loopsDeleteContact(email);
     }

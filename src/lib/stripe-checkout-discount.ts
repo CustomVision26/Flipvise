@@ -4,6 +4,7 @@ import {
   affiliateStripeCouponId,
   buildAffiliatePlanCouponName,
   discontinueDateToRedeemByUnix,
+  STRIPE_COUPON_NAME_MAX_LEN,
 } from "@/lib/affiliate-stripe-coupon";
 import { stripe } from "@/lib/stripe";
 import { STRIPE_PAID_PLAN_IDS, type StripePaidPlanId } from "@/lib/billing-plan-ids";
@@ -71,6 +72,78 @@ export async function resolveStripeCheckoutDiscountPayload(
   throw new Error(
     `No Stripe coupon or active promotion code matches "${id}". In the Stripe Dashboard, either create a Coupon with this exact id, or create a Promotion code with this customer-facing code (same Stripe mode as STRIPE_SECRET_KEY).`,
   );
+}
+
+function generalCouponDisplayName(
+  planId: string,
+  label: string | undefined,
+  discount: PlanConfig["discount"],
+): string {
+  const raw =
+    label?.trim() ||
+    (discount?.type === "percentage" && discount.value > 0
+      ? `${planId} ${discount.value}% off`
+      : `${planId} promo`);
+  return raw.length <= STRIPE_COUPON_NAME_MAX_LEN
+    ? raw
+    : raw.slice(0, STRIPE_COUPON_NAME_MAX_LEN);
+}
+
+/**
+ * Creates the tier’s general marketing Coupon in Stripe when admin enables a discount in
+ * `plans-config.json` — avoids manual Dashboard setup per `stripeCouponId`.
+ */
+export async function ensureGeneralPlanStripeCoupon(opts: {
+  planId: PaidPlanId;
+  discount: NonNullable<PlanConfig["discount"]>;
+  discontinueAt?: string | null;
+}): Promise<string> {
+  const id = opts.discount.stripeCouponId.trim();
+  if (!id) {
+    throw new Error("Plan discount is missing stripeCouponId in plans config.");
+  }
+  if (id.startsWith("fv_aff_")) {
+    return id;
+  }
+
+  const value = Math.round(opts.discount.value ?? 0);
+  if (value <= 0) {
+    throw new Error("Plan discount value must be greater than zero.");
+  }
+
+  const discontinueRaw = opts.discontinueAt?.trim() ?? "";
+  const redeemBy = discontinueRaw
+    ? discontinueDateToRedeemByUnix(discontinueRaw)
+    : undefined;
+  const name = generalCouponDisplayName(
+    opts.planId,
+    opts.discount.label,
+    opts.discount,
+  );
+
+  const createParams: Stripe.CouponCreateParams = {
+    id,
+    duration: "forever",
+    name,
+    ...(opts.discount.type === "percentage"
+      ? { percent_off: Math.min(100, value) }
+      : { amount_off: Math.round(value * 100), currency: "usd" }),
+    ...(redeemBy != null ? { redeem_by: redeemBy } : {}),
+  };
+
+  try {
+    const existing = await stripe.coupons.retrieve(id);
+    if (redeemBy != null && existing.redeem_by !== redeemBy) {
+      await stripe.coupons.update(id, { redeem_by: redeemBy } as Parameters<
+        typeof stripe.coupons.update
+      >[1]);
+    }
+  } catch (err) {
+    if (!isStripeResourceMissing(err)) throw err;
+    await stripe.coupons.create(createParams);
+  }
+
+  return id;
 }
 
 /**

@@ -10,15 +10,30 @@ import { z } from "zod";
 import { promises as fs } from "fs";
 import path from "path";
 import type { PlanConfig } from "@/components/pricing-content";
-import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import {
+  getActiveStripeSubscription,
+  getManageableStripeSubscription,
+} from "@/db/queries/stripe-subscriptions";
 import {
   readStripePriceIdFromEnv,
   stripePriceEnvPairForPlan,
 } from "@/lib/stripe-plan-price-env";
 import {
+  ensureGeneralPlanStripeCoupon,
   resolveCheckoutDiscount,
   resolveStripeCheckoutDiscountPayload,
 } from "@/lib/stripe-checkout-discount";
+import {
+  fetchCancelSubscriptionPreview,
+  scheduleSubscriptionCancelAtPeriodEnd,
+  type CancelSubscriptionPreview,
+} from "@/lib/stripe-cancel-subscription";
+import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
+import {
+  fetchUpgradableStripeSubscription,
+  tryUpgradeExistingStripeSubscription,
+} from "@/lib/apply-plan-upgrade";
+import { personalDashboardHrefAfterCheckoutSuccess } from "@/lib/personal-dashboard-url";
 
 const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
 type PaidPlanId = StripePaidPlanId;
@@ -134,15 +149,74 @@ function envVarForPlan(plan: PaidPlanId, period: BillingPeriod): string {
   return stripePriceEnvPairForPlan(plan, period).primary;
 }
 
+type CheckoutCustomerSessionParams =
+  | {
+      customer: string;
+      /** Required when `tax_id_collection` + `billing_address_collection` use an existing customer. */
+      customer_update: { name: "auto"; address: "auto" };
+    }
+  | { customer_email: string };
+
+/** Reuse Stripe customer when known; otherwise prefill Checkout email from Clerk. */
+async function resolveCheckoutCustomerParams(
+  userId: string,
+): Promise<CheckoutCustomerSessionParams | Record<string, never>> {
+  const sub =
+    (await getManageableStripeSubscription(userId)) ??
+    (await getActiveStripeSubscription(userId));
+  if (sub?.stripeCustomerId) {
+    return {
+      customer: sub.stripeCustomerId,
+      customer_update: {
+        name: "auto",
+        address: "auto",
+      },
+    };
+  }
+
+  const { primaryEmail } = await getClerkUserFieldDisplayById(userId);
+  const email = primaryEmail?.trim().toLowerCase();
+  if (email) {
+    return { customer_email: email };
+  }
+
+  return {};
+}
+
 export async function createStripeCheckoutSessionAction(
   data: CreateCheckoutSessionInput,
-): Promise<{ url: string }> {
+): Promise<{ url: string; upgradedInPlace?: boolean }> {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = createCheckoutSessionSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
   const { plan, period, promotionCode } = parsed.data;
+
+  const appUrl = resolveAppUrl();
+  const successReturnUrl = `${appUrl}${personalDashboardHrefAfterCheckoutSuccess({
+    userId,
+    purchasedPlanSlug: plan,
+  })}`;
+
+  const trimmedPromo = promotionCode?.trim() ?? "";
+  const upgradableSub = await fetchUpgradableStripeSubscription(userId);
+
+  if (upgradableSub) {
+    if (trimmedPromo) {
+      throw new Error(
+        "Promotion codes only apply to new subscriptions. Clear the promo field to change your existing plan — Stripe will prorate automatically.",
+      );
+    }
+    const upgraded = await tryUpgradeExistingStripeSubscription({
+      userId,
+      planSlug: plan,
+      period,
+    });
+    if (upgraded) {
+      return { url: successReturnUrl, upgradedInPlace: true };
+    }
+  }
 
   let plansConfig: PlanConfig[] = [];
   try {
@@ -160,14 +234,32 @@ export async function createStripeCheckoutSessionAction(
     plansConfig,
   });
 
+  if (
+    discountResolution.couponId != null &&
+    discountResolution.affiliateId == null
+  ) {
+    const planRow = plansConfig.find((p) => p.id === plan);
+    const discount = planRow?.discount;
+    if (
+      discount?.active &&
+      (discount.value ?? 0) > 0 &&
+      discount.stripeCouponId?.trim() === discountResolution.couponId
+    ) {
+      await ensureGeneralPlanStripeCoupon({
+        planId: plan,
+        discount,
+        discontinueAt: planRow?.discontinueAt ?? null,
+      });
+    }
+  }
+
   const checkoutDiscount =
     discountResolution.couponId != null
       ? await resolveStripeCheckoutDiscountPayload(discountResolution.couponId)
       : null;
 
-  const appUrl = resolveAppUrl();
-  const successUrl = `${appUrl}/dashboard`;
-  const cancelUrl = `${appUrl}/pricing`;
+  const successUrl = successReturnUrl;
+  const cancelUrl = `${appUrl}/pricing?checkout=canceled`;
 
   const subscriptionMetadata: Record<string, string> = {
     clerkUserId: userId,
@@ -178,10 +270,13 @@ export async function createStripeCheckoutSessionAction(
     subscriptionMetadata.affiliateId = String(discountResolution.affiliateId);
   }
 
+  const checkoutCustomer = await resolveCheckoutCustomerParams(userId);
+
   let session;
   try {
     session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      ...checkoutCustomer,
       line_items: [
         {
           price: priceId,
@@ -232,7 +327,9 @@ export async function createBillingPortalSessionAction(): Promise<{
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
-  const sub = await getActiveStripeSubscription(userId);
+  const sub =
+    (await getManageableStripeSubscription(userId)) ??
+    (await getActiveStripeSubscription(userId));
   if (!sub?.stripeCustomerId) {
     throw new Error(
       "No active subscription found. Please subscribe to a plan first.",
@@ -247,4 +344,82 @@ export async function createBillingPortalSessionAction(): Promise<{
   });
 
   return { url: session.url };
+}
+
+export async function getCancelSubscriptionPreviewAction(): Promise<CancelSubscriptionPreview> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const sub = await getManageableStripeSubscription(userId);
+  if (!sub) {
+    throw new Error("No active paid subscription found.");
+  }
+
+  return fetchCancelSubscriptionPreview(
+    sub.stripeSubscriptionId,
+    sub.planSlug,
+  );
+}
+
+/** Whether the signed-in user has a Stripe subscription row that can be canceled. */
+export async function hasCancelableStripeSubscriptionAction(): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+  const sub = await getManageableStripeSubscription(userId);
+  return sub != null;
+}
+
+/**
+ * Opens Stripe Customer Portal on the subscription-cancel flow (proration and
+ * timing follow your Stripe Dashboard portal settings).
+ */
+export async function createSubscriptionCancelPortalSessionAction(): Promise<{
+  url: string;
+}> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const sub = await getManageableStripeSubscription(userId);
+  if (!sub?.stripeCustomerId) {
+    throw new Error("No active subscription found.");
+  }
+
+  const appUrl = resolveAppUrl();
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: sub.stripeCustomerId,
+    return_url: `${appUrl}/dashboard`,
+    flow_data: {
+      type: "subscription_cancel",
+      subscription_cancel: {
+        subscription: sub.stripeSubscriptionId,
+      },
+    },
+  });
+  if (!session.url) throw new Error("Missing portal URL");
+  return { url: session.url };
+}
+
+/** Schedule cancel at period end without leaving the app (portal fallback). */
+export async function cancelSubscriptionAtPeriodEndAction(): Promise<{
+  periodEnd: string;
+}> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const sub = await getManageableStripeSubscription(userId);
+  if (!sub) throw new Error("No active subscription found.");
+
+  const preview = await fetchCancelSubscriptionPreview(
+    sub.stripeSubscriptionId,
+    sub.planSlug,
+  );
+  if (preview.cancelAtPeriodEnd) {
+    return { periodEnd: preview.periodEnd };
+  }
+
+  const result = await scheduleSubscriptionCancelAtPeriodEnd(
+    sub.stripeSubscriptionId,
+  );
+  return { periodEnd: result.periodEnd };
 }

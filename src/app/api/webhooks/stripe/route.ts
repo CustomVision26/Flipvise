@@ -3,28 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { upsertBillingInvoiceRecord } from "@/db/queries/billing";
 import { replaceProrationLinesForStripeInvoice } from "@/db/queries/billing-proration";
-import {
-  upsertStripeSubscription,
-  markStripeSubscriptionStatus,
-} from "@/db/queries/stripe-subscriptions";
+import { markStripeSubscriptionStatus } from "@/db/queries/stripe-subscriptions";
 import { incrementAffiliatePaidReferral } from "@/db/queries/affiliates";
-import {
-  BILLING_PLAN_KEY,
-  BILLING_STATUS_KEY,
-  BILLING_PLAN_UPDATED_AT_KEY,
-  resolveEffectivePlan,
-  type BillingStatusValue,
-} from "@/lib/plan-metadata-billing-resolution";
+import type { BillingStatusValue } from "@/lib/plan-metadata-billing-resolution";
 import { stripe } from "@/lib/stripe";
 import {
-  canonicalTeamPlanId,
-  isTeamPlanId,
-} from "@/lib/team-plans";
+  asPaidPlanId,
+  setStripeBillingState,
+  upsertStripeSubscriptionFromStripeSub,
+} from "@/lib/stripe-billing-sync";
 import {
   STRIPE_PAID_PLAN_IDS,
   type StripePaidPlanId,
 } from "@/lib/billing-plan-ids";
-import { updateOwnedTeamsPlanSlug } from "@/db/queries/teams";
 import { loopsSendEvent, loopsUpdateContact } from "@/lib/loops";
 
 export const dynamic = "force-dynamic";
@@ -132,54 +123,6 @@ function invoiceTaxCents(invoice: Stripe.Invoice): number | null {
   return null;
 }
 
-/**
- * Writes Stripe-sourced billing fields to Clerk public metadata, then recomputes
- * and writes the resolved `plan` value using resolveEffectivePlan().
- *
- * Only this function should write billingPlan / billingStatus / billingPlanUpdatedAt.
- */
-async function setStripeBillingState(
-  userId: string,
-  plan: PaidPlanId | null,
-  status: BillingStatusValue,
-) {
-  const user = await clerkClient.users.getUser(userId);
-  const now = new Date().toISOString();
-  const existing = user.publicMetadata as Record<string, unknown>;
-
-  const updated: Record<string, unknown> = {
-    ...existing,
-    [BILLING_PLAN_KEY]: plan,
-    [BILLING_STATUS_KEY]: status,
-    [BILLING_PLAN_UPDATED_AT_KEY]: now,
-  };
-
-  const resolvedPlan = resolveEffectivePlan(updated);
-  const isTeamPlan = resolvedPlan !== null && isTeamPlanId(resolvedPlan);
-
-  await clerkClient.users.updateUserMetadata(userId, {
-    publicMetadata: {
-      ...updated,
-      plan: resolvedPlan,
-      teamPlanId: isTeamPlan ? resolvedPlan : null,
-    },
-  });
-
-  // Keep all workspaces owned by this user in sync with the new resolved plan
-  // so workspace limits (maxTeams / maxMembersPerTeam) always match the active
-  // Stripe subscription rather than the plan at workspace creation time.
-  try {
-    const canonicalTeam =
-      resolvedPlan !== null ? canonicalTeamPlanId(resolvedPlan) : null;
-    if (canonicalTeam) {
-      await updateOwnedTeamsPlanSlug(userId, canonicalTeam);
-    }
-  } catch {
-    // Best-effort — billing state already written above; a retry or
-    // subsequent plan change will bring the workspace row back in sync.
-  }
-}
-
 async function getClerkUserEmail(userId: string): Promise<string | null> {
   try {
     const user = await clerkClient.users.getUser(userId);
@@ -190,15 +133,6 @@ async function getClerkUserEmail(userId: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-function asPaidPlanId(value: unknown): PaidPlanId | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if ((PAID_PLAN_IDS as readonly string[]).includes(trimmed)) return trimmed as PaidPlanId;
-  const canonTeam = canonicalTeamPlanId(trimmed);
-  return canonTeam ?? null;
 }
 
 async function resolvePaidPlanFromCustomer(customerId: string): Promise<PaidPlanId | null> {
@@ -280,21 +214,11 @@ export async function POST(req: NextRequest) {
               const sub = await stripe.subscriptions.retrieve(subscriptionId, {
                 expand: ["items.data"],
               });
-              const firstItem = sub.items?.data?.[0];
-              // current_period_end moved to SubscriptionItem in API ≥ 2025-03-31.basil
-              const firstItemAny = firstItem as unknown as { current_period_end?: number };
-              await upsertStripeSubscription({
+              await upsertStripeSubscriptionFromStripeSub(
                 userId,
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: subscriptionId,
-                stripeSubscriptionItemId: firstItem?.id ?? null,
-                planSlug: selectedPlan,
-                status: sub.status,
-                currentPeriodEnd:
-                  typeof firstItemAny?.current_period_end === "number"
-                    ? new Date(firstItemAny.current_period_end * 1000)
-                    : null,
-              });
+                sub,
+                selectedPlan,
+              );
             } catch {
               // Best-effort — billing state already written above.
             }
@@ -366,21 +290,11 @@ export async function POST(req: NextRequest) {
               if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") {
                 await markStripeSubscriptionStatus(sub.id, stripeStatus);
               } else {
-                const firstItem = sub.items?.data?.[0];
-                // current_period_end moved to SubscriptionItem in API ≥ 2025-03-31.basil
-                const firstItemAny = firstItem as unknown as { current_period_end?: number };
-                await upsertStripeSubscription({
-                  userId: resolution.userId,
-                  stripeCustomerId: customerId,
-                  stripeSubscriptionId: sub.id,
-                  stripeSubscriptionItemId: firstItem?.id ?? null,
-                  planSlug: activePlan,
-                  status: stripeStatus,
-                  currentPeriodEnd:
-                    typeof firstItemAny?.current_period_end === "number"
-                      ? new Date(firstItemAny.current_period_end * 1000)
-                      : null,
-                });
+                await upsertStripeSubscriptionFromStripeSub(
+                  resolution.userId,
+                  sub,
+                  activePlan,
+                );
               }
             }
           } catch {

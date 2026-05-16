@@ -37,6 +37,7 @@ import {
   getTeamMembershipsForUser,
 } from "@/db/queries/teams";
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
+import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialog } from "@/components/add-deck-dialog";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
@@ -440,6 +441,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
       <Suspense fallback={null}>
         <TeamInviteAcceptedBanner />
+        <StripeCheckoutToast />
       </Suspense>
       {showTeamOnboarding && (
         <Alert>

@@ -25,6 +25,7 @@ import {
 } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
+import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, Palette, Shield } from "lucide-react";
 
 interface HeaderUserSectionProps {
@@ -100,23 +101,35 @@ export function HeaderUserSection({
 
   const planName = activeTeamPlan
     ? TEAM_PLAN_LABELS[activeTeamPlan]
-    : isPro
-      ? "Pro"
-      : "Free";
+    : resolvedHasProPlusInterfacePalette
+      ? "Pro Plus"
+      : isPro
+        ? "Pro"
+        : "Free";
 
   const planNameLinkTooltip = useMemo(() => {
     let planLabel: string;
     if (activeTeamPlan != null) {
       planLabel = `${planName} plan`;
+    } else if (resolvedHasProPlusInterfacePalette) {
+      planLabel =
+        isAdmin || adminGranted
+          ? "Pro Plus plan (complimentary)"
+          : "Pro Plus plan";
     } else if (isPro) {
-      planLabel = adminGranted
-        ? "Pro plan (complimentary)"
-        : "Pro plan";
+      planLabel = "Pro plan";
     } else {
       planLabel = "Free plan";
     }
     return `${planLabel} — Opens the pricing page`;
-  }, [activeTeamPlan, planName, isPro, adminGranted]);
+  }, [
+    activeTeamPlan,
+    planName,
+    isPro,
+    adminGranted,
+    isAdmin,
+    resolvedHasProPlusInterfacePalette,
+  ]);
 
   if (!userId) {
     return null;
@@ -147,7 +160,7 @@ export function HeaderUserSection({
           variant={isPro ? "default" : "secondary"}
           className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2 cursor-pointer hover:opacity-80 transition-opacity"
         >
-          {isPro ? "Pro" : "Free"}
+          {planName}
         </Badge>
       </Link>
       <div className="flex min-w-0 flex-row items-center gap-2">
@@ -206,6 +219,7 @@ export function HeaderUserSection({
             </UserButton.UserProfilePage>
           </UserButton>
         </span>
+        <AccountDeleteDialog />
       </div>
       <InboxNavIconButton unreadCount={inboxUnreadCount} />
       {!hideHelpCenter && <HelpCenter />}

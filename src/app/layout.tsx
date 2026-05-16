@@ -8,8 +8,9 @@ import { HeaderLogo } from "@/components/header-logo";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
-import { isTeamPlanId, TEAM_PLAN_LABELS } from "@/lib/team-plans";
+import { isTeamPlanId } from "@/lib/team-plans";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
+import { personalWorkspacePlanDisplayLabel } from "@/lib/personal-workspace-plan-label";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import {
   countPendingInvitationsForEmail,
@@ -135,13 +136,12 @@ export default async function RootLayout({
     workspaceTeamsTotalEligible > 0 ||
     (activeTeamPlan != null && isTeamPlanId(activeTeamPlan));
 
-  /** Next to “Personal Dash” — real team tier name when on a team subscription, else Pro/Free. */
-  const personalPlanLabelForWorkspace =
-    activeTeamPlan != null
-      ? TEAM_PLAN_LABELS[activeTeamPlan]
-      : isPro
-        ? "Pro"
-        : "Free";
+  /** Next to “Personal Dash” — team tier name, else Pro Plus / Pro / Free (admins → Pro Plus). */
+  const personalPlanLabelForWorkspace = personalWorkspacePlanDisplayLabel({
+    activeTeamPlan,
+    isPro,
+    hasProPlusInterfacePalette,
+  });
 
   /** When the workspace nav lacks subscriber-owned team rows, still link Team Dash from admin scope. */
   const teamDashFallback =

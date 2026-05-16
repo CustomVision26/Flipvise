@@ -2,7 +2,13 @@
 
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  BILLING_SYNCED_EVENT,
+} from "@/components/stripe-checkout-toast";
+import { loadBillingTabDataAction } from "@/actions/billing-page";
+import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
+import type { CancelSubscriptionPreview } from "@/lib/stripe-cancel-subscription";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Separator } from "@/components/ui/separator";
@@ -15,8 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { CancelSubscriptionButton } from "@/components/cancel-subscription-button";
 import { ManageBillingButton } from "@/components/manage-billing-button";
-import { loadUserPlanHistoryAction } from "@/actions/plan-history";
 import type { PlanHistoryRow } from "@/lib/plan-history-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { CreditCard, ExternalLink, Loader2, Zap } from "lucide-react";
@@ -43,50 +49,106 @@ function formatDateTime(iso: string) {
 }
 
 export function UserBillingPage() {
+  const rootRef = useRef<HTMLDivElement>(null);
   const { user, isLoaded } = useUser();
+  const [tabVisible, setTabVisible] = useState(false);
   const [planHistory, setPlanHistory] = useState<PlanHistoryRow[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [canCancelStripe, setCanCancelStripe] = useState(false);
+  const [cancelPreview, setCancelPreview] = useState<CancelSubscriptionPreview | null>(
+    null,
+  );
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [stripeCurrentPlanSlug, setStripeCurrentPlanSlug] = useState<string | null>(
+    null,
+  );
+  const [stripeBillingStatus, setStripeBillingStatus] = useState<string | null>(
+    null,
+  );
+  const loadedForUserRef = useRef<string | null>(null);
+
+  const loadBillingData = (userId: string, force = false) => {
+    if (!force && loadedForUserRef.current === userId) return;
+
+    setBillingLoading(true);
+    setHistoryError(null);
+
+    void loadBillingTabDataAction()
+      .then((data) => {
+        loadedForUserRef.current = userId;
+        setPlanHistory(data.planHistory);
+        setCanCancelStripe(data.canCancelStripe);
+        setCancelPreview(data.cancelPreview);
+        setStripeCurrentPlanSlug(data.currentPlanSlug);
+        setStripeBillingStatus(data.billingStatus);
+        setHistoryError(null);
+      })
+      .catch((err) => {
+        console.error("[UserBillingPage] billing tab:", err);
+        setHistoryError("Could not load plan history.");
+        setPlanHistory([]);
+        setCanCancelStripe(false);
+        setCancelPreview(null);
+        setStripeCurrentPlanSlug(null);
+        setStripeBillingStatus(null);
+      })
+      .finally(() => {
+        setBillingLoading(false);
+      });
+  };
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!user?.id) {
-      setPlanHistory([]);
-      return;
-    }
+    const el = rootRef.current;
+    if (!el) return;
 
-    let cancelled = false;
-    setPlanHistory(null);
-    setHistoryError(null);
-    loadUserPlanHistoryAction()
-      .then((rows) => {
-        if (!cancelled) setPlanHistory(rows);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHistoryError("Could not load plan history.");
-          setPlanHistory([]);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setTabVisible(true);
         }
-      });
-    return () => {
-      cancelled = true;
+      },
+      { root: null, threshold: 0.12 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!tabVisible || !isLoaded || !user?.id) return;
+    loadBillingData(user.id);
+  }, [tabVisible, isLoaded, user?.id]);
+
+  useEffect(() => {
+    const onSynced = () => {
+      if (!user?.id) return;
+      loadedForUserRef.current = null;
+      loadBillingData(user.id, true);
     };
-  }, [isLoaded, user?.id]);
+    window.addEventListener(BILLING_SYNCED_EVENT, onSynced);
+    return () => window.removeEventListener(BILLING_SYNCED_EVENT, onSynced);
+  }, [user?.id]);
+
   const meta = (user?.publicMetadata ?? {}) as Record<string, unknown>;
 
-  const billingPlan = meta.billingPlan as string | undefined;
-  const billingStatus = meta.billingStatus as string | undefined;
+  const metaBillingStatus = meta.billingStatus as string | undefined;
   const adminPlan = meta.adminPlan as string | undefined;
 
-  const resolvedPlan = (meta.plan as string | undefined) ?? null;
+  const metaPlan = (meta.plan as string | undefined) ?? null;
+  const resolvedPlan = stripeCurrentPlanSlug ?? metaPlan;
   const isPaid = !!resolvedPlan;
   const planLabel = resolvedPlan ? displayNameForBillingPlanSlug(resolvedPlan) : "Free";
 
+  const billingStatus = stripeBillingStatus ?? metaBillingStatus;
   const isActive = billingStatus === "active" || billingStatus === "trialing";
-  const hasStripeSubscription = !!billingPlan && isActive;
   const isAdminGranted = !!adminPlan && resolvedPlan === adminPlan;
+  const isPaidStripePlan =
+    resolvedPlan != null &&
+    resolvedPlan !== "free" &&
+    isStripePaidPlanId(resolvedPlan);
+  const showPaidStripeControls = isPaidStripePlan && !isAdminGranted;
 
   return (
-    <div className="flex flex-col gap-6 p-1">
+    <div ref={rootRef} className="flex flex-col gap-6 p-1 min-h-[120px]">
       <div>
         <h2 className="text-base font-semibold text-foreground">Billing</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
@@ -96,7 +158,6 @@ export function UserBillingPage() {
 
       <Separator />
 
-      {/* Current plan */}
       <div className="flex flex-col gap-3">
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Current plan
@@ -137,18 +198,23 @@ export function UserBillingPage() {
 
       <Separator />
 
-      {/* Actions */}
       <div className="flex flex-col gap-3">
-        {hasStripeSubscription && (
+        {showPaidStripeControls && (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-foreground">
               Manage subscription
             </p>
             <p className="text-xs text-muted-foreground mb-2">
-              Update payment method, download invoices, or cancel your plan via
-              the Stripe Customer Portal.
+              Update your payment method, download invoices, or cancel renewal.
+              You keep access until the end of the current billing period.
             </p>
             <div className="flex flex-wrap gap-2">
+              {canCancelStripe ? (
+                <CancelSubscriptionButton
+                  preview={cancelPreview}
+                  onPreviewChange={setCancelPreview}
+                />
+              ) : null}
               <ManageBillingButton
                 label="Open billing portal"
                 variant="outline"
@@ -189,10 +255,10 @@ export function UserBillingPage() {
           </div>
         )}
 
-        {isPaid && !hasStripeSubscription && (
+        {isPaid && !showPaidStripeControls && (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-foreground">
-              Change or upgrade plan
+              {isAdminGranted ? "Complimentary access" : "Change or upgrade plan"}
             </p>
             <Link
               href={PRICING_PAGE_PATH}
@@ -221,7 +287,7 @@ export function UserBillingPage() {
           </p>
         </div>
 
-        {planHistory === null && (
+        {(billingLoading || planHistory === null) && !historyError && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
             <Loader2 className="size-4 animate-spin shrink-0" />
             Loading history…
@@ -232,7 +298,7 @@ export function UserBillingPage() {
           <p className="text-xs text-destructive">{historyError}</p>
         )}
 
-        {planHistory && planHistory.length === 0 && !historyError && (
+        {planHistory && planHistory.length === 0 && !historyError && !billingLoading && (
           <p className="text-sm text-muted-foreground py-2">
             No plan history recorded yet.
           </p>

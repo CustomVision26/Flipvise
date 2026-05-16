@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Check, Loader2, ChevronDown, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { createStripeCheckoutSessionAction } from "@/actions/stripe";
@@ -265,10 +266,20 @@ export function PricingContent({
             ? { promotionCode: promotionCode.trim() }
             : {}),
         });
+        if (result.upgradedInPlace) {
+          toast.success("Plan updated", {
+            description:
+              "Your subscription was changed in place. Stripe may email a proration receipt for the difference.",
+            duration: 10_000,
+          });
+        }
         window.location.href = result.url;
       } catch (e) {
-        setErrors({
-          [planId]: e instanceof Error ? e.message : "Unable to start checkout.",
+        const message =
+          e instanceof Error ? e.message : "Unable to start checkout.";
+        toast.error("Could not start checkout", {
+          description: message,
+          duration: 12_000,
         });
         setPendingPlan(null);
       }

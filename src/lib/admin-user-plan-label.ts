@@ -27,7 +27,7 @@ export function getAdminUserPlanColumnLabel(input: {
   }
 
   if (adminGranted) {
-    return "Complimentary Pro";
+    return "Pro Plus";
   }
 
   if (stripeSubscriptionActive) {

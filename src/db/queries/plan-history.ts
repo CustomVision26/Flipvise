@@ -102,20 +102,28 @@ export function buildAdminComplimentarySegments(
 }
 
 export async function listPlanAssignmentLogsForUser(targetUserId: string) {
-  return db
-    .select({
-      action: adminPlanAssignmentLogs.action,
-      planName: adminPlanAssignmentLogs.planName,
-      createdAt: adminPlanAssignmentLogs.createdAt,
-    })
-    .from(adminPlanAssignmentLogs)
-    .where(
-      and(
-        eq(adminPlanAssignmentLogs.targetUserId, targetUserId),
-        inArray(adminPlanAssignmentLogs.action, ["plan_assigned", "plan_removed"]),
-      ),
-    )
-    .orderBy(asc(adminPlanAssignmentLogs.createdAt));
+  try {
+    return await db
+      .select({
+        action: adminPlanAssignmentLogs.action,
+        planName: adminPlanAssignmentLogs.planName,
+        createdAt: adminPlanAssignmentLogs.createdAt,
+      })
+      .from(adminPlanAssignmentLogs)
+      .where(
+        and(
+          eq(adminPlanAssignmentLogs.targetUserId, targetUserId),
+          inArray(adminPlanAssignmentLogs.action, [
+            "plan_assigned",
+            "plan_removed",
+          ]),
+        ),
+      )
+      .orderBy(asc(adminPlanAssignmentLogs.createdAt));
+  } catch (error) {
+    console.error("[plan-history] listPlanAssignmentLogsForUser:", error);
+    return [];
+  }
 }
 
 function affiliateStatusLabel(
@@ -134,7 +142,26 @@ function affiliateStatusLabel(
  * Returns merged plan history for the account settings billing view.
  * Combines Stripe invoice periods, Stripe proration lines, admin complimentary intervals, and affiliate grants.
  */
+function toIsoString(value: Date | string | null | undefined): string | null {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 export async function getMergedPlanHistoryForUser(
+  userId: string,
+  userEmail: string | null,
+): Promise<PlanHistoryRow[]> {
+  try {
+    return await buildMergedPlanHistoryForUser(userId, userEmail);
+  } catch (error) {
+    console.error("[plan-history] getMergedPlanHistoryForUser:", error);
+    return [];
+  }
+}
+
+async function buildMergedPlanHistoryForUser(
   userId: string,
   userEmail: string | null,
 ): Promise<PlanHistoryRow[]> {
@@ -187,10 +214,12 @@ export async function getMergedPlanHistoryForUser(
       continue;
     }
 
-    const start = inv.periodStart ?? inv.paidAt ?? inv.createdAt;
-    if (!start) continue;
+    const startIso = toIsoString(
+      inv.periodStart ?? inv.paidAt ?? inv.createdAt,
+    );
+    if (!startIso) continue;
 
-    const end = inv.periodEnd ?? null;
+    const endIso = toIsoString(inv.periodEnd);
     const planName = slugToPlanDisplayName(inv.planSlug);
 
     const planType: PlanHistoryTypeLabel =
@@ -203,19 +232,18 @@ export async function getMergedPlanHistoryForUser(
       planName,
       planType,
       statusLabel: invoiceStatusLabel(inv.status),
-      startAt: start.toISOString(),
-      endAt: end ? end.toISOString() : null,
+      startAt: startIso,
+      endAt: endIso,
       receiptUrl,
     });
   }
 
   for (const line of prorationLines) {
-    const start =
-      line.periodStart ??
-      (line.createdAt instanceof Date
-        ? line.createdAt
-        : new Date(line.createdAt));
-    const end = line.periodEnd ?? null;
+    const startIso = toIsoString(
+      line.periodStart ?? line.createdAt,
+    );
+    if (!startIso) continue;
+    const endIso = toIsoString(line.periodEnd);
     const receiptUrl = receiptUrlFromStoredInvoice(line);
     rows.push({
       id: `prl-${line.id}`,
@@ -224,8 +252,8 @@ export async function getMergedPlanHistoryForUser(
       statusLabel: line.invoiceStatus
         ? invoiceStatusLabel(line.invoiceStatus)
         : "—",
-      startAt: start.toISOString(),
-      endAt: end ? end.toISOString() : null,
+      startAt: startIso,
+      endAt: endIso,
       receiptUrl,
     });
   }
@@ -235,13 +263,15 @@ export async function getMergedPlanHistoryForUser(
   );
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!;
+    const startIso = toIsoString(seg.start);
+    if (!startIso) continue;
     rows.push({
-      id: `admin-${i}-${seg.start.toISOString()}`,
+      id: `admin-${i}-${startIso}`,
       planName: seg.planName,
       planType: "Complimentary (admin)",
       statusLabel: seg.end ? "Ended" : "Active",
-      startAt: seg.start.toISOString(),
-      endAt: seg.end ? seg.end.toISOString() : null,
+      startAt: startIso,
+      endAt: toIsoString(seg.end),
       receiptUrl: null,
     });
   }
@@ -252,8 +282,9 @@ export async function getMergedPlanHistoryForUser(
       (a.status !== "pending" ? a.startedAt : null);
     if (!startRaw) continue;
 
-    const start =
-      startRaw instanceof Date ? startRaw : new Date(startRaw);
+    const startIso = toIsoString(startRaw);
+    if (!startIso) continue;
+
     const endsAt =
       a.endsAt instanceof Date ? a.endsAt : new Date(a.endsAt);
     const revokedAt = a.revokedAt
@@ -269,13 +300,16 @@ export async function getMergedPlanHistoryForUser(
           : endsAt
         : endsAt;
 
+    const endIso = toIsoString(endAt);
+    if (!endIso) continue;
+
     rows.push({
       id: `aff-${a.id}`,
       planName: slugToPlanDisplayName(a.planAssigned),
       planType: "Complimentary (affiliate)",
       statusLabel: affiliateStatusLabel(a.status, endsAt, revokedAt),
-      startAt: start.toISOString(),
-      endAt: endAt.toISOString(),
+      startAt: startIso,
+      endAt: endIso,
       receiptUrl: null,
     });
   }
