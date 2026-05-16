@@ -23,6 +23,7 @@ import {
   insertAdminPlanAssignmentInvite,
   supersedePendingAdminPlanInvitesForUser,
 } from "@/db/queries/admin-plan-invites";
+import { loopsSendAccountStatusEmail } from "@/lib/loops";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -252,6 +253,18 @@ export async function toggleUserBanAction(data: ToggleUserBanInput) {
     assignedByUserId: userId,
     assignedByName: callerName,
   });
+
+  if (targetEmail) {
+    try {
+      await loopsSendAccountStatusEmail({
+        email: targetEmail,
+        userName: targetName,
+        accountState: ban ? "banned" : "unbanned",
+      });
+    } catch (err) {
+      console.error("[Admin] account status email failed:", err);
+    }
+  }
 
   revalidatePath("/admin");
 }

@@ -1,4 +1,5 @@
 import { LoopsClient } from "loops";
+import { resolveAppUrl } from "@/lib/stripe";
 
 // ---------------------------------------------------------------------------
 // Singleton client — returns null if LOOPS_API_KEY is not configured so the
@@ -453,6 +454,98 @@ export async function loopsSendAffiliateArrangementUpdateEmail(
     confirmationExpiresAt: payload.confirmationExpiresAt,
     currentPlanLabel: payload.currentPlanLabel,
     currentEndsAtFormatted: payload.currentEndsAtFormatted,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Account banned / unbanned (admin action)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data variables for `LOOPS_ACCOUNT_BANNED_TRANSACTIONAL_ID` and
+ * `LOOPS_ACCOUNT_UNBANNED_TRANSACTIONAL_ID`. Define the same keys in each Loops
+ * template (case-sensitive).
+ *
+ * | Variable | Purpose |
+ * |----------|---------|
+ * | `subjectLine` | Full subject (`{DATA_VARIABLE:subjectLine}` in Loops). |
+ * | `accountState` | `"banned"` or `"unbanned"` (matches which template fired). |
+ * | `statusHeadline` | Short title for the email body. |
+ * | `statusMessage` | Plain-language explanation of what changed. |
+ * | `userName` | Display name of the affected user. |
+ * | `userEmail` | Recipient address (duplicate for template convenience). |
+ * | `homeUrl` | App origin from `NEXT_PUBLIC_APP_URL`. |
+ * | `signInUrl` | Same as `homeUrl` — homepage sign-in entry point. |
+ * | `actionAt` | When the ban/unban was applied (locale-formatted). |
+ */
+export type AccountStatusEmailPayload = {
+  email: string;
+  userName: string;
+  accountState: "banned" | "unbanned";
+};
+
+function formatAccountStatusActionAt(date: Date): string {
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+function resolveAccountStatusTransactionalId(
+  accountState: AccountStatusEmailPayload["accountState"],
+): string | null {
+  const legacy = process.env.LOOPS_ACCOUNT_STATUS_TRANSACTIONAL_ID?.trim();
+  const bannedId = process.env.LOOPS_ACCOUNT_BANNED_TRANSACTIONAL_ID?.trim();
+  const unbannedId = process.env.LOOPS_ACCOUNT_UNBANNED_TRANSACTIONAL_ID?.trim();
+  if (accountState === "banned") {
+    return bannedId || legacy || null;
+  }
+  return unbannedId || legacy || null;
+}
+
+export async function loopsSendAccountStatusEmail(
+  payload: AccountStatusEmailPayload,
+): Promise<void> {
+  if (!process.env.LOOPS_API_KEY?.trim()) {
+    return;
+  }
+
+  const transactionalId = resolveAccountStatusTransactionalId(payload.accountState);
+  if (!transactionalId) {
+    const envHint =
+      payload.accountState === "banned"
+        ? "LOOPS_ACCOUNT_BANNED_TRANSACTIONAL_ID"
+        : "LOOPS_ACCOUNT_UNBANNED_TRANSACTIONAL_ID";
+    console.warn(
+      `[AccountStatusEmail] LOOPS_API_KEY is set but ${envHint} is missing — ${payload.accountState} notification email will not send.`,
+    );
+    return;
+  }
+
+  const appUrl = resolveAppUrl();
+  const isBanned = payload.accountState === "banned";
+  const subjectLine = isBanned
+    ? "Your Flipvise account has been suspended"
+    : "Your Flipvise account has been restored";
+  const statusHeadline = isBanned ? "Account suspended" : "Account restored";
+  const statusMessage = isBanned
+    ? "A platform administrator has suspended your Flipvise account. You can no longer sign in or use the app until your account is restored. If you believe this was done in error, contact support with the email address on this account."
+    : "Your Flipvise account has been restored. You can sign in again and use Flipvise as usual.";
+
+  await loopsSendTransactional(payload.email, transactionalId, {
+    subjectLine,
+    accountState: payload.accountState,
+    statusHeadline,
+    statusMessage,
+    userName: payload.userName,
+    userEmail: payload.email,
+    homeUrl: appUrl,
+    signInUrl: appUrl,
+    actionAt: formatAccountStatusActionAt(new Date()),
   });
 }
 
