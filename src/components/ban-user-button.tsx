@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -43,10 +44,32 @@ export function BanUserButton({
   if (isSelf || targetIsSuperadmin) return null;
   if (targetIsCoAdmin && !callerIsSuperadmin) return null;
 
+  const emailNotice = targetUserEmail
+    ? ` A Loops notification email will be sent to ${targetUserEmail}.`
+    : " This user has no email on file — no notification email will be sent.";
+
   function handleConfirm() {
     setOpen(false);
     startTransition(async () => {
-      await toggleUserBanAction({ targetUserId, ban: !isBanned });
+      try {
+        const result = await toggleUserBanAction({ targetUserId, ban: !isBanned });
+        const actionLabel = isBanned ? "unbanned" : "banned";
+
+        if (result.email.sent) {
+          toast.success(`User ${actionLabel}`, {
+            description: `Notification email sent to ${targetUserEmail}.`,
+          });
+        } else {
+          toast.warning(`User ${actionLabel}`, {
+            description: result.email.reason,
+          });
+        }
+      } catch (err) {
+        toast.error("Ban action failed", {
+          description:
+            err instanceof Error ? err.message : "Please try again.",
+        });
+      }
     });
   }
 
@@ -77,8 +100,8 @@ export function BanUserButton({
             <AlertDialogHeader>
               <AlertDialogTitle>Unban user?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will restore full access to the application. They will be
-                able to sign in again immediately.
+                This will restore full access to the application. They will be able to sign in
+                again immediately.{emailNotice}
               </AlertDialogDescription>
               <AdminUserIdentityBlock
                 name={targetUserName}
@@ -90,9 +113,9 @@ export function BanUserButton({
             <AlertDialogHeader>
               <AlertDialogTitle>Ban user?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will immediately revoke all active sessions and prevent
-                them from signing in. Their account and data are preserved —
-                this action can be undone by clicking Unban.
+                This will immediately revoke all active sessions and prevent them from signing in.
+                Their account and data are preserved — this action can be undone by clicking
+                Unban.{emailNotice}
               </AlertDialogDescription>
               <AdminUserIdentityBlock
                 name={targetUserName}

@@ -23,7 +23,10 @@ import {
   insertAdminPlanAssignmentInvite,
   supersedePendingAdminPlanInvitesForUser,
 } from "@/db/queries/admin-plan-invites";
-import { loopsSendAccountStatusEmail } from "@/lib/loops";
+import {
+  loopsSendAccountStatusEmail,
+  type AccountStatusEmailResult,
+} from "@/lib/loops";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -205,7 +208,14 @@ const toggleUserBanSchema = z.object({
 
 type ToggleUserBanInput = z.infer<typeof toggleUserBanSchema>;
 
-export async function toggleUserBanAction(data: ToggleUserBanInput) {
+export type ToggleUserBanResult = {
+  banned: boolean;
+  email: AccountStatusEmailResult;
+};
+
+export async function toggleUserBanAction(
+  data: ToggleUserBanInput,
+): Promise<ToggleUserBanResult> {
   const { userId, caller } = await requirePlatformAdminActor();
 
   const parsed = toggleUserBanSchema.safeParse(data);
@@ -254,19 +264,20 @@ export async function toggleUserBanAction(data: ToggleUserBanInput) {
     assignedByName: callerName,
   });
 
-  if (targetEmail) {
-    try {
-      await loopsSendAccountStatusEmail({
+  const email: AccountStatusEmailResult = targetEmail
+    ? await loopsSendAccountStatusEmail({
         email: targetEmail,
         userName: targetName,
         accountState: ban ? "banned" : "unbanned",
-      });
-    } catch (err) {
-      console.error("[Admin] account status email failed:", err);
-    }
-  }
+      })
+    : {
+        sent: false,
+        reason: "This user has no primary email on file.",
+      };
 
   revalidatePath("/admin");
+
+  return { banned: ban, email };
 }
 
 const createTeamWorkspaceForUserSchema = z.object({

@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
 
@@ -46,7 +47,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <ThemeStorageNormalize>
-        <ClerkWithTheme>{children}</ClerkWithTheme>
+        <ClerkWithTheme>
+          {children}
+          <Toaster richColors closeButton position="top-right" />
+        </ClerkWithTheme>
       </ThemeStorageNormalize>
     </ThemeProvider>
   );

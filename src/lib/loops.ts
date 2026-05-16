@@ -470,7 +470,8 @@ export async function loopsSendAffiliateArrangementUpdateEmail(
  * |----------|---------|
  * | `subjectLine` | Full subject (`{DATA_VARIABLE:subjectLine}` in Loops). |
  * | `accountState` | `"banned"` or `"unbanned"` (matches which template fired). |
- * | `statusHeadline` | Short title for the email body. |
+ * | `statusHeadLine` | Short title — use in **banned** template (`{DATA_VARIABLE:statusHeadLine}`). |
+ * | `statusHeadline` | Same value — use in **unbanned** template if it expects lowercase `line`. |
  * | `statusMessage` | Plain-language explanation of what changed. |
  * | `userName` | Display name of the affected user. |
  * | `userEmail` | Recipient address (duplicate for template convenience). |
@@ -483,6 +484,10 @@ export type AccountStatusEmailPayload = {
   userName: string;
   accountState: "banned" | "unbanned";
 };
+
+export type AccountStatusEmailResult =
+  | { sent: true }
+  | { sent: false; reason: string };
 
 function formatAccountStatusActionAt(date: Date): string {
   return date.toLocaleString("en-US", {
@@ -507,11 +512,27 @@ function resolveAccountStatusTransactionalId(
   return unbannedId || legacy || null;
 }
 
+function accountStatusEmailFailureReason(err: unknown): string {
+  if (isLoopsLikeErr(err)) {
+    if (err.statusCode === 404) {
+      return "Loops transactional template not found — confirm the template is published and the env transactional ID matches.";
+    }
+    const detail =
+      err.json && typeof err.json === "object" && "message" in err.json
+        ? String((err.json as { message: unknown }).message)
+        : err.message;
+    return detail?.trim() ? detail : `Loops API error (HTTP ${err.statusCode})`;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return "Loops failed to send the notification email.";
+}
+
 export async function loopsSendAccountStatusEmail(
   payload: AccountStatusEmailPayload,
-): Promise<void> {
-  if (!process.env.LOOPS_API_KEY?.trim()) {
-    return;
+): Promise<AccountStatusEmailResult> {
+  const client = getClient();
+  if (!client) {
+    return { sent: false, reason: "Loops is not configured (LOOPS_API_KEY missing)." };
   }
 
   const transactionalId = resolveAccountStatusTransactionalId(payload.accountState);
@@ -520,10 +541,10 @@ export async function loopsSendAccountStatusEmail(
       payload.accountState === "banned"
         ? "LOOPS_ACCOUNT_BANNED_TRANSACTIONAL_ID"
         : "LOOPS_ACCOUNT_UNBANNED_TRANSACTIONAL_ID";
-    console.warn(
-      `[AccountStatusEmail] LOOPS_API_KEY is set but ${envHint} is missing — ${payload.accountState} notification email will not send.`,
-    );
-    return;
+    return {
+      sent: false,
+      reason: `${envHint} is not set — add your published Loops transactional ID to env.`,
+    };
   }
 
   const appUrl = resolveAppUrl();
@@ -531,22 +552,38 @@ export async function loopsSendAccountStatusEmail(
   const subjectLine = isBanned
     ? "Your Flipvise account has been suspended"
     : "Your Flipvise account has been restored";
-  const statusHeadline = isBanned ? "Account suspended" : "Account restored";
+  const statusHeadLine = isBanned ? "Account suspended" : "Account restored";
   const statusMessage = isBanned
     ? "A platform administrator has suspended your Flipvise account. You can no longer sign in or use the app until your account is restored. If you believe this was done in error, contact support with the email address on this account."
     : "Your Flipvise account has been restored. You can sign in again and use Flipvise as usual.";
 
-  await loopsSendTransactional(payload.email, transactionalId, {
-    subjectLine,
-    accountState: payload.accountState,
-    statusHeadline,
-    statusMessage,
-    userName: payload.userName,
-    userEmail: payload.email,
-    homeUrl: appUrl,
-    signInUrl: appUrl,
-    actionAt: formatAccountStatusActionAt(new Date()),
-  });
+  try {
+    await client.sendTransactionalEmail({
+      transactionalId,
+      email: payload.email,
+      dataVariables: {
+        subjectLine,
+        accountState: payload.accountState,
+        statusHeadLine,
+        // Loops templates are case-sensitive; banned vs unbanned IDs may use different keys.
+        statusHeadline: statusHeadLine,
+        statusMessage,
+        userName: payload.userName,
+        userEmail: payload.email,
+        homeUrl: appUrl,
+        signInUrl: appUrl,
+        actionAt: formatAccountStatusActionAt(new Date()),
+      },
+    });
+    return { sent: true };
+  } catch (err) {
+    const reason = accountStatusEmailFailureReason(err);
+    console.error(
+      `[AccountStatusEmail] send failed (${payload.accountState}, ${transactionalId}):`,
+      err,
+    );
+    return { sent: false, reason };
+  }
 }
 
 // ---------------------------------------------------------------------------
