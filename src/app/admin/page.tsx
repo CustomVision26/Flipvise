@@ -1,1 +1,5 @@
-export { default } from "./admin-dashboard-page";
+import AdminDashboardPage from "./admin-dashboard-page";
+
+export default function AdminPage() {
+  return <AdminDashboardPage section="all-users" />;
+}
