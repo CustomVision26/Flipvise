@@ -1,6 +1,32 @@
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import type { NextRequest, NextResponse } from "next/server";
 
+/** Route handler clears cookies; safe from Server Components and Server Actions. */
+export const CLEAR_STALE_SESSION_PATH = "/api/auth/clear-stale-session";
+
+export function isClerkUserNotFoundError(error: unknown): boolean {
+  if (!isClerkAPIResponseError(error)) return false;
+
+  const status =
+    "status" in error && typeof error.status === "number"
+      ? error.status
+      : "statusCode" in error && typeof (error as { statusCode: unknown }).statusCode === "number"
+        ? (error as { statusCode: number }).statusCode
+        : null;
+  if (status === 404) return true;
+
+  if (/not found/i.test(error.message)) return true;
+
+  return (
+    error.errors?.some(
+      (e) =>
+        (e.code ?? "").toLowerCase() === "resource_not_found" ||
+        /not found/i.test(e.message ?? "") ||
+        /not found/i.test(e.longMessage ?? ""),
+    ) ?? false
+  );
+}
+
 export function isStaleOrMissingSessionError(error: unknown): boolean {
   const text = (() => {
     if (error instanceof Error) return error.message;

@@ -125,77 +125,76 @@ export async function purgeAllUserData(
     }
   }
 
-  await db.transaction(async (tx) => {
-    const ownedTeams = await tx
-      .select({ id: teams.id })
-      .from(teams)
-      .where(eq(teams.ownerUserId, userId));
-    const ownedTeamIds = ownedTeams.map((t) => t.id);
+  // neon-http driver does not support transactions — run deletes sequentially.
+  const ownedTeams = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(eq(teams.ownerUserId, userId));
+  const ownedTeamIds = ownedTeams.map((t) => t.id);
 
-    if (ownedTeamIds.length > 0) {
-      await tx.delete(teams).where(eq(teams.ownerUserId, userId));
-    }
+  if (ownedTeamIds.length > 0) {
+    await db.delete(teams).where(eq(teams.ownerUserId, userId));
+  }
 
-    await tx.delete(teamMembers).where(eq(teamMembers.userId, userId));
-    await tx
-      .delete(teamDeckAssignments)
-      .where(eq(teamDeckAssignments.memberUserId, userId));
-    await tx
-      .delete(teamWorkspaceEvents)
-      .where(eq(teamWorkspaceEvents.ownerUserId, userId));
+  await db.delete(teamMembers).where(eq(teamMembers.userId, userId));
+  await db
+    .delete(teamDeckAssignments)
+    .where(eq(teamDeckAssignments.memberUserId, userId));
+  await db
+    .delete(teamWorkspaceEvents)
+    .where(eq(teamWorkspaceEvents.ownerUserId, userId));
 
-    await tx.delete(decks).where(eq(decks.userId, userId));
+  await db.delete(decks).where(eq(decks.userId, userId));
 
-    await tx.delete(supportTickets).where(eq(supportTickets.userId, userId));
-    await tx.delete(billingInvoices).where(eq(billingInvoices.userId, userId));
-    await tx
-      .delete(billingProrationLines)
-      .where(eq(billingProrationLines.userId, userId));
-    await tx.delete(stripeSubscriptions).where(eq(stripeSubscriptions.userId, userId));
-    await tx.delete(quizResults).where(eq(quizResults.userId, userId));
-    await tx
-      .delete(quizResultInboxMessages)
-      .where(eq(quizResultInboxMessages.recipientUserId, userId));
-    await tx.delete(inboxReads).where(eq(inboxReads.userId, userId));
-    await tx
-      .delete(affiliateBroadcastInboxMessages)
-      .where(eq(affiliateBroadcastInboxMessages.recipientUserId, userId));
-    await tx
-      .delete(adminPlanAssignmentInvites)
-      .where(
-        or(
-          eq(adminPlanAssignmentInvites.targetUserId, userId),
-          eq(adminPlanAssignmentInvites.assignedByUserId, userId),
-        ),
-      );
-    await tx.delete(deactivated).where(eq(deactivated.userId, userId));
-    await tx
-      .delete(affiliates)
-      .where(
-        or(
-          eq(affiliates.invitedUserId, userId),
-          eq(affiliates.addedByUserId, userId),
-          eq(affiliates.revokedByUserId, userId),
-        ),
-      );
+  await db.delete(supportTickets).where(eq(supportTickets.userId, userId));
+  await db.delete(billingInvoices).where(eq(billingInvoices.userId, userId));
+  await db
+    .delete(billingProrationLines)
+    .where(eq(billingProrationLines.userId, userId));
+  await db.delete(stripeSubscriptions).where(eq(stripeSubscriptions.userId, userId));
+  await db.delete(quizResults).where(eq(quizResults.userId, userId));
+  await db
+    .delete(quizResultInboxMessages)
+    .where(eq(quizResultInboxMessages.recipientUserId, userId));
+  await db.delete(inboxReads).where(eq(inboxReads.userId, userId));
+  await db
+    .delete(affiliateBroadcastInboxMessages)
+    .where(eq(affiliateBroadcastInboxMessages.recipientUserId, userId));
+  await db
+    .delete(adminPlanAssignmentInvites)
+    .where(
+      or(
+        eq(adminPlanAssignmentInvites.targetUserId, userId),
+        eq(adminPlanAssignmentInvites.assignedByUserId, userId),
+      ),
+    );
+  await db.delete(deactivated).where(eq(deactivated.userId, userId));
+  await db
+    .delete(affiliates)
+    .where(
+      or(
+        eq(affiliates.invitedUserId, userId),
+        eq(affiliates.addedByUserId, userId),
+        eq(affiliates.revokedByUserId, userId),
+      ),
+    );
 
-    await tx
-      .delete(adminPlanAssignmentLogs)
-      .where(
-        or(
-          eq(adminPlanAssignmentLogs.targetUserId, userId),
-          eq(adminPlanAssignmentLogs.assignedByUserId, userId),
-        ),
-      );
-    await tx
-      .delete(adminPrivilegeLogs)
-      .where(
-        or(
-          eq(adminPrivilegeLogs.targetUserId, userId),
-          eq(adminPrivilegeLogs.grantedByUserId, userId),
-        ),
-      );
-  });
+  await db
+    .delete(adminPlanAssignmentLogs)
+    .where(
+      or(
+        eq(adminPlanAssignmentLogs.targetUserId, userId),
+        eq(adminPlanAssignmentLogs.assignedByUserId, userId),
+      ),
+    );
+  await db
+    .delete(adminPrivilegeLogs)
+    .where(
+      or(
+        eq(adminPrivilegeLogs.targetUserId, userId),
+        eq(adminPrivilegeLogs.grantedByUserId, userId),
+      ),
+    );
 
   await deleteUserMedia(mediaUrls);
 }

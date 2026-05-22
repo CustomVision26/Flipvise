@@ -3,10 +3,10 @@ import {
   currentUser as clerkCurrentUser,
 } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { isStaleOrMissingSessionError } from "@/lib/clerk-stale-session";
-
-/** Route handler clears cookies; safe to call from Server Components and Server Actions. */
-const CLEAR_STALE_SESSION_PATH = "/api/auth/clear-stale-session";
+import {
+  CLEAR_STALE_SESSION_PATH,
+  isStaleOrMissingSessionError,
+} from "@/lib/clerk-stale-session";
 
 export async function auth(
   ...args: Parameters<typeof clerkAuth>

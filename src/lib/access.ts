@@ -1,6 +1,11 @@
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { auth } from "@/lib/clerk-auth";
+import {
+  CLEAR_STALE_SESSION_PATH,
+  isClerkUserNotFoundError,
+} from "@/lib/clerk-stale-session";
 import { createClerkClient } from "@clerk/backend";
 import {
   legacyUnlimitedStyleProBundleSatisfied,
@@ -166,6 +171,10 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     meta = user.publicMetadata as PublicMeta;
     primaryEmail = primaryEmailFromClerkBackendUser(user);
   } catch (error) {
+    // Session JWT still valid but user was deleted (self-service delete, admin purge, etc.).
+    if (isClerkUserNotFoundError(error)) {
+      redirect(CLEAR_STALE_SESSION_PATH);
+    }
     if (!isClerkBackendRateLimitError(error)) throw error;
     // Degrade to JWT-only resolution when Clerk Backend returns 429 (still better than hard-failing the tree).
     meta = {} as PublicMeta;
