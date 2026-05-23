@@ -11,11 +11,15 @@ async function main() {
   const events = await stripe.events.list({ limit: 25, type: "checkout.session.completed" });
   console.log(`Recent checkout.session.completed events (showing up to 25):\n`);
   for (const ev of events.data) {
-    const session = ev.data.object as { id?: string; subscription?: string; metadata?: Record<string, string> };
+    const session = ev.data.object as {
+      id?: string;
+      subscription?: string | { id?: string } | null;
+      metadata?: Record<string, string>;
+    };
     const sub =
       typeof session.subscription === "string"
         ? session.subscription
-        : (session.subscription as { id?: string } | null)?.id;
+        : session.subscription?.id;
     const match = sub === subId ? " <-- YOUR SUBSCRIPTION" : "";
     console.log(`${ev.created} | ${ev.id} | session ${session.id} | sub ${sub ?? "—"} | clerk ${session.metadata?.clerkUserId ?? "—"}${match}`);
   }
