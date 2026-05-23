@@ -144,8 +144,15 @@ async function refundLatestPaidInvoiceForSubscription(
     return { refunded: false, reason: "no paid invoice found" };
   }
 
+  const paidRefs = paid as Stripe.Invoice & {
+    charge?: string | { id?: string } | null;
+  };
   const chargeId =
-    typeof paid.charge === "string" ? paid.charge : paid.charge?.id ?? null;
+    typeof paidRefs.charge === "string"
+      ? paidRefs.charge
+      : paidRefs.charge && typeof paidRefs.charge === "object"
+        ? paidRefs.charge.id ?? null
+        : null;
 
   const refundParams = {
     reason: "duplicate" as const,

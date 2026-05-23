@@ -125,12 +125,23 @@ async function resolveClerkPrimaryEmail(userId: string): Promise<string | null> 
 }
 
 /**
- * Locates an active/trialing subscription for a Clerk user when webhooks did not run.
+ * Active/trialing subscription for a Clerk user (DB-independent Stripe lookup).
  * Subscription metadata is checked first — Checkout always sets `clerkUserId` there,
  * even before customer metadata is patched.
  */
-/** Active/trialing subscription for a Clerk user (DB-independent Stripe lookup). */
 export async function findActiveSubscriptionForClerkUser(userId: string): Promise<{
+  sub: Stripe.Subscription;
+  customerId: string;
+} | null> {
+  try {
+    return await findActiveSubscriptionForClerkUserInner(userId);
+  } catch (error) {
+    console.error("[findActiveSubscriptionForClerkUser]", error);
+    return null;
+  }
+}
+
+async function findActiveSubscriptionForClerkUserInner(userId: string): Promise<{
   sub: Stripe.Subscription;
   customerId: string;
 } | null> {
@@ -155,21 +166,33 @@ export async function findActiveSubscriptionForClerkUser(userId: string): Promis
 
   let customerId: string | undefined;
 
-  const customers = await stripe.customers.search({
-    query: `metadata['clerkUserId']:'${uid}'`,
-    limit: 1,
-  });
-  customerId = customers.data[0]?.id;
+  try {
+    const customers = await stripe.customers.search({
+      query: `metadata['clerkUserId']:'${uid}'`,
+      limit: 1,
+    });
+    customerId = customers.data[0]?.id;
+  } catch {
+    // Stripe Search may be unavailable — fall through to email lookup.
+  }
 
   if (!customerId) {
     const email = await resolveClerkPrimaryEmail(userId);
     if (email) {
-      const escapedEmail = stripeSearchLiteral(email);
-      const byEmail = await stripe.customers.search({
-        query: `email:'${escapedEmail}'`,
-        limit: 10,
-      });
-      for (const customer of byEmail.data) {
+      let customersByEmail: Stripe.Customer[] = [];
+      try {
+        const escapedEmail = stripeSearchLiteral(email);
+        const byEmail = await stripe.customers.search({
+          query: `email:'${escapedEmail}'`,
+          limit: 10,
+        });
+        customersByEmail = byEmail.data;
+      } catch {
+        const listed = await stripe.customers.list({ email, limit: 10 });
+        customersByEmail = listed.data;
+      }
+
+      for (const customer of customersByEmail) {
         const listed = await stripe.subscriptions.list({
           customer: customer.id,
           status: "all",
@@ -184,7 +207,7 @@ export async function findActiveSubscriptionForClerkUser(userId: string): Promis
           break;
         }
       }
-      customerId ??= byEmail.data[0]?.id;
+      customerId ??= customersByEmail[0]?.id;
     }
   }
 

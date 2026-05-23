@@ -158,6 +158,16 @@ type CheckoutCustomerSessionParams =
   | { customer_email: string };
 
 /** Reuse Stripe customer when known; otherwise prefill Checkout email from Clerk. */
+async function isStripeCustomerReachable(customerId: string): Promise<boolean> {
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    return !("deleted" in customer && customer.deleted);
+  } catch {
+    return false;
+  }
+}
+
+/** Reuse Stripe customer when known; otherwise prefill Checkout email from Clerk. */
 async function resolveCheckoutCustomerParams(
   userId: string,
 ): Promise<CheckoutCustomerSessionParams | Record<string, never>> {
@@ -165,13 +175,16 @@ async function resolveCheckoutCustomerParams(
     (await getManageableStripeSubscription(userId)) ??
     (await getActiveStripeSubscription(userId));
   if (sub?.stripeCustomerId) {
-    return {
-      customer: sub.stripeCustomerId,
-      customer_update: {
-        name: "auto",
-        address: "auto",
-      },
-    };
+    const reachable = await isStripeCustomerReachable(sub.stripeCustomerId);
+    if (reachable) {
+      return {
+        customer: sub.stripeCustomerId,
+        customer_update: {
+          name: "auto",
+          address: "auto",
+        },
+      };
+    }
   }
 
   const { primaryEmail } = await getClerkUserFieldDisplayById(userId);
@@ -183,7 +196,41 @@ async function resolveCheckoutCustomerParams(
   return {};
 }
 
+function checkoutActionErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    if (
+      "type" in error &&
+      typeof error.type === "string" &&
+      error.type === "StripeInvalidRequestError"
+    ) {
+      const message = error.message;
+      if (/no such customer/i.test(message)) {
+        return "Your saved billing profile is out of date. Please try checkout again.";
+      }
+      if (/no such price/i.test(message)) {
+        return message;
+      }
+      if (/automatic tax/i.test(message)) {
+        return "Stripe Tax is not configured for this account. Contact support or disable automatic tax in Stripe.";
+      }
+      return message;
+    }
+    return error.message;
+  }
+  return "Unable to start checkout. Please try again.";
+}
+
 export async function createStripeCheckoutSessionAction(
+  data: CreateCheckoutSessionInput,
+): Promise<{ url: string; upgradedInPlace?: boolean }> {
+  try {
+    return await createStripeCheckoutSessionActionInner(data);
+  } catch (error) {
+    throw new Error(checkoutActionErrorMessage(error));
+  }
+}
+
+async function createStripeCheckoutSessionActionInner(
   data: CreateCheckoutSessionInput,
 ): Promise<{ url: string; upgradedInPlace?: boolean }> {
   const { userId } = await auth();
@@ -200,7 +247,12 @@ export async function createStripeCheckoutSessionAction(
   })}`;
 
   const trimmedPromo = promotionCode?.trim() ?? "";
-  const upgradableSub = await fetchUpgradableStripeSubscription(userId);
+  let upgradableSub = null;
+  try {
+    upgradableSub = await fetchUpgradableStripeSubscription(userId);
+  } catch (error) {
+    console.error("[createStripeCheckoutSessionAction] upgradable lookup:", error);
+  }
 
   if (upgradableSub) {
     if (trimmedPromo) {
