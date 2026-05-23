@@ -107,6 +107,101 @@ function billingStatusFromStripeSubscription(
   return "expired";
 }
 
+function stripeSearchLiteral(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+async function resolveClerkPrimaryEmail(userId: string): Promise<string | null> {
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    const primary =
+      user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)
+        ?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
+    const normalized = primary?.trim().toLowerCase();
+    return normalized || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Locates an active/trialing subscription for a Clerk user when webhooks did not run.
+ * Subscription metadata is checked first — Checkout always sets `clerkUserId` there,
+ * even before customer metadata is patched.
+ */
+async function findActiveSubscriptionForClerkUser(userId: string): Promise<{
+  sub: Stripe.Subscription;
+  customerId: string;
+} | null> {
+  const uid = stripeSearchLiteral(userId);
+
+  try {
+    const bySubMeta = await stripe.subscriptions.search({
+      query: `metadata['clerkUserId']:'${uid}' AND (status:'active' OR status:'trialing')`,
+      limit: 1,
+    });
+    const subFromMeta = bySubMeta.data[0];
+    if (subFromMeta) {
+      const customerId =
+        typeof subFromMeta.customer === "string"
+          ? subFromMeta.customer
+          : subFromMeta.customer?.id;
+      if (customerId) return { sub: subFromMeta, customerId };
+    }
+  } catch {
+    // Subscription Search may be unavailable; fall through to customer lookup.
+  }
+
+  let customerId: string | undefined;
+
+  const customers = await stripe.customers.search({
+    query: `metadata['clerkUserId']:'${uid}'`,
+    limit: 1,
+  });
+  customerId = customers.data[0]?.id;
+
+  if (!customerId) {
+    const email = await resolveClerkPrimaryEmail(userId);
+    if (email) {
+      const escapedEmail = stripeSearchLiteral(email);
+      const byEmail = await stripe.customers.search({
+        query: `email:'${escapedEmail}'`,
+        limit: 10,
+      });
+      for (const customer of byEmail.data) {
+        const listed = await stripe.subscriptions.list({
+          customer: customer.id,
+          status: "all",
+          limit: 5,
+        });
+        if (
+          listed.data.some(
+            (s) => s.status === "active" || s.status === "trialing",
+          )
+        ) {
+          customerId = customer.id;
+          break;
+        }
+      }
+      customerId ??= byEmail.data[0]?.id;
+    }
+  }
+
+  if (!customerId) return null;
+
+  const listed = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 20,
+  });
+  const sub = listed.data.find(
+    (s) => s.status === "active" || s.status === "trialing",
+  );
+  if (!sub) return null;
+
+  return { sub, customerId };
+}
+
 /**
  * Pulls the user's active/trialing Stripe subscription and syncs Clerk + DB.
  * Used when webhooks did not reach the app (common in local dev).
@@ -114,27 +209,12 @@ function billingStatusFromStripeSubscription(
 export async function syncActiveSubscriptionFromStripeForUser(
   userId: string,
 ): Promise<{ synced: boolean; planSlug: StripePaidPlanId | null }> {
-  const customers = await stripe.customers.search({
-    query: `metadata['clerkUserId']:'${userId}'`,
-    limit: 1,
-  });
-  const customerId = customers.data[0]?.id;
-  if (!customerId) {
+  const resolved = await findActiveSubscriptionForClerkUser(userId);
+  if (!resolved) {
     return { synced: false, planSlug: null };
   }
 
-  const listed = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 20,
-  });
-
-  const sub = listed.data.find(
-    (s) => s.status === "active" || s.status === "trialing",
-  );
-  if (!sub) {
-    return { synced: false, planSlug: null };
-  }
+  const { sub, customerId } = resolved;
 
   const customer = await stripe.customers.retrieve(customerId);
   const customerPlan =

@@ -145,17 +145,25 @@ async function resolveUserAndPlanFromSubscription(sub: Stripe.Subscription): Pro
   userId: string;
   plan: PaidPlanId | null;
 } | null> {
+  const subUserId = stringOrNull(sub.metadata?.clerkUserId);
+  const subPlan = asPaidPlanId(sub.metadata?.plan);
+
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
-  if (!customerId) return null;
 
-  const customer = await stripe.customers.retrieve(customerId);
-  if (customer.deleted) return null;
+  let customerUserId: string | null = null;
+  let customerPlan: PaidPlanId | null = null;
 
-  const userId = stringOrNull(customer.metadata?.clerkUserId);
+  if (customerId) {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer.deleted) {
+      customerUserId = stringOrNull(customer.metadata?.clerkUserId);
+      customerPlan = asPaidPlanId(customer.metadata?.plan);
+    }
+  }
+
+  const userId = subUserId ?? customerUserId;
   if (!userId) return null;
 
-  const subPlan = asPaidPlanId(sub.metadata?.plan);
-  const customerPlan = asPaidPlanId(customer.metadata?.plan);
   return { userId, plan: subPlan ?? customerPlan };
 }
 
@@ -243,6 +251,7 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+      case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
@@ -261,6 +270,25 @@ export async function POST(req: NextRequest) {
               : null;
 
           await setStripeBillingState(resolution.userId, activePlan, billingStatus);
+
+          const customerId =
+            typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+          if (
+            customerId &&
+            activePlan &&
+            (billingStatus === "active" || billingStatus === "trialing")
+          ) {
+            try {
+              await stripe.customers.update(customerId, {
+                metadata: {
+                  clerkUserId: resolution.userId,
+                  plan: activePlan,
+                },
+              });
+            } catch {
+              // Best-effort — billing state already written above.
+            }
+          }
 
           // Loops: sync userGroup and fire lifecycle events
           void (async () => {
@@ -284,8 +312,6 @@ export async function POST(req: NextRequest) {
           // Keep the stripe_subscriptions row in sync with the latest status,
           // plan slug, and item ID (price swaps update the item list).
           try {
-            const customerId =
-              typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
             if (customerId) {
               if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") {
                 await markStripeSubscriptionStatus(sub.id, stripeStatus);
