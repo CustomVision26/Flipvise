@@ -33,6 +33,7 @@
     "db:migrate:prod": "drizzle-kit migrate --config=drizzle.config.prod.mjs",
     "db:migrate-cloudfront": "tsx scripts/migrate-cloudfront-to-s3.ts",
     "db:verify-s3": "tsx scripts/verify-s3-setup.ts",
+    "stripe:cancel-duplicate-subs": "tsx scripts/cancel-duplicate-stripe-subs.ts",
     "lint": "eslint",
     "logo:transparent": "node scripts/remove-logo-background.cjs"
   },

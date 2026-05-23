@@ -129,7 +129,8 @@ async function resolveClerkPrimaryEmail(userId: string): Promise<string | null> 
  * Subscription metadata is checked first — Checkout always sets `clerkUserId` there,
  * even before customer metadata is patched.
  */
-async function findActiveSubscriptionForClerkUser(userId: string): Promise<{
+/** Active/trialing subscription for a Clerk user (DB-independent Stripe lookup). */
+export async function findActiveSubscriptionForClerkUser(userId: string): Promise<{
   sub: Stripe.Subscription;
   customerId: string;
 } | null> {

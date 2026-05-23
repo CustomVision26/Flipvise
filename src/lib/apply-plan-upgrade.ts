@@ -13,6 +13,7 @@
  */
 
 import { createClerkClient } from "@clerk/backend";
+import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import {
   getActiveStripeSubscription,
@@ -20,6 +21,7 @@ import {
   markStripeSubscriptionStatus,
 } from "@/db/queries/stripe-subscriptions";
 import {
+  findActiveSubscriptionForClerkUser,
   setStripeBillingState,
   upsertStripeSubscriptionFromStripeSub,
 } from "@/lib/stripe-billing-sync";
@@ -135,9 +137,52 @@ export type UpgradableStripeSubscription = {
   status: string;
 };
 
+function upgradableFromStripeSubscription(
+  sub: Stripe.Subscription,
+  fallbackCustomerId?: string | null,
+  fallbackItemId?: string | null,
+): UpgradableStripeSubscription | null {
+  if (!UPDATABLE_STRIPE_SUBSCRIPTION_STATUSES.has(sub.status)) {
+    return null;
+  }
+
+  const itemId = sub.items?.data?.[0]?.id ?? fallbackItemId?.trim();
+  if (!itemId) return null;
+
+  const customerId =
+    typeof sub.customer === "string"
+      ? sub.customer
+      : (sub.customer?.id ?? fallbackCustomerId ?? null);
+  if (!customerId) return null;
+
+  return {
+    subscriptionId: sub.id,
+    customerId,
+    itemId,
+    status: sub.status,
+  };
+}
+
+async function persistUpgradableSubscriptionRow(
+  userId: string,
+  sub: Stripe.Subscription,
+): Promise<void> {
+  const planSlug =
+    typeof sub.metadata?.plan === "string" && isStripePaidPlan(sub.metadata.plan)
+      ? sub.metadata.plan
+      : null;
+  try {
+    await upsertStripeSubscriptionFromStripeSub(userId, sub, planSlug);
+  } catch (error) {
+    console.error("[fetchUpgradableStripeSubscription] DB upsert:", error);
+  }
+}
+
 /**
  * Loads the user’s subscription row and confirms with Stripe that it can be updated in place.
- * Returns null when the sub is canceled (or missing) so Checkout can start a new subscription.
+ * Falls back to a Stripe API search when the DB row is missing or stale (e.g. webhook lag),
+ * so Checkout upgrades in place with proration instead of creating duplicate subscriptions.
+ * Returns null when no updatable sub exists so Checkout can start a new subscription.
  */
 export async function fetchUpgradableStripeSubscription(
   userId: string,
@@ -146,44 +191,49 @@ export async function fetchUpgradableStripeSubscription(
     (await getActiveStripeSubscription(userId)) ??
     (await getManageableStripeSubscription(userId));
 
-  if (!row?.stripeSubscriptionId || !row.stripeCustomerId) {
-    return null;
-  }
+  if (row?.stripeSubscriptionId && row.stripeCustomerId) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(row.stripeSubscriptionId, {
+        expand: ["items.data.price"],
+      });
+      const resolved = upgradableFromStripeSubscription(
+        sub,
+        row.stripeCustomerId,
+        row.stripeSubscriptionItemId,
+      );
+      if (resolved) return resolved;
 
-  let sub;
-  try {
-    sub = await stripe.subscriptions.retrieve(row.stripeSubscriptionId, {
-      expand: ["items.data.price"],
-    });
-  } catch {
-    return null;
-  }
-
-  if (!UPDATABLE_STRIPE_SUBSCRIPTION_STATUSES.has(sub.status)) {
-    if (sub.status === "canceled" || sub.status === "incomplete_expired") {
-      try {
-        await markStripeSubscriptionStatus(row.stripeSubscriptionId, sub.status);
-      } catch {
-        // best-effort — stale DB row
+      if (sub.status === "canceled" || sub.status === "incomplete_expired") {
+        try {
+          await markStripeSubscriptionStatus(row.stripeSubscriptionId, sub.status);
+        } catch {
+          // best-effort — stale DB row
+        }
       }
+    } catch {
+      // DB points at a missing/invalid subscription — fall through to Stripe search.
     }
-    return null;
   }
 
-  const itemId = sub.items?.data?.[0]?.id ?? row.stripeSubscriptionItemId?.trim();
-  if (!itemId) return null;
+  const located = await findActiveSubscriptionForClerkUser(userId);
+  if (!located) return null;
 
-  const customerId =
-    typeof sub.customer === "string"
-      ? sub.customer
-      : (sub.customer?.id ?? row.stripeCustomerId);
+  let sub = located.sub;
+  if (!sub.items?.data?.[0]?.id) {
+    try {
+      sub = await stripe.subscriptions.retrieve(sub.id, {
+        expand: ["items.data.price"],
+      });
+    } catch {
+      return null;
+    }
+  }
 
-  return {
-    subscriptionId: row.stripeSubscriptionId,
-    customerId,
-    itemId,
-    status: sub.status,
-  };
+  const resolved = upgradableFromStripeSubscription(sub, located.customerId);
+  if (!resolved) return null;
+
+  await persistUpgradableSubscriptionRow(userId, sub);
+  return resolved;
 }
 
 function priceIdOnSubscriptionItem(

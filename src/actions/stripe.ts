@@ -208,13 +208,23 @@ export async function createStripeCheckoutSessionAction(
         "Promotion codes only apply to new subscriptions. Clear the promo field to change your existing plan — Stripe will prorate automatically.",
       );
     }
-    const upgraded = await tryUpgradeExistingStripeSubscription({
-      userId,
-      planSlug: plan,
-      period,
-    });
-    if (upgraded) {
-      return { url: successReturnUrl, upgradedInPlace: true };
+    try {
+      const upgraded = await tryUpgradeExistingStripeSubscription({
+        userId,
+        planSlug: plan,
+        period,
+      });
+      if (upgraded) {
+        return { url: successReturnUrl, upgradedInPlace: true };
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("already on this plan")
+      ) {
+        return { url: successReturnUrl, upgradedInPlace: true };
+      }
+      throw error;
     }
   }
 
