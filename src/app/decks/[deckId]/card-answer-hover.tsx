@@ -15,7 +15,9 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { FormattedCardAnswer } from "@/components/formatted-card-answer";
 import { cn } from "@/lib/utils";
+import { isStepAnswer } from "@/lib/parse-step-answer";
 
 type CardAnswerHoverProps = {
   children: React.ReactNode;
@@ -40,6 +42,7 @@ export function CardAnswerHover({
   if (!hasPreview) return <>{children}</>;
 
   const imageAlt = answerText || front || "Answer image";
+  const isStructuredAnswer = isStepAnswer(answerText);
 
   return (
     <>
@@ -57,7 +60,12 @@ export function CardAnswerHover({
         side="top"
         align="center"
         sideOffset={10}
-        className="w-[min(18rem,calc(100vw-2rem))] overflow-hidden border-2 border-primary bg-card p-0 text-card-foreground shadow-lg shadow-primary/30 ring-0"
+        className={cn(
+          "overflow-hidden border-2 border-primary bg-card p-0 text-card-foreground shadow-lg shadow-primary/30 ring-0",
+          isStructuredAnswer
+            ? "w-[min(24rem,calc(100vw-2rem))]"
+            : "w-[min(18rem,calc(100vw-2rem))]",
+        )}
       >
         <div className="border-b border-primary/40 bg-primary px-3 py-2">
           <div className="flex items-center gap-2">
@@ -70,39 +78,53 @@ export function CardAnswerHover({
             </p>
           </div>
         </div>
-        <div className="bg-card px-3 py-2.5">
-          <div className="flex items-start gap-2.5">
-          {isMC ? (
-            <CheckCircle2
-              className="mt-0.5 size-3.5 shrink-0 text-emerald-500"
-              aria-hidden
-            />
-          ) : null}
-          {backImageUrl ? (
-            <button
-              type="button"
-              className="relative size-11 shrink-0 overflow-hidden rounded-md border border-border bg-muted cursor-zoom-in transition-[box-shadow,transform] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="Double-click to enlarge"
-              aria-label="Double-click to enlarge answer image"
-              onDoubleClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setImageOpen(true);
-              }}
-            >
-              <Image
-                src={backImageUrl}
-                alt=""
-                fill
-                className="object-cover pointer-events-none"
-                sizes="44px"
-                draggable={false}
+        <div className={cn("bg-card", isStructuredAnswer ? "px-3 py-3" : "px-3 py-2.5")}>
+          <div
+            className={cn(
+              "flex min-w-0",
+              isStructuredAnswer || !backImageUrl
+                ? "flex-col gap-2"
+                : "items-start gap-2.5",
+            )}
+          >
+            {isMC && !isStructuredAnswer ? (
+              <CheckCircle2
+                className="mt-0.5 size-3.5 shrink-0 text-emerald-500"
+                aria-hidden
               />
-            </button>
-          ) : null}
-          <p className="min-w-0 text-sm font-medium leading-snug text-foreground break-words whitespace-pre-wrap">
-            {answerText || (backImageUrl ? "Image answer" : "—")}
-          </p>
+            ) : null}
+            {backImageUrl ? (
+              <button
+                type="button"
+                className={cn(
+                  "relative shrink-0 overflow-hidden rounded-md border border-border bg-muted cursor-zoom-in transition-[box-shadow,transform] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isStructuredAnswer ? "h-20 w-full" : "size-11",
+                )}
+                title="Double-click to enlarge"
+                aria-label="Double-click to enlarge answer image"
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setImageOpen(true);
+                }}
+              >
+                <Image
+                  src={backImageUrl}
+                  alt=""
+                  fill
+                  className="object-contain pointer-events-none p-1"
+                  sizes={isStructuredAnswer ? "320px" : "44px"}
+                  draggable={false}
+                />
+              </button>
+            ) : null}
+            {answerText ? (
+              <FormattedCardAnswer text={answerText} variant="hover" className="min-w-0 flex-1" />
+            ) : backImageUrl ? (
+              <p className="text-sm font-medium text-foreground">Image answer</p>
+            ) : (
+              <p className="text-sm font-medium text-muted-foreground">—</p>
+            )}
           </div>
         </div>
       </HoverCardContent>
@@ -129,9 +151,7 @@ export function CardAnswerHover({
             priority
           />
           {answerText ? (
-            <p className="text-center text-xs font-medium text-card-foreground">
-              {answerText}
-            </p>
+            <FormattedCardAnswer text={answerText} variant="hover" className="text-center" />
           ) : null}
           </div>
         </DialogContent>

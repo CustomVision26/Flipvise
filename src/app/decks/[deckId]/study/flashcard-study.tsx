@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { FormattedCardAnswer } from "@/components/formatted-card-answer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -78,89 +79,6 @@ function MagicAnswerAmbience({ revealKey }: { revealKey: number }) {
           }}
         />
       ))}
-    </div>
-  );
-}
-
-function FormattedCardBack({
-  text,
-  hasGradient,
-  revealKey,
-}: {
-  text: string;
-  hasGradient?: boolean;
-  revealKey: number;
-}) {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const lineDelay = (index: number) => `${0.38 + index * 0.11}s`;
-
-  if (lines.length <= 1) {
-    return (
-      <p
-        key={revealKey}
-        className={cn(
-          "animate-magic-answer-reveal text-center text-xl font-semibold leading-relaxed break-words sm:text-2xl md:text-3xl",
-          hasGradient && "text-white",
-        )}
-      >
-        {text}
-      </p>
-    );
-  }
-
-  return (
-    <div key={revealKey} className="w-full space-y-1.5 text-left">
-      {lines.map((line, i) => {
-        const revealClass = "animate-magic-line-reveal";
-        const revealStyle = { animationDelay: lineDelay(i) };
-
-        if (/^Step\s*\d+:/i.test(line)) {
-          return (
-            <p
-              key={i}
-              className={cn(
-                revealClass,
-                "pt-2 text-sm font-semibold break-words first:pt-0 sm:text-base",
-                hasGradient ? "text-white/90" : "text-primary",
-              )}
-              style={revealStyle}
-            >
-              {line}
-            </p>
-          );
-        }
-        if (/^(Answer|Result|Solution|∴)[\s:]*/i.test(line)) {
-          return (
-            <p
-              key={i}
-              className={cn(
-                "animate-magic-line-reveal-glow mt-1 border-t pt-3 text-sm font-bold break-words sm:text-base md:text-lg",
-                hasGradient ? "border-white/20 text-white" : "border-border text-emerald-400",
-              )}
-              style={
-                {
-                  "--magic-line-delay": lineDelay(i),
-                } as React.CSSProperties
-              }
-            >
-              {line}
-            </p>
-          );
-        }
-        return (
-          <p
-            key={i}
-            className={cn(
-              revealClass,
-              "pl-2 font-mono text-xs leading-relaxed break-words sm:pl-3 sm:text-sm",
-              hasGradient ? "text-white/80" : "text-foreground",
-            )}
-            style={revealStyle}
-          >
-            {line}
-          </p>
-        );
-      })}
     </div>
   );
 }
@@ -669,8 +587,9 @@ export function FlashcardStudy({
             )}
             <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-4 py-3 sm:px-8">
               {currentCard.back && (
-                <FormattedCardBack
+                <FormattedCardAnswer
                   text={currentCard.back}
+                  variant="study"
                   hasGradient={hasGradient}
                   revealKey={answerRevealKey}
                 />

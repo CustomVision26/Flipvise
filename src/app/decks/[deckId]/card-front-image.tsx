@@ -37,7 +37,7 @@ export function CardFrontImage({
           "relative shrink-0 overflow-hidden border border-border bg-muted/30 cursor-zoom-in",
           "transition-[box-shadow,transform] hover:ring-2 hover:ring-primary/40",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          variant === "tile" && "aspect-[16/10] w-full rounded-sm",
+          variant === "tile" && "aspect-[2/1] w-full rounded-sm",
           variant === "thumb" && "h-14 w-14 rounded-sm sm:h-16 sm:w-16",
           className,
         )}
@@ -54,7 +54,7 @@ export function CardFrontImage({
           alt={alt}
           fill
           className="object-contain pointer-events-none"
-          sizes={variant === "tile" ? "160px" : "64px"}
+          sizes={variant === "tile" ? "120px" : "64px"}
           draggable={false}
         />
       </button>

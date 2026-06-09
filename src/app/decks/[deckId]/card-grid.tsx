@@ -300,26 +300,26 @@ export function CardGrid({
                 backImageUrl={card.backImageUrl}
               >
               <Card
-                className="flex h-full min-h-[148px] flex-col gap-1 rounded-lg py-2 px-2 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm"
+                className="flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm"
                 style={{ animationDelay: `${i * 30}ms` }}
               >
-                <div className="flex min-h-3.5 flex-wrap items-center gap-0.5">
+                <div className="flex min-h-3 shrink-0 items-center gap-0.5">
                   {isMC && (
                     <Badge
                       variant="outline"
-                      className="h-4 gap-0.5 border-primary/35 px-1 py-0 text-[8px] font-normal leading-none"
+                      className="size-3.5 justify-center border-primary/35 p-0"
+                      aria-label="Multiple choice"
                     >
                       <ListChecks className="size-2 text-primary" />
-                      MC
                     </Badge>
                   )}
                   {card.aiGenerated && (
                     <Badge
                       variant="outline"
-                      className="h-4 gap-0.5 px-1 py-0 text-[8px] font-normal leading-none"
+                      className="size-3.5 justify-center p-0"
+                      aria-label="AI generated"
                     >
                       <Sparkles className="size-2 text-primary" />
-                      AI
                     </Badge>
                   )}
                 </div>
@@ -330,25 +330,22 @@ export function CardGrid({
                     label={frontImageLabel}
                     variant="tile"
                   />
-                ) : (
-                  <div
-                    className="aspect-[16/10] w-full shrink-0 rounded-sm border border-border/50 bg-muted/10"
-                    aria-hidden
-                  />
-                )}
+                ) : null}
                 <p
                   className={cn(
-                    "min-h-[1.75rem] text-[11px] font-medium leading-snug line-clamp-2",
+                    "min-h-0 flex-1 text-[11px] font-medium leading-snug break-words",
+                    card.frontImageUrl ? "line-clamp-2" : "line-clamp-5",
                     card.front ? "text-foreground" : "text-transparent select-none",
                   )}
+                  title={card.front ?? undefined}
                 >
                   {card.front ?? "No front text"}
                 </p>
-                <div className="mt-auto flex items-center justify-between gap-0.5 border-t border-border/40 pt-1">
-                  <span className="text-[9px] text-muted-foreground tabular-nums truncate">
+                <div className="mt-auto flex shrink-0 items-center justify-between gap-0.5 border-t border-border/30 pt-1">
+                  <span className="text-[8px] text-muted-foreground tabular-nums truncate">
                     {updatedCompact}
                   </span>
-                  <div className="flex shrink-0 items-center [&_button]:h-6 [&_button]:min-h-6 [&_button]:px-1.5 [&_button]:text-[10px]">
+                  <div className="flex shrink-0 items-center [&_button]:h-5 [&_button]:min-h-5 [&_button]:px-1 [&_button]:text-[9px]">
                     <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
                     <DeleteCardDialog cardId={card.id} deckId={deckId} />
                   </div>
