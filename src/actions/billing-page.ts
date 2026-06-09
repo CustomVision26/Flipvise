@@ -2,7 +2,11 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { createClerkClient } from "@clerk/backend";
-import { getMergedPlanHistoryForUser } from "@/db/queries/plan-history";
+import {
+  appendComplimentaryAccessHistoryRows,
+  getMergedPlanHistoryForUser,
+} from "@/db/queries/plan-history";
+import { resolveBillingTabPlanDisplay } from "@/lib/billing-tab-plan-display";
 import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
@@ -20,9 +24,14 @@ export type BillingTabData = {
   planHistory: PlanHistoryRow[];
   canCancelStripe: boolean;
   cancelPreview: CancelSubscriptionPreview | null;
-  /** Active Stripe subscription slug — preferred over Clerk `meta.plan` for “Current plan”. */
+  /** Resolved current plan slug (Stripe, metadata, or complimentary unlock). */
   currentPlanSlug: string | null;
+  planLabel: string;
   billingStatus: string | null;
+  adminRoleLabel: string | null;
+  isComplimentary: boolean;
+  accessSubtitle: string;
+  showPaidStripeControls: boolean;
 };
 
 const clerkClient = createClerkClient({
@@ -54,7 +63,12 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
         canCancelStripe: false,
         cancelPreview: null,
         currentPlanSlug: null,
+        planLabel: "Free",
         billingStatus: null,
+        adminRoleLabel: null,
+        isComplimentary: false,
+        accessSubtitle: "No active subscription",
+        showPaidStripeControls: false,
       };
     }
 
@@ -71,10 +85,11 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
       (await getManageableStripeSubscription(userId));
     const sub = activeSub;
 
+    let meta: Record<string, unknown> = {};
     let billingStatus: string | null = null;
     try {
       const user = await clerkClient.users.getUser(userId);
-      const meta = user.publicMetadata as Record<string, unknown>;
+      meta = (user.publicMetadata ?? {}) as Record<string, unknown>;
       const raw = meta.billingStatus;
       billingStatus = typeof raw === "string" ? raw : null;
     } catch {
@@ -82,6 +97,16 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
     }
 
     const planHistory = await getMergedPlanHistoryForUser(userId, email);
+    await appendComplimentaryAccessHistoryRows(userId, planHistory, meta);
+    planHistory.sort(
+      (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+    );
+
+    const planDisplay = resolveBillingTabPlanDisplay({
+      meta,
+      stripePlanSlug: activeSub?.planSlug?.trim() || null,
+      billingStatus,
+    });
 
     let cancelPreview: CancelSubscriptionPreview | null = null;
     if (sub) {
@@ -99,8 +124,13 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
       planHistory,
       canCancelStripe: sub != null,
       cancelPreview,
-      currentPlanSlug: activeSub?.planSlug?.trim() || null,
-      billingStatus,
+      currentPlanSlug: planDisplay.planSlug,
+      planLabel: planDisplay.planLabel,
+      billingStatus: planDisplay.billingStatus,
+      adminRoleLabel: planDisplay.adminRoleLabel,
+      isComplimentary: planDisplay.isComplimentary,
+      accessSubtitle: planDisplay.accessSubtitle,
+      showPaidStripeControls: planDisplay.showPaidStripeControls,
     };
   } catch (error) {
     console.error("[loadBillingTabDataAction]", error);
@@ -109,7 +139,12 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
       canCancelStripe: false,
       cancelPreview: null,
       currentPlanSlug: null,
+      planLabel: "Free",
       billingStatus: null,
+      adminRoleLabel: null,
+      isComplimentary: false,
+      accessSubtitle: "No active subscription",
+      showPaidStripeControls: false,
     };
   }
 }

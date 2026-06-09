@@ -10,9 +10,9 @@ const StudySessionDynamic = dynamic<StudySessionProps>(
     // Avoids Turbopack dev SSR "module factory is not available" for this client tree.
     ssr: false,
     loading: () => (
-      <div className="flex w-full max-w-2xl flex-1 flex-col gap-4 self-center">
+      <div className="flex w-full max-w-xl flex-1 flex-col gap-4 self-center">
         <Skeleton className="mx-auto h-9 w-64 rounded-md" />
-        <Skeleton className="min-h-[280px] w-full rounded-2xl sm:min-h-[380px]" />
+        <Skeleton className="min-h-[220px] w-full rounded-2xl sm:min-h-[300px] md:h-[380px]" />
         <div className="flex justify-center gap-3">
           <Skeleton className="h-9 w-24 rounded-md" />
           <Skeleton className="h-9 w-20 rounded-md" />

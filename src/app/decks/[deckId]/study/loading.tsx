@@ -13,8 +13,8 @@ export default function StudyLoading() {
       </div>
 
       {/* Flashcard skeleton */}
-      <div className="w-full max-w-2xl">
-        <Skeleton className="w-full min-h-[300px] sm:min-h-[400px] md:h-[540px] rounded-2xl" />
+      <div className="w-full max-w-xl">
+        <Skeleton className="w-full min-h-[220px] sm:min-h-[300px] md:h-[380px] rounded-2xl" />
       </div>
 
       {/* Navigation buttons skeleton */}

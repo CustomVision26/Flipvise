@@ -1,12 +1,16 @@
 import { db } from "@/db";
-import { adminPlanAssignmentLogs } from "@/db/schema";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { adminPlanAssignmentLogs, adminPrivilegeLogs } from "@/db/schema";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import {
+  isClerkPlatformAdminRole,
+} from "@/lib/clerk-platform-admin-role";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
 import { listBillingInvoicesForUser } from "@/db/queries/billing";
 import {
   listProrationLinesWithReceiptForUser,
   type ProrationLineWithReceipt,
 } from "@/db/queries/billing-proration";
+import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { receiptPlanTitle } from "@/lib/stripe-receipt-plan-title";
@@ -172,6 +176,117 @@ function toIsoString(value: Date | string | null | undefined): string | null {
   return date.toISOString();
 }
 
+type StoredBillingInvoice = Awaited<
+  ReturnType<typeof listBillingInvoicesForUser>
+>[number];
+
+const PERIOD_END_MATCH_TOLERANCE_MS = 86_400_000 * 2;
+
+function planNamesMatch(rowPlanName: string, planSlug: string): boolean {
+  const normalizedRow = rowPlanName.trim().toLowerCase();
+  const fromReceipt = receiptPlanTitle(planSlug).trim().toLowerCase();
+  const fromSlug = slugToPlanDisplayName(planSlug).trim().toLowerCase();
+  return normalizedRow === fromReceipt || normalizedRow === fromSlug;
+}
+
+function rowCoversActiveSubscriptionPeriod(
+  row: PlanHistoryRow,
+  planSlug: string,
+  periodEnd: Date | null,
+): boolean {
+  if (row.planType === "Proration") return false;
+  if (!planNamesMatch(row.planName, planSlug)) return false;
+
+  const endMs = row.endAt ? new Date(row.endAt).getTime() : null;
+  const targetEndMs = periodEnd?.getTime() ?? null;
+
+  if (targetEndMs != null && endMs != null) {
+    return Math.abs(endMs - targetEndMs) <= PERIOD_END_MATCH_TOLERANCE_MS;
+  }
+
+  if (endMs == null) return true;
+  return endMs > Date.now();
+}
+
+function pushPaidInvoiceHistoryRow(
+  rows: PlanHistoryRow[],
+  inv: StoredBillingInvoice,
+  planType: PlanHistoryTypeLabel = "Paid subscription",
+) {
+  const receiptUrl = receiptUrlFromStoredInvoice(inv);
+  const startIso = toIsoString(inv.periodStart ?? inv.paidAt ?? inv.createdAt);
+  if (!startIso) return;
+
+  rows.push({
+    id: `inv-${inv.id}`,
+    planName: receiptPlanTitle(inv.planSlug),
+    planType,
+    statusLabel: invoiceStatusLabel(inv.status),
+    startAt: startIso,
+    endAt: toIsoString(inv.periodEnd),
+    receiptUrl,
+    receiptLabel: inv.invoiceNumber?.trim() || null,
+  });
+}
+
+async function appendActiveStripeSubscriptionRow(
+  userId: string,
+  rows: PlanHistoryRow[],
+  invoices: StoredBillingInvoice[],
+): Promise<void> {
+  const activeSub = await getActiveStripeSubscription(userId);
+  const planSlug = activeSub?.planSlug?.trim();
+  if (!activeSub || !planSlug) return;
+  if (activeSub.status !== "active" && activeSub.status !== "trialing") return;
+
+  const periodEnd =
+    activeSub.currentPeriodEnd instanceof Date
+      ? activeSub.currentPeriodEnd
+      : activeSub.currentPeriodEnd
+        ? new Date(activeSub.currentPeriodEnd)
+        : null;
+
+  if (
+    rows.some((row) =>
+      rowCoversActiveSubscriptionPeriod(row, planSlug, periodEnd),
+    )
+  ) {
+    return;
+  }
+
+  const latestPaidInvoice = invoices.find(
+    (inv) =>
+      inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase() &&
+      inv.status?.toLowerCase() === "paid",
+  );
+
+  const startIso = toIsoString(
+    latestPaidInvoice?.periodStart ??
+      latestPaidInvoice?.paidAt ??
+      activeSub.updatedAt ??
+      activeSub.createdAt,
+  );
+  if (!startIso) return;
+
+  rows.push({
+    id: `stripe-sub-active-${activeSub.stripeSubscriptionId}`,
+    planName: receiptPlanTitle(planSlug),
+    planType: "Paid subscription",
+    statusLabel:
+      activeSub.status === "trialing"
+        ? "Trialing"
+        : latestPaidInvoice
+          ? invoiceStatusLabel(latestPaidInvoice.status)
+          : "Active",
+    startAt: startIso,
+    endAt: toIsoString(periodEnd ?? latestPaidInvoice?.periodEnd),
+    receiptUrl: latestPaidInvoice
+      ? receiptUrlFromStoredInvoice(latestPaidInvoice)
+      : null,
+    receiptLabel: latestPaidInvoice?.invoiceNumber?.trim() || null,
+  });
+}
+
 export async function getMergedPlanHistoryForUser(
   userId: string,
   userEmail: string | null,
@@ -225,41 +340,24 @@ async function buildMergedPlanHistoryForUser(
   const rows: PlanHistoryRow[] = [];
 
   for (const inv of invoices) {
-    const receiptUrl = receiptUrlFromStoredInvoice(inv);
-
     const billingReason = inv.stripeBillingReason?.toLowerCase() ?? "";
-    const skipInvoiceAggregate =
+    const hasProrationDetail =
       inv.source === "invoice" &&
       billingReason === "subscription_update" &&
       invoicesWithProrationDetail.has(inv.externalId);
 
-    if (skipInvoiceAggregate) {
+    if (hasProrationDetail) {
+      // Proration lines are listed separately; still show the new plan period from the invoice.
+      pushPaidInvoiceHistoryRow(rows, inv, "Paid subscription");
       continue;
     }
-
-    const startIso = toIsoString(
-      inv.periodStart ?? inv.paidAt ?? inv.createdAt,
-    );
-    if (!startIso) continue;
-
-    const endIso = toIsoString(inv.periodEnd);
-    const planName = receiptPlanTitle(inv.planSlug);
 
     const planType: PlanHistoryTypeLabel =
       inv.source === "invoice" && billingReason === "subscription_update"
         ? "Proration"
         : "Paid subscription";
 
-    rows.push({
-      id: `inv-${inv.id}`,
-      planName,
-      planType,
-      statusLabel: invoiceStatusLabel(inv.status),
-      startAt: startIso,
-      endAt: endIso,
-      receiptUrl,
-      receiptLabel: inv.invoiceNumber?.trim() || null,
-    });
+    pushPaidInvoiceHistoryRow(rows, inv, planType);
   }
 
   const prorationByInvoice = groupProrationLinesByInvoice(prorationLines);
@@ -343,10 +441,73 @@ async function buildMergedPlanHistoryForUser(
     });
   }
 
+  await appendActiveStripeSubscriptionRow(userId, rows, invoices);
+
   rows.sort(
     (a, b) =>
       new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
   );
 
   return rows;
+}
+
+function hasOpenComplimentaryPlanRow(
+  rows: PlanHistoryRow[],
+  planName: string,
+): boolean {
+  return rows.some(
+    (row) =>
+      row.endAt == null &&
+      row.planName === planName &&
+      row.planType.startsWith("Complimentary"),
+  );
+}
+
+/** Platform-admin / `adminGranted` unlock is not logged as a plan assignment — surface it in history. */
+export async function appendComplimentaryAccessHistoryRows(
+  userId: string,
+  rows: PlanHistoryRow[],
+  meta: Record<string, unknown>,
+): Promise<void> {
+  const role = typeof meta.role === "string" ? meta.role : null;
+  const adminGranted = meta.adminGranted === true;
+  const isPlatformAdmin = isClerkPlatformAdminRole(role);
+
+  if (!isPlatformAdmin && !adminGranted) return;
+
+  const planName = "Pro Plus";
+  if (hasOpenComplimentaryPlanRow(rows, planName)) return;
+
+  let startIso = new Date().toISOString();
+  try {
+    const [latestGrant] = await db
+      .select({ createdAt: adminPrivilegeLogs.createdAt })
+      .from(adminPrivilegeLogs)
+      .where(
+        and(
+          eq(adminPrivilegeLogs.targetUserId, userId),
+          inArray(adminPrivilegeLogs.action, ["granted", "superadmin_granted"]),
+        ),
+      )
+      .orderBy(desc(adminPrivilegeLogs.createdAt))
+      .limit(1);
+    if (latestGrant?.createdAt) {
+      startIso = toIsoString(latestGrant.createdAt) ?? startIso;
+    }
+  } catch (error) {
+    console.error("[plan-history] admin privilege grant lookup:", error);
+  }
+
+  rows.push({
+    id: isPlatformAdmin
+      ? `platform-admin-complimentary-${userId}`
+      : `admin-granted-complimentary-${userId}`,
+    planName,
+    planType: "Complimentary (admin)",
+    statusLabel: "Active",
+    startAt: startIso,
+    endAt: null,
+    receiptUrl: null,
+    receiptLabel: null,
+  });
 }

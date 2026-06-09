@@ -23,7 +23,7 @@ import { AddCardDialog } from "./add-card-dialog";
 import { EditDeckDialog } from "./edit-deck-dialog";
 import { DeleteAllCardsDialog } from "./delete-all-cards-dialog";
 import { StudyLink } from "./study-link";
-import { GenerateCardsButton } from "./generate-cards-button";
+import { GenerateCardsButtonLoader } from "./generate-cards-button-loader";
 import { CardGrid } from "./card-grid";
 import {
   CARDS_PER_DECK_LIMIT_FREE,
@@ -146,7 +146,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             )}
           </div>
           <div className="flex flex-col gap-2 sm:gap-3 lg:items-end">
-            <GenerateCardsButton
+            <GenerateCardsButtonLoader
               deckId={id}
               hasDescription={!!deck.description}
               totalCardCount={cards.length}
@@ -233,6 +233,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
           <h2 className={cn("text-base sm:text-lg font-semibold", hasGradient && "text-white")}>Cards</h2>
           <AddCardDialog
             deckId={id}
+            deckName={deck.name}
             isAtLimit={isAtCardLimit}
             hasAI={effectiveAI}
             allowsMultipleChoiceFormat={paidDeckCards}
@@ -258,6 +259,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             </div>
             <AddCardDialog
               deckId={id}
+              deckName={deck.name}
               isAtLimit={isAtCardLimit}
               hasAI={effectiveAI}
               allowsMultipleChoiceFormat={paidDeckCards}

@@ -280,6 +280,10 @@ Correct answer / Back: ${correctAnswer}
 Generate exactly 3 plausible wrong answers that match the deck's style and scope.`,
   });
 
+  if (!output?.distractors || output.distractors.length !== 3) {
+    throw new Error("AI distractor generation failed. Please try again.");
+  }
+
   const [d1, d2, d3] = output.distractors.map((d) => cleanAiText(d));
   return [d1, d2, d3];
 }
@@ -424,7 +428,6 @@ export async function createCardAction(data: CreateCardInput) {
     }
   }
 
-  revalidatePath(`/decks/${deckId}`);
 }
 
 export async function updateCardAction(data: UpdateCardInput) {
@@ -732,7 +735,11 @@ User's Question: ${question}
 Does this question match the deck's topic and scope?`,
   });
 
-  if (!validationOutput.isRelevant && validationOutput.warning) {
+  if (
+    validationOutput &&
+    !validationOutput.isRelevant &&
+    validationOutput.warning
+  ) {
     throw new Error(`${validationOutput.warning} You can still add this card manually if you'd like.`);
   }
 
@@ -774,14 +781,22 @@ Question/Term: ${question}
 Generate an appropriate answer for the back of this flashcard, matching the style of the existing cards.`,
   });
 
+  if (!output?.answer?.trim()) {
+    throw new Error("AI answer generation failed. Please try again.");
+  }
+
   const answer = cleanAiText(output.answer);
 
-  // Always also generate 3 distractors so the client can persist them when
-  // the user saves the card. They are not displayed in the back field —
-  // only the correct `answer` is surfaced to the UI.
+  // Back illustration is fetched separately via /api/ai/card-back-image so the
+  // binary payload is not limited by server-action response size.
   let distractors: [string, string, string];
   try {
-    distractors = await generateStandardDistractors(deck, existingCards, question, answer);
+    distractors = await generateStandardDistractors(
+      deck,
+      existingCards,
+      question,
+      answer,
+    );
   } catch {
     distractors = ["", "", ""];
   }
@@ -893,7 +908,6 @@ export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceC
     0,
   );
 
-  revalidatePath(`/decks/${deckId}`);
 }
 
 export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceCardInput) {
@@ -992,7 +1006,11 @@ User's Question: ${question}
 Does this question match the deck's topic and scope?`,
   });
 
-  if (!validationOutput.isRelevant && validationOutput.warning) {
+  if (
+    validationOutput &&
+    !validationOutput.isRelevant &&
+    validationOutput.warning
+  ) {
     throw new Error(`${validationOutput.warning} You can still add this card manually if you'd like.`);
   }
 
@@ -1055,9 +1073,16 @@ Generate the correct answer and 3 plausible wrong answers that match the deck's 
     prompt: userPrompt,
   });
 
+  if (!output?.distractors || output.distractors.length !== 3) {
+    throw new Error("AI multiple-choice generation failed. Please try again.");
+  }
+
   const finalCorrect = hasCorrect
     ? cleanUserText(correctAnswer!)
     : cleanAiText(output.correctAnswer);
+  if (!finalCorrect) {
+    throw new Error("AI multiple-choice generation failed. Please try again.");
+  }
   const [d1, d2, d3] = output.distractors.map((d) => cleanAiText(d));
 
   return {

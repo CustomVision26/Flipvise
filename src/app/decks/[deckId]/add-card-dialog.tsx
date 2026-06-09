@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +19,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -41,16 +51,130 @@ import {
   MicOff,
   RefreshCw,
   Sparkles,
+  Type,
   X,
 } from "lucide-react";
 
 interface AddCardDialogProps {
   deckId: number;
+  deckName: string;
   trigger?: React.ReactElement;
   isAtLimit?: boolean;
   hasAI?: boolean;
   /** Paid tiers — Free users only get the standard card format in this dialog. */
   allowsMultipleChoiceFormat?: boolean;
+}
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function validateImageFile(file: File): string | null {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return "Invalid file type. Only JPG, JPEG, PNG, WebP, and GIF images are allowed.";
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    return "Image size must be 5MB or less.";
+  }
+  return null;
+}
+
+function extensionForMediaType(mediaType: string): string {
+  if (mediaType === "image/webp") return "webp";
+  if (mediaType === "image/jpeg") return "jpg";
+  if (mediaType === "image/gif") return "gif";
+  return "png";
+}
+
+function blobToPendingFile(blob: Blob): File {
+  const mediaType = blob.type || "image/webp";
+  return new File(
+    [blob],
+    `ai-back-${Date.now()}.${extensionForMediaType(mediaType)}`,
+    { type: mediaType },
+  );
+}
+
+async function fetchAiBackImage(
+  deckId: number,
+  question: string,
+  answer: string,
+): Promise<Blob | null> {
+  const response = await fetch("/api/ai/card-back-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deckId, question, answer }),
+  });
+  if (!response.ok) return null;
+  return response.blob();
+}
+
+function isLocalImagePreview(url: string): boolean {
+  return url.startsWith("blob:") || url.startsWith("data:");
+}
+
+/** Portal overlay — avoids nesting Dialog inside the Add Card dialog (portal teardown crash). */
+function ImageEnlargeOverlay({
+  open,
+  onClose,
+  imageSrc,
+  altText,
+}: {
+  open: boolean;
+  onClose: () => void;
+  imageSrc: string;
+  altText: string;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4 supports-backdrop-filter:backdrop-blur-xs"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Enlarged image preview"
+    >
+      <div
+        className="relative flex max-w-[min(calc(100vw-2rem),28rem)] flex-col overflow-hidden rounded-xl border-2 border-primary bg-card shadow-lg shadow-primary/30"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="border-b border-primary/40 bg-primary px-3 py-2 pr-10">
+          <p className="text-xs font-semibold text-primary-foreground">Image preview</p>
+        </div>
+        <div className="p-3">
+          <Image
+            src={imageSrc}
+            alt={altText}
+            width={640}
+            height={480}
+            className="mx-auto block h-auto max-h-[min(60vh,22rem)] w-auto max-w-[min(calc(100vw-3.5rem),26rem)] rounded-md border border-primary/35 bg-muted object-contain"
+            unoptimized={isLocalImagePreview(imageSrc)}
+            priority
+          />
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-2 right-2 text-primary-foreground hover:bg-primary-foreground/20"
+          onClick={onClose}
+          aria-label="Close enlarged preview"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 function ImageUploadSection({
@@ -62,6 +186,7 @@ function ImageUploadSection({
   onFileChange,
   onRemove,
   altText,
+  enableEnlarge = false,
 }: {
   label: string;
   imagePreview: string | null;
@@ -71,18 +196,39 @@ function ImageUploadSection({
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
   altText: string;
+  enableEnlarge?: boolean;
 }) {
+  const [enlargeOpen, setEnlargeOpen] = useState(false);
+
+  useEffect(() => {
+    if (!imagePreview) setEnlargeOpen(false);
+  }, [imagePreview]);
+
   return (
     <div className="flex flex-col gap-2">
       <Label className="text-muted-foreground text-xs">{label}</Label>
       {imagePreview ? (
-        <div className="relative w-full h-32 sm:h-48 rounded-lg overflow-hidden border border-border bg-muted/30">
+        <div
+          className={cn(
+            "relative w-full h-32 sm:h-48 rounded-lg overflow-hidden border border-border bg-muted/30",
+            enableEnlarge && !isUploading && "cursor-zoom-in",
+          )}
+          title={enableEnlarge ? "Double-click to enlarge" : undefined}
+          onDoubleClick={
+            enableEnlarge && !isUploading
+              ? (event) => {
+                  event.preventDefault();
+                  setEnlargeOpen(true);
+                }
+              : undefined
+          }
+        >
           <Image
             src={imagePreview}
             alt={altText}
             fill
-            className="object-contain"
-            unoptimized={imagePreview.startsWith("blob:")}
+            className="object-contain pointer-events-none"
+            unoptimized={isLocalImagePreview(imagePreview)}
           />
           {isUploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-xs sm:text-sm text-muted-foreground">
@@ -121,21 +267,17 @@ function ImageUploadSection({
         className="hidden"
         onChange={onFileChange}
       />
+
+      {enableEnlarge && imagePreview ? (
+        <ImageEnlargeOverlay
+          open={enlargeOpen}
+          onClose={() => setEnlargeOpen(false)}
+          imageSrc={imagePreview}
+          altText={altText}
+        />
+      ) : null}
     </div>
   );
-}
-
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-
-function validateImageFile(file: File): string | null {
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return "Invalid file type. Only JPG, JPEG, PNG, WebP, and GIF images are allowed.";
-  }
-  if (file.size > MAX_IMAGE_SIZE) {
-    return "Image size must be 5MB or less.";
-  }
-  return null;
 }
 
 function useSpeechRecognition(onAppend: (text: string) => void) {
@@ -224,10 +366,13 @@ function StandardCardForm({
   const [back, setBack] = useState("");
   const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
   const [backImagePreview, setBackImagePreview] = useState<string | null>(null);
+  const [backPendingFile, setBackPendingFile] = useState<File | null>(null);
   const [isUploadingBack, setIsUploadingBack] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [aiChoiceOpen, setAiChoiceOpen] = useState(false);
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
+  const [isGeneratingBackImage, setIsGeneratingBackImage] = useState(false);
   // AI-generated wrong answers paired with the current back text. Hidden from
   // the UI — only sent along with createCardAction so they are persisted on
   // the card for later use.
@@ -241,9 +386,10 @@ function StandardCardForm({
   const backSpeech = useSpeechRecognition((t) => setBack((prev) => prev + t));
 
   const isUploading = isUploadingFront || isUploadingBack;
-  const isBusy = isPending || isUploading || isGeneratingAnswer;
+  const isBusy = isPending || isUploading || isGeneratingAnswer || isGeneratingBackImage;
   const frontHasContent = front.trim().length > 0 || !!frontImageUrl;
-  const backHasContent = back.trim().length > 0 || !!backImageUrl;
+  const backHasContent =
+    back.trim().length > 0 || !!backImageUrl || !!backImagePreview;
 
   async function handleImageChange(
     e: React.ChangeEvent<HTMLInputElement>,
@@ -290,12 +436,24 @@ function StandardCardForm({
         : null;
     startTransition(async () => {
       try {
+        let resolvedBackImageUrl = backImageUrl;
+        if (backPendingFile && !backImageUrl) {
+          setIsUploadingBack(true);
+          try {
+            const formData = new FormData();
+            formData.append("image", backPendingFile);
+            resolvedBackImageUrl = await uploadCardImageAction({ deckId }, formData);
+          } finally {
+            setIsUploadingBack(false);
+          }
+        }
+
         await createCardAction({
           deckId,
           front,
           frontImageUrl,
           back,
-          backImageUrl,
+          backImageUrl: resolvedBackImageUrl,
           distractors: distractorsToSend,
         });
         setFront("");
@@ -304,6 +462,7 @@ function StandardCardForm({
         setBack("");
         setBackImageUrl(null);
         setBackImagePreview(null);
+        setBackPendingFile(null);
         setAiDistractors(null);
         setAiDistractorsFor(null);
         onSuccess();
@@ -313,17 +472,19 @@ function StandardCardForm({
     });
   }
 
-  async function handleGenerateAnswer() {
+  async function runAiGeneration(includeImage: boolean) {
     if (!front.trim()) {
       setError("Please enter a question or term in the front field first.");
       return;
     }
+    setAiChoiceOpen(false);
     setError(null);
     setIsGeneratingAnswer(true);
     try {
+      const question = front.trim();
       const { answer, distractors } = await generateAnswerAction({
         deckId,
-        question: front.trim(),
+        question,
       });
       setBack(answer);
       // Stash distractors keyed to the exact answer the user is about to see.
@@ -337,10 +498,34 @@ function StandardCardForm({
         setAiDistractors(null);
         setAiDistractorsFor(null);
       }
+
+      if (backImagePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(backImagePreview);
+      }
+      setBackPendingFile(null);
+      setBackImageUrl(null);
+      setBackImagePreview(null);
+      setIsGeneratingAnswer(false);
+
+      if (!includeImage) return;
+
+      setIsGeneratingBackImage(true);
+      try {
+        const imageBlob = await fetchAiBackImage(deckId, question, answer);
+        if (imageBlob) {
+          const pendingFile = blobToPendingFile(imageBlob);
+          setBackPendingFile(pendingFile);
+          setBackImagePreview(URL.createObjectURL(pendingFile));
+        }
+      } catch {
+        // Answer text is still usable when image generation fails.
+      } finally {
+        setIsGeneratingBackImage(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate answer.");
-    } finally {
       setIsGeneratingAnswer(false);
+      setIsGeneratingBackImage(false);
     }
   }
 
@@ -358,27 +543,74 @@ function StandardCardForm({
             </Label>
             <div className="flex items-center gap-1.5">
               {hasAI && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger render={<span />}>
+                <Popover open={aiChoiceOpen} onOpenChange={setAiChoiceOpen}>
+                  <PopoverTrigger
+                    render={
                       <Button
                         type="button"
                         variant="default"
                         size="icon"
                         className="h-7 w-7"
-                        onClick={handleGenerateAnswer}
                         disabled={!front.trim() || isBusy}
+                        aria-label={
+                          !front.trim()
+                            ? "Enter a question or term first"
+                            : "Generate an answer with AI"
+                        }
+                        title={
+                          !front.trim()
+                            ? "Enter a question or term first"
+                            : "Generate an answer with AI"
+                        }
+                      />
+                    }
+                  >
+                    <Sparkles
+                      className={`h-3.5 w-3.5 ${isGeneratingAnswer || isGeneratingBackImage ? "animate-pulse" : ""}`}
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="z-[60] w-64 gap-3 p-3">
+                    <PopoverHeader className="gap-1">
+                      <PopoverTitle className="text-sm">AI generate</PopoverTitle>
+                      <PopoverDescription className="text-xs leading-relaxed">
+                        Uses your deck name, description, and existing cards for style and scope.
+                      </PopoverDescription>
+                    </PopoverHeader>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-auto justify-start gap-2 px-3 py-2.5 text-left whitespace-normal"
+                        onClick={() => runAiGeneration(true)}
+                        disabled={isBusy}
                       >
-                        <Sparkles className="h-3.5 w-3.5" />
+                        <ImagePlus className="h-4 w-4 shrink-0" />
+                        <span>
+                          <span className="block font-medium">Text answer + image</span>
+                          <span className="block text-[11px] font-normal text-primary-foreground/80">
+                            Image is saved only when you click Add Card.
+                          </span>
+                        </span>
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-64 text-center">
-                      {!front.trim()
-                        ? "Enter a question or term first"
-                        : "Generate answer with AI. Uses your deck name, description, and existing cards so the answer matches your deck's style and scope."}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-auto justify-start gap-2 px-3 py-2.5 text-left whitespace-normal"
+                        onClick={() => runAiGeneration(false)}
+                        disabled={isBusy}
+                      >
+                        <Type className="h-4 w-4 shrink-0" />
+                        <span>
+                          <span className="block font-medium">Text answer only</span>
+                          <span className="block text-[11px] font-normal text-muted-foreground">
+                            Faster — no back illustration.
+                          </span>
+                        </span>
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
               {frontSpeech.supported && (
                 <TooltipProvider>
@@ -508,22 +740,33 @@ function StandardCardForm({
           isUploading={isUploadingBack}
           isBusy={isBusy}
           fileInputRef={backFileInputRef}
-          onFileChange={(e) =>
+          onFileChange={(e) => {
+            setBackPendingFile(null);
             handleImageChange(
               e,
               setBackImageUrl,
               setBackImagePreview,
               setIsUploadingBack,
               backFileInputRef,
-            )
-          }
+            );
+          }}
           onRemove={() => {
+            if (backImagePreview?.startsWith("blob:")) {
+              URL.revokeObjectURL(backImagePreview);
+            }
             setBackImageUrl(null);
             setBackImagePreview(null);
+            setBackPendingFile(null);
             if (backFileInputRef.current) backFileInputRef.current.value = "";
           }}
           altText="Back image preview"
+          enableEnlarge
         />
+        {isGeneratingBackImage && !backImagePreview ? (
+          <p className="text-xs text-muted-foreground animate-pulse">
+            Generating illustration…
+          </p>
+        ) : null}
       </div>
 
       {error && (
@@ -546,7 +789,13 @@ function StandardCardForm({
           disabled={isBusy || !frontHasContent || !backHasContent}
           className="w-full sm:w-auto"
         >
-          {isPending ? "Adding…" : isUploading ? "Uploading…" : "Add Card"}
+          {isPending
+            ? "Adding…"
+            : isUploading
+              ? "Uploading…"
+              : isGeneratingAnswer || isGeneratingBackImage
+                ? "Generating…"
+                : "Add Card"}
         </Button>
       </DialogFooter>
     </div>
@@ -569,6 +818,7 @@ function MultipleChoiceCardForm({
   const [question, setQuestion] = useState("");
   const [questionImageUrl, setQuestionImageUrl] = useState<string | null>(null);
   const [questionImagePreview, setQuestionImagePreview] = useState<string | null>(null);
+  const [questionPendingFile, setQuestionPendingFile] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState("");
   const [distractors, setDistractors] = useState<string[]>(["", "", ""]);
@@ -576,13 +826,21 @@ function MultipleChoiceCardForm({
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [aiChoiceOpen, setAiChoiceOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingQuestionImage, setIsGeneratingQuestionImage] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const speech = useSpeechRecognition((t) => setQuestion((prev) => prev + t));
 
-  const isBusy = isPending || isUploadingImage || isGenerating || isRegeneratingDistractors;
-  const questionHasContent = question.trim().length > 0 || !!questionImageUrl;
+  const isBusy =
+    isPending ||
+    isUploadingImage ||
+    isGenerating ||
+    isGeneratingQuestionImage ||
+    isRegeneratingDistractors;
+  const questionHasContent =
+    question.trim().length > 0 || !!questionImageUrl || !!questionImagePreview;
   const correctFilled = correctAnswer.trim().length > 0;
   const allDistractorsFilled = distractors.every((d) => d.trim().length > 0);
 
@@ -596,6 +854,7 @@ function MultipleChoiceCardForm({
       return;
     }
     setError(null);
+    setQuestionPendingFile(null);
     setIsUploadingImage(true);
     setQuestionImagePreview(URL.createObjectURL(file));
     try {
@@ -620,25 +879,59 @@ function MultipleChoiceCardForm({
     });
   }
 
-  async function handleGenerate() {
+  async function runMcAiGeneration(includeImage: boolean) {
     if (!question.trim()) {
       setError("Please enter a question first.");
       return;
     }
+    setAiChoiceOpen(false);
     setError(null);
     setIsGenerating(true);
+    let resolvedCorrect = correctAnswer.trim();
     try {
       const result = await generateMultipleChoiceAction({
         deckId,
         question: question.trim(),
-        correctAnswer: correctFilled ? correctAnswer.trim() : null,
+        correctAnswer: correctFilled ? resolvedCorrect : null,
       });
-      if (!correctFilled) setCorrectAnswer(result.correctAnswer);
+      if (!correctFilled) {
+        setCorrectAnswer(result.correctAnswer);
+        resolvedCorrect = result.correctAnswer.trim();
+      }
       setDistractors([...result.distractors]);
+      setShowDistractors(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate answers.");
-    } finally {
       setIsGenerating(false);
+      return;
+    }
+    setIsGenerating(false);
+
+    if (!includeImage || !resolvedCorrect) return;
+
+    if (questionImagePreview?.startsWith("blob:") && questionPendingFile) {
+      URL.revokeObjectURL(questionImagePreview);
+    }
+    setQuestionPendingFile(null);
+    setQuestionImageUrl(null);
+    setQuestionImagePreview(null);
+
+    setIsGeneratingQuestionImage(true);
+    try {
+      const imageBlob = await fetchAiBackImage(
+        deckId,
+        question.trim(),
+        resolvedCorrect,
+      );
+      if (imageBlob) {
+        const pendingFile = blobToPendingFile(imageBlob);
+        setQuestionPendingFile(pendingFile);
+        setQuestionImagePreview(URL.createObjectURL(pendingFile));
+      }
+    } catch {
+      // Answers are still usable when image generation fails.
+    } finally {
+      setIsGeneratingQuestionImage(false);
     }
   }
 
@@ -675,16 +968,29 @@ function MultipleChoiceCardForm({
     speech.stop();
     startTransition(async () => {
       try {
+        let resolvedQuestionImageUrl = questionImageUrl;
+        if (questionPendingFile && !questionImageUrl) {
+          setIsUploadingImage(true);
+          try {
+            const formData = new FormData();
+            formData.append("image", questionPendingFile);
+            resolvedQuestionImageUrl = await uploadCardImageAction({ deckId }, formData);
+          } finally {
+            setIsUploadingImage(false);
+          }
+        }
+
         await createMultipleChoiceCardAction({
           deckId,
           question,
-          questionImageUrl,
+          questionImageUrl: resolvedQuestionImageUrl,
           correctAnswer,
           distractors,
         });
         setQuestion("");
         setQuestionImageUrl(null);
         setQuestionImagePreview(null);
+        setQuestionPendingFile(null);
         setCorrectAnswer("");
         setDistractors(["", "", ""]);
         onSuccess();
@@ -694,11 +1000,15 @@ function MultipleChoiceCardForm({
     });
   }
 
-  const aiTooltip = !question.trim()
-    ? "Enter a question first"
-    : correctFilled
-      ? "Generate 3 wrong answers with AI. Uses your deck's name, description, and existing cards to match style and scope."
-      : "Generate correct answer + 3 wrong answers with AI. Uses your deck's name, description, and existing cards to match style and scope.";
+  const aiChoiceTitle = correctFilled ? "AI distractors" : "AI generate";
+  const aiWithImageLabel = correctFilled ? "Distractors + image" : "Answers + image";
+  const aiWithImageHint = correctFilled
+    ? "Regenerate wrong answers and add a question illustration."
+    : "Generate correct answer, wrong answers, and a question illustration.";
+  const aiTextOnlyLabel = correctFilled ? "Distractors only" : "Answers only";
+  const aiTextOnlyHint = correctFilled
+    ? "Regenerate the 3 wrong answers only."
+    : "Generate correct answer and wrong answers only.";
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 py-2">
@@ -763,12 +1073,22 @@ function MultipleChoiceCardForm({
           fileInputRef={imageFileInputRef}
           onFileChange={handleImageChange}
           onRemove={() => {
+            if (questionImagePreview?.startsWith("blob:")) {
+              URL.revokeObjectURL(questionImagePreview);
+            }
             setQuestionImageUrl(null);
             setQuestionImagePreview(null);
+            setQuestionPendingFile(null);
             if (imageFileInputRef.current) imageFileInputRef.current.value = "";
           }}
           altText="Question image preview"
+          enableEnlarge
         />
+        {isGeneratingQuestionImage && !questionImagePreview ? (
+          <p className="text-xs text-muted-foreground animate-pulse">
+            Generating illustration…
+          </p>
+        ) : null}
       </div>
 
       {/* Answers */}
@@ -778,28 +1098,83 @@ function MultipleChoiceCardForm({
             Answers
           </p>
           {hasAI && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger render={<span />}>
+            <Popover open={aiChoiceOpen} onOpenChange={setAiChoiceOpen}>
+              <PopoverTrigger
+                render={
                   <Button
                     type="button"
                     variant="default"
                     size="sm"
                     className="h-7 gap-1.5 text-xs"
-                    onClick={handleGenerate}
                     disabled={!question.trim() || isBusy}
+                    aria-label={
+                      !question.trim()
+                        ? "Enter a question first"
+                        : correctFilled
+                          ? "Generate distractors with AI"
+                          : "Generate answers with AI"
+                    }
+                    title={
+                      !question.trim()
+                        ? "Enter a question first"
+                        : correctFilled
+                          ? "Generate distractors with AI"
+                          : "Generate answers with AI"
+                    }
+                  />
+                }
+              >
+                <Sparkles
+                  className={`h-3.5 w-3.5 ${isGenerating || isGeneratingQuestionImage ? "animate-pulse" : ""}`}
+                />
+                {isGenerating || isGeneratingQuestionImage
+                  ? "Generating…"
+                  : correctFilled
+                    ? "AI distractors"
+                    : "AI generate"}
+              </PopoverTrigger>
+              <PopoverContent align="end" className="z-[60] w-64 gap-3 p-3">
+                <PopoverHeader className="gap-1">
+                  <PopoverTitle className="text-sm">{aiChoiceTitle}</PopoverTitle>
+                  <PopoverDescription className="text-xs leading-relaxed">
+                    Uses your deck name, description, and existing cards for style and scope.
+                  </PopoverDescription>
+                </PopoverHeader>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-auto justify-start gap-2 px-3 py-2.5 text-left whitespace-normal"
+                    onClick={() => runMcAiGeneration(true)}
+                    disabled={isBusy}
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {isGenerating
-                      ? "Generating…"
-                      : correctFilled
-                        ? "AI distractors"
-                        : "AI generate"}
+                    <ImagePlus className="h-4 w-4 shrink-0" />
+                    <span>
+                      <span className="block font-medium">{aiWithImageLabel}</span>
+                      <span className="block text-[11px] font-normal text-primary-foreground/80">
+                        {aiWithImageHint} Image is saved only when you click Add Card.
+                      </span>
+                    </span>
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-64 text-center">{aiTooltip}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto justify-start gap-2 px-3 py-2.5 text-left whitespace-normal"
+                    onClick={() => runMcAiGeneration(false)}
+                    disabled={isBusy}
+                  >
+                    <Type className="h-4 w-4 shrink-0" />
+                    <span>
+                      <span className="block font-medium">{aiTextOnlyLabel}</span>
+                      <span className="block text-[11px] font-normal text-muted-foreground">
+                        {aiTextOnlyHint}
+                      </span>
+                    </span>
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
 
@@ -921,7 +1296,7 @@ function MultipleChoiceCardForm({
             ? "Adding…"
             : isUploadingImage
               ? "Uploading…"
-              : isGenerating || isRegeneratingDistractors
+              : isGenerating || isGeneratingQuestionImage || isRegeneratingDistractors
                 ? "Generating…"
                 : "Add Card"}
         </Button>
@@ -934,11 +1309,13 @@ function MultipleChoiceCardForm({
 
 export function AddCardDialog({
   deckId,
+  deckName,
   trigger,
   isAtLimit = false,
   hasAI = false,
   allowsMultipleChoiceFormat = true,
 }: AddCardDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"standard" | "multiple_choice">("standard");
 
@@ -974,6 +1351,9 @@ export function AddCardDialog({
 
   function handleSuccess() {
     setOpen(false);
+    // Refresh after the dialog portal has fully unmounted — revalidating too
+    // early can crash React teardown (`removeChild on null`).
+    window.setTimeout(() => router.refresh(), 150);
   }
 
   function handleCancel() {
@@ -999,6 +1379,12 @@ export function AddCardDialog({
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Add a new card</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Adding to{" "}
+            <span className="font-semibold text-foreground break-words">
+              {deckName}
+            </span>
+          </p>
           <DialogDescription className="text-xs sm:text-sm">
             {allowsMultipleChoiceFormat
               ? "Choose a card format: a classic question-and-answer card, or a multiple-choice card."

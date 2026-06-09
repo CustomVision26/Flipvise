@@ -35,6 +35,9 @@ import {
   type ViewMode,
   type SortOption as DropdownSortOption,
 } from "@/components/view-mode-dropdown";
+import { cn } from "@/lib/utils";
+import { CardAnswerHover } from "./card-answer-hover";
+import { CardFrontImage } from "./card-front-image";
 import { EditCardDialog } from "./edit-card-dialog";
 import { DeleteCardDialog } from "./delete-card-dialog";
 
@@ -215,7 +218,7 @@ export function CardGrid({
       <div
         className={
           view === "compact"
-            ? "grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            ? "grid grid-cols-2 items-stretch gap-1.5 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
             : view === "list"
               ? "flex flex-col gap-1"
               : "flex flex-col gap-2"
@@ -241,11 +244,21 @@ export function CardGrid({
             hour: "numeric",
             minute: "2-digit",
           });
+          const updatedCompact = card.updatedAt.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+          });
 
           if (view === "list") {
             return (
-              <Card
+              <CardAnswerHover
                 key={card.id}
+                front={card.front}
+                answer={correctAnswer}
+                isMC={isMC}
+                backImageUrl={card.backImageUrl}
+              >
+              <Card
                 className="flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-2 px-3"
                 style={{ animationDelay: `${i * 20}ms` }}
               >
@@ -268,69 +281,93 @@ export function CardGrid({
                   <DeleteCardDialog cardId={card.id} deckId={deckId} />
                 </div>
               </Card>
+              </CardAnswerHover>
             );
           }
 
           if (view === "compact") {
+            const frontImageAlt =
+              card.front ?? (isMC ? "Question image" : "Front image");
+            const frontImageLabel = isMC ? "Question image" : "Front image";
+
             return (
-              <Card
+              <CardAnswerHover
                 key={card.id}
-                className="flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,transform] py-3 px-3 gap-1.5"
+                className="h-full"
+                front={card.front}
+                answer={correctAnswer}
+                isMC={isMC}
+                backImageUrl={card.backImageUrl}
+              >
+              <Card
+                className="flex h-full min-h-[148px] flex-col gap-1 rounded-lg py-2 px-2 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm"
                 style={{ animationDelay: `${i * 30}ms` }}
               >
-                <div className="flex flex-wrap items-center gap-1">
+                <div className="flex min-h-3.5 flex-wrap items-center gap-0.5">
                   {isMC && (
                     <Badge
                       variant="outline"
-                      className="gap-1 px-1 py-0 text-[9px] font-normal border-primary/40"
+                      className="h-4 gap-0.5 border-primary/35 px-1 py-0 text-[8px] font-normal leading-none"
                     >
-                      <ListChecks className="size-2.5 text-primary" />
+                      <ListChecks className="size-2 text-primary" />
                       MC
                     </Badge>
                   )}
                   {card.aiGenerated && (
                     <Badge
                       variant="outline"
-                      className="gap-1 px-1 py-0 text-[9px] font-normal"
+                      className="h-4 gap-0.5 px-1 py-0 text-[8px] font-normal leading-none"
                     >
-                      <Sparkles className="size-2.5 text-primary" />
+                      <Sparkles className="size-2 text-primary" />
                       AI
                     </Badge>
                   )}
                 </div>
                 {card.frontImageUrl ? (
-                  <div className="relative h-16 w-full rounded-md overflow-hidden border border-border bg-muted/30">
-                    <Image
-                      src={card.frontImageUrl}
-                      alt={isMC ? "Question image" : "Front image"}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                ) : null}
-                {card.front && (
-                  <p className="text-foreground text-xs font-medium line-clamp-2">
-                    {card.front}
-                  </p>
+                  <CardFrontImage
+                    src={card.frontImageUrl}
+                    alt={frontImageAlt}
+                    label={frontImageLabel}
+                    variant="tile"
+                  />
+                ) : (
+                  <div
+                    className="aspect-[16/10] w-full shrink-0 rounded-sm border border-border/50 bg-muted/10"
+                    aria-hidden
+                  />
                 )}
-                <div className="flex-1" />
-                <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] text-muted-foreground tabular-nums truncate">
-                    {updatedShort}
+                <p
+                  className={cn(
+                    "min-h-[1.75rem] text-[11px] font-medium leading-snug line-clamp-2",
+                    card.front ? "text-foreground" : "text-transparent select-none",
+                  )}
+                >
+                  {card.front ?? "No front text"}
+                </p>
+                <div className="mt-auto flex items-center justify-between gap-0.5 border-t border-border/40 pt-1">
+                  <span className="text-[9px] text-muted-foreground tabular-nums truncate">
+                    {updatedCompact}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex shrink-0 items-center [&_button]:h-6 [&_button]:min-h-6 [&_button]:px-1.5 [&_button]:text-[10px]">
                     <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
                     <DeleteCardDialog cardId={card.id} deckId={deckId} />
                   </div>
                 </div>
               </Card>
+              </CardAnswerHover>
             );
           }
 
           // Default: Grid = detailed table row — show every field fully, no truncation
           return (
-            <Card
+            <CardAnswerHover
               key={card.id}
+              front={card.front}
+              answer={correctAnswer}
+              isMC={isMC}
+              backImageUrl={card.backImageUrl}
+            >
+            <Card
               className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-3 px-4"
               style={{ animationDelay: `${i * 30}ms` }}
             >
@@ -339,16 +376,14 @@ export function CardGrid({
                   {isMC ? "Question" : "Front"}
                 </span>
                 <div className="flex items-start gap-2">
-                  {card.frontImageUrl && (
-                    <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden border border-border bg-muted/30">
-                      <Image
-                        src={card.frontImageUrl}
-                        alt=""
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
+                  {card.frontImageUrl ? (
+                    <CardFrontImage
+                      src={card.frontImageUrl}
+                      alt={card.front ?? (isMC ? "Question image" : "Front image")}
+                      label={isMC ? "Question image" : "Front image"}
+                      variant="thumb"
+                    />
+                  ) : null}
                   <p className="text-sm font-medium text-foreground break-words whitespace-pre-wrap min-w-0">
                     {card.front ?? "(no front)"}
                   </p>
@@ -448,6 +483,7 @@ export function CardGrid({
                 </Button>
               </div>
             </Card>
+            </CardAnswerHover>
           );
         })}
       </div>

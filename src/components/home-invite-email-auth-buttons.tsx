@@ -7,24 +7,28 @@ export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
   const { isSignedIn, isLoaded } = useAuth();
   if (!isLoaded) {
     return (
-      <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
-        <Button variant="outline" disabled>
+      <div className="flex w-full flex-wrap justify-center gap-3">
+        <Button variant="outline" size="lg" disabled>
           Sign In
         </Button>
-        <Button disabled>Sign Up</Button>
+        <Button size="lg" disabled>
+          Sign Up
+        </Button>
       </div>
     );
   }
   if (isSignedIn) return null;
   return (
-    <div className="flex w-full justify-center gap-2 sm:gap-3 flex-wrap">
+    <div className="flex w-full flex-wrap justify-center gap-3">
       <SignInButton
         mode="modal"
         initialValues={{ emailAddress: email }}
         fallbackRedirectUrl="/auth/continue"
         signUpFallbackRedirectUrl="/auth/continue"
       >
-        <Button variant="outline">Sign In</Button>
+        <Button variant="outline" size="lg">
+          Sign In
+        </Button>
       </SignInButton>
       <SignUpButton
         mode="modal"
@@ -32,7 +36,7 @@ export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
         fallbackRedirectUrl="/auth/continue"
         signInFallbackRedirectUrl="/auth/continue"
       >
-        <Button>Sign Up</Button>
+        <Button size="lg">Sign Up</Button>
       </SignUpButton>
     </div>
   );

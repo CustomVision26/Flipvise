@@ -7,7 +7,7 @@ import {
   BILLING_SYNCED_EVENT,
 } from "@/components/stripe-checkout-toast";
 import { loadBillingTabDataAction } from "@/actions/billing-page";
-import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
+import { resolveBillingTabPlanDisplay } from "@/lib/billing-tab-plan-display";
 import type { CancelSubscriptionPreview } from "@/lib/stripe-cancel-subscription";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -24,8 +24,7 @@ import { cn } from "@/lib/utils";
 import { CancelSubscriptionButton } from "@/components/cancel-subscription-button";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import type { PlanHistoryRow } from "@/lib/plan-history-types";
-import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import { CreditCard, ExternalLink, Loader2, Zap } from "lucide-react";
+import { CreditCard, ExternalLink, Loader2, Shield, Zap } from "lucide-react";
 
 /** Canonical in-app pricing page (see `src/app/pricing/page.tsx`). */
 const PRICING_PAGE_PATH = "/pricing" as const;
@@ -65,6 +64,16 @@ export function UserBillingPage() {
   const [stripeBillingStatus, setStripeBillingStatus] = useState<string | null>(
     null,
   );
+  const [serverPlanLabel, setServerPlanLabel] = useState<string | null>(null);
+  const [serverAdminRoleLabel, setServerAdminRoleLabel] = useState<string | null>(
+    null,
+  );
+  const [serverIsComplimentary, setServerIsComplimentary] = useState(false);
+  const [serverAccessSubtitle, setServerAccessSubtitle] = useState<string | null>(
+    null,
+  );
+  const [serverShowPaidStripeControls, setServerShowPaidStripeControls] =
+    useState<boolean | null>(null);
   const loadedForUserRef = useRef<string | null>(null);
 
   const loadBillingData = (userId: string, force = false) => {
@@ -81,6 +90,11 @@ export function UserBillingPage() {
         setCancelPreview(data.cancelPreview);
         setStripeCurrentPlanSlug(data.currentPlanSlug);
         setStripeBillingStatus(data.billingStatus);
+        setServerPlanLabel(data.planLabel);
+        setServerAdminRoleLabel(data.adminRoleLabel);
+        setServerIsComplimentary(data.isComplimentary);
+        setServerAccessSubtitle(data.accessSubtitle);
+        setServerShowPaidStripeControls(data.showPaidStripeControls);
         setHistoryError(null);
       })
       .catch((err) => {
@@ -91,6 +105,11 @@ export function UserBillingPage() {
         setCancelPreview(null);
         setStripeCurrentPlanSlug(null);
         setStripeBillingStatus(null);
+        setServerPlanLabel(null);
+        setServerAdminRoleLabel(null);
+        setServerIsComplimentary(false);
+        setServerAccessSubtitle(null);
+        setServerShowPaidStripeControls(null);
       })
       .finally(() => {
         setBillingLoading(false);
@@ -130,22 +149,27 @@ export function UserBillingPage() {
 
   const meta = (user?.publicMetadata ?? {}) as Record<string, unknown>;
 
-  const metaBillingStatus = meta.billingStatus as string | undefined;
-  const adminPlan = meta.adminPlan as string | undefined;
+  const clientPlanDisplay = resolveBillingTabPlanDisplay({
+    meta,
+    stripePlanSlug: stripeCurrentPlanSlug,
+    billingStatus: stripeBillingStatus,
+  });
 
-  const metaPlan = (meta.plan as string | undefined) ?? null;
-  const resolvedPlan = stripeCurrentPlanSlug ?? metaPlan;
-  const isPaid = !!resolvedPlan;
-  const planLabel = resolvedPlan ? displayNameForBillingPlanSlug(resolvedPlan) : "Free";
-
-  const billingStatus = stripeBillingStatus ?? metaBillingStatus;
-  const isActive = billingStatus === "active" || billingStatus === "trialing";
-  const isAdminGranted = !!adminPlan && resolvedPlan === adminPlan;
-  const isPaidStripePlan =
-    resolvedPlan != null &&
-    resolvedPlan !== "free" &&
-    isStripePaidPlanId(resolvedPlan);
-  const showPaidStripeControls = isPaidStripePlan && !isAdminGranted;
+  const planLabel = serverPlanLabel ?? clientPlanDisplay.planLabel;
+  const isPaid = clientPlanDisplay.isPaid;
+  const billingStatus = clientPlanDisplay.billingStatus;
+  const isActive =
+    billingStatus === "active" ||
+    billingStatus === "trialing" ||
+    clientPlanDisplay.isComplimentary;
+  const adminRoleLabel =
+    serverAdminRoleLabel ?? clientPlanDisplay.adminRoleLabel;
+  const isComplimentary =
+    serverIsComplimentary || clientPlanDisplay.isComplimentary;
+  const accessSubtitle =
+    serverAccessSubtitle ?? clientPlanDisplay.accessSubtitle;
+  const showPaidStripeControls =
+    serverShowPaidStripeControls ?? clientPlanDisplay.showPaidStripeControls;
 
   return (
     <div ref={rootRef} className="flex flex-col gap-6 p-1 min-h-[120px]">
@@ -171,26 +195,37 @@ export function UserBillingPage() {
             )}
           </div>
           <div className="flex flex-col">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-foreground">
                 {planLabel}
               </span>
-              {billingStatus && (
+              {adminRoleLabel && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0 gap-1"
+                >
+                  <Shield className="size-3 shrink-0" aria-hidden />
+                  {adminRoleLabel}
+                </Badge>
+              )}
+              {(billingStatus || isComplimentary) && (
                 <Badge
                   variant={isActive ? "default" : "secondary"}
                   className="text-[10px] px-1.5 py-0"
                 >
-                  {STATUS_LABELS[billingStatus] ?? billingStatus}
+                  {billingStatus
+                    ? (STATUS_LABELS[billingStatus] ?? billingStatus)
+                    : "Active"}
                 </Badge>
               )}
-              {isAdminGranted && (
+              {isComplimentary && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                   Complimentary
                 </Badge>
               )}
             </div>
             <span className="text-xs text-muted-foreground">
-              {isPaid ? "Paid subscription" : "No active subscription"}
+              {accessSubtitle}
             </span>
           </div>
         </div>
@@ -258,7 +293,7 @@ export function UserBillingPage() {
         {isPaid && !showPaidStripeControls && (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-foreground">
-              {isAdminGranted ? "Complimentary access" : "Change or upgrade plan"}
+              {isComplimentary ? "Complimentary access" : "Change or upgrade plan"}
             </p>
             <Link
               href={PRICING_PAGE_PATH}

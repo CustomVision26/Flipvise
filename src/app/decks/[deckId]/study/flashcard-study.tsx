@@ -49,34 +49,114 @@ type CardData = {
   backImageUrl?: string | null;
 };
 
-function FormattedCardBack({ text, hasGradient }: { text: string; hasGradient?: boolean }) {
+const MAGIC_SPARKLE_POSITIONS = [
+  { left: "12%", top: "18%" },
+  { left: "82%", top: "14%" },
+  { left: "68%", top: "72%" },
+  { left: "22%", top: "78%" },
+  { left: "48%", top: "10%" },
+  { left: "90%", top: "48%" },
+  { left: "8%", top: "52%" },
+  { left: "55%", top: "88%" },
+] as const;
+
+function MagicAnswerAmbience({ revealKey }: { revealKey: number }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      <div
+        key={`aura-${revealKey}`}
+        className="magic-aura-burst animate-magic-aura-burst absolute inset-0"
+      />
+      {MAGIC_SPARKLE_POSITIONS.map((pos, i) => (
+        <span
+          key={`${revealKey}-${i}`}
+          className="magic-sparkle-particle"
+          style={{
+            left: pos.left,
+            top: pos.top,
+            animationDelay: `${0.35 + i * 0.14}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function FormattedCardBack({
+  text,
+  hasGradient,
+  revealKey,
+}: {
+  text: string;
+  hasGradient?: boolean;
+  revealKey: number;
+}) {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lineDelay = (index: number) => `${0.38 + index * 0.11}s`;
 
   if (lines.length <= 1) {
     return (
-      <p className={cn("text-center text-base sm:text-xl font-semibold leading-relaxed break-words", hasGradient && "text-white")}>{text}</p>
+      <p
+        key={revealKey}
+        className={cn(
+          "animate-magic-answer-reveal text-center text-xl font-semibold leading-relaxed break-words sm:text-2xl md:text-3xl",
+          hasGradient && "text-white",
+        )}
+      >
+        {text}
+      </p>
     );
   }
 
   return (
-    <div className="w-full space-y-1.5 text-left">
+    <div key={revealKey} className="w-full space-y-1.5 text-left">
       {lines.map((line, i) => {
+        const revealClass = "animate-magic-line-reveal";
+        const revealStyle = { animationDelay: lineDelay(i) };
+
         if (/^Step\s*\d+:/i.test(line)) {
           return (
-            <p key={i} className={cn("font-semibold text-xs sm:text-sm pt-2 first:pt-0 break-words", hasGradient ? "text-white/90" : "text-primary")}>
+            <p
+              key={i}
+              className={cn(
+                revealClass,
+                "pt-2 text-sm font-semibold break-words first:pt-0 sm:text-base",
+                hasGradient ? "text-white/90" : "text-primary",
+              )}
+              style={revealStyle}
+            >
               {line}
             </p>
           );
         }
         if (/^(Answer|Result|Solution|∴)[\s:]*/i.test(line)) {
           return (
-            <p key={i} className={cn("font-bold text-xs sm:text-sm pt-3 mt-1 border-t break-words", hasGradient ? "text-white border-white/20" : "text-emerald-400 border-border")}>
+            <p
+              key={i}
+              className={cn(
+                "animate-magic-line-reveal-glow mt-1 border-t pt-3 text-sm font-bold break-words sm:text-base md:text-lg",
+                hasGradient ? "border-white/20 text-white" : "border-border text-emerald-400",
+              )}
+              style={
+                {
+                  "--magic-line-delay": lineDelay(i),
+                } as React.CSSProperties
+              }
+            >
               {line}
             </p>
           );
         }
         return (
-          <p key={i} className={cn("text-[10px] sm:text-xs font-mono pl-2 sm:pl-3 leading-relaxed break-words", hasGradient ? "text-white/80" : "text-foreground")}>
+          <p
+            key={i}
+            className={cn(
+              revealClass,
+              "pl-2 font-mono text-xs leading-relaxed break-words sm:pl-3 sm:text-sm",
+              hasGradient ? "text-white/80" : "text-foreground",
+            )}
+            style={revealStyle}
+          >
             {line}
           </p>
         );
@@ -119,6 +199,7 @@ export function FlashcardStudy({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [answerRevealKey, setAnswerRevealKey] = useState(0);
   const [voice, setVoice] = useState<TtsVoice>("nova");
   const [answers, setAnswers] = useState<Record<number, "correct" | "incorrect">>({});
   const [sessionComplete, setSessionComplete] = useState(false);
@@ -178,7 +259,10 @@ export function FlashcardStudy({
   }, []);
 
   function handleFlip() {
-    setIsFlipped((prev) => !prev);
+    setIsFlipped((prev) => {
+      if (!prev) setAnswerRevealKey((k) => k + 1);
+      return !prev;
+    });
   }
 
   const SWIPE_THRESHOLD = 60;
@@ -478,7 +562,7 @@ export function FlashcardStudy({
 
       {/* Flashcard */}
       <div
-        className="w-full max-w-2xl select-none"
+        className="w-full max-w-xl select-none"
         style={{
           transform: `translateX(calc(${slideX}% + ${dragOffsetX}px))`,
           opacity: slideOpacity,
@@ -499,6 +583,13 @@ export function FlashcardStudy({
         aria-label={isFlipped ? "Card back — click to flip" : "Card front — click to flip"}
       >
       <div
+        className={cn(
+          dragOffsetX === 0 && !enableSlideTransition && "animate-flashcard-float",
+        )}
+      >
+      <div
+        key={visibleIndex}
+        className="animate-flashcard-enter"
         style={{ perspective: "1200px" }}
       >
         <div
@@ -514,7 +605,7 @@ export function FlashcardStudy({
           <div
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
             className={cn(
-              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]",
+              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[220px] sm:min-h-[300px] md:h-[380px] animate-flashcard-shimmer",
               hasGradient
                 ? cn(cardGradient.classes, "border border-white/20")
                 : "bg-card border",
@@ -526,7 +617,7 @@ export function FlashcardStudy({
             </div>
             {currentCard.frontImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2">
-                <div className="relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+                <div className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
                   <Image
                     src={currentCard.frontImageUrl}
                     alt="Card front image"
@@ -538,7 +629,7 @@ export function FlashcardStudy({
             )}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col items-center justify-center">
               {currentCard.front && (
-                <p className={cn("text-center text-base sm:text-xl font-semibold leading-relaxed break-words", hasGradient && "text-white")}>
+                <p className={cn("text-center text-xl sm:text-2xl md:text-3xl font-semibold leading-relaxed break-words", hasGradient && "text-white")}>
                   {currentCard.front}
                 </p>
               )}
@@ -553,19 +644,20 @@ export function FlashcardStudy({
               transform: "rotateY(180deg)",
             }}
             className={cn(
-              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[300px] sm:min-h-[400px] md:h-[540px]",
+              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[220px] sm:min-h-[300px] md:h-[380px] animate-flashcard-shimmer",
               hasGradient
                 ? cn(cardGradient.classes, "border border-white/20")
                 : "bg-card border",
             )}
           >
-            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
+            {isFlipped && <MagicAnswerAmbience revealKey={answerRevealKey} />}
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0 relative z-10">
               <Badge variant="outline" className={cn("text-xs", hasGradient && "bg-white/20 text-white border-white/30")}>Back</Badge>
               <span className={cn("text-xs hidden sm:inline", hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
             </div>
             {currentCard.backImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2">
-                <div className="relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+                <div className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
                   <Image
                     src={currentCard.backImageUrl}
                     alt="Card back image"
@@ -575,11 +667,18 @@ export function FlashcardStudy({
                 </div>
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col justify-center">
-              {currentCard.back && <FormattedCardBack text={currentCard.back} hasGradient={hasGradient} />}
+            <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-4 py-3 sm:px-8">
+              {currentCard.back && (
+                <FormattedCardBack
+                  text={currentCard.back}
+                  hasGradient={hasGradient}
+                  revealKey={answerRevealKey}
+                />
+              )}
             </div>
           </div>
         </div>
+      </div>
       </div>
       </div>
 
