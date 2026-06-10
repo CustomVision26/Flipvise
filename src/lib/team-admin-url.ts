@@ -43,9 +43,27 @@ export const TEAM_ADMIN_INVITE_HISTORY_LEGACY_PATH =
 export const TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH =
   "/dashboard/team-admin/deck-manager/assign-decks-to-members";
 
+/** Deck Manager — member study mode privileges per assignment. */
+export const TEAM_ADMIN_STUDY_PRIVILEGES_PATH =
+  "/dashboard/team-admin/deck-manager/study-privileges";
+
 /** True when `pathname` is under Deck Manager. */
 export function isTeamAdminDeckManagerPath(pathname: string): boolean {
   return pathname.startsWith("/dashboard/team-admin/deck-manager");
+}
+
+export function isTeamAdminAssignDecksToMembersPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH}/`)
+  );
+}
+
+export function isTeamAdminStudyPrivilegesPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_STUDY_PRIVILEGES_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_STUDY_PRIVILEGES_PATH}/`)
+  );
 }
 
 /** True when `pathname` is the members team-admin dashboard. */
@@ -198,4 +216,12 @@ export function buildTeamAdminAssignDecksToMembersPath(
   return qs
     ? `${TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH}?${qs}`
     : TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH;
+}
+
+export function buildTeamAdminStudyPrivilegesPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs ? `${TEAM_ADMIN_STUDY_PRIVILEGES_PATH}?${qs}` : TEAM_ADMIN_STUDY_PRIVILEGES_PATH;
 }

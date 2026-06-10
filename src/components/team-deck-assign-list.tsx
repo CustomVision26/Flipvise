@@ -43,6 +43,12 @@ import {
 import type { DeckRow, TeamMemberRow } from "@/db/schema";
 import type { TeamDeckAssignmentListRow } from "@/db/queries/teams";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
+import {
+  TEAM_MEMBER_STUDY_PRIVILEGES,
+  TEAM_MEMBER_STUDY_PRIVILEGE_LABELS,
+  defaultTeamMemberStudyPrivilege,
+  type TeamMemberStudyPrivilege,
+} from "@/lib/team-study-privilege";
 
 type MemberRow = TeamMemberRow;
 type AssignmentRow = TeamDeckAssignmentListRow;
@@ -164,6 +170,9 @@ const CAPTION_NORMAL_MEMBER =
 const CAPTION_DECK =
   "Only decks linked to this workspace appear here — create on your Personal Dashboard, then link deck to this workspace below, or create a deck directly scoped to this workspace.";
 
+const CAPTION_STUDY_PRIVILEGE =
+  "For regular team members — choose whether they may use Standard Review, Quiz, or both on the study page for this deck. Team admins always have full study access.";
+
 const CAPTION_LINK_PERSONAL =
   "Lists every deck from your Personal Dashboard. Decks already tied to this workspace stay selectable — linking again simply confirms they remain attached (no duplicate).";
 
@@ -208,6 +217,9 @@ export function TeamDeckAssignList({
   const [workspaceId, setWorkspaceId] = React.useState(String(defaultWorkspaceId));
   const [memberUserId, setMemberUserId] = React.useState(NO_MEMBER);
   const [deckId, setDeckId] = React.useState(NO_DECK);
+  const [studyPrivilege, setStudyPrivilege] = React.useState<TeamMemberStudyPrivilege>(
+    defaultTeamMemberStudyPrivilege(),
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<"assign" | "unassign" | null>(null);
   const [linkDeckId, setLinkDeckId] = React.useState(LINK_NO_DECK);
@@ -223,6 +235,7 @@ export function TeamDeckAssignList({
     setWorkspaceId(String(defaultWorkspaceId));
     setMemberUserId(NO_MEMBER);
     setDeckId(NO_DECK);
+    setStudyPrivilege(defaultTeamMemberStudyPrivilege());
     setLinkDeckId(LINK_NO_DECK);
     setExpandedAssignmentKey(null);
   }, [defaultWorkspaceId]);
@@ -251,8 +264,15 @@ export function TeamDeckAssignList({
     }
     setMemberUserId(NO_MEMBER);
     setDeckId(NO_DECK);
+    setStudyPrivilege(defaultTeamMemberStudyPrivilege());
     setLinkDeckId(LINK_NO_DECK);
   }, [workspaceId]);
+
+  const selectedMember =
+    memberUserId !== NO_MEMBER
+      ? normalMembers.find((m) => m.userId === memberUserId)
+      : undefined;
+  const selectedMemberIsRegular = selectedMember?.role === "team_member";
 
   const assignmentTableRows = React.useMemo((): AssignmentTableDisplayRow[] => {
     const out: AssignmentTableDisplayRow[] = [];
@@ -358,6 +378,7 @@ export function TeamDeckAssignList({
         teamId: teamIdNum,
         deckId: deckIdNum,
         memberUserId,
+        studyPrivilege: selectedMemberIsRegular ? studyPrivilege : defaultTeamMemberStudyPrivilege(),
       });
       router.refresh();
     } catch (e) {
@@ -669,9 +690,45 @@ export function TeamDeckAssignList({
                 </Select>
               </div>
 
+              {selectedMemberIsRegular ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="assign-deck-study-privilege">Study modes</Label>
+                    <HintBalloon fieldLabel="Study modes" caption={CAPTION_STUDY_PRIVILEGE} />
+                  </div>
+                  <span id="assign-deck-study-privilege-caption" className="sr-only">
+                    {CAPTION_STUDY_PRIVILEGE}
+                  </span>
+                  <Select
+                    value={studyPrivilege}
+                    onValueChange={(v) =>
+                      v != null && setStudyPrivilege(v as TeamMemberStudyPrivilege)
+                    }
+                  >
+                    <SelectTrigger
+                      id="assign-deck-study-privilege"
+                      className="w-full"
+                      aria-describedby="assign-deck-study-privilege-caption"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TEAM_MEMBER_STUDY_PRIVILEGES.map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {TEAM_MEMBER_STUDY_PRIVILEGE_LABELS[value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
               {assigned && (
                 <p className="text-sm text-muted-foreground">
                   This deck is already assigned to this member for their workspace Study view.
+                  {selectedMemberIsRegular
+                    ? " Re-assign to update study modes, or edit on the Study privileges tab."
+                    : null}
                 </p>
               )}
 
@@ -679,10 +736,18 @@ export function TeamDeckAssignList({
                 <Button
                   type="button"
                   className="h-10 w-full"
-                  disabled={!canSubmit || assigned || busy !== null}
+                  disabled={
+                    !canSubmit || busy !== null || (assigned && !selectedMemberIsRegular)
+                  }
                   onClick={onAssign}
                 >
-                  {busy === "assign" ? "Assigning…" : "Assign deck"}
+                  {busy === "assign"
+                    ? "Saving…"
+                    : assigned && selectedMemberIsRegular
+                      ? "Update assignment"
+                      : assigned
+                        ? "Already assigned"
+                        : "Assign deck"}
                 </Button>
                 <Button
                   type="button"

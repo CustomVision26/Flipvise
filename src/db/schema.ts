@@ -42,6 +42,13 @@ export const teamMemberRoleEnum = pgEnum('team_member_role', [
   'team_member',
 ]);
 
+/** Study modes allowed for a team_member deck assignment. */
+export const teamMemberStudyPrivilegeEnum = pgEnum('team_member_study_privilege', [
+  'standard_review',
+  'quiz',
+  'both',
+]);
+
 export const teamInvitationStatusEnum = pgEnum('team_invitation_status', [
   'pending',
   'accepted',
@@ -145,6 +152,8 @@ export const teamDeckAssignments = pgTable(
     /** Clerk user id of owner/co-admin who created this assignment (null for rows before audit). */
     assignedByUserId: varchar({ length: 255 }),
     createdAt: timestamp().notNull().defaultNow(),
+    /** Which study modes this member may use for this deck on the study page. */
+    studyPrivilege: teamMemberStudyPrivilegeEnum().notNull().default('both'),
   },
   (t) => [
     uniqueIndex('team_deck_assign_uidx').on(t.teamId, t.deckId, t.memberUserId),

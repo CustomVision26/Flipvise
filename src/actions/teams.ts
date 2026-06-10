@@ -30,6 +30,7 @@ import {
   insertTeamInvitation,
   insertTeamMember,
   insertDeckAssignment,
+  updateDeckAssignmentStudyPrivilege,
   deleteDeckAssignment,
   attachPersonalDeckToOwnedTeamWorkspace,
   markInvitationAccepted,
@@ -483,10 +484,13 @@ export async function revokeTeamInvitationAction(
   revalidatePath("/dashboard/team-admin", "layout");
 }
 
+const studyPrivilegeSchema = z.enum(["standard_review", "quiz", "both"]);
+
 const assignDeckSchema = z.object({
   teamId: z.number().int().positive(),
   deckId: z.number().int().positive(),
   memberUserId: z.string().min(1),
+  studyPrivilege: studyPrivilegeSchema.default("both"),
 });
 
 export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSchema>) {
@@ -515,9 +519,45 @@ export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSc
     parsed.data.deckId,
     parsed.data.memberUserId,
     userId,
+    parsed.data.studyPrivilege,
   );
 
   revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
+}
+
+const updateDeckStudyPrivilegeSchema = z.object({
+  teamId: z.number().int().positive(),
+  deckId: z.number().int().positive(),
+  memberUserId: z.string().min(1),
+  studyPrivilege: studyPrivilegeSchema,
+});
+
+export async function updateDeckAssignmentStudyPrivilegeAction(
+  data: z.infer<typeof updateDeckStudyPrivilegeSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateDeckStudyPrivilegeSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  await assertCanManageTeam(userId, parsed.data.teamId);
+
+  const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
+  if (!member || member.role !== "team_member") {
+    throw new Error("Study privileges apply only to regular team members.");
+  }
+
+  await updateDeckAssignmentStudyPrivilege(
+    parsed.data.teamId,
+    parsed.data.deckId,
+    parsed.data.memberUserId,
+    parsed.data.studyPrivilege,
+  );
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
 }
 
 const unassignDeckSchema = z.object({

@@ -25,6 +25,10 @@ import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
 import {
+  defaultTeamMemberStudyPrivilege,
+  type TeamMemberStudyPrivilege,
+} from "@/lib/team-study-privilege";
+import {
   and,
   count,
   desc,
@@ -1448,6 +1452,45 @@ function isMissingTeamDeckAssignmentAuditColumnError(error: unknown): boolean {
   return false;
 }
 
+function isMissingTeamDeckAssignmentStudyPrivilegeColumnError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const o = current as Record<string, unknown>;
+    const code = o.code;
+    const message = typeof o.message === "string" ? o.message : "";
+    if (code === "42703" || code === 42703) {
+      if (
+        /studyPrivilege/i.test(message) ||
+        (/column/i.test(message) && /does not exist/i.test(message))
+      ) {
+        return true;
+      }
+    }
+    if (
+      /studyPrivilege/i.test(message) &&
+      (/does not exist/i.test(message) || /undefined column/i.test(message))
+    ) {
+      return true;
+    }
+    current = o.cause;
+  }
+  const flat = String(error);
+  return (
+    /Failed query:/i.test(flat) &&
+    /team_deck_assignments/i.test(flat) &&
+    (/studyPrivilege/i.test(flat) || /team_member_study_privilege/i.test(flat))
+  );
+}
+
+let warnedMissingTeamDeckAssignmentStudyPrivilegeColumn = false;
+function warnMissingTeamDeckAssignmentStudyPrivilegeColumnOnce() {
+  if (warnedMissingTeamDeckAssignmentStudyPrivilegeColumn) return;
+  warnedMissingTeamDeckAssignmentStudyPrivilegeColumn = true;
+  console.warn(
+    "[db] `team_deck_assignments` is missing `studyPrivilege` — apply migration `0027_team_deck_study_privilege.sql`.",
+  );
+}
+
 /** Normalized assignment row for admin UI (supports DB before migration 0023). */
 export type TeamDeckAssignmentListRow = {
   teamId: number;
@@ -1455,6 +1498,7 @@ export type TeamDeckAssignmentListRow = {
   memberUserId: string;
   assignedByUserId: string | null;
   createdAt: Date | null;
+  studyPrivilege: TeamMemberStudyPrivilege;
 };
 
 export async function listAssignmentsForTeam(
@@ -1471,10 +1515,21 @@ export async function listAssignmentsForTeam(
       memberUserId: r.memberUserId,
       assignedByUserId: r.assignedByUserId ?? null,
       createdAt: r.createdAt ?? null,
+      studyPrivilege: r.studyPrivilege ?? defaultTeamMemberStudyPrivilege(),
     }));
   } catch (e) {
-    if (!isMissingTeamDeckAssignmentAuditColumnError(e)) throw e;
-    warnMissingTeamDeckAssignmentAuditColumnsOnce();
+    if (
+      !isMissingTeamDeckAssignmentAuditColumnError(e) &&
+      !isMissingTeamDeckAssignmentStudyPrivilegeColumnError(e)
+    ) {
+      throw e;
+    }
+    if (isMissingTeamDeckAssignmentAuditColumnError(e)) {
+      warnMissingTeamDeckAssignmentAuditColumnsOnce();
+    }
+    if (isMissingTeamDeckAssignmentStudyPrivilegeColumnError(e)) {
+      warnMissingTeamDeckAssignmentStudyPrivilegeColumnOnce();
+    }
     const rows = await db
       .select(teamDeckAssignmentListSelectLegacy)
       .from(teamDeckAssignments)
@@ -1483,6 +1538,7 @@ export async function listAssignmentsForTeam(
       ...r,
       assignedByUserId: null,
       createdAt: null,
+      studyPrivilege: defaultTeamMemberStudyPrivilege(),
     }));
   }
 }
@@ -1492,24 +1548,89 @@ export async function insertDeckAssignment(
   deckId: number,
   memberUserId: string,
   assignedByUserId: string,
+  studyPrivilege: TeamMemberStudyPrivilege = defaultTeamMemberStudyPrivilege(),
 ) {
   const createdAt = new Date();
   try {
-    // Drizzle `.insert(teamDeckAssignments).values(...)` still lists every schema column and uses
-    // SQL DEFAULT for omitted fields; that breaks unmigrated DBs and can skip bound parameters.
-    // Parameterized SQL inserts exactly what we intend (see team_members legacy insert above).
     await db.execute(
-      sql`INSERT INTO "team_deck_assignments" ("teamId", "deckId", "memberUserId", "assignedByUserId", "createdAt")
-          VALUES (${teamId}, ${deckId}, ${memberUserId}, ${assignedByUserId}, ${createdAt})
-          ON CONFLICT ("teamId", "deckId", "memberUserId") DO NOTHING`,
+      sql`INSERT INTO "team_deck_assignments" ("teamId", "deckId", "memberUserId", "assignedByUserId", "createdAt", "studyPrivilege")
+          VALUES (${teamId}, ${deckId}, ${memberUserId}, ${assignedByUserId}, ${createdAt}, ${studyPrivilege}::team_member_study_privilege)
+          ON CONFLICT ("teamId", "deckId", "memberUserId") DO UPDATE SET
+            "assignedByUserId" = EXCLUDED."assignedByUserId",
+            "studyPrivilege" = EXCLUDED."studyPrivilege"`,
     );
   } catch (e) {
+    if (isMissingTeamDeckAssignmentStudyPrivilegeColumnError(e)) {
+      warnMissingTeamDeckAssignmentStudyPrivilegeColumnOnce();
+      try {
+        await db.execute(
+          sql`INSERT INTO "team_deck_assignments" ("teamId", "deckId", "memberUserId", "assignedByUserId", "createdAt")
+              VALUES (${teamId}, ${deckId}, ${memberUserId}, ${assignedByUserId}, ${createdAt})
+              ON CONFLICT ("teamId", "deckId", "memberUserId") DO UPDATE SET
+                "assignedByUserId" = EXCLUDED."assignedByUserId"`,
+        );
+        return;
+      } catch (inner) {
+        if (!isMissingTeamDeckAssignmentAuditColumnError(inner)) throw inner;
+      }
+    }
     if (!isMissingTeamDeckAssignmentAuditColumnError(e)) throw e;
     warnMissingTeamDeckAssignmentAuditColumnsOnce();
     await db.execute(
       sql`INSERT INTO "team_deck_assignments" ("teamId", "deckId", "memberUserId")
           VALUES (${teamId}, ${deckId}, ${memberUserId})
           ON CONFLICT ("teamId", "deckId", "memberUserId") DO NOTHING`,
+    );
+  }
+}
+
+export async function getDeckAssignmentStudyPrivilege(
+  teamId: number,
+  deckId: number,
+  memberUserId: string,
+): Promise<TeamMemberStudyPrivilege> {
+  try {
+    const [row] = await db
+      .select({ studyPrivilege: teamDeckAssignments.studyPrivilege })
+      .from(teamDeckAssignments)
+      .where(
+        and(
+          eq(teamDeckAssignments.teamId, teamId),
+          eq(teamDeckAssignments.deckId, deckId),
+          eq(teamDeckAssignments.memberUserId, memberUserId),
+        ),
+      )
+      .limit(1);
+    return row?.studyPrivilege ?? defaultTeamMemberStudyPrivilege();
+  } catch (e) {
+    if (!isMissingTeamDeckAssignmentStudyPrivilegeColumnError(e)) throw e;
+    warnMissingTeamDeckAssignmentStudyPrivilegeColumnOnce();
+    return defaultTeamMemberStudyPrivilege();
+  }
+}
+
+export async function updateDeckAssignmentStudyPrivilege(
+  teamId: number,
+  deckId: number,
+  memberUserId: string,
+  studyPrivilege: TeamMemberStudyPrivilege,
+) {
+  try {
+    await db
+      .update(teamDeckAssignments)
+      .set({ studyPrivilege })
+      .where(
+        and(
+          eq(teamDeckAssignments.teamId, teamId),
+          eq(teamDeckAssignments.deckId, deckId),
+          eq(teamDeckAssignments.memberUserId, memberUserId),
+        ),
+      );
+  } catch (e) {
+    if (!isMissingTeamDeckAssignmentStudyPrivilegeColumnError(e)) throw e;
+    warnMissingTeamDeckAssignmentStudyPrivilegeColumnOnce();
+    throw new Error(
+      "Database is missing study privilege support. Apply migration 0027_team_deck_study_privilege.sql.",
     );
   }
 }

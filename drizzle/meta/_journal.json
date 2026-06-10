@@ -176,6 +176,13 @@
       "when": 1778120000000,
       "tag": "0026_affiliate_broadcast_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1778200000000,
+      "tag": "0027_team_deck_study_privilege",
+      "breakpoints": true
     }
   ]
 }

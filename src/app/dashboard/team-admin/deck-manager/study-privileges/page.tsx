@@ -17,17 +17,13 @@ import {
   getTeamsForTeamDashboard,
   listAssignmentsForTeam,
   listTeamMembers,
-  roleReceivesDeckAssignments,
 } from "@/db/queries/teams";
-import { getOwnedDecksByUserWithCardCount } from "@/db/queries/decks";
 import {
   buildTeamAdminAssignDecksToMembersPath,
   buildTeamAdminPath,
   buildTeamAdminStudyPrivilegesPath,
 } from "@/lib/team-admin-url";
-import { TeamDeckManagerSubTabs } from "@/components/team-deck-manager-sub-tabs";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
-import { TeamDeckAssignListLoader } from "@/components/team-deck-assign-list-loader";
 import { toClientJson } from "@/lib/to-client-json";
 import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
 import { TeamAdminPanelScroll } from "@/components/team-admin-panel-scroll";
@@ -42,6 +38,8 @@ import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
+import { TeamDeckManagerSubTabs } from "@/components/team-deck-manager-sub-tabs";
+import { TeamStudyPrivilegesTable } from "@/components/team-study-privileges-table";
 
 interface PageProps {
   searchParams: Promise<{
@@ -52,7 +50,7 @@ interface PageProps {
   }>;
 }
 
-export default async function TeamAdminAssignDecksToMembersPage({ searchParams }: PageProps) {
+export default async function TeamAdminStudyPrivilegesPage({ searchParams }: PageProps) {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
@@ -79,17 +77,17 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
     cookieTeamRaw: cookieRaw,
     useridParam,
     planParam,
-    buildCanonicalPath: buildTeamAdminAssignDecksToMembersPath,
+    buildCanonicalPath: buildTeamAdminStudyPrivilegesPath,
   });
   if (resolution.outcome === "redirect") {
     redirect(resolution.to);
   }
   const { selected, teamsForSubscriber, viewerTeamMemberUrlParam } = resolution;
 
-  const [assignWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
+  const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
     Promise.all(
       teamsForSubscriber.map(async (t) => {
-        const [allMembers, decks, assignments] = await Promise.all([
+        const [teamMembers, decks, assignments] = await Promise.all([
           listTeamMembers(t.id),
           getDecksForTeam(t.id, t.ownerUserId),
           listAssignmentsForTeam(t.id),
@@ -97,9 +95,7 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
         return {
           id: t.id,
           name: t.name,
-          ownerUserId: t.ownerUserId,
-          normalMembers: allMembers.filter((m) => roleReceivesDeckAssignments(m.role)),
-          allMembers,
+          teamMembers,
           decks,
           assignments,
         };
@@ -108,30 +104,12 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
     getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
   ]);
 
-  const assignMemberUserIds = assignWorkspaceSnapshots.flatMap((w) =>
-    w.allMembers.map((m) => m.userId),
+  const memberUserIds = privilegeWorkspaceSnapshots.flatMap((w) =>
+    w.teamMembers.map((m) => m.userId),
   );
-  const assignmentSignerUserIds = assignWorkspaceSnapshots.flatMap((w) =>
-    w.assignments
-      .map((a) => a.assignedByUserId)
-      .filter((id): id is string => Boolean(id)),
-  );
-  const workspaceOwnerUserIds = assignWorkspaceSnapshots.map((w) => w.ownerUserId);
   const userFieldDisplayById = await getClerkUserFieldDisplaysByIds([
-    ...new Set([...assignMemberUserIds, ...assignmentSignerUserIds, ...workspaceOwnerUserIds]),
+    ...new Set(memberUserIds),
   ]);
-
-  const selectedWsDecks =
-    assignWorkspaceSnapshots.find((w) => w.id === selected.id)?.decks ?? [];
-  const decksListedForWorkspace = new Set(selectedWsDecks.map((d) => d.id));
-  const subscriberPersonalUnlinkedDecks =
-    selected.ownerUserId === userId
-      ? (await getOwnedDecksByUserWithCardCount(selected.ownerUserId)).map((d) => ({
-          id: d.id,
-          name: d.name,
-          alreadyLinked: decksListedForWorkspace.has(d.id),
-        }))
-      : undefined;
 
   const access = await getAccessContext();
   const personalStripeSlug = access.hasClerkPersonalProPlus
@@ -181,14 +159,14 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
                 teamAdminPanelScrollClass,
               )}
             >
-              Assign decks to members
+              Study privileges
             </h1>
             <p className="truncate text-sm text-muted-foreground" title={selected.name}>
               {selected.name}
             </p>
           </div>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Link personal decks to this workspace, then assign them to members or co-admins.
+            Control which study modes regular members may use for each assigned deck.
           </p>
         </div>
         <TeamAdminQuickNavPanel
@@ -226,26 +204,19 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
 
       <Card className={teamAdminActivePanelClass}>
         <CardHeader className="space-y-2 pb-4">
-          <CardTitle
-            id={TEAM_ADMIN_PANEL_IDS.deckManager}
-            className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}
-          >
-            Deck assignments
+          <CardTitle className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}>
+            Member study modes
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Link decks from Personal and assign workspace decks to members or co-admins.
+            Each row is a deck assignment for a regular team member. Update or remove study features
+            as needed — changes apply on their next study session.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <TeamDeckAssignListLoader
-            workspaces={toClientJson(assignWorkspaceSnapshots)}
+          <TeamStudyPrivilegesTable
+            workspaces={toClientJson(privilegeWorkspaceSnapshots)}
             defaultWorkspaceId={selected.id}
             userFieldDisplayById={toClientJson(userFieldDisplayById)}
-            subscriberPersonalUnlinkedDecks={
-              subscriberPersonalUnlinkedDecks
-                ? toClientJson(subscriberPersonalUnlinkedDecks)
-                : undefined
-            }
           />
         </CardContent>
       </Card>

@@ -35,7 +35,8 @@ import {
 } from "@/lib/team-admin-url";
 import {
   TEAM_ADMIN_PANEL_IDS,
-  teamAdminCardClass,
+  teamAdminActivePanelClass,
+  teamAdminActivePanelTitleClass,
   teamAdminPanelHref,
   teamAdminPanelScrollClass,
   teamAdminSubTabClass,
@@ -138,14 +139,11 @@ function TeamAdminPanelCard({
   children: ReactNode;
 }) {
   return (
-    <Card className={teamAdminCardClass}>
+    <Card className={teamAdminActivePanelClass}>
       <CardHeader className="space-y-2 pb-4">
         <CardTitle
           id={panelId}
-          className={cn(
-            "text-base font-medium tracking-tight sm:text-lg",
-            teamAdminPanelScrollClass,
-          )}
+          className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}
         >
           {title}
         </CardTitle>
@@ -238,6 +236,7 @@ export function TeamAdminManageTabs({
         </div>
       </div>
 
+      <div key={pathname} className="w-full">
       {mainPanel === "members" && !invitePanelVisible ? (
         <TeamAdminPanelCard
           panelId={TEAM_ADMIN_PANEL_IDS.members}
@@ -366,6 +365,7 @@ export function TeamAdminManageTabs({
           userFieldDisplayById={userFieldDisplayById}
         />
       ) : null}
+      </div>
     </div>
   );
 }

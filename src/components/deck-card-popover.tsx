@@ -545,6 +545,21 @@ export function DeckCardPopover({
                 Open deck
               </Link>
 
+              <Link
+                href={studyHref}
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "xs" }),
+                  "w-full justify-start gap-2 px-2 font-normal rounded-md",
+                  deck.cardCount === 0 && "pointer-events-none opacity-40",
+                )}
+                onClick={() => setPopoverOpen(false)}
+                aria-disabled={deck.cardCount === 0}
+                tabIndex={deck.cardCount === 0 ? -1 : undefined}
+              >
+                <GraduationCap className="size-3.5 text-muted-foreground shrink-0" />
+                Study
+              </Link>
+
               {previewControlsFor(true)}
 
               <div className="my-0.5 h-px bg-border" />
