@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { teamAdminTableWrapClass } from "@/components/team-admin-panel-styles";
+import { TeamAdminRecordSlider } from "@/components/team-admin-record-slider";
 import {
   Select,
   SelectContent,
@@ -32,14 +32,6 @@ import {
   linkPersonalDeckToTeamWorkspaceAction,
 } from "@/actions/teams";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { DeckRow, TeamMemberRow } from "@/db/schema";
 import type { TeamDeckAssignmentListRow } from "@/db/queries/teams";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
@@ -65,6 +57,8 @@ type AssignmentTableDisplayRow = {
   signedByLabel: string;
   signedByTitle: string | undefined;
   createdAt: Date | string | null;
+  studyPrivilege: TeamMemberStudyPrivilege;
+  memberRole: MemberRow["role"] | null;
 };
 
 export type TeamAssignWorkspaceSnapshot = {
@@ -177,7 +171,7 @@ const CAPTION_LINK_PERSONAL =
   "Lists every deck from your Personal Dashboard. Decks already tied to this workspace stay selectable — linking again simply confirms they remain attached (no duplicate).";
 
 const TOOLTIP_ASSIGNMENT_TABLE_ROW =
-  "Double-click to load this assignment in the form above and open access details below. Only the workspace subscriber (owner) can remove a member's deck access.";
+  "Tap or click to load this assignment in the form above and open access details. Only the workspace subscriber (owner) can remove a member's deck access.";
 
 function HintBalloon({ fieldLabel, caption }: { fieldLabel: string; caption: string }) {
   return (
@@ -279,6 +273,7 @@ export function TeamDeckAssignList({
     for (const w of workspaces) {
       for (const a of w.assignments) {
         const deck = w.decks.find((d) => d.id === a.deckId);
+        const memberRecord = w.allMembers.find((m) => m.userId === a.memberUserId);
         const byId = a.assignedByUserId;
         const signedByLabel = assignmentAuditSignedByLabel(
           byId,
@@ -302,6 +297,8 @@ export function TeamDeckAssignList({
             signedByLabel,
           ),
           createdAt: a.createdAt ?? null,
+          studyPrivilege: a.studyPrivilege ?? defaultTeamMemberStudyPrivilege(),
+          memberRole: memberRecord?.role ?? null,
         });
       }
     }
@@ -318,6 +315,25 @@ export function TeamDeckAssignList({
     });
     return out;
   }, [workspaces, userFieldDisplayById]);
+
+  const assignmentDeckFilterOptions = React.useMemo(
+    () => [...new Set(assignmentTableRows.map((r) => r.deckName))].sort((a, b) => a.localeCompare(b)),
+    [assignmentTableRows],
+  );
+
+  function assignmentSearchHaystack(row: AssignmentTableDisplayRow): string {
+    const display = userFieldDisplayById[row.memberUserId];
+    return [
+      row.memberLabel,
+      row.deckName,
+      row.workspaceName,
+      display?.primaryEmail,
+      display?.secondaryLine,
+      row.memberUserId,
+    ]
+      .filter((part): part is string => Boolean(part && String(part).trim()))
+      .join(" ");
+  }
 
   function isAssigned(teamId: number, dId: number, mId: string) {
     return assignments.some(
@@ -414,12 +430,46 @@ export function TeamDeckAssignList({
     }
     setMemberUserId(row.memberUserId);
     setDeckId(String(row.deckId));
+    if (row.memberRole === "team_member") {
+      setStudyPrivilege(row.studyPrivilege);
+    } else {
+      setStudyPrivilege(defaultTeamMemberStudyPrivilege());
+    }
     setError(null);
   }
 
-  function onAssignmentTableRowDoubleClick(row: AssignmentTableDisplayRow) {
+  function onAssignmentTableRowActivate(row: AssignmentTableDisplayRow) {
     applyAssignmentFromTableRow(row);
     setExpandedAssignmentKey((prev) => (prev === row.key ? null : row.key));
+  }
+
+  function renderAssignmentAccessPanel(row: AssignmentTableDisplayRow) {
+    return (
+      <div className="rounded-lg border border-border/80 bg-muted/20 px-4 py-3 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Access management
+        </p>
+        {isAssignmentRowWorkspaceOwner(row) ? (
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            className="h-9 w-full sm:w-auto"
+            disabled={busy !== null}
+            onClick={() => {
+              setRemoveAccessRow(row);
+              setRemoveAccessDialogOpen(true);
+            }}
+          >
+            Remove assignment
+          </Button>
+        ) : (
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Only the workspace subscriber (owner) can remove this member&apos;s access to this deck.
+          </p>
+        )}
+      </div>
+    );
   }
 
   async function handleConfirmRemoveAccess() {
@@ -471,9 +521,14 @@ export function TeamDeckAssignList({
           </div>
         )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-4">
         <div className="flex items-center gap-1">
-          <Label htmlFor="assign-deck-workspace">Team workspace</Label>
+          <Label
+            htmlFor="assign-deck-workspace"
+            className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+          >
+            Team workspace
+          </Label>
           <HintBalloon fieldLabel="Team workspace" caption={CAPTION_TEAM_WORKSPACE} />
         </div>
         <span id="assign-deck-workspace-caption" className="sr-only">
@@ -485,7 +540,7 @@ export function TeamDeckAssignList({
         >
           <SelectTrigger
             id="assign-deck-workspace"
-            className="h-10 w-full"
+            className="h-10 w-full bg-background"
             aria-describedby="assign-deck-workspace-caption"
           >
             <SelectValue placeholder={PLACEHOLDER_WORKSPACE}>
@@ -774,135 +829,77 @@ export function TeamDeckAssignList({
 
       <Separator className="my-2" />
 
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-foreground">Assignments by member</h3>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Double-click a row to load it into the form above. Only the workspace owner can remove
-          assignments.
-        </p>
-        <div className={teamAdminTableWrapClass}>
-          <Table className="min-w-[48rem] text-sm">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead>Deck</TableHead>
-                <TableHead>Workspace</TableHead>
-                <TableHead>Signed by</TableHead>
-                <TableHead>{ASSIGNMENTS_COL_DATE_TIME}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assignmentTableRows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground text-sm">
-                    No deck assignments yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                assignmentTableRows.map((row) => (
-                  <React.Fragment key={row.key}>
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={(tProps) => (
-                          <TableRow
-                            {...tProps}
-                            aria-expanded={expandedAssignmentKey === row.key}
-                            className={cn("cursor-pointer hover:bg-muted/50", tProps.className)}
-                            onDoubleClick={() => onAssignmentTableRowDoubleClick(row)}
-                          >
-                            <TableCell className="max-w-[min(100%,220px)]">
-                              <span className="truncate font-medium" title={row.memberLabel}>
-                                {row.memberLabel}
-                              </span>
-                            </TableCell>
-                            <TableCell className="max-w-[min(100%,220px)]">
-                              <span className="truncate" title={row.deckName}>
-                                {row.deckName}
-                              </span>
-                            </TableCell>
-                            <TableCell className="max-w-[min(100%,200px)]">
-                              <span
-                                className="truncate text-muted-foreground"
-                                title={row.workspaceName}
-                              >
-                                {row.workspaceName}
-                              </span>
-                            </TableCell>
-                            <TableCell className="max-w-[min(100%,220px)]">
-                              <span
-                                className="truncate font-medium text-foreground"
-                                title={row.signedByTitle}
-                              >
-                                {row.signedByLabel}
-                              </span>
-                            </TableCell>
-                            <TableCell className="min-w-[12rem] whitespace-nowrap text-sm text-foreground">
-                              {row.createdAt ? (
-                                <span title={toAssignmentDate(row.createdAt)?.toISOString()}>
-                                  {formatAssignmentRecordedAt(row.createdAt)}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      />
-                      <TooltipContent
-                        side="top"
-                        className="max-w-xs text-pretty text-left"
-                      >
-                        <span className="block text-xs leading-snug">
-                          {TOOLTIP_ASSIGNMENT_TABLE_ROW}
-                        </span>
-                      </TooltipContent>
-                    </Tooltip>
-                    {expandedAssignmentKey === row.key ? (
-                      <TableRow className="border-0 hover:bg-transparent">
-                        <TableCell colSpan={5} className="p-0">
-                          <div className="border-t border-border bg-muted/25 px-3 py-3">
-                            <Table className="rounded-md border border-border">
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Access management</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                <TableRow>
-                                  <TableCell>
-                                    {isAssignmentRowWorkspaceOwner(row) ? (
-                                      <Button
-                                        type="button"
-                                        variant="destructive"
-                                        size="sm"
-                                        disabled={busy !== null}
-                                        onClick={() => {
-                                          setRemoveAccessRow(row);
-                                          setRemoveAccessDialogOpen(true);
-                                        }}
-                                      >
-                                        Delete access
-                                      </Button>
-                                    ) : (
-                                      <p className="text-sm text-muted-foreground">
-                                        Only the workspace subscriber (owner) can remove this
-                                        member&apos;s access to this deck.
-                                      </p>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
-                  </React.Fragment>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-foreground">Assignments by member</h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Tap or click a row to load it into the form above. Only the workspace owner can remove
+            assignments.
+          </p>
         </div>
+
+        <TeamAdminRecordSlider
+          items={assignmentTableRows}
+          activeKey={expandedAssignmentKey}
+          onActivate={onAssignmentTableRowActivate}
+          deckFilterOptions={assignmentDeckFilterOptions}
+          showDateSort
+          getSearchHaystack={assignmentSearchHaystack}
+          getSortDate={(row) => toAssignmentDate(row.createdAt)?.getTime() ?? null}
+          emptyMessage="No deck assignments yet."
+          noResultsMessage="No assignments match your search or filters."
+          renderCard={(row, isActive) => {
+            const display = userFieldDisplayById[row.memberUserId];
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Member
+                    </p>
+                    <p className="font-medium text-foreground">{row.memberLabel}</p>
+                    {display?.primaryEmail ? (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {display.primaryEmail}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Deck
+                    </p>
+                    <p className="text-sm text-foreground">{row.deckName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Workspace
+                    </p>
+                    <p className="text-sm text-foreground">{row.workspaceName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Signed by
+                    </p>
+                    <p className="text-sm text-foreground">{row.signedByLabel}</p>
+                  </div>
+                </div>
+                {row.createdAt ? (
+                  <p className="text-xs text-muted-foreground">
+                    Assigned {formatAssignmentRecordedAt(row.createdAt)}
+                  </p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  {isActive
+                    ? "Tap again to collapse access options"
+                    : "Tap to load in the form above and expand access options"}
+                </p>
+              </div>
+            );
+          }}
+          renderBelowActive={(row) =>
+            expandedAssignmentKey === row.key ? renderAssignmentAccessPanel(row) : null
+          }
+        />
       </div>
     </div>
 
