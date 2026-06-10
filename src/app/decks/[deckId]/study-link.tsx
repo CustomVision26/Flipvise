@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Brain } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
@@ -31,17 +32,18 @@ export function StudyLink({
               href={href}
               {...props}
               className={cn(
-                buttonVariants({ variant: "default" }),
-                "text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4",
-                props.className
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "h-9 gap-2",
+                props.className,
               )}
             >
-              🧠 Brain Challenge
+              <Brain className="size-4" />
+              Study deck
             </Link>
           )}
         />
         <TooltipContent>
-          <p>Lets go! and test my memory bank</p>
+          <p>Open flashcard study mode for this deck.</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

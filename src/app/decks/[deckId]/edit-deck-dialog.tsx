@@ -168,8 +168,8 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" />}>
-        Edit Deck
+      <DialogTrigger render={<Button variant="outline" size="sm" className="h-9 gap-2" />}>
+        Edit deck
       </DialogTrigger>
       <DialogContent className="w-[calc(100vw-1.25rem)] max-w-md max-h-[min(92dvh,40rem)] overflow-y-auto overflow-x-hidden p-4 sm:p-6 sm:mx-auto sm:w-full">
         <DialogHeader className="text-left sm:text-left">

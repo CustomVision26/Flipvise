@@ -1,6 +1,4 @@
 import { MainDashboardButton } from "@/components/main-dashboard-button";
-import { Badge } from "@/components/ui/badge";
-import { labelForTeamPlanSlug } from "@/lib/team-plans";
 import { cn } from "@/lib/utils";
 
 type TeamAdminDashboardNavActionsProps = {
@@ -11,7 +9,7 @@ type TeamAdminDashboardNavActionsProps = {
   workspaceTeamId: number;
   /** Hide "To workspace" when the signed-in user owns this workspace. */
   isOwner: boolean;
-  /** `teams.planSlug` for the selected workspace — shown next to Personal dashboard. */
+  /** `teams.planSlug` for the selected workspace — shown in the card header. */
   workspacePlanSlug: string;
   className?: string;
 };
@@ -21,35 +19,32 @@ export function TeamAdminDashboardNavActions({
   workspaceDashboardHref,
   workspaceTeamId,
   isOwner,
-  workspacePlanSlug,
   className,
 }: TeamAdminDashboardNavActionsProps) {
-  const planLabel = labelForTeamPlanSlug(workspacePlanSlug) ?? workspacePlanSlug;
-
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div
+      className={cn(
+        "grid gap-2 sm:grid-cols-2 sm:gap-3",
+        !isOwner && "sm:max-w-xl",
+        className,
+      )}
+    >
       <MainDashboardButton
         teamId={null}
         href={mainDashboardHref}
         label="Personal dashboard"
         leadingArrow
-        variant="secondary"
-        className="h-9 w-full justify-center font-medium sm:w-auto sm:min-w-[11.5rem]"
-      />
-      <Badge
         variant="outline"
-        className="h-9 shrink-0 border-border px-3 py-0 text-xs font-medium leading-none text-muted-foreground"
-      >
-        {planLabel}
-      </Badge>
+        className="h-10 w-full justify-center font-medium"
+      />
       {!isOwner ? (
         <MainDashboardButton
           teamId={workspaceTeamId}
           href={workspaceDashboardHref}
-          label="To workspace"
+          label="Workspace dashboard"
           trailingArrow
           variant="outline"
-          className="h-9 w-full justify-center font-medium sm:w-auto sm:min-w-[11.5rem]"
+          className="h-10 w-full justify-center font-medium"
         />
       ) : null}
     </div>

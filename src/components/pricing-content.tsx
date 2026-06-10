@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Check, Loader2, ChevronDown, LayoutGrid } from "lucide-react";
+import { Check, Loader2, ChevronDown, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { createStripeCheckoutSessionAction } from "@/actions/stripe";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,14 +142,13 @@ function PlanCard({
   return (
     <Card
       className={cn(
-        "flex flex-col",
-        plan.highlighted &&
-          "ring-2 ring-primary shadow-lg shadow-primary/10",
+        "flex flex-col border-border/80 bg-card/60 shadow-sm",
+        plan.highlighted && "border-primary/40 ring-1 ring-primary/20",
       )}
     >
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-base font-semibold leading-none">
+          <span className="text-base font-medium leading-none tracking-tight">
             {plan.name}
           </span>
           <div className="flex shrink-0 gap-1.5">
@@ -207,10 +205,10 @@ function PlanCard({
       </CardHeader>
 
       <CardContent className="flex flex-col flex-1 gap-4 pt-0">
-        <ul className="space-y-2 flex-1">
+        <ul className="flex-1 space-y-2.5 border-t border-border/60 pt-4">
           {plan.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-sm">
-              <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+            <li key={feature} className="flex items-start gap-2.5 text-sm leading-snug text-muted-foreground">
+              <Check className="mt-0.5 size-3.5 shrink-0 text-primary/90" />
               <span>{feature}</span>
             </li>
           ))}
@@ -294,117 +292,136 @@ export function PricingContent({
 
   return (
     <div className="space-y-8">
-      {/* Controls row: billing toggle + plan filter dropdown */}
-      <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-        {/* Billing period toggle */}
-        <div className="flex items-center gap-3">
-          <Label
-            htmlFor="billing-period"
-            className={cn(
-              "text-sm font-medium cursor-pointer",
-              period === "monthly" ? "text-foreground" : "text-muted-foreground",
-            )}
-          >
-            Monthly
-          </Label>
-          <Switch
-            id="billing-period"
-            checked={period === "yearly"}
-            onCheckedChange={(checked) =>
-              setPeriod(checked ? "yearly" : "monthly")
-            }
-          />
-          <Label
-            htmlFor="billing-period"
-            className={cn(
-              "text-sm font-medium cursor-pointer flex items-center gap-2",
-              period === "yearly" ? "text-foreground" : "text-muted-foreground",
-            )}
-          >
-            Annual
-            <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-              Save more
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card/40">
+        <div className="flex flex-col gap-4 border-b border-border/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex flex-col items-center gap-2 sm:items-start">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Billing period
             </span>
-          </Label>
-        </div>
-
-        {/* Plan filter dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "gap-2 min-w-[9rem] justify-between",
-            )}
-          >
-            <span className="flex items-center gap-2">
-              <LayoutGrid className="size-3.5 shrink-0" />
-              {selectedPlan ? selectedPlan.name : "All Plans"}
-            </span>
-            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              onClick={() => setSelectedPlanId(null)}
-              className={cn("gap-2", !selectedPlanId && "font-medium text-primary")}
+            <div
+              className="inline-flex rounded-lg border border-border/80 bg-muted/20 p-1"
+              role="group"
+              aria-label="Billing period"
             >
-              <LayoutGrid className="size-3.5" />
-              All Plans
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {plans.map((plan) => (
-              <DropdownMenuItem
-                key={plan.id}
-                onClick={() => setSelectedPlanId(plan.id)}
+              <Button
+                type="button"
+                size="sm"
+                variant={period === "monthly" ? "secondary" : "ghost"}
                 className={cn(
-                  "gap-2",
-                  selectedPlanId === plan.id && "font-medium text-primary",
+                  "h-8 min-w-[5.5rem] rounded-md px-4 text-sm font-medium",
+                  period === "monthly" && "shadow-sm",
+                )}
+                onClick={() => setPeriod("monthly")}
+              >
+                Monthly
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={period === "yearly" ? "secondary" : "ghost"}
+                className={cn(
+                  "h-8 min-w-[5.5rem] gap-2 rounded-md px-4 text-sm font-medium",
+                  period === "yearly" && "shadow-sm",
+                )}
+                onClick={() => setPeriod("yearly")}
+              >
+                Annual
+                <Badge
+                  variant="outline"
+                  className="border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0 text-[10px] font-medium text-emerald-300"
+                >
+                  Save
+                </Badge>
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-2 sm:items-end">
+            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              View plans
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "h-8 min-w-[10rem] justify-between gap-2 bg-background/60 px-3",
                 )}
               >
-                {plan.name}
-                {plan.discount?.active && plan.discount.value > 0 && (
-                  <Badge className="ml-auto text-[10px] px-1 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">
-                    {plan.discount.type === "percentage"
-                      ? `${plan.discount.value}%`
-                      : `$${plan.discount.value}`}{" "}
-                    off
-                  </Badge>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {userId ? (
-        <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 max-w-xl mx-auto sm:mx-0">
-          <Label htmlFor="checkout-promo" className="text-sm font-medium">
-            Promotion code <span className="text-muted-foreground font-normal">(optional)</span>
-          </Label>
-          <Input
-            id="checkout-promo"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="e.g. SummerLaunch or SummerLaunchyourcode"
-            value={promotionCode}
-            onChange={(e) => setPromotionCode(e.target.value)}
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Enter the public code for the tier you&apos;re buying, or a combined affiliate code (
-            <span className="font-mono text-foreground">base</span> from any tier that lists the promo +{" "}
-            <span className="font-mono text-foreground">affiliate id</span>). The correct affiliate discount for the
-            plan you click will apply. Leave blank to use that tier&apos;s default pricing.
-          </p>
+                <span className="flex items-center gap-2 truncate">
+                  <SlidersHorizontal className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">
+                    {selectedPlan ? selectedPlan.name : "All plans"}
+                  </span>
+                </span>
+                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => setSelectedPlanId(null)}
+                  className={cn(!selectedPlanId && "font-medium text-primary")}
+                >
+                  All plans
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {plans.map((plan) => (
+                  <DropdownMenuItem
+                    key={plan.id}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    className={cn(
+                      "justify-between gap-2",
+                      selectedPlanId === plan.id && "font-medium text-primary",
+                    )}
+                  >
+                    <span>{plan.name}</span>
+                    {plan.discount?.active && plan.discount.value > 0 ? (
+                      <Badge className="shrink-0 border-amber-500/20 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-300">
+                        {plan.discount.type === "percentage"
+                          ? `${plan.discount.value}%`
+                          : `$${plan.discount.value}`}
+                      </Badge>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      ) : null}
+
+        {userId ? (
+          <div className="space-y-3 px-4 py-4 sm:px-5">
+            <div className="space-y-1">
+              <Label htmlFor="checkout-promo" className="text-sm font-medium text-foreground">
+                Promotion code
+              </Label>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Optional. Apply a public promo or affiliate code at checkout.
+              </p>
+            </div>
+            <Input
+              id="checkout-promo"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="Enter your code"
+              value={promotionCode}
+              onChange={(e) => setPromotionCode(e.target.value)}
+              className="h-10 max-w-md bg-background/80 text-sm"
+            />
+            <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Use the code listed for your selected tier, or a combined affiliate code made from
+              the tier&apos;s base promo plus your affiliate ID. The discount matches the plan you
+              choose at checkout.
+            </p>
+          </div>
+        ) : null}
+      </div>
 
       {/* Plan cards grid */}
       <div
         className={cn(
-          "grid gap-4",
+          "grid gap-5",
           visiblePlans.length === 1
-            ? "max-w-sm mx-auto"
+            ? "mx-auto max-w-sm"
             : "sm:grid-cols-2 lg:grid-cols-3",
         )}
       >

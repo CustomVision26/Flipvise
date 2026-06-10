@@ -9,7 +9,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -31,6 +30,36 @@ interface GenerateCardsButtonProps {
   aiGeneratedCount: number;
   hasAI: boolean;
   deckCardLimit: number;
+}
+
+function DisabledAiButton({
+  tooltip,
+  onClick,
+}: {
+  tooltip: string;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            aria-disabled="true"
+            onClick={onClick ?? ((e) => e.preventDefault())}
+            className="h-9 w-full cursor-not-allowed gap-2 opacity-60"
+          />
+        }
+      >
+        <Sparkles className="size-4" />
+        Generate with AI
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-64 text-center text-sm">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function GenerateCardsButton({
@@ -80,159 +109,97 @@ export function GenerateCardsButton({
 
   if (!hasAI) {
     return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/pricing")}
-              className="gap-1 sm:gap-1.5 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-            />
-          }
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">AI generation</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Available on Pro and team plans.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push("/pricing")}
+          className="h-9 w-full gap-2"
         >
-          <Sparkles className="size-3 sm:size-4" />
-          <span className="hidden sm:inline">Generate with AI</span>
-          <span className="sm:hidden">AI Gen</span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-56 text-center">
-          AI card generation is a Pro feature. Click to upgrade your plan.
-        </TooltipContent>
-      </Tooltip>
+          <Sparkles className="size-4" />
+          Upgrade for AI
+        </Button>
+      </div>
     );
   }
 
   const atAiQuota = aiGeneratedCount >= AI_GENERATION_CAP_PER_DECK;
   const noBatchRoom = batchOptions.length === 0;
 
+  const statsLine = `${aiGeneratedCount} AI · ${manualCardCount} manual · ${Math.max(0, remainingDeckSlots)} slot${Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} remaining`;
+
   return (
-    <div className="flex w-full max-w-md flex-col items-stretch gap-2 sm:max-w-lg sm:items-end">
-      <Alert className="text-left text-xs sm:text-sm p-3 sm:p-4">
-        <Sparkles className="text-primary h-4 w-4 sm:h-5 sm:w-5" />
-        <AlertTitle className="text-sm sm:text-base">AI flashcard batches</AlertTitle>
-        <AlertDescription className="text-muted-foreground space-y-1 text-xs sm:text-sm">
-          <p className="hidden sm:block">
-            Choose how many cards to generate (multiples of 5, up to 75 per run). Each option
-            includes an AI marker on new cards.
-          </p>
-          <p className="sm:hidden">
-            Choose batch size (multiples of 5, max 75).
-          </p>
-          <p className="text-[10px] sm:text-xs italic">
-            AI reads your deck&apos;s name, description, and existing cards to match their style,
-            scope, and difficulty — and avoid duplicates.
-          </p>
-          <p className="text-foreground font-medium text-[10px] sm:text-sm">
-            {aiGeneratedCount} AI · {manualCardCount} manual · {Math.max(0, remainingDeckSlots)} slot
-            {Math.max(0, remainingDeckSlots) !== 1 ? "s" : ""} left (
-            {deckCardLimit} max, {paidDeckCards ? "Paid plan" : "Free"})
-          </p>
-        </AlertDescription>
-      </Alert>
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 shrink-0 text-primary" />
+          <p className="text-sm font-medium text-foreground">AI generation</p>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Generate cards in batches of 5. AI matches your deck&apos;s style and avoids duplicates.
+        </p>
+        <p className="text-xs tabular-nums text-muted-foreground">
+          {statsLine}
+          <span className="text-muted-foreground/80">
+            {" "}
+            · {deckCardLimit} max · {paidDeckCards ? "Paid plan" : "Free plan"}
+          </span>
+        </p>
+      </div>
 
       {atAiQuota ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                aria-disabled="true"
-                onClick={(e) => e.preventDefault()}
-                className="gap-1 sm:gap-1.5 cursor-not-allowed opacity-50 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-              />
-            }
-          >
-            <Sparkles className="size-3 sm:size-4" />
-            <span className="hidden sm:inline">Generate with AI</span>
-            <span className="sm:hidden">AI Gen</span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-64 text-center text-xs sm:text-sm">
-            AI generation is limited to {AI_GENERATION_CAP_PER_DECK} AI-generated cards per deck.
-            This deck already has {aiGeneratedCount}.
-          </TooltipContent>
-        </Tooltip>
+        <DisabledAiButton
+          tooltip={`AI generation is limited to ${AI_GENERATION_CAP_PER_DECK} cards per deck. This deck already has ${aiGeneratedCount}.`}
+        />
       ) : !hasDescription ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                aria-disabled="true"
-                onClick={(e) => e.preventDefault()}
-                className="gap-1 sm:gap-1.5 cursor-not-allowed opacity-50 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-              />
-            }
-          >
-            <Sparkles className="size-3 sm:size-4" />
-            <span className="hidden sm:inline">Generate with AI</span>
-            <span className="sm:hidden">AI Gen</span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-56 text-center text-xs sm:text-sm">
-            Add a description to this deck first. Click &ldquo;Edit Deck&rdquo; to add one.
-          </TooltipContent>
-        </Tooltip>
+        <DisabledAiButton tooltip='Add a deck description first using "Edit deck".' />
       ) : noBatchRoom ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                aria-disabled="true"
-                onClick={(e) => e.preventDefault()}
-                className="gap-1 sm:gap-1.5 cursor-not-allowed opacity-50 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-              />
-            }
-          >
-            <Sparkles className="size-3 sm:size-4" />
-            <span className="hidden sm:inline">Generate with AI</span>
-            <span className="sm:hidden">AI Gen</span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-64 text-center text-xs sm:text-sm">
-            {remainingDeckSlots <= 0
+        <DisabledAiButton
+          tooltip={
+            remainingDeckSlots <= 0
               ? paidDeckCards
-                ? `This deck is full (${deckCardLimit} cards on your plan). Delete cards to free space.`
-                : `This deck is full on the Free plan (${deckCardLimit} cards). Upgrade on Pricing for more room per deck, or delete cards.`
-              : "No valid batch size left for AI generation with current limits."}
-          </TooltipContent>
-        </Tooltip>
+                ? `This deck is full (${deckCardLimit} cards). Delete cards to free space.`
+                : `This deck is full on the Free plan (${deckCardLimit} cards). Upgrade or delete cards.`
+              : "No valid batch size left with current limits."
+          }
+        />
       ) : (
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Select
             value={String(batchSize)}
             onValueChange={(v) => setBatchSize(Number(v))}
             disabled={isPending}
           >
-            <SelectTrigger size="sm" className="w-full min-w-[140px] sm:min-w-[200px] sm:w-[220px] h-8 sm:h-9 text-xs sm:text-sm">
-              <SelectValue placeholder="Cards per batch" />
+            <SelectTrigger size="sm" className="h-9 w-full sm:min-w-[8.5rem] sm:flex-1">
+              <SelectValue placeholder="Batch size" />
             </SelectTrigger>
             <SelectContent>
               {batchOptions.map((n) => (
-                <SelectItem key={n} value={String(n)} className="text-xs sm:text-sm">
-                  <Sparkles className="size-3 sm:size-4 text-primary" />
-                  <span>{n} cards</span>
+                <SelectItem key={n} value={String(n)}>
+                  {n} cards
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
             size="sm"
             onClick={handleGenerate}
             disabled={isPending}
-            className="gap-1 sm:gap-1.5 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
+            className="h-9 w-full gap-2 sm:w-auto sm:shrink-0"
           >
-            <Sparkles className="size-3 sm:size-4" />
-            <span className="hidden sm:inline">{isPending ? "Generating…" : "Generate with AI"}</span>
-            <span className="sm:hidden">{isPending ? "Gen…" : "Gen AI"}</span>
+            <Sparkles className="size-4" />
+            {isPending ? "Generating…" : "Generate"}
           </Button>
         </div>
       )}
-      {error && (
-        <p className="text-destructive max-w-md text-right text-[10px] sm:text-xs">{error}</p>
-      )}
+
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

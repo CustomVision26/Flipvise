@@ -21,8 +21,8 @@ export function ViewQuizResultDialog({
 
   return (
     <>
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Eye className="size-3.5" aria-hidden />
+      <Button variant="outline" size="sm" className="h-9 w-full gap-2 sm:w-auto" onClick={() => setOpen(true)}>
+        <Eye className="size-4" aria-hidden />
         {triggerLabel}
       </Button>
 

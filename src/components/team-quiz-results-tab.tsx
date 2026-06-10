@@ -12,6 +12,7 @@ import { CheckCircle, XCircle, CircleHelp, ClipboardList } from "lucide-react";
 import type { QuizResultRow } from "@/db/queries/quiz-results";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import { ViewQuizResultDialog, type QuizResultSummary } from "@/components/view-quiz-result-dialog";
+import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 
 function formatDate(value: Date | string): string {
   const d = typeof value === "string" ? new Date(value) : value;
@@ -51,7 +52,6 @@ export function TeamQuizResultsTab({
   members,
   userFieldDisplayById,
 }: TeamQuizResultsTabProps) {
-  // Build a quick role-lookup map: userId → role
   const memberRoleMap = new Map(members.map((m) => [m.userId, m.role]));
 
   const ownerDisplay = userFieldDisplayById[ownerUserId];
@@ -59,20 +59,20 @@ export function TeamQuizResultsTab({
   const ownerEmail = ownerDisplay?.primaryEmail ?? null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardList className="size-5 shrink-0" aria-hidden />
-          Member quiz results
+    <Card className={teamAdminCardClass}>
+      <CardHeader className="space-y-2 pb-4">
+        <CardTitle className="flex items-center gap-2 text-base font-medium tracking-tight sm:text-lg">
+          <ClipboardList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          Quiz results
         </CardTitle>
-        <CardDescription>
-          All saved quiz attempts from members of this workspace, newest first.
+        <CardDescription className="text-sm leading-relaxed">
+          Saved quiz attempts from members of this workspace, newest first.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {results.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No quiz results saved yet. Members can save their results from the quiz result screen.
+            No quiz results saved yet. Members can save results from the quiz screen.
           </p>
         ) : (
           results.map((r) => {
@@ -81,14 +81,6 @@ export function TeamQuizResultsTab({
             const userEmail = display?.primaryEmail ?? null;
             const memberLabel = userName ?? userEmail ?? r.userId;
 
-            const tierColor =
-              r.percent >= 90
-                ? "text-yellow-500"
-                : r.percent >= 50
-                  ? "text-blue-400"
-                  : "text-purple-400";
-
-            // Resolve member role
             let memberRole: QuizResultSummary["memberRole"] = null;
             if (r.userId === ownerUserId) {
               memberRole = "owner";
@@ -124,35 +116,35 @@ export function TeamQuizResultsTab({
             return (
               <div
                 key={r.id}
-                className="flex flex-col gap-3 rounded-lg border border-border bg-card/50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-4 rounded-lg border border-border/80 bg-background/40 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="min-w-0 space-y-1.5">
+                <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-foreground truncate">{r.deckName}</p>
-                    <Badge variant="secondary" className="shrink-0 text-xs">
+                    <p className="truncate font-medium text-foreground">{r.deckName}</p>
+                    <Badge variant="secondary" className="shrink-0 text-xs font-normal">
                       {memberLabel}
                     </Badge>
-                    {memberRole && (
-                      <Badge variant="outline" className="shrink-0 text-xs text-muted-foreground">
+                    {memberRole ? (
+                      <Badge variant="outline" className="shrink-0 text-xs font-normal text-muted-foreground">
                         {memberRole === "owner"
                           ? "Owner"
                           : memberRole === "team_admin"
                             ? "Admin"
                             : "Member"}
                       </Badge>
-                    )}
+                    ) : null}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span className={`font-semibold tabular-nums ${tierColor}`}>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <span className="font-semibold tabular-nums text-foreground">
                       {r.percent}%
                     </span>
-                    <span className="flex items-center gap-1 text-emerald-500">
-                      <CheckCircle className="size-3.5" aria-hidden />
-                      {r.correct} / {r.total} correct
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <CheckCircle className="size-3.5 text-emerald-500" aria-hidden />
+                      {r.correct}/{r.total} correct
                     </span>
-                    <span className="flex items-center gap-1 text-rose-500">
-                      <XCircle className="size-3.5" aria-hidden />
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <XCircle className="size-3.5 text-rose-500" aria-hidden />
                       {r.incorrect} incorrect
                     </span>
                     <span className="flex items-center gap-1 text-muted-foreground">
@@ -162,12 +154,12 @@ export function TeamQuizResultsTab({
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    {r.total} card{r.total !== 1 ? "s" : ""} &middot;{" "}
-                    {formatClock(r.elapsedSeconds)} &middot; {formatDate(r.savedAt)}
+                    {r.total} card{r.total !== 1 ? "s" : ""} · {formatClock(r.elapsedSeconds)} ·{" "}
+                    {formatDate(r.savedAt)}
                   </p>
                 </div>
 
-                <div className="shrink-0">
+                <div className="shrink-0 sm:self-center">
                   <ViewQuizResultDialog result={summary} />
                 </div>
               </div>

@@ -1,15 +1,7 @@
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
-import { Users, LayoutGrid } from "lucide-react";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   getDecksForTeam,
   getDecksForTeamWithCardCount,
@@ -26,6 +18,7 @@ import {
 import {
   canonicalTeamPlanId,
   isTeamPlanId,
+  labelForTeamPlanSlug,
   limitsForPlan,
   personalDashboardPlanQueryValue,
 } from "@/lib/team-plans";
@@ -42,7 +35,8 @@ import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-das
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
 import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
 import { TeamAdminManageTabs } from "@/components/team-admin-manage-tabs";
-import { TeamAdminDashboardNavActions } from "@/components/team-admin-dashboard-nav-actions";
+import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
+import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
 import {
   getClerkPrimaryEmailsByUserIds,
   getClerkUserDisplayNameById,
@@ -260,102 +254,70 @@ export default async function TeamAdminDashboardView({
         )
       : undefined;
 
+  const planLabel = labelForTeamPlanSlug(selected.planSlug) ?? selected.planSlug;
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="min-w-0 flex-1 space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Team Admin Dashboard</h1>
-            <p
-              className="text-lg font-semibold tracking-tight text-foreground sm:text-xl truncate min-w-0"
-              title={ownerDisplayName}
-            >
-              {ownerDisplayName}
+    <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1 space-y-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              Team admin
             </p>
-            <p
-              className="text-sm font-medium text-muted-foreground sm:text-base truncate min-w-0"
-              title={selected.name}
-            >
-              {selected.name}
-            </p>
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <div className="space-y-2">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                Dashboard
+              </h1>
+              <p
+                className="truncate text-sm font-medium text-foreground sm:text-base"
+                title={ownerDisplayName}
+              >
+                {ownerDisplayName}
+              </p>
+              <p
+                className="truncate text-sm text-muted-foreground"
+                title={selected.name}
+              >
+                {selected.name}
+              </p>
+            </div>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Manage teams, members, and deck access for your subscription.
             </p>
           </div>
-          {isOwner && isTeamPlanId(selected.planSlug) && (
-            <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end sm:pt-0.5">
+          {isOwner && isTeamPlanId(selected.planSlug) ? (
+            <div className="flex shrink-0 sm:justify-end">
               <AddTeamDialogLazy
                 planSlug={canonicalTeamPlanId(selected.planSlug)!}
                 isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
               />
             </div>
-          )}
+          ) : null}
         </div>
 
-        <Card className="border-border/80 bg-muted/20 shadow-none">
-          <CardHeader className="space-y-1 px-4 pb-2 pt-4 sm:px-5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Quick navigation
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground sm:text-sm">
-              {isOwner
-                ? "Jump to your Personal Dashboard."
-                : "Jump to your Personal Dashboard or the main dashboard scoped to this workspace."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 px-4 pb-4 sm:flex-row sm:flex-wrap sm:gap-3 sm:px-5">
-            <TeamAdminDashboardNavActions
-              mainDashboardHref={mainDashboardHref}
-              workspaceDashboardHref={workspaceDashboardHref}
-              workspaceTeamId={selected.id}
-              isOwner={isOwner}
-              workspacePlanSlug={selected.planSlug}
-              className="sm:justify-start"
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Workspaces
-              </CardTitle>
-              <LayoutGrid className="h-4 w-4 text-muted-foreground" aria-hidden />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">
-              {teamsForSubscriber.length}
-              <span className="text-lg font-normal text-muted-foreground"> / {limits.maxTeams}</span>
-            </p>
-            <CardDescription className="mt-0.5">Active subscriber-owned workspaces</CardDescription>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Members
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold tabular-nums">
-              {memberCount}
-              <span className="text-lg font-normal text-muted-foreground"> / {limits.maxMembersPerTeam}</span>
-            </p>
-            <CardDescription className="mt-0.5">Members in this workspace</CardDescription>
-          </CardContent>
-        </Card>
-        <TeamAdminWorkspaceDeckCardTotals
-          teamDecksWithCardCounts={teamDecksWithCardCounts}
-          planSlug={selected.planSlug}
+        <TeamAdminQuickNavPanel
+          planLabel={planLabel}
+          description={
+            isOwner
+              ? "Return to your personal dashboard to create and edit decks."
+              : "Open your personal dashboard or the workspace-scoped main dashboard."
+          }
+          mainDashboardHref={mainDashboardHref}
+          workspaceDashboardHref={workspaceDashboardHref}
+          workspaceTeamId={selected.id}
+          isOwner={isOwner}
+          workspacePlanSlug={selected.planSlug}
         />
       </div>
+
+      <TeamAdminWorkspaceStatsPanel
+        workspacesCount={teamsForSubscriber.length}
+        maxWorkspaces={limits.maxTeams}
+        memberCount={memberCount}
+        maxMembersPerTeam={limits.maxMembersPerTeam}
+        teamDecksWithCardCounts={teamDecksWithCardCounts}
+        planSlug={selected.planSlug}
+      />
 
       <TeamAdminManageTabs
         key={selected.id}

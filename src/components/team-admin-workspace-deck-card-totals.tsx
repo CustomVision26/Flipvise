@@ -46,48 +46,52 @@ export function TeamAdminWorkspaceDeckCardTotals({
 
   return (
     <>
-      <Card>
+      <Card className="border-border/80 bg-card/60 shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
               Decks
             </CardTitle>
-            <Layers className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <Layers className="size-4 text-muted-foreground" aria-hidden />
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold tabular-nums">
+          <p className="text-2xl font-semibold tabular-nums tracking-tight">
             {teamDecksWithCardCounts.length}
             {limits.maxDecksPerWorkspace > 0 ? (
-              <span className="text-lg font-normal text-muted-foreground">
+              <span className="text-base font-normal text-muted-foreground">
                 {" "}
                 / {limits.maxDecksPerWorkspace}
               </span>
             ) : null}
           </p>
-          <CardDescription className="mt-0.5">Flashcard decks in this workspace</CardDescription>
+          <CardDescription className="mt-1 text-xs sm:text-sm">
+            Flashcard decks in this workspace
+          </CardDescription>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="border-border/80 bg-card/60 shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
               Cards
             </CardTitle>
-            <SquareStack className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <SquareStack className="size-4 text-muted-foreground" aria-hidden />
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold tabular-nums">
+          <p className="text-2xl font-semibold tabular-nums tracking-tight">
             {workspaceCardRecordCount}
             {workspaceCardsCapacity > 0 ? (
-              <span className="text-lg font-normal text-muted-foreground">
+              <span className="text-base font-normal text-muted-foreground">
                 {" "}
                 / {workspaceCardsCapacity}
               </span>
             ) : null}
           </p>
-          <CardDescription className="mt-0.5">Flashcard records in this workspace</CardDescription>
+          <CardDescription className="mt-1 text-xs sm:text-sm">
+            Flashcard records in this workspace
+          </CardDescription>
         </CardContent>
       </Card>
     </>

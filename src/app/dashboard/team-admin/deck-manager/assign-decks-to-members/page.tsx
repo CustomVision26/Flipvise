@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
@@ -26,11 +27,11 @@ import {
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
 import { TeamDeckAssignListLoader } from "@/components/team-deck-assign-list-loader";
 import { toClientJson } from "@/lib/to-client-json";
-import { TeamAdminDashboardNavActions } from "@/components/team-admin-dashboard-nav-actions";
-import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
+import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
+import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
-import { personalDashboardPlanQueryValue } from "@/lib/team-plans";
+import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
 
 interface PageProps {
   searchParams: Promise<{
@@ -144,55 +145,63 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
   });
   const workspaceDashboardHref = `/dashboard?${workspaceDashboardParams.toString()}`;
   const isOwner = selected.ownerUserId === userId;
+  const planLabel = labelForTeamPlanSlug(selected.planSlug) ?? selected.planSlug;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
-          <p className="text-muted-foreground text-sm">
+    <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="inline-flex w-fit flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             <Link
               href={buildTeamAdminPath(selected.id, viewerTeamMemberUrlParam)}
-              className="underline-offset-4 hover:text-foreground hover:underline"
+              className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
             >
-              Team Admin
+              <ArrowLeft className="size-3.5 shrink-0" aria-hidden />
+              Team admin
             </Link>
-            <span aria-hidden className="px-1.5">
-              /
-            </span>
-            <span className="text-foreground">Deck Manager</span>
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Assign decks to members</h1>
-          <p
-            className="text-muted-foreground text-sm font-medium sm:text-base truncate min-w-0"
-            title={selected.name}
-          >
-            Workspace: {selected.name}
-          </p>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            Subscribers manage flashcards from the Personal Dashboard, then attach decks here to
-            their workspace before assigning team members or team admins — subscribers also see every
-            linked deck without an assignment row.
+            <span aria-hidden>·</span>
+            <span className="text-muted-foreground/80">Deck manager</span>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              Assign decks to members
+            </h1>
+            <p className="truncate text-sm text-muted-foreground" title={selected.name}>
+              {selected.name}
+            </p>
+          </div>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Link personal decks to this workspace, then assign them to members or co-admins.
           </p>
         </div>
-        <TeamAdminDashboardNavActions
+        <TeamAdminQuickNavPanel
+          className="w-full shrink-0 sm:max-w-sm"
+          planLabel={planLabel}
+          description={
+            isOwner
+              ? "Return to your personal dashboard to create and edit decks."
+              : "Open your personal dashboard or the workspace-scoped main dashboard."
+          }
           mainDashboardHref={mainDashboardHref}
           workspaceDashboardHref={workspaceDashboardHref}
           workspaceTeamId={selected.id}
           isOwner={isOwner}
           workspacePlanSlug={selected.planSlug}
-          className="self-start"
         />
       </div>
 
-      <TeamAdminWorkspaceDeckCardTotals
+      <TeamAdminWorkspaceStatsPanel
         teamDecksWithCardCounts={teamDecksWithCardCounts}
         planSlug={selected.planSlug}
+        showWorkspacesAndMembers={false}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Deck Manager</CardTitle>
-          <CardDescription>
+      <Card className="border-border/80 bg-card/60 shadow-sm">
+        <CardHeader className="space-y-2 pb-4">
+          <CardTitle className="text-base font-medium tracking-tight sm:text-lg">
+            Deck assignments
+          </CardTitle>
+          <CardDescription className="text-sm leading-relaxed">
             Link decks from Personal and assign workspace decks to members or co-admins.
           </CardDescription>
         </CardHeader>

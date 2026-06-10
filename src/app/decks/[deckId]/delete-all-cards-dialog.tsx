@@ -37,13 +37,12 @@ export function DeleteAllCardsDialog({ deckId, cardCount }: DeleteAllCardsDialog
           <Button
             variant="outline"
             size="sm"
-            className="gap-1 sm:gap-1.5 text-destructive hover:text-destructive border-destructive/40 hover:border-destructive hover:bg-destructive/10 text-xs sm:text-sm h-8 sm:h-9 px-2.5 sm:px-3"
+            className="h-9 gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
           />
         }
       >
-        <Trash2 className="size-3 sm:size-4" />
-        <span className="hidden sm:inline">Delete All Cards</span>
-        <span className="sm:hidden">Delete All</span>
+        <Trash2 className="size-4" />
+        Delete all
       </AlertDialogTrigger>
       <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <AlertDialogHeader>

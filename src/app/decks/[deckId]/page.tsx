@@ -103,49 +103,96 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
   const hasGradient = deckGradient.slug !== "none";
 
   return (
-    <div className={cn("flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8", deckGradient.classes)}>
-      {/* Deck section */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex flex-col gap-1">
+    <div className={cn("flex flex-1 flex-col gap-6 sm:gap-8 p-4 sm:p-8", deckGradient.classes)}>
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-3">
             <Link
               href={dashboardHref}
               className={cn(
-                "inline-flex items-center gap-1.5 text-sm transition-colors",
+                "inline-flex w-fit items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] transition-colors",
                 hasGradient
-                  ? "text-white/70 hover:text-white"
+                  ? "text-white/60 hover:text-white"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <ArrowLeft className="size-3.5" />
               Dashboard
             </Link>
-            {teamDeckHeading && (
-              <div className="mt-1 space-y-0.5">
+
+            {teamDeckHeading ? (
+              <div className="space-y-1">
                 <p className={cn("text-sm", hasGradient ? "text-white/70" : "text-muted-foreground")}>
-                  Team:{" "}
+                  Team workspace:{" "}
                   <span className={cn("font-medium", hasGradient ? "text-white" : "text-foreground")}>
                     {teamDeckHeading.teamName}
                   </span>
                 </p>
-                <p className={cn("text-xs sm:text-sm", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+                <p className={cn("text-xs sm:text-sm", hasGradient ? "text-white/60" : "text-muted-foreground")}>
                   Owner:{" "}
-                  <span className={hasGradient ? "text-white/90" : "text-foreground/90"}>
+                  <span className={hasGradient ? "text-white/85" : "text-foreground/85"}>
                     {teamDeckHeading.ownerDisplayName}
                   </span>
                 </p>
               </div>
-            )}
-            <h1 className={cn("text-2xl sm:text-3xl font-bold tracking-tight break-words", hasGradient && "text-white")}>
-              {deck.name}
-            </h1>
-            {deck.description && (
-              <p className={cn("mt-1 text-sm sm:text-base", hasGradient ? "text-white/80" : "text-muted-foreground")}>
-                {deck.description}
-              </p>
-            )}
+            ) : null}
+
+            <div className="space-y-2">
+              <h1
+                className={cn(
+                  "text-2xl font-semibold tracking-tight break-words sm:text-3xl",
+                  hasGradient && "text-white",
+                )}
+              >
+                {deck.name}
+              </h1>
+              {deck.description ? (
+                <p
+                  className={cn(
+                    "max-w-2xl text-sm leading-relaxed sm:text-[0.9375rem]",
+                    hasGradient ? "text-white/75" : "text-muted-foreground",
+                  )}
+                >
+                  {deck.description}
+                </p>
+              ) : null}
+            </div>
+
+            <div
+              className={cn(
+                "flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm",
+                hasGradient ? "text-white/65" : "text-muted-foreground",
+              )}
+            >
+              <span className={cn("font-medium tabular-nums", hasGradient ? "text-white/90" : "text-foreground")}>
+                {cards.length} / {deckCardLimit} cards
+              </span>
+              <span aria-hidden className="select-none">
+                ·
+              </span>
+              <span>{isFreePlan ? "Free plan" : "Paid plan"}</span>
+              <span aria-hidden className="select-none">
+                ·
+              </span>
+              <span>
+                Updated{" "}
+                {deck.updatedAt.toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col gap-2 sm:gap-3 lg:items-end">
+
+          <div
+            className={cn(
+              "w-full shrink-0 space-y-3 rounded-xl border p-4 sm:p-5 lg:max-w-md",
+              hasGradient
+                ? "border-white/15 bg-black/20 backdrop-blur-sm"
+                : "border-border/80 bg-card/50",
+            )}
+          >
             <GenerateCardsButtonLoader
               deckId={id}
               hasDescription={!!deck.description}
@@ -154,30 +201,35 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               hasAI={effectiveAI}
               deckCardLimit={deckCardLimit}
             />
-            <div className="flex flex-wrap gap-2">
-              <EditDeckDialog deck={deck} allowCoverUpload={teamTierPro} />
-              {cards.length > 0 && (
-                <DeleteAllCardsDialog deckId={id} cardCount={cards.length} />
+
+            <div
+              className={cn(
+                "flex flex-wrap gap-2 border-t pt-3",
+                hasGradient ? "border-white/10" : "border-border/60",
               )}
+            >
+              <EditDeckDialog deck={deck} allowCoverUpload={teamTierPro} />
+              {cards.length > 0 ? (
+                <DeleteAllCardsDialog deckId={id} cardCount={cards.length} />
+              ) : null}
               {cards.length > 0 ? (
                 <StudyLink
                   deckId={id}
-                  workspaceQueryString={
-                    fromTeamWorkspaceUrl ? workspaceQs : undefined
-                  }
+                  workspaceQueryString={fromTeamWorkspaceUrl ? workspaceQs : undefined}
                 />
               ) : (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger render={<span tabIndex={0} className="cursor-not-allowed" />}>
                       <Button
-                        size="default"
-                        className="gap-2 pointer-events-none"
+                        size="sm"
+                        variant="outline"
+                        className="pointer-events-none gap-2"
                         disabled
                         aria-disabled
                       >
-                        <BookOpen className="h-4 w-4" />
-                        Start Studying
+                        <BookOpen className="size-4" />
+                        Study deck
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -188,24 +240,6 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               )}
             </div>
           </div>
-        </div>
-        <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-xs", hasGradient ? "text-white/70" : "text-muted-foreground")}>
-          <span className={cn("font-medium tabular-nums", hasGradient ? "text-white" : "text-foreground")}>
-            {cards.length} / {deckCardLimit} cards
-            <span className={cn("font-normal", hasGradient ? "text-white/70" : "text-muted-foreground")}>
-              {" "}
-              ({isFreePlan ? "Free plan" : "Paid plan"})
-            </span>
-          </span>
-          <span aria-hidden className="select-none">·</span>
-          <span>
-            Last updated{" "}
-            {deck.updatedAt.toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
-          </span>
         </div>
         {isAtCardLimit && (
           <p className={cn("text-xs", hasGradient ? "text-rose-200 font-medium" : "text-destructive")}>
@@ -227,10 +261,18 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
         )}
       </div>
 
-      {/* Cards section */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className={cn("text-base sm:text-lg font-semibold", hasGradient && "text-white")}>Cards</h2>
+        <div className="flex items-center justify-between gap-3 border-b pb-3 sm:pb-4">
+          <div className="space-y-0.5">
+            <h2 className={cn("text-base font-medium tracking-tight sm:text-lg", hasGradient && "text-white")}>
+              Cards
+            </h2>
+            {cards.length > 0 ? (
+              <p className={cn("text-xs sm:text-sm", hasGradient ? "text-white/60" : "text-muted-foreground")}>
+                {cards.length} card{cards.length === 1 ? "" : "s"} in this deck
+              </p>
+            ) : null}
+          </div>
           <AddCardDialog
             deckId={id}
             deckName={deck.name}

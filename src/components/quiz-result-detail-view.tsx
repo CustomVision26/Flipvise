@@ -327,113 +327,116 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
 
   const titleBlock =
     variant === "dialog" ? (
-      <DialogHeader>
-        <DialogTitle className="text-xl font-bold leading-tight">{result.deckName}</DialogTitle>
-        <DialogDescription className="text-xs text-muted-foreground">
+      <DialogHeader className="space-y-1 text-left">
+        <DialogTitle className="text-lg font-semibold leading-tight tracking-tight">
+          {result.deckName}
+        </DialogTitle>
+        <DialogDescription className="text-sm">
           Saved {formatDate(result.savedAt)}
         </DialogDescription>
       </DialogHeader>
     ) : (
       <div className="space-y-1">
-        <h1 className="text-xl font-bold leading-tight text-foreground">{result.deckName}</h1>
-        <p className="text-xs text-muted-foreground">Saved {formatDate(result.savedAt)}</p>
+        <h1 className="text-lg font-semibold leading-tight tracking-tight text-foreground">
+          {result.deckName}
+        </h1>
+        <p className="text-sm text-muted-foreground">Saved {formatDate(result.savedAt)}</p>
       </div>
     );
 
   const body = (
     <>
-      <div className="shrink-0 border-b px-6 pt-6 pb-4 space-y-4">
-
+      <div className="shrink-0 space-y-4 border-b px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
         {titleBlock}
 
-        {/* User / workspace info */}
         {(result.userName || result.userEmail || result.teamName) && (
-          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 space-y-1.5 text-xs">
+          <div className="space-y-3 rounded-lg border border-border/80 bg-muted/15 px-4 py-3 text-sm">
             {(result.userName || result.userEmail) && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-semibold text-muted-foreground uppercase tracking-wide">
+              <div className="space-y-0.5">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Taken by
-                </span>
-                {result.userName && (
-                  <span className="text-foreground font-medium">{result.userName}</span>
-                )}
-                {result.userEmail && (
-                  <span className="text-muted-foreground">{result.userEmail}</span>
-                )}
+                </p>
+                {result.userName ? (
+                  <p className="font-medium text-foreground">{result.userName}</p>
+                ) : null}
+                {result.userEmail ? (
+                  <p className="text-muted-foreground">{result.userEmail}</p>
+                ) : null}
               </div>
             )}
-            {result.teamName && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-semibold text-muted-foreground uppercase tracking-wide">
+            {result.teamName ? (
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Workspace
-                </span>
-                <span className="text-foreground font-medium">{result.teamName}</span>
-                {result.memberRole && (
-                  <span className="rounded-full border border-border px-2 py-0.5 text-muted-foreground capitalize">
-                    {result.memberRole === "owner"
-                      ? "Owner"
-                      : result.memberRole === "team_admin"
-                        ? "Team Admin"
-                        : "Member"}
-                  </span>
-                )}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-foreground">{result.teamName}</span>
+                  {result.memberRole ? (
+                    <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                      {result.memberRole === "owner"
+                        ? "Owner"
+                        : result.memberRole === "team_admin"
+                          ? "Team admin"
+                          : "Member"}
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
-            )}
-            {result.teamName && (result.ownerName || result.ownerEmail) && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-semibold text-muted-foreground uppercase tracking-wide">
+            ) : null}
+            {result.teamName && (result.ownerName || result.ownerEmail) ? (
+              <div className="space-y-0.5">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Owner
-                </span>
-                {result.ownerName && (
-                  <span className="text-foreground font-medium">{result.ownerName}</span>
-                )}
-                {result.ownerEmail && (
-                  <span className="text-muted-foreground">{result.ownerEmail}</span>
-                )}
+                </p>
+                {result.ownerName ? (
+                  <p className="font-medium text-foreground">{result.ownerName}</p>
+                ) : null}
+                {result.ownerEmail ? (
+                  <p className="text-muted-foreground">{result.ownerEmail}</p>
+                ) : null}
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
         {/* Score bar */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground font-medium">Score</span>
-            <span className={`font-bold tabular-nums ${tierColor}`}>
+            <span className="text-muted-foreground">Score</span>
+            <span className={`font-semibold tabular-nums ${tierColor}`}>
               {result.percent}%
             </span>
           </div>
-          <Progress value={result.percent} className="h-2.5" />
+          <Progress value={result.percent} className="h-2" />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Correct cards</span>
-            <span className={`font-semibold ${tierColor}`}>
+            <span className="font-medium tabular-nums text-foreground">
               {result.correct} / {result.total}
             </span>
           </div>
         </div>
 
-        {/* Stat chips */}
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="flex items-center gap-1.5 font-medium text-emerald-500">
-            <CheckCircle className="size-4" aria-hidden />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle className="size-3.5 text-emerald-500" aria-hidden />
             {result.correct} correct
           </span>
-          <span className="flex items-center gap-1.5 font-medium text-rose-500">
-            <XCircle className="size-4" aria-hidden />
+          <span className="flex items-center gap-1.5">
+            <XCircle className="size-3.5 text-rose-500" aria-hidden />
             {result.incorrect} incorrect
           </span>
-          <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-            <CircleHelp className="size-4" aria-hidden />
+          <span className="flex items-center gap-1.5">
+            <CircleHelp className="size-3.5" aria-hidden />
             {result.unanswered} unanswered
           </span>
-          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+          <span className="w-full text-xs tabular-nums sm:ml-auto sm:w-auto">
             {result.total} card{result.total !== 1 ? "s" : ""} · {formatClock(result.elapsedSeconds)}
           </span>
         </div>
       </div>
 
       {/* ── Scrollable question review ── */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
         {cards.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             No per-card breakdown is available for this result.
@@ -582,13 +585,18 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
         )}
       </div>
 
-      <div className="shrink-0 border-t px-6 py-4 flex justify-end gap-3">
+      <div className="flex shrink-0 flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
         {variant === "dialog" ? (
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" className="h-10 w-full sm:w-auto" onClick={onClose}>
             Close
           </Button>
         ) : null}
-        <Button className="gap-2" onClick={handleDownload} disabled={downloading}>
+        <Button
+          variant="default"
+          className="h-10 w-full gap-2 sm:w-auto"
+          onClick={handleDownload}
+          disabled={downloading}
+        >
           <Download className="size-4" aria-hidden />
           {downloading ? "Generating…" : "Download PDF"}
         </Button>

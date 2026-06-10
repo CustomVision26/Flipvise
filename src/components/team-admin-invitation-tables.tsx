@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { teamAdminTableWrapClass } from "@/components/team-admin-panel-styles";
 
 type InvitationRow = TeamInvitationRow;
 
@@ -120,14 +121,15 @@ export function TeamActiveInvitationsTable({
           {error}
         </p>
       )}
-      <Table>
+      <div className={teamAdminTableWrapClass}>
+      <Table className="min-w-[44rem] text-sm">
         <TableHeader>
           <TableRow>
             <TableHead>Email</TableHead>
             <TableHead>Workspace</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Sent</TableHead>
-            <TableHead className="whitespace-nowrap">Days until expiry</TableHead>
+            <TableHead className="whitespace-nowrap">Expires in</TableHead>
             <TableHead>Invited by</TableHead>
             <TableHead className="text-end">Actions</TableHead>
           </TableRow>
@@ -135,10 +137,10 @@ export function TeamActiveInvitationsTable({
         <TableBody>
           {invitations.map((inv) => (
             <TableRow key={inv.id}>
-              <TableCell className="max-w-[min(100%,220px)] font-mono text-xs break-all">
+              <TableCell className="max-w-[12rem] break-all text-sm">
                 {inv.email}
               </TableCell>
-              <TableCell className="max-w-[min(100%,200px)] truncate text-sm" title={workspaceName}>
+              <TableCell className="max-w-[10rem] truncate" title={workspaceName}>
                 {workspaceName}
               </TableCell>
               <TableCell>{roleLabel(inv.role)}</TableCell>
@@ -170,6 +172,7 @@ export function TeamActiveInvitationsTable({
           ))}
         </TableBody>
       </Table>
+      </div>
 
       <AlertDialog
         open={revokeDialogId != null}
@@ -222,7 +225,8 @@ export function TeamInvitationHistoryTable({
   }
 
   return (
-    <Table>
+    <div className={teamAdminTableWrapClass}>
+    <Table className="min-w-[44rem] text-sm">
       <TableHeader>
         <TableRow>
           <TableHead>Email</TableHead>
@@ -237,10 +241,10 @@ export function TeamInvitationHistoryTable({
       <TableBody>
         {rows.map((inv) => (
           <TableRow key={inv.id}>
-            <TableCell className="max-w-[min(100%,220px)] font-mono text-xs break-all">
+            <TableCell className="max-w-[12rem] break-all text-sm">
               {inv.email}
             </TableCell>
-            <TableCell className="max-w-[min(100%,200px)] truncate text-sm" title={workspaceName}>
+            <TableCell className="max-w-[10rem] truncate" title={workspaceName}>
               {workspaceName}
             </TableCell>
             <TableCell>{roleLabel(inv.role)}</TableCell>
@@ -260,5 +264,6 @@ export function TeamInvitationHistoryTable({
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

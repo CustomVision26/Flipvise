@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { teamAdminTableWrapClass } from "@/components/team-admin-panel-styles";
 import {
   Select,
   SelectContent,
@@ -433,7 +434,7 @@ export function TeamDeckAssignList({
 
   return (
     <>
-    <div className="w-full max-w-2xl space-y-6">
+    <div className="w-full max-w-3xl space-y-6">
         {(error || linkError) && (
           <div className="space-y-1">
             {error ? (
@@ -463,7 +464,7 @@ export function TeamDeckAssignList({
         >
           <SelectTrigger
             id="assign-deck-workspace"
-            className="w-full"
+            className="h-10 w-full"
             aria-describedby="assign-deck-workspace-caption"
           >
             <SelectValue placeholder={PLACEHOLDER_WORKSPACE}>
@@ -674,23 +675,25 @@ export function TeamDeckAssignList({
                 </p>
               )}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
                   type="button"
+                  className="h-10 w-full"
                   disabled={!canSubmit || assigned || busy !== null}
                   onClick={onAssign}
                 >
-                  {busy === "assign" ? "Assigning…" : "Assign"}
+                  {busy === "assign" ? "Assigning…" : "Assign deck"}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
+                  className="h-10 w-full"
                   disabled={
                     !canSubmit || !assigned || busy !== null || !viewerOwnsSelectedWorkspace
                   }
                   onClick={onUnassign}
                 >
-                  {busy === "unassign" ? "Removing…" : "Unassign"}
+                  {busy === "unassign" ? "Removing…" : "Remove assignment"}
                 </Button>
               </div>
               {!viewerOwnsSelectedWorkspace ? (
@@ -707,16 +710,13 @@ export function TeamDeckAssignList({
       <Separator className="my-2" />
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-foreground">Assignments by member</h3>
-        <p className="text-sm text-muted-foreground leading-snug">
-          Rows list each deck assignment (member or co-admin, deck, workspace), who added it (name of
-          the user who saved the assignment), and the date and time it was added. Hover a row for a
-          short hint. Double-click a row to load it into the form above and open an access panel
-          beneath that row — Unassign stays available for the owner only; Assign is disabled while an
-          existing assignment is selected.
+        <h3 className="text-sm font-medium text-foreground">Assignments by member</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Double-click a row to load it into the form above. Only the workspace owner can remove
+          assignments.
         </p>
-        <div className="rounded-md border border-border overflow-x-auto">
-          <Table>
+        <div className={teamAdminTableWrapClass}>
+          <Table className="min-w-[48rem] text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead>Member</TableHead>

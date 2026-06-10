@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { TeamWorkspaceEventRow } from "@/db/queries/team-workspace-events";
+import { teamAdminTableWrapClass } from "@/components/team-admin-panel-styles";
 
 function formatEventTimestamp(d: Date) {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -58,27 +59,46 @@ export function TeamWorkspaceHistoryTable({
   }
 
   return (
-    <div className="rounded-md border border-border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[200px]">Event time</TableHead>
-            <TableHead className="w-[120px]">Action</TableHead>
-            <TableHead>Details</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {list.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="whitespace-nowrap text-muted-foreground">
-                {formatEventTimestamp(row.createdAt)}
-              </TableCell>
-              <TableCell>{actionLabel(row.action)}</TableCell>
-              <TableCell className="min-w-0 break-words">{detailsForRow(row)}</TableCell>
+    <>
+      <div className={`${teamAdminTableWrapClass} hidden sm:block`}>
+        <Table className="min-w-[36rem] text-sm">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[11rem]">Event time</TableHead>
+              <TableHead className="w-[6rem]">Action</TableHead>
+              <TableHead>Details</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {list.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {formatEventTimestamp(row.createdAt)}
+                </TableCell>
+                <TableCell>{actionLabel(row.action)}</TableCell>
+                <TableCell className="min-w-0 break-words">{detailsForRow(row)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <ul className="space-y-3 sm:hidden">
+        {list.map((row) => (
+          <li
+            key={row.id}
+            className="space-y-2 rounded-lg border border-border/80 bg-background/40 p-4"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{actionLabel(row.action)}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {formatEventTimestamp(row.createdAt)}
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">{detailsForRow(row)}</p>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

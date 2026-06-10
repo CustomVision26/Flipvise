@@ -32,20 +32,14 @@ import {
   isTeamAdminQuizResultsPath,
   isTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
-import { cn } from "@/lib/utils";
+import {
+  teamAdminCardClass,
+  teamAdminSubTabClass,
+  teamAdminTabClass,
+} from "@/components/team-admin-panel-styles";
 
 type InvitationRow = TeamInvitationRow;
 type MemberRow = TeamMemberRow;
-
-function teamAdminLineTabClass(isActive: boolean) {
-  return cn(
-    "inline-flex shrink-0 items-center justify-center rounded-none border-b-2 px-2.5 py-2 text-xs sm:px-3 sm:text-sm",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    isActive
-      ? "border-primary bg-transparent text-foreground"
-      : "border-transparent bg-transparent text-muted-foreground hover:text-foreground",
-  );
-}
 
 function TeamAdminDeckManagerNavLink({
   href,
@@ -57,7 +51,7 @@ function TeamAdminDeckManagerNavLink({
   const pathname = usePathname();
   const isActive = isTeamAdminDeckManagerPath(pathname);
   return (
-    <Link href={href} className={teamAdminLineTabClass(isActive)}>
+    <Link href={href} className={teamAdminTabClass(isActive)} role="tab">
       {children}
     </Link>
   );
@@ -65,28 +59,19 @@ function TeamAdminDeckManagerNavLink({
 
 export type TeamAdminManageTabsProps = {
   teamId: number;
-  /** Bookmarkable Deck Manager URL for the current workspace (`?team=`). */
   deckManagerHref: string;
-  /** Members panel URL (`/dashboard/team-admin/members?team=`). */
   membersHref: string;
-  /** Workspace history panel URL (`/dashboard/team-admin/ws-history?team=`). */
   workspaceHistoryHref: string;
-  /** Invite members — send invite (`/dashboard/team-admin/invite-members/send-invite?team=`). */
   inviteSendHref: string;
-  /** Invite members — pending invitations (`/dashboard/team-admin/invite-members/pending-invitations?team=`). */
   invitePendingHref: string;
-  /** Invite members — invitation history (`/dashboard/team-admin/invite-members/invitation-history?team=`). */
   inviteHistoryHref: string;
-  /** Quiz results (`/dashboard/team-admin/quiz-results?team=`). */
   quizResultsHref: string;
   teamName: string;
   ownerUserId: string;
-  /** `teams.createdAt` for the selected workspace. */
   teamCreatedAt: Date;
   currentUserId: string;
   isOwner: boolean;
   workspaces: TeamInviteWorkspaceOption[];
-  /** When set (subscriber owns ≥1 listed workspace), invite email picker lists these across owned workspaces. */
   inviteAggregatedMemberEmails?: string[];
   defaultWorkspaceId: number;
   members: MemberRow[];
@@ -94,12 +79,30 @@ export type TeamAdminManageTabsProps = {
   pendingInvitations: InvitationRow[];
   invitationHistory: InvitationRow[];
   workspaceHistory?: TeamWorkspaceEventRow[] | null;
-  /** Maps normalized email → suggested invitee display name (members + prior invites across subscriber workspaces). */
   inviteDisplayHintsByEmail: Record<string, string>;
-  /** Normalized primary email of the workspace subscriber; used to block inviting the owner from the form. */
   subscriberOwnerPrimaryEmail: string | null;
   teamQuizResults: QuizResultRow[];
 };
+
+function TeamAdminPanelCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card className={teamAdminCardClass}>
+      <CardHeader className="space-y-2 pb-4">
+        <CardTitle className="text-base font-medium tracking-tight sm:text-lg">{title}</CardTitle>
+        <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
 
 export function TeamAdminManageTabs({
   teamId,
@@ -143,114 +146,104 @@ export function TeamAdminManageTabs({
   const inviteMembersLinkActive = invitePanelVisible;
 
   return (
-    <div className="group/tabs flex w-full flex-col gap-4">
-      <div
-        role="tablist"
-        aria-orientation="horizontal"
-        className="inline-flex h-auto w-full min-w-0 flex-wrap justify-start gap-0 border-b border-border bg-transparent p-0 text-muted-foreground"
-      >
-        <Link href={membersHref} className={teamAdminLineTabClass(membersLinkActive)} role="tab">
-          Members
-        </Link>
-        <TeamAdminDeckManagerNavLink href={deckManagerHref}>Deck Manager</TeamAdminDeckManagerNavLink>
-        <Link
-          href={workspaceHistoryHref}
-          className={teamAdminLineTabClass(workspaceHistoryLinkActive)}
-          role="tab"
+    <div className="flex w-full flex-col gap-5">
+      <div className="-mx-1 overflow-x-auto px-1">
+        <div
+          role="tablist"
+          aria-orientation="horizontal"
+          className="flex min-w-max gap-0 border-b border-border/80"
         >
-          Workspace history
-        </Link>
-        <Link
-          href={inviteSendHref}
-          className={teamAdminLineTabClass(inviteMembersLinkActive)}
-          role="tab"
-        >
-          Invite members
-        </Link>
-        <Link href={quizResultsHref} className={teamAdminLineTabClass(quizResultsLinkActive)} role="tab">
-          Quiz results
-        </Link>
+          <Link href={membersHref} className={teamAdminTabClass(membersLinkActive)} role="tab">
+            Members
+          </Link>
+          <TeamAdminDeckManagerNavLink href={deckManagerHref}>Deck Manager</TeamAdminDeckManagerNavLink>
+          <Link
+            href={workspaceHistoryHref}
+            className={teamAdminTabClass(workspaceHistoryLinkActive)}
+            role="tab"
+          >
+            Workspace history
+          </Link>
+          <Link
+            href={inviteSendHref}
+            className={teamAdminTabClass(inviteMembersLinkActive)}
+            role="tab"
+          >
+            Invite members
+          </Link>
+          <Link href={quizResultsHref} className={teamAdminTabClass(quizResultsLinkActive)} role="tab">
+            Quiz results
+          </Link>
+        </div>
       </div>
 
       {mainPanel === "members" && !invitePanelVisible ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Members</CardTitle>
-            <CardDescription>
-              Change roles or remove members. Subscribers and team admins can access this dashboard.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TeamMemberTable
-              teamId={teamId}
-              ownerUserId={ownerUserId}
-              teamCreatedAt={teamCreatedAt}
-              members={members}
-              currentUserId={currentUserId}
-              isOwner={isOwner}
-              userFieldDisplayById={userFieldDisplayById}
-            />
-          </CardContent>
-        </Card>
+        <TeamAdminPanelCard
+          title="Members"
+          description="Change roles or remove members. Subscribers and team admins can access this dashboard."
+        >
+          <TeamMemberTable
+            teamId={teamId}
+            ownerUserId={ownerUserId}
+            teamCreatedAt={teamCreatedAt}
+            members={members}
+            currentUserId={currentUserId}
+            isOwner={isOwner}
+            userFieldDisplayById={userFieldDisplayById}
+          />
+        </TeamAdminPanelCard>
       ) : null}
 
       {mainPanel === "workspace-history" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Workspace history</CardTitle>
-            <CardDescription>
-              When this workspace was created, renamed, or removed. Each row is recorded at the time
-              the change happened.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TeamWorkspaceHistoryTable rows={workspaceHistory} />
-          </CardContent>
-        </Card>
+        <TeamAdminPanelCard
+          title="Workspace history"
+          description="When this workspace was created, renamed, or removed. Each row is recorded at the time the change happened."
+        >
+          <TeamWorkspaceHistoryTable rows={workspaceHistory} />
+        </TeamAdminPanelCard>
       ) : null}
 
       {invitePanelVisible ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Invite members</CardTitle>
-            <CardDescription>
-              Send invitations, manage active invites, or review history for this workspace. Invites
-              expire in {TEAM_INVITE_EXPIRY_DAYS} days.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div
-              role="tablist"
-              aria-orientation="horizontal"
-              className="mb-4 inline-flex h-auto w-full min-w-0 flex-wrap justify-start gap-0 border-b border-border bg-transparent p-0"
-            >
-              <Link
-                href={inviteSendHref}
-                className={teamAdminLineTabClass(isTeamAdminInviteSendPath(pathname))}
-                role="tab"
+        <TeamAdminPanelCard
+          title="Invite members"
+          description={`Send invitations, manage active invites, or review history for this workspace. Invites expire in ${TEAM_INVITE_EXPIRY_DAYS} days.`}
+        >
+          <div className="space-y-5">
+            <div className="overflow-x-auto">
+              <div
+                role="tablist"
+                aria-orientation="horizontal"
+                className="inline-flex min-w-full rounded-lg border border-border/80 bg-muted/20 p-1 sm:min-w-0"
               >
-                Send invite
-              </Link>
-              <Link
-                href={invitePendingHref}
-                className={teamAdminLineTabClass(isTeamAdminInvitePendingPath(pathname))}
-                role="tab"
-              >
-                Pending invitations
-              </Link>
-              <Link
-                href={inviteHistoryHref}
-                className={teamAdminLineTabClass(isTeamAdminInviteHistoryPath(pathname))}
-                role="tab"
-              >
-                Invitation history
-              </Link>
+                <Link
+                  href={inviteSendHref}
+                  className={teamAdminSubTabClass(isTeamAdminInviteSendPath(pathname))}
+                  role="tab"
+                >
+                  Send invite
+                </Link>
+                <Link
+                  href={invitePendingHref}
+                  className={teamAdminSubTabClass(isTeamAdminInvitePendingPath(pathname))}
+                  role="tab"
+                >
+                  Pending
+                </Link>
+                <Link
+                  href={inviteHistoryHref}
+                  className={teamAdminSubTabClass(isTeamAdminInviteHistoryPath(pathname))}
+                  role="tab"
+                >
+                  History
+                </Link>
+              </div>
             </div>
+
             {isTeamAdminInviteSendPath(pathname) ? (
-              <>
-                <p className="text-muted-foreground mb-4 text-sm">
-                  Choose a workspace, then enter an email and role. Subscribers see every workspace they
-                  own; co-admins only see workspaces they were invited to manage.
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Choose a workspace, then enter an email and role. Subscribers see every workspace
+                  they own; co-admins only see workspaces they were invited to manage.
                 </p>
                 <TeamInviteForm
                   key={`${teamId}-${defaultWorkspaceId}`}
@@ -260,12 +253,13 @@ export function TeamAdminManageTabs({
                   subscriberOwnerPrimaryEmail={subscriberOwnerPrimaryEmail}
                   defaultWorkspaceId={defaultWorkspaceId}
                 />
-              </>
+              </div>
             ) : null}
+
             {isTeamAdminInvitePendingPath(pathname) ? (
-              <>
-                <p className="text-muted-foreground mb-4 text-sm">
-                  Active invites for the workspace selected in the dashboard header ({teamName}).
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Active invites for <span className="font-medium text-foreground">{teamName}</span>.
                   Revoke to withdraw a link before it is accepted or before it expires.
                 </p>
                 {pendingInvitations.length === 0 ? (
@@ -279,11 +273,12 @@ export function TeamAdminManageTabs({
                     userFieldDisplayById={userFieldDisplayById}
                   />
                 )}
-              </>
+              </div>
             ) : null}
+
             {isTeamAdminInviteHistoryPath(pathname) ? (
-              <>
-                <p className="text-muted-foreground mb-4 text-sm">
+              <div className="space-y-4">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   Accepted, declined, expired, and revoked invitations for this workspace.
                 </p>
                 <TeamInvitationHistoryTable
@@ -292,10 +287,10 @@ export function TeamAdminManageTabs({
                   rows={invitationHistory}
                   userFieldDisplayById={userFieldDisplayById}
                 />
-              </>
+              </div>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </TeamAdminPanelCard>
       ) : null}
 
       {mainPanel === "quiz-results" ? (

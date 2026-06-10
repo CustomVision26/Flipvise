@@ -33,7 +33,7 @@ export function FormattedCardAnswer({
           className={cn(
             isStudy
               ? "animate-magic-answer-reveal text-center text-xl font-semibold leading-relaxed break-words sm:text-2xl md:text-3xl"
-              : "text-sm font-medium leading-snug break-words whitespace-pre-wrap",
+              : "text-base font-medium leading-relaxed break-words whitespace-pre-wrap",
             hasGradient && isStudy && "text-white",
             className,
           )}
@@ -48,7 +48,7 @@ export function FormattedCardAnswer({
         key={revealKey}
         className={cn(
           "space-y-1 text-left",
-          isStudy ? "w-full space-y-1.5" : "text-sm leading-snug",
+          isStudy ? "w-full space-y-1.5" : "text-base leading-relaxed",
           className,
         )}
       >
@@ -84,7 +84,7 @@ export function FormattedCardAnswer({
       key={revealKey}
       className={cn(
         "flex w-full flex-col",
-        isStudy ? "gap-2 sm:gap-2.5" : "gap-1.5",
+        isStudy ? "gap-2 sm:gap-2.5" : "gap-2.5",
         className,
       )}
     >
@@ -149,20 +149,20 @@ export function FormattedCardAnswer({
           return (
             <div
               key={`step-${blockIndex}`}
-              className="rounded-md border border-border/60 bg-muted/20 px-2.5 py-2"
+              className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5"
             >
-              <div className="flex items-start gap-2">
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary tabular-nums">
+              <div className="flex items-start gap-2.5">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary tabular-nums">
                   {block.stepNumber}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold leading-snug text-foreground break-words">
+                  <p className="text-sm font-semibold leading-snug text-foreground break-words">
                     {stepTitle}
                   </p>
                   {block.work.map((workLine, workIndex) => (
                     <p
                       key={workIndex}
-                      className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground break-words"
+                      className="mt-1.5 font-mono text-xs leading-relaxed text-muted-foreground break-words"
                     >
                       {workLine}
                     </p>
@@ -211,12 +211,12 @@ export function FormattedCardAnswer({
           return (
             <div
               key={`final-${blockIndex}`}
-              className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-2"
+              className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5"
             >
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
                 {block.label}
               </p>
-              <p className="mt-0.5 text-sm font-bold leading-snug text-foreground break-words">
+              <p className="mt-1 text-base font-bold leading-relaxed text-foreground break-words">
                 {block.value}
               </p>
             </div>
@@ -231,7 +231,7 @@ export function FormattedCardAnswer({
               isStudy && "animate-magic-line-reveal break-words",
               isStudy
                 ? cn("text-sm sm:text-base", hasGradient ? "text-white/90" : "text-foreground")
-                : "text-xs text-foreground break-words",
+                : "text-sm text-foreground break-words leading-relaxed",
             )}
             style={isStudy ? { animationDelay: delay } : undefined}
           >
