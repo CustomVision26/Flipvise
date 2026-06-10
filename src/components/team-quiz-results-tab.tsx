@@ -12,7 +12,12 @@ import { CheckCircle, XCircle, CircleHelp, ClipboardList } from "lucide-react";
 import type { QuizResultRow } from "@/db/queries/quiz-results";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import { ViewQuizResultDialog, type QuizResultSummary } from "@/components/view-quiz-result-dialog";
-import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
+import {
+  TEAM_ADMIN_PANEL_IDS,
+  teamAdminCardClass,
+  teamAdminPanelScrollClass,
+} from "@/components/team-admin-panel-styles";
+import { cn } from "@/lib/utils";
 
 function formatDate(value: Date | string): string {
   const d = typeof value === "string" ? new Date(value) : value;
@@ -61,7 +66,13 @@ export function TeamQuizResultsTab({
   return (
     <Card className={teamAdminCardClass}>
       <CardHeader className="space-y-2 pb-4">
-        <CardTitle className="flex items-center gap-2 text-base font-medium tracking-tight sm:text-lg">
+        <CardTitle
+          id={TEAM_ADMIN_PANEL_IDS.quizResults}
+          className={cn(
+            "flex items-center gap-2 text-base font-medium tracking-tight sm:text-lg",
+            teamAdminPanelScrollClass,
+          )}
+        >
           <ClipboardList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           Quiz results
         </CardTitle>

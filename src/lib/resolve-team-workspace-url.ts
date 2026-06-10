@@ -11,10 +11,14 @@ export type ResolvedTeamWorkspaceUrl = {
    */
   canEditTeamDecks: boolean;
   /**
-   * Invited `team_member` or `team_admin` — `/dashboard?team=` shows only decks assigned to them.
-   * Management uses `/dashboard/team-admin` (URLs use `teamMemberId`; `0` = owner).
+   * Invited `team_member` — `/dashboard?team=` shows only decks assigned to them (study/preview).
    */
   isAssignedMemberPreview: boolean;
+  /**
+   * Invited `team_admin` — `/dashboard?team=` lists workspace decks with full open/edit access.
+   * Management uses `/dashboard/team-admin` (URLs use `teamMemberId`; `0` = owner).
+   */
+  isTeamAdminWorkspaceViewer: boolean;
   /** Canonical `plan=` for workspace URLs — matches DB team tier when applicable. */
   workspacePlanQuery: string;
 };
@@ -70,6 +74,7 @@ export async function resolveTeamWorkspaceFromSearchParams(
       ownerUserId: team.ownerUserId,
       canEditTeamDecks: true,
       isAssignedMemberPreview: false,
+      isTeamAdminWorkspaceViewer: false,
       workspacePlanQuery,
     };
   }
@@ -82,7 +87,8 @@ export async function resolveTeamWorkspaceFromSearchParams(
       teamId,
       ownerUserId: team.ownerUserId,
       canEditTeamDecks: false,
-      isAssignedMemberPreview: true,
+      isAssignedMemberPreview: false,
+      isTeamAdminWorkspaceViewer: true,
       workspacePlanQuery,
     };
   }
@@ -92,6 +98,7 @@ export async function resolveTeamWorkspaceFromSearchParams(
     ownerUserId: team.ownerUserId,
     canEditTeamDecks: false,
     isAssignedMemberPreview: true,
+    isTeamAdminWorkspaceViewer: false,
     workspacePlanQuery,
   };
 }
@@ -208,4 +215,35 @@ export async function buildResolvedTeamWorkspaceQueryString(
   p.set(TEAM_WORKSPACE_QUERY.plan, tw.workspacePlanQuery);
   p.set(TEAM_WORKSPACE_QUERY.teamMemberId, String(teamMemberUrlParam));
   return p.toString();
+}
+
+/** Identity fields from the current URL in canonical key order (for redirect comparison). */
+function teamWorkspaceIdentityQueryFromSearchParams(
+  sp: Record<string, string | string[] | undefined>,
+): string {
+  const p = new URLSearchParams();
+  const team = firstString(sp, ["team"]);
+  if (team) p.set(TEAM_WORKSPACE_QUERY.team, team);
+  const userid = firstString(sp, ["userid", "userId"]);
+  if (userid) p.set(TEAM_WORKSPACE_QUERY.userid, userid);
+  const plan = firstString(sp, ["plan", "Plan"]);
+  if (plan) p.set(TEAM_WORKSPACE_QUERY.plan, plan);
+  const teamMemberId = firstString(sp, ["teamMemberId"]);
+  if (teamMemberId) p.set(TEAM_WORKSPACE_QUERY.teamMemberId, teamMemberId);
+  return p.toString();
+}
+
+/**
+ * When workspace identity query fields are present but stale or partial, returns the
+ * canonical query string. When the URL is already canonical, returns `null` (no redirect).
+ */
+export async function resolveTeamWorkspaceCanonicalRedirectQueryString(
+  viewerUserId: string,
+  sp: Record<string, string | string[] | undefined>,
+  tw: ResolvedTeamWorkspaceUrl,
+): Promise<string | null> {
+  if (!teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)) return null;
+  const canonical = await buildResolvedTeamWorkspaceQueryString(viewerUserId, tw);
+  if (teamWorkspaceIdentityQueryFromSearchParams(sp) === canonical) return null;
+  return canonical;
 }

@@ -54,6 +54,12 @@ import {
 } from "@/actions/cards";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { DeckPreviewCarousel } from "./deck-preview-carousel";
+import {
+  ItemWatermark,
+  itemCardContainerClass,
+  itemPrimaryTextClass,
+  type ItemWatermarkView,
+} from "./item-watermark";
 
 type PreviewCard = {
   id: number;
@@ -64,7 +70,7 @@ type PreviewCard = {
   aiGenerated: boolean;
 };
 
-export type DeckView = "grid" | "list" | "compact";
+export type DeckView = ItemWatermarkView;
 
 interface DeckCardPopoverProps {
   deck: {
@@ -217,6 +223,45 @@ export function DeckCardPopover({
         : "w-full justify-start gap-2.5 h-9 px-2.5 font-normal",
     );
     if (teamTierPreviewPromo && deck.cardCount > 0) {
+      const previewButton = (
+        <button
+          type="button"
+          className={cn(
+            buttonVariants({ variant: "default", size: compact ? "xs" : "sm" }),
+            "w-full justify-center gap-1.5 font-medium",
+            loadingPreview && "pointer-events-none opacity-70",
+          )}
+          onClick={handlePreview}
+          disabled={loadingPreview}
+        >
+          {loadingPreview ? (
+            <Loader2
+              className={cn(
+                "animate-spin shrink-0",
+                compact ? "size-3.5" : "size-4",
+              )}
+              aria-hidden
+            />
+          ) : (
+            <Eye
+              className={cn("shrink-0", compact ? "size-3.5" : "size-4")}
+              aria-hidden
+            />
+          )}
+          {loadingPreview
+            ? compact
+              ? "Opening…"
+              : "Opening preview…"
+            : compact
+              ? "Preview cards"
+              : "Click to preview deck cards"}
+        </button>
+      );
+
+      if (!deck.firstPreviewCardFrontImageUrl) {
+        return previewButton;
+      }
+
       return (
         <div
           className={cn(
@@ -230,68 +275,15 @@ export function DeckCardPopover({
               compact ? "aspect-[5/2] max-h-[5.25rem]" : "aspect-[4/3]",
             )}
           >
-            {deck.firstPreviewCardFrontImageUrl ? (
-              <Image
-                src={deck.firstPreviewCardFrontImageUrl}
-                alt="First card in this deck (preview order)"
-                fill
-                className="object-cover"
-                sizes={compact ? "180px" : "280px"}
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-0.5 px-2 text-center">
-                <Eye
-                  className={cn(
-                    "text-muted-foreground shrink-0",
-                    compact ? "size-4" : "size-6",
-                  )}
-                  aria-hidden
-                />
-                <span
-                  className={cn(
-                    "text-muted-foreground leading-snug",
-                    compact ? "text-[10px] leading-tight" : "text-xs",
-                  )}
-                >
-                  {compact
-                    ? "No cover image yet"
-                    : "First preview card has no image yet — you can still open the full preview."}
-                </span>
-              </div>
-            )}
+            <Image
+              src={deck.firstPreviewCardFrontImageUrl}
+              alt="First card in this deck (preview order)"
+              fill
+              className="object-cover"
+              sizes={compact ? "180px" : "280px"}
+            />
           </div>
-          <button
-            type="button"
-            className={cn(
-              buttonVariants({ variant: "default", size: compact ? "xs" : "sm" }),
-              "w-full justify-center gap-1.5 font-medium",
-              loadingPreview && "pointer-events-none opacity-70",
-            )}
-            onClick={handlePreview}
-            disabled={loadingPreview}
-          >
-            {loadingPreview ? (
-              <Loader2
-                className={cn(
-                  "animate-spin shrink-0",
-                  compact ? "size-3.5" : "size-4",
-                )}
-                aria-hidden
-              />
-            ) : (
-              <Eye
-                className={cn("shrink-0", compact ? "size-3.5" : "size-4")}
-                aria-hidden
-              />
-            )}
-            {loadingPreview
-              ? compact
-                ? "Opening…"
-                : "Opening preview…"
-              : compact
-                ? "Preview cards"
-                : "Click to preview deck cards"}
-          </button>
+          {previewButton}
         </div>
       );
     }
@@ -354,11 +346,13 @@ export function DeckCardPopover({
 
   const deckGradient = getGradientBySlug(deck.gradient);
   const hasGradient = deckGradient.slug !== "none";
+  const deckTextClass = itemPrimaryTextClass(hasGradient);
 
   const deckCard = (
     <Card
       className={cn(
-        "h-full transition-all duration-200 cursor-pointer select-none overflow-hidden",
+        itemCardContainerClass,
+        "h-full transition-all duration-200 cursor-pointer select-none",
         hasGradient ? "hover:opacity-90 hover:shadow-md" : "hover:bg-muted/50 hover:shadow-md",
         "active:scale-[0.99]",
         hasGradient && deckGradient.classes,
@@ -374,14 +368,27 @@ export function DeckCardPopover({
             : "flex flex-row items-center gap-3 px-4 py-3 sm:gap-4",
       )}
     >
+      <ItemWatermark label="DECK" view={view} onGradient={hasGradient} />
       {view === "compact" && coverBanner}
       {view === "compact" ? (
         <>
           <CardHeader className="px-3 py-3 gap-1">
-            <CardTitle className={cn("line-clamp-2 text-sm sm:text-base leading-tight", hasGradient && "text-white")}>
+            <CardTitle
+              className={cn(
+                "line-clamp-2 text-sm sm:text-base leading-tight",
+                deckTextClass,
+                hasGradient && "text-white",
+              )}
+            >
               {deck.name}
             </CardTitle>
-            <CardDescription className={cn("line-clamp-2 text-[11px] sm:text-xs", hasGradient && "text-white/70")}>
+            <CardDescription
+              className={cn(
+                "line-clamp-2 text-[11px] sm:text-xs",
+                deckTextClass,
+                hasGradient && "text-white/70",
+              )}
+            >
               {deck.description ?? "No description provided."}
             </CardDescription>
           </CardHeader>
@@ -400,7 +407,15 @@ export function DeckCardPopover({
         <>
           {coverThumbList}
           <div className="flex-1 min-w-0">
-            <p className={cn("line-clamp-1 text-sm font-medium", hasGradient && "text-white")}>{deck.name}</p>
+            <p
+              className={cn(
+                "line-clamp-1 text-sm font-medium",
+                deckTextClass,
+                hasGradient && "text-white",
+              )}
+            >
+              {deck.name}
+            </p>
           </div>
           <span className={cn("shrink-0 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
             {deck.cardCount}{" "}
@@ -413,10 +428,22 @@ export function DeckCardPopover({
       ) : (
         <div className="flex min-h-0 flex-1 flex-row items-center gap-3 sm:gap-4">
           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-            <p className={cn("text-sm sm:text-base font-semibold break-words whitespace-pre-wrap", hasGradient && "text-white")}>
+            <p
+              className={cn(
+                "text-sm sm:text-base font-semibold break-words whitespace-pre-wrap",
+                deckTextClass,
+                hasGradient && "text-white",
+              )}
+            >
               {deck.name}
             </p>
-            <p className={cn("text-xs break-words whitespace-pre-wrap", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+            <p
+              className={cn(
+                "text-xs break-words whitespace-pre-wrap",
+                deckTextClass,
+                hasGradient ? "text-white/70" : "text-muted-foreground",
+              )}
+            >
               {deck.description ?? "No description provided."}
             </p>
           </div>

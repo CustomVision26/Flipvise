@@ -8,8 +8,8 @@ import { isDeckLinkedToWorkspace } from "@/db/queries/teams";
 import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   buildResolvedTeamWorkspaceQueryString,
+  resolveTeamWorkspaceCanonicalRedirectQueryString,
   resolveTeamWorkspaceFromSearchParams,
-  teamWorkspaceSearchParamsHaveLegacyIdentityFields,
 } from "@/lib/resolve-team-workspace-url";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { StudySessionLoader } from "./study-session-loader";
@@ -34,15 +34,15 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   const sp = await searchParams;
   const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
-  if (
-    teamWorkspaceUrl != null &&
-    teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)
-  ) {
-    const fullQs = await buildResolvedTeamWorkspaceQueryString(
+  if (teamWorkspaceUrl != null) {
+    const canonicalQs = await resolveTeamWorkspaceCanonicalRedirectQueryString(
       userId,
+      sp,
       teamWorkspaceUrl,
     );
-    redirect(withTeamWorkspaceQuery(`/decks/${id}/study`, fullQs));
+    if (canonicalQs != null) {
+      redirect(withTeamWorkspaceQuery(`/decks/${id}/study`, canonicalQs));
+    }
   }
   const workspaceQs =
     teamWorkspaceUrl != null

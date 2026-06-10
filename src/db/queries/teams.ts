@@ -696,6 +696,76 @@ export async function isDeckLinkedToWorkspace(
   }
 }
 
+/** Deck is in the workspace tied to the joined `team_members` row (correlated subqueries). */
+function deckInJoinedSubscriberWorkspaceWhere(includeWorkspaceLinks: boolean) {
+  const workspaceMatch = [
+    eq(decks.teamId, teamMembers.teamId),
+    ...(includeWorkspaceLinks
+      ? [
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(deckWorkspaceLinks)
+              .where(
+                and(
+                  eq(deckWorkspaceLinks.teamId, teamMembers.teamId),
+                  eq(deckWorkspaceLinks.deckId, decks.id),
+                ),
+              ),
+          ),
+        ]
+      : []),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(teamDeckAssignments)
+        .where(
+          and(
+            eq(teamDeckAssignments.teamId, teamMembers.teamId),
+            eq(teamDeckAssignments.deckId, decks.id),
+          ),
+        ),
+    ),
+  ];
+  return and(eq(decks.userId, teams.ownerUserId), or(...workspaceMatch));
+}
+
+/** Co-admin access to any deck listed in a subscriber workspace (not only personal assignments). */
+async function resolveTeamAdminWorkspaceDeckAccess(
+  deckId: number,
+  deckOwnerUserId: string,
+  viewerUserId: string,
+): Promise<number | null> {
+  const run = async (includeWorkspaceLinks: boolean) => {
+    const [row] = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teams.id, teamMembers.teamId))
+      .innerJoin(
+        decks,
+        and(eq(decks.id, deckId), eq(decks.userId, teams.ownerUserId)),
+      )
+      .where(
+        and(
+          eq(teamMembers.userId, viewerUserId),
+          eq(teamMembers.role, "team_admin"),
+          eq(teams.ownerUserId, deckOwnerUserId),
+          deckInJoinedSubscriberWorkspaceWhere(includeWorkspaceLinks),
+        ),
+      )
+      .limit(1);
+    return row?.teamId ?? null;
+  };
+
+  try {
+    return await run(true);
+  } catch (e) {
+    if (!isMissingDeckWorkspaceLinksTableError(e)) throw e;
+    warnMissingDeckWorkspaceLinksTableOnce();
+    return run(false);
+  }
+}
+
 export async function resolveDeckViewerAccess(
   deckId: number,
   viewerUserId: string,
@@ -785,6 +855,15 @@ export async function resolveDeckViewerAccess(
         return { kind: "team_admin", teamId: adminPick.teamId };
       }
 
+      const workspaceAdminTeamId = await resolveTeamAdminWorkspaceDeckAccess(
+        deck.id,
+        deck.userId,
+        viewerUserId,
+      );
+      if (workspaceAdminTeamId != null) {
+        return { kind: "team_admin", teamId: workspaceAdminTeamId };
+      }
+
       return null;
     } catch {
       return null;
@@ -802,6 +881,10 @@ export async function resolveDeckViewerAccess(
     const member = await getMemberRecord(deck.teamId, viewerUserId);
     if (!member) return null;
 
+    if (member.role === "team_admin") {
+      return { kind: "team_admin", teamId: deck.teamId };
+    }
+
     const assignedRows = await db
       .select()
       .from(teamDeckAssignments)
@@ -815,10 +898,6 @@ export async function resolveDeckViewerAccess(
       .limit(1);
 
     if (assignedRows.length === 0) return null;
-
-    if (member.role === "team_admin") {
-      return { kind: "team_admin", teamId: deck.teamId };
-    }
 
     if (member.role === "team_member") {
       return { kind: "team_member", teamId: deck.teamId };

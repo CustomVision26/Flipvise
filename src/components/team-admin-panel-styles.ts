@@ -1,13 +1,30 @@
 import { cn } from "@/lib/utils";
 
+/** Scroll targets for team-admin section tabs — used in URLs (`#…`) and panel headings. */
+export const TEAM_ADMIN_PANEL_IDS = {
+  members: "team-admin-panel-members",
+  deckManager: "team-admin-panel-deck-manager",
+  workspaceHistory: "team-admin-panel-workspace-history",
+  inviteMembers: "team-admin-panel-invite-members",
+  quizResults: "team-admin-panel-quiz-results",
+} as const;
+
+export const teamAdminPanelScrollClass = "scroll-mt-24 sm:scroll-mt-28";
+
+export function teamAdminPanelHref(href: string, panelId: string): string {
+  const base = href.split("#")[0] ?? href;
+  return `${base}#${panelId}`;
+}
+
 /** Primary team-admin section tabs (Members, Deck Manager, …). */
 export function teamAdminTabClass(isActive: boolean) {
   return cn(
-    "inline-flex shrink-0 items-center justify-center whitespace-nowrap border-b px-3 py-2.5 text-xs font-medium transition-colors sm:px-4 sm:text-sm",
+    "inline-flex shrink-0 items-center justify-center whitespace-nowrap px-3.5 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-2.5 sm:text-sm",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    "rounded-full sm:rounded-none sm:border-b",
     isActive
-      ? "border-foreground text-foreground"
-      : "border-transparent text-muted-foreground hover:text-foreground",
+      ? "bg-primary text-primary-foreground sm:border-foreground sm:bg-transparent sm:text-foreground"
+      : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground sm:border-transparent sm:bg-transparent sm:hover:bg-transparent sm:hover:text-foreground",
   );
 }
 

@@ -33,6 +33,7 @@ import { getPersonalDecksByUserWithCardCount } from "@/db/queries/decks";
 import {
   countTeamsForOwner,
   getAssignedDecksForMemberWithCardCount,
+  getDecksForTeamWithCardCount,
   getTeamById,
   getTeamMembershipsForUser,
 } from "@/db/queries/teams";
@@ -235,6 +236,83 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const cookieStore = await cookies();
   const teamCtxRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
   const teamCtxId = teamCtxRaw ? Number(teamCtxRaw) : NaN;
+
+  if (teamWorkspaceUrl?.isTeamAdminWorkspaceViewer) {
+    const [workspaceHeadingRow, workspaceDecksRaw] = await Promise.all([
+      tryTeamQuery(() => getTeamById(teamWorkspaceUrl.teamId), null),
+      tryTeamQuery(
+        () =>
+          getDecksForTeamWithCardCount(
+            teamWorkspaceUrl.teamId,
+            teamWorkspaceUrl.ownerUserId,
+          ),
+        [],
+      ),
+    ]);
+    const teamWorkspaceTierExtras = teamWorkspaceHasTierExtras(
+      ownSubscriberTeamTierExtras,
+      workspaceHeadingRow,
+    );
+    const [workspaceDecks, workspaceHeadingOwnerName] = await Promise.all([
+      teamWorkspaceTierExtras
+        ? mergePreviewThumbsForDecks(workspaceDecksRaw)
+        : Promise.resolve(workspaceDecksRaw),
+      workspaceHeadingRow
+        ? getClerkUserDisplayNameById(workspaceHeadingRow.ownerUserId)
+        : Promise.resolve(null),
+    ]);
+    const workspaceHeadingGroupName = workspaceHeadingRow?.name ?? null;
+    const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
+    return (
+      <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            {teamWorkspaceTierExtras ? (
+              <DashboardTeamHeading
+                showTeamTierExtras
+                ownerName={workspaceHeadingOwnerName}
+                teamName={workspaceHeadingGroupName}
+              />
+            ) : (
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+            )}
+            {teamWorkspaceTierExtras ? (
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+                Team workspace — open decks to edit cards or study
+              </p>
+            ) : (
+              <DashboardTeamWorkspaceSubline
+                teamName={workspaceHeadingGroupName}
+                ownerName={workspaceHeadingOwnerName}
+                tailText="Team workspace — open decks to edit cards or study"
+              />
+            )}
+          </div>
+        </div>
+        {workspaceDecks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
+              <BookOpen className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground text-sm">No decks in this workspace yet</p>
+              <p className="text-muted-foreground text-xs max-w-xs">
+                Use Deck Manager in Team Admin to link subscriber decks or assign them to members.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <DeckGrid
+            decks={workspaceDecks}
+            initialView={initialView}
+            workspaceQueryString={workspaceQueryString}
+            teamTierPreviewPromo={teamWorkspaceTierExtras}
+            hasAiReading={hasAiReading}
+          />
+        )}
+      </div>
+    );
+  }
 
   if (teamWorkspaceUrl?.isAssignedMemberPreview) {
     const [assignedHeadingRow, assignedRaw] = await Promise.all([

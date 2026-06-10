@@ -28,6 +28,12 @@ import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-das
 import { TeamDeckAssignListLoader } from "@/components/team-deck-assign-list-loader";
 import { toClientJson } from "@/lib/to-client-json";
 import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
+import { TeamAdminPanelScroll } from "@/components/team-admin-panel-scroll";
+import {
+  TEAM_ADMIN_PANEL_IDS,
+  teamAdminPanelScrollClass,
+} from "@/components/team-admin-panel-styles";
+import { cn } from "@/lib/utils";
 import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
@@ -149,6 +155,7 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
 
   return (
     <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
+      <TeamAdminPanelScroll />
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div className="inline-flex w-fit flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
@@ -163,7 +170,13 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
             <span className="text-muted-foreground/80">Deck manager</span>
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1
+              id={TEAM_ADMIN_PANEL_IDS.deckManager}
+              className={cn(
+                "text-2xl font-semibold tracking-tight sm:text-3xl",
+                teamAdminPanelScrollClass,
+              )}
+            >
               Assign decks to members
             </h1>
             <p className="truncate text-sm text-muted-foreground" title={selected.name}>

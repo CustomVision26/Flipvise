@@ -40,6 +40,11 @@ import { CardAnswerHover } from "./card-answer-hover";
 import { CardFrontImage } from "./card-front-image";
 import { EditCardDialog } from "./edit-card-dialog";
 import { DeleteCardDialog } from "./delete-card-dialog";
+import {
+  ItemWatermark,
+  itemCardContainerClass,
+  itemPrimaryTextClass,
+} from "@/components/item-watermark";
 
 type CardData = {
   id: number;
@@ -249,13 +254,19 @@ export function CardGrid({
             day: "numeric",
           });
 
+          const cardTextClass = itemPrimaryTextClass();
+
           if (view === "list") {
             return (
               <Card
                 key={card.id}
-                className="flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-2 px-3"
+                className={cn(
+                  itemCardContainerClass,
+                  "flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-2 px-3",
+                )}
                 style={{ animationDelay: `${i * 20}ms` }}
               >
+                <ItemWatermark label="CARD" view="list" />
                 <CardAnswerHover
                   className="min-w-0 flex-1"
                   front={card.front}
@@ -278,7 +289,12 @@ export function CardGrid({
                         />
                       )}
                     </div>
-                    <p className="min-w-0 flex-1 text-sm font-medium text-foreground line-clamp-1">
+                    <p
+                      className={cn(
+                        "min-w-0 flex-1 text-sm font-medium text-foreground line-clamp-1",
+                        cardTextClass,
+                      )}
+                    >
                       {card.front ?? "(no front)"}
                     </p>
                     <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
@@ -302,9 +318,13 @@ export function CardGrid({
             return (
               <Card
                 key={card.id}
-                className="flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm"
+                className={cn(
+                  itemCardContainerClass,
+                  "flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm",
+                )}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
+                <ItemWatermark label="CARD" view="compact" />
                 <CardAnswerHover
                   className="flex min-h-0 flex-1 flex-col"
                   front={card.front}
@@ -344,6 +364,7 @@ export function CardGrid({
                     <p
                       className={cn(
                         "min-h-0 flex-1 text-[11px] font-medium leading-snug break-words",
+                        cardTextClass,
                         card.frontImageUrl ? "line-clamp-2" : "line-clamp-5",
                         card.front
                           ? "text-foreground"
@@ -372,9 +393,13 @@ export function CardGrid({
           return (
             <Card
               key={card.id}
-              className="flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-3 px-4 md:flex-row md:items-start md:gap-4"
+              className={cn(
+                itemCardContainerClass,
+                "flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-3 px-4 md:flex-row md:items-start md:gap-4",
+              )}
               style={{ animationDelay: `${i * 30}ms` }}
             >
+              <ItemWatermark label="CARD" view="grid" />
               <CardAnswerHover
                 className="min-w-0 flex-1"
                 front={card.front}
@@ -396,7 +421,12 @@ export function CardGrid({
                       variant="thumb"
                     />
                   ) : null}
-                  <p className="text-sm font-medium text-foreground break-words whitespace-pre-wrap min-w-0">
+                  <p
+                    className={cn(
+                      "text-sm font-medium text-foreground break-words whitespace-pre-wrap min-w-0",
+                      cardTextClass,
+                    )}
+                  >
                     {card.front ?? "(no front)"}
                   </p>
                 </div>
@@ -419,7 +449,12 @@ export function CardGrid({
                       />
                     </div>
                   )}
-                  <span className="break-words whitespace-pre-wrap min-w-0">
+                  <span
+                    className={cn(
+                      "break-words whitespace-pre-wrap min-w-0",
+                      cardTextClass,
+                    )}
+                  >
                     {correctAnswer || (card.backImageUrl ? "(image)" : "(no back)")}
                   </span>
                 </div>

@@ -20,6 +20,7 @@ import { TeamWorkspaceHistoryTable } from "@/components/team-workspace-history-t
 import type { TeamWorkspaceEventRow } from "@/db/queries/team-workspace-events";
 import type { TeamInvitationRow, TeamMemberRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
+import { cn } from "@/lib/utils";
 import { TEAM_INVITE_EXPIRY_DAYS } from "@/lib/team-invite-expiry";
 import { TeamQuizResultsTab } from "@/components/team-quiz-results-tab";
 import type { QuizResultRow } from "@/db/queries/quiz-results";
@@ -33,13 +34,50 @@ import {
   isTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
 import {
+  TEAM_ADMIN_PANEL_IDS,
   teamAdminCardClass,
+  teamAdminPanelHref,
+  teamAdminPanelScrollClass,
   teamAdminSubTabClass,
   teamAdminTabClass,
 } from "@/components/team-admin-panel-styles";
+import {
+  scrollToTeamAdminPanel,
+  TeamAdminPanelScroll,
+} from "@/components/team-admin-panel-scroll";
 
 type InvitationRow = TeamInvitationRow;
 type MemberRow = TeamMemberRow;
+
+function TeamAdminTabLink({
+  href,
+  panelId,
+  isActive,
+  children,
+}: {
+  href: string;
+  panelId: string;
+  isActive: boolean;
+  children: ReactNode;
+}) {
+  const panelHref = teamAdminPanelHref(href, panelId);
+
+  return (
+    <Link
+      href={panelHref}
+      className={teamAdminTabClass(isActive)}
+      role="tab"
+      onClick={(e) => {
+        if (isActive) {
+          e.preventDefault();
+          scrollToTeamAdminPanel(panelId);
+        }
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
 
 function TeamAdminDeckManagerNavLink({
   href,
@@ -51,9 +89,13 @@ function TeamAdminDeckManagerNavLink({
   const pathname = usePathname();
   const isActive = isTeamAdminDeckManagerPath(pathname);
   return (
-    <Link href={href} className={teamAdminTabClass(isActive)} role="tab">
+    <TeamAdminTabLink
+      href={href}
+      panelId={TEAM_ADMIN_PANEL_IDS.deckManager}
+      isActive={isActive}
+    >
       {children}
-    </Link>
+    </TeamAdminTabLink>
   );
 }
 
@@ -85,10 +127,12 @@ export type TeamAdminManageTabsProps = {
 };
 
 function TeamAdminPanelCard({
+  panelId,
   title,
   description,
   children,
 }: {
+  panelId: string;
   title: string;
   description: string;
   children: ReactNode;
@@ -96,7 +140,15 @@ function TeamAdminPanelCard({
   return (
     <Card className={teamAdminCardClass}>
       <CardHeader className="space-y-2 pb-4">
-        <CardTitle className="text-base font-medium tracking-tight sm:text-lg">{title}</CardTitle>
+        <CardTitle
+          id={panelId}
+          className={cn(
+            "text-base font-medium tracking-tight sm:text-lg",
+            teamAdminPanelScrollClass,
+          )}
+        >
+          {title}
+        </CardTitle>
         <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
       </CardHeader>
       <CardContent>{children}</CardContent>
@@ -147,38 +199,48 @@ export function TeamAdminManageTabs({
 
   return (
     <div className="flex w-full flex-col gap-5">
+      <TeamAdminPanelScroll />
       <div className="-mx-1 overflow-x-auto px-1">
         <div
           role="tablist"
           aria-orientation="horizontal"
-          className="flex min-w-max gap-0 border-b border-border/80"
+          className="flex min-w-max gap-2 py-0.5 sm:gap-0 sm:border-b sm:border-border/80 sm:py-0"
         >
-          <Link href={membersHref} className={teamAdminTabClass(membersLinkActive)} role="tab">
+          <TeamAdminTabLink
+            href={membersHref}
+            panelId={TEAM_ADMIN_PANEL_IDS.members}
+            isActive={membersLinkActive}
+          >
             Members
-          </Link>
+          </TeamAdminTabLink>
           <TeamAdminDeckManagerNavLink href={deckManagerHref}>Deck Manager</TeamAdminDeckManagerNavLink>
-          <Link
+          <TeamAdminTabLink
             href={workspaceHistoryHref}
-            className={teamAdminTabClass(workspaceHistoryLinkActive)}
-            role="tab"
+            panelId={TEAM_ADMIN_PANEL_IDS.workspaceHistory}
+            isActive={workspaceHistoryLinkActive}
           >
             Workspace history
-          </Link>
-          <Link
+          </TeamAdminTabLink>
+          <TeamAdminTabLink
             href={inviteSendHref}
-            className={teamAdminTabClass(inviteMembersLinkActive)}
-            role="tab"
+            panelId={TEAM_ADMIN_PANEL_IDS.inviteMembers}
+            isActive={inviteMembersLinkActive}
           >
             Invite members
-          </Link>
-          <Link href={quizResultsHref} className={teamAdminTabClass(quizResultsLinkActive)} role="tab">
+          </TeamAdminTabLink>
+          <TeamAdminTabLink
+            href={quizResultsHref}
+            panelId={TEAM_ADMIN_PANEL_IDS.quizResults}
+            isActive={quizResultsLinkActive}
+          >
             Quiz results
-          </Link>
+          </TeamAdminTabLink>
         </div>
       </div>
 
       {mainPanel === "members" && !invitePanelVisible ? (
         <TeamAdminPanelCard
+          panelId={TEAM_ADMIN_PANEL_IDS.members}
           title="Members"
           description="Change roles or remove members. Subscribers and team admins can access this dashboard."
         >
@@ -196,6 +258,7 @@ export function TeamAdminManageTabs({
 
       {mainPanel === "workspace-history" ? (
         <TeamAdminPanelCard
+          panelId={TEAM_ADMIN_PANEL_IDS.workspaceHistory}
           title="Workspace history"
           description="When this workspace was created, renamed, or removed. Each row is recorded at the time the change happened."
         >
@@ -205,6 +268,7 @@ export function TeamAdminManageTabs({
 
       {invitePanelVisible ? (
         <TeamAdminPanelCard
+          panelId={TEAM_ADMIN_PANEL_IDS.inviteMembers}
           title="Invite members"
           description={`Send invitations, manage active invites, or review history for this workspace. Invites expire in ${TEAM_INVITE_EXPIRY_DAYS} days.`}
         >
