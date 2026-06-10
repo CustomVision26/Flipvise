@@ -1,9 +1,11 @@
+import { FlipviseLoaderStatic } from "@/components/flipvise-loader-static";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export default function DeckLoading() {
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
+      <FlipviseLoaderStatic variant="inline" message="Loading deck…" className="py-2" />
       {/* Deck header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col gap-1.5">

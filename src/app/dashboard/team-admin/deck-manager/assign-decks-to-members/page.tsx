@@ -24,7 +24,8 @@ import {
   buildTeamAdminPath,
 } from "@/lib/team-admin-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
-import { TeamDeckAssignList } from "@/components/team-deck-assign-list";
+import { TeamDeckAssignListLoader } from "@/components/team-deck-assign-list-loader";
+import { toClientJson } from "@/lib/to-client-json";
 import { TeamAdminDashboardNavActions } from "@/components/team-admin-dashboard-nav-actions";
 import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
@@ -196,11 +197,15 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <TeamDeckAssignList
-            workspaces={assignWorkspaceSnapshots}
+          <TeamDeckAssignListLoader
+            workspaces={toClientJson(assignWorkspaceSnapshots)}
             defaultWorkspaceId={selected.id}
-            userFieldDisplayById={userFieldDisplayById}
-            subscriberPersonalUnlinkedDecks={subscriberPersonalUnlinkedDecks}
+            userFieldDisplayById={toClientJson(userFieldDisplayById)}
+            subscriberPersonalUnlinkedDecks={
+              subscriberPersonalUnlinkedDecks
+                ? toClientJson(subscriberPersonalUnlinkedDecks)
+                : undefined
+            }
           />
         </CardContent>
       </Card>

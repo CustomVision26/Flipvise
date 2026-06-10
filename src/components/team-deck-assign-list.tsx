@@ -57,7 +57,7 @@ type AssignmentTableDisplayRow = {
   workspaceName: string;
   signedByLabel: string;
   signedByTitle: string | undefined;
-  createdAt: Date | null;
+  createdAt: Date | string | null;
 };
 
 export type TeamAssignWorkspaceSnapshot = {
@@ -73,7 +73,7 @@ export type TeamAssignWorkspaceSnapshot = {
   assignments: AssignmentRow[];
 };
 
-interface TeamDeckAssignListProps {
+export interface TeamDeckAssignListProps {
   workspaces: TeamAssignWorkspaceSnapshot[];
   defaultWorkspaceId: number;
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
@@ -125,8 +125,19 @@ function assignmentSignedByCellTitle(
   return bits.join(" · ");
 }
 
-function formatAssignmentRecordedAt(value: Date) {
-  return value.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
+function toAssignmentDate(value: Date | string | null | undefined): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatAssignmentRecordedAt(value: Date | string) {
+  const date = toAssignmentDate(value);
+  if (!date) return "—";
+  return date.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" });
 }
 
 /** Placeholder values so Select stays controlled (never `value={undefined}`). */
@@ -274,8 +285,8 @@ export function TeamDeckAssignList({
       }
     }
     out.sort((a, b) => {
-      const ta = a.createdAt?.getTime() ?? Number.NEGATIVE_INFINITY;
-      const tb = b.createdAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+      const ta = toAssignmentDate(a.createdAt)?.getTime() ?? Number.NEGATIVE_INFINITY;
+      const tb = toAssignmentDate(b.createdAt)?.getTime() ?? Number.NEGATIVE_INFINITY;
       const t = tb - ta;
       if (t !== 0) return t;
       const w = a.workspaceName.localeCompare(b.workspaceName);
@@ -762,7 +773,7 @@ export function TeamDeckAssignList({
                             </TableCell>
                             <TableCell className="min-w-[12rem] whitespace-nowrap text-sm text-foreground">
                               {row.createdAt ? (
-                                <span title={row.createdAt.toISOString()}>
+                                <span title={toAssignmentDate(row.createdAt)?.toISOString()}>
                                   {formatAssignmentRecordedAt(row.createdAt)}
                                 </span>
                               ) : (

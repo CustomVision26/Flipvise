@@ -2,14 +2,9 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { cn } from "@/lib/utils";
+import { useCardHoverPreview } from "./card-hover-preview-context";
 
 type CardFrontImageProps = {
   src: string;
@@ -28,6 +23,7 @@ export function CardFrontImage({
   className,
 }: CardFrontImageProps) {
   const [open, setOpen] = useState(false);
+  const hoverPreview = useCardHoverPreview();
 
   return (
     <>
@@ -46,6 +42,7 @@ export function CardFrontImage({
         onDoubleClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          hoverPreview?.closeHover();
           setOpen(true);
         }}
       >
@@ -59,26 +56,13 @@ export function CardFrontImage({
         />
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-max max-w-[min(calc(100vw-2rem),28rem)] gap-0 overflow-hidden border-2 border-primary bg-card p-0 shadow-lg shadow-primary/30 ring-0 sm:max-w-[min(calc(100vw-2rem),28rem)]">
-          <DialogHeader className="gap-0 border-b border-primary/40 bg-primary px-3 py-2 pr-10 text-left">
-            <DialogTitle className="text-xs font-semibold text-primary-foreground">
-              {label ?? "Front image"}
-            </DialogTitle>
-            <DialogDescription className="sr-only">Enlarged front image</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 bg-card p-3">
-            <Image
-              src={src}
-              alt={alt}
-              width={640}
-              height={480}
-              className="mx-auto block h-auto max-h-[min(60vh,22rem)] w-auto max-w-[min(calc(100vw-3.5rem),26rem)] rounded-md border border-primary/35 bg-muted object-contain"
-              priority
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ImageEnlargeOverlay
+        open={open}
+        onClose={() => setOpen(false)}
+        src={src}
+        alt={alt}
+        title={label ?? "Front image"}
+      />
     </>
   );
 }

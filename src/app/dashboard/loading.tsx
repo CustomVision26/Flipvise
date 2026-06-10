@@ -1,3 +1,4 @@
+import { FlipviseLoaderStatic } from "@/components/flipvise-loader-static";
 import {
   Card,
   CardContent,
@@ -8,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function DashboardLoading() {
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+      <FlipviseLoaderStatic variant="inline" message="Loading your decks…" className="py-2" />
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">

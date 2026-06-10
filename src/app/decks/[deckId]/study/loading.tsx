@@ -1,8 +1,10 @@
+import { FlipviseLoaderStatic } from "@/components/flipvise-loader-static";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StudyLoading() {
   return (
     <div className="flex flex-1 flex-col items-center gap-4 sm:gap-8 p-4 sm:p-8">
+      <FlipviseLoaderStatic variant="inline" message="Preparing study session…" className="py-2" />
       {/* Progress bar area */}
       <div className="w-full max-w-2xl flex flex-col gap-2">
         <div className="flex justify-between items-center">

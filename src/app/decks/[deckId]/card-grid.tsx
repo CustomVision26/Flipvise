@@ -251,37 +251,46 @@ export function CardGrid({
 
           if (view === "list") {
             return (
-              <CardAnswerHover
-                key={card.id}
-                front={card.front}
-                answer={correctAnswer}
-                isMC={isMC}
-                backImageUrl={card.backImageUrl}
-              >
               <Card
+                key={card.id}
                 className="flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-2 px-3"
                 style={{ animationDelay: `${i * 20}ms` }}
               >
-                <div className="flex shrink-0 items-center gap-1">
-                  {isMC && (
-                    <ListChecks className="size-3.5 text-primary" aria-label="Multiple choice" />
-                  )}
-                  {card.aiGenerated && (
-                    <Sparkles className="size-3.5 text-primary" aria-label="AI generated" />
-                  )}
-                </div>
-                <p className="flex-1 min-w-0 text-sm font-medium text-foreground line-clamp-1">
-                  {card.front ?? "(no front)"}
-                </p>
-                <span className="hidden sm:inline shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {updatedShort}
-                </span>
+                <CardAnswerHover
+                  className="min-w-0 flex-1"
+                  front={card.front}
+                  answer={correctAnswer}
+                  isMC={isMC}
+                  backImageUrl={card.backImageUrl}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-1">
+                      {isMC && (
+                        <ListChecks
+                          className="size-3.5 text-primary"
+                          aria-label="Multiple choice"
+                        />
+                      )}
+                      {card.aiGenerated && (
+                        <Sparkles
+                          className="size-3.5 text-primary"
+                          aria-label="AI generated"
+                        />
+                      )}
+                    </div>
+                    <p className="min-w-0 flex-1 text-sm font-medium text-foreground line-clamp-1">
+                      {card.front ?? "(no front)"}
+                    </p>
+                    <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
+                      {updatedShort}
+                    </span>
+                  </div>
+                </CardAnswerHover>
                 <div className="flex shrink-0 items-center gap-1 self-center">
                   <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
                   <DeleteCardDialog cardId={card.id} deckId={deckId} />
                 </div>
               </Card>
-              </CardAnswerHover>
             );
           }
 
@@ -291,58 +300,63 @@ export function CardGrid({
             const frontImageLabel = isMC ? "Question image" : "Front image";
 
             return (
-              <CardAnswerHover
-                key={card.id}
-                className="h-full"
-                front={card.front}
-                answer={correctAnswer}
-                isMC={isMC}
-                backImageUrl={card.backImageUrl}
-              >
               <Card
+                key={card.id}
                 className="flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm"
                 style={{ animationDelay: `${i * 30}ms` }}
               >
-                <div className="flex min-h-3 shrink-0 items-center gap-0.5">
-                  {isMC && (
-                    <Badge
-                      variant="outline"
-                      className="size-3.5 justify-center border-primary/35 p-0"
-                      aria-label="Multiple choice"
-                    >
-                      <ListChecks className="size-2 text-primary" />
-                    </Badge>
-                  )}
-                  {card.aiGenerated && (
-                    <Badge
-                      variant="outline"
-                      className="size-3.5 justify-center p-0"
-                      aria-label="AI generated"
-                    >
-                      <Sparkles className="size-2 text-primary" />
-                    </Badge>
-                  )}
-                </div>
-                {card.frontImageUrl ? (
-                  <CardFrontImage
-                    src={card.frontImageUrl}
-                    alt={frontImageAlt}
-                    label={frontImageLabel}
-                    variant="tile"
-                  />
-                ) : null}
-                <p
-                  className={cn(
-                    "min-h-0 flex-1 text-[11px] font-medium leading-snug break-words",
-                    card.frontImageUrl ? "line-clamp-2" : "line-clamp-5",
-                    card.front ? "text-foreground" : "text-transparent select-none",
-                  )}
-                  title={card.front ?? undefined}
+                <CardAnswerHover
+                  className="flex min-h-0 flex-1 flex-col"
+                  front={card.front}
+                  answer={correctAnswer}
+                  isMC={isMC}
+                  backImageUrl={card.backImageUrl}
                 >
-                  {card.front ?? "No front text"}
-                </p>
+                  <div className="flex min-h-0 flex-1 flex-col gap-1">
+                    <div className="flex min-h-3 shrink-0 items-center gap-0.5">
+                      {isMC && (
+                        <Badge
+                          variant="outline"
+                          className="size-3.5 justify-center border-primary/35 p-0"
+                          aria-label="Multiple choice"
+                        >
+                          <ListChecks className="size-2 text-primary" />
+                        </Badge>
+                      )}
+                      {card.aiGenerated && (
+                        <Badge
+                          variant="outline"
+                          className="size-3.5 justify-center p-0"
+                          aria-label="AI generated"
+                        >
+                          <Sparkles className="size-2 text-primary" />
+                        </Badge>
+                      )}
+                    </div>
+                    {card.frontImageUrl ? (
+                      <CardFrontImage
+                        src={card.frontImageUrl}
+                        alt={frontImageAlt}
+                        label={frontImageLabel}
+                        variant="tile"
+                      />
+                    ) : null}
+                    <p
+                      className={cn(
+                        "min-h-0 flex-1 text-[11px] font-medium leading-snug break-words",
+                        card.frontImageUrl ? "line-clamp-2" : "line-clamp-5",
+                        card.front
+                          ? "text-foreground"
+                          : "text-transparent select-none",
+                      )}
+                      title={card.front ?? undefined}
+                    >
+                      {card.front ?? "No front text"}
+                    </p>
+                  </div>
+                </CardAnswerHover>
                 <div className="mt-auto flex shrink-0 items-center justify-between gap-0.5 border-t border-border/30 pt-1">
-                  <span className="text-[8px] text-muted-foreground tabular-nums truncate">
+                  <span className="truncate text-[8px] text-muted-foreground tabular-nums">
                     {updatedCompact}
                   </span>
                   <div className="flex shrink-0 items-center [&_button]:h-5 [&_button]:min-h-5 [&_button]:px-1 [&_button]:text-[9px]">
@@ -351,23 +365,24 @@ export function CardGrid({
                   </div>
                 </div>
               </Card>
-              </CardAnswerHover>
             );
           }
 
           // Default: Grid = detailed table row — show every field fully, no truncation
           return (
-            <CardAnswerHover
-              key={card.id}
-              front={card.front}
-              answer={correctAnswer}
-              isMC={isMC}
-              backImageUrl={card.backImageUrl}
-            >
             <Card
-              className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-3 px-4"
+              key={card.id}
+              className="flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-3 px-4 md:flex-row md:items-start md:gap-4"
               style={{ animationDelay: `${i * 30}ms` }}
             >
+              <CardAnswerHover
+                className="min-w-0 flex-1"
+                front={card.front}
+                answer={correctAnswer}
+                isMC={isMC}
+                backImageUrl={card.backImageUrl}
+              >
+              <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:gap-4">
               <div className="md:flex-1 min-w-0 flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground md:hidden">
                   {isMC ? "Question" : "Front"}
@@ -447,7 +462,9 @@ export function CardGrid({
                   {updatedLabel}
                 </span>
               </div>
-              <div className="flex md:w-28 shrink-0 items-center justify-end gap-1 md:self-center">
+              </div>
+              </CardAnswerHover>
+              <div className="flex shrink-0 items-center justify-end gap-1 md:w-28 md:self-center">
                 {!hiddenActionRows.has(card.id) && (
                   <>
                     <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
@@ -480,7 +497,6 @@ export function CardGrid({
                 </Button>
               </div>
             </Card>
-            </CardAnswerHover>
           );
         })}
       </div>

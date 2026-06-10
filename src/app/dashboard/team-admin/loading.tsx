@@ -1,3 +1,4 @@
+import { FlipviseLoaderStatic } from "@/components/flipvise-loader-static";
 import {
   Card,
   CardContent,
@@ -8,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function TeamAdminLoading() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
+      <FlipviseLoaderStatic variant="inline" message="Loading team workspace…" className="py-2" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <div className="min-w-0 space-y-2">
