@@ -63,6 +63,14 @@ export const teamWorkspaceEventActionEnum = pgEnum('team_workspace_event_action'
   'deleted',
 ]);
 
+export const quizSecuritySessionStatusEnum = pgEnum('quiz_security_session_status', [
+  'active',
+  'locked',
+  'granted_resume',
+  'terminated',
+  'completed',
+]);
+
 /** Subscriber-owned team workspace (plan limits apply per owner subscription). */
 export const teams = pgTable('teams', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -75,6 +83,8 @@ export const teams = pgTable('teams', {
    * {@link teamOwnerQuizDefaults.defaultQuizDurationMinutes} for the subscriber owner.
    */
   quizDurationMinutes: integer(),
+  /** When true, quiz takers cannot leave the study UI until submit; leaving locks the session. */
+  quizSecurityEnabled: boolean().notNull().default(false),
   createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -513,6 +523,59 @@ export const quizResults = pgTable('quiz_results', {
  * Inbox rows for saved quiz results (multiple rows may share the same `quizResultId`).
  * The quiz-taker always gets one row; for team-deck quizzes the workspace owner gets a second row when the taker is not the owner.
  */
+/** Serialized quiz progress for secured team-workspace quiz sessions. */
+export type QuizSecuritySessionState = {
+  questions: {
+    cardId: number;
+    question: string | null;
+    questionImageUrl: string | null;
+    options: string[];
+    correctIndex: number;
+  }[];
+  selectedByIndex: (number | null)[];
+  currentIndex: number;
+  remainingSeconds: number;
+};
+
+export const quizSecuritySessions = pgTable(
+  'quiz_security_sessions',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    deckId: integer().references(() => decks.id, { onDelete: 'set null' }),
+    deckName: varchar({ length: 255 }).notNull(),
+    status: quizSecuritySessionStatusEnum().notNull().default('active'),
+    sessionState: json().$type<QuizSecuritySessionState>(),
+    lockedAt: timestamp(),
+    terminatedAt: timestamp(),
+    completedAt: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('quiz_security_sessions_team_status_idx').on(t.teamId, t.status),
+    index('quiz_security_sessions_user_deck_idx').on(t.userId, t.deckId),
+  ],
+);
+
+/** Inbox rows when a secured quiz session is terminated for leaving the UI. */
+export const quizSecurityInboxMessages = pgTable(
+  'quiz_security_inbox_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    sessionId: integer()
+      .notNull()
+      .references(() => quizSecuritySessions.id, { onDelete: 'cascade' }),
+    read: boolean().notNull().default(false),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('quiz_security_inbox_recipient_idx').on(t.recipientUserId)],
+);
+
 export const quizResultInboxMessages = pgTable('quiz_result_inbox_messages', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   recipientUserId: varchar({ length: 255 }).notNull(),

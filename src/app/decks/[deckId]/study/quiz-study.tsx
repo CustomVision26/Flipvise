@@ -48,12 +48,20 @@ import {
   Play,
   ListChecks,
   BookCheck,
+  ShieldAlert,
+  Lock,
 } from "lucide-react";
 import {
   submitQuizResultAction,
   saveQuizResultAction,
   type QuizResult,
 } from "@/actions/study";
+import {
+  completeQuizSecuritySessionAction,
+  lockQuizSecuritySessionAction,
+  startQuizSecuritySessionAction,
+} from "@/actions/quiz-security";
+import type { QuizSecuritySessionState } from "@/db/schema";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
 import { getDeckQuizAccent } from "@/lib/deck-quiz-accent";
 import { cn } from "@/lib/utils";
@@ -88,6 +96,53 @@ interface QuizStudyProps {
   /** Team workspace admin setting — flat quiz duration in seconds. */
   quizDurationSeconds?: number;
   hasAiReading?: boolean;
+  exitHref: string;
+  exitLabel: string;
+  quizSecurity?: {
+    enabled: boolean;
+    teamId: number;
+    initialSession: {
+      id: number;
+      status: "active" | "locked" | "granted_resume" | "terminated" | "completed";
+      sessionState: QuizSecuritySessionState | null;
+    } | null;
+  };
+}
+
+type QuizSecurityStatus = NonNullable<QuizStudyProps["quizSecurity"]>["initialSession"] extends infer S
+  ? S extends { status: infer St }
+    ? St
+    : never
+  : never;
+
+function questionsFromSessionState(state: QuizSecuritySessionState): QuizQuestion[] {
+  return state.questions.map((q) => ({
+    cardId: q.cardId,
+    question: q.question,
+    questionImageUrl: q.questionImageUrl,
+    options: q.options,
+    correctIndex: q.correctIndex,
+  }));
+}
+
+function buildSessionState(
+  questions: QuizQuestion[],
+  selectedByIndex: (number | null)[],
+  currentIndex: number,
+  remainingSeconds: number,
+): QuizSecuritySessionState {
+  return {
+    questions: questions.map((q) => ({
+      cardId: q.cardId,
+      question: q.question,
+      questionImageUrl: q.questionImageUrl,
+      options: q.options,
+      correctIndex: q.correctIndex,
+    })),
+    selectedByIndex,
+    currentIndex,
+    remainingSeconds,
+  };
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -263,8 +318,21 @@ export function QuizStudy({
   autoSaveQuizResult = false,
   quizDurationSeconds,
   hasAiReading = false,
+  exitHref,
+  exitLabel,
+  quizSecurity,
 }: QuizStudyProps) {
   const router = useRouter();
+  const leaveStudy = useCallback(() => router.push(exitHref), [router, exitHref]);
+  const securityEnabled = Boolean(quizSecurity?.enabled);
+  const initialSession = quizSecurity?.initialSession ?? null;
+  const restoredState =
+    initialSession?.sessionState &&
+    (initialSession.status === "active" ||
+      (initialSession.status === "granted_resume" && initialSession.sessionState != null))
+      ? initialSession.sessionState
+      : null;
+
   const deckAccent = useMemo(() => getDeckQuizAccent(deckGradient), [deckGradient]);
   const deckAccentCss =
     deckAccent.hasDeckAccent && deckAccent.accent && deckAccent.accentForeground
@@ -274,10 +342,14 @@ export function QuizStudy({
         } as CSSProperties)
       : undefined;
 
-  const [questions, setQuestions] = useState<QuizQuestion[]>(() => buildQuestions(cards));
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
+    restoredState ? questionsFromSessionState(restoredState) : buildQuestions(cards),
+  );
+  const [currentIndex, setCurrentIndex] = useState(() => restoredState?.currentIndex ?? 0);
   const [selectedByIndex, setSelectedByIndex] = useState<(number | null)[]>(() =>
-    Array(questions.length).fill(null),
+    restoredState
+      ? restoredState.selectedByIndex
+      : Array(buildQuestions(cards).length).fill(null),
   );
   const [voice, setVoice] = useState<TtsVoice>("nova");
 
@@ -285,9 +357,69 @@ export function QuizStudy({
     () => quizDurationSeconds ?? getQuizDurationSeconds(questions.length),
     [quizDurationSeconds, questions.length],
   );
-  const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
+  const [remainingSeconds, setRemainingSeconds] = useState(
+    () => restoredState?.remainingSeconds ?? totalSeconds,
+  );
   const startTimeRef = useRef<number>(0);
-  const [quizStarted, setQuizStarted] = useState(false);
+  const [quizStarted, setQuizStarted] = useState(
+    () => securityEnabled && initialSession?.status === "active",
+  );
+  const [securitySessionId, setSecuritySessionId] = useState<number | null>(
+    () => initialSession?.id ?? null,
+  );
+  const [securityStatus, setSecurityStatus] = useState<QuizSecurityStatus | null>(
+    () => initialSession?.status ?? null,
+  );
+  const [securityLocking, setSecurityLocking] = useState(false);
+  const lockingRef = useRef(false);
+
+  const grantedFreshStart = useMemo(
+    () =>
+      securityEnabled &&
+      (securityStatus === "granted_resume" || initialSession?.status === "granted_resume") &&
+      restoredState == null,
+    [securityEnabled, securityStatus, initialSession?.status, restoredState],
+  );
+  const grantedResume = useMemo(
+    () =>
+      securityEnabled &&
+      (securityStatus === "granted_resume" || initialSession?.status === "granted_resume") &&
+      restoredState != null,
+    [securityEnabled, securityStatus, initialSession?.status, restoredState],
+  );
+  const isSecurityTerminated = useMemo(
+    () =>
+      securityEnabled &&
+      (securityStatus === "terminated" || initialSession?.status === "terminated"),
+    [securityEnabled, securityStatus, initialSession?.status],
+  );
+  const isSecurityCompleted = useMemo(
+    () =>
+      securityEnabled &&
+      (securityStatus === "completed" || initialSession?.status === "completed"),
+    [securityEnabled, securityStatus, initialSession?.status],
+  );
+  const isSecurityLocked = useMemo(
+    () =>
+      securityEnabled &&
+      (securityStatus === "locked" || initialSession?.status === "locked"),
+    [securityEnabled, securityStatus, initialSession?.status],
+  );
+  const canStartSecuredQuiz = useMemo(
+    () =>
+      !securityEnabled ||
+      grantedFreshStart ||
+      grantedResume ||
+      (!isSecurityTerminated && !isSecurityCompleted && !isSecurityLocked),
+    [
+      securityEnabled,
+      grantedFreshStart,
+      grantedResume,
+      isSecurityTerminated,
+      isSecurityCompleted,
+      isSecurityLocked,
+    ],
+  );
 
   const [result, setResult] = useState<QuizResult | null>(null);
   const [submitting, startTransition] = useTransition();
@@ -353,6 +485,10 @@ export function QuizStudy({
             setAutoPersisted(false);
             setAutoPersistError(null);
           }
+          if (securityEnabled && securitySessionId) {
+            await completeQuizSecuritySessionAction({ sessionId: securitySessionId });
+            setSecurityStatus("completed");
+          }
           setResult(res);
         } catch (err) {
           setSubmitError(err instanceof Error ? err.message : "Failed to submit quiz");
@@ -369,8 +505,84 @@ export function QuizStudy({
       autoSaveQuizResult,
       deckName,
       teamId,
+      securityEnabled,
+      securitySessionId,
     ],
   );
+
+  const lockSecuritySession = useCallback(async () => {
+    if (
+      !securityEnabled ||
+      !securitySessionId ||
+      !quizStarted ||
+      result ||
+      securityStatus === "locked" ||
+      lockingRef.current
+    ) {
+      return;
+    }
+    lockingRef.current = true;
+    setSecurityLocking(true);
+    try {
+      const sessionState = buildSessionState(
+        questions,
+        selectedByIndex,
+        currentIndex,
+        remainingSeconds,
+      );
+      await lockQuizSecuritySessionAction({ sessionId: securitySessionId, sessionState });
+      setSecurityStatus("locked");
+      setQuizStarted(false);
+    } catch {
+      // Best-effort lock — UI still pauses locally.
+      setSecurityStatus("locked");
+      setQuizStarted(false);
+    } finally {
+      setSecurityLocking(false);
+    }
+  }, [
+    securityEnabled,
+    securitySessionId,
+    quizStarted,
+    result,
+    securityStatus,
+    questions,
+    selectedByIndex,
+    currentIndex,
+    remainingSeconds,
+  ]);
+
+  useEffect(() => {
+    if (!securityEnabled || !quizStarted || result) return;
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        void lockSecuritySession();
+      }
+    };
+    const onPageHide = () => {
+      void lockSecuritySession();
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [securityEnabled, quizStarted, result, lockSecuritySession]);
+
+  useEffect(() => {
+    if (quizStarted && startTimeRef.current === 0) {
+      startTimeRef.current = Date.now();
+    }
+  }, [quizStarted]);
 
   useEffect(() => {
     if (!quizStarted || result || totalQuestions === 0) return;
@@ -421,13 +633,39 @@ export function QuizStudy({
     submitQuiz({ timedOut: false });
   }
 
-  function handleStartQuiz() {
+  async function handleStartQuiz() {
+    if (securityEnabled && quizSecurity) {
+      const sessionState = buildSessionState(
+        questions,
+        selectedByIndex,
+        currentIndex,
+        remainingSeconds,
+      );
+      try {
+        const session = await startQuizSecuritySessionAction({
+          teamId: quizSecurity.teamId,
+          deckId,
+          deckName,
+          sessionState,
+        });
+        if (session) {
+          setSecuritySessionId(session.id);
+          setSecurityStatus(session.status);
+        }
+      } catch (err) {
+        setSubmitError(err instanceof Error ? err.message : "Could not start secured quiz");
+        return;
+      }
+    }
     startTimeRef.current = Date.now();
-    setRemainingSeconds(totalSeconds);
+    if (!restoredState) {
+      setRemainingSeconds(totalSeconds);
+    }
     setQuizStarted(true);
   }
 
   function handleRetake() {
+    if (securityEnabled) return;
     const fresh = buildQuestions(cards);
     setQuestions(fresh);
     setSelectedByIndex(Array(fresh.length).fill(null));
@@ -455,8 +693,73 @@ export function QuizStudy({
         autoPersisted={autoPersisted}
         autoPersistError={autoPersistError}
         onRetake={handleRetake}
-        onBack={() => router.push(`/decks/${deckId}`)}
+        onBack={leaveStudy}
+        backLabel={exitLabel}
+        allowRetake={!securityEnabled}
+        hideSaveResult={securityEnabled || autoSaveQuizResult}
       />
+    );
+  }
+
+  if (isSecurityTerminated || isSecurityCompleted) {
+    const isTerminated = isSecurityTerminated;
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-6">
+        <Card className="w-full max-w-md shadow-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15 text-destructive">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-xl">
+              {isTerminated ? "Quiz terminated" : "Quiz already completed"}
+            </CardTitle>
+            <CardDescription className="text-balance">
+              {isTerminated
+                ? "This quiz was ended by your team admin. Check your inbox for details and await team feedback before trying again."
+                : "You already finished this quiz. Retakes are not allowed for this deck."}
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            {isTerminated ? (
+              <Button variant="secondary" onClick={() => router.refresh()}>
+                Check for access
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={leaveStudy}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {exitLabel}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isSecurityLocked) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-6">
+        <Card className="w-full max-w-md shadow-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+              <Lock className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-xl">Quiz paused</CardTitle>
+            <CardDescription className="text-balance">
+              You left the quiz window. Your session is locked until your team admin grants access.
+              {securityLocking ? " Saving your progress…" : null}
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button variant="secondary" onClick={() => router.refresh()}>
+              Check for access
+            </Button>
+            <Button variant="outline" onClick={leaveStudy}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {exitLabel}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     );
   }
 
@@ -474,10 +777,10 @@ export function QuizStudy({
             variant="outline"
             size="sm"
             className="self-center gap-2"
-            onClick={() => router.push(`/decks/${deckId}`)}
+            onClick={leaveStudy}
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Deck
+            {exitLabel}
           </Button>
         </div>
       </div>
@@ -505,7 +808,9 @@ export function QuizStudy({
             >
               <ListChecks className="h-6 w-6" />
             </div>
-            <CardTitle className="text-xl">Timed quiz</CardTitle>
+            <CardTitle className="text-xl">
+              {grantedResume ? "Resume quiz" : grantedFreshStart ? "Start over" : "Timed quiz"}
+            </CardTitle>
             <CardDescription className="text-balance">
               <span className="font-medium text-foreground">{deckName}</span>
             </CardDescription>
@@ -514,36 +819,47 @@ export function QuizStudy({
             <p>
               {totalQuestions} question{totalQuestions !== 1 ? "s" : ""} ·{" "}
               <span className="tabular-nums font-medium text-foreground">
-                {formatClock(totalSeconds)}
+                {formatClock(restoredState?.remainingSeconds ?? totalSeconds)}
               </span>{" "}
               on the clock
             </p>
+            {securityEnabled ? (
+              <p className="text-xs text-amber-400/90">
+                Quiz security is on. Stay on this tab until you submit — leaving will lock your
+                session.
+              </p>
+            ) : null}
             <p className="text-xs">
-              Press start when you are ready. The timer begins only after you
-              start.
+              {grantedResume
+                ? "Your team admin granted access. Press start to continue where you left off."
+                : grantedFreshStart
+                  ? "Your team admin granted access to start this quiz over from the beginning."
+                  : "Press start when you are ready. The timer begins only after you start."}
             </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button
-              size="default"
-              className={cn(
-                "w-full gap-2 sm:w-auto sm:min-w-40",
-                deckAccent.hasDeckAccent &&
-                  "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-              )}
-              onClick={handleStartQuiz}
-            >
-              <Play className="h-4 w-4" />
-              Start quiz
-            </Button>
+            {canStartSecuredQuiz ? (
+              <Button
+                size="default"
+                className={cn(
+                  "w-full gap-2 sm:w-auto sm:min-w-40",
+                  deckAccent.hasDeckAccent &&
+                    "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+                )}
+                onClick={handleStartQuiz}
+              >
+                <Play className="h-4 w-4" />
+                {grantedFreshStart ? "Start over" : "Start quiz"}
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               size="default"
               className="w-full gap-2 sm:w-auto"
-              onClick={() => router.push(`/decks/${deckId}`)}
+              onClick={leaveStudy}
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to deck
+              {exitLabel}
             </Button>
           </CardFooter>
         </Card>
@@ -873,6 +1189,9 @@ function QuizResultCard({
   autoPersistError,
   onRetake,
   onBack,
+  backLabel = "Back to Deck",
+  allowRetake = true,
+  hideSaveResult = false,
 }: {
   result: QuizResult;
   questions: QuizQuestion[];
@@ -886,6 +1205,9 @@ function QuizResultCard({
   autoPersistError: string | null;
   onRetake: () => void;
   onBack: () => void;
+  backLabel?: string;
+  allowRetake?: boolean;
+  hideSaveResult?: boolean;
 }) {
   const { percent, correct, incorrect, unanswered, total, tier, quote, elapsedSeconds, timedOut } =
     result;
@@ -1039,14 +1361,14 @@ function QuizResultCard({
           </p>
         )}
 
-        {!saved && autoSaveQuizResult && saveError && (
+        {!saved && autoSaveQuizResult && saveError && !hideSaveResult && (
           <p className="text-xs text-muted-foreground text-center px-2">
             Automatic save did not complete. Use Save result below, or try again later.
           </p>
         )}
 
         <div className="w-full flex flex-col gap-3">
-          {!saved ? (
+          {!saved && !hideSaveResult ? (
             <Button
               size="default"
               variant="secondary"
@@ -1057,26 +1379,32 @@ function QuizResultCard({
               <BookCheck className="h-4 w-4" />
               Save Result
             </Button>
-          ) : (
+          ) : saved ? (
             <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-medium text-emerald-400">
               <CheckCircle className="h-4 w-4" />
               {autoSaveQuizResult
                 ? "Result saved for your workspace — check your inbox and email"
                 : "Result saved — check your inbox and email"}
             </div>
-          )}
-          <Button
-            size="default"
-            className={cn(
-              "w-full gap-2 h-10 sm:h-11",
-              resultAccent.hasDeckAccent &&
-                "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-            )}
-            onClick={onRetake}
-          >
-            <RotateCcw className="h-4 w-4" />
-            Retake Quiz
-          </Button>
+          ) : hideSaveResult && autoSaveQuizResult ? (
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-border/80 bg-muted/20 py-2.5 text-sm text-muted-foreground">
+              Result is saved automatically for your workspace.
+            </div>
+          ) : null}
+          {allowRetake ? (
+            <Button
+              size="default"
+              className={cn(
+                "w-full gap-2 h-10 sm:h-11",
+                resultAccent.hasDeckAccent &&
+                  "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+              )}
+              onClick={onRetake}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retake Quiz
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="default"
@@ -1084,7 +1412,7 @@ function QuizResultCard({
             onClick={onBack}
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Deck
+            {backLabel}
           </Button>
         </div>
 

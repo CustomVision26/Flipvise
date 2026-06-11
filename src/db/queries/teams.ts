@@ -1742,6 +1742,12 @@ function isMissingTeamOwnerQuizDefaultsError(error: unknown): boolean {
   return /team_owner_quiz_defaults/i.test(msg);
 }
 
+function isMissingOwnerQuizEnforceColumnError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /enforce_default_for_all_workspaces|enforceDefaultForAllWorkspaces/i.test(msg);
+}
+
 const DEFAULT_OWNER_QUIZ_SETTINGS: OwnerQuizDefaultSettings = {
   defaultQuizDurationMinutes: DEFAULT_TEAM_QUIZ_DURATION_MINUTES,
   enforceDefaultForAllWorkspaces: false,
@@ -1760,9 +1766,27 @@ export async function getOwnerQuizDefaultSettings(
       defaultQuizDurationMinutes: resolveTeamQuizDurationMinutes(
         row.defaultQuizDurationMinutes,
       ),
-      enforceDefaultForAllWorkspaces: row.enforceDefaultForAllWorkspaces,
+      enforceDefaultForAllWorkspaces: Boolean(row.enforceDefaultForAllWorkspaces),
     };
   } catch (e) {
+    if (isMissingOwnerQuizEnforceColumnError(e)) {
+      try {
+        const [row] = await db
+          .select({
+            defaultQuizDurationMinutes: teamOwnerQuizDefaults.defaultQuizDurationMinutes,
+          })
+          .from(teamOwnerQuizDefaults)
+          .where(eq(teamOwnerQuizDefaults.ownerUserId, ownerUserId));
+        return {
+          defaultQuizDurationMinutes: resolveTeamQuizDurationMinutes(
+            row?.defaultQuizDurationMinutes,
+          ),
+          enforceDefaultForAllWorkspaces: false,
+        };
+      } catch {
+        return DEFAULT_OWNER_QUIZ_SETTINGS;
+      }
+    }
     if (!isMissingTeamOwnerQuizDefaultsError(e)) throw e;
     return DEFAULT_OWNER_QUIZ_SETTINGS;
   }
@@ -1815,6 +1839,11 @@ export async function updateOwnerQuizDefaultSettings(
       await clearWorkspaceQuizOverridesForOwner(ownerUserId);
     }
   } catch (e) {
+    if (isMissingOwnerQuizEnforceColumnError(e)) {
+      throw new Error(
+        "Database is missing quiz enforce-default support. Run: npm run db:ensure-owner-quiz-enforce-column (or apply migration 0030_owner_quiz_enforce_default.sql).",
+      );
+    }
     if (!isMissingTeamOwnerQuizDefaultsError(e)) throw e;
     throw new Error(
       "Database is missing owner quiz default support. Apply migrations 0029_team_quiz_owner_defaults.sql and 0030_owner_quiz_enforce_default.sql.",

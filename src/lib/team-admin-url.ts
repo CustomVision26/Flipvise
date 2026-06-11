@@ -26,6 +26,10 @@ export const TEAM_ADMIN_QUIZ_RESULTS_PATH = "/dashboard/team-admin/quiz-results"
 /** Quiz timer settings for the workspace (`?team=`). */
 export const TEAM_ADMIN_QUIZ_TIMER_PATH = "/dashboard/team-admin/quiz-results/quiz-timer";
 
+/** Quiz security settings and locked sessions (`?team=`). */
+export const TEAM_ADMIN_QUIZ_SECURITY_PATH =
+  "/dashboard/team-admin/quiz-results/quiz-security";
+
 /** Invite members — send invite form (`?team=`). */
 export const TEAM_ADMIN_INVITE_SEND_PATH =
   "/dashboard/team-admin/invite-members/send-invite";
@@ -94,6 +98,13 @@ export function isTeamAdminQuizTimerPath(pathname: string): boolean {
   return (
     pathname === TEAM_ADMIN_QUIZ_TIMER_PATH ||
     pathname.startsWith(`${TEAM_ADMIN_QUIZ_TIMER_PATH}/`)
+  );
+}
+
+export function isTeamAdminQuizSecurityPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_QUIZ_SECURITY_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_QUIZ_SECURITY_PATH}/`)
   );
 }
 
@@ -188,6 +199,14 @@ export function buildTeamAdminQuizTimerPath(
 ): string {
   const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_QUIZ_TIMER_PATH}?${qs}` : TEAM_ADMIN_QUIZ_TIMER_PATH;
+}
+
+export function buildTeamAdminQuizSecurityPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs ? `${TEAM_ADMIN_QUIZ_SECURITY_PATH}?${qs}` : TEAM_ADMIN_QUIZ_SECURITY_PATH;
 }
 
 export function buildTeamAdminInviteSendPath(

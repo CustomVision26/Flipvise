@@ -385,8 +385,26 @@ export function TeamDeckAssignList({
   const assigned =
     canSubmit && isAssigned(teamIdNum, deckIdNum, memberUserId);
 
+  const existingAssignment =
+    canSubmit
+      ? assignments.find(
+          (a) =>
+            a.teamId === teamIdNum &&
+            a.deckId === deckIdNum &&
+            a.memberUserId === memberUserId,
+        )
+      : undefined;
+
+  const savedStudyPrivilege =
+    existingAssignment?.studyPrivilege ?? defaultTeamMemberStudyPrivilege();
+
+  const studyPrivilegeChanged =
+    selectedMemberIsRegular && studyPrivilege !== savedStudyPrivilege;
+
   async function onAssign() {
-    if (!canSubmit || assigned) return;
+    if (!canSubmit) return;
+    if (assigned && !selectedMemberIsRegular) return;
+    if (assigned && selectedMemberIsRegular && !studyPrivilegeChanged) return;
     setError(null);
     setBusy("assign");
     try {
@@ -792,7 +810,10 @@ export function TeamDeckAssignList({
                   type="button"
                   className="h-10 w-full"
                   disabled={
-                    !canSubmit || busy !== null || (assigned && !selectedMemberIsRegular)
+                    !canSubmit ||
+                    busy !== null ||
+                    (assigned && !selectedMemberIsRegular) ||
+                    (assigned && selectedMemberIsRegular && !studyPrivilegeChanged)
                   }
                   onClick={onAssign}
                 >

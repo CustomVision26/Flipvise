@@ -237,81 +237,74 @@ export function TeamStudyPrivilegesTable({
         </p>
       ) : null}
 
-      <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Label htmlFor="study-priv-workspace" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Team workspace
-          </Label>
-          {workspaceLocked ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-muted-foreground"
-              onClick={unlockWorkspaceField}
-            >
-              Change workspace
-            </Button>
-          ) : null}
-        </div>
-        <Select
-          value={workspaceId}
-          disabled={workspaceLocked}
-          onValueChange={(v) => {
-            if (workspaceLocked || v == null) return;
-            setWorkspaceId(v);
-            setActiveRowKey(null);
-          }}
-        >
-          <SelectTrigger
-            id="study-priv-workspace"
-            className="h-10 w-full bg-background disabled:cursor-default disabled:opacity-100"
-          >
-            <SelectValue placeholder={PLACEHOLDER_WORKSPACE}>
-              {(value) => {
-                const w = workspaces.find((t) => String(t.id) === String(value));
-                if (w) {
-                  return (
-                    <span className={workspaceLocked ? "truncate text-muted-foreground" : "truncate"}>
-                      {w.name}
-                    </span>
-                  );
-                }
-                return (
-                  <span className="text-muted-foreground">{PLACEHOLDER_WORKSPACE}</span>
-                );
-              }}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {workspaces.map((w) => (
-              <SelectItem key={w.id} value={String(w.id)}>
-                <span className="truncate">{w.name}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {workspaceLocked && workspace ? (
-          <p className="text-xs text-muted-foreground">
-            Set from the selected assignment. Double-click another record to switch workspace.
-          </p>
-        ) : null}
-      </div>
-
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-muted-foreground">
           Regular team members only. Set which study modes each member may use per assigned deck —
           Standard Review, Quiz, or both. Swipe or use the arrows to browse assignments. Double-click a
-          record to load its workspace in the field above.
+          record to load its workspace in Search &amp; filters.
         </p>
 
         <TeamAdminRecordSlider
           items={rows}
-          activeKey={activeRowKey}
+          activeKey={activeRowKey ?? workspaceId}
           interactiveCard
           onDoubleClick={onPrivilegeRowDoubleClick}
           deckFilterOptions={deckFilterOptions}
           getSearchHaystack={privilegeSearchHaystack}
+          filterPanelExtraActive={workspaceLocked}
+          filterPanelExtra={({ filtersOpen }) => (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label
+                  htmlFor="study-priv-workspace"
+                  className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                >
+                  Team workspace
+                </Label>
+                {workspaceLocked ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-muted-foreground"
+                    onClick={unlockWorkspaceField}
+                  >
+                    Change workspace
+                  </Button>
+                ) : null}
+              </div>
+              <Select
+                value={workspaceId}
+                disabled={workspaceLocked || !filtersOpen}
+                onValueChange={(v) => {
+                  if (workspaceLocked || v == null) return;
+                  setWorkspaceId(v);
+                  setActiveRowKey(v);
+                }}
+              >
+                <SelectTrigger
+                  id="study-priv-workspace"
+                  className="h-10 w-full bg-background disabled:cursor-default disabled:opacity-100"
+                >
+                  <SelectValue placeholder={PLACEHOLDER_WORKSPACE}>
+                    {workspace?.name ?? PLACEHOLDER_WORKSPACE}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaces.map((w) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      <span className="truncate">{w.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {workspaceLocked && workspace ? (
+                <p className="text-xs text-muted-foreground">
+                  Set from the selected assignment. Double-click another record to switch workspace.
+                </p>
+              ) : null}
+            </div>
+          )}
           emptyMessage="No deck assignments for regular members yet."
           noResultsMessage="No assignments match your search or filters."
           renderCard={(row) => {

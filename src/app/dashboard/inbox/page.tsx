@@ -18,6 +18,7 @@ import { getInboxReadsForUser } from "@/db/queries/inbox-reads";
 import { listAdminPlanAssignmentInboxLogsForUser } from "@/db/queries/admin";
 import { listAdminPlanInvitesForInbox } from "@/db/queries/admin-plan-invites";
 import { listAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
+import { getQuizSecurityInboxForUser } from "@/db/queries/quiz-security";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
@@ -54,6 +55,7 @@ export default async function DashboardInboxPage() {
     adminPlanLogRows,
     adminPlanInviteRows,
     affiliateBroadcastRows,
+    quizSecurityInboxRows,
     readSet,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
@@ -63,6 +65,7 @@ export default async function DashboardInboxPage() {
     listAdminPlanAssignmentInboxLogsForUser(userId, 100),
     listAdminPlanInvitesForInbox(userId, 80),
     tryTeamQuery(() => listAffiliateBroadcastInboxForUser(userId), []),
+    tryTeamQuery(() => getQuizSecurityInboxForUser(userId), []),
     getInboxReadsForUser(userId),
   ]);
 
@@ -83,12 +86,15 @@ export default async function DashboardInboxPage() {
 
   // ── Batch Clerk user lookups ──────────────────────────────────────────────
   const quizTakerIds = quizEntries.map((e) => e.quizResult.userId);
+  const quizSecurityMemberIds = quizSecurityInboxRows.map((e) => e.session.userId);
   const teamOwnerIds = teamsRows.map((t) => t.ownerUserId);
   const teamInviteInviterIds = teamInviteRows
     .map((r) => r.invitation.invitedByUserId ?? r.team.ownerUserId)
     .filter(Boolean) as string[];
 
-  const allUserIds = [...new Set([...quizTakerIds, ...teamOwnerIds, ...teamInviteInviterIds])];
+  const allUserIds = [
+    ...new Set([...quizTakerIds, ...quizSecurityMemberIds, ...teamOwnerIds, ...teamInviteInviterIds]),
+  ];
   const userDisplayById = allUserIds.length > 0
     ? await getClerkUserFieldDisplaysByIds(allUserIds)
     : {};
@@ -217,6 +223,38 @@ export default async function DashboardInboxPage() {
         hostedInvoiceUrl: invoice.hostedInvoiceUrl ?? null,
         invoicePdfUrl: invoice.invoicePdfUrl ?? null,
         paidAtIso: invoice.paidAt?.toISOString() ?? null,
+      },
+    });
+  }
+
+  for (const entry of quizSecurityInboxRows) {
+    const key = `quiz_security_notice:${entry.id}`;
+    const isRead = readSet.has(key) || entry.read;
+    const isOwnerCopy = entry.recipientUserId === entry.ownerUserId;
+    const memberDisplay = userDisplayById[entry.session.userId];
+    const memberName = memberDisplay?.primaryLine ?? memberDisplay?.primaryEmail ?? null;
+    const teamName = entry.teamName ?? null;
+    const deckName = entry.session.deckName;
+
+    const description = isOwnerCopy
+      ? `Quiz for ${memberName ?? "a member"} on "${deckName}" was terminated due to suspicious behaviour (left the secured quiz).`
+      : `Due to suspicious behaviour, your quiz on "${deckName}" was terminated. Await team owner feedback for access to quiz again.`;
+
+    items.push({
+      type: "quiz_security_notice",
+      key,
+      title: isOwnerCopy ? "Secured quiz terminated" : "Quiz session terminated",
+      description,
+      dateIso: entry.createdAt.toISOString(),
+      isRead,
+      requiresAction: false,
+      payload: {
+        messageId: entry.id,
+        sessionId: entry.sessionId,
+        deckName,
+        teamName,
+        isOwnerCopy,
+        memberName,
       },
     });
   }

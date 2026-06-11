@@ -624,24 +624,29 @@ const updateOwnerQuizDefaultSchema = z.object({
 export async function updateOwnerQuizDefaultAction(
   data: z.infer<typeof updateOwnerQuizDefaultSchema>,
 ) {
-  const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  try {
+    const { userId } = await getAccessContext();
+    if (!userId) throw new Error("Unauthorized");
 
-  const parsed = updateOwnerQuizDefaultSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid input");
+    const parsed = updateOwnerQuizDefaultSchema.safeParse(data);
+    if (!parsed.success) throw new Error("Invalid input");
 
-  const ownedTeams = await getTeamsByOwner(userId);
-  if (ownedTeams.length === 0) {
-    throw new Error("Only the workspace subscriber can set a default for all workspaces.");
+    const ownedTeams = await getTeamsByOwner(userId);
+    if (ownedTeams.length === 0) {
+      throw new Error("Only the workspace subscriber can set a default for all workspaces.");
+    }
+
+    await updateOwnerQuizDefaultSettings(userId, {
+      defaultQuizDurationMinutes: parsed.data.durationMinutes,
+      enforceDefaultForAllWorkspaces: parsed.data.enforceDefaultForAllWorkspaces,
+    });
+
+    revalidatePath("/dashboard/team-admin", "layout");
+    revalidatePath("/dashboard/team-admin/quiz-results", "layout");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not save default quiz timer.";
+    throw new Error(msg);
   }
-
-  await updateOwnerQuizDefaultSettings(userId, {
-    defaultQuizDurationMinutes: parsed.data.durationMinutes,
-    enforceDefaultForAllWorkspaces: parsed.data.enforceDefaultForAllWorkspaces,
-  });
-
-  revalidatePath("/dashboard/team-admin", "layout");
-  revalidatePath("/dashboard/team-admin/quiz-results", "layout");
 }
 
 const unassignDeckSchema = z.object({

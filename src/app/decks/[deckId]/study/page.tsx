@@ -6,9 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 import {
   getDeckAssignmentStudyPrivilege,
+  getMemberRecord,
+  getTeamById,
   getTeamQuizDurationMinutes,
   isDeckLinkedToWorkspace,
 } from "@/db/queries/teams";
+import {
+  resolveQuizSecurityContextForStudy,
+  type QuizSecurityStudyContext,
+} from "@/db/queries/quiz-security";
 import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
@@ -22,7 +28,10 @@ import {
   resolveTeamWorkspaceCanonicalRedirectQueryString,
   resolveTeamWorkspaceFromSearchParams,
 } from "@/lib/resolve-team-workspace-url";
-import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
+import {
+  buildTeamWorkspaceDashboardPath,
+  withTeamWorkspaceQuery,
+} from "@/lib/team-workspace-url";
 import { StudySessionLoader } from "./study-session-loader";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import {
@@ -92,14 +101,23 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     ? withTeamWorkspaceQuery(`/decks/${id}`, workspaceQs)
     : `/decks/${id}`;
 
-  let quizDurationSeconds: number | undefined;
-  const quizTeamId =
+  const studyTeamId =
     fromTeamWorkspaceUrl && teamWorkspaceUrl
       ? teamWorkspaceUrl.teamId
-      : deck.teamId ?? null;
-  if (quizTeamId != null) {
-    const minutes = await getTeamQuizDurationMinutes(quizTeamId);
+      : access.kind === "team_member" || access.kind === "team_admin"
+        ? access.teamId
+        : deck.teamId ?? null;
+
+  let quizDurationSeconds: number | undefined;
+  if (studyTeamId != null) {
+    const minutes = await getTeamQuizDurationMinutes(studyTeamId);
     quizDurationSeconds = teamQuizDurationSeconds(minutes);
+  }
+
+  let quizSecurity: QuizSecurityStudyContext | undefined;
+  if (studyTeamId != null) {
+    quizSecurity =
+      (await resolveQuizSecurityContextForStudy(userId, id, studyTeamId)) ?? undefined;
   }
 
   let memberAllowReview = true;
@@ -113,16 +131,40 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   let studyBackHref: string;
   let studyBackLabel: string;
-  if (fromTeamWorkspaceUrl && workspaceQs) {
+  if (workspaceQs) {
     studyBackHref = teamDashboardHref;
     studyBackLabel = "← Dashboard";
-  } else if (access.kind === "team_member") {
+  } else if (
+    studyTeamId != null &&
+    (access.kind === "team_member" ||
+      access.kind === "team_admin" ||
+      fromTeamWorkspaceUrl)
+  ) {
+    const team = await getTeamById(studyTeamId);
+    if (team) {
+      let teamMemberUrlParam = 0;
+      if (team.ownerUserId !== userId) {
+        const member = await getMemberRecord(studyTeamId, userId);
+        teamMemberUrlParam = member?.id ?? 0;
+      }
+      studyBackHref = buildTeamWorkspaceDashboardPath({
+        teamId: studyTeamId,
+        ownerUserId: team.ownerUserId,
+        planSlug: team.planSlug,
+        teamMemberUrlParam,
+      });
+    } else {
+      studyBackHref = "/dashboard";
+    }
+    studyBackLabel = "← Dashboard";
+  } else if (access.kind === "team_member" || access.kind === "team_admin") {
     studyBackHref = "/dashboard";
     studyBackLabel = "← Dashboard";
   } else {
     studyBackHref = `/decks/${id}`;
     studyBackLabel = "← Back to Deck";
   }
+  const studyExitLabel = studyBackLabel.replace(/^←\s*/, "");
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
@@ -187,6 +229,9 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         autoSaveQuizResult={fromTeamWorkspaceUrl}
         quizDurationSeconds={quizDurationSeconds}
         hasAiReading={hasAiReading}
+        quizSecurity={quizSecurity}
+        exitHref={studyBackHref}
+        exitLabel={studyExitLabel}
       />
     </div>
   );

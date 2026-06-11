@@ -13,6 +13,8 @@ import {
   inboxReads,
   quizResultInboxMessages,
   quizResults,
+  quizSecurityInboxMessages,
+  quizSecuritySessions,
   stripeSubscriptions,
   supportTickets,
   teamDeckAssignments,
@@ -155,9 +157,13 @@ export async function purgeAllUserData(
     .where(eq(billingProrationLines.userId, userId));
   await db.delete(stripeSubscriptions).where(eq(stripeSubscriptions.userId, userId));
   await db.delete(quizResults).where(eq(quizResults.userId, userId));
+  await db.delete(quizSecuritySessions).where(eq(quizSecuritySessions.userId, userId));
   await db
     .delete(quizResultInboxMessages)
     .where(eq(quizResultInboxMessages.recipientUserId, userId));
+  await db
+    .delete(quizSecurityInboxMessages)
+    .where(eq(quizSecurityInboxMessages.recipientUserId, userId));
   await db.delete(inboxReads).where(eq(inboxReads.userId, userId));
   await db
     .delete(affiliateBroadcastInboxMessages)

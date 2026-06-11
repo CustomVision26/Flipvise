@@ -17,6 +17,8 @@
     "db:ensure-team-invite-revoked-enum": "tsx scripts/ensure-team-invitation-revoked-enum.ts",
     "db:ensure-team-workspace-events": "tsx scripts/ensure-team-workspace-events.ts",
     "db:ensure-team-member-audit-columns": "tsx scripts/ensure-team-member-audit-columns.ts",
+    "db:ensure-owner-quiz-enforce-column": "tsx scripts/ensure-owner-quiz-enforce-column.ts",
+    "db:ensure-quiz-security-tables": "tsx scripts/ensure-quiz-security-tables.ts",
     "db:ensure-stripe-subscriptions": "tsx scripts/ensure-stripe-subscriptions.ts",
     "db:ensure-affiliate-invite-expires-at": "tsx scripts/ensure-affiliate-invite-expires-at.ts",
     "db:ensure-affiliates-camelcase-columns": "tsx scripts/ensure-affiliates-camelcase-columns.ts",

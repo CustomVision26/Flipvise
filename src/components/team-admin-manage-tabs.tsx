@@ -23,7 +23,7 @@ import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import { cn } from "@/lib/utils";
 import { TEAM_INVITE_EXPIRY_DAYS } from "@/lib/team-invite-expiry";
 import { TeamQuizResultsTab } from "@/components/team-quiz-results-tab";
-import type { QuizResultRow } from "@/db/queries/quiz-results";
+import type { TeamQuizWorkspaceSnapshot } from "@/components/team-quiz-results-tab";
 import {
   isTeamAdminDeckManagerPath,
   isTeamAdminInviteHistoryPath,
@@ -110,6 +110,7 @@ export type TeamAdminManageTabsProps = {
   inviteHistoryHref: string;
   quizResultsHref: string;
   quizTimerHref: string;
+  quizSecurityHref: string;
   teamName: string;
   ownerUserId: string;
   teamCreatedAt: Date;
@@ -125,7 +126,7 @@ export type TeamAdminManageTabsProps = {
   workspaceHistory?: TeamWorkspaceEventRow[] | null;
   inviteDisplayHintsByEmail: Record<string, string>;
   subscriberOwnerPrimaryEmail: string | null;
-  teamQuizResults: QuizResultRow[];
+  workspaceQuizSnapshots: TeamQuizWorkspaceSnapshot[];
 };
 
 function TeamAdminPanelCard({
@@ -165,6 +166,7 @@ export function TeamAdminManageTabs({
   inviteHistoryHref,
   quizResultsHref,
   quizTimerHref,
+  quizSecurityHref,
   teamName,
   ownerUserId,
   teamCreatedAt,
@@ -180,7 +182,7 @@ export function TeamAdminManageTabs({
   workspaceHistory = [],
   inviteDisplayHintsByEmail,
   subscriberOwnerPrimaryEmail,
-  teamQuizResults,
+  workspaceQuizSnapshots,
 }: TeamAdminManageTabsProps) {
   const pathname = usePathname();
   const mainPanel = isTeamAdminWsHistoryPath(pathname)
@@ -360,13 +362,11 @@ export function TeamAdminManageTabs({
 
       {mainPanel === "quiz-results" ? (
         <TeamQuizResultsTab
-          results={teamQuizResults}
-          teamName={teamName}
-          ownerUserId={ownerUserId}
-          members={members}
+          workspaces={workspaceQuizSnapshots}
           userFieldDisplayById={userFieldDisplayById}
           quizResultsHref={quizResultsHref}
           quizTimerHref={quizTimerHref}
+          quizSecurityHref={quizSecurityHref}
         />
       ) : null}
       </div>

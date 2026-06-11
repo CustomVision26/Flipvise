@@ -5,7 +5,7 @@ import {
   teams,
   type PerCardSnapshot,
 } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type QuizResultRow = InferSelectModel<typeof quizResults>;
@@ -120,6 +120,30 @@ export async function getQuizResultsForTeam(teamId: number): Promise<QuizResultR
     .from(quizResults)
     .where(eq(quizResults.teamId, teamId))
     .orderBy(desc(quizResults.savedAt));
+}
+
+/** Saved quiz results across multiple team workspaces (subscriber admin view). */
+export async function getQuizResultsForTeams(teamIds: number[]): Promise<QuizResultRow[]> {
+  if (teamIds.length === 0) return [];
+  return db
+    .select()
+    .from(quizResults)
+    .where(inArray(quizResults.teamId, teamIds))
+    .orderBy(desc(quizResults.savedAt));
+}
+
+/** Deletes a team quiz result when it belongs to the given workspace. */
+export async function deleteQuizResultForTeamAdmin(
+  resultId: number,
+  teamId: number,
+): Promise<void> {
+  const deleted = await db
+    .delete(quizResults)
+    .where(and(eq(quizResults.id, resultId), eq(quizResults.teamId, teamId)))
+    .returning({ id: quizResults.id });
+  if (deleted.length === 0) {
+    throw new Error("Quiz result not found");
+  }
 }
 
 export type QuizResultInboxEntry = QuizResultInboxMessageRow & {

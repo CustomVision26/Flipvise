@@ -10,7 +10,8 @@ export type InboxItemType =
   | "affiliate_broadcast"
   | "affiliate_notice"
   | "admin_plan_log"
-  | "admin_plan_invite";
+  | "admin_plan_invite"
+  | "quiz_security_notice";
 
 // ── Type-specific payload shapes ──────────────────────────────────────────────
 
@@ -95,6 +96,16 @@ export type AdminPlanInvitePayload = {
   status: "pending" | "declined" | "superseded";
 };
 
+export type QuizSecurityNoticePayload = {
+  messageId: number;
+  sessionId: number;
+  deckName: string;
+  teamName: string | null;
+  /** True when the recipient is the workspace owner (admin copy). */
+  isOwnerCopy: boolean;
+  memberName: string | null;
+};
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type UnifiedInboxItem =
@@ -141,6 +152,16 @@ export type UnifiedInboxItem =
       isRead: boolean;
       requiresAction: boolean;
       payload: AdminPlanInvitePayload;
+    }
+  | {
+      type: "quiz_security_notice";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: false;
+      payload: QuizSecurityNoticePayload;
     };
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
@@ -152,4 +173,5 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   affiliate_notice: "Affiliate notice",
   admin_plan_log: "Plan update",
   admin_plan_invite: "Plan request",
+  quiz_security_notice: "Quiz security",
 };

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   isTeamAdminQuizResultsPath,
+  isTeamAdminQuizSecurityPath,
   isTeamAdminQuizTimerPath,
 } from "@/lib/team-admin-url";
 import { teamAdminSubTabClass } from "@/components/team-admin-panel-styles";
@@ -11,16 +12,20 @@ import { teamAdminSubTabClass } from "@/components/team-admin-panel-styles";
 export type TeamQuizResultsSubTabsProps = {
   quizResultsHref: string;
   quizTimerHref: string;
+  quizSecurityHref: string;
 };
 
 export function TeamQuizResultsSubTabs({
   quizResultsHref,
   quizTimerHref,
+  quizSecurityHref,
 }: TeamQuizResultsSubTabsProps) {
   const pathname = usePathname();
-  const resultsActive =
-    isTeamAdminQuizResultsPath(pathname) && !isTeamAdminQuizTimerPath(pathname);
+  const onQuizResultsSubRoute =
+    isTeamAdminQuizTimerPath(pathname) || isTeamAdminQuizSecurityPath(pathname);
+  const resultsActive = isTeamAdminQuizResultsPath(pathname) && !onQuizResultsSubRoute;
   const timerActive = isTeamAdminQuizTimerPath(pathname);
+  const securityActive = isTeamAdminQuizSecurityPath(pathname);
 
   return (
     <div className="overflow-x-auto">
@@ -44,6 +49,14 @@ export function TeamQuizResultsSubTabs({
           aria-selected={timerActive}
         >
           Quiz timer
+        </Link>
+        <Link
+          href={quizSecurityHref}
+          className={teamAdminSubTabClass(securityActive)}
+          role="tab"
+          aria-selected={securityActive}
+        >
+          Quiz security
         </Link>
       </div>
     </div>

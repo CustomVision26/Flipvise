@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, Shield } from "lucide-react";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
@@ -13,11 +13,13 @@ import {
 } from "@/components/ui/card";
 import {
   getDecksForTeamWithCardCount,
-  getOwnerQuizDefaultSettings,
-  getTeamsByOwner,
   getTeamsForTeamDashboard,
-  listQuizTimerWorkspaceSnapshots,
+  listTeamMembers,
 } from "@/db/queries/teams";
+import {
+  listQuizSecuritySessionsForTeamAdmin,
+  listQuizSecurityWorkspaceSnapshots,
+} from "@/db/queries/quiz-security";
 import {
   buildTeamAdminPath,
   buildTeamAdminQuizResultsPath,
@@ -38,7 +40,9 @@ import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-
 import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
 import { TeamQuizResultsSubTabs } from "@/components/team-quiz-results-sub-tabs";
-import { TeamQuizTimerSettings } from "@/components/team-quiz-timer-settings";
+import { TeamQuizSecuritySettings } from "@/components/team-quiz-security-settings";
+import { TeamQuizSecuritySessionsTable } from "@/components/team-quiz-security-sessions-table";
+import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { toClientJson } from "@/lib/to-client-json";
 
 interface PageProps {
@@ -50,7 +54,7 @@ interface PageProps {
   }>;
 }
 
-export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps) {
+export default async function TeamAdminQuizSecurityPage({ searchParams }: PageProps) {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
@@ -76,7 +80,7 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
     cookieTeamRaw: cookieRaw,
     useridParam,
     planParam,
-    buildCanonicalPath: buildTeamAdminQuizTimerPath,
+    buildCanonicalPath: buildTeamAdminQuizSecurityPath,
   });
   if (resolution.outcome === "redirect") {
     redirect(resolution.to);
@@ -85,16 +89,19 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
 
   const isOwner = selected.ownerUserId === userId;
 
-  const [workspaceSnapshots, ownerQuizSettings, teamDecksWithCardCounts, ownedWorkspaceCount] =
+  const [workspaceSnapshots, lockedSessions, teamDecksWithCardCounts, members] =
     await Promise.all([
-      listQuizTimerWorkspaceSnapshots(teamsForSubscriber),
-      getOwnerQuizDefaultSettings(selected.ownerUserId),
+      listQuizSecurityWorkspaceSnapshots(teamsForSubscriber),
+      listQuizSecuritySessionsForTeamAdmin(selected.id),
       getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
-      isOwner ? getTeamsByOwner(userId).then((rows) => rows.length) : Promise.resolve(0),
+      listTeamMembers(selected.id),
     ]);
 
-  const selectedWorkspaceSnapshot =
-    workspaceSnapshots.find((w) => w.id === selected.id) ?? workspaceSnapshots[0] ?? null;
+  const sessionUserIds = [
+    ...new Set([...lockedSessions.map((s) => s.userId), selected.ownerUserId, ...members.map((m) => m.userId)]),
+  ];
+  const userFieldDisplayById =
+    sessionUserIds.length > 0 ? await getClerkUserFieldDisplaysByIds(sessionUserIds) : {};
 
   const access = await getAccessContext();
   const personalStripeSlug = access.hasClerkPersonalProPlus
@@ -143,16 +150,15 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
                 teamAdminPanelScrollClass,
               )}
             >
-              Quiz timer
+              Quiz security
             </h1>
             <p className="truncate text-sm text-muted-foreground" title={selected.name}>
               {selected.name}
             </p>
           </div>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {isOwner
-              ? "Set one quiz time for all workspaces, or allow custom presets per workspace."
-              : "View workspace quiz times and set custom presets when the subscriber allows it."}
+            Lock members into the quiz UI until they submit. Manage locked sessions and grant
+            resume access when needed.
           </p>
         </div>
         <TeamAdminQuickNavPanel
@@ -196,41 +202,41 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
         <CardHeader className="space-y-2 pb-4">
           <CardTitle className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}>
             <span className="inline-flex items-center gap-2">
-              <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              Timed quiz duration
+              <Shield className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              Workspace security
             </span>
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            {selectedWorkspaceSnapshot ? (
-              <>
-                Active quiz time for{" "}
-                <span className="font-medium text-foreground">{selected.name}</span>:{" "}
-                <span className="font-medium text-foreground">
-                  {selectedWorkspaceSnapshot.effectiveMinutes} minutes
-                </span>
-                .{" "}
-                {workspaceSnapshots.length > 1
-                  ? `${workspaceSnapshots.length} workspaces available below.`
-                  : null}
-              </>
-            ) : (
-              "No workspaces available for quiz timer settings."
-            )}
+            Turn quiz security on or off per workspace. Members on a secured quiz cannot switch
+            tabs or leave until they submit.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {workspaceSnapshots.length > 0 ? (
-            <TeamQuizTimerSettings
+            <TeamQuizSecuritySettings
               workspaces={toClientJson(workspaceSnapshots)}
               defaultWorkspaceId={selected.id}
-              isSubscriberOwner={isOwner}
-              ownedWorkspaceCount={ownedWorkspaceCount}
-              globalDefaultMinutes={ownerQuizSettings.defaultQuizDurationMinutes}
-              enforceDefaultForAllWorkspaces={
-                ownerQuizSettings.enforceDefaultForAllWorkspaces
-              }
             />
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className={teamAdminActivePanelClass}>
+        <CardHeader className="space-y-2 pb-4">
+          <CardTitle className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}>
+            Locked & terminated sessions
+          </CardTitle>
+          <CardDescription className="text-sm leading-relaxed">
+            Members who left a quiz, finished and need a redo, or were terminated. Continue to
+            let them resume, Start over for a fresh attempt, or terminate an active lock.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TeamQuizSecuritySessionsTable
+            teamId={selected.id}
+            sessions={toClientJson(lockedSessions)}
+            userFieldDisplayById={userFieldDisplayById}
+          />
         </CardContent>
       </Card>
     </div>

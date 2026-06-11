@@ -29,6 +29,7 @@ import {
   buildTeamAdminInviteSendPath,
   buildTeamAdminMembersPath,
   buildTeamAdminQuizResultsPath,
+  buildTeamAdminQuizSecurityPath,
   buildTeamAdminQuizTimerPath,
   buildTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
@@ -109,7 +110,7 @@ export default async function TeamAdminDashboardView({
       workspaceHistory,
       teamDecksWithCardCounts,
       ownerDisplayName,
-      teamQuizResults,
+      workspaceQuizSnapshots,
     ],
     assignWorkspaceSnapshots,
   ] = await Promise.all([
@@ -121,7 +122,21 @@ export default async function TeamAdminDashboardView({
       listTeamWorkspaceEventsForTeam(selected.ownerUserId, selected.id),
       getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
       getClerkUserDisplayNameById(selected.ownerUserId),
-      getQuizResultsForTeam(selected.id),
+      Promise.all(
+        teamsForSubscriber.map(async (t) => {
+          const [allMembers, results] = await Promise.all([
+            listTeamMembers(t.id),
+            getQuizResultsForTeam(t.id),
+          ]);
+          return {
+            teamId: t.id,
+            teamName: t.name,
+            ownerUserId: t.ownerUserId,
+            members: allMembers,
+            results,
+          };
+        }),
+      ),
     ]),
     Promise.all(
       teamsForSubscriber.map(async (t) => {
@@ -143,11 +158,13 @@ export default async function TeamAdminDashboardView({
     ),
   ]);
 
+  const allTeamQuizResults = workspaceQuizSnapshots.flatMap((w) => w.results);
+
   const memberTableUserIds = [
     selected.ownerUserId,
     ...members.map((m) => m.userId),
     ...members.map((m) => m.addedByUserId).filter((id): id is string => Boolean(id)),
-    ...teamQuizResults.map((r) => r.userId),
+    ...allTeamQuizResults.map((r) => r.userId),
   ];
   const assignMemberUserIds = assignWorkspaceSnapshots.flatMap((w) =>
     w.allMembers.map((m) => m.userId),
@@ -349,6 +366,10 @@ export default async function TeamAdminDashboardView({
           selected.id,
           viewerTeamMemberUrlParam,
         )}
+        quizSecurityHref={buildTeamAdminQuizSecurityPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
         teamName={selected.name}
         ownerUserId={selected.ownerUserId}
         teamCreatedAt={selected.createdAt}
@@ -364,7 +385,7 @@ export default async function TeamAdminDashboardView({
         workspaceHistory={workspaceHistory}
         inviteDisplayHintsByEmail={inviteDisplayHintsByEmail}
         subscriberOwnerPrimaryEmail={subscriberOwnerPrimaryEmail}
-        teamQuizResults={teamQuizResults}
+        workspaceQuizSnapshots={workspaceQuizSnapshots}
       />
     </div>
   );

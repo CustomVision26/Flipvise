@@ -42,6 +42,30 @@ export interface StudySessionProps {
   quizDurationSeconds?: number;
   /** Pro Plus / team / platform admin — listen-to-card (TTS). Not available on Free or Pro. */
   hasAiReading?: boolean;
+  /** Leave study — team workspace dashboard or deck detail. */
+  exitHref: string;
+  exitLabel: string;
+  /** Secured team-workspace quiz — prevents leaving the UI until submit. */
+  quizSecurity?: {
+    enabled: boolean;
+    teamId: number;
+    initialSession: {
+      id: number;
+      status: "active" | "locked" | "granted_resume" | "terminated" | "completed";
+      sessionState: {
+        questions: {
+          cardId: number;
+          question: string | null;
+          questionImageUrl: string | null;
+          options: string[];
+          correctIndex: number;
+        }[];
+        selectedByIndex: (number | null)[];
+        currentIndex: number;
+        remainingSeconds: number;
+      } | null;
+    } | null;
+  };
 }
 
 export function StudySession({
@@ -56,6 +80,9 @@ export function StudySession({
   autoSaveQuizResult = false,
   quizDurationSeconds,
   hasAiReading = false,
+  exitHref,
+  exitLabel,
+  quizSecurity,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
   const showQuizTab = memberAllowQuiz && allowsQuizStudy;
@@ -182,6 +209,9 @@ export function StudySession({
               autoSaveQuizResult={autoSaveQuizResult}
               quizDurationSeconds={quizDurationSeconds}
               hasAiReading={hasAiReading}
+              exitHref={exitHref}
+              exitLabel={exitLabel}
+              quizSecurity={quizSecurity}
             />
           </TabsContent>
         ) : null}

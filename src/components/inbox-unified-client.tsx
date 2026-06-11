@@ -13,6 +13,7 @@ import {
   Megaphone,
   CircleAlert,
   Shield,
+  ShieldAlert,
   MailOpen,
   CheckCheck,
   History,
@@ -80,6 +81,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   affiliate_notice: <CircleAlert className="size-4 text-orange-400" aria-hidden />,
   admin_plan_invite: <Shield className="size-4 text-violet-400" aria-hidden />,
   admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
+  quiz_security_notice: <ShieldAlert className="size-4 text-rose-400" aria-hidden />,
 };
 
 type SortKey = "newest" | "oldest" | "type";
@@ -96,6 +98,7 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         affiliate_broadcast: 5,
         affiliate_notice: 6,
         admin_plan_log: 7,
+        quiz_security_notice: 8,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -491,6 +494,11 @@ function InboxItemRow({
                 className="shrink-0 border-amber-500/35 text-xs text-amber-400"
               >
                 {item.payload.variant === "general" ? "Public promos" : "Your codes"}
+              </Badge>
+            )}
+            {item.type === "quiz_security_notice" && (
+              <Badge variant="destructive" className="shrink-0 text-xs">
+                {item.payload.isOwnerCopy ? "Admin notice" : "Terminated"}
               </Badge>
             )}
           </div>
