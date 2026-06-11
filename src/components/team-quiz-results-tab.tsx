@@ -30,6 +30,7 @@ import {
   teamAdminActivePanelTitleClass,
   teamAdminPanelScrollClass,
 } from "@/components/team-admin-panel-styles";
+import { TeamQuizResultsSubTabs } from "@/components/team-quiz-results-sub-tabs";
 import { cn } from "@/lib/utils";
 
 function formatDate(value: Date | string): string {
@@ -67,6 +68,8 @@ interface TeamQuizResultsTabProps {
   ownerUserId: string;
   members: MemberRow[];
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
+  quizResultsHref: string;
+  quizTimerHref: string;
 }
 
 function QuizResultListItem({
@@ -189,6 +192,8 @@ export function TeamQuizResultsTab({
   ownerUserId,
   members,
   userFieldDisplayById,
+  quizResultsHref,
+  quizTimerHref,
 }: TeamQuizResultsTabProps) {
   const memberRoleMap = new Map(members.map((m) => [m.userId, m.role]));
 
@@ -197,6 +202,11 @@ export function TeamQuizResultsTab({
   const ownerEmail = ownerDisplay?.primaryEmail ?? null;
 
   return (
+    <div className="space-y-4">
+      <TeamQuizResultsSubTabs
+        quizResultsHref={quizResultsHref}
+        quizTimerHref={quizTimerHref}
+      />
     <Card className={teamAdminActivePanelClass}>
       <CardHeader className="space-y-2 pb-2 sm:pb-4">
         <CardTitle
@@ -282,5 +292,6 @@ export function TeamQuizResultsTab({
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

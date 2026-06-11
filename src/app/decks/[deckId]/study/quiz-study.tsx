@@ -85,6 +85,8 @@ interface QuizStudyProps {
   deckGradient?: string | null;
   /** Set when study was opened from a team workspace URL — result is saved right after submit. */
   autoSaveQuizResult?: boolean;
+  /** Team workspace admin setting — flat quiz duration in seconds. */
+  quizDurationSeconds?: number;
   hasAiReading?: boolean;
 }
 
@@ -259,6 +261,7 @@ export function QuizStudy({
   teamId,
   deckGradient = null,
   autoSaveQuizResult = false,
+  quizDurationSeconds,
   hasAiReading = false,
 }: QuizStudyProps) {
   const router = useRouter();
@@ -279,8 +282,8 @@ export function QuizStudy({
   const [voice, setVoice] = useState<TtsVoice>("nova");
 
   const totalSeconds = useMemo(
-    () => getQuizDurationSeconds(questions.length),
-    [questions.length],
+    () => quizDurationSeconds ?? getQuizDurationSeconds(questions.length),
+    [quizDurationSeconds, questions.length],
   );
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
   const startTimeRef = useRef<number>(0);
@@ -435,7 +438,7 @@ export function QuizStudy({
     setAutoPersistError(null);
     setQuizStarted(false);
     startTimeRef.current = 0;
-    setRemainingSeconds(getQuizDurationSeconds(fresh.length));
+    setRemainingSeconds(quizDurationSeconds ?? getQuizDurationSeconds(fresh.length));
   }
 
   if (result) {

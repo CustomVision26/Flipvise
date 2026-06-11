@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,6 +97,13 @@ export type TeamAdminRecordSliderProps<T extends { key: string; memberLabel: str
   getSortDate?: (item: T) => number | null;
   emptyMessage?: string;
   noResultsMessage?: string;
+  searchLabel?: string;
+  searchPlaceholder?: string;
+  sortLabelMap?: Partial<Record<TeamAdminRecordSort, string>>;
+  allowedSortOptions?: TeamAdminRecordSort[];
+  /** Optional controls rendered inside the Search & filters panel (e.g. workspace picker). */
+  filterPanelExtra?: (context: { filtersOpen: boolean }) => React.ReactNode;
+  filterPanelExtraActive?: boolean;
 };
 
 export function TeamAdminRecordSlider<T extends { key: string; memberLabel: string; deckName: string }>({
@@ -113,12 +120,25 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
   getSortDate,
   emptyMessage = "No records yet.",
   noResultsMessage = "No records match your search or filters.",
+  searchLabel = "Search member",
+  searchPlaceholder = "Name, email, or username…",
+  sortLabelMap,
+  allowedSortOptions,
+  filterPanelExtra,
+  filterPanelExtraActive = false,
 }: TeamAdminRecordSliderProps<T>) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState<TeamAdminRecordSort>("member_az");
   const [deckFilter, setDeckFilter] = React.useState(FILTER_ALL_DECKS);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slideIndex, setSlideIndex] = React.useState(0);
   const trackRef = React.useRef<HTMLDivElement>(null);
+
+  const hasActiveFilters =
+    searchQuery.trim() !== "" ||
+    sortBy !== "member_az" ||
+    deckFilter !== FILTER_ALL_DECKS ||
+    filterPanelExtraActive;
 
   const filteredItems = React.useMemo(() => {
     let next = items;
@@ -180,10 +200,14 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
     scrollToIndex(next);
   }
 
-  const sortOptions = (Object.keys(SORT_LABELS) as TeamAdminRecordSort[]).filter(
-    (key) =>
-      showDateSort || (key !== "date_newest" && key !== "date_oldest"),
-  );
+  const resolvedSortLabels = { ...SORT_LABELS, ...sortLabelMap };
+
+  const sortOptions =
+    allowedSortOptions ??
+    (Object.keys(SORT_LABELS) as TeamAdminRecordSort[]).filter(
+      (key) =>
+        showDateSort || (key !== "date_newest" && key !== "date_oldest"),
+    );
 
   if (items.length === 0) {
     return (
@@ -195,66 +219,110 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-lg border border-border/70 bg-muted/15 p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
-          <Label htmlFor="record-slider-search" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Search member
-          </Label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input
-              id="record-slider-search"
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Name, email, or username…"
-              className="h-10 bg-background pl-9"
-            />
-          </div>
-        </div>
+      <div className="space-y-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-[11rem]"
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+          aria-controls="record-slider-filters"
+        >
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <SlidersHorizontal className="size-4 shrink-0" aria-hidden />
+            <span>Search & filters</span>
+            {hasActiveFilters && !filtersOpen ? (
+              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                Active
+              </span>
+            ) : null}
+          </span>
+          <ChevronDown
+            className={cn("size-4 shrink-0 transition-transform", filtersOpen && "rotate-180")}
+            aria-hidden
+          />
+        </Button>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="record-slider-sort" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Sort by
-          </Label>
-          <Select value={sortBy} onValueChange={(v) => v != null && setSortBy(v as TeamAdminRecordSort)}>
-            <SelectTrigger id="record-slider-sort" className="h-10 w-full bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sortOptions.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {SORT_LABELS[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <div
+          id="record-slider-filters"
+          className={cn(
+            "grid gap-3 rounded-lg border border-border/70 bg-muted/15 p-4 sm:grid-cols-2 lg:grid-cols-4",
+            !filtersOpen && "hidden",
+          )}
+          aria-hidden={!filtersOpen}
+        >
+            {filterPanelExtra ? (
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+                {filterPanelExtra({ filtersOpen })}
+              </div>
+            ) : null}
+            <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+              <Label htmlFor="record-slider-search" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {searchLabel}
+              </Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Input
+                  id="record-slider-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="h-10 bg-background pl-9"
+                />
+              </div>
+            </div>
 
-        {deckFilterOptions && deckFilterOptions.length > 0 ? (
-          <div className="space-y-1.5">
-            <Label htmlFor="record-slider-deck" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              Filter by deck
-            </Label>
-            <Select value={deckFilter} onValueChange={(v) => v != null && setDeckFilter(v)}>
-              <SelectTrigger id="record-slider-deck" className="h-10 w-full bg-background">
-                <SelectValue>
-                  {(value) =>
-                    value === FILTER_ALL_DECKS ? "All decks" : String(value)
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={FILTER_ALL_DECKS}>All decks</SelectItem>
-                {deckFilterOptions.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    <span className="truncate">{name}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
+            <div className="space-y-1.5">
+              <Label htmlFor="record-slider-sort" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Sort by
+              </Label>
+              <Select
+                value={sortBy}
+                disabled={!filtersOpen}
+                onValueChange={(v) => v != null && setSortBy(v as TeamAdminRecordSort)}
+              >
+                <SelectTrigger id="record-slider-sort" className="h-10 w-full bg-background">
+                  <SelectValue placeholder="Sort by">{resolvedSortLabels[sortBy]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {resolvedSortLabels[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {deckFilterOptions && deckFilterOptions.length > 0 ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="record-slider-deck" className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  Filter by deck
+                </Label>
+                <Select
+                  value={deckFilter}
+                  disabled={!filtersOpen}
+                  onValueChange={(v) => v != null && setDeckFilter(v)}
+                >
+                  <SelectTrigger id="record-slider-deck" className="h-10 w-full bg-background">
+                    <SelectValue placeholder="All decks">
+                      {deckFilter === FILTER_ALL_DECKS ? "All decks" : deckFilter}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL_DECKS}>All decks</SelectItem>
+                    {deckFilterOptions.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        <span className="truncate">{name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+        </div>
       </div>
 
       {filteredItems.length === 0 ? (

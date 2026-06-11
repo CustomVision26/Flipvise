@@ -6,6 +6,7 @@ import {
   teamDeckAssignments,
   teamInvitations,
   teamMembers,
+  teamOwnerQuizDefaults,
   teams,
   type TeamInvitationRow,
   type TeamMemberRow,
@@ -28,6 +29,13 @@ import {
   defaultTeamMemberStudyPrivilege,
   type TeamMemberStudyPrivilege,
 } from "@/lib/team-study-privilege";
+import {
+  DEFAULT_TEAM_QUIZ_DURATION_MINUTES,
+  resolveTeamQuizDurationMinutes,
+  type OwnerQuizDefaultSettings,
+  type QuizTimerWorkspaceSnapshot,
+  type TeamQuizDurationContext,
+} from "@/lib/team-quiz-duration";
 import {
   and,
   count,
@@ -1710,5 +1718,220 @@ export async function attachPersonalDeckToOwnedTeamWorkspace(params: {
       );
     }
     throw e;
+  }
+}
+
+let warnedMissingTeamQuizDurationColumn = false;
+function warnMissingTeamQuizDurationColumnOnce() {
+  if (warnedMissingTeamQuizDurationColumn) return;
+  warnedMissingTeamQuizDurationColumn = true;
+  console.warn(
+    "[db] Column teams.quizDurationMinutes is missing. Apply migration 0028_team_quiz_duration_minutes.sql.",
+  );
+}
+
+function isMissingTeamQuizDurationColumnError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /quizDurationMinutes|quiz_duration_minutes/i.test(msg);
+}
+
+function isMissingTeamOwnerQuizDefaultsError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /team_owner_quiz_defaults/i.test(msg);
+}
+
+const DEFAULT_OWNER_QUIZ_SETTINGS: OwnerQuizDefaultSettings = {
+  defaultQuizDurationMinutes: DEFAULT_TEAM_QUIZ_DURATION_MINUTES,
+  enforceDefaultForAllWorkspaces: false,
+};
+
+export async function getOwnerQuizDefaultSettings(
+  ownerUserId: string,
+): Promise<OwnerQuizDefaultSettings> {
+  try {
+    const [row] = await db
+      .select()
+      .from(teamOwnerQuizDefaults)
+      .where(eq(teamOwnerQuizDefaults.ownerUserId, ownerUserId));
+    if (!row) return DEFAULT_OWNER_QUIZ_SETTINGS;
+    return {
+      defaultQuizDurationMinutes: resolveTeamQuizDurationMinutes(
+        row.defaultQuizDurationMinutes,
+      ),
+      enforceDefaultForAllWorkspaces: row.enforceDefaultForAllWorkspaces,
+    };
+  } catch (e) {
+    if (!isMissingTeamOwnerQuizDefaultsError(e)) throw e;
+    return DEFAULT_OWNER_QUIZ_SETTINGS;
+  }
+}
+
+export async function getOwnerQuizDefaultMinutes(ownerUserId: string): Promise<number> {
+  const settings = await getOwnerQuizDefaultSettings(ownerUserId);
+  return settings.defaultQuizDurationMinutes;
+}
+
+export async function clearWorkspaceQuizOverridesForOwner(
+  ownerUserId: string,
+): Promise<void> {
+  try {
+    await db
+      .update(teams)
+      .set({ quizDurationMinutes: null })
+      .where(eq(teams.ownerUserId, ownerUserId));
+  } catch (e) {
+    if (!isMissingTeamQuizDurationColumnError(e)) throw e;
+    warnMissingTeamQuizDurationColumnOnce();
+  }
+}
+
+export async function updateOwnerQuizDefaultSettings(
+  ownerUserId: string,
+  input: OwnerQuizDefaultSettings,
+): Promise<void> {
+  const normalizedMinutes = resolveTeamQuizDurationMinutes(
+    input.defaultQuizDurationMinutes,
+  );
+  try {
+    await db
+      .insert(teamOwnerQuizDefaults)
+      .values({
+        ownerUserId,
+        defaultQuizDurationMinutes: normalizedMinutes,
+        enforceDefaultForAllWorkspaces: input.enforceDefaultForAllWorkspaces,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: teamOwnerQuizDefaults.ownerUserId,
+        set: {
+          defaultQuizDurationMinutes: normalizedMinutes,
+          enforceDefaultForAllWorkspaces: input.enforceDefaultForAllWorkspaces,
+          updatedAt: new Date(),
+        },
+      });
+    if (input.enforceDefaultForAllWorkspaces) {
+      await clearWorkspaceQuizOverridesForOwner(ownerUserId);
+    }
+  } catch (e) {
+    if (!isMissingTeamOwnerQuizDefaultsError(e)) throw e;
+    throw new Error(
+      "Database is missing owner quiz default support. Apply migrations 0029_team_quiz_owner_defaults.sql and 0030_owner_quiz_enforce_default.sql.",
+    );
+  }
+}
+
+/** @deprecated Use {@link updateOwnerQuizDefaultSettings}. */
+export async function updateOwnerQuizDefaultMinutes(
+  ownerUserId: string,
+  minutes: number,
+): Promise<void> {
+  const current = await getOwnerQuizDefaultSettings(ownerUserId);
+  await updateOwnerQuizDefaultSettings(ownerUserId, {
+    ...current,
+    defaultQuizDurationMinutes: minutes,
+  });
+}
+
+/** Quiz timer rows for team-admin UI — one per manageable workspace under the same subscriber. */
+export async function listQuizTimerWorkspaceSnapshots(
+  manageableTeams: InferSelectModel<typeof teams>[],
+): Promise<QuizTimerWorkspaceSnapshot[]> {
+  if (manageableTeams.length === 0) return [];
+
+  const ownerUserId = manageableTeams[0]?.ownerUserId;
+  const ownerSettings = ownerUserId
+    ? await getOwnerQuizDefaultSettings(ownerUserId)
+    : DEFAULT_OWNER_QUIZ_SETTINGS;
+  const globalDefaultMinutes = ownerSettings.defaultQuizDurationMinutes;
+
+  const snapshots = manageableTeams.map((team) => {
+    const workspaceOverrideMinutes =
+      team.quizDurationMinutes != null
+        ? resolveTeamQuizDurationMinutes(team.quizDurationMinutes)
+        : null;
+    const effectiveMinutes = ownerSettings.enforceDefaultForAllWorkspaces
+      ? globalDefaultMinutes
+      : (workspaceOverrideMinutes ?? globalDefaultMinutes);
+    return {
+      id: team.id,
+      name: team.name,
+      workspaceOverrideMinutes,
+      effectiveMinutes,
+    };
+  });
+
+  return snapshots.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getTeamQuizDurationContext(
+  teamId: number,
+): Promise<TeamQuizDurationContext | null> {
+  try {
+    const team = await getTeamById(teamId);
+    if (!team) return null;
+    const ownerSettings = await getOwnerQuizDefaultSettings(team.ownerUserId);
+    const globalDefaultMinutes = ownerSettings.defaultQuizDurationMinutes;
+    const workspaceOverrideMinutes =
+      team.quizDurationMinutes != null
+        ? resolveTeamQuizDurationMinutes(team.quizDurationMinutes)
+        : null;
+    const effectiveMinutes = ownerSettings.enforceDefaultForAllWorkspaces
+      ? globalDefaultMinutes
+      : (workspaceOverrideMinutes ?? globalDefaultMinutes);
+    return {
+      effectiveMinutes,
+      globalDefaultMinutes,
+      workspaceOverrideMinutes,
+      enforceDefaultForAllWorkspaces: ownerSettings.enforceDefaultForAllWorkspaces,
+      ownerUserId: team.ownerUserId,
+    };
+  } catch (e) {
+    if (
+      !isMissingTeamQuizDurationColumnError(e) &&
+      !isMissingTeamOwnerQuizDefaultsError(e)
+    ) {
+      throw e;
+    }
+    warnMissingTeamQuizDurationColumnOnce();
+    return {
+      effectiveMinutes: DEFAULT_TEAM_QUIZ_DURATION_MINUTES,
+      globalDefaultMinutes: DEFAULT_TEAM_QUIZ_DURATION_MINUTES,
+      workspaceOverrideMinutes: null,
+      enforceDefaultForAllWorkspaces: false,
+      ownerUserId: "",
+    };
+  }
+}
+
+export async function getTeamQuizDurationMinutes(teamId: number): Promise<number> {
+  const ctx = await getTeamQuizDurationContext(teamId);
+  return ctx?.effectiveMinutes ?? DEFAULT_TEAM_QUIZ_DURATION_MINUTES;
+}
+
+export async function updateTeamQuizDurationMinutes(
+  teamId: number,
+  minutes: number | null,
+): Promise<void> {
+  try {
+    if (minutes == null) {
+      await db
+        .update(teams)
+        .set({ quizDurationMinutes: null })
+        .where(eq(teams.id, teamId));
+      return;
+    }
+    const normalized = resolveTeamQuizDurationMinutes(minutes);
+    await db
+      .update(teams)
+      .set({ quizDurationMinutes: normalized })
+      .where(eq(teams.id, teamId));
+  } catch (e) {
+    if (!isMissingTeamQuizDurationColumnError(e)) throw e;
+    warnMissingTeamQuizDurationColumnOnce();
+    throw new Error(
+      "Database is missing quiz duration support. Apply migration 0028_team_quiz_duration_minutes.sql.",
+    );
   }
 }

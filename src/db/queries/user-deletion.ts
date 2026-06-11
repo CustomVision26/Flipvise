@@ -17,6 +17,7 @@ import {
   supportTickets,
   teamDeckAssignments,
   teamMembers,
+  teamOwnerQuizDefaults,
   teamWorkspaceEvents,
   teams,
 } from "@/db/schema";
@@ -135,6 +136,7 @@ export async function purgeAllUserData(
   if (ownedTeamIds.length > 0) {
     await db.delete(teams).where(eq(teams.ownerUserId, userId));
   }
+  await db.delete(teamOwnerQuizDefaults).where(eq(teamOwnerQuizDefaults.ownerUserId, userId));
 
   await db.delete(teamMembers).where(eq(teamMembers.userId, userId));
   await db

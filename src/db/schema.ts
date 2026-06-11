@@ -70,7 +70,24 @@ export const teams = pgTable('teams', {
   name: varchar({ length: 255 }).notNull(),
   /** Clerk plan id at creation, e.g. pro_team_basic — used for limits. */
   planSlug: varchar({ length: 64 }).notNull(),
+  /**
+   * Workspace-specific quiz timer override (minutes). When null, uses
+   * {@link teamOwnerQuizDefaults.defaultQuizDurationMinutes} for the subscriber owner.
+   */
+  quizDurationMinutes: integer(),
   createdAt: timestamp().notNull().defaultNow(),
+});
+
+/** Subscriber default timed-quiz length — applies to all owned workspaces without an override. */
+export const teamOwnerQuizDefaults = pgTable('team_owner_quiz_defaults', {
+  ownerUserId: varchar({ length: 255 }).primaryKey(),
+  defaultQuizDurationMinutes: integer().notNull().default(10),
+  /**
+   * When true, every owned workspace uses {@link defaultQuizDurationMinutes};
+   * per-workspace overrides are ignored and cannot be set until turned off.
+   */
+  enforceDefaultForAllWorkspaces: boolean().notNull().default(false),
+  updatedAt: timestamp().notNull().defaultNow(),
 });
 
 export const decks = pgTable('decks', {

@@ -403,6 +403,32 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     invitedTeamWorkspaceMemberships.some((m) => m.teamId === teamCtxId);
 
   if (isTeamMemberWorkspace) {
+    const cookieMembership = invitedTeamWorkspaceMemberships.find(
+      (m) => m.teamId === teamCtxId,
+    );
+
+    /** Co-admins must use the canonical `?team=&userid=&plan=&teamMemberId=` URL — cookie-only context wrongly showed the member Study/Preview UI. */
+    if (cookieMembership?.role === "team_admin") {
+      const cookieTeam = await tryTeamQuery(() => getTeamById(teamCtxId), null);
+      if (cookieTeam && isTeamPlanId(cookieTeam.planSlug)) {
+        const canonicalQs = await buildResolvedTeamWorkspaceQueryString(userId, {
+          teamId: teamCtxId,
+          ownerUserId: cookieTeam.ownerUserId,
+          canEditTeamDecks: false,
+          isAssignedMemberPreview: false,
+          isTeamAdminWorkspaceViewer: true,
+          workspacePlanQuery: cookieTeam.planSlug,
+        });
+        const redirectParams = new URLSearchParams(canonicalQs);
+        const ti = sp.team_invite;
+        const inviteRaw = Array.isArray(ti) ? ti[0] : ti;
+        if (typeof inviteRaw === "string" && inviteRaw.trim() !== "") {
+          redirectParams.set("team_invite", inviteRaw.trim());
+        }
+        redirect(`/dashboard?${redirectParams.toString()}`);
+      }
+    }
+
     const [cookieTeamHeadingRow, assigned] = await Promise.all([
       tryTeamQuery(() => getTeamById(teamCtxId), null),
       tryTeamQuery(

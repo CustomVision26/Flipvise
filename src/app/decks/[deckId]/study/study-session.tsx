@@ -38,6 +38,8 @@ export interface StudySessionProps {
   deckGradient?: string | null;
   /** Team workspace study URL — quiz results are saved automatically after submit. */
   autoSaveQuizResult?: boolean;
+  /** Team workspace timed-quiz limit in seconds (owner/co-admin configured). */
+  quizDurationSeconds?: number;
   /** Pro Plus / team / platform admin — listen-to-card (TTS). Not available on Free or Pro. */
   hasAiReading?: boolean;
 }
@@ -52,6 +54,7 @@ export function StudySession({
   memberAllowQuiz = true,
   deckGradient,
   autoSaveQuizResult = false,
+  quizDurationSeconds,
   hasAiReading = false,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
@@ -177,6 +180,7 @@ export function StudySession({
               teamId={teamId}
               deckGradient={deckGradient ?? null}
               autoSaveQuizResult={autoSaveQuizResult}
+              quizDurationSeconds={quizDurationSeconds}
               hasAiReading={hasAiReading}
             />
           </TabsContent>

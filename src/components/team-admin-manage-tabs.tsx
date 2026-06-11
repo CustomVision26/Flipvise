@@ -109,6 +109,7 @@ export type TeamAdminManageTabsProps = {
   invitePendingHref: string;
   inviteHistoryHref: string;
   quizResultsHref: string;
+  quizTimerHref: string;
   teamName: string;
   ownerUserId: string;
   teamCreatedAt: Date;
@@ -163,6 +164,7 @@ export function TeamAdminManageTabs({
   invitePendingHref,
   inviteHistoryHref,
   quizResultsHref,
+  quizTimerHref,
   teamName,
   ownerUserId,
   teamCreatedAt,
@@ -363,6 +365,8 @@ export function TeamAdminManageTabs({
           ownerUserId={ownerUserId}
           members={members}
           userFieldDisplayById={userFieldDisplayById}
+          quizResultsHref={quizResultsHref}
+          quizTimerHref={quizTimerHref}
         />
       ) : null}
       </div>

@@ -15,6 +15,11 @@ import {
   type TeamPlanId,
 } from "@/lib/team-plans";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
+import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
+import {
+  MAX_TEAM_QUIZ_DURATION_MINUTES,
+  MIN_TEAM_QUIZ_DURATION_MINUTES,
+} from "@/lib/team-quiz-duration";
 import {
   countMembersForTeam,
   countPendingInvitationsForTeam,
@@ -31,6 +36,10 @@ import {
   insertTeamMember,
   insertDeckAssignment,
   updateDeckAssignmentStudyPrivilege,
+  updateTeamQuizDurationMinutes,
+  updateOwnerQuizDefaultSettings,
+  getOwnerQuizDefaultSettings,
+  getTeamsByOwner,
   deleteDeckAssignment,
   attachPersonalDeckToOwnedTeamWorkspace,
   markInvitationAccepted,
@@ -370,11 +379,23 @@ export async function acceptTeamInvitationAction(data: z.infer<typeof acceptSche
   revalidatePath("/dashboard/inbox");
   revalidatePath("/dashboard/team-admin", "layout");
 
+  const team = await getTeamById(inv.teamId);
+  const member = await getMemberRecord(inv.teamId, userId);
   const qs = new URLSearchParams();
   qs.set("team_invite", "accepted");
-  const redirectUrl = `/dashboard?${qs.toString()}`;
+  if (team && member && isTeamPlanId(team.planSlug)) {
+    const workspacePath = buildTeamWorkspaceDashboardPath({
+      teamId: team.id,
+      ownerUserId: team.ownerUserId,
+      planSlug: team.planSlug,
+      teamMemberUrlParam: member.id,
+    });
+    const workspaceQs = new URLSearchParams(workspacePath.split("?")[1] ?? "");
+    workspaceQs.set("team_invite", "accepted");
+    return { teamId: inv.teamId, redirectUrl: `/dashboard?${workspaceQs.toString()}` };
+  }
 
-  return { teamId: inv.teamId, redirectUrl };
+  return { teamId: inv.teamId, redirectUrl: `/dashboard?${qs.toString()}` };
 }
 
 const invitationByIdSchema = z.object({
@@ -558,6 +579,69 @@ export async function updateDeckAssignmentStudyPrivilegeAction(
 
   revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
+}
+
+const quizDurationMinutesSchema = z
+  .number()
+  .int()
+  .min(MIN_TEAM_QUIZ_DURATION_MINUTES)
+  .max(MAX_TEAM_QUIZ_DURATION_MINUTES);
+
+const updateTeamQuizDurationSchema = z.object({
+  teamId: z.number().int().positive(),
+  /** Null clears the workspace override so the subscriber default applies. */
+  durationMinutes: z.union([quizDurationMinutesSchema, z.null()]),
+});
+
+export async function updateTeamQuizDurationAction(
+  data: z.infer<typeof updateTeamQuizDurationSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateTeamQuizDurationSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  const ownerSettings = await getOwnerQuizDefaultSettings(team.ownerUserId);
+  if (ownerSettings.enforceDefaultForAllWorkspaces) {
+    throw new Error(
+      "The subscriber has locked one quiz time for all workspaces. Per-workspace times cannot be changed.",
+    );
+  }
+
+  await updateTeamQuizDurationMinutes(parsed.data.teamId, parsed.data.durationMinutes);
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard/team-admin/quiz-results", "layout");
+}
+
+const updateOwnerQuizDefaultSchema = z.object({
+  durationMinutes: quizDurationMinutesSchema,
+  enforceDefaultForAllWorkspaces: z.boolean(),
+});
+
+export async function updateOwnerQuizDefaultAction(
+  data: z.infer<typeof updateOwnerQuizDefaultSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateOwnerQuizDefaultSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const ownedTeams = await getTeamsByOwner(userId);
+  if (ownedTeams.length === 0) {
+    throw new Error("Only the workspace subscriber can set a default for all workspaces.");
+  }
+
+  await updateOwnerQuizDefaultSettings(userId, {
+    defaultQuizDurationMinutes: parsed.data.durationMinutes,
+    enforceDefaultForAllWorkspaces: parsed.data.enforceDefaultForAllWorkspaces,
+  });
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard/team-admin/quiz-results", "layout");
 }
 
 const unassignDeckSchema = z.object({

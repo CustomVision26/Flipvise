@@ -4,7 +4,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
-import { getDeckAssignmentStudyPrivilege, isDeckLinkedToWorkspace } from "@/db/queries/teams";
+import {
+  getDeckAssignmentStudyPrivilege,
+  getTeamQuizDurationMinutes,
+  isDeckLinkedToWorkspace,
+} from "@/db/queries/teams";
+import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
@@ -86,6 +91,16 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   const deckPageHref = workspaceQs
     ? withTeamWorkspaceQuery(`/decks/${id}`, workspaceQs)
     : `/decks/${id}`;
+
+  let quizDurationSeconds: number | undefined;
+  const quizTeamId =
+    fromTeamWorkspaceUrl && teamWorkspaceUrl
+      ? teamWorkspaceUrl.teamId
+      : deck.teamId ?? null;
+  if (quizTeamId != null) {
+    const minutes = await getTeamQuizDurationMinutes(quizTeamId);
+    quizDurationSeconds = teamQuizDurationSeconds(minutes);
+  }
 
   let memberAllowReview = true;
   let memberAllowQuiz = true;
@@ -170,6 +185,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         memberAllowQuiz={memberAllowQuiz}
         deckGradient={deck.gradient ?? null}
         autoSaveQuizResult={fromTeamWorkspaceUrl}
+        quizDurationSeconds={quizDurationSeconds}
         hasAiReading={hasAiReading}
       />
     </div>
