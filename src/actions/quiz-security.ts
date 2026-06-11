@@ -4,14 +4,17 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getAccessContext } from "@/lib/access";
 import {
+  assertDeckInWorkspaceForSecurity,
+  clearQuizSecuritySessionsOnDeckDisable,
   createQuizSecuritySession,
   getLatestQuizSecuritySessionForUserDeck,
   getQuizSecuritySessionById,
   clearQuizSecuritySessionsOnDisable,
   grantQuizSecuritySessionRestart,
   grantQuizSecuritySessionResume,
-  isTeamQuizSecurityEnabled,
+  isDeckQuizSecurityEnabled,
   terminateQuizSecuritySession,
+  updateDeckQuizSecurityEnabled,
   updateQuizSecuritySession,
   updateTeamQuizSecurityEnabled,
 } from "@/db/queries/quiz-security";
@@ -58,8 +61,8 @@ export async function startQuizSecuritySessionAction(data: z.infer<typeof startS
   const parsed = startSessionSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const enabled = await isTeamQuizSecurityEnabled(parsed.data.teamId);
-  if (!enabled) throw new Error("Quiz security is not enabled for this workspace.");
+  const enabled = await isDeckQuizSecurityEnabled(parsed.data.teamId, parsed.data.deckId);
+  if (!enabled) throw new Error("Quiz security is not enabled for this quiz.");
 
   const existing = await getLatestQuizSecuritySessionForUserDeck(
     userId,
@@ -190,6 +193,49 @@ export async function updateTeamQuizSecurityAction(data: z.infer<typeof updateTe
   await updateTeamQuizSecurityEnabled(parsed.data.teamId, parsed.data.enabled);
   if (!parsed.data.enabled) {
     await clearQuizSecuritySessionsOnDisable(parsed.data.teamId);
+  }
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard/team-admin/quiz-results", "layout");
+  revalidatePath("/decks", "layout");
+}
+
+const updateDeckSecuritySchema = z.object({
+  teamId: z.number().int().positive(),
+  deckId: z.number().int().positive(),
+  enabled: z.boolean().nullable(),
+});
+
+export async function updateDeckQuizSecurityAction(
+  data: z.infer<typeof updateDeckSecuritySchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateDeckSecuritySchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  await assertDeckInWorkspaceForSecurity(
+    parsed.data.teamId,
+    team.ownerUserId,
+    parsed.data.deckId,
+  );
+
+  const wasEnabled = await isDeckQuizSecurityEnabled(parsed.data.teamId, parsed.data.deckId);
+  await updateDeckQuizSecurityEnabled(
+    parsed.data.deckId,
+    team.ownerUserId,
+    parsed.data.enabled,
+  );
+
+  const workspaceEnabled = Boolean(team.quizSecurityEnabled);
+  const nextEnabled =
+    parsed.data.enabled === null
+      ? workspaceEnabled
+      : parsed.data.enabled;
+  if (wasEnabled && !nextEnabled) {
+    await clearQuizSecuritySessionsOnDeckDisable(parsed.data.teamId, parsed.data.deckId);
   }
 
   revalidatePath("/dashboard/team-admin", "layout");

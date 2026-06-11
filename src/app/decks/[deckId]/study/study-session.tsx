@@ -45,6 +45,14 @@ export interface StudySessionProps {
   /** Leave study — team workspace dashboard or deck detail. */
   exitHref: string;
   exitLabel: string;
+  /** Team member quiz — owner inbox can be chosen when saving after timeout. */
+  ownerInboxAvailable?: boolean;
+  /** Scheduled quiz start — members cannot begin before this time. */
+  quizSchedule?: {
+    enabled: boolean;
+    startAtIso: string;
+    source: "deck" | "workspace";
+  };
   /** Secured team-workspace quiz — prevents leaving the UI until submit. */
   quizSecurity?: {
     enabled: boolean;
@@ -82,6 +90,8 @@ export function StudySession({
   hasAiReading = false,
   exitHref,
   exitLabel,
+  ownerInboxAvailable = false,
+  quizSchedule,
   quizSecurity,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
@@ -211,6 +221,8 @@ export function StudySession({
               hasAiReading={hasAiReading}
               exitHref={exitHref}
               exitLabel={exitLabel}
+              ownerInboxAvailable={ownerInboxAvailable}
+              quizSchedule={quizSchedule}
               quizSecurity={quizSecurity}
             />
           </TabsContent>

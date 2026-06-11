@@ -5,6 +5,10 @@ import {
   teams,
   type PerCardSnapshot,
 } from "@/db/schema";
+import {
+  resolveQuizResultInboxRecipients,
+  type QuizResultInboxTarget,
+} from "@/lib/quiz-result-inbox-targets";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -32,6 +36,8 @@ export type SaveQuizResultInput = {
   percent: number;
   elapsedSeconds: number;
   perCard: PerCardSnapshot[];
+  /** When omitted, the quiz-taker and workspace owner (if any) both receive inbox rows. */
+  inboxTargets?: QuizResultInboxTarget[];
 };
 
 /**
@@ -71,17 +77,20 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQu
     }
   }
 
-  const inboxRecipients: string[] = [input.userId];
-  if (ownerUserId && ownerUserId !== input.userId) {
-    inboxRecipients.push(ownerUserId);
-  }
-
-  await db.insert(quizResultInboxMessages).values(
-    inboxRecipients.map((recipientUserId) => ({
-      recipientUserId,
-      quizResultId: saved.id,
-    })),
+  const inboxRecipients = resolveQuizResultInboxRecipients(
+    input.userId,
+    ownerUserId,
+    input.inboxTargets,
   );
+
+  if (inboxRecipients.length > 0) {
+    await db.insert(quizResultInboxMessages).values(
+      inboxRecipients.map((recipientUserId) => ({
+        recipientUserId,
+        quizResultId: saved.id,
+      })),
+    );
+  }
 
   return { result: saved, ownerUserId, teamName };
 }

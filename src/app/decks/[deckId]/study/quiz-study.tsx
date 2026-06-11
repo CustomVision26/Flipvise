@@ -12,6 +12,8 @@ import {
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -64,7 +66,21 @@ import {
 import type { QuizSecuritySessionState } from "@/db/schema";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
 import { getDeckQuizAccent } from "@/lib/deck-quiz-accent";
+import {
+  formatCountdown,
+  formatQuizStartSchedule,
+  isQuizStartAllowed,
+  secondsUntilQuizStart,
+  type ResolvedQuizStartSchedule,
+} from "@/lib/quiz-start-schedule";
+import type { QuizResultInboxTarget } from "@/lib/quiz-result-inbox-targets";
 import { cn } from "@/lib/utils";
+
+type SubmitQuizOptions = {
+  timedOut: boolean;
+  saveResult?: boolean;
+  inboxTargets?: QuizResultInboxTarget[];
+};
 
 type CardData = {
   id: number;
@@ -98,6 +114,13 @@ interface QuizStudyProps {
   hasAiReading?: boolean;
   exitHref: string;
   exitLabel: string;
+  /** Team member quiz — owner inbox can be chosen when saving after timeout. */
+  ownerInboxAvailable?: boolean;
+  quizSchedule?: {
+    enabled: boolean;
+    startAtIso: string;
+    source: "deck" | "workspace";
+  };
   quizSecurity?: {
     enabled: boolean;
     teamId: number;
@@ -320,11 +343,15 @@ export function QuizStudy({
   hasAiReading = false,
   exitHref,
   exitLabel,
+  ownerInboxAvailable = false,
+  quizSchedule,
   quizSecurity,
 }: QuizStudyProps) {
   const router = useRouter();
   const leaveStudy = useCallback(() => router.push(exitHref), [router, exitHref]);
   const securityEnabled = Boolean(quizSecurity?.enabled);
+  const resultTeamId = quizSecurity?.teamId ?? teamId;
+  const shouldAutoSaveResult = autoSaveQuizResult || securityEnabled;
   const initialSession = quizSecurity?.initialSession ?? null;
   const restoredState =
     initialSession?.sessionState &&
@@ -421,10 +448,46 @@ export function QuizStudy({
     ],
   );
 
+  const activeSchedule = useMemo<ResolvedQuizStartSchedule | null>(() => {
+    if (!quizSchedule?.enabled) return null;
+    const startAt = new Date(quizSchedule.startAtIso);
+    if (Number.isNaN(startAt.getTime())) return null;
+    return {
+      enabled: true,
+      startAt,
+      source: quizSchedule.source,
+    };
+  }, [quizSchedule]);
+
+  const [scheduleSecondsRemaining, setScheduleSecondsRemaining] = useState(() =>
+    secondsUntilQuizStart(activeSchedule),
+  );
+
+  useEffect(() => {
+    setScheduleSecondsRemaining(secondsUntilQuizStart(activeSchedule));
+    if (!activeSchedule) return;
+    const timerId = window.setInterval(() => {
+      setScheduleSecondsRemaining(secondsUntilQuizStart(activeSchedule));
+    }, 1000);
+    return () => window.clearInterval(timerId);
+  }, [activeSchedule]);
+
+  const scheduleBlocksStart = useMemo(() => {
+    if (!activeSchedule || grantedResume || grantedFreshStart) return false;
+    return !isQuizStartAllowed(activeSchedule);
+  }, [activeSchedule, grantedResume, grantedFreshStart, scheduleSecondsRemaining]);
+
+  const canStartQuiz = canStartSecuredQuiz && !scheduleBlocksStart;
+
   const [result, setResult] = useState<QuizResult | null>(null);
   const [submitting, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [submitChoiceDialogOpen, setSubmitChoiceDialogOpen] = useState(false);
+  const [submitChoiceTimedOut, setSubmitChoiceTimedOut] = useState(false);
+  const timeoutPromptShownRef = useRef(false);
+  const [saveToUserInbox, setSaveToUserInbox] = useState(true);
+  const [saveToOwnerInbox, setSaveToOwnerInbox] = useState(ownerInboxAvailable);
   const [autoPersisted, setAutoPersisted] = useState(false);
   const [autoPersistError, setAutoPersistError] = useState<string | null>(null);
 
@@ -434,8 +497,17 @@ export function QuizStudy({
   const progressPercent =
     totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
+  const revealQuizResult = useCallback((res: QuizResult) => {
+    if (securityEnabled) {
+      setResult(res);
+      return;
+    }
+    setSubmitChoiceDialogOpen(false);
+    window.setTimeout(() => setResult(res), 0);
+  }, [securityEnabled]);
+
   const submitQuiz = useCallback(
-    (reason: { timedOut: boolean }) => {
+    (reason: SubmitQuizOptions) => {
       if (result || submitting) return;
       const elapsed = Math.min(
         totalSeconds,
@@ -457,13 +529,16 @@ export function QuizStudy({
             elapsedSeconds: elapsed,
             timedOut: reason.timedOut,
           });
-          if (autoSaveQuizResult) {
+          const shouldSave =
+            shouldAutoSaveResult ||
+            Boolean(reason.saveResult && reason.inboxTargets && reason.inboxTargets.length > 0);
+          if (shouldSave) {
             try {
               const perCard = buildPerCardSnapshotForSave(res, questions, selectedByIndex);
               await saveQuizResultAction({
                 deckId,
                 deckName,
-                teamId,
+                teamId: resultTeamId,
                 savedFromTeamWorkspace: autoSaveQuizResult,
                 correct: res.correct,
                 incorrect: res.incorrect,
@@ -472,6 +547,7 @@ export function QuizStudy({
                 percent: res.percent,
                 elapsedSeconds: res.elapsedSeconds,
                 perCard,
+                inboxTargets: shouldAutoSaveResult ? undefined : reason.inboxTargets,
               });
               setAutoPersisted(true);
               setAutoPersistError(null);
@@ -489,7 +565,7 @@ export function QuizStudy({
             await completeQuizSecuritySessionAction({ sessionId: securitySessionId });
             setSecurityStatus("completed");
           }
-          setResult(res);
+          revealQuizResult(res);
         } catch (err) {
           setSubmitError(err instanceof Error ? err.message : "Failed to submit quiz");
         }
@@ -502,11 +578,13 @@ export function QuizStudy({
       questions,
       selectedByIndex,
       deckId,
+      shouldAutoSaveResult,
       autoSaveQuizResult,
       deckName,
-      teamId,
+      resultTeamId,
       securityEnabled,
       securitySessionId,
+      revealQuizResult,
     ],
   );
 
@@ -607,8 +685,68 @@ export function QuizStudy({
     ) {
       return;
     }
-    submitQuiz({ timedOut: true });
-  }, [quizStarted, remainingSeconds, result, totalQuestions, submitQuiz]);
+    if (securityEnabled) {
+      submitQuiz({ timedOut: true });
+      return;
+    }
+    if (!timeoutPromptShownRef.current) {
+      timeoutPromptShownRef.current = true;
+      openSubmitChoiceDialog(true);
+    }
+  }, [
+    quizStarted,
+    remainingSeconds,
+    result,
+    totalQuestions,
+    submitQuiz,
+    securityEnabled,
+    ownerInboxAvailable,
+  ]);
+
+  function openSubmitChoiceDialog(timedOut: boolean) {
+    setSubmitChoiceTimedOut(timedOut);
+    setSaveToUserInbox(true);
+    setSaveToOwnerInbox(ownerInboxAvailable);
+    setSubmitChoiceDialogOpen(true);
+  }
+
+  function buildSubmitInboxTargets(): QuizResultInboxTarget[] {
+    const targets: QuizResultInboxTarget[] = [];
+    if (saveToUserInbox) targets.push("user");
+    if (ownerInboxAvailable && saveToOwnerInbox) targets.push("owner");
+    return targets;
+  }
+
+  function handleSubmitChoiceViewOnly() {
+    submitQuiz({ timedOut: submitChoiceTimedOut, saveResult: false });
+  }
+
+  function handleSubmitChoiceSaveAndView() {
+    const inboxTargets = buildSubmitInboxTargets();
+    if (inboxTargets.length === 0) return;
+    submitQuiz({ timedOut: submitChoiceTimedOut, saveResult: true, inboxTargets });
+  }
+
+  function submitChoiceDialogTitle(): string {
+    if (submitChoiceTimedOut) return "Time's up — submit your quiz?";
+    if (unansweredCount > 0) {
+      return `Submit with ${unansweredCount} unanswered ${unansweredCount === 1 ? "question" : "questions"}?`;
+    }
+    return "Submit your quiz?";
+  }
+
+  function submitChoiceDialogDescription(): string {
+    if (submitChoiceTimedOut) {
+      if (unansweredCount > 0) {
+        return `${unansweredCount} unanswered ${unansweredCount === 1 ? "question" : "questions"} will count as incorrect. Choose whether to save this result before viewing your score.`;
+      }
+      return "Your time has run out. Choose whether to save this result before viewing your score.";
+    }
+    if (unansweredCount > 0) {
+      return "Unanswered questions will be counted as incorrect. You can go back and answer them first, or submit now and choose where to save your result.";
+    }
+    return "Choose whether to save this result before viewing your score.";
+  }
 
   function handleSelect(optionIndex: number) {
     setSelectedByIndex((prev) => {
@@ -626,11 +764,15 @@ export function QuizStudy({
   }
 
   function handleFinishRequest() {
-    if (unansweredCount > 0) {
-      setConfirmOpen(true);
+    if (securityEnabled) {
+      if (unansweredCount > 0) {
+        setConfirmOpen(true);
+        return;
+      }
+      submitQuiz({ timedOut: false });
       return;
     }
-    submitQuiz({ timedOut: false });
+    openSubmitChoiceDialog(false);
   }
 
   async function handleStartQuiz() {
@@ -677,27 +819,147 @@ export function QuizStudy({
     setQuizStarted(false);
     startTimeRef.current = 0;
     setRemainingSeconds(quizDurationSeconds ?? getQuizDurationSeconds(fresh.length));
+    timeoutPromptShownRef.current = false;
+    setSubmitChoiceDialogOpen(false);
   }
+
+  const quizSubmitDialogs = (
+    <>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base sm:text-lg">
+              Submit with {unansweredCount} unanswered{" "}
+              {unansweredCount === 1 ? "question" : "questions"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
+              Unanswered questions will be counted as incorrect. You can go
+              back and answer them first, or submit now to see your score.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+            <AlertDialogCancel className="w-full sm:w-auto">
+              Keep answering
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="w-full sm:w-auto"
+              disabled={submitting}
+              onClick={() => {
+                setConfirmOpen(false);
+                submitQuiz({ timedOut: false });
+              }}
+            >
+              {submitting ? "Submitting…" : "Submit anyway"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={submitChoiceDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && submitChoiceTimedOut && !result && !submitting) {
+            return;
+          }
+          setSubmitChoiceDialogOpen(open);
+        }}
+      >
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base sm:text-lg">
+              {submitChoiceDialogTitle()}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
+              {submitChoiceDialogDescription()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 rounded-lg border border-border/80 bg-muted/15 p-3 text-left">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              Save result to
+            </p>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="submit-save-user-inbox"
+                checked={saveToUserInbox}
+                onCheckedChange={(checked) => setSaveToUserInbox(checked === true)}
+              />
+              <Label htmlFor="submit-save-user-inbox" className="text-sm font-normal leading-snug">
+                My inbox
+              </Label>
+            </div>
+            {ownerInboxAvailable ? (
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="submit-save-owner-inbox"
+                  checked={saveToOwnerInbox}
+                  onCheckedChange={(checked) => setSaveToOwnerInbox(checked === true)}
+                />
+                <Label
+                  htmlFor="submit-save-owner-inbox"
+                  className="text-sm font-normal leading-snug"
+                >
+                  Workspace owner inbox
+                </Label>
+              </div>
+            ) : null}
+          </div>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+            {!submitChoiceTimedOut ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={submitting}
+                onClick={() => setSubmitChoiceDialogOpen(false)}
+              >
+                Keep answering
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={submitting}
+              onClick={handleSubmitChoiceViewOnly}
+            >
+              View results only
+            </Button>
+            <AlertDialogAction
+              className="w-full sm:w-auto"
+              disabled={submitting || buildSubmitInboxTargets().length === 0}
+              onClick={handleSubmitChoiceSaveAndView}
+            >
+              {submitting ? "Submitting…" : "Save & view results"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 
   if (result) {
     return (
-      <QuizResultCard
-        result={result}
-        questions={questions}
-        selectedByIndex={selectedByIndex}
-        deckId={deckId}
-        deckName={deckName}
-        teamId={teamId}
-        deckGradient={deckGradient}
-        autoSaveQuizResult={autoSaveQuizResult}
-        autoPersisted={autoPersisted}
-        autoPersistError={autoPersistError}
-        onRetake={handleRetake}
-        onBack={leaveStudy}
-        backLabel={exitLabel}
-        allowRetake={!securityEnabled}
-        hideSaveResult={securityEnabled || autoSaveQuizResult}
-      />
+      <>
+        <QuizResultCard
+          result={result}
+          questions={questions}
+          selectedByIndex={selectedByIndex}
+          deckId={deckId}
+          deckName={deckName}
+          teamId={teamId}
+          deckGradient={deckGradient}
+          autoSaveQuizResult={shouldAutoSaveResult}
+          autoPersisted={autoPersisted}
+          autoPersistError={autoPersistError}
+          onRetake={handleRetake}
+          onBack={leaveStudy}
+          backLabel={exitLabel}
+          allowRetake={!securityEnabled}
+          hideSaveResult={shouldAutoSaveResult}
+          securedQuiz={securityEnabled}
+        />
+        {quizSubmitDialogs}
+      </>
     );
   }
 
@@ -829,16 +1091,28 @@ export function QuizStudy({
                 session.
               </p>
             ) : null}
+            {scheduleBlocksStart && activeSchedule ? (
+              <p className="text-xs text-amber-400/90">
+                This quiz unlocks at {formatQuizStartSchedule(activeSchedule.startAt)} (
+                {activeSchedule.source === "deck" ? "deck schedule" : "workspace schedule"}). Time
+                remaining:{" "}
+                <span className="font-medium tabular-nums text-foreground">
+                  {formatCountdown(scheduleSecondsRemaining)}
+                </span>
+              </p>
+            ) : null}
             <p className="text-xs">
               {grantedResume
                 ? "Your team admin granted access. Press start to continue where you left off."
                 : grantedFreshStart
                   ? "Your team admin granted access to start this quiz over from the beginning."
-                  : "Press start when you are ready. The timer begins only after you start."}
+                  : scheduleBlocksStart
+                    ? "The start button unlocks when the scheduled time arrives."
+                    : "Press start when you are ready. The timer begins only after you start."}
             </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            {canStartSecuredQuiz ? (
+            {canStartQuiz ? (
               <Button
                 size="default"
                 className={cn(
@@ -873,6 +1147,7 @@ export function QuizStudy({
   const timerCritical = remainingSeconds <= 30;
 
   return (
+    <>
     <div
       className="flex flex-1 flex-col items-center gap-4 sm:gap-6 w-full min-w-0"
       style={deckAccentCss}
@@ -1117,36 +1392,6 @@ export function QuizStudy({
           {submitting ? "Submitting…" : "Finish Quiz"}
         </Button>
 
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-base sm:text-lg">
-                Submit with {unansweredCount} unanswered{" "}
-                {unansweredCount === 1 ? "question" : "questions"}?
-              </AlertDialogTitle>
-              <AlertDialogDescription className="text-xs sm:text-sm">
-                Unanswered questions will be counted as incorrect. You can go
-                back and answer them first, or submit now to see your score.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-              <AlertDialogCancel className="w-full sm:w-auto">
-                Keep answering
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className="w-full sm:w-auto"
-                disabled={submitting}
-                onClick={() => {
-                  setConfirmOpen(false);
-                  submitQuiz({ timedOut: false });
-                }}
-              >
-                {submitting ? "Submitting…" : "Submit anyway"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
         <Button
           variant="outline"
           size="default"
@@ -1173,6 +1418,8 @@ export function QuizStudy({
         </div>
       )}
     </div>
+    {quizSubmitDialogs}
+    </>
   );
 }
 
@@ -1192,6 +1439,7 @@ function QuizResultCard({
   backLabel = "Back to Deck",
   allowRetake = true,
   hideSaveResult = false,
+  securedQuiz = false,
 }: {
   result: QuizResult;
   questions: QuizQuestion[];
@@ -1208,6 +1456,7 @@ function QuizResultCard({
   backLabel?: string;
   allowRetake?: boolean;
   hideSaveResult?: boolean;
+  securedQuiz?: boolean;
 }) {
   const { percent, correct, incorrect, unanswered, total, tier, quote, elapsedSeconds, timedOut } =
     result;
@@ -1225,7 +1474,7 @@ function QuizResultCard({
   const [saving, startSaving] = useTransition();
   const [saved, setSaved] = useState(() => autoSaveQuizResult && autoPersisted);
   const [saveError, setSaveError] = useState<string | null>(() =>
-    autoSaveQuizResult && autoPersistError ? autoPersistError : null,
+    autoPersistError && (autoSaveQuizResult || hideSaveResult) ? autoPersistError : null,
   );
 
   const perCardSnapshot = useMemo(
@@ -1361,11 +1610,17 @@ function QuizResultCard({
           </p>
         )}
 
-        {!saved && autoSaveQuizResult && saveError && !hideSaveResult && (
+        {!saved && autoSaveQuizResult && saveError && !hideSaveResult ? (
           <p className="text-xs text-muted-foreground text-center px-2">
             Automatic save did not complete. Use Save result below, or try again later.
           </p>
-        )}
+        ) : null}
+        {!saved && hideSaveResult && saveError ? (
+          <p className="text-xs text-muted-foreground text-center px-2">
+            Automatic save did not complete. Your score is shown above; contact your team admin if
+            this keeps happening.
+          </p>
+        ) : null}
 
         <div className="w-full flex flex-col gap-3">
           {!saved && !hideSaveResult ? (
@@ -1382,13 +1637,11 @@ function QuizResultCard({
           ) : saved ? (
             <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-medium text-emerald-400">
               <CheckCircle className="h-4 w-4" />
-              {autoSaveQuizResult
-                ? "Result saved for your workspace — check your inbox and email"
-                : "Result saved — check your inbox and email"}
-            </div>
-          ) : hideSaveResult && autoSaveQuizResult ? (
-            <div className="flex items-center justify-center gap-2 rounded-lg border border-border/80 bg-muted/20 py-2.5 text-sm text-muted-foreground">
-              Result is saved automatically for your workspace.
+              {securedQuiz
+                ? "Result saved — check your inbox; your team owner was notified"
+                : autoSaveQuizResult
+                  ? "Result saved for your workspace — check your inbox and email"
+                  : "Result saved — check your inbox and email"}
             </div>
           ) : null}
           {allowRetake ? (

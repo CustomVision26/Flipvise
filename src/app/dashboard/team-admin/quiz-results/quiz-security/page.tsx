@@ -17,12 +17,14 @@ import {
   listTeamMembers,
 } from "@/db/queries/teams";
 import {
+  listQuizSecurityDeckSnapshots,
   listQuizSecuritySessionsForTeamAdmin,
   listQuizSecurityWorkspaceSnapshots,
 } from "@/db/queries/quiz-security";
 import {
   buildTeamAdminPath,
   buildTeamAdminQuizResultsPath,
+  buildTeamAdminQuizSchedulePath,
   buildTeamAdminQuizSecurityPath,
   buildTeamAdminQuizTimerPath,
 } from "@/lib/team-admin-url";
@@ -89,13 +91,21 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
 
   const isOwner = selected.ownerUserId === userId;
 
-  const [workspaceSnapshots, lockedSessions, teamDecksWithCardCounts, members] =
+  const [workspaceSnapshots, lockedSessions, teamDecksWithCardCounts, members, decksByWorkspaceEntries] =
     await Promise.all([
       listQuizSecurityWorkspaceSnapshots(teamsForSubscriber),
       listQuizSecuritySessionsForTeamAdmin(selected.id),
       getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
       listTeamMembers(selected.id),
+      Promise.all(
+        teamsForSubscriber.map(async (team) => [
+          team.id,
+          await listQuizSecurityDeckSnapshots(team.id, team.ownerUserId),
+        ] as const),
+      ),
     ]);
+
+  const decksByWorkspaceId = Object.fromEntries(decksByWorkspaceEntries);
 
   const sessionUserIds = [
     ...new Set([...lockedSessions.map((s) => s.userId), selected.ownerUserId, ...members.map((m) => m.userId)]),
@@ -192,6 +202,10 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
           selected.id,
           viewerTeamMemberUrlParam,
         )}
+        quizScheduleHref={buildTeamAdminQuizSchedulePath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
         quizSecurityHref={buildTeamAdminQuizSecurityPath(
           selected.id,
           viewerTeamMemberUrlParam,
@@ -207,14 +221,15 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
             </span>
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Turn quiz security on or off per workspace. Members on a secured quiz cannot switch
-            tabs or leave until they submit.
+            Turn quiz security on or off per workspace and per deck. Members on a secured quiz
+            cannot switch tabs or leave until they submit.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {workspaceSnapshots.length > 0 ? (
             <TeamQuizSecuritySettings
               workspaces={toClientJson(workspaceSnapshots)}
+              decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
               defaultWorkspaceId={selected.id}
             />
           ) : null}

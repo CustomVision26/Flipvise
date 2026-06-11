@@ -30,6 +30,10 @@ export const TEAM_ADMIN_QUIZ_TIMER_PATH = "/dashboard/team-admin/quiz-results/qu
 export const TEAM_ADMIN_QUIZ_SECURITY_PATH =
   "/dashboard/team-admin/quiz-results/quiz-security";
 
+/** Quiz start date & time settings (`?team=`). */
+export const TEAM_ADMIN_QUIZ_SCHEDULE_PATH =
+  "/dashboard/team-admin/quiz-results/quiz-schedule";
+
 /** Invite members — send invite form (`?team=`). */
 export const TEAM_ADMIN_INVITE_SEND_PATH =
   "/dashboard/team-admin/invite-members/send-invite";
@@ -105,6 +109,13 @@ export function isTeamAdminQuizSecurityPath(pathname: string): boolean {
   return (
     pathname === TEAM_ADMIN_QUIZ_SECURITY_PATH ||
     pathname.startsWith(`${TEAM_ADMIN_QUIZ_SECURITY_PATH}/`)
+  );
+}
+
+export function isTeamAdminQuizSchedulePath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_QUIZ_SCHEDULE_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_QUIZ_SCHEDULE_PATH}/`)
   );
 }
 
@@ -207,6 +218,14 @@ export function buildTeamAdminQuizSecurityPath(
 ): string {
   const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_QUIZ_SECURITY_PATH}?${qs}` : TEAM_ADMIN_QUIZ_SECURITY_PATH;
+}
+
+export function buildTeamAdminQuizSchedulePath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs ? `${TEAM_ADMIN_QUIZ_SCHEDULE_PATH}?${qs}` : TEAM_ADMIN_QUIZ_SCHEDULE_PATH;
 }
 
 export function buildTeamAdminInviteSendPath(

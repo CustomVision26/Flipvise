@@ -11,38 +11,32 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
-  CheckCircle,
-  XCircle,
-  CircleHelp,
   ClipboardList,
-  Clock,
-  Layers,
   ChevronDown,
-  ChevronUp,
-  LayoutGrid,
+  Eye,
+  Search,
+  SlidersHorizontal,
   Trash2,
+  X,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { QuizResultRow } from "@/db/queries/quiz-results";
 import type { TeamMemberRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import {
-  ViewQuizResultDialog,
+  QuizResultDetailView,
   type QuizResultSummary,
-} from "@/components/view-quiz-result-dialog";
+} from "@/components/quiz-result-detail-view";
 import {
   TEAM_ADMIN_PANEL_IDS,
   teamAdminActivePanelClass,
@@ -92,38 +86,12 @@ function memberRoleLabel(role: QuizResultSummary["memberRole"]): string | null {
   return null;
 }
 
-function memberInitials(label: string): string {
-  const trimmed = label.trim();
-  if (!trimmed) return "?";
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-  }
-  if (trimmed.includes("@")) {
-    return trimmed.slice(0, 2).toUpperCase();
-  }
-  return trimmed.slice(0, 2).toUpperCase();
-}
-
-function workspaceInitials(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return "?";
-  const parts = trimmed.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-  }
-  return trimmed.slice(0, 2).toUpperCase();
-}
-
-function memberKey(teamId: number, userId: string): string {
-  return `${teamId}:${userId}`;
-}
-
 interface TeamQuizResultsTabProps {
   workspaces: TeamQuizWorkspaceSnapshot[];
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
   quizResultsHref: string;
   quizTimerHref: string;
+  quizScheduleHref: string;
   quizSecurityHref: string;
 }
 
@@ -143,327 +111,189 @@ type WorkspaceQuizResultGroup = {
   attemptCount: number;
 };
 
-function DeleteQuizResultButton({
-  resultId,
-  teamId,
-  deckName,
-}: {
-  resultId: number;
+type QuizResultTableRow = {
+  key: string;
   teamId: number;
-  deckName: string;
-}) {
-  const router = useRouter();
-  const [isPending, setIsPending] = React.useState(false);
-
-  async function handleDelete() {
-    setIsPending(true);
-    try {
-      await deleteQuizResultAction({ resultId, teamId });
-      router.refresh();
-    } catch {
-      // UI refresh on success only
-    } finally {
-      setIsPending(false);
-    }
-  }
-
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs text-muted-foreground hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-            disabled={isPending}
-          />
-        }
-      >
-        <Trash2 className="size-3.5" aria-hidden />
-        Delete
-      </AlertDialogTrigger>
-      <AlertDialogContent className="mx-4 w-[calc(100vw-2rem)] max-w-md sm:mx-auto">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-base sm:text-lg">Delete quiz result?</AlertDialogTitle>
-          <AlertDialogDescription className="text-xs sm:text-sm">
-            This will permanently remove the saved result for &ldquo;{deckName}&rdquo;. This action
-            cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
-          <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={isPending}
-            onClick={handleDelete}
-            className="w-full sm:w-auto"
-          >
-            {isPending ? "Deleting…" : "Delete result"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function QuizResultListItem({
-  result: r,
-  summary,
-  teamId,
-}: {
+  teamName: string;
+  memberLabel: string;
+  memberEmail: string | null;
+  memberRole: QuizResultSummary["memberRole"];
   result: QuizResultRow;
   summary: QuizResultSummary;
-  teamId: number;
-}) {
-  return (
-    <article className="rounded-lg border border-border/70 bg-card/40 p-3.5 sm:p-4">
-      <div className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 space-y-0.5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              Deck
-            </p>
-            <h4 className="text-sm font-semibold leading-snug text-foreground sm:text-base">
-              {r.deckName}
-            </h4>
-          </div>
-          <p className="shrink-0 text-xs text-muted-foreground sm:text-right">
-            {formatDate(r.savedAt)}
-          </p>
-        </div>
+};
 
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
-          <p
-            className={cn(
-              "shrink-0 text-3xl font-semibold tabular-nums leading-none sm:text-4xl",
-              scoreToneClass(r.percent),
-            )}
-          >
-            {r.percent}%
-          </p>
-          <div className="min-w-0 flex-1 space-y-1">
-            <Progress value={r.percent} className="h-2 w-full" />
-            <p className="text-xs text-muted-foreground">
-              {r.correct} of {r.total} answered correctly
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-2.5 text-center">
-            <div className="flex items-center justify-center gap-1 text-emerald-500">
-              <CheckCircle className="size-3.5 shrink-0" aria-hidden />
-              <span className="text-lg font-semibold tabular-nums">{r.correct}</span>
-            </div>
-            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Correct
-            </p>
-          </div>
-          <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-2.5 text-center">
-            <div className="flex items-center justify-center gap-1 text-rose-500">
-              <XCircle className="size-3.5 shrink-0" aria-hidden />
-              <span className="text-lg font-semibold tabular-nums">{r.incorrect}</span>
-            </div>
-            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Incorrect
-            </p>
-          </div>
-          <div className="rounded-md border border-border/60 bg-muted/20 px-2 py-2.5 text-center">
-            <div className="flex items-center justify-center gap-1 text-muted-foreground">
-              <CircleHelp className="size-3.5 shrink-0" aria-hidden />
-              <span className="text-lg font-semibold tabular-nums text-foreground">
-                {r.unanswered}
-              </span>
-            </div>
-            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              Skipped
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Layers className="size-3.5 shrink-0" aria-hidden />
-              {r.total} card{r.total !== 1 ? "s" : ""}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="size-3.5 shrink-0" aria-hidden />
-              {formatClock(r.elapsedSeconds)}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ViewQuizResultDialog result={summary} triggerLabel="View details" />
-            <DeleteQuizResultButton resultId={r.id} teamId={teamId} deckName={r.deckName} />
-          </div>
-        </div>
-      </div>
-    </article>
+function flattenToTableRows(groups: WorkspaceQuizResultGroup[]): QuizResultTableRow[] {
+  const rows: QuizResultTableRow[] = [];
+  for (const workspace of groups) {
+    for (const member of workspace.memberGroups) {
+      for (const { result, summary } of member.attempts) {
+        rows.push({
+          key: `${workspace.teamId}:${result.id}`,
+          teamId: workspace.teamId,
+          teamName: workspace.teamName,
+          memberLabel: member.memberLabel,
+          memberEmail: member.memberEmail,
+          memberRole: member.memberRole,
+          result,
+          summary,
+        });
+      }
+    }
+  }
+  return rows.sort(
+    (a, b) => new Date(b.result.savedAt).getTime() - new Date(a.result.savedAt).getTime(),
   );
 }
 
-function MemberQuizResultsGroup({
-  group,
-  teamId,
-  expanded,
-  onToggle,
+function QuizResultsTable({
+  rows,
+  showWorkspaceColumn,
+  activeResultId,
+  deletingKey,
+  onView,
+  onDelete,
 }: {
-  group: MemberQuizResultGroup;
-  teamId: number;
-  expanded: boolean;
-  onToggle: () => void;
+  rows: QuizResultTableRow[];
+  showWorkspaceColumn: boolean;
+  activeResultId: number | null;
+  deletingKey: string | null;
+  onView: (row: QuizResultTableRow) => void;
+  onDelete: (row: QuizResultTableRow) => void;
 }) {
-  const latest = group.attempts[0]?.result;
-  const roleLabel = memberRoleLabel(group.memberRole);
-  const showEmail =
-    group.memberEmail &&
-    group.memberEmail !== group.memberLabel &&
-    !group.memberLabel.includes("@");
-
-  const collapsedSummary = latest
-    ? `Latest: ${latest.deckName} · ${latest.percent}% · ${formatDate(latest.savedAt)}`
-    : null;
-
   return (
-    <section className="overflow-hidden rounded-lg border border-border/70 bg-card/20">
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-auto w-full justify-between gap-3 rounded-none px-3 py-3 text-left hover:bg-muted/30 sm:px-4"
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <Avatar className="mt-0.5 size-8 bg-muted/60">
-            <AvatarFallback className="bg-muted/80 text-xs font-semibold text-foreground">
-              {memberInitials(group.memberLabel)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-sm font-semibold text-foreground">
-                {group.memberLabel}
-              </span>
-              {roleLabel ? (
-                <Badge
-                  variant="outline"
-                  className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
-                >
-                  {roleLabel}
-                </Badge>
-              ) : null}
-              <Badge variant="secondary" className="shrink-0 text-[10px] font-medium tabular-nums">
-                {group.attempts.length} attempt{group.attempts.length !== 1 ? "s" : ""}
-              </Badge>
-            </div>
-            {showEmail ? (
-              <p className="truncate text-xs text-muted-foreground">{group.memberEmail}</p>
+    <div className="rounded-lg border border-border/80">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            {showWorkspaceColumn ? (
+              <TableHead className="min-w-[10rem]">Workspace</TableHead>
             ) : null}
-            {!expanded && collapsedSummary ? (
-              <p className="line-clamp-2 text-xs text-muted-foreground">{collapsedSummary}</p>
-            ) : null}
-          </div>
-        </div>
-        {expanded ? (
-          <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        ) : (
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        )}
-      </Button>
+            <TableHead className="min-w-[9rem]">Member</TableHead>
+            <TableHead className="min-w-[10rem]">Email</TableHead>
+            <TableHead className="min-w-[9rem]">Deck</TableHead>
+            <TableHead className="text-right">Score</TableHead>
+            <TableHead className="hidden text-right md:table-cell">Correct</TableHead>
+            <TableHead className="hidden text-right md:table-cell">Wrong</TableHead>
+            <TableHead className="hidden text-right lg:table-cell">Skipped</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Cards</TableHead>
+            <TableHead className="hidden text-right sm:table-cell">Time</TableHead>
+            <TableHead className="min-w-[9rem]">Saved</TableHead>
+            <TableHead className="min-w-[11rem] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => {
+            const roleLabel = memberRoleLabel(row.memberRole);
+            const email =
+              row.memberEmail ??
+              (row.memberLabel.includes("@") ? row.memberLabel : null);
+            const r = row.result;
 
-      {expanded ? (
-        <div className="space-y-2.5 border-t border-border/60 bg-muted/10 px-3 py-3 sm:space-y-3 sm:px-4 sm:py-4">
-          {group.attempts.map(({ result, summary }) => (
-            <QuizResultListItem
-              key={result.id}
-              result={result}
-              summary={summary}
-              teamId={teamId}
-            />
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function WorkspaceQuizResultsGroup({
-  group,
-  expanded,
-  onToggle,
-  expandedMemberKeys,
-  onToggleMember,
-}: {
-  group: WorkspaceQuizResultGroup;
-  expanded: boolean;
-  onToggle: () => void;
-  expandedMemberKeys: Set<string>;
-  onToggleMember: (key: string) => void;
-}) {
-  const latest = group.memberGroups[0]?.attempts[0]?.result;
-  const collapsedSummary = latest
-    ? `${group.memberGroups.length} member${group.memberGroups.length !== 1 ? "s" : ""} · ${group.attemptCount} attempt${group.attemptCount !== 1 ? "s" : ""} · Latest: ${latest.deckName} (${latest.percent}%)`
-    : `${group.memberGroups.length} member${group.memberGroups.length !== 1 ? "s" : ""} · ${group.attemptCount} attempt${group.attemptCount !== 1 ? "s" : ""}`;
-
-  return (
-    <section className="overflow-hidden rounded-xl border border-border/80 bg-card/30 shadow-sm">
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-auto w-full justify-between gap-3 rounded-none px-3 py-3 text-left hover:bg-muted/30 sm:px-4 sm:py-3.5"
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <Avatar className="mt-0.5 size-9 bg-primary/10">
-            <AvatarFallback className="bg-primary/15 text-xs font-semibold text-foreground">
-              {workspaceInitials(group.teamName)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <LayoutGrid className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="truncate text-sm font-semibold text-foreground sm:text-base">
-                {group.teamName}
-              </span>
-              <Badge variant="secondary" className="shrink-0 text-[10px] font-medium tabular-nums">
-                {group.attemptCount} attempt{group.attemptCount !== 1 ? "s" : ""}
-              </Badge>
-            </div>
-            {!expanded ? (
-              <p className="line-clamp-2 text-xs text-muted-foreground">{collapsedSummary}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {group.memberGroups.length} member{group.memberGroups.length !== 1 ? "s" : ""}
-              </p>
-            )}
-          </div>
-        </div>
-        {expanded ? (
-          <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        ) : (
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        )}
-      </Button>
-
-      {expanded ? (
-        <div className="space-y-2.5 border-t border-border/60 bg-muted/10 px-3 py-3 sm:space-y-3 sm:px-4 sm:py-4">
-          {group.memberGroups.map((memberGroup) => {
-            const key = memberKey(group.teamId, memberGroup.userId);
             return (
-              <MemberQuizResultsGroup
-                key={key}
-                group={memberGroup}
-                teamId={group.teamId}
-                expanded={expandedMemberKeys.has(key)}
-                onToggle={() => onToggleMember(key)}
-              />
+              <TableRow
+                key={row.key}
+                data-state={activeResultId === r.id ? "selected" : undefined}
+              >
+                {showWorkspaceColumn ? (
+                  <TableCell className="max-w-[14rem]">
+                    <span className="line-clamp-2 font-medium text-foreground" title={row.teamName}>
+                      {row.teamName}
+                    </span>
+                  </TableCell>
+                ) : null}
+                <TableCell className="max-w-[12rem]">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className="truncate font-medium text-foreground"
+                        title={row.memberLabel}
+                      >
+                        {row.memberLabel}
+                      </span>
+                      {roleLabel ? (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                        >
+                          {roleLabel}
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="max-w-[14rem]">
+                  {email ? (
+                    <span className="block truncate text-muted-foreground" title={email}>
+                      {email}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="max-w-[12rem]">
+                  <span className="line-clamp-2 font-medium text-foreground" title={r.deckName}>
+                    {r.deckName}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <span
+                    className={cn(
+                      "text-base font-semibold tabular-nums",
+                      scoreToneClass(r.percent),
+                    )}
+                  >
+                    {r.percent}%
+                  </span>
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums md:table-cell">
+                  {r.correct}
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums md:table-cell">
+                  {r.incorrect}
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums lg:table-cell">
+                  {r.unanswered}
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums sm:table-cell">
+                  {r.total}
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums sm:table-cell">
+                  {formatClock(r.elapsedSeconds)}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {formatDate(r.savedAt)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() => onView(row)}
+                    >
+                      <Eye className="size-3.5" aria-hidden />
+                      View
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs text-muted-foreground hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+                      disabled={deletingKey === row.key}
+                      onClick={() => onDelete(row)}
+                    >
+                      <Trash2 className="size-3.5" aria-hidden />
+                      {deletingKey === row.key ? "Deleting…" : "Delete"}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             );
           })}
-        </div>
-      ) : null}
-    </section>
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -540,6 +370,76 @@ function buildMemberGroups(
   });
 }
 
+const FILTER_ALL_WORKSPACES = "__fv_all_workspaces__";
+const FILTER_ALL_DECKS = "__fv_all_decks__";
+
+const nativeSelectClassName = cn(
+  "h-10 w-full min-w-0 rounded-lg border border-input bg-background px-2.5 py-2 text-sm text-foreground",
+  "outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+  "disabled:pointer-events-none disabled:opacity-50 dark:bg-input/30",
+);
+
+function attemptSearchHaystack(
+  workspace: WorkspaceQuizResultGroup,
+  member: MemberQuizResultGroup,
+  result: QuizResultRow,
+): string {
+  return [
+    workspace.teamName,
+    member.memberLabel,
+    member.memberEmail,
+    member.userId,
+    result.deckName,
+  ]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(" ")
+    .toLowerCase();
+}
+
+function filterWorkspaceGroups(
+  groups: WorkspaceQuizResultGroup[],
+  options: {
+    searchQuery: string;
+    workspaceFilter: string;
+    deckFilter: string;
+  },
+): WorkspaceQuizResultGroup[] {
+  const q = options.searchQuery.trim().toLowerCase();
+
+  return groups
+    .filter((workspace) => {
+      if (options.workspaceFilter === FILTER_ALL_WORKSPACES) return true;
+      return String(workspace.teamId) === options.workspaceFilter;
+    })
+    .map((workspace) => {
+      const memberGroups = workspace.memberGroups
+        .map((member) => {
+          const attempts = member.attempts.filter(({ result }) => {
+            if (
+              options.deckFilter !== FILTER_ALL_DECKS &&
+              result.deckName !== options.deckFilter
+            ) {
+              return false;
+            }
+            if (!q) return true;
+            return attemptSearchHaystack(workspace, member, result).includes(q);
+          });
+          if (attempts.length === 0) return null;
+          return { ...member, attempts };
+        })
+        .filter((member): member is MemberQuizResultGroup => member !== null);
+
+      if (memberGroups.length === 0) return null;
+
+      return {
+        ...workspace,
+        memberGroups,
+        attemptCount: memberGroups.reduce((sum, member) => sum + member.attempts.length, 0),
+      };
+    })
+    .filter((workspace): workspace is WorkspaceQuizResultGroup => workspace !== null);
+}
+
 function buildWorkspaceGroups(
   workspaces: TeamQuizWorkspaceSnapshot[],
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>,
@@ -583,65 +483,127 @@ export function TeamQuizResultsTab({
   userFieldDisplayById,
   quizResultsHref,
   quizTimerHref,
+  quizScheduleHref,
   quizSecurityHref,
 }: TeamQuizResultsTabProps) {
+  const router = useRouter();
+  const detailPanelRef = React.useRef<HTMLDivElement | null>(null);
+  const [detailSummary, setDetailSummary] = React.useState<QuizResultSummary | null>(null);
+  const [deletingKey, setDeletingKey] = React.useState<string | null>(null);
+  const [removedResultKeys, setRemovedResultKeys] = React.useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    setRemovedResultKeys(new Set());
+  }, [workspaces]);
+
   const workspaceGroups = React.useMemo(
     () => buildWorkspaceGroups(workspaces, userFieldDisplayById),
     [workspaces, userFieldDisplayById],
   );
 
-  const totalAttempts = workspaceGroups.reduce((sum, g) => sum + g.attemptCount, 0);
-  const totalMembers = workspaceGroups.reduce((sum, g) => sum + g.memberGroups.length, 0);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [workspaceFilter, setWorkspaceFilter] = React.useState(FILTER_ALL_WORKSPACES);
+  const [deckFilter, setDeckFilter] = React.useState(FILTER_ALL_DECKS);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
 
-  const [expandedWorkspaceIds, setExpandedWorkspaceIds] = React.useState<Set<number>>(
-    new Set(),
+  const workspaceFilterOptions = React.useMemo(
+    () =>
+      [...workspaceGroups]
+        .sort((a, b) => a.teamName.localeCompare(b.teamName))
+        .map((g) => ({ id: String(g.teamId), name: g.teamName })),
+    [workspaceGroups],
   );
-  const [expandedMemberKeys, setExpandedMemberKeys] = React.useState<Set<string>>(new Set());
 
-  React.useEffect(() => {
-    setExpandedWorkspaceIds(new Set(workspaceGroups.map((g) => g.teamId)));
-    const memberKeys = workspaceGroups.flatMap((g) =>
-      g.memberGroups.map((m) => memberKey(g.teamId, m.userId)),
-    );
-    setExpandedMemberKeys(new Set(memberKeys));
+  const deckFilterOptions = React.useMemo(() => {
+    const names = new Set<string>();
+    for (const workspace of workspaceGroups) {
+      for (const member of workspace.memberGroups) {
+        for (const { result } of member.attempts) {
+          names.add(result.deckName);
+        }
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
   }, [workspaceGroups]);
 
-  const allWorkspacesExpanded =
-    workspaceGroups.length > 0 &&
-    workspaceGroups.every((g) => expandedWorkspaceIds.has(g.teamId));
+  const hasActiveFilters =
+    searchQuery.trim() !== "" ||
+    workspaceFilter !== FILTER_ALL_WORKSPACES ||
+    deckFilter !== FILTER_ALL_DECKS;
 
-  function toggleWorkspace(teamId: number) {
-    setExpandedWorkspaceIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(teamId)) next.delete(teamId);
-      else next.add(teamId);
-      return next;
+  const filteredWorkspaceGroups = React.useMemo(
+    () =>
+      filterWorkspaceGroups(workspaceGroups, {
+        searchQuery,
+        workspaceFilter,
+        deckFilter,
+      }),
+    [workspaceGroups, searchQuery, workspaceFilter, deckFilter],
+  );
+
+  const totalAttempts = workspaceGroups.reduce((sum, g) => sum + g.attemptCount, 0);
+  const totalMembers = workspaceGroups.reduce((sum, g) => sum + g.memberGroups.length, 0);
+  const filteredAttempts = filteredWorkspaceGroups.reduce(
+    (sum, g) => sum + g.attemptCount,
+    0,
+  );
+  const filteredMembers = filteredWorkspaceGroups.reduce(
+    (sum, g) => sum + g.memberGroups.length,
+    0,
+  );
+
+  const tableRows = React.useMemo(
+    () => flattenToTableRows(filteredWorkspaceGroups),
+    [filteredWorkspaceGroups],
+  );
+
+  const visibleTableRows = React.useMemo(
+    () => tableRows.filter((row) => !removedResultKeys.has(row.key)),
+    [tableRows, removedResultKeys],
+  );
+
+  const showWorkspaceColumn = workspaceGroups.length > 1;
+
+  function clearFilters() {
+    setSearchQuery("");
+    setWorkspaceFilter(FILTER_ALL_WORKSPACES);
+    setDeckFilter(FILTER_ALL_DECKS);
+  }
+
+  function openView(row: QuizResultTableRow) {
+    setDetailSummary(row.summary);
+    requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
-  function toggleMember(key: string) {
-    setExpandedMemberKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
+  async function handleDelete(row: QuizResultTableRow) {
+    const confirmed = window.confirm(
+      `Delete the saved result for "${row.result.deckName}"? This cannot be undone.`,
+    );
+    if (!confirmed) return;
 
-  function setAllExpanded(expanded: boolean) {
-    if (expanded) {
-      setExpandedWorkspaceIds(new Set(workspaceGroups.map((g) => g.teamId)));
-      setExpandedMemberKeys(
-        new Set(
-          workspaceGroups.flatMap((g) =>
-            g.memberGroups.map((m) => memberKey(g.teamId, m.userId)),
-          ),
-        ),
-      );
-      return;
+    if (detailSummary?.id === row.result.id) {
+      setDetailSummary(null);
     }
-    setExpandedWorkspaceIds(new Set());
-    setExpandedMemberKeys(new Set());
+
+    setDeletingKey(row.key);
+    try {
+      await deleteQuizResultAction({
+        resultId: row.result.id,
+        teamId: row.teamId,
+      });
+      setRemovedResultKeys((prev) => new Set(prev).add(row.key));
+      router.refresh();
+    } catch {
+      // optimistic row stays until refresh on success only
+    } finally {
+      setDeletingKey(null);
+    }
+  }
+
+  function toggleFiltersPanel() {
+    setFiltersOpen((open) => !open);
   }
 
   return (
@@ -649,51 +611,172 @@ export function TeamQuizResultsTab({
       <TeamQuizResultsSubTabs
         quizResultsHref={quizResultsHref}
         quizTimerHref={quizTimerHref}
+        quizScheduleHref={quizScheduleHref}
         quizSecurityHref={quizSecurityHref}
       />
       <Card className={teamAdminActivePanelClass}>
         <CardHeader className="space-y-3 pb-2 sm:pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <CardTitle
-                id={TEAM_ADMIN_PANEL_IDS.quizResults}
-                className={cn(
-                  "flex items-center gap-2",
-                  teamAdminActivePanelTitleClass,
-                  teamAdminPanelScrollClass,
-                )}
-              >
-                <ClipboardList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                Quiz results
-              </CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                Saved attempts grouped by workspace and member. Expand a row to review each quiz.
-                {totalAttempts > 0 ? (
-                  <span className="mt-1 block font-medium text-foreground">
-                    {totalAttempts} attempt{totalAttempts !== 1 ? "s" : ""} ·{" "}
-                    {workspaceGroups.length} workspace
-                    {workspaceGroups.length !== 1 ? "s" : ""} · {totalMembers} member
-                    {totalMembers !== 1 ? "s" : ""}
-                  </span>
-                ) : null}
-              </CardDescription>
-            </div>
-            {workspaceGroups.length > 0 ? (
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => setAllExpanded(!allWorkspacesExpanded)}
-                >
-                  {allWorkspacesExpanded ? "Collapse all" : "Expand all"}
-                </Button>
-              </div>
-            ) : null}
+          <div className="space-y-2">
+            <CardTitle
+              id={TEAM_ADMIN_PANEL_IDS.quizResults}
+              className={cn(
+                "flex items-center gap-2",
+                teamAdminActivePanelTitleClass,
+                teamAdminPanelScrollClass,
+              )}
+            >
+              <ClipboardList className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              Quiz results
+            </CardTitle>
+            <CardDescription className="text-sm leading-relaxed">
+              Saved quiz attempts by workspace and member. Use View to expand full details below the table.
+              {totalAttempts > 0 ? (
+                <span className="mt-1 block font-medium text-foreground">
+                  {hasActiveFilters ? (
+                    <>
+                      Showing {filteredAttempts} of {totalAttempts} attempt
+                      {totalAttempts !== 1 ? "s" : ""} · {filteredWorkspaceGroups.length} of{" "}
+                      {workspaceGroups.length} workspace
+                      {workspaceGroups.length !== 1 ? "s" : ""} · {filteredMembers} of{" "}
+                      {totalMembers} member{totalMembers !== 1 ? "s" : ""}
+                    </>
+                  ) : (
+                    <>
+                      {totalAttempts} attempt{totalAttempts !== 1 ? "s" : ""} ·{" "}
+                      {workspaceGroups.length} workspace
+                      {workspaceGroups.length !== 1 ? "s" : ""} · {totalMembers} member
+                      {totalMembers !== 1 ? "s" : ""}
+                    </>
+                  )}
+                </span>
+              ) : null}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 pt-0 sm:space-y-4">
+          {totalAttempts > 0 ? (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 w-full justify-between gap-2 sm:w-auto sm:min-w-[11rem]"
+                onClick={toggleFiltersPanel}
+                aria-expanded={filtersOpen}
+                aria-controls="quiz-results-filters"
+              >
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <SlidersHorizontal className="size-4 shrink-0" aria-hidden />
+                  <span>Search & filters</span>
+                  {hasActiveFilters && !filtersOpen ? (
+                    <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      Active
+                    </span>
+                  ) : null}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "size-4 shrink-0 transition-transform",
+                    filtersOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </Button>
+
+              {filtersOpen ? (
+              <div
+                id="quiz-results-filters"
+                className="grid gap-3 rounded-lg border border-border/70 bg-muted/15 p-4 sm:grid-cols-2 lg:grid-cols-4"
+              >
+                <div className="space-y-1.5 sm:col-span-2 lg:col-span-2">
+                  <Label
+                    htmlFor="quiz-results-search"
+                    className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                  >
+                    Search
+                  </Label>
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <Input
+                      id="quiz-results-search"
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Workspace, member, email, or deck…"
+                      className="h-10 bg-background pl-9"
+                    />
+                  </div>
+                </div>
+
+                {workspaceFilterOptions.length > 1 ? (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="quiz-results-workspace"
+                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                    >
+                      Workspace
+                    </Label>
+                    <select
+                      id="quiz-results-workspace"
+                      value={workspaceFilter}
+                      onChange={(e) => setWorkspaceFilter(e.target.value)}
+                      className={nativeSelectClassName}
+                    >
+                      <option value={FILTER_ALL_WORKSPACES}>All workspaces</option>
+                      {workspaceFilterOptions.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {workspace.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                {deckFilterOptions.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="quiz-results-deck"
+                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                    >
+                      Deck
+                    </Label>
+                    <select
+                      id="quiz-results-deck"
+                      value={deckFilter}
+                      onChange={(e) => setDeckFilter(e.target.value)}
+                      className={nativeSelectClassName}
+                    >
+                      <option value={FILTER_ALL_DECKS}>All decks</option>
+                      {deckFilterOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+
+                {hasActiveFilters ? (
+                  <div className="flex items-end sm:col-span-2 lg:col-span-4">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-10 text-xs text-muted-foreground"
+                      onClick={clearFilters}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {totalAttempts === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 bg-muted/15 px-6 py-12 text-center">
               <ClipboardList className="size-10 text-muted-foreground/60" aria-hidden />
@@ -704,17 +787,69 @@ export function TeamQuizResultsTab({
                 </p>
               </div>
             </div>
+          ) : filteredWorkspaceGroups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 bg-muted/15 px-6 py-12 text-center">
+              <Search className="size-10 text-muted-foreground/60" aria-hidden />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">No matching results</p>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Try a different workspace, member, email, or deck name.
+                </p>
+              </div>
+              {hasActiveFilters ? (
+                <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : null}
+            </div>
+          ) : visibleTableRows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 bg-muted/15 px-6 py-12 text-center">
+              <Search className="size-10 text-muted-foreground/60" aria-hidden />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">No matching results</p>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Try a different workspace, member, email, or deck name.
+                </p>
+              </div>
+              {hasActiveFilters ? (
+                <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : null}
+            </div>
           ) : (
-            workspaceGroups.map((group) => (
-              <WorkspaceQuizResultsGroup
-                key={group.teamId}
-                group={group}
-                expanded={expandedWorkspaceIds.has(group.teamId)}
-                onToggle={() => toggleWorkspace(group.teamId)}
-                expandedMemberKeys={expandedMemberKeys}
-                onToggleMember={toggleMember}
+            <div className="space-y-4">
+              <QuizResultsTable
+                rows={visibleTableRows}
+                showWorkspaceColumn={showWorkspaceColumn}
+                activeResultId={detailSummary?.id ?? null}
+                deletingKey={deletingKey}
+                onView={openView}
+                onDelete={handleDelete}
               />
-            ))
+
+              {detailSummary ? (
+                <div
+                  ref={detailPanelRef}
+                  className="scroll-mt-4 rounded-lg border border-border/80 bg-card/40"
+                >
+                  <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">Result details</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() => setDetailSummary(null)}
+                    >
+                      <X className="size-3.5" aria-hidden />
+                      Close
+                    </Button>
+                  </div>
+                  <QuizResultDetailView variant="embedded" result={detailSummary} />
+                </div>
+              ) : null}
+            </div>
           )}
         </CardContent>
       </Card>

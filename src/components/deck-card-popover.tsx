@@ -19,11 +19,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -180,38 +175,41 @@ export function DeckCardPopover({
     />
   );
 
-  /** Grid (detail) view: no inline cover — show cover in a small tooltip on hover (pointer fine). */
+  /**
+   * Grid (detail) view: inline cover omitted — show cover on hover via CSS only.
+   * Do not use Tooltip here: it portals into document.body while the card sits
+   * inside Popover/Dialog triggers, and dual portal teardown races → removeChild(null).
+   */
   function withGridCoverHover(card: React.ReactNode) {
     if (view !== "grid" || !deck.coverImageUrl) return card;
+    const overlayOpen = popoverOpen || teamWorkspaceDialogOpen || previewOpen;
     return (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <div className="block h-full w-full min-h-0 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-          }
-        >
-          {card}
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          align="center"
-          sideOffset={10}
-          className="z-[100] max-w-none border border-border bg-popover p-2 text-popover-foreground shadow-lg ring-1 ring-foreground/10"
-        >
-          <p className="mb-1.5 max-w-[10.5rem] truncate text-[11px] font-medium leading-tight text-foreground sm:max-w-[11rem] sm:text-xs">
-            {deck.name}
-          </p>
-          <div className="relative h-[5.25rem] w-[9.25rem] overflow-hidden rounded-md border border-border bg-muted/30 sm:h-24 sm:w-40">
-            <Image
-              src={deck.coverImageUrl}
-              alt=""
-              fill
-              className="object-cover"
-              sizes="160px"
-            />
+      <div className="group/cover-preview relative block h-full w-full min-h-0 rounded-xl">
+        {card}
+        {!overlayOpen ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-[100] hidden -translate-x-1/2",
+              "rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg ring-1 ring-foreground/10",
+              "group-hover/cover-preview:block",
+            )}
+            aria-hidden
+          >
+            <p className="mb-1.5 max-w-[10.5rem] truncate text-[11px] font-medium leading-tight text-foreground sm:max-w-[11rem] sm:text-xs">
+              {deck.name}
+            </p>
+            <div className="relative h-[5.25rem] w-[9.25rem] overflow-hidden rounded-md border border-border bg-muted/30 sm:h-24 sm:w-40">
+              <Image
+                src={deck.coverImageUrl}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="160px"
+              />
+            </div>
           </div>
-        </TooltipContent>
-      </Tooltip>
+        ) : null}
+      </div>
     );
   }
 

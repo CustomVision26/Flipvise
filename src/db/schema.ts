@@ -85,6 +85,10 @@ export const teams = pgTable('teams', {
   quizDurationMinutes: integer(),
   /** When true, quiz takers cannot leave the study UI until submit; leaving locks the session. */
   quizSecurityEnabled: boolean().notNull().default(false),
+  /** When true, quizzes in this workspace cannot start before {@link quizStartAt}. */
+  quizStartScheduleEnabled: boolean().notNull().default(false),
+  /** Earliest moment members may start a quiz (workspace default when deck schedule is off). */
+  quizStartAt: timestamp(),
   createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -111,6 +115,15 @@ export const decks = pgTable('decks', {
   coverImageUrl: text(),
   /** Gradient slug (e.g. "ocean", "sunset") applied to deck tile and study flashcard. */
   gradient: text(),
+  /** When true, this deck's quiz cannot start before {@link quizStartAt} (overrides workspace schedule). */
+  quizStartScheduleEnabled: boolean().notNull().default(false),
+  /** Earliest moment members may start a quiz on this deck. */
+  quizStartAt: timestamp(),
+  /**
+   * Per-deck quiz security override. When null, uses the workspace {@link teams.quizSecurityEnabled}.
+   * When true or false, overrides the workspace for this deck only.
+   */
+  quizSecurityEnabled: boolean(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });

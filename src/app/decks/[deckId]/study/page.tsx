@@ -15,6 +15,10 @@ import {
   resolveQuizSecurityContextForStudy,
   type QuizSecurityStudyContext,
 } from "@/db/queries/quiz-security";
+import {
+  resolveQuizStartScheduleForStudy,
+  type QuizScheduleStudyContext,
+} from "@/db/queries/quiz-schedule";
 import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
@@ -115,9 +119,14 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   }
 
   let quizSecurity: QuizSecurityStudyContext | undefined;
+  let quizSchedule: QuizScheduleStudyContext | undefined;
   if (studyTeamId != null) {
-    quizSecurity =
-      (await resolveQuizSecurityContextForStudy(userId, id, studyTeamId)) ?? undefined;
+    const [securityContext, scheduleContext] = await Promise.all([
+      resolveQuizSecurityContextForStudy(userId, id, studyTeamId),
+      resolveQuizStartScheduleForStudy(id, studyTeamId),
+    ]);
+    quizSecurity = securityContext ?? undefined;
+    quizSchedule = scheduleContext ?? undefined;
   }
 
   let memberAllowReview = true;
@@ -165,6 +174,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     studyBackLabel = "← Back to Deck";
   }
   const studyExitLabel = studyBackLabel.replace(/^←\s*/, "");
+
+  const ownerInboxAvailable =
+    studyTeamId != null
+      ? (await getTeamById(studyTeamId))?.ownerUserId !== userId
+      : false;
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
@@ -221,7 +235,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         cards={cards}
         deckId={id}
         deckName={deck.name}
-        teamId={deck.teamId ?? null}
+        teamId={studyTeamId ?? deck.teamId ?? null}
         allowsQuizStudy={allowsQuizStudy}
         memberAllowReview={memberAllowReview}
         memberAllowQuiz={memberAllowQuiz}
@@ -230,8 +244,10 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         quizDurationSeconds={quizDurationSeconds}
         hasAiReading={hasAiReading}
         quizSecurity={quizSecurity}
+        quizSchedule={quizSchedule}
         exitHref={studyBackHref}
         exitLabel={studyExitLabel}
+        ownerInboxAvailable={ownerInboxAvailable}
       />
     </div>
   );

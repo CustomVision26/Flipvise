@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Clock } from "lucide-react";
+import { ArrowLeft, CalendarClock } from "lucide-react";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
@@ -11,13 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getDecksForTeamWithCardCount, getTeamsForTeamDashboard } from "@/db/queries/teams";
 import {
-  getDecksForTeamWithCardCount,
-  getOwnerQuizDefaultSettings,
-  getTeamsByOwner,
-  getTeamsForTeamDashboard,
-  listQuizTimerWorkspaceSnapshots,
-} from "@/db/queries/teams";
+  listQuizScheduleDeckSnapshots,
+  listQuizScheduleWorkspaceSnapshots,
+} from "@/db/queries/quiz-schedule";
 import {
   buildTeamAdminPath,
   buildTeamAdminQuizResultsPath,
@@ -39,7 +37,7 @@ import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-
 import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
 import { TeamQuizResultsSubTabs } from "@/components/team-quiz-results-sub-tabs";
-import { TeamQuizTimerSettings } from "@/components/team-quiz-timer-settings";
+import { TeamQuizScheduleSettings } from "@/components/team-quiz-schedule-settings";
 import { toClientJson } from "@/lib/to-client-json";
 
 interface PageProps {
@@ -51,7 +49,7 @@ interface PageProps {
   }>;
 }
 
-export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps) {
+export default async function TeamAdminQuizSchedulePage({ searchParams }: PageProps) {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
@@ -77,7 +75,7 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
     cookieTeamRaw: cookieRaw,
     useridParam,
     planParam,
-    buildCanonicalPath: buildTeamAdminQuizTimerPath,
+    buildCanonicalPath: buildTeamAdminQuizSchedulePath,
   });
   if (resolution.outcome === "redirect") {
     redirect(resolution.to);
@@ -86,16 +84,19 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
 
   const isOwner = selected.ownerUserId === userId;
 
-  const [workspaceSnapshots, ownerQuizSettings, teamDecksWithCardCounts, ownedWorkspaceCount] =
+  const [workspaceSnapshots, teamDecksWithCardCounts, decksByWorkspaceEntries] =
     await Promise.all([
-      listQuizTimerWorkspaceSnapshots(teamsForSubscriber),
-      getOwnerQuizDefaultSettings(selected.ownerUserId),
+      listQuizScheduleWorkspaceSnapshots(teamsForSubscriber),
       getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
-      isOwner ? getTeamsByOwner(userId).then((rows) => rows.length) : Promise.resolve(0),
+      Promise.all(
+        teamsForSubscriber.map(async (team) => [
+          team.id,
+          await listQuizScheduleDeckSnapshots(team.id, team.ownerUserId),
+        ] as const),
+      ),
     ]);
 
-  const selectedWorkspaceSnapshot =
-    workspaceSnapshots.find((w) => w.id === selected.id) ?? workspaceSnapshots[0] ?? null;
+  const decksByWorkspaceId = Object.fromEntries(decksByWorkspaceEntries);
 
   const access = await getAccessContext();
   const personalStripeSlug = access.hasClerkPersonalProPlus
@@ -144,16 +145,15 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
                 teamAdminPanelScrollClass,
               )}
             >
-              Quiz timer
+              Quiz schedule
             </h1>
             <p className="truncate text-sm text-muted-foreground" title={selected.name}>
               {selected.name}
             </p>
           </div>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {isOwner
-              ? "Set one quiz time for all workspaces, or allow custom presets per workspace."
-              : "View workspace quiz times and set custom presets when the subscriber allows it."}
+            Choose when members can start a quiz. Set a workspace-wide start time or override it
+            per deck.
           </p>
         </div>
         <TeamAdminQuickNavPanel
@@ -201,39 +201,21 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
         <CardHeader className="space-y-2 pb-4">
           <CardTitle className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}>
             <span className="inline-flex items-center gap-2">
-              <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              Timed quiz duration
+              <CalendarClock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              Quiz start times
             </span>
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            {selectedWorkspaceSnapshot ? (
-              <>
-                Active quiz time for{" "}
-                <span className="font-medium text-foreground">{selected.name}</span>:{" "}
-                <span className="font-medium text-foreground">
-                  {selectedWorkspaceSnapshot.effectiveMinutes} minutes
-                </span>
-                .{" "}
-                {workspaceSnapshots.length > 1
-                  ? `${workspaceSnapshots.length} workspaces available below.`
-                  : null}
-              </>
-            ) : (
-              "No workspaces available for quiz timer settings."
-            )}
+            Toggle scheduling on or off for each workspace and deck. Members see a countdown until
+            the quiz unlocks.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {workspaceSnapshots.length > 0 ? (
-            <TeamQuizTimerSettings
+            <TeamQuizScheduleSettings
               workspaces={toClientJson(workspaceSnapshots)}
+              decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
               defaultWorkspaceId={selected.id}
-              isSubscriberOwner={isOwner}
-              ownedWorkspaceCount={ownedWorkspaceCount}
-              globalDefaultMinutes={ownerQuizSettings.defaultQuizDurationMinutes}
-              enforceDefaultForAllWorkspaces={
-                ownerQuizSettings.enforceDefaultForAllWorkspaces
-              }
             />
           ) : null}
         </CardContent>

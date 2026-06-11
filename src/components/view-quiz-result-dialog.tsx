@@ -11,17 +11,28 @@ export type { QuizResultSummary };
 interface ViewQuizResultDialogProps {
   result: QuizResultSummary;
   triggerLabel?: string;
+  compact?: boolean;
 }
 
 export function ViewQuizResultDialog({
   result,
   triggerLabel = "View Results",
+  compact = false,
 }: ViewQuizResultDialogProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button variant="outline" size="sm" className="h-9 w-full gap-2 sm:w-auto" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        className={
+          compact
+            ? "h-8 gap-1.5 text-xs"
+            : "h-9 w-full gap-2 sm:w-auto"
+        }
+        onClick={() => setOpen(true)}
+      >
         <Eye className="size-4" aria-hidden />
         {triggerLabel}
       </Button>

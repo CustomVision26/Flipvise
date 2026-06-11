@@ -29,6 +29,7 @@ import {
   buildTeamAdminInviteSendPath,
   buildTeamAdminMembersPath,
   buildTeamAdminQuizResultsPath,
+  buildTeamAdminQuizSchedulePath,
   buildTeamAdminQuizSecurityPath,
   buildTeamAdminQuizTimerPath,
   buildTeamAdminWsHistoryPath,
@@ -363,6 +364,10 @@ export default async function TeamAdminDashboardView({
           viewerTeamMemberUrlParam,
         )}
         quizTimerHref={buildTeamAdminQuizTimerPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
+        quizScheduleHref={buildTeamAdminQuizSchedulePath(
           selected.id,
           viewerTeamMemberUrlParam,
         )}

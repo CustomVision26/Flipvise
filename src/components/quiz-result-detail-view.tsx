@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   DialogHeader,
   DialogTitle,
@@ -9,8 +9,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { CheckCircle, XCircle, CircleHelp, Download } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  CircleHelp,
+  ChevronDown,
+  ChevronUp,
+  Download,
+} from "lucide-react";
 import type { PerCardSnapshot } from "@/db/schema";
 import { cn } from "@/lib/utils";
 
@@ -114,174 +120,298 @@ function QuizResultMemberContext({ result }: { result: QuizResultSummary }) {
   );
 }
 
-function QuizResultPerCardReview({ cards }: { cards: PerCardSnapshot[] }) {
+type ReviewFilter = "all" | CardStatus;
+
+function statusBadge(status: CardStatus) {
+  if (status === "correct") {
+    return (
+      <Badge
+        variant="outline"
+        className="shrink-0 border-emerald-500/40 text-emerald-500 text-[11px] gap-1 px-2"
+      >
+        <CheckCircle className="size-3" aria-hidden />
+        Correct
+      </Badge>
+    );
+  }
+  if (status === "incorrect") {
+    return (
+      <Badge
+        variant="outline"
+        className="shrink-0 border-rose-500/40 text-rose-500 text-[11px] gap-1 px-2"
+      >
+        <XCircle className="size-3" aria-hidden />
+        Incorrect
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="shrink-0 text-muted-foreground text-[11px] gap-1 px-2">
+      <CircleHelp className="size-3" aria-hidden />
+      Unanswered
+    </Badge>
+  );
+}
+
+function answerBlock({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  tone: "correct" | "incorrect" | "muted";
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-3 sm:px-4 sm:py-3.5",
+        tone === "correct" && "border-emerald-500/25 bg-emerald-500/5",
+        tone === "incorrect" && "border-rose-500/25 bg-rose-500/5",
+        tone === "muted" && "border-border/70 bg-muted/20",
+      )}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1.5 text-sm leading-relaxed sm:text-base",
+          tone === "correct" && "font-medium text-emerald-400",
+          tone === "incorrect" && "font-medium text-rose-400",
+          tone === "muted" && "text-foreground",
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function QuizResultPerCardReview({
+  cards,
+  expanded = false,
+}: {
+  cards: PerCardSnapshot[];
+  /** Roomier layout for team-admin embedded review. */
+  expanded?: boolean;
+}) {
   const correctCount = cards.filter((c) => getStatus(c) === "correct").length;
   const incorrectCount = cards.filter((c) => getStatus(c) === "incorrect").length;
   const unansweredCount = cards.filter((c) => getStatus(c) === "unanswered").length;
 
+  const [filter, setFilter] = useState<ReviewFilter>("all");
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<number>>(
+    () => new Set(cards.map((c) => c.cardId)),
+  );
+
+  useEffect(() => {
+    setFilter("all");
+    setExpandedCardIds(new Set(cards.map((c) => c.cardId)));
+  }, [cards]);
+
+  const filteredCards = useMemo(() => {
+    if (filter === "all") return cards;
+    return cards.filter((card) => getStatus(card) === filter);
+  }, [cards, filter]);
+
+  const allFilteredExpanded =
+    filteredCards.length > 0 &&
+    filteredCards.every((card) => expandedCardIds.has(card.cardId));
+
+  function toggleCard(cardId: number) {
+    setExpandedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
+  }
+
+  function setAllExpanded(open: boolean) {
+    if (open) {
+      setExpandedCardIds(new Set(filteredCards.map((card) => card.cardId)));
+      return;
+    }
+    setExpandedCardIds(new Set());
+  }
+
   if (cards.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-2">
+      <p className="py-4 text-sm text-muted-foreground">
         No per-card breakdown is available for this result.
       </p>
     );
   }
 
+  const filterOptions: Array<{ id: ReviewFilter; label: string; count: number }> = [
+    { id: "all", label: "All", count: cards.length },
+    { id: "correct", label: "Correct", count: correctCount },
+    { id: "incorrect", label: "Incorrect", count: incorrectCount },
+    { id: "unanswered", label: "Unanswered", count: unansweredCount },
+  ];
+
   return (
-    <>
-      <ol className="space-y-4">
-        {cards.map((card, idx) => {
-          const status = getStatus(card);
-
-          return (
-            <li
-              key={card.cardId}
-              className={cn(
-                "rounded-xl border p-4 space-y-3 sm:p-5",
-                status === "correct"
-                  ? "border-emerald-500/30 bg-emerald-500/5"
-                  : status === "incorrect"
-                    ? "border-rose-500/30 bg-rose-500/5"
-                    : "border-border bg-muted/15",
-              )}
+    <div className={cn("space-y-4", expanded && "space-y-5")}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {filterOptions.map((option) => (
+            <Button
+              key={option.id}
+              type="button"
+              size="sm"
+              variant={filter === option.id ? "default" : "outline"}
+              className="h-8 gap-1.5 px-2.5 text-xs"
+              onClick={() => setFilter(option.id)}
             >
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-semibold text-foreground leading-relaxed sm:text-base">
-                  <span className="text-muted-foreground font-normal mr-1.5 tabular-nums">
-                    {idx + 1}.
-                  </span>
-                  {card.question ?? (
-                    <span className="italic text-muted-foreground font-normal">
-                      (no question text)
-                    </span>
-                  )}
-                </p>
+              {option.label}
+              <span className="tabular-nums text-[10px] opacity-80">{option.count}</span>
+            </Button>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 self-start text-xs text-muted-foreground sm:self-auto"
+          onClick={() => setAllExpanded(!allFilteredExpanded)}
+        >
+          {allFilteredExpanded ? "Collapse all" : "Expand all"}
+        </Button>
+      </div>
 
-                {status === "correct" && (
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 border-emerald-500/40 text-emerald-500 text-[11px] gap-1 px-2"
-                  >
-                    <CheckCircle className="size-3" aria-hidden />
-                    Correct
-                  </Badge>
-                )}
-                {status === "incorrect" && (
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 border-rose-500/40 text-rose-500 text-[11px] gap-1 px-2"
-                  >
-                    <XCircle className="size-3" aria-hidden />
-                    Incorrect
-                  </Badge>
-                )}
-                {status === "unanswered" && (
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 text-muted-foreground text-[11px] gap-1 px-2"
-                  >
-                    <CircleHelp className="size-3" aria-hidden />
-                    Unanswered
-                  </Badge>
-                )}
-              </div>
+      {filteredCards.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border/80 bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
+          No questions match this filter.
+        </p>
+      ) : (
+        <ol className={cn("space-y-3", expanded && "space-y-4")}>
+          {filteredCards.map((card, idx) => {
+            const status = getStatus(card);
+            const isOpen = expandedCardIds.has(card.cardId);
+            const questionNumber = cards.findIndex((c) => c.cardId === card.cardId) + 1;
 
-              <Separator className="opacity-40" />
-
-              <div className="space-y-2 text-sm pl-1">
-                {status === "correct" && (
-                  <div className="flex items-start gap-2">
-                    <CheckCircle
-                      className="size-4 shrink-0 mt-0.5 text-emerald-500"
-                      aria-hidden
-                    />
-                    <div>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-0.5">
-                        Your answer
+            return (
+              <li
+                key={card.cardId}
+                className={cn(
+                  "overflow-hidden rounded-xl border",
+                  status === "correct"
+                    ? "border-emerald-500/30 bg-emerald-500/5"
+                    : status === "incorrect"
+                      ? "border-rose-500/30 bg-rose-500/5"
+                      : "border-border bg-muted/15",
+                )}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 px-4 py-4 text-left hover:bg-muted/10 sm:px-5 sm:py-4"
+                  onClick={() => toggleCard(card.cardId)}
+                  aria-expanded={isOpen}
+                >
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-background/80 text-xs font-semibold tabular-nums text-foreground ring-1 ring-border/70">
+                        {questionNumber}
                       </span>
-                      <span className="text-emerald-400 font-medium">
-                        {card.selectedAnswer}
-                      </span>
+                      {statusBadge(status)}
                     </div>
+                    <p
+                      className={cn(
+                        "font-semibold leading-relaxed text-foreground",
+                        expanded ? "text-base sm:text-lg" : "text-sm sm:text-base",
+                      )}
+                    >
+                      {card.question ?? (
+                        <span className="font-normal italic text-muted-foreground">
+                          (no question text)
+                        </span>
+                      )}
+                    </p>
+                    {!isOpen ? (
+                      <p className="line-clamp-1 text-xs text-muted-foreground">
+                        {status === "correct" && card.selectedAnswer
+                          ? `Answer: ${card.selectedAnswer}`
+                          : status === "incorrect" && card.selectedAnswer
+                            ? `Selected: ${card.selectedAnswer}`
+                            : status === "unanswered"
+                              ? `Correct answer: ${card.correctAnswer}`
+                              : null}
+                      </p>
+                    ) : null}
                   </div>
-                )}
+                  {isOpen ? (
+                    <ChevronUp className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  ) : (
+                    <ChevronDown className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  )}
+                </button>
 
-                {status === "incorrect" && (
-                  <>
-                    <div className="flex items-start gap-2">
-                      <XCircle
-                        className="size-4 shrink-0 mt-0.5 text-rose-500"
-                        aria-hidden
-                      />
-                      <div>
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-0.5">
-                          Your answer
-                        </span>
-                        <span className="text-rose-400 font-medium">
-                          {card.selectedAnswer}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle
-                        className="size-4 shrink-0 mt-0.5 text-emerald-500"
-                        aria-hidden
-                      />
-                      <div>
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-0.5">
-                          Correct answer
-                        </span>
-                        <span className="text-emerald-400 font-medium">
-                          {card.correctAnswer}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
+                {isOpen ? (
+                  <div className="space-y-3 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 sm:pt-4">
+                    <div
+                      className={cn(
+                        "grid gap-3",
+                        status === "correct" ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2",
+                      )}
+                    >
+                      {status === "correct" ? (
+                        answerBlock({
+                          label: "Your answer",
+                          value: card.selectedAnswer,
+                          tone: "correct",
+                        })
+                      ) : null}
 
-                {status === "unanswered" && (
-                  <>
-                    <div className="flex items-start gap-2">
-                      <CircleHelp
-                        className="size-4 shrink-0 mt-0.5 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <div>
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-0.5">
-                          Your answer
-                        </span>
-                        <span className="italic text-muted-foreground">Not answered</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle
-                        className="size-4 shrink-0 mt-0.5 text-emerald-500"
-                        aria-hidden
-                      />
-                      <div>
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-0.5">
-                          Correct answer
-                        </span>
-                        <span className="text-emerald-400 font-medium">
-                          {card.correctAnswer}
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+                      {status === "incorrect" ? (
+                        <>
+                          {answerBlock({
+                            label: "Your answer",
+                            value: card.selectedAnswer,
+                            tone: "incorrect",
+                          })}
+                          {answerBlock({
+                            label: "Correct answer",
+                            value: card.correctAnswer,
+                            tone: "correct",
+                          })}
+                        </>
+                      ) : null}
 
-      <div className="mt-4 rounded-lg border border-border bg-muted/10 px-4 py-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-        <span className="text-emerald-500 font-medium">{correctCount} correct</span>
-        <span className="text-rose-500 font-medium">{incorrectCount} incorrect</span>
+                      {status === "unanswered" ? (
+                        <>
+                          {answerBlock({
+                            label: "Your answer",
+                            value: <span className="italic text-muted-foreground">Not answered</span>,
+                            tone: "muted",
+                          })}
+                          {answerBlock({
+                            label: "Correct answer",
+                            value: card.correctAnswer,
+                            tone: "correct",
+                          })}
+                        </>
+                      ) : null}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground tabular-nums">
+                      Question {questionNumber} of {cards.length}
+                      {filter !== "all" ? ` · Showing ${idx + 1} of ${filteredCards.length} filtered` : ""}
+                    </p>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      <div className="flex flex-wrap gap-4 rounded-lg border border-border bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
+        <span className="font-medium text-emerald-500">{correctCount} correct</span>
+        <span className="font-medium text-rose-500">{incorrectCount} incorrect</span>
         <span className="font-medium">{unansweredCount} unanswered</span>
         <span className="ml-auto tabular-nums">{cards.length} total questions</span>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -323,9 +453,9 @@ export function QuizResultInlineDetail({ result }: { result: QuizResultSummary }
   return (
     <div className="space-y-4">
       <QuizResultMemberContext result={result} />
-      <div className="space-y-3 rounded-lg border border-border/80 bg-muted/10 p-3 sm:p-4">
+      <div className="space-y-4 rounded-lg border border-border/80 bg-muted/10 p-4 sm:p-5">
         <h4 className="text-sm font-semibold text-foreground">Question review</h4>
-        <QuizResultPerCardReview cards={cards} />
+        <QuizResultPerCardReview cards={cards} expanded />
       </div>
       <div className="flex justify-stretch sm:justify-end">
         <QuizResultDownloadButton result={result} className="w-full sm:w-auto" />
@@ -561,7 +691,7 @@ async function downloadPdf(result: QuizResultSummary) {
 
 // ─── Shared detail UI (dialog + full page) ───────────────────────────────────
 
-export type QuizResultDetailVariant = "dialog" | "page";
+export type QuizResultDetailVariant = "dialog" | "page" | "embedded";
 
 export type QuizResultDetailViewProps = {
   result: QuizResultSummary;
@@ -650,40 +780,56 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
     </div>
   );
 
+  const reviewExpanded = variant === "embedded";
+
   const reviewSection = (
     <div
       className={cn(
         "px-4 py-4 sm:px-6 sm:py-5",
         variant === "dialog"
           ? "shrink-0 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
-          : "flex min-h-0 flex-1 flex-col overflow-hidden",
+          : variant === "embedded"
+            ? "w-full"
+            : "flex min-h-0 flex-1 flex-col overflow-hidden",
       )}
     >
-      <h2 className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Question review
-      </h2>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Question review
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Expand each question to compare answers, or filter by result type.
+          </p>
+        </div>
+      </div>
 
       <div
         className={cn(
-          "rounded-xl border border-border/80 bg-muted/10 p-4 sm:p-5",
+          "rounded-xl border border-border/80 bg-muted/10 p-4 sm:p-5 lg:p-6",
           variant === "page" && "flex min-h-0 flex-1 flex-col overflow-y-auto",
+          reviewExpanded && "w-full",
         )}
       >
-        <QuizResultPerCardReview cards={result.perCard ?? []} />
+        <QuizResultPerCardReview cards={result.perCard ?? []} expanded={reviewExpanded} />
         {actionButtons}
       </div>
     </div>
   );
 
   const containerClass =
-    variant === "page"
-      ? "mx-auto flex min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card max-h-[min(92vh,calc(100dvh-6rem))]"
-      : "flex min-h-0 flex-1 flex-col overflow-hidden";
+    variant === "embedded"
+      ? "flex w-full flex-col"
+      : variant === "page"
+        ? "mx-auto flex min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card max-h-[min(92vh,calc(100dvh-6rem))]"
+        : "flex min-h-0 flex-1 flex-col overflow-hidden";
 
   const scrollClass =
     variant === "dialog"
       ? "min-h-0 flex-1 overflow-y-auto overscroll-contain"
-      : "flex min-h-0 flex-1 flex-col overflow-hidden";
+      : variant === "embedded"
+        ? "flex w-full flex-col"
+        : "flex min-h-0 flex-1 flex-col overflow-hidden";
 
   return (
     <div className={containerClass}>

@@ -1,10 +1,13 @@
 import { db } from "@/db";
 import {
+  decks,
   quizSecurityInboxMessages,
   quizSecuritySessions,
   teams,
   type QuizSecuritySessionState,
 } from "@/db/schema";
+import { getDecksForTeam } from "@/db/queries/teams";
+import { resolveQuizSecurityEnabled } from "@/lib/quiz-security-resolve";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -15,6 +18,13 @@ export type QuizSecurityWorkspaceSnapshot = {
   id: number;
   name: string;
   quizSecurityEnabled: boolean;
+};
+
+export type QuizSecurityDeckSnapshot = {
+  id: number;
+  name: string;
+  /** null = inherit workspace quiz security setting */
+  quizSecurityEnabled: boolean | null;
 };
 
 export type QuizSecuritySessionAdminRow = QuizSecuritySessionRow & {
@@ -54,6 +64,94 @@ export async function isTeamQuizSecurityEnabled(teamId: number): Promise<boolean
   return Boolean(team?.quizSecurityEnabled);
 }
 
+export async function isDeckQuizSecurityEnabled(
+  teamId: number,
+  deckId: number,
+): Promise<boolean> {
+  const [team] = await db
+    .select({ quizSecurityEnabled: teams.quizSecurityEnabled })
+    .from(teams)
+    .where(eq(teams.id, teamId));
+  if (!team) return false;
+
+  const [deck] = await db
+    .select({ quizSecurityEnabled: decks.quizSecurityEnabled })
+    .from(decks)
+    .where(eq(decks.id, deckId));
+  if (!deck) return Boolean(team.quizSecurityEnabled);
+
+  return resolveQuizSecurityEnabled(deck, team);
+}
+
+export async function listQuizSecurityDeckSnapshots(
+  teamId: number,
+  ownerUserId: string,
+): Promise<QuizSecurityDeckSnapshot[]> {
+  const teamDecks = await getDecksForTeam(teamId, ownerUserId);
+  const deckIds = teamDecks.map((deck) => deck.id);
+  if (deckIds.length === 0) return [];
+
+  const rows = await db
+    .select({
+      id: decks.id,
+      name: decks.name,
+      quizSecurityEnabled: decks.quizSecurityEnabled,
+    })
+    .from(decks)
+    .where(eq(decks.userId, ownerUserId));
+
+  const deckIdSet = new Set(deckIds);
+  return rows
+    .filter((row) => deckIdSet.has(row.id))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      quizSecurityEnabled: row.quizSecurityEnabled ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function updateDeckQuizSecurityEnabled(
+  deckId: number,
+  ownerUserId: string,
+  enabled: boolean | null,
+): Promise<void> {
+  await db
+    .update(decks)
+    .set({
+      quizSecurityEnabled: enabled,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(decks.id, deckId), eq(decks.userId, ownerUserId)));
+}
+
+export async function assertDeckInWorkspaceForSecurity(
+  teamId: number,
+  ownerUserId: string,
+  deckId: number,
+): Promise<void> {
+  const teamDecks = await getDecksForTeam(teamId, ownerUserId);
+  if (!teamDecks.some((deck) => deck.id === deckId)) {
+    throw new Error("Deck is not part of this workspace.");
+  }
+}
+
+/** Drop only in-flight sessions when deck security is turned off; keep admin-actionable history. */
+export async function clearQuizSecuritySessionsOnDeckDisable(
+  teamId: number,
+  deckId: number,
+): Promise<void> {
+  await db
+    .delete(quizSecuritySessions)
+    .where(
+      and(
+        eq(quizSecuritySessions.teamId, teamId),
+        eq(quizSecuritySessions.deckId, deckId),
+        eq(quizSecuritySessions.status, "active"),
+      ),
+    );
+}
+
 export async function updateTeamQuizSecurityEnabled(
   teamId: number,
   enabled: boolean,
@@ -79,7 +177,7 @@ export async function resolveQuizSecurityContextForStudy(
   deckId: number,
   teamId: number,
 ): Promise<QuizSecurityStudyContext | null> {
-  const securityEnabled = await isTeamQuizSecurityEnabled(teamId);
+  const securityEnabled = await isDeckQuizSecurityEnabled(teamId, deckId);
   if (!securityEnabled) return null;
 
   const session = await getLatestQuizSecuritySessionForUserDeck(userId, teamId, deckId);
@@ -240,21 +338,12 @@ export async function grantQuizSecuritySessionRestart(
   return row ?? null;
 }
 
-/** When quiz security is turned off, remove in-progress blocks for that workspace. */
+/** Drop only in-flight sessions when workspace security is turned off; keep admin-actionable history. */
 export async function clearQuizSecuritySessionsOnDisable(teamId: number): Promise<void> {
   await db
     .delete(quizSecuritySessions)
     .where(
-      and(
-        eq(quizSecuritySessions.teamId, teamId),
-        inArray(quizSecuritySessions.status, [
-          "active",
-          "locked",
-          "granted_resume",
-          "terminated",
-          "completed",
-        ]),
-      ),
+      and(eq(quizSecuritySessions.teamId, teamId), eq(quizSecuritySessions.status, "active")),
     );
 }
 

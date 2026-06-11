@@ -10,6 +10,9 @@ export const deckRowSelectWithoutCover = {
   teamId: decks.teamId,
   name: decks.name,
   description: decks.description,
+  quizStartScheduleEnabled: decks.quizStartScheduleEnabled,
+  quizStartAt: decks.quizStartAt,
+  quizSecurityEnabled: decks.quizSecurityEnabled,
   createdAt: decks.createdAt,
   updatedAt: decks.updatedAt,
 } as const;
@@ -44,7 +47,13 @@ export function isMissingDeckCoverColumnError(error: unknown): boolean {
 }
 
 function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient">>(row: T): DeckRow {
-  return { ...row, coverImageUrl: null, gradient: null };
+  return {
+    ...row,
+    coverImageUrl: null,
+    gradient: null,
+    quizSecurityEnabled:
+      "quizSecurityEnabled" in row ? (row.quizSecurityEnabled ?? null) : null,
+  };
 }
 
 export async function getDecksByUser(userId: string): Promise<DeckRow[]> {

@@ -21,6 +21,11 @@ import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { generateQuizResultPdfBuffer } from "@/lib/quiz-pdf-server";
 import type { QuizResultRow } from "@/db/queries/quiz-results";
 import type { PerCardSnapshot } from "@/db/schema";
+import {
+  shouldSendQuizResultEmailToOwner,
+  shouldSendQuizResultEmailToUser,
+  type QuizResultInboxTarget,
+} from "@/lib/quiz-result-inbox-targets";
 
 const quizAnswerSchema = z.object({
   cardId: z.number().int().positive(),
@@ -194,6 +199,7 @@ const saveQuizResultSchema = z.object({
   percent: z.number().int().min(0).max(100),
   elapsedSeconds: z.number().int().min(0),
   perCard: z.array(perCardSnapshotSchema),
+  inboxTargets: z.array(z.enum(["user", "owner"])).min(1).optional(),
 });
 
 type SaveQuizResultInput = z.infer<typeof saveQuizResultSchema>;
@@ -221,6 +227,7 @@ export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{
     percent: d.percent,
     elapsedSeconds: d.elapsedSeconds,
     perCard: d.perCard,
+    inboxTargets: d.inboxTargets,
   });
 }
 
@@ -231,6 +238,7 @@ type QuizEmailContext = {
   result: QuizResultRow;
   /** Study opened/saved from team workspace URL — see `.cursor/rules/loops-quiz-result-email.mdc`. */
   savedFromTeamWorkspace: boolean;
+  inboxTargets?: QuizResultInboxTarget[];
 };
 
 /**
@@ -241,7 +249,10 @@ type QuizEmailContext = {
  * `.cursor/rules/loops-quiz-result-email.mdc` for the full matrix.
  */
 async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
-  const { result, userId, ownerUserId, teamName, savedFromTeamWorkspace } = ctx;
+  const { result, userId, ownerUserId, teamName, savedFromTeamWorkspace, inboxTargets } =
+    ctx;
+  const emailUser = shouldSendQuizResultEmailToUser(inboxTargets);
+  const emailOwner = shouldSendQuizResultEmailToOwner(inboxTargets);
 
   const teamMemberNotOwner = Boolean(ownerUserId && ownerUserId !== userId);
   const teamDeck = ownerUserId !== null;
@@ -319,7 +330,7 @@ async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
     );
   }
 
-  if (takerEmail) {
+  if (takerEmail && emailUser) {
     if (useOwnerLoopsTemplate) {
       await loopsSendQuizResultEmail(
         {
@@ -353,7 +364,7 @@ async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
     }
   }
 
-  if (useOwnerLoopsTemplate && teamMemberNotOwner && ownerEmail) {
+  if (useOwnerLoopsTemplate && teamMemberNotOwner && ownerEmail && emailOwner) {
     await loopsSendQuizResultEmail(
       {
         ...sharedFields,
@@ -384,6 +395,7 @@ async function persistQuizResultAndNotify(params: {
   percent: number;
   elapsedSeconds: number;
   perCard: PerCardSnapshot[];
+  inboxTargets?: QuizResultInboxTarget[];
 }): Promise<{ id: number }> {
   const { result: saved, ownerUserId, teamName } = await saveQuizResult({
     userId: params.userId,
@@ -397,6 +409,7 @@ async function persistQuizResultAndNotify(params: {
     percent: params.percent,
     elapsedSeconds: params.elapsedSeconds,
     perCard: params.perCard,
+    inboxTargets: params.inboxTargets,
   });
 
   await sendQuizResultEmails({
@@ -405,6 +418,7 @@ async function persistQuizResultAndNotify(params: {
     teamName,
     result: saved,
     savedFromTeamWorkspace: params.savedFromTeamWorkspace,
+    inboxTargets: params.inboxTargets,
   });
 
   return { id: saved.id };

@@ -52,7 +52,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import type { InferSelectModel } from "drizzle-orm";
+import type { InferSelectModel, SQL } from "drizzle-orm";
 
 export type { TeamMemberRow, TeamInvitationRow };
 
@@ -278,18 +278,66 @@ export async function countTeamsForOwner(ownerUserId: string) {
   return Number(row?.n ?? 0);
 }
 
+type TeamRow = InferSelectModel<typeof teams>;
+
+const teamRowSelectWithoutQuizSchedule = {
+  id: teams.id,
+  ownerUserId: teams.ownerUserId,
+  name: teams.name,
+  planSlug: teams.planSlug,
+  quizDurationMinutes: teams.quizDurationMinutes,
+  quizSecurityEnabled: teams.quizSecurityEnabled,
+  createdAt: teams.createdAt,
+} as const;
+
+function withDefaultTeamQuizSchedule(
+  row: Omit<TeamRow, "quizStartScheduleEnabled" | "quizStartAt">,
+): TeamRow {
+  return {
+    ...row,
+    quizStartScheduleEnabled: false,
+    quizStartAt: null,
+  };
+}
+
+let warnedMissingQuizScheduleColumn = false;
+function warnMissingQuizScheduleColumnOnce() {
+  if (warnedMissingQuizScheduleColumn) return;
+  warnedMissingQuizScheduleColumn = true;
+  console.warn(
+    "[db] Quiz schedule columns are missing. Run: npm run db:ensure-quiz-schedule-columns",
+  );
+}
+
+function isMissingQuizScheduleColumnError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /quizStartScheduleEnabled|quizStartAt|quiz_start_schedule/i.test(msg);
+}
+
+async function selectTeamRows(where: SQL): Promise<TeamRow[]> {
+  try {
+    return await db.select().from(teams).where(where);
+  } catch (e) {
+    if (!isMissingQuizScheduleColumnError(e)) throw e;
+    warnMissingQuizScheduleColumnOnce();
+    const rows = await db.select(teamRowSelectWithoutQuizSchedule).from(teams).where(where);
+    return rows.map(withDefaultTeamQuizSchedule);
+  }
+}
+
 export async function getTeamsByOwner(ownerUserId: string) {
-  return db.select().from(teams).where(eq(teams.ownerUserId, ownerUserId));
+  return selectTeamRows(eq(teams.ownerUserId, ownerUserId));
 }
 
 export async function getTeamById(teamId: number) {
-  const rows = await db.select().from(teams).where(eq(teams.id, teamId));
+  const rows = await selectTeamRows(eq(teams.id, teamId));
   return rows[0] ?? null;
 }
 
 export async function getTeamsByIds(ids: number[]) {
   if (ids.length === 0) return [];
-  return db.select().from(teams).where(inArray(teams.id, ids));
+  return selectTeamRows(inArray(teams.id, ids));
 }
 
 export async function getMemberRecord(teamId: number, userId: string) {
@@ -570,7 +618,11 @@ export async function getDecksForTeam(
         .select(deckRowSelectWithoutCover)
         .from(decks)
         .where(where);
-      return rows.map((r) => ({ ...r, coverImageUrl: null, gradient: null }));
+      return rows.map((r) => ({
+        ...r,
+        coverImageUrl: null,
+        gradient: null,
+      }));
     }
   }
 
@@ -648,7 +700,11 @@ export async function getAssignedDecksForMember(
           eq(teamDeckAssignments.memberUserId, memberUserId),
         ),
       );
-    return rows.map((r) => ({ ...r, coverImageUrl: null, gradient: null }));
+    return rows.map((r) => ({
+      ...r,
+      coverImageUrl: null,
+      gradient: null,
+    }));
   }
 }
 
@@ -929,10 +985,7 @@ export async function getTeamsForTeamDashboard(userId: string) {
     .from(teamMembers)
     .where(and(eq(teamMembers.userId, userId), eq(teamMembers.role, "team_admin")));
   const ids = [...new Set(adminRows.map((r) => r.teamId))].filter(Boolean);
-  const extra =
-    ids.length > 0
-      ? await db.select().from(teams).where(inArray(teams.id, ids))
-      : [];
+  const extra = ids.length > 0 ? await selectTeamRows(inArray(teams.id, ids)) : [];
   const map = new Map<number, InferSelectModel<typeof teams>>();
   for (const t of [...owned, ...extra]) {
     map.set(t.id, t);
