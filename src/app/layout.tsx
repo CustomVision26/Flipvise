@@ -20,6 +20,7 @@ import {
   getRootLayoutTeamNavPayload,
 } from "@/db/queries/teams";
 import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
+import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { shouldHideHelpCenter } from "@/lib/team-help";
 import {
@@ -101,7 +102,8 @@ export default async function RootLayout({
   const xSearch = headerStore.get("x-search") ?? "";
 
   // Batch 2: layout nav + help + inbox — team bootstrap is shared (no duplicate Drizzle loads).
-  const [teamNavPayload, hideHelpCenter, inboxUnreadCount] = await Promise.all([
+  const [teamNavPayload, hideHelpCenter, inboxUnreadCount, activeAffiliateRow] =
+    await Promise.all([
     userId != null
       ? tryTeamQuery(
           () =>
@@ -128,7 +130,15 @@ export default async function RootLayout({
           tryTeamQuery(() => countUnreadAffiliateBroadcastInboxForUser(userId), 0),
         ]).then(([invites, affiliateBroadcasts]) => invites + affiliateBroadcasts)
       : Promise.resolve(0),
+
+    userId != null
+      ? getActiveAffiliateForUser(
+          userId,
+          primaryEmail?.toLowerCase() ?? null,
+        ).catch(() => null)
+      : Promise.resolve(null),
   ]);
+  const showAffiliatePortal = activeAffiliateRow != null;
 
   const teamAdminHeaderTeams = teamNavPayload.teamAdminHeaderTeams;
   const workspaceTeams = teamNavPayload.workspaceNav.teams;
@@ -256,6 +266,7 @@ export default async function RootLayout({
                           personalPlanLabelForWorkspace
                         }
                         personalAccountPlanLabel={personalAccountPlanLabel}
+                        showAffiliatePortal={showAffiliatePortal}
                         teamDashFallback={teamDashFallback}
                         resolvedIsPro={isPro}
                         resolvedActiveTeamPlan={activeTeamPlan}

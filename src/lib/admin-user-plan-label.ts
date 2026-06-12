@@ -16,9 +16,6 @@ export type AdminUserPlanAccessType =
 type AdminPlanAccessMeta = PlanPublicMetadata & {
   role?: string;
   adminGranted?: boolean;
-  billingStatus?: string;
-  billingPlan?: string;
-  adminPlan?: string;
 };
 
 function normalizePlanSlug(slug: string | null | undefined): string | null {

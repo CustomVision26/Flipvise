@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { affiliates } from "@/db/schema";
 import { eq, desc, or, and, sql, inArray } from "drizzle-orm";
+import { evaluateAffiliateQuotaRenewal } from "@/lib/affiliate-quota-renewal";
 import {
   buildAffiliatePromotionalCandidate,
   slugifyAffiliatePromoBase,
@@ -86,14 +87,75 @@ export async function incrementAffiliatePaidReferral(affiliateId: number) {
   const sameMonth = prevKey === key;
   const nextMonth = sameMonth ? (row.paidReferralsMonth ?? 0) + 1 : 1;
 
+  const now = Date.now();
+  const inQuotaPeriod =
+    row.referralQuotaEnabled &&
+    row.endsAt.getTime() > now &&
+    row.status === "active";
+  const nextPeriodReferrals = inQuotaPeriod
+    ? (row.periodPaidReferrals ?? 0) + 1
+    : row.periodPaidReferrals ?? 0;
+
   await db
     .update(affiliates)
     .set({
       paidReferralsTotal: (row.paidReferralsTotal ?? 0) + 1,
       paidReferralsMonth: nextMonth,
       paidReferralsMonthKey: key,
+      periodPaidReferrals: nextPeriodReferrals,
     })
     .where(eq(affiliates.id, affiliateId));
+
+  try {
+    await evaluateAffiliateQuotaRenewal(affiliateId);
+  } catch (error) {
+    console.error("[affiliates] quota evaluate after referral:", error);
+  }
+}
+
+export async function updateAffiliateQuotaSettings(
+  affiliateId: number,
+  input: {
+    referralQuotaEnabled: boolean;
+    referralQuotaTarget: number | null;
+    resetPeriod?: boolean;
+  },
+) {
+  const row = await getAffiliateById(affiliateId);
+  if (!row) return false;
+
+  const enabling = input.referralQuotaEnabled && !row.referralQuotaEnabled;
+  const periodStart =
+    enabling || input.resetPeriod
+      ? (row.inviteAcceptedAt ?? row.startedAt)
+      : row.quotaPeriodStartedAt;
+
+  const rows = await db
+    .update(affiliates)
+    .set({
+      referralQuotaEnabled: input.referralQuotaEnabled,
+      referralQuotaTarget: input.referralQuotaEnabled
+        ? input.referralQuotaTarget
+        : null,
+      ...(enabling || input.resetPeriod
+        ? {
+            quotaPeriodStartedAt: periodStart,
+            periodPaidReferrals: 0,
+          }
+        : {}),
+    })
+    .where(eq(affiliates.id, affiliateId))
+    .returning({ id: affiliates.id });
+
+  if (rows.length > 0 && input.referralQuotaEnabled) {
+    try {
+      await evaluateAffiliateQuotaRenewal(affiliateId);
+    } catch (error) {
+      console.error("[affiliates] quota evaluate after settings update:", error);
+    }
+  }
+
+  return rows.length > 0;
 }
 
 export async function listActiveAffiliatesForBroadcast(opts?: {
@@ -213,6 +275,36 @@ export async function getAllAffiliatesByEmailOrUserId(
     .from(affiliates)
     .where(matchCondition)
     .orderBy(desc(affiliates.createdAt));
+}
+
+/** Active marketing-affiliate row for this signed-in user, if any. */
+export async function getActiveAffiliateForUser(
+  userId: string,
+  emailLower: string | null,
+) {
+  const rows = await listAffiliatesForPlanHistory(userId, emailLower);
+  const now = Date.now();
+  for (const row of rows) {
+    if (row.status !== "active") continue;
+    if (row.revokedAt) continue;
+    if (row.referralQuotaEnabled) {
+      try {
+        await evaluateAffiliateQuotaRenewal(row.id);
+      } catch (error) {
+        console.error("[affiliates] quota evaluate for user:", error);
+      }
+    }
+    const refreshed = row.referralQuotaEnabled
+      ? ((await getAffiliateById(row.id)) ?? row)
+      : row;
+    const ends =
+      refreshed.endsAt instanceof Date
+        ? refreshed.endsAt
+        : new Date(refreshed.endsAt);
+    if (Number.isNaN(ends.getTime()) || ends.getTime() <= now) continue;
+    return refreshed;
+  }
+  return null;
 }
 
 /** Affiliate rows linked to this Clerk user (by email and/or invitedUserId). */

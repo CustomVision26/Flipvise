@@ -42,7 +42,10 @@ import {
   Copy,
   Check,
   AlertCircle,
+  Target,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdminAffiliateQuotaPanel } from "@/components/admin-affiliate-quota-panel";
 import {
   inviteAffiliateAction,
   revokeAffiliateAction,
@@ -490,6 +493,13 @@ export function AdminAffiliatesPanel({
     "shrink-0 flex flex-col-reverse gap-2 border-t border-border px-3 py-3 sm:flex-row sm:justify-end sm:px-4 sm:py-4";
   const affiliateDialogFieldClass = "w-full min-w-0 max-w-full";
 
+  const quotaEnabledCount = useMemo(
+    () =>
+      affiliates.filter((a) => a.status === "active" && a.referralQuotaEnabled)
+        .length,
+    [affiliates],
+  );
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -515,9 +525,6 @@ export function AdminAffiliatesPanel({
                   </span>
                 )}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Double-click a row to expand actions.
-              </p>
             </div>
             <Button
               size="sm"
@@ -528,36 +535,62 @@ export function AdminAffiliatesPanel({
               Invite Affiliate
             </Button>
           </div>
-
-          {/* Filters */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap mt-3">
-            <div className="relative w-full sm:w-auto sm:min-w-[220px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder="Search by name, email, or admin…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 w-full"
-              />
-            </div>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter((v ?? "all") as StatusFilter)}
-            >
-              <SelectTrigger className="w-full sm:w-[140px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="revoked">Revoked</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </CardHeader>
 
-        <CardContent className="overflow-x-auto p-0">
+        <CardContent className="p-4 pt-0">
+          <Tabs defaultValue="directory" className="w-full gap-4">
+            <TabsList
+              variant="line"
+              className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit"
+            >
+              <TabsTrigger value="directory" className="gap-1.5">
+                <Megaphone className="h-4 w-4 shrink-0" />
+                Affiliate directory
+              </TabsTrigger>
+              <TabsTrigger value="quotas" className="gap-1.5">
+                <Target className="h-4 w-4 shrink-0" />
+                Referral quotas
+                {quotaEnabledCount > 0 ? (
+                  <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                    {quotaEnabledCount}
+                  </Badge>
+                ) : null}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="directory" className="mt-0 space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Double-click a row to expand actions.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <div className="relative w-full sm:w-auto sm:min-w-[220px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Search by name, email, or admin…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-8 w-full"
+                  />
+                </div>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) =>
+                    setStatusFilter((v ?? "all") as StatusFilter)
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="revoked">Revoked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border-2 border-border/70">
           <Table>
             <TableHeader>
               <TableRow>
@@ -815,6 +848,13 @@ export function AdminAffiliatesPanel({
               )}
             </TableBody>
           </Table>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="quotas" className="mt-0">
+              <AdminAffiliateQuotaPanel affiliates={affiliates} />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

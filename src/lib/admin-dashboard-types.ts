@@ -137,6 +137,10 @@ export type SerializedAffiliate = {
   paidReferralsMonth: number;
   /** `YYYY-MM` for the monthly counter, or null if none yet. */
   paidReferralsMonthKey: string | null;
+  referralQuotaEnabled: boolean;
+  referralQuotaTarget: number | null;
+  periodPaidReferrals: number;
+  quotaPeriodStartedAt: string | null;
   /** Staged proposed plan slug (active affiliates awaiting confirmation only). */
   pendingPlanAssigned: string | null;
   pendingEndsAt: string | null;

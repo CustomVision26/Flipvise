@@ -12,6 +12,7 @@ import {
 } from "@/db/queries/admin";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import { listAffiliates } from "@/db/queries/affiliates";
+import { evaluateAllActiveAffiliateQuotas } from "@/lib/affiliate-quota-renewal";
 import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
 import type { AdminDashboardSection } from "@/lib/admin-dashboard-section";
@@ -173,6 +174,11 @@ export async function loadAdminTabsData(
     }
 
     case "marketing-affiliates": {
+      try {
+        await evaluateAllActiveAffiliateQuotas();
+      } catch (error) {
+        console.error("[admin] affiliate quota evaluation:", error);
+      }
       const rawAffiliates = await listAffiliates();
       return {
         ...empty,
@@ -197,6 +203,10 @@ export async function loadAdminTabsData(
           paidReferralsTotal: a.paidReferralsTotal ?? 0,
           paidReferralsMonth: a.paidReferralsMonth ?? 0,
           paidReferralsMonthKey: a.paidReferralsMonthKey ?? null,
+          referralQuotaEnabled: a.referralQuotaEnabled ?? false,
+          referralQuotaTarget: a.referralQuotaTarget ?? null,
+          periodPaidReferrals: a.periodPaidReferrals ?? 0,
+          quotaPeriodStartedAt: a.quotaPeriodStartedAt?.toISOString() ?? null,
           pendingPlanAssigned: a.pendingPlanAssigned ?? null,
           pendingEndsAt: a.pendingEndsAt?.toISOString() ?? null,
           arrangementChangeExpiresAt: a.arrangementChangeExpiresAt?.toISOString() ?? null,

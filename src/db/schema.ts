@@ -422,6 +422,14 @@ export const affiliates = pgTable('affiliates', {
   paidReferralsMonth: integer().notNull().default(0),
   /** Calendar month for `paidReferralsMonth`, format `YYYY-MM`. */
   paidReferralsMonthKey: varchar({ length: 7 }),
+  /** When true, plan auto-renews at period end if `periodPaidReferrals` ≥ `referralQuotaTarget`. */
+  referralQuotaEnabled: boolean().notNull().default(false),
+  /** Required paid referrals in the current quota period (admin-set). */
+  referralQuotaTarget: integer(),
+  /** Paid referrals counted toward the current quota period. */
+  periodPaidReferrals: integer().notNull().default(0),
+  /** Start of the current quota measurement window (defaults to arrangement start when enabled). */
+  quotaPeriodStartedAt: timestamp(),
   /** Proposed plan after admin edits an active affiliate; applied only after confirmation. */
   pendingPlanAssigned: varchar({ length: 64 }),
   pendingEndsAt: timestamp(),

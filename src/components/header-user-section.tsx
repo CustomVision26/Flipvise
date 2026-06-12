@@ -21,7 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
-import { CreditCard, Palette, Shield } from "lucide-react";
+import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
 
 interface HeaderUserSectionProps {
   currentProTheme?: ProUiThemeId;
@@ -40,6 +40,8 @@ interface HeaderUserSectionProps {
   personalPlanLabelForWorkspace?: string;
   /** Billing tier link to `/pricing` (e.g. Team Basic, Pro Plus). */
   personalAccountPlanLabel?: string;
+  /** Active marketing-affiliate arrangement — show link to `/dashboard/affiliate`. */
+  showAffiliatePortal?: boolean;
   /** When nav has no owned team-tier row, Team Dash href still targets this admin workspace. */
   teamDashFallback?: {
     teamId: number;
@@ -67,6 +69,7 @@ export function HeaderUserSection({
   personalWorkspaceHref = "/dashboard",
   personalPlanLabelForWorkspace = "Free",
   personalAccountPlanLabel = "Free",
+  showAffiliatePortal = false,
   teamDashFallback = null,
   resolvedIsPro = false,
   resolvedActiveTeamPlan = null,
@@ -126,6 +129,18 @@ export function HeaderUserSection({
         >
           <Shield className="size-3.5 shrink-0" aria-hidden />
           Platform Admin
+        </Link>
+      )}
+      {showAffiliatePortal && (
+        <Link
+          href="/dashboard/affiliate"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+          )}
+        >
+          <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
+          Affiliate
         </Link>
       )}
       <div className="flex min-w-0 flex-row items-center gap-2">
