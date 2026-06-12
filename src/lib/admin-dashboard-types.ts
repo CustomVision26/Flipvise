@@ -95,6 +95,8 @@ export type SerializedAdminSubscription = {
   userName: string;
   email: string | null;
   planSlug: string;
+  /** Human-readable plan name for admin tables. */
+  planLabel: string;
   status: string;
   currency: string | null;
   currentPeriodStart: string | null;

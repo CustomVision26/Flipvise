@@ -61,6 +61,19 @@ import {
   adminReplyToTicketAction,
 } from "@/actions/support-admin";
 import type { SerializedTicket, SupportStats } from "@/lib/support-admin-dto";
+import {
+  adminFilterInputClass,
+  adminSectionTitleClass,
+  adminSupportChartCardClass,
+  adminSupportEmptyStateClass,
+  adminSupportFilterBarClass,
+  adminSupportKpiCardClass,
+  adminSupportKpiGridClass,
+  adminSupportSectionLabelClass,
+  adminSupportShellClass,
+  adminSupportTableCardClass,
+} from "@/components/admin-panel-styles";
+import { cn } from "@/lib/utils";
 
 // ── Serialised types (plain objects safe to pass from Server → Client) ─────
 
@@ -252,8 +265,11 @@ function TicketDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
-        <SheetHeader className="px-6 py-4 border-b border-border shrink-0">
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col gap-0 border-l-2 border-primary/40 p-0 sm:max-w-lg"
+      >
+        <SheetHeader className="shrink-0 border-b border-border/70 bg-muted/20 px-6 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-sm leading-snug truncate">
@@ -285,8 +301,10 @@ function TicketDetailSheet({
           </div>
 
           {/* Original message */}
-          <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Original Message</p>
+          <div className="rounded-lg border-2 border-border/70 bg-muted/20 px-4 py-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Original Message
+            </p>
             <p className="text-sm whitespace-pre-wrap">{ticket.message}</p>
           </div>
 
@@ -297,7 +315,7 @@ function TicketDetailSheet({
               {localReplies.map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3"
+                  className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold">{r.adminName}</span>
@@ -420,38 +438,85 @@ export function AdminSupportPanel({
   }
 
   return (
-    <div className="flex flex-col gap-6 mt-4">
-      {/* ── KPI row ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className={adminSupportShellClass}>
+      <div className="mb-5 border-b border-border/50 pb-4">
+        <h2 className={adminSectionTitleClass}>Support Center</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Monitor ticket volume, resolution status, and respond to user requests.
+        </p>
+      </div>
+
+      <p className={adminSupportSectionLabelClass}>Ticket metrics</p>
+      <div className={cn(adminSupportKpiGridClass, "mb-6")}>
         {[
-          { label: "Total Tickets", value: stats.totals.total, icon: Ticket, color: "text-foreground" },
-          { label: "Open", value: stats.totals.openCount, icon: Clock, color: "text-blue-400" },
-          { label: "Resolved", value: stats.totals.resolvedCount, icon: CheckCircle2, color: "text-green-400" },
-          { label: "Urgent", value: stats.totals.urgentCount, icon: AlertTriangle, color: "text-red-400" },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label}>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-xs text-muted-foreground">{label}</CardTitle>
-              <Icon className={`h-4 w-4 ${color}`} />
+          {
+            label: "Total Tickets",
+            value: stats.totals.total,
+            icon: Ticket,
+            color: "text-foreground",
+            iconWrap: "border-border/60 bg-muted/30",
+          },
+          {
+            label: "Open",
+            value: stats.totals.openCount,
+            icon: Clock,
+            color: "text-blue-400",
+            iconWrap: "border-blue-500/30 bg-blue-500/10",
+          },
+          {
+            label: "Resolved",
+            value: stats.totals.resolvedCount,
+            icon: CheckCircle2,
+            color: "text-green-400",
+            iconWrap: "border-green-500/30 bg-green-500/10",
+          },
+          {
+            label: "Urgent",
+            value: stats.totals.urgentCount,
+            icon: AlertTriangle,
+            color: "text-red-400",
+            iconWrap: "border-red-500/30 bg-red-500/10",
+          },
+        ].map(({ label, value, icon: Icon, color, iconWrap }, index) => (
+          <Card
+            key={label}
+            className={cn(
+              adminSupportKpiCardClass,
+              "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500",
+            )}
+            style={{ animationDelay: `${index * 75}ms` }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
+              <span
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                  iconWrap,
+                )}
+              >
+                <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", color)} />
+              </span>
             </CardHeader>
             <CardContent>
-              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+              <p className={cn("text-2xl font-bold tabular-nums sm:text-3xl", color)}>{value}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* ── Charts row ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Category bar chart */}
-        <Card className="md:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Tickets by Category</CardTitle>
+      <p className={adminSupportSectionLabelClass}>Analytics</p>
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <Card className={cn(adminSupportChartCardClass, "md:col-span-2")}>
+          <CardHeader className="border-b border-border/50 pb-3">
+            <CardTitle className="text-sm font-semibold tracking-tight">Tickets by Category</CardTitle>
             <CardDescription className="text-xs">Volume per support type</CardDescription>
           </CardHeader>
-          <CardContent className="h-52">
+          <CardContent className="h-52 pt-4">
             {categoryChartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data yet</div>
+              <div className={adminSupportEmptyStateClass}>
+                <Ticket className="h-5 w-5 text-muted-foreground/70" />
+                <p className="text-xs text-muted-foreground">No category data yet</p>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={categoryChartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
@@ -472,15 +537,17 @@ export function AdminSupportPanel({
           </CardContent>
         </Card>
 
-        {/* Status donut chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Status Breakdown</CardTitle>
+        <Card className={adminSupportChartCardClass}>
+          <CardHeader className="border-b border-border/50 pb-3">
+            <CardTitle className="text-sm font-semibold tracking-tight">Status Breakdown</CardTitle>
             <CardDescription className="text-xs">Current resolution state</CardDescription>
           </CardHeader>
-          <CardContent className="h-52">
+          <CardContent className="h-52 pt-4">
             {statusChartData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data yet</div>
+              <div className={adminSupportEmptyStateClass}>
+                <CheckCircle2 className="h-5 w-5 text-muted-foreground/70" />
+                <p className="text-xs text-muted-foreground">No status data yet</p>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -512,15 +579,17 @@ export function AdminSupportPanel({
         </Card>
       </div>
 
-      {/* Priority bar chart */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Priority Distribution</CardTitle>
+      <Card className={cn(adminSupportChartCardClass, "mb-6")}>
+        <CardHeader className="border-b border-border/50 pb-3">
+          <CardTitle className="text-sm font-semibold tracking-tight">Priority Distribution</CardTitle>
           <CardDescription className="text-xs">Tickets grouped by assigned severity</CardDescription>
         </CardHeader>
-        <CardContent className="h-40">
+        <CardContent className="h-40 pt-4">
           {priorityChartData.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-xs text-muted-foreground">No data yet</div>
+            <div className={adminSupportEmptyStateClass}>
+              <AlertTriangle className="h-5 w-5 text-muted-foreground/70" />
+              <p className="text-xs text-muted-foreground">No priority data yet</p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={priorityChartData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 40 }}>
@@ -541,29 +610,31 @@ export function AdminSupportPanel({
         </CardContent>
       </Card>
 
-      {/* ── Ticket table ── */}
-      <Card>
-        <CardHeader className="pb-4">
+      <p className={adminSupportSectionLabelClass}>Ticket queue</p>
+      <Card className={adminSupportTableCardClass}>
+        <CardHeader className="border-b border-border/50 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-sm">All Support Tickets</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <CardTitle className="text-sm font-semibold tracking-tight">All Support Tickets</CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {filteredTickets.length} of {tickets.length} tickets
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <div className="relative w-full sm:w-auto sm:min-w-[200px]">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                <Input
-                  placeholder="Search by subject, user, ID…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 h-8 text-sm w-full"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
+          </div>
+        </CardHeader>
+        <div className={adminSupportFilterBarClass}>
+          <div className="relative md:col-span-2 lg:col-span-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by subject, user, ID…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={cn(adminFilterInputClass, "h-9 w-full pl-8 text-sm")}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 md:col-span-2 lg:col-span-3">
                 <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-                  <SelectTrigger className="w-[calc(50%-4px)] sm:w-[120px] h-8 text-sm">
+                  <SelectTrigger className={cn(adminFilterInputClass, "h-9 w-[calc(50%-4px)] text-sm sm:w-[130px]")}>
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -575,7 +646,7 @@ export function AdminSupportPanel({
                   </SelectContent>
                 </Select>
                 <Select value={categoryFilter} onValueChange={(v) => { if (v !== null) setCategoryFilter(v); }}>
-                  <SelectTrigger className="w-[calc(50%-4px)] sm:w-[120px] h-8 text-sm">
+                  <SelectTrigger className={cn(adminFilterInputClass, "h-9 w-[calc(50%-4px)] text-sm sm:w-[130px]")}>
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -589,7 +660,7 @@ export function AdminSupportPanel({
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as PriorityFilter)}>
-                  <SelectTrigger className="w-full sm:w-[110px] h-8 text-sm">
+                  <SelectTrigger className={cn(adminFilterInputClass, "h-9 w-full text-sm sm:w-[130px]")}>
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent>
@@ -600,20 +671,21 @@ export function AdminSupportPanel({
                     <SelectItem value="low">Low</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
           </div>
-        </CardHeader>
+        </div>
         <CardContent className="p-0">
           {filteredTickets.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              No tickets match the current filters.
+            <div className="px-4 py-16">
+              <div className={cn(adminSupportEmptyStateClass, "min-h-32 py-8")}>
+                <Ticket className="h-5 w-5 text-muted-foreground/70" />
+                <p className="text-sm text-muted-foreground">No tickets match the current filters.</p>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="border-b border-border/60 hover:bg-transparent">
                     <TableHead className="w-12 text-xs">#</TableHead>
                     <TableHead className="text-xs">Subject</TableHead>
                     <TableHead className="text-xs">User</TableHead>
@@ -628,7 +700,7 @@ export function AdminSupportPanel({
                   {filteredTickets.map((ticket) => (
                     <TableRow
                       key={ticket.id}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/40"
                       onClick={() => setSelectedTicket(ticket)}
                     >
                       <TableCell className="text-xs text-muted-foreground font-mono">

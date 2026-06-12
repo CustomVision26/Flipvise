@@ -2,11 +2,18 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { syncBillingAfterCheckoutAction } from "@/actions/billing-page";
 
 export const BILLING_SYNCED_EVENT = "flipvise:billing-synced";
+
+async function reloadClerkUserSession() {
+  if (typeof window === "undefined") return;
+  const clerk = (
+    window as Window & { Clerk?: { user?: { reload?: () => Promise<unknown> } } }
+  ).Clerk;
+  await clerk?.user?.reload?.();
+}
 
 /**
  * One-shot toasts after Stripe Checkout redirect (`?checkout=success` | `?checkout=canceled`).
@@ -15,7 +22,6 @@ export const BILLING_SYNCED_EVENT = "flipvise:billing-synced";
 export function StripeCheckoutToast() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useUser();
   const handled = useRef(false);
 
   useEffect(() => {
@@ -41,7 +47,7 @@ export function StripeCheckoutToast() {
     void (async () => {
       try {
         const result = await syncBillingAfterCheckoutAction();
-        await user?.reload?.();
+        await reloadClerkUserSession();
 
         if (result.synced && result.planLabel) {
           toast.success("Subscription active", {
@@ -67,7 +73,7 @@ export function StripeCheckoutToast() {
         });
       }
     })();
-  }, [searchParams, router, user]);
+  }, [searchParams, router]);
 
   return null;
 }

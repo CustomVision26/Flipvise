@@ -4,18 +4,12 @@ import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { UserBillingPage } from "@/components/user-billing-page";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
 import { HelpCenter } from "@/components/help-center";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
-import {
-  type TeamPlanId,
-  TEAM_PLAN_LABELS,
-  isTeamPlanId,
-} from "@/lib/team-plans";
+import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 import type { WorkspaceTeamOption } from "@/components/workspace-context-dropdown";
 import { WorkspaceContextDropdown } from "@/components/workspace-context-dropdown";
 import { InboxNavIconButton } from "@/components/inbox-nav-icon-button";
@@ -41,8 +35,10 @@ interface HeaderUserSectionProps {
   activeWorkspaceTeamId?: number | null;
   /** Personal dashboard target when selecting “Personal Dash” (may include `?userid=` / `plan=`). */
   personalWorkspaceHref?: string;
-  /** Shown next to "Personal Dash" in the workspace dropdown (team tier display name, Pro, or Free). */
+  /** Shown next to "Personal Dash" in the workspace dropdown (access role or grant type). */
   personalPlanLabelForWorkspace?: string;
+  /** Billing tier link to `/pricing` (e.g. Team Basic, Pro Plus). */
+  personalAccountPlanLabel?: string;
   /** When nav has no owned team-tier row, Team Dash href still targets this admin workspace. */
   teamDashFallback?: {
     teamId: number;
@@ -69,6 +65,7 @@ export function HeaderUserSection({
   activeWorkspaceTeamId = null,
   personalWorkspaceHref = "/dashboard",
   personalPlanLabelForWorkspace = "Free",
+  personalAccountPlanLabel = "Free",
   teamDashFallback = null,
   resolvedIsPro = false,
   resolvedActiveTeamPlan = null,
@@ -99,38 +96,6 @@ export function HeaderUserSection({
     activeTeamPlan != null &&
     (pathname === "/pricing" || pathname.startsWith("/pricing/"));
 
-  const planName = activeTeamPlan
-    ? TEAM_PLAN_LABELS[activeTeamPlan]
-    : resolvedHasProPlusInterfacePalette
-      ? "Pro Plus"
-      : isPro
-        ? "Pro"
-        : "Free";
-
-  const planNameLinkTooltip = useMemo(() => {
-    let planLabel: string;
-    if (activeTeamPlan != null) {
-      planLabel = `${planName} plan`;
-    } else if (resolvedHasProPlusInterfacePalette) {
-      planLabel =
-        isAdmin || adminGranted
-          ? "Pro Plus plan (complimentary)"
-          : "Pro Plus plan";
-    } else if (isPro) {
-      planLabel = "Pro plan";
-    } else {
-      planLabel = "Free plan";
-    }
-    return `${planLabel} — Opens the pricing page`;
-  }, [
-    activeTeamPlan,
-    planName,
-    isPro,
-    adminGranted,
-    isAdmin,
-    resolvedHasProPlusInterfacePalette,
-  ]);
-
   if (!userId) {
     return null;
   }
@@ -151,29 +116,16 @@ export function HeaderUserSection({
           Platform Admin
         </Link>
       )}
-      <Link
-        href="/pricing"
-        title={planNameLinkTooltip}
-        className="lg:hidden inline-flex"
-      >
-        <Badge
-          variant={isPro ? "default" : "secondary"}
-          className="text-[10px] sm:text-xs font-semibold tracking-wide px-1.5 sm:px-2 cursor-pointer hover:opacity-80 transition-opacity"
-        >
-          {planName}
-        </Badge>
-      </Link>
       <div className="flex min-w-0 flex-row items-center gap-2">
         <Link
           href="/pricing"
-          title={planNameLinkTooltip}
+          title={`${personalAccountPlanLabel} plan — Opens the pricing page`}
           className={cn(
-            "order-1 hidden min-w-0 max-w-[11rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors lg:inline-flex",
+            "min-w-0 max-w-[9rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors sm:max-w-[11rem] xl:max-w-[14rem]",
             isPro && "text-foreground",
-            "xl:max-w-[16rem]",
           )}
         >
-          {planName}
+          {personalAccountPlanLabel}
         </Link>
         {showWorkspaceSwitcher &&
           (workspaceTeams.length > 0 ||
@@ -181,7 +133,7 @@ export function HeaderUserSection({
           !hideWorkspaceSwitcherOnWorkspaceManagement &&
           !hideWorkspaceSwitcherOnTeamRoute &&
           !hideWorkspaceSwitcherOnPricingForTeamTier && (
-            <span className="order-2 inline-flex max-w-full min-w-0 shrink">
+            <span className="inline-flex max-w-full min-w-0 shrink">
               <WorkspaceContextDropdown
                 teams={workspaceTeams}
                 totalEligibleTeamCount={workspaceTeamsTotalEligible}
@@ -194,7 +146,7 @@ export function HeaderUserSection({
           )}
         {/* Avoid Tooltip wrapping UserButton (both use portals) — teardown race → removeChild on null parent. */}
         <span
-          className="order-3 inline-flex shrink-0 items-center"
+          className="inline-flex shrink-0 items-center"
           title="Account"
         >
           <UserButton>

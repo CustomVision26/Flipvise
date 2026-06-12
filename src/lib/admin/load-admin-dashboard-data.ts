@@ -12,10 +12,12 @@ import {
 } from "@/db/queries/admin";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import { listAffiliates } from "@/db/queries/affiliates";
+import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
 import type { AdminDashboardSection } from "@/lib/admin-dashboard-section";
 import { getAdminClerkUserList } from "@/lib/admin/admin-clerk-cache";
 import {
+  buildActiveAffiliateUserIds,
   buildAdminBillingSnapshot,
   clerkUsersToBillingMeta,
 } from "@/lib/admin/admin-billing-snapshot";
@@ -56,21 +58,35 @@ export type AdminOverviewData = {
 };
 
 export async function loadAdminOverviewData(): Promise<AdminOverviewData> {
-  const [{ data: clerkUsers, totalCount }, dbStats, dbPaidSubscriberCount, persistedBillingInvoices] =
-    await runDbTasksWithConcurrencyLimit(
-      [
-        () => getAdminClerkUserList(),
-        () => getAdminOverviewStats(),
-        () => countPaidSubscribersFromDB(),
-        () => listBillingInvoicesForAdmin(OVERVIEW_INVOICE_LIMIT),
-      ] as const,
-      ADMIN_DASHBOARD_DB_CONCURRENCY,
-    );
+  const [
+    { data: clerkUsers, totalCount },
+    dbStats,
+    dbPaidSubscriberCount,
+    persistedBillingInvoices,
+    rawAffiliates,
+    stripeSubscriptions,
+  ] = await runDbTasksWithConcurrencyLimit(
+    [
+      () => getAdminClerkUserList(),
+      () => getAdminOverviewStats(),
+      () => countPaidSubscribersFromDB(),
+      () => listBillingInvoicesForAdmin(OVERVIEW_INVOICE_LIMIT),
+      () => listAffiliates(),
+      () => listStripeSubscriptionsForAdmin(),
+    ] as const,
+    ADMIN_DASHBOARD_DB_CONCURRENCY,
+  );
 
   const billingUsers = clerkUsersToBillingMeta(clerkUsers);
+  const activeAffiliateUserIds = buildActiveAffiliateUserIds(
+    rawAffiliates,
+    billingUsers,
+  );
   const { paidSubscriberCount, subscriptions, invoices } = buildAdminBillingSnapshot({
     users: billingUsers,
     persistedBillingInvoices,
+    stripeSubscriptions,
+    activeAffiliateUserIds,
   });
 
   return {
@@ -266,11 +282,25 @@ export async function loadAdminTabsData(
     case "invoices": {
       const { data: clerkUsers } = await getAdminClerkUserList();
       const invoiceLimit = section === "invoices" ? INVOICES_TAB_LIMIT : OVERVIEW_INVOICE_LIMIT;
-      const persistedBillingInvoices = await listBillingInvoicesForAdmin(invoiceLimit);
+      const [persistedBillingInvoices, rawAffiliates, stripeSubscriptions] =
+        await runDbTasksWithConcurrencyLimit(
+          [
+            () => listBillingInvoicesForAdmin(invoiceLimit),
+            () => listAffiliates(),
+            () => listStripeSubscriptionsForAdmin(),
+          ] as const,
+          ADMIN_DASHBOARD_DB_CONCURRENCY,
+        );
       const billingUsers = clerkUsersToBillingMeta(clerkUsers);
+      const activeAffiliateUserIds = buildActiveAffiliateUserIds(
+        rawAffiliates,
+        billingUsers,
+      );
       const { subscriptions, invoices } = buildAdminBillingSnapshot({
         users: billingUsers,
         persistedBillingInvoices,
+        stripeSubscriptions,
+        activeAffiliateUserIds,
       });
 
       if (section === "subscription") {

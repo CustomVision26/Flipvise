@@ -345,25 +345,31 @@ export function DeckCardPopover({
   const deckGradient = getGradientBySlug(deck.gradient);
   const hasGradient = deckGradient.slug !== "none";
   const deckTextClass = itemPrimaryTextClass(hasGradient);
+  const deckMetaClass = hasGradient ? "text-white/80" : "text-foreground/70";
+  const deckDescriptionClass = hasGradient ? "text-white/80" : "text-foreground/75";
 
   const deckCard = (
     <Card
       className={cn(
         itemCardContainerClass,
         "h-full transition-all duration-200 cursor-pointer select-none",
-        hasGradient ? "hover:opacity-90 hover:shadow-md" : "hover:bg-muted/50 hover:shadow-md",
-        "active:scale-[0.99]",
-        hasGradient && deckGradient.classes,
+        "border shadow-lg shadow-black/30 active:scale-[0.99]",
+        hasGradient
+          ? cn(
+              deckGradient.classes,
+              "border-white/20 ring-1 ring-inset ring-white/15 hover:shadow-xl hover:ring-white/25",
+            )
+          : "border-border/80 bg-card/95 ring-1 ring-foreground/20 backdrop-blur-md hover:border-foreground/30 hover:bg-card hover:shadow-xl",
         view === "compact"
           ? cn("flex flex-col hover:-translate-y-0.5", hasCover && "p-0")
           : view === "list"
             ? cn(
-                "flex flex-row items-center py-2 sm:gap-3",
+                "flex flex-row items-center py-2.5 sm:gap-3",
                 hasCover
                   ? "gap-2.5 pl-2 pr-3 sm:pl-2.5 sm:pr-3"
                   : "gap-3 px-3",
               )
-            : "flex flex-row items-center gap-3 px-4 py-3 sm:gap-4",
+            : "flex min-h-[4.75rem] flex-row items-center gap-3 px-4 py-3.5 sm:gap-4",
       )}
     >
       <ItemWatermark label="DECK" view={view} onGradient={hasGradient} />
@@ -384,7 +390,7 @@ export function DeckCardPopover({
               className={cn(
                 "line-clamp-2 text-[11px] sm:text-xs",
                 deckTextClass,
-                hasGradient && "text-white/70",
+                deckDescriptionClass,
               )}
             >
               {deck.description ?? "No description provided."}
@@ -392,11 +398,11 @@ export function DeckCardPopover({
           </CardHeader>
           <div className="flex-1" />
           <CardFooter className="px-3 pb-3 pt-0 flex items-center justify-between gap-2">
-            <span className={cn("text-[11px] tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+            <span className={cn("text-[11px] tabular-nums", deckMetaClass)}>
               {deck.cardCount}{" "}
               {deck.cardCount === 1 ? "card" : "cards"}
             </span>
-            <span className={cn("text-[11px] tabular-nums truncate", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+            <span className={cn("text-[11px] tabular-nums truncate", deckMetaClass)}>
               {updatedShort}
             </span>
           </CardFooter>
@@ -415,11 +421,11 @@ export function DeckCardPopover({
               {deck.name}
             </p>
           </div>
-          <span className={cn("shrink-0 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+          <span className={cn("shrink-0 text-xs tabular-nums", deckMetaClass)}>
             {deck.cardCount}{" "}
             {deck.cardCount === 1 ? "card" : "cards"}
           </span>
-          <span className={cn("hidden sm:inline shrink-0 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+          <span className={cn("hidden sm:inline shrink-0 text-xs tabular-nums", deckMetaClass)}>
             Updated {updatedLabel}
           </span>
         </>
@@ -439,13 +445,13 @@ export function DeckCardPopover({
               className={cn(
                 "text-xs break-words whitespace-pre-wrap",
                 deckTextClass,
-                hasGradient ? "text-white/70" : "text-muted-foreground",
+                deckDescriptionClass,
               )}
             >
               {deck.description ?? "No description provided."}
             </p>
           </div>
-          <div className={cn("flex flex-wrap shrink-0 items-center gap-x-6 gap-y-1 text-xs tabular-nums", hasGradient ? "text-white/70" : "text-muted-foreground")}>
+          <div className={cn("flex flex-wrap shrink-0 items-center gap-x-6 gap-y-1 text-xs tabular-nums", deckMetaClass)}>
             <span className="sm:w-16 sm:text-right">
               {deck.cardCount}{" "}
               {deck.cardCount === 1 ? "card" : "cards"}

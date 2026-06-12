@@ -12,6 +12,11 @@ import {
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  adminOverviewMetricsLabelClass,
+  adminOverviewMetricsShellClass,
+  adminOverviewMetricsToggleClass,
+} from "@/components/admin-panel-styles";
 import { cn } from "@/lib/utils";
 
 /** Admin sections where the dashboard overview stat row can be folded away. */
@@ -74,7 +79,13 @@ export function AdminOverviewMetricsProvider({ children }: { children: ReactNode
 
   useLayoutEffect(() => {
     const stored = readStoredExpanded();
-    if (stored !== null) setOpen(stored);
+    if (stored !== null) {
+      setOpen(stored);
+      return;
+    }
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setOpen(false);
+    }
   }, []);
 
   const toggle = useCallback(() => {
@@ -102,15 +113,15 @@ export function AdminOverviewMetricsToggle() {
       type="button"
       variant="outline"
       size="sm"
-      className="h-8 w-fit gap-2 text-xs sm:text-sm shrink-0"
+      className={cn(adminOverviewMetricsToggleClass, "w-fit shrink-0")}
       aria-expanded={open}
       aria-controls={panelId}
       onClick={toggle}
     >
       {open ? (
-        <ChevronUp className="h-4 w-4 shrink-0" aria-hidden />
+        <ChevronUp className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
       ) : (
-        <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
       )}
       Overview metrics
     </Button>
@@ -120,10 +131,37 @@ export function AdminOverviewMetricsToggle() {
 /** Collapsible wrapper for the stat card grid — pairs with AdminOverviewMetricsToggle. */
 export function AdminOverviewMetricsPanel({ children }: { children: ReactNode }) {
   const { eligible, open, panelId } = useOverviewMetricsContext();
-  if (!eligible) return children;
+  if (!eligible) {
+    return (
+      <div className={adminOverviewMetricsShellClass}>
+        <p className={adminOverviewMetricsLabelClass}>Overview metrics</p>
+        {children}
+      </div>
+    );
+  }
+
   return (
-    <div id={panelId} className={cn(!open && "hidden")}>
-      {children}
+    <div
+      id={panelId}
+      className={cn(
+        "grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out",
+        open
+          ? "mb-0 grid-rows-[1fr] opacity-100"
+          : "mb-0 grid-rows-[0fr] opacity-0",
+      )}
+      aria-hidden={!open}
+    >
+      <div className="min-h-0 overflow-hidden">
+        <div
+          className={cn(
+            adminOverviewMetricsShellClass,
+            open && "animate-in fade-in-0 slide-in-from-top-2 duration-300 fill-mode-both",
+          )}
+        >
+          <p className={adminOverviewMetricsLabelClass}>Overview metrics</p>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

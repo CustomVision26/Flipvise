@@ -7,7 +7,7 @@ import {
   deleteTeamWorkspaceAction,
   updateTeamWorkspaceNameAction,
 } from "@/actions/teams";
-import { AddTeamDialogLazy } from "@/components/add-team-dialog-lazy";
+import { AddTeamDialog } from "@/components/add-team-dialog";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -160,7 +160,7 @@ export function ManageWorkspacesPanel({
               is deleted.
             </p>
           </div>
-          <AddTeamDialogLazy
+          <AddTeamDialog
             planSlug={addTeamPlanSlug}
             isAtLimit={isAtTeamLimit}
           />

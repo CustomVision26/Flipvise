@@ -157,19 +157,25 @@ export function UserBillingPage() {
 
   const planLabel = serverPlanLabel ?? clientPlanDisplay.planLabel;
   const isPaid = clientPlanDisplay.isPaid;
-  const billingStatus = clientPlanDisplay.billingStatus;
+  const accessSubtitle =
+    serverAccessSubtitle ??
+    (billingLoading ? "Loading plan details…" : clientPlanDisplay.accessSubtitle);
+  const showPaidStripeControls =
+    serverShowPaidStripeControls ??
+    (billingLoading ? false : clientPlanDisplay.showPaidStripeControls);
+  const isComplimentary =
+    serverIsComplimentary ||
+    clientPlanDisplay.isComplimentary ||
+    (serverAccessSubtitle?.toLowerCase().includes("affiliate") ?? false);
+  const billingStatus = isComplimentary
+    ? null
+    : (stripeBillingStatus ?? clientPlanDisplay.billingStatus);
   const isActive =
     billingStatus === "active" ||
     billingStatus === "trialing" ||
-    clientPlanDisplay.isComplimentary;
+    isComplimentary;
   const adminRoleLabel =
     serverAdminRoleLabel ?? clientPlanDisplay.adminRoleLabel;
-  const isComplimentary =
-    serverIsComplimentary || clientPlanDisplay.isComplimentary;
-  const accessSubtitle =
-    serverAccessSubtitle ?? clientPlanDisplay.accessSubtitle;
-  const showPaidStripeControls =
-    serverShowPaidStripeControls ?? clientPlanDisplay.showPaidStripeControls;
 
   return (
     <div ref={rootRef} className="flex flex-col gap-6 p-1 min-h-[120px]">

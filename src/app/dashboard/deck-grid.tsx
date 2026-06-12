@@ -209,7 +209,7 @@ export function DeckGrid({
             ? "grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
             : view === "list"
               ? "flex flex-col gap-1"
-              : "flex flex-col gap-2"
+              : "flex flex-col gap-3"
         }
       >
         {paginated.map((deck) => (

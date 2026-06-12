@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
@@ -45,8 +46,13 @@ import {
   getClerkUserDisplayNameById,
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
-import { AddTeamDialogLazy } from "@/components/add-team-dialog-lazy";
 import { getAccessContext } from "@/lib/access";
+
+/** Turbopack: avoid static SSR import of this client chunk from a Server Component. */
+const AddTeamDialog = dynamic(
+  () => import("@/components/add-team-dialog").then((mod) => mod.AddTeamDialog),
+  { loading: () => null },
+);
 import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
 
 interface PageProps {
@@ -306,7 +312,7 @@ export default async function TeamAdminDashboardView({
           </div>
           {isOwner && isTeamPlanId(selected.planSlug) ? (
             <div className="flex shrink-0 sm:justify-end">
-              <AddTeamDialogLazy
+              <AddTeamDialog
                 planSlug={canonicalTeamPlanId(selected.planSlug)!}
                 isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
               />

@@ -66,7 +66,7 @@ export function AddTeamDialog({
       });
       setOpen(false);
       setName("");
-      router.push("/dashboard");
+      router.push("/dashboard/workspaces");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create team.");

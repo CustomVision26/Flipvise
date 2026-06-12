@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { tabPanelContentClass } from "@/lib/tab-panel-styles";
 
 /** Scroll targets for team-admin section tabs — used in URLs (`#…`) and panel headings. */
 export const TEAM_ADMIN_PANEL_IDS = {
@@ -19,22 +20,22 @@ export function teamAdminPanelHref(href: string, panelId: string): string {
 /** Primary team-admin section tabs (Members, Deck Manager, …). */
 export function teamAdminTabClass(isActive: boolean) {
   return cn(
-    "inline-flex shrink-0 items-center justify-center whitespace-nowrap px-3.5 py-2 text-xs transition-all duration-200 sm:px-4 sm:py-2.5 sm:text-sm",
+    "inline-flex shrink-0 items-center justify-center whitespace-nowrap border-2 px-3.5 py-2 text-xs transition-all duration-200 sm:px-4 sm:py-2.5 sm:text-sm",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    "rounded-full sm:rounded-none sm:border-b",
+    "rounded-full sm:rounded-none sm:border-b-2",
     isActive
-      ? "bg-primary font-bold text-primary-foreground shadow-sm sm:border-primary sm:bg-transparent sm:font-semibold sm:text-foreground"
-      : "bg-muted/60 font-medium text-muted-foreground hover:bg-muted hover:text-foreground sm:border-transparent sm:bg-transparent sm:hover:bg-transparent sm:hover:text-foreground",
+      ? "border-primary bg-primary font-bold text-primary-foreground shadow-sm sm:border-primary sm:bg-transparent sm:font-semibold sm:text-foreground"
+      : "border-transparent bg-muted/60 font-medium text-muted-foreground hover:bg-muted hover:text-foreground sm:bg-transparent sm:hover:bg-transparent sm:hover:text-foreground",
   );
 }
 
 /** Nested pill tabs (Send invite, Pending, …). */
 export function teamAdminSubTabClass(isActive: boolean) {
   return cn(
-    "inline-flex h-9 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors sm:text-sm",
+    "inline-flex h-9 shrink-0 items-center justify-center rounded-md border-2 px-3 text-xs font-medium transition-colors sm:text-sm",
     isActive
-      ? "bg-background text-foreground shadow-sm"
-      : "text-muted-foreground hover:text-foreground",
+      ? "border-primary bg-background font-semibold text-foreground shadow-sm"
+      : "border-transparent text-muted-foreground hover:text-foreground",
   );
 }
 
@@ -42,10 +43,13 @@ export const teamAdminCardClass = "border-border/80 bg-card/60 shadow-sm";
 
 /** Open tab panel — primary border, bold presence, entrance motion. */
 export const teamAdminActivePanelClass = cn(
-  "border-2 border-primary bg-card/90 shadow-lg",
-  "ring-2 ring-primary/20",
+  tabPanelContentClass,
+  "shadow-lg ring-2 ring-primary/20",
   "animate-in fade-in-0 slide-in-from-bottom-3 duration-300 fill-mode-both",
 );
+
+/** Nested sub-tab content (invite send / pending / history, etc.). */
+export const teamAdminSubTabPanelClass = cn(tabPanelContentClass, "p-4");
 
 export const teamAdminActivePanelTitleClass =
   "text-base font-bold tracking-tight text-foreground sm:text-lg";

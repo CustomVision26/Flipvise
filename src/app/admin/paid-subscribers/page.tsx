@@ -259,11 +259,20 @@ export default async function PaidSubscribersPage({
         userId: uid,
         userName: user?.fullName ?? latestInv?.userEmail ?? periodInv?.userEmail ?? uid,
         email: user?.email ?? latestInv?.userEmail ?? periodInv?.userEmail ?? null,
-        planSlug:
+        planSlug: (() => {
+          const slug =
+            (isMetaActive ? user?.planDisplayName : null) ??
+            latestInv?.planSlug ??
+            periodInv?.planSlug ??
+            "pro";
+          return slug;
+        })(),
+        planLabel: displayNameForBillingPlanSlug(
           (isMetaActive ? user?.planDisplayName : null) ??
-          latestInv?.planSlug ??
-          periodInv?.planSlug ??
-          "pro",
+            latestInv?.planSlug ??
+            periodInv?.planSlug ??
+            "pro",
+        ),
         status: isMetaActive ? (user?.billingStatus ?? "active") : "active",
         currency: periodInv?.currency ?? latestInv?.currency ?? null,
         currentPeriodStart: periodInv?.periodStart?.toISOString() ?? null,

@@ -28,11 +28,16 @@ export default async function AdminDashboardPage({
 
   return (
     <AdminOverviewMetricsProvider>
-      <div className="flex flex-1 flex-col gap-4 sm:gap-8 p-4 sm:p-8">
-        <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+      <div className="flex flex-1 flex-col gap-5 sm:gap-8 p-4 sm:p-8">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:gap-4">
+          <div className="min-w-0 space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Platform administration
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              Admin Dashboard
+            </h1>
+            <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
               Monitor and manage all users across Flipvise
             </p>
           </div>

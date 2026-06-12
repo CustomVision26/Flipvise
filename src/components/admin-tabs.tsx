@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo } from "react";
+import { Fragment, useState, useMemo, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
@@ -67,6 +67,23 @@ import type {
 } from "@/lib/admin-dashboard-types";
 import { TEAM_PLAN_LABELS } from "@/lib/team-plans";
 import type { PlanConfig } from "@/components/pricing-content";
+import {
+  adminFilterInputClass,
+  adminMenuCardClass,
+  adminMenuContentClass,
+  adminMenuHeaderClass,
+  adminMenuIconButtonClass,
+  adminMenuTabClass,
+  adminMenuTitleClass,
+  adminPlanHistoryTableShellClass,
+  adminPlansSubTabPanelClass,
+  adminSectionCardClass,
+  adminSectionTitleClass,
+  adminSupportSectionLabelClass,
+  adminShowMenuButtonClass,
+} from "@/components/admin-panel-styles";
+import { cn } from "@/lib/utils";
+import { formatCurrencyFromCents } from "@/lib/format-currency";
 
 export type { SerializedUser, SerializedLog } from "@/lib/admin-dashboard-types";
 
@@ -174,6 +191,12 @@ export function AdminTabs({
   const [invoiceDateFrom, setInvoiceDateFrom] = useState("");
   const [invoiceDateTo, setInvoiceDateTo] = useState("");
   const [sidebarHidden, setSidebarHidden] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setSidebarHidden(true);
+    }
+  }, []);
   const [expandedAllUsersUserId, setExpandedAllUsersUserId] = useState<string | null>(null);
   const [expandedWorkspaceUserId, setExpandedWorkspaceUserId] = useState<string | null>(null);
   const [workspaceDialog, setWorkspaceDialog] = useState<SerializedAdminWorkspace | null>(null);
@@ -234,7 +257,9 @@ export function AdminTabs({
       if (q) {
         const nameMatch = row.userName.toLowerCase().includes(q);
         const emailMatch = (row.email ?? "").toLowerCase().includes(q);
-        const planMatch = row.planSlug.toLowerCase().includes(q);
+        const planMatch =
+          row.planSlug.toLowerCase().includes(q) ||
+          row.planLabel.toLowerCase().includes(q);
         if (!nameMatch && !emailMatch && !planMatch) return false;
       }
       if (paidOnlyFilter === "paid-only") {
@@ -298,16 +323,18 @@ export function AdminTabs({
   });
 
   return (
-    <div className={`grid gap-4 ${sidebarHidden ? "grid-cols-1" : "lg:grid-cols-[15rem_minmax(0,1fr)]"}`}>
+    <div
+      className={`grid gap-4 sm:gap-6 ${sidebarHidden ? "grid-cols-1" : "lg:grid-cols-[15rem_minmax(0,1fr)]"}`}
+    >
       {sidebarHidden ? null : (
-        <Card className="h-fit">
-          <CardHeader className="pb-3">
+        <Card className={adminMenuCardClass}>
+          <CardHeader className={adminMenuHeaderClass}>
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base">Admin Menu</CardTitle>
+              <CardTitle className={adminMenuTitleClass}>Admin Menu</CardTitle>
               <button
                 type="button"
                 onClick={() => setSidebarHidden(true)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border hover:bg-accent/50"
+                className={adminMenuIconButtonClass}
                 aria-label="Hide admin menu"
                 title="Hide admin menu"
               >
@@ -315,15 +342,15 @@ export function AdminTabs({
               </button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className={adminMenuContentClass}>
             <button
               type="button"
               onClick={() => router.push("/admin/all-users")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "all-users" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "all-users")}
             >
-              <span className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                All Users
+              <span className="flex w-full items-center gap-2.5">
+                <Users className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">All Users</span>
                 {bannedCount > 0 ? (
                   <Badge variant="destructive" className="ml-auto text-xs">
                     {bannedCount}
@@ -334,41 +361,41 @@ export function AdminTabs({
             <button
               type="button"
               onClick={() => router.push("/admin/team-workspaces")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "workspace-admin" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "workspace-admin")}
             >
-              <span className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Team Workspaces
+              <span className="flex w-full items-center gap-2.5">
+                <Building2 className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Team Workspaces</span>
               </span>
             </button>
             <button
               type="button"
               onClick={() => router.push("/admin/subscription")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "subscription" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "subscription")}
             >
-              <span className="flex items-center gap-2">
-                <WalletCards className="h-4 w-4" />
-                Subscription
+              <span className="flex w-full items-center gap-2.5">
+                <WalletCards className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Subscription</span>
               </span>
             </button>
             <button
               type="button"
               onClick={() => router.push("/admin/invoices")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "invoices" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "invoices")}
             >
-              <span className="flex items-center gap-2">
-                <ReceiptText className="h-4 w-4" />
-                Invoices
+              <span className="flex w-full items-center gap-2.5">
+                <ReceiptText className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Invoices</span>
               </span>
             </button>
             <button
               type="button"
               onClick={() => router.push("/admin/admin-roles")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "admin-roles" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "admin-roles")}
             >
-              <span className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" />
-                Admin Roles
+              <span className="flex w-full items-center gap-2.5">
+                <ShieldCheck className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Admin Roles</span>
                 {logs.length > 0 ? (
                   <Badge className="ml-auto text-xs" variant="secondary">
                     {logs.length}
@@ -379,11 +406,11 @@ export function AdminTabs({
             <button
               type="button"
               onClick={() => router.push("/admin/support-center")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "support-center" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "support-center")}
             >
-              <span className="flex items-center gap-2">
-                <LifeBuoy className="h-4 w-4" />
-                Support Center
+              <span className="flex w-full items-center gap-2.5">
+                <LifeBuoy className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Support Center</span>
                 {supportStats.totals.openCount > 0 ? (
                   <Badge className="ml-auto text-xs" variant="destructive">
                     {supportStats.totals.openCount}
@@ -394,11 +421,11 @@ export function AdminTabs({
             <button
               type="button"
               onClick={() => router.push("/admin/plans")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "plans" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "plans")}
             >
-              <span className="flex items-center gap-2">
-                <LayoutList className="h-4 w-4" />
-                Plans
+              <span className="flex w-full items-center gap-2.5">
+                <LayoutList className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Plans</span>
                 {planAssignmentLogs.length > 0 ? (
                   <Badge className="ml-auto text-xs" variant="secondary">
                     {planAssignmentLogs.length}
@@ -409,11 +436,11 @@ export function AdminTabs({
             <button
               type="button"
               onClick={() => router.push("/admin/marketing-affiliates")}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${activeSection === "marketing-affiliates" ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              className={adminMenuTabClass(activeSection === "marketing-affiliates")}
             >
-              <span className="flex items-center gap-2">
-                <Megaphone className="h-4 w-4" />
-                Marketing Affiliates
+              <span className="flex w-full items-center gap-2.5">
+                <Megaphone className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Marketing Affiliates</span>
                 {(() => {
                   const active = affiliates.filter((a) => a.status === "active").length;
                   const pending = affiliates.filter((a) => a.status === "pending").length;
@@ -435,51 +462,52 @@ export function AdminTabs({
         </Card>
       )}
 
-      <div>
+      <div className="min-w-0">
       {sidebarHidden ? (
-        <div className="mb-3">
+        <div className="mb-4">
           <button
             type="button"
             onClick={() => setSidebarHidden(false)}
-            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-accent/50"
+            className={adminShowMenuButtonClass}
             aria-label="Show admin menu"
           >
-            <PanelLeftOpen className="h-4 w-4" />
-            Show Admin Menu
+            <PanelLeftOpen className="h-4 w-4 shrink-0 opacity-80" />
+            Admin Menu
           </button>
         </div>
       ) : null}
       {activeSection === "all-users" ? (
-        <Card className="rounded-tl-none border-t-0">
-          <CardHeader className="pb-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>All Users</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
+        <Card className={adminSectionCardClass}>
+          <CardHeader className="space-y-4 border-b border-border/50 pb-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 space-y-1">
+                <CardTitle className={adminSectionTitleClass}>All Users</CardTitle>
+                <p className="text-sm text-muted-foreground">
                   {filteredUsers.length} of {users.length} users
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Double-click a user row to expand personal plan details.
+                  <span className="hidden sm:inline"> · </span>
+                  <span className="block sm:inline text-xs sm:text-sm">
+                    Double-click a row to expand plan details
+                  </span>
                 </p>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <div className="flex w-full min-w-0 flex-col gap-2 lg:max-w-xl">
                 {/* Search */}
-                <div className="relative w-full sm:w-auto sm:min-w-[220px]">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <div className="relative w-full min-w-0">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search by name or email…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 w-full"
+                    className={cn(adminFilterInputClass, "w-full pl-8")}
                   />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   {/* Plan filter */}
                   <Select
                     value={planFilter}
                     onValueChange={(v) => setPlanFilter(v as PlanFilter)}
                   >
-                    <SelectTrigger className="w-[calc(50%-4px)] sm:w-[130px]">
+                    <SelectTrigger className={cn(adminFilterInputClass, "w-full sm:w-[130px]")}>
                       <SelectValue placeholder="Plan" />
                     </SelectTrigger>
                     <SelectContent>
@@ -493,7 +521,7 @@ export function AdminTabs({
                     value={roleFilter}
                     onValueChange={(v) => setRoleFilter(v as RoleFilter)}
                   >
-                    <SelectTrigger className="w-[calc(50%-4px)] sm:w-[130px]">
+                    <SelectTrigger className={cn(adminFilterInputClass, "w-full sm:w-[130px]")}>
                       <SelectValue placeholder="Role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -507,7 +535,7 @@ export function AdminTabs({
                     value={statusFilter}
                     onValueChange={(v) => setStatusFilter(v as StatusFilter)}
                   >
-                    <SelectTrigger className="w-full sm:w-[130px]">
+                    <SelectTrigger className={cn(adminFilterInputClass, "col-span-2 w-full sm:col-span-1 sm:w-[130px]")}>
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -679,7 +707,7 @@ export function AdminTabs({
       ) : null}
 
       {activeSection === "workspace-admin" ? (
-        <Card className="rounded-tl-none border-t-0">
+        <Card className={adminSectionCardClass}>
           <CardHeader>
             <CardTitle>Team Workspace Management</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -956,7 +984,7 @@ export function AdminTabs({
       ) : null}
 
       {activeSection === "subscription" ? (
-        <Card className="rounded-tl-none border-t-0">
+        <Card className={adminSectionCardClass}>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -986,7 +1014,7 @@ export function AdminTabs({
                     subscriptionRows.map((row) => [
                       row.userName,
                       row.email,
-                      row.planSlug,
+                      row.planLabel,
                       row.status,
                       row.currentPeriodStart,
                       row.currentPeriodEnd,
@@ -1074,8 +1102,8 @@ export function AdminTabs({
                         {row.email ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={row.planSlug === "Free" ? "secondary" : "default"}>
-                          {row.planSlug}
+                        <Badge variant={row.planSlug === "free" ? "secondary" : "default"}>
+                          {row.planLabel}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -1107,7 +1135,7 @@ export function AdminTabs({
       ) : null}
 
       {activeSection === "invoices" ? (
-        <Card className="rounded-tl-none border-t-0">
+        <Card className={adminSectionCardClass}>
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1141,8 +1169,7 @@ export function AdminTabs({
                       row.userName,
                       row.email,
                       row.status,
-                      row.amountDue,
-                      row.currency,
+                      formatCurrencyFromCents(row.amountDue, row.currency),
                       row.createdAt,
                       row.periodStart,
                       row.periodEnd,
@@ -1232,10 +1259,8 @@ export function AdminTabs({
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {invoice.status}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {invoice.amountDue != null
-                          ? `${invoice.amountDue.toLocaleString()} ${invoice.currency ?? ""}`.trim()
-                          : "—"}
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                        {formatCurrencyFromCents(invoice.amountDue, invoice.currency)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {formatDate(invoice.createdAt)}
@@ -1283,7 +1308,7 @@ export function AdminTabs({
 
       {/* ── Admin roles + privilege audit (sub-tabs; URLs /admin/admin-roles & /admin/audit-log) ── */}
       {activeSection === "admin-roles" ? (
-        <Card className="rounded-tl-none border-t-0">
+        <Card className={adminSectionCardClass}>
           <CardHeader>
             <CardTitle>Admin roles</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -1460,14 +1485,12 @@ export function AdminTabs({
 
       {/* ── Support Center ── */}
       {activeSection === "support-center" ? (
-      <div className="mt-0 px-4 pb-8 sm:px-6">
         <AdminSupportPanel tickets={supportTickets} stats={supportStats} />
-      </div>
       ) : null}
 
       {/* ── Plans (pricing editor + assignment history) ── */}
       {activeSection === "plans" ? (
-        <Card className="rounded-tl-none border-t-0">
+        <Card className={adminSectionCardClass}>
           <CardHeader>
             <CardTitle>Plans</CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -1500,40 +1523,49 @@ export function AdminTabs({
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="pricing-plans" className="mt-4 flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">
-                  Edit plan names, prices, descriptions, and features. Changes are saved to the pricing
-                  page immediately after clicking Save on each plan card.
-                </p>
-                <AdminPlansEditor initialPlans={plansConfig} affiliates={affiliates} />
+              <TabsContent value="pricing-plans" className="mt-0">
+                <div className={adminPlansSubTabPanelClass}>
+                  <p className={adminSupportSectionLabelClass}>Public pricing</p>
+                  <p className="text-sm text-muted-foreground">
+                    Edit plan names, prices, descriptions, and features. Changes are saved to the pricing
+                    page immediately after clicking Save on each plan card.
+                  </p>
+                  <AdminPlansEditor initialPlans={plansConfig} affiliates={affiliates} />
+                </div>
               </TabsContent>
 
-              <TabsContent value="plan-history" className="mt-4 space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  A full record of every plan assignment and user ban/unban performed by admins,
-                  showing the user affected, previous and new plan, and who made the change.
-                </p>
-                <div className="overflow-x-auto rounded-md border">
+              <TabsContent value="plan-history" className="mt-0">
+                <div className={adminPlansSubTabPanelClass}>
+                  <p className={adminSupportSectionLabelClass}>Assignment audit log</p>
+                  <p className="text-sm text-muted-foreground">
+                    A full record of every plan assignment and user ban/unban performed by admins,
+                    showing the user affected, previous and new plan, and who made the change.
+                  </p>
+                  <div className={adminPlanHistoryTableShellClass}>
                   {planAssignmentLogs.length === 0 ? (
-                    <p className="p-6 text-sm text-muted-foreground">
+                    <p className="px-4 py-10 text-center text-sm text-muted-foreground">
                       No plan or ban actions recorded yet. Changes will appear here automatically after any
                       plan assignment or user ban.
                     </p>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>User</TableHead>
-                          <TableHead>Previous Plan</TableHead>
-                          <TableHead>Action</TableHead>
-                          <TableHead>New Plan</TableHead>
-                          <TableHead>Admin</TableHead>
-                          <TableHead>Date &amp; Time</TableHead>
+                        <TableRow className="border-b border-border/60 hover:bg-transparent">
+                          <TableHead className="text-xs">User</TableHead>
+                          <TableHead className="text-xs">Previous Plan</TableHead>
+                          <TableHead className="text-xs">Action</TableHead>
+                          <TableHead className="text-xs">New Plan</TableHead>
+                          <TableHead className="text-xs">Admin</TableHead>
+                          <TableHead className="text-xs">Date &amp; Time</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {planAssignmentLogs.map((log) => (
-                          <TableRow key={log.id}>
+                          <TableRow
+                            key={log.id}
+                            className="border-b border-border/40 transition-colors hover:bg-muted/30"
+                          >
                             <TableCell>
                               <div className="font-medium whitespace-nowrap">{log.targetUserName}</div>
                               {log.targetUserEmail ? (
@@ -1576,14 +1608,16 @@ export function AdminTabs({
                             <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                               {log.assignedByName}
                             </TableCell>
-                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                            <TableCell className="text-muted-foreground text-sm whitespace-nowrap tabular-nums">
                               {formatDateTime(log.createdAt)}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

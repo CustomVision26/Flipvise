@@ -8,6 +8,7 @@ import {
   useState,
   useTransition,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -34,6 +35,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   CheckCircle,
   XCircle,
@@ -498,13 +507,10 @@ export function QuizStudy({
     totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
   const revealQuizResult = useCallback((res: QuizResult) => {
-    if (securityEnabled) {
-      setResult(res);
-      return;
-    }
     setSubmitChoiceDialogOpen(false);
-    window.setTimeout(() => setResult(res), 0);
-  }, [securityEnabled]);
+    setConfirmOpen(false);
+    setResult(res);
+  }, []);
 
   const submitQuiz = useCallback(
     (reason: SubmitQuizOptions) => {
@@ -855,24 +861,22 @@ export function QuizStudy({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
+      <Dialog
         open={submitChoiceDialogOpen}
-        onOpenChange={(open) => {
-          if (!open && submitChoiceTimedOut && !result && !submitting) {
-            return;
-          }
-          setSubmitChoiceDialogOpen(open);
-        }}
+        onOpenChange={setSubmitChoiceDialogOpen}
       >
-        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base sm:text-lg">
+        <DialogContent
+          className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto sm:max-w-md"
+          showCloseButton={false}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">
               {submitChoiceDialogTitle()}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs sm:text-sm">
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm text-left">
               {submitChoiceDialogDescription()}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-3 rounded-lg border border-border/80 bg-muted/15 p-3 text-left">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
               Save result to
@@ -903,7 +907,7 @@ export function QuizStudy({
               </div>
             ) : null}
           </div>
-          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0 sm:justify-end">
             {!submitChoiceTimedOut ? (
               <Button
                 type="button"
@@ -924,48 +928,46 @@ export function QuizStudy({
             >
               View results only
             </Button>
-            <AlertDialogAction
+            <Button
+              type="button"
               className="w-full sm:w-auto"
               disabled={submitting || buildSubmitInboxTargets().length === 0}
               onClick={handleSubmitChoiceSaveAndView}
             >
               {submitting ? "Submitting…" : "Save & view results"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 
-  if (result) {
-    return (
-      <>
-        <QuizResultCard
-          result={result}
-          questions={questions}
-          selectedByIndex={selectedByIndex}
-          deckId={deckId}
-          deckName={deckName}
-          teamId={teamId}
-          deckGradient={deckGradient}
-          autoSaveQuizResult={shouldAutoSaveResult}
-          autoPersisted={autoPersisted}
-          autoPersistError={autoPersistError}
-          onRetake={handleRetake}
-          onBack={leaveStudy}
-          backLabel={exitLabel}
-          allowRetake={!securityEnabled}
-          hideSaveResult={shouldAutoSaveResult}
-          securedQuiz={securityEnabled}
-        />
-        {quizSubmitDialogs}
-      </>
-    );
-  }
+  let quizBody: ReactNode;
 
-  if (isSecurityTerminated || isSecurityCompleted) {
+  if (result) {
+    quizBody = (
+      <QuizResultCard
+        result={result}
+        questions={questions}
+        selectedByIndex={selectedByIndex}
+        deckId={deckId}
+        deckName={deckName}
+        teamId={teamId}
+        deckGradient={deckGradient}
+        autoSaveQuizResult={shouldAutoSaveResult}
+        autoPersisted={autoPersisted}
+        autoPersistError={autoPersistError}
+        onRetake={handleRetake}
+        onBack={leaveStudy}
+        backLabel={exitLabel}
+        allowRetake={!securityEnabled}
+        hideSaveResult={shouldAutoSaveResult}
+        securedQuiz={securityEnabled}
+      />
+    );
+  } else if (isSecurityTerminated || isSecurityCompleted) {
     const isTerminated = isSecurityTerminated;
-    return (
+    quizBody = (
       <div className="flex flex-1 items-center justify-center px-4 py-6">
         <Card className="w-full max-w-md shadow-md">
           <CardHeader className="text-center">
@@ -995,10 +997,8 @@ export function QuizStudy({
         </Card>
       </div>
     );
-  }
-
-  if (isSecurityLocked) {
-    return (
+  } else if (isSecurityLocked) {
+    quizBody = (
       <div className="flex flex-1 items-center justify-center px-4 py-6">
         <Card className="w-full max-w-md shadow-md">
           <CardHeader className="text-center">
@@ -1023,10 +1023,8 @@ export function QuizStudy({
         </Card>
       </div>
     );
-  }
-
-  if (totalQuestions === 0) {
-    return (
+  } else if (totalQuestions === 0) {
+    quizBody = (
       <div className="flex flex-1 items-center justify-center px-4">
         <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-md text-center flex flex-col gap-3">
           <CircleHelp className="h-10 w-10 text-muted-foreground mx-auto" />
@@ -1047,10 +1045,8 @@ export function QuizStudy({
         </div>
       </div>
     );
-  }
-
-  if (!quizStarted) {
-    return (
+  } else if (!quizStarted) {
+    quizBody = (
       <div
         className="flex flex-1 items-center justify-center px-4 py-6"
         style={deckAccentCss}
@@ -1139,15 +1135,13 @@ export function QuizStudy({
         </Card>
       </div>
     );
-  }
-
+  } else {
   const current = questions[currentIndex];
   const selectedForCurrent = selectedByIndex[currentIndex];
   const timerWarning = remainingSeconds <= 60;
   const timerCritical = remainingSeconds <= 30;
 
-  return (
-    <>
+  quizBody = (
     <div
       className="flex flex-1 flex-col items-center gap-4 sm:gap-6 w-full min-w-0"
       style={deckAccentCss}
@@ -1418,7 +1412,13 @@ export function QuizStudy({
         </div>
       )}
     </div>
-    {quizSubmitDialogs}
+  );
+  }
+
+  return (
+    <>
+      {quizBody}
+      {quizSubmitDialogs}
     </>
   );
 }

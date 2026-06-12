@@ -10,7 +10,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
-import { personalWorkspacePlanDisplayLabel } from "@/lib/personal-workspace-plan-label";
+import {
+  getPersonalWorkspaceAccessLabel,
+  getPersonalWorkspaceAccountPlanLabel,
+} from "@/lib/personal-workspace-plan-label";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import {
   countPendingInvitationsForEmail,
@@ -136,13 +139,13 @@ export default async function RootLayout({
     workspaceTeamsTotalEligible > 0 ||
     (activeTeamPlan != null && isTeamPlanId(activeTeamPlan));
 
-  /** Next to “Personal Dash” — team tier name, else Pro Plus / Pro / Free (admins → Pro Plus). */
-  const personalPlanLabelForWorkspace = personalWorkspacePlanDisplayLabel({
-    activeTeamPlan,
-    isPro,
-    hasProPlusInterfacePalette,
-  });
-
+  /** Next to “Personal Dash” — SuperAdmin, Co-Admin, plan name, Subscriber, Complimentary, or Free / tier. */
+  const personalPlanLabelForWorkspace = userId
+    ? await getPersonalWorkspaceAccessLabel()
+    : "Free";
+  const personalAccountPlanLabel = userId
+    ? await getPersonalWorkspaceAccountPlanLabel()
+    : "Free";
   /** When the workspace nav lacks subscriber-owned team rows, still link Team Dash from admin scope. */
   const teamDashFallback =
     userId != null &&
@@ -253,6 +256,7 @@ export default async function RootLayout({
                         personalPlanLabelForWorkspace={
                           personalPlanLabelForWorkspace
                         }
+                        personalAccountPlanLabel={personalAccountPlanLabel}
                         teamDashFallback={teamDashFallback}
                         resolvedIsPro={isPro}
                         resolvedActiveTeamPlan={activeTeamPlan}

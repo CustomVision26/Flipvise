@@ -25,6 +25,7 @@ import type {
   SerializedAdminInvoice,
 } from "@/lib/admin-dashboard-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { cn } from "@/lib/utils";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ type Props = {
   dbPaidSubscriberCount: number;
   subscriptions: SerializedAdminSubscription[];
   invoices: SerializedAdminInvoice[];
+  className?: string;
 };
 
 export function PaidSubscribersCard({
@@ -116,6 +118,7 @@ export function PaidSubscribersCard({
   dbPaidSubscriberCount,
   subscriptions,
   invoices,
+  className,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -192,21 +195,26 @@ export function PaidSubscribersCard({
   return (
     <>
       <Card
-        className="cursor-pointer select-none transition-all hover:ring-2 hover:ring-green-500/40"
+        className={cn(
+          className,
+          "h-full cursor-pointer select-none hover:ring-2 hover:ring-green-500/30",
+        )}
         onClick={handleClick}
         title="Click to open full page · Double-click to preview"
       >
-        <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-          <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
             Paid Subscribers
           </CardTitle>
-          <BadgeCheck className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-green-500" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/10">
+            <BadgeCheck className="h-3.5 w-3.5 text-green-500 sm:h-4 sm:w-4" />
+          </span>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl sm:text-3xl font-bold text-green-500">
+          <p className="text-2xl font-bold tabular-nums text-green-500 sm:text-3xl">
             {dbPaidSubscriberCount.toLocaleString()}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
             Paid via Stripe
             {paidSubscriberCount > 0 && (
               <> · <span className="text-green-500">{paidSubscriberCount} active</span></>

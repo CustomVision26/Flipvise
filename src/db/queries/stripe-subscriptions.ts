@@ -170,6 +170,16 @@ export async function getStripeSubscriptionBySubscriptionId(
   }
 }
 
+/** All persisted Stripe subscription rows (admin billing views). */
+export async function listStripeSubscriptionsForAdmin() {
+  try {
+    return await db.select().from(stripeSubscriptions);
+  } catch (error) {
+    if (isRecoverableStripeSubscriptionsReadError(error)) return [];
+    throw error;
+  }
+}
+
 /** Mark a subscription row as canceled/expired by subscription ID. */
 export async function markStripeSubscriptionStatus(
   stripeSubscriptionId: string,

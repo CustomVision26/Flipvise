@@ -62,6 +62,8 @@ import {
 } from "@/lib/affiliate-invite-expiry";
 import { resolveAffiliateInviteEmailConflict } from "@/lib/affiliate-invite-email-conflict";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { adminSectionCardClass } from "@/components/admin-panel-styles";
 
 interface AdminAffiliatesPanelProps {
   affiliates: SerializedAffiliate[];
@@ -478,11 +480,21 @@ export function AdminAffiliatesPanel({
     });
   }
 
+  const affiliateDialogContentClass =
+    "flex max-h-[min(92dvh,44rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:w-full sm:max-w-md";
+  const affiliateDialogHeaderClass =
+    "shrink-0 min-w-0 space-y-2 px-3 pt-4 pr-10 sm:px-4 sm:pr-12";
+  const affiliateDialogBodyClass =
+    "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 sm:px-4";
+  const affiliateDialogFooterClass =
+    "shrink-0 flex flex-col-reverse gap-2 border-t border-border px-3 py-3 sm:flex-row sm:justify-end sm:px-4 sm:py-4";
+  const affiliateDialogFieldClass = "w-full min-w-0 max-w-full";
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>
-      <Card className="rounded-tl-none border-t-0">
+      <Card className={adminSectionCardClass}>
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -545,7 +557,7 @@ export function AdminAffiliatesPanel({
           </div>
         </CardHeader>
 
-        <CardContent className="p-0">
+        <CardContent className="overflow-x-auto p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -814,13 +826,13 @@ export function AdminAffiliatesPanel({
           if (!open) resetInviteForm();
         }}
       >
-        <DialogContent className="flex max-h-[min(92vh,44rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
-          <DialogHeader className="shrink-0 space-y-2 px-4 pt-4 pr-12">
+        <DialogContent className={affiliateDialogContentClass}>
+          <DialogHeader className={affiliateDialogHeaderClass}>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
+              <UserPlus className="h-5 w-5 shrink-0" />
               Invite Affiliate
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-pretty break-words">
               The affiliate plan activates only after the invitee accepts. If they already have a
               Flipvise account (email matches Clerk), only their app inbox receives the invite — no outgoing
               email. If no account exists yet, Loops sends an invitation email to their address (when configured).
@@ -828,8 +840,8 @@ export function AdminAffiliatesPanel({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-2 [scrollbar-gutter:stable]">
-          <div className="space-y-4 pb-4">
+          <div className={affiliateDialogBodyClass}>
+          <div className="min-w-0 space-y-4 pb-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Full Name</label>
               <Input
@@ -837,8 +849,9 @@ export function AdminAffiliatesPanel({
                 value={inviteName}
                 onChange={(e) => setInviteName(e.target.value)}
                 disabled={isPending}
+                className={affiliateDialogFieldClass}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-pretty break-words text-muted-foreground">
                 If the email belongs to an existing Flipvise account, the name is filled from their profile automatically.
               </p>
             </div>
@@ -852,16 +865,17 @@ export function AdminAffiliatesPanel({
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 disabled={isPending}
+                className={affiliateDialogFieldClass}
               />
               {/* Account lookup feedback */}
               {inviteEmail.includes("@") && (
-                <div className="text-xs rounded-md border px-3 py-2 min-h-[2rem] flex items-center gap-2">
+                <div className="flex min-h-[2rem] min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-xs break-words">
                   {emailLookupLoading ? (
                     <span className="text-muted-foreground">Looking up account…</span>
                   ) : emailLookup === null ? null : emailLookup.found ? (
                     <>
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      <span>
+                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                      <span className="min-w-0 flex-1 text-pretty">
                         <span className="font-medium text-foreground">
                           {emailLookup.name.trim() || "Registered account"}
                         </span>
@@ -878,8 +892,8 @@ export function AdminAffiliatesPanel({
                     </>
                   ) : (
                     <>
-                      <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      <span className="text-muted-foreground">
+                      <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <span className="min-w-0 flex-1 text-pretty text-muted-foreground">
                         No Flipvise account on this email — <span className="font-medium text-foreground">Send Invite</span>{" "}
                         triggers a Loops invitation email when configured; they choose the affiliate grant only after accepting.
                       </span>
@@ -890,10 +904,10 @@ export function AdminAffiliatesPanel({
             </div>
 
             {inviteEmailConflict && (
-              <Alert variant={inviteEmailConflict.variant}>
-                <AlertCircle className="h-4 w-4" aria-hidden />
+              <Alert variant={inviteEmailConflict.variant} className="min-w-0">
+                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
                 <AlertTitle>{inviteEmailConflict.title}</AlertTitle>
-                <AlertDescription className="space-y-2">
+                <AlertDescription className="space-y-2 text-pretty break-words">
                   <p>{inviteEmailConflict.detail}</p>
                   {inviteEmailConflict.affiliateId != null && (
                     <Button
@@ -924,7 +938,7 @@ export function AdminAffiliatesPanel({
                 value={invitePlan}
                 onValueChange={(v) => { if (v) setInvitePlan(v as AffiliatePlanValue); }}
               >
-                <SelectTrigger className="w-full" disabled={isPending}>
+                <SelectTrigger className={affiliateDialogFieldClass} disabled={isPending}>
                   <SelectValue placeholder="Select plan" />
                 </SelectTrigger>
                 <SelectContent>
@@ -950,17 +964,17 @@ export function AdminAffiliatesPanel({
                 value={inviteExpiresInDaysStr}
                 onChange={(e) => setInviteExpiresInDaysStr(e.target.value)}
                 disabled={isPending}
-                className="tabular-nums"
+                className={cn(affiliateDialogFieldClass, "tabular-nums")}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-pretty break-words text-muted-foreground">
                 How long the invitee can use the email or inbox link to accept (1–365). Default when
                 you open this form is {defaultInviteExpiresInDays} (from server settings).
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              <label className="flex items-center gap-1.5 text-sm font-medium">
+                <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
                 Affiliation End Date
               </label>
               <Input
@@ -969,29 +983,32 @@ export function AdminAffiliatesPanel({
                 value={inviteEndsAt}
                 onChange={(e) => setInviteEndsAt(e.target.value)}
                 disabled={isPending}
+                className={affiliateDialogFieldClass}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-pretty break-words text-muted-foreground">
                 Plan access expires on this date even if not revoked sooner.
               </p>
             </div>
 
             {inviteError && (
-              <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">
+              <p className="text-pretty break-words rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {inviteError}
               </p>
             )}
           </div>
           </div>
 
-          <div className="shrink-0 flex justify-end gap-2 border-t border-border px-4 py-4">
+          <div className={affiliateDialogFooterClass}>
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => setInviteOpen(false)}
               disabled={isPending}
             >
               Cancel
             </Button>
             <Button
+              className="w-full sm:w-auto"
               onClick={handleInviteSubmit}
               disabled={isPending || !!inviteEmailConflict}
             >
@@ -1014,19 +1031,19 @@ export function AdminAffiliatesPanel({
           }
         }}
       >
-        <DialogContent className="flex max-h-[min(92vh,44rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
-          <DialogHeader className="shrink-0 space-y-2 px-4 pt-4 pr-12">
+        <DialogContent className={affiliateDialogContentClass}>
+          <DialogHeader className={affiliateDialogHeaderClass}>
             <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-5 w-5" />
+              <Pencil className="h-5 w-5 shrink-0" />
               Edit Affiliate
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-pretty break-words">
               Update details for{" "}
               <span className="font-semibold text-foreground">{editTarget?.affiliateName ?? ""}</span>.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-2 [scrollbar-gutter:stable]">
+          <div className={affiliateDialogBodyClass}>
           {editTarget?.status === "pending" && (
               <Alert className="mb-4 border-border bg-muted/30">
                 <Megaphone className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -1082,7 +1099,7 @@ export function AdminAffiliatesPanel({
               </Alert>
             )}
 
-          <div className="space-y-4 pb-4">
+          <div className="min-w-0 space-y-4 pb-4">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium text-foreground">Full Name</Label>
               <Input
@@ -1091,6 +1108,7 @@ export function AdminAffiliatesPanel({
                 disabled={isPending || editTarget?.status === "active"}
                 readOnly={editTarget?.status === "active"}
                 aria-readonly={editTarget?.status === "active" || undefined}
+                className={affiliateDialogFieldClass}
               />
               {editTarget?.status === "active" && (
                 <p className="text-xs text-muted-foreground">
@@ -1107,15 +1125,16 @@ export function AdminAffiliatesPanel({
                 disabled={isPending || editTarget?.status === "active"}
                 readOnly={editTarget?.status === "active"}
                 aria-readonly={editTarget?.status === "active" || undefined}
+                className={affiliateDialogFieldClass}
               />
               {editTarget?.status === "pending" && editEmail.includes("@") && (
-                <div className="text-xs rounded-md border px-3 py-2 min-h-[2rem] flex items-center gap-2">
+                <div className="flex min-h-[2rem] min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-xs break-words">
                   {editEmailLookupLoading ? (
                     <span className="text-muted-foreground">Looking up account…</span>
                   ) : editEmailLookup === null ? null : editEmailLookup.found ? (
                     <>
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      <span>
+                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                      <span className="min-w-0 flex-1 text-pretty">
                         <span className="font-medium text-foreground">
                           {editEmailLookup.name.trim() || "Registered account"}
                         </span>
@@ -1128,8 +1147,10 @@ export function AdminAffiliatesPanel({
                     </>
                   ) : (
                     <>
-                      <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      <span className="text-muted-foreground">No Clerk account on this email — name is manual only.</span>
+                      <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      <span className="min-w-0 flex-1 text-pretty text-muted-foreground">
+                        No Clerk account on this email — name is manual only.
+                      </span>
                     </>
                   )}
                 </div>
@@ -1138,7 +1159,7 @@ export function AdminAffiliatesPanel({
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Plan Assigned</label>
               <Select modal={false} value={editPlan} onValueChange={(v) => { if (v) setEditPlan(v as AffiliatePlanValue); }}>
-                <SelectTrigger className="w-full" disabled={isPending}>
+                <SelectTrigger className={affiliateDialogFieldClass} disabled={isPending}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1148,7 +1169,7 @@ export function AdminAffiliatesPanel({
                 </SelectContent>
               </Select>
               {editTarget?.status === "active" && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-pretty break-words text-muted-foreground">
                   Changing plan or end date adds an in-app inbox confirmation for the affiliate. Nothing changes
                   on their account until they accept.
                 </p>
@@ -1159,7 +1180,13 @@ export function AdminAffiliatesPanel({
                 <CalendarClock className="h-4 w-4 text-muted-foreground" />
                 Affiliation End Date
               </label>
-              <Input type="date" value={editEndsAt} onChange={(e) => setEditEndsAt(e.target.value)} disabled={isPending} />
+              <Input
+                type="date"
+                value={editEndsAt}
+                onChange={(e) => setEditEndsAt(e.target.value)}
+                disabled={isPending}
+                className={affiliateDialogFieldClass}
+              />
             </div>
             {editTarget?.status === "pending" && (
               <div className="space-y-1.5">
@@ -1175,9 +1202,9 @@ export function AdminAffiliatesPanel({
                   value={editInviteExpiresInDaysStr}
                   onChange={(e) => setEditInviteExpiresInDaysStr(e.target.value)}
                   disabled={isPending}
-                  className="tabular-nums"
+                  className={cn(affiliateDialogFieldClass, "tabular-nums")}
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-pretty break-words text-muted-foreground">
                   On save, the accept-by deadline is set from <span className="font-medium text-foreground">now</span>{" "}
                   using this many days (1–365). Current deadline:{" "}
                   {formatDate(editTarget.inviteExpiresAt)}.
@@ -1185,14 +1212,23 @@ export function AdminAffiliatesPanel({
               </div>
             )}
             {editError && (
-              <p className="text-sm text-destructive rounded-md bg-destructive/10 px-3 py-2">{editError}</p>
+              <p className="text-pretty break-words rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {editError}
+              </p>
             )}
           </div>
           </div>
 
-          <div className="shrink-0 flex justify-end gap-2 border-t border-border px-4 py-4">
-            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isPending}>Cancel</Button>
-            <Button onClick={handleEditSubmit} disabled={isPending}>
+          <div className={affiliateDialogFooterClass}>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setEditOpen(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button className="w-full sm:w-auto" onClick={handleEditSubmit} disabled={isPending}>
               {isPending ? "Saving…" : "Save Changes"}
             </Button>
           </div>
@@ -1201,8 +1237,8 @@ export function AdminAffiliatesPanel({
 
       {/* ── Cancel Invite Dialog ── */}
       <Dialog open={!!cancelTarget} onOpenChange={(o) => { if (!o) { setCancelTarget(null); setCancelError(null); } }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
-          <DialogHeader className="pr-10">
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:w-full sm:max-w-sm">
+          <DialogHeader className="min-w-0 pr-10">
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <UserX className="h-5 w-5" />
               Cancel Invite
@@ -1231,8 +1267,8 @@ export function AdminAffiliatesPanel({
 
       {/* ── Revoke Dialog ── */}
       <Dialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) { setRevokeTarget(null); setRevokeError(null); } }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
-          <DialogHeader className="pr-10">
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:w-full sm:max-w-sm">
+          <DialogHeader className="min-w-0 pr-10">
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <ShieldOff className="h-5 w-5" />
               Revoke Affiliation

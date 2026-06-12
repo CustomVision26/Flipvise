@@ -6,13 +6,18 @@ import {
   appendComplimentaryAccessHistoryRows,
   getMergedPlanHistoryForUser,
 } from "@/db/queries/plan-history";
-import { resolveBillingTabPlanDisplay } from "@/lib/billing-tab-plan-display";
+import {
+  resolveActiveAffiliateGrant,
+  resolveBillingTabPlanDisplay,
+} from "@/lib/billing-tab-plan-display";
+import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
 import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
 } from "@/db/queries/stripe-subscriptions";
 import { syncActiveSubscriptionFromStripeForUser } from "@/lib/stripe-billing-sync";
 import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
+import { getAccessContext } from "@/lib/access";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
   fetchCancelSubscriptionPreview,
@@ -96,16 +101,24 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
       // omit
     }
 
-    const planHistory = await getMergedPlanHistoryForUser(userId, email);
+    const [planHistory, affiliateRows] = await Promise.all([
+      getMergedPlanHistoryForUser(userId, email),
+      listAffiliatesForPlanHistory(userId, email),
+    ]);
     await appendComplimentaryAccessHistoryRows(userId, planHistory, meta);
     planHistory.sort(
       (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
     );
 
+    const activeAffiliateGrant = resolveActiveAffiliateGrant(affiliateRows);
+    const accessCtx = await getAccessContext();
+
     const planDisplay = resolveBillingTabPlanDisplay({
       meta,
       stripePlanSlug: activeSub?.planSlug?.trim() || null,
       billingStatus,
+      activeAffiliateGrant,
+      platformAdminUnlocked: accessCtx.isAdmin,
     });
 
     let cancelPreview: CancelSubscriptionPreview | null = null;
@@ -122,7 +135,7 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
 
     return {
       planHistory,
-      canCancelStripe: sub != null,
+      canCancelStripe: sub != null && planDisplay.showPaidStripeControls,
       cancelPreview,
       currentPlanSlug: planDisplay.planSlug,
       planLabel: planDisplay.planLabel,

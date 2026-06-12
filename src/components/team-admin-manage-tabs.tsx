@@ -40,6 +40,7 @@ import {
   teamAdminPanelHref,
   teamAdminPanelScrollClass,
   teamAdminSubTabClass,
+  teamAdminSubTabPanelClass,
   teamAdminTabClass,
 } from "@/components/team-admin-panel-styles";
 import {
@@ -309,7 +310,7 @@ export function TeamAdminManageTabs({
             </div>
 
             {isTeamAdminInviteSendPath(pathname) ? (
-              <div className="space-y-4">
+              <div className={cn(teamAdminSubTabPanelClass, "space-y-4")}>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   Choose a workspace, then enter an email and role. Subscribers see every workspace
                   they own; co-admins only see workspaces they were invited to manage.
@@ -326,7 +327,7 @@ export function TeamAdminManageTabs({
             ) : null}
 
             {isTeamAdminInvitePendingPath(pathname) ? (
-              <div className="space-y-4">
+              <div className={cn(teamAdminSubTabPanelClass, "space-y-4")}>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   Active invites for <span className="font-medium text-foreground">{teamName}</span>.
                   Revoke to withdraw a link before it is accepted or before it expires.
@@ -346,7 +347,7 @@ export function TeamAdminManageTabs({
             ) : null}
 
             {isTeamAdminInviteHistoryPath(pathname) ? (
-              <div className="space-y-4">
+              <div className={cn(teamAdminSubTabPanelClass, "space-y-4")}>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   Accepted, declined, expired, and revoked invitations for this workspace.
                 </p>
