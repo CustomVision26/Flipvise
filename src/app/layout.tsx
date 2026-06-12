@@ -39,12 +39,11 @@ import {
 } from "@/lib/resolve-team-workspace-url";
 import "./globals.css";
 
-/** Turbopack: avoid static SSR import of this client chunk from the root layout (fixes “module factory is not available”). */
+/** Turbopack: avoid static SSR import of these client chunks from the root layout. */
 const TeamAdminHeaderSwitcherClient = dynamic(
   () => import("@/components/team-admin-header-switcher-client"),
   { loading: () => null },
 );
-
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],

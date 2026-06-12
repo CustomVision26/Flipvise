@@ -4,6 +4,7 @@ import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { UserBillingPage } from "@/components/user-billing-page";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
 import { HelpCenter } from "@/components/help-center";
@@ -96,6 +97,17 @@ export function HeaderUserSection({
     activeTeamPlan != null &&
     (pathname === "/pricing" || pathname.startsWith("/pricing/"));
 
+  /** Defer Clerk / Radix portals until after sign-in modal teardown (removeChild race). */
+  const [portalsReady, setPortalsReady] = useState(false);
+  useEffect(() => {
+    if (!userId) {
+      setPortalsReady(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setPortalsReady(true), 150);
+    return () => window.clearTimeout(timer);
+  }, [userId]);
+
   if (!userId) {
     return null;
   }
@@ -127,54 +139,62 @@ export function HeaderUserSection({
         >
           {personalAccountPlanLabel}
         </Link>
-        {showWorkspaceSwitcher &&
-          (workspaceTeams.length > 0 ||
-            (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))) &&
-          !hideWorkspaceSwitcherOnWorkspaceManagement &&
-          !hideWorkspaceSwitcherOnTeamRoute &&
-          !hideWorkspaceSwitcherOnPricingForTeamTier && (
-            <span className="inline-flex max-w-full min-w-0 shrink">
-              <WorkspaceContextDropdown
-                teams={workspaceTeams}
-                totalEligibleTeamCount={workspaceTeamsTotalEligible}
-                activeTeamId={activeWorkspaceTeamId}
-                personalWorkspaceHref={personalWorkspaceHref}
-                personalPlanLabel={personalPlanLabelForWorkspace}
-                teamDashFallback={teamDashFallback}
-              />
+        {portalsReady ? (
+          <>
+            {showWorkspaceSwitcher &&
+              (workspaceTeams.length > 0 ||
+                (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))) &&
+              !hideWorkspaceSwitcherOnWorkspaceManagement &&
+              !hideWorkspaceSwitcherOnTeamRoute &&
+              !hideWorkspaceSwitcherOnPricingForTeamTier && (
+                <span className="inline-flex max-w-full min-w-0 shrink">
+                  <WorkspaceContextDropdown
+                    teams={workspaceTeams}
+                    totalEligibleTeamCount={workspaceTeamsTotalEligible}
+                    activeTeamId={activeWorkspaceTeamId}
+                    personalWorkspaceHref={personalWorkspaceHref}
+                    personalPlanLabel={personalPlanLabelForWorkspace}
+                    teamDashFallback={teamDashFallback}
+                  />
+                </span>
+              )}
+            {/* Avoid Tooltip wrapping UserButton (both use portals) — teardown race → removeChild on null parent. */}
+            <span
+              className="inline-flex shrink-0 items-center"
+              title="Account"
+            >
+              <UserButton>
+                <UserButton.UserProfilePage
+                  label="Appearance"
+                  url="appearance"
+                  labelIcon={<Palette className="size-4" />}
+                >
+                  <UserAppearanceSettingsPage
+                    currentProTheme={currentProTheme}
+                    currentFreeTheme={currentFreeTheme}
+                    isPro={isPro}
+                    hasProPlusInterfacePalette={resolvedHasProPlusInterfacePalette}
+                  />
+                </UserButton.UserProfilePage>
+                <UserButton.UserProfilePage
+                  label="Billing"
+                  url="billing"
+                  labelIcon={<CreditCard className="size-4" />}
+                >
+                  <UserBillingPage />
+                </UserButton.UserProfilePage>
+              </UserButton>
             </span>
-          )}
-        {/* Avoid Tooltip wrapping UserButton (both use portals) — teardown race → removeChild on null parent. */}
-        <span
-          className="inline-flex shrink-0 items-center"
-          title="Account"
-        >
-          <UserButton>
-            <UserButton.UserProfilePage
-              label="Appearance"
-              url="appearance"
-              labelIcon={<Palette className="size-4" />}
-            >
-              <UserAppearanceSettingsPage
-                currentProTheme={currentProTheme}
-                currentFreeTheme={currentFreeTheme}
-                isPro={isPro}
-                hasProPlusInterfacePalette={resolvedHasProPlusInterfacePalette}
-              />
-            </UserButton.UserProfilePage>
-            <UserButton.UserProfilePage
-              label="Billing"
-              url="billing"
-              labelIcon={<CreditCard className="size-4" />}
-            >
-              <UserBillingPage />
-            </UserButton.UserProfilePage>
-          </UserButton>
-        </span>
-        <AccountDeleteDialog />
+            <AccountDeleteDialog />
+          </>
+        ) : null}
       </div>
-      <InboxNavIconButton unreadCount={inboxUnreadCount} />
-      {!hideHelpCenter && <HelpCenter />}
+      {portalsReady ? (
+        <>
+          <InboxNavIconButton unreadCount={inboxUnreadCount} />
+          {!hideHelpCenter && <HelpCenter />}
+        </>
+      ) : null}
     </div>
   );
 }
