@@ -65,6 +65,7 @@ import type {
   SerializedPlanAssignmentLog,
   SerializedUser,
 } from "@/lib/admin-dashboard-types";
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { TEAM_PLAN_LABELS } from "@/lib/team-plans";
 import type { PlanConfig } from "@/components/pricing-content";
 import {
@@ -86,6 +87,21 @@ import { cn } from "@/lib/utils";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
 
 export type { SerializedUser, SerializedLog } from "@/lib/admin-dashboard-types";
+
+function planAccessTypeBadgeVariant(
+  type: AdminUserPlanAccessType,
+): "default" | "secondary" | "outline" {
+  switch (type) {
+    case "Paid":
+      return "default";
+    case "Assigned":
+    case "Complimentary":
+      return "outline";
+    case "Affiliate":
+    case "Free":
+      return "secondary";
+  }
+}
 
 export interface AdminTabsProps {
   currentUserId: string;
@@ -556,6 +572,7 @@ export function AdminTabs({
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Plan</TableHead>
+                  <TableHead>Plan type</TableHead>
                   <TableHead>Associate plan</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead>Joined</TableHead>
@@ -567,7 +584,7 @@ export function AdminTabs({
                 {filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={9}
                       className="text-center text-muted-foreground py-10"
                     >
                       No users match your search or filters.
@@ -619,6 +636,14 @@ export function AdminTabs({
                               {user.planDisplayName}
                             </Badge>
                           </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Badge
+                              variant={planAccessTypeBadgeVariant(user.planAccessType)}
+                              className="text-xs font-normal"
+                            >
+                              {user.planAccessType}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground max-w-[12rem]">
                             {user.associatePlan ? (
                               <span className="line-clamp-2">{user.associatePlan}</span>
@@ -668,9 +693,13 @@ export function AdminTabs({
                         </TableRow>
                         {isExpanded ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="bg-muted/20 py-3">
+                            <TableCell colSpan={9} className="bg-muted/20 py-3">
                               <div className="overflow-x-auto">
-                                <div className="grid min-w-[52rem] gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                <div className="grid min-w-[52rem] gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                                  <div className="rounded-md border bg-background p-3">
+                                    <p className="text-xs text-muted-foreground">Plan type</p>
+                                    <p className="mt-1 text-sm font-medium">{user.planAccessType}</p>
+                                  </div>
                                   <div className="rounded-md border bg-background p-3">
                                     <p className="text-xs text-muted-foreground">Clerk Plan</p>
                                     <p className="mt-1 text-sm font-medium">{user.clerkPlan}</p>

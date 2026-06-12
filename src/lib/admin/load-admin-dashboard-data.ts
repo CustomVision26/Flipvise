@@ -21,6 +21,7 @@ import {
   buildAdminBillingSnapshot,
   clerkUsersToBillingMeta,
 } from "@/lib/admin/admin-billing-snapshot";
+import type { AdminBillingUserMeta } from "@/lib/admin/admin-billing-snapshot";
 import { getActiveSessionData } from "@/lib/admin/get-active-session-data";
 import { readPlansConfig } from "@/lib/admin/read-plans-config";
 import {
@@ -374,6 +375,7 @@ export async function loadAdminTabsData(
       }
       if (section === "all-users") {
         factories.push(() => getActiveSessionData());
+        factories.push(() => listAffiliates());
       }
 
       const results = await runDbTasksWithConcurrencyLimit(
@@ -405,6 +407,25 @@ export async function loadAdminTabsData(
         section === "all-users"
           ? (results[idx++] as Awaited<ReturnType<typeof getActiveSessionData>>)
           : new Map<string, number>();
+      const rawAffiliatesForUsers =
+        section === "all-users"
+          ? (results[idx++] as Awaited<ReturnType<typeof listAffiliates>>)
+          : [];
+      const activeAffiliateUserIds =
+        section === "all-users"
+          ? buildActiveAffiliateUserIds(
+              rawAffiliatesForUsers,
+              clerkUsers.map((u) => {
+                const primary =
+                  u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)
+                    ?.emailAddress ?? null;
+                return {
+                  id: u.id,
+                  email: primary,
+                } satisfies Pick<AdminBillingUserMeta, "id" | "email">;
+              }),
+            )
+          : undefined;
 
       const users = serializeAdminUsers({
         clerkUsers,
@@ -417,6 +438,7 @@ export async function loadAdminTabsData(
         workspaceDetailsByOwnerUserId,
         activeSessionData,
         includeWorkspaceDetails,
+        activeAffiliateUserIds,
       });
 
       return { ...empty, users };

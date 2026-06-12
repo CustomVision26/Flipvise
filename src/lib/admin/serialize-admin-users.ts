@@ -1,6 +1,9 @@
 import type { User } from "@clerk/backend";
 import type { SerializedUser } from "@/lib/admin-dashboard-types";
-import { getAdminUserPlanColumnLabel } from "@/lib/admin-user-plan-label";
+import {
+  getAdminUserPlanColumnLabel,
+  resolveAdminUserPlanAccessType,
+} from "@/lib/admin-user-plan-label";
 import {
   augmentAdminPlanLabelWithWinner,
   metadataPlanSlugFromPublicMeta,
@@ -101,6 +104,8 @@ export type SerializeAdminUsersContext = {
   >;
   activeSessionData: Map<string, number>;
   includeWorkspaceDetails: boolean;
+  /** Active marketing-affiliate user ids (Clerk user id or email-linked). */
+  activeAffiliateUserIds?: Set<string>;
 };
 
 export function serializeAdminUsers(ctx: SerializeAdminUsersContext): SerializedUser[] {
@@ -164,6 +169,12 @@ export function serializeAdminUsers(ctx: SerializeAdminUsersContext): Serialized
       comparedMetadataToBilling: planResolutionAdmin.comparedMetadataToBilling,
       winner: planResolutionAdmin.winner,
       legacyMetadataOverride: planResolutionAdmin.legacyMetadataOverride,
+    });
+    const planAccessType = resolveAdminUserPlanAccessType({
+      meta,
+      isSuperadmin,
+      isCoAdmin,
+      isActiveAffiliate: ctx.activeAffiliateUserIds?.has(user.id) ?? false,
     });
     const roleAutoProLabel = isAdmin ? "Pro" : null;
     const nonFreePlanFallback =
@@ -269,6 +280,7 @@ export function serializeAdminUsers(ctx: SerializeAdminUsersContext): Serialized
       currentPersonalPlan: currentPersonalPlanLabel,
       currentPersonalPlanDateTime,
       planDisplayName,
+      planAccessType,
       associatePlan,
       isOnline,
       activeSessionCount,

@@ -1,5 +1,7 @@
 /** Shapes for `/admin` Server Component serialization; safe to import from the server. */
 
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
+
 export type SerializedUser = {
   id: string;
   fullName: string;
@@ -25,6 +27,8 @@ export type SerializedUser = {
    * or platform role / complimentary Pro. See `getAdminUserPlanColumnLabel`.
    */
   planDisplayName: string;
+  /** Paid, Assigned, Affiliate, Complimentary (platform admin), or Free. */
+  planAccessType: AdminUserPlanAccessType;
   /** Workspace tier(s) for teams the user accepted an invite on (DB `team_invitations` = accepted). */
   associatePlan: string | null;
   isOnline: boolean;
