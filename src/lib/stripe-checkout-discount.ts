@@ -3,9 +3,16 @@ import { getAffiliateByPromotionalCode } from "@/db/queries/affiliates";
 import {
   affiliateStripeCouponId,
   buildAffiliatePlanCouponName,
-  discontinueDateToRedeemByUnix,
   STRIPE_COUPON_NAME_MAX_LEN,
 } from "@/lib/affiliate-stripe-coupon";
+import {
+  isAffiliateDiscountEffectivelyActive,
+  isGeneralDiscountEffectivelyActive,
+  isPlanPromoExpired,
+  isPromoWindowActive,
+  promoEndsAtToRedeemByUnix,
+  resolvePlanPromoWindow,
+} from "@/lib/plan-promo-window";
 import { stripe } from "@/lib/stripe";
 import { STRIPE_PAID_PLAN_IDS, type StripePaidPlanId } from "@/lib/billing-plan-ids";
 import type Stripe from "stripe";
@@ -112,9 +119,11 @@ export async function ensureGeneralPlanStripeCoupon(opts: {
   }
 
   const discontinueRaw = opts.discontinueAt?.trim() ?? "";
-  const redeemBy = discontinueRaw
-    ? discontinueDateToRedeemByUnix(discontinueRaw)
-    : undefined;
+  const redeemBy = discontinueRaw.includes("T")
+    ? promoEndsAtToRedeemByUnix(discontinueRaw)
+    : discontinueRaw
+      ? promoEndsAtToRedeemByUnix(`${discontinueRaw}T23:59`)
+      : undefined;
   const name = generalCouponDisplayName(
     opts.planId,
     opts.discount.label,
@@ -162,8 +171,16 @@ export async function ensureAffiliatePlanStripeCoupon(opts: {
   }
 
   const discontinueRaw = opts.discontinueAt?.trim() ?? "";
-  const redeemBy = discontinueRaw ? discontinueDateToRedeemByUnix(discontinueRaw) : undefined;
-  const id = affiliateStripeCouponId(opts.planId, pct, discontinueRaw || null);
+  const redeemBy = discontinueRaw.includes("T")
+    ? promoEndsAtToRedeemByUnix(discontinueRaw)
+    : discontinueRaw
+      ? promoEndsAtToRedeemByUnix(`${discontinueRaw}T23:59`)
+      : undefined;
+  const id = affiliateStripeCouponId(
+    opts.planId,
+    pct,
+    discontinueRaw ? discontinueRaw.slice(0, 10) : null,
+  );
 
   try {
     const existing = await stripe.coupons.retrieve(id);
@@ -242,10 +259,10 @@ export async function resolveCheckoutDiscount(opts: {
 
   const planRow = plansConfig.find((p) => p.id === planId);
   const baseCoupon = planRow?.discount?.stripeCouponId?.trim() ?? "";
-  const generalActive =
-    !!planRow?.discount?.active &&
-    (planRow.discount.value ?? 0) > 0 &&
-    baseCoupon.length > 0;
+  const generalActive = planRow != null && isGeneralDiscountEffectivelyActive(planRow);
+  const { endsAt: promoEndsAt } = planRow
+    ? resolvePlanPromoWindow(planRow)
+    : { endsAt: null };
 
   const trimmed = (promotionCodeInput ?? "").trim();
 
@@ -270,6 +287,16 @@ export async function resolveCheckoutDiscount(opts: {
   const baseLower = baseCoupon.toLowerCase();
 
   if (lower === baseLower) {
+    if (planRow && isPlanPromoExpired(planRow)) {
+      throw new Error("This promotion has expired and is no longer accepted at checkout.");
+    }
+    if (planRow && !generalActive) {
+      const { startsAt, endsAt } = resolvePlanPromoWindow(planRow);
+      if (startsAt && endsAt && !isPromoWindowActive(startsAt, endsAt)) {
+        throw new Error("This promotion is not active yet or has expired.");
+      }
+      throw new Error("This general promotion is not active for checkout.");
+    }
     return { couponId: baseCoupon, allowPromotionCodes: false, affiliateId: null };
   }
 
@@ -279,16 +306,19 @@ export async function resolveCheckoutDiscount(opts: {
       throw new Error("That affiliate promotion is not active yet.");
     }
 
-    const aff = planRow?.affiliateDiscount;
-    if (!aff?.active || (aff.value ?? 0) <= 0) {
+    if (!planRow || !isAffiliateDiscountEffectivelyActive(planRow)) {
+      if (planRow && isPlanPromoExpired(planRow)) {
+        throw new Error("This affiliate promotion has expired and is no longer accepted at checkout.");
+      }
       throw new Error("Affiliate pricing is not enabled for this plan in admin.");
     }
 
+    const aff = planRow.affiliateDiscount!;
     const pct = Math.round(aff.value);
     const couponId = await ensureAffiliatePlanStripeCoupon({
       planId,
       percent: pct,
-      discontinueAt: planRow?.discontinueAt ?? null,
+      discontinueAt: promoEndsAt ?? planRow.discontinueAt ?? null,
     });
     return { couponId, allowPromotionCodes: false, affiliateId: affiliate.id };
   }

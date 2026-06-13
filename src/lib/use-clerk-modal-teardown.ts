@@ -3,9 +3,10 @@
 import { useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { hasClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
 
 /** Keep Clerk modal trigger trees mounted until portal DOM finishes teardown. */
-export const CLERK_MODAL_TEARDOWN_MS = 800;
+export const CLERK_MODAL_TEARDOWN_MS = 1000;
 
 /**
  * Stay `true` while signed out, on `/` after sign-in (Clerk redirect pending), or
@@ -37,6 +38,6 @@ export function useKeepClerkAuthButtonsMounted(): boolean {
 
   if (!isLoaded) return true;
   if (!isSignedIn) return true;
-  if (pathname === "/") return true;
+  if (pathname === "/" || hasClerkAuthHandoff()) return true;
   return keepMounted;
 }

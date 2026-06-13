@@ -35,6 +35,15 @@ export const supportPriorityEnum = pgEnum('support_priority', [
   'urgent',
 ]);
 
+export const supportAuthorRoleEnum = pgEnum('support_author_role', ['admin', 'user']);
+
+export const supportNotificationKindEnum = pgEnum('support_notification_kind', [
+  'new_ticket',
+  'admin_reply',
+  'user_reply',
+  'status_resolved',
+]);
+
 export const cardTypeEnum = pgEnum('card_type', ['standard', 'multiple_choice']);
 
 export const teamMemberRoleEnum = pgEnum('team_member_role', [
@@ -317,11 +326,36 @@ export const supportTicketReplies = pgTable('support_ticket_replies', {
   ticketId: integer()
     .notNull()
     .references(() => supportTickets.id, { onDelete: 'cascade' }),
-  adminId: varchar({ length: 255 }).notNull(),
-  adminName: varchar({ length: 255 }).notNull(),
+  /** Clerk user id of the message author (admin or ticket owner). */
+  authorUserId: varchar({ length: 255 }).notNull(),
+  authorName: varchar({ length: 255 }).notNull(),
+  authorRole: supportAuthorRoleEnum().notNull().default('admin'),
+  /** Legacy admin id column — kept for existing rows; new writes mirror authorUserId. */
+  adminId: varchar({ length: 255 }),
+  adminName: varchar({ length: 255 }),
   message: text().notNull(),
   createdAt: timestamp().notNull().defaultNow(),
 });
+
+/** In-app alerts for platform admins and ticket owners (support thread activity). */
+export const supportTicketNotifications = pgTable(
+  'support_ticket_notifications',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    ticketId: integer()
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: 'cascade' }),
+    kind: supportNotificationKindEnum().notNull(),
+    preview: varchar({ length: 500 }).notNull(),
+    readAt: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('support_ticket_notifications_recipient_idx').on(t.recipientUserId),
+    index('support_ticket_notifications_ticket_idx').on(t.ticketId),
+  ],
+);
 
 export const billingInvoices = pgTable(
   'billing_invoices',

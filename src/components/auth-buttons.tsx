@@ -16,11 +16,7 @@ export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
   }
   if (!keepMounted) return null;
   return (
-    <SignInButton
-      mode="modal"
-      fallbackRedirectUrl="/auth/continue"
-      signUpFallbackRedirectUrl="/auth/continue"
-    >
+    <SignInButton mode="modal">
       <Button variant="outline" size={size}>Sign In</Button>
     </SignInButton>
   );
@@ -38,11 +34,7 @@ export function SignUpBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
   }
   if (!keepMounted) return null;
   return (
-    <SignUpButton
-      mode="modal"
-      fallbackRedirectUrl="/auth/continue"
-      signInFallbackRedirectUrl="/auth/continue"
-    >
+    <SignUpButton mode="modal">
       <Button size={size}>Sign Up</Button>
     </SignUpButton>
   );

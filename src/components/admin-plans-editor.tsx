@@ -19,6 +19,11 @@ import type { PlanConfig, PlanDiscount, PlanAffiliateDiscount } from "@/componen
 import { updatePlanAction } from "@/actions/admin-plans";
 import { affiliateStripeCouponId } from "@/lib/affiliate-stripe-coupon";
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
+import {
+  joinPromoDateTime,
+  planHasCompletePromoWindow,
+  splitPromoDateTime,
+} from "@/lib/plan-promo-window";
 
 interface AdminPlansEditorProps {
   initialPlans: PlanConfig[];
@@ -66,6 +71,20 @@ function PlanEditor({
 
   const baseStripeId = (draft.discount?.stripeCouponId ?? "").trim();
   const canExplainAffiliateCodes = baseStripeId.length > 0;
+  const promoStart = splitPromoDateTime(draft.promoStartsAt);
+  const promoEnd = splitPromoDateTime(draft.promoEndsAt);
+
+  function patchPromoStart(date: string, time: string) {
+    update({ promoStartsAt: joinPromoDateTime(date, time) });
+  }
+
+  function patchPromoEnd(date: string, time: string) {
+    const promoEndsAt = joinPromoDateTime(date, time);
+    update({
+      promoEndsAt,
+      discontinueAt: date || null,
+    });
+  }
 
   function updateFeature(index: number, value: string) {
     const features = [...draft.features];
@@ -127,12 +146,14 @@ function PlanEditor({
 
   const isFree = plan.id === "free";
 
-  const hasEndDate = !!draft.discontinueAt;
+  const hasPromoWindow = planHasCompletePromoWindow(draft);
   const hasValue = (draft.discount?.value ?? 0) > 0;
   const hasCouponId = (draft.discount?.stripeCouponId ?? "").trim().length > 0;
-  const canActivateDiscount = hasEndDate && hasValue && hasCouponId;
+  const hasAffiliateValue = (draft.affiliateDiscount?.value ?? 0) > 0;
+  const canActivateDiscount = hasPromoWindow && hasValue && hasCouponId;
+  const canActivateAffiliate = hasPromoWindow && hasCouponId && hasAffiliateValue;
   const discountMissingReasons: string[] = [];
-  if (!hasEndDate) discountMissingReasons.push("a discontinue end date");
+  if (!hasPromoWindow) discountMissingReasons.push("promotion start and end date and time");
   if (!hasValue) discountMissingReasons.push("a discount value greater than 0");
   if (!hasCouponId) discountMissingReasons.push("a Stripe Coupon ID");
 
@@ -281,10 +302,11 @@ function PlanEditor({
               <div className="flex items-center gap-2">
                 <Input
                   type="date"
-                  value={draft.discontinueAt ?? ""}
-                  onChange={(e) =>
-                    update({ discontinueAt: e.target.value === "" ? null : e.target.value })
-                  }
+                  value={draft.discontinueAt ?? promoEnd.date ?? ""}
+                  onChange={(e) => {
+                    const date = e.target.value === "" ? "" : e.target.value;
+                    patchPromoEnd(date, promoEnd.time || "23:59");
+                  }}
                   className="h-8 text-sm w-auto"
                 />
                 {draft.discontinueAt && (
@@ -369,6 +391,55 @@ function PlanEditor({
                 .
               </p>
             )}
+
+            <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+              <Label className="text-xs font-medium text-foreground">
+                Promotion schedule{" "}
+                <span className="font-normal text-muted-foreground">(required for general and affiliate discounts)</span>
+              </Label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Start date</Label>
+                  <Input
+                    type="date"
+                    value={promoStart.date}
+                    onChange={(e) => patchPromoStart(e.target.value, promoStart.time || "00:00")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Start time</Label>
+                  <Input
+                    type="time"
+                    value={promoStart.time || "00:00"}
+                    onChange={(e) => patchPromoStart(promoStart.date, e.target.value)}
+                    className="h-8 text-sm"
+                    disabled={!promoStart.date}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">End date</Label>
+                  <Input
+                    type="date"
+                    value={promoEnd.date || draft.discontinueAt || ""}
+                    onChange={(e) => patchPromoEnd(e.target.value, promoEnd.time || "23:59")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">End time</Label>
+                  <Input
+                    type="time"
+                    value={promoEnd.time || "23:59"}
+                    onChange={(e) =>
+                      patchPromoEnd(promoEnd.date || draft.discontinueAt || "", e.target.value)
+                    }
+                    className="h-8 text-sm"
+                    disabled={!promoEnd.date && !draft.discontinueAt}
+                  />
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -502,6 +573,7 @@ function PlanEditor({
                 <Switch
                   id={`aff-aff-${plan.id}`}
                   checked={!!draft.affiliateDiscount?.active}
+                  disabled={!canActivateAffiliate}
                   onCheckedChange={(val) => patchAffiliateDiscount({ active: val })}
                 />
                 <Label
@@ -519,10 +591,15 @@ function PlanEditor({
               </span>
               . Customers enter it on the pricing page before subscribing. Uses this percent off via an
               auto-managed Stripe coupon (separate from the general promo coupon above).
-              {draft.discontinueAt
-                ? " Stripe redeem-by for that affiliate coupon follows the plan end date you set below."
+              {draft.promoEndsAt || draft.discontinueAt
+                ? " Stripe redeem-by for affiliate coupons follows the promotion end date and time above."
                 : null}
             </p>
+            {!canActivateAffiliate ? (
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2 border border-border">
+                To turn on affiliate discount, set the promotion schedule, Stripe coupon id, and affiliate percent.
+              </p>
+            ) : null}
             {!canExplainAffiliateCodes ? (
               <p className="text-xs text-amber-400 bg-amber-500/10 rounded-md px-3 py-2 border border-amber-500/20">
                 Set the Stripe coupon id in the general discount section (you can leave &quot;Active&quot;
@@ -566,15 +643,16 @@ function PlanEditor({
                     {affiliateStripeCouponId(
                       plan.id,
                       Math.round(draft.affiliateDiscount.value),
-                      draft.discontinueAt ?? null,
+                      (draft.promoEndsAt ?? draft.discontinueAt ?? null)?.slice(0, 10) ?? null,
                     )}
                   </span>
                   .
                 </p>
-                {draft.discontinueAt ? (
+                {draft.promoEndsAt || draft.discontinueAt ? (
                   <p className="text-violet-200/90">
-                    New checkouts stop after the plan end date (UTC end of{" "}
-                    {draft.discontinueAt}) — same window as this tier&apos;s discontinuation.
+                    New checkouts stop after{" "}
+                    {draft.promoEndsAt ?? `${draft.discontinueAt}T23:59`} — same window as the
+                    promotion schedule.
                   </p>
                 ) : null}
               </div>

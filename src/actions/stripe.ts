@@ -34,6 +34,10 @@ import {
   tryUpgradeExistingStripeSubscription,
 } from "@/lib/apply-plan-upgrade";
 import { personalDashboardHrefAfterCheckoutSuccess } from "@/lib/personal-dashboard-url";
+import {
+  isGeneralDiscountEffectivelyActive,
+  resolvePlanPromoWindow,
+} from "@/lib/plan-promo-window";
 
 const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
 type PaidPlanId = StripePaidPlanId;
@@ -303,14 +307,15 @@ async function createStripeCheckoutSessionActionInner(
     const planRow = plansConfig.find((p) => p.id === plan);
     const discount = planRow?.discount;
     if (
-      discount?.active &&
-      (discount.value ?? 0) > 0 &&
-      discount.stripeCouponId?.trim() === discountResolution.couponId
+      planRow &&
+      isGeneralDiscountEffectivelyActive(planRow) &&
+      discount?.stripeCouponId?.trim() === discountResolution.couponId
     ) {
+      const { endsAt } = resolvePlanPromoWindow(planRow);
       await ensureGeneralPlanStripeCoupon({
         planId: plan,
-        discount,
-        discontinueAt: planRow?.discontinueAt ?? null,
+        discount: discount!,
+        discontinueAt: endsAt ?? planRow.discontinueAt ?? null,
       });
     }
   }

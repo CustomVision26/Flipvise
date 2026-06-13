@@ -21,7 +21,7 @@ import {
   buildAffiliateCombinedDetailsBlock,
   buildGeneralPromoDetailsBlock,
   listPlansWithGeneralDiscount,
-  planHasAffiliateCombinedCode,
+  listPlansEligibleForAffiliateCodeBroadcast,
 } from "@/lib/affiliate-broadcast-messaging";
 
 const clerkClient = createClerkClient({
@@ -158,14 +158,19 @@ function assertSelectedPlansEligible(plans: PlanConfig[], selectedPlanIds: strin
   }
 }
 
-function assertAffiliateCodesAvailable(plans: PlanConfig[], selectedPlanIds: string[]) {
-  const idSet = new Set(selectedPlanIds);
-  const hasCode = plans.some(
-    (p) => idSet.has(p.id) && planHasAffiliateCombinedCode(p),
-  );
-  if (!hasCode) {
+function assertSelectedPlansAffiliateBroadcastEligible(
+  plans: PlanConfig[],
+  selectedPlanIds: string[],
+) {
+  if (selectedPlanIds.length === 0) {
+    throw new Error("Select at least one plan.");
+  }
+
+  const eligibleIds = new Set(listPlansEligibleForAffiliateCodeBroadcast(plans).map((p) => p.id));
+  const invalid = selectedPlanIds.filter((id) => !eligibleIds.has(id));
+  if (invalid.length > 0) {
     throw new Error(
-      "No affiliate combined codes are available for the selected plans. Turn on affiliate discount % on at least one selected plan.",
+      "Every selected plan must have general discount and affiliate discount turned on (with a Stripe coupon id).",
     );
   }
 }
@@ -244,8 +249,7 @@ export async function broadcastAffiliateCodesAction(
   }
 
   const plans = await readPlans();
-  assertSelectedPlansEligible(plans, selectedPlanIds);
-  assertAffiliateCodesAvailable(plans, selectedPlanIds);
+  assertSelectedPlansAffiliateBroadcastEligible(plans, selectedPlanIds);
   const base = resolveAppUrl();
   const pricingPageUrl = `${base}/pricing`;
 

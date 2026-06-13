@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -59,7 +60,14 @@ import {
 import {
   adminUpdateTicketStatusAction,
   adminReplyToTicketAction,
+  adminMarkTicketResolvedAction,
+  getAdminSupportTicketThreadAction,
 } from "@/actions/support-admin";
+import { SupportTicketThread } from "@/components/support-ticket-thread";
+import type {
+  SerializedTicketMessage,
+  SupportTicketThreadTicket,
+} from "@/lib/support-ticket-dto";
 import type { SerializedTicket, SupportStats } from "@/lib/support-admin-dto";
 import {
   adminFilterInputClass,
@@ -79,14 +87,7 @@ import { cn } from "@/lib/utils";
 
 export type { SerializedTicket, SupportStats };
 
-export type SerializedReply = {
-  id: number;
-  ticketId: number;
-  adminId: string;
-  adminName: string;
-  message: string;
-  createdAt: string;
-};
+export type SerializedReply = SerializedTicketMessage;
 
 interface AdminSupportPanelProps {
   tickets: SerializedTicket[];
@@ -205,62 +206,60 @@ function TicketDetailSheet({
   onOpenChange,
   onTicketUpdated,
 }: TicketDetailSheetProps) {
-  const [replyText, setReplyText] = useState("");
-  const [localReplies, setLocalReplies] = useState<SerializedReply[]>([]);
-  const [status, setStatus] = useState(ticket.status);
-  const [isPendingReply, startReplyTransition] = useTransition();
-  const [isPendingStatus, startStatusTransition] = useTransition();
-  const [replyError, setReplyError] = useState<string | null>(null);
+  const [threadTicket, setThreadTicket] = useState<SupportTicketThreadTicket | null>(null);
+  const [messages, setMessages] = useState<SerializedTicketMessage[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, startLoad] = useTransition();
 
-  // Sync status when ticket prop changes
-  if (ticket.status !== status && !isPendingStatus) {
-    setStatus(ticket.status);
-  }
-
-  function handleStatusChange(newStatus: string | null) {
-    if (!newStatus) return;
-    setStatus(newStatus);
-    startStatusTransition(async () => {
+  const loadThread = useCallback(() => {
+    startLoad(async () => {
       try {
-        const { ticket: next, stats } = await adminUpdateTicketStatusAction({
-          ticketId: ticket.id,
-          status: newStatus as "open" | "in_progress" | "resolved" | "closed",
-        });
-        onTicketUpdated(next, stats);
-      } catch {
-        setStatus(ticket.status);
-      }
-    });
-  }
-
-  function handleReply(e: React.FormEvent) {
-    e.preventDefault();
-    if (!replyText.trim()) return;
-    setReplyError(null);
-    const text = replyText;
-    startReplyTransition(async () => {
-      try {
-        const { ticket: next } = await adminReplyToTicketAction({
-          ticketId: ticket.id,
-          message: text,
-        });
-        onTicketUpdated(next);
-        setLocalReplies((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            ticketId: ticket.id,
-            adminId: "me",
-            adminName: "You",
-            message: text,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-        setReplyText("");
+        setLoadError(null);
+        const thread = await getAdminSupportTicketThreadAction(ticket.id);
+        setThreadTicket(thread.ticket);
+        setMessages(thread.messages);
       } catch (err) {
-        setReplyError(err instanceof Error ? err.message : "Failed to send reply");
+        setLoadError(err instanceof Error ? err.message : "Failed to load thread");
       }
     });
+  }, [ticket.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    loadThread();
+  }, [open, loadThread]);
+
+  async function handleSendReply(message: string) {
+    const { ticket: next, message: reply } = await adminReplyToTicketAction({
+      ticketId: ticket.id,
+      message,
+    });
+    onTicketUpdated(next);
+    setThreadTicket((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: next.status,
+            updatedAt: next.updatedAt,
+          }
+        : prev,
+    );
+    setMessages((prev) => [...prev, reply]);
+  }
+
+  async function handleMarkResolved() {
+    const { ticket: next, stats } = await adminMarkTicketResolvedAction(ticket.id);
+    onTicketUpdated(next, stats);
+    setThreadTicket((prev) => (prev ? { ...prev, status: "resolved" } : prev));
+  }
+
+  async function handleReopen() {
+    const { ticket: next, stats } = await adminUpdateTicketStatusAction({
+      ticketId: ticket.id,
+      status: "open",
+    });
+    onTicketUpdated(next, stats);
+    setThreadTicket((prev) => (prev ? { ...prev, status: "open" } : prev));
   }
 
   return (
@@ -271,104 +270,48 @@ function TicketDetailSheet({
       >
         <SheetHeader className="shrink-0 border-b border-border/70 bg-muted/20 px-6 py-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <SheetTitle className="text-sm leading-snug truncate">
+            <div className="min-w-0 flex-1">
+              <SheetTitle className="truncate text-sm leading-snug">
                 #{ticket.id} — {ticket.subject}
               </SheetTitle>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <StatusBadge status={status} />
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <StatusBadge status={threadTicket?.status ?? ticket.status} />
                 <PriorityBadge priority={ticket.priority} />
-                <span className="text-xs text-muted-foreground capitalize">
+                <span className="text-xs capitalize text-muted-foreground">
                   {CATEGORY_LABELS[ticket.category] ?? ticket.category}
                 </span>
+              </div>
+              <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground">From:</span>{" "}
+                  {ticket.userName || "Unknown"} · {ticket.userEmail || ticket.userId}
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Submitted:</span>{" "}
+                  {formatDateTime(ticket.createdAt)}
+                </p>
               </div>
             </div>
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto flex flex-col gap-4 px-6 py-4">
-          {/* Ticket meta */}
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <div>
-              <span className="font-medium text-foreground">From</span>
-              <p>{ticket.userName || "Unknown"}</p>
-              <p>{ticket.userEmail || ticket.userId}</p>
+        <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
+          {isLoading && !threadTicket ? (
+            <div className="flex flex-1 items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-            <div>
-              <span className="font-medium text-foreground">Submitted</span>
-              <p>{formatDateTime(ticket.createdAt)}</p>
-            </div>
-          </div>
-
-          {/* Original message */}
-          <div className="rounded-lg border-2 border-border/70 bg-muted/20 px-4 py-3">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Original Message
-            </p>
-            <p className="text-sm whitespace-pre-wrap">{ticket.message}</p>
-          </div>
-
-          {/* Admin replies */}
-          {localReplies.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground">Admin Replies</p>
-              {localReplies.map((r) => (
-                <div
-                  key={r.id}
-                  className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold">{r.adminName}</span>
-                    <span className="text-xs text-muted-foreground">{formatDateTime(r.createdAt)}</span>
-                  </div>
-                  <p className="text-sm whitespace-pre-wrap">{r.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Status control */}
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Update Status</Label>
-            <Select value={status} onValueChange={handleStatusChange} disabled={isPendingStatus}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Reply form */}
-          <form onSubmit={handleReply} className="flex flex-col gap-2">
-            <Label className="text-xs">Reply to User</Label>
-            <Textarea
-              placeholder="Type your response..."
-              rows={4}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              disabled={isPendingReply}
+          ) : loadError ? (
+            <p className="text-sm text-destructive">{loadError}</p>
+          ) : threadTicket ? (
+            <SupportTicketThread
+              ticket={threadTicket}
+              messages={messages}
+              viewerRole="admin"
+              onSendReply={handleSendReply}
+              onMarkResolved={handleMarkResolved}
+              onReopen={handleReopen}
             />
-            {replyError && (
-              <p className="text-xs text-destructive">{replyError}</p>
-            )}
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isPendingReply || !replyText.trim()}
-            >
-              {isPendingReply ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-              ) : (
-                <SendHorizonal className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              Send Reply
-            </Button>
-          </form>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>
@@ -385,6 +328,12 @@ export function AdminSupportPanel({
   tickets: initialTickets,
   stats: initialStats,
 }: AdminSupportPanelProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const ticketFromUrl = Number(searchParams.get("ticket") || "");
+  const deepLinkTicketId =
+    Number.isFinite(ticketFromUrl) && ticketFromUrl > 0 ? ticketFromUrl : null;
+
   const [tickets, setTickets] = useState(initialTickets);
   const [stats, setStats] = useState(initialStats);
   const [search, setSearch] = useState("");
@@ -392,6 +341,24 @@ export function AdminSupportPanel({
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
   const [selectedTicket, setSelectedTicket] = useState<SerializedTicket | null>(null);
+
+  useEffect(() => {
+    if (!deepLinkTicketId) return;
+    const match = tickets.find((t) => t.id === deepLinkTicketId);
+    if (match) setSelectedTicket(match);
+  }, [deepLinkTicketId, tickets]);
+
+  function handleSelectTicket(ticket: SerializedTicket) {
+    setSelectedTicket(ticket);
+    router.replace(`/admin/support-center?ticket=${ticket.id}`);
+  }
+
+  function handleCloseTicketSheet(open: boolean) {
+    if (!open) {
+      setSelectedTicket(null);
+      router.replace("/admin/support-center");
+    }
+  }
 
   const filteredTickets = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -701,7 +668,7 @@ export function AdminSupportPanel({
                     <TableRow
                       key={ticket.id}
                       className="cursor-pointer border-b border-border/40 transition-colors hover:bg-muted/40"
-                      onClick={() => setSelectedTicket(ticket)}
+                      onClick={() => handleSelectTicket(ticket)}
                     >
                       <TableCell className="text-xs text-muted-foreground font-mono">
                         {ticket.id}
@@ -746,7 +713,7 @@ export function AdminSupportPanel({
         <TicketDetailSheet
           ticket={selectedTicket}
           open={!!selectedTicket}
-          onOpenChange={(v) => { if (!v) setSelectedTicket(null); }}
+          onOpenChange={handleCloseTicketSheet}
           onTicketUpdated={handleTicketUpdated}
         />
       )}

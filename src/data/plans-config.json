@@ -38,8 +38,8 @@
     "discount": {
       "active": true,
       "type": "percentage",
-      "value": 20,
-      "label": "Summer Launch 2026",
+      "value": 5,
+      "label": "Summer save 2026",
       "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
@@ -47,7 +47,9 @@
       "value": 10,
       "label": " "
     },
-    "discontinueAt": "2026-06-12"
+    "discontinueAt": "2026-06-14",
+    "promoStartsAt": "2026-06-01T00:00",
+    "promoEndsAt": "2026-06-14T23:59"
   },
   {
     "id": "pro_plus",
@@ -72,11 +74,13 @@
       "stripeCouponId": "SummerLaunchProPlus26"
     },
     "affiliateDiscount": {
-      "active": true,
+      "active": false,
       "value": 12,
       "label": "Affiliate rate"
     },
-    "discontinueAt": "2026-05-18"
+    "discontinueAt": "2026-05-18",
+    "promoStartsAt": "2026-05-01T00:00",
+    "promoEndsAt": "2026-05-18T23:59"
   },
   {
     "id": "pro_plus_team_basic",
@@ -123,18 +127,20 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": false,
+      "active": true,
       "type": "percentage",
-      "value": 0,
-      "label": "",
-      "stripeCouponId": ""
+      "value": 8,
+      "label": "Summer save 2026",
+      "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": false,
-      "value": 0,
-      "label": ""
+      "active": true,
+      "value": 13,
+      "label": "13 percent off"
     },
-    "discontinueAt": null
+    "discontinueAt": "2026-06-14",
+    "promoStartsAt": "2026-06-01T00:00",
+    "promoEndsAt": "2026-06-14T23:59"
   },
   {
     "id": "pro_plus_platinum_plan",
@@ -152,18 +158,20 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": false,
+      "active": true,
       "type": "percentage",
-      "value": 0,
-      "label": "",
-      "stripeCouponId": ""
+      "value": 11,
+      "label": "Summer save 2026",
+      "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": false,
-      "value": 0,
-      "label": ""
+      "active": true,
+      "value": 16,
+      "label": "16 % off"
     },
-    "discontinueAt": null
+    "discontinueAt": "2026-06-14",
+    "promoStartsAt": "2026-06-01T00:00",
+    "promoEndsAt": "2026-06-14T23:59"
   },
   {
     "id": "pro_plus_enterprise",
@@ -181,17 +189,19 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": false,
+      "active": true,
       "type": "percentage",
-      "value": 0,
-      "label": "",
-      "stripeCouponId": ""
+      "value": 15,
+      "label": "Summer save 2026",
+      "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": false,
-      "value": 0,
-      "label": ""
+      "active": true,
+      "value": 20,
+      "label": "20 % off"
     },
-    "discontinueAt": null
+    "discontinueAt": "2026-06-14",
+    "promoStartsAt": "2026-06-01T00:00",
+    "promoEndsAt": "2026-06-14T23:59"
   }
 ]

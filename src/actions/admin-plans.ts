@@ -9,6 +9,10 @@ import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import type { PlanConfig } from "@/components/pricing-content";
 import { plansConfigFilePath } from "@/lib/plans-config-disk";
+import {
+  deactivateExpiredPlanPromos,
+  validatePlanPromoForSave,
+} from "@/lib/plan-promo-window";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -39,6 +43,8 @@ const PlanConfigSchema = z.object({
   discount: PlanDiscountSchema.optional(),
   affiliateDiscount: PlanAffiliateDiscountSchema.optional(),
   discontinueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  promoStartsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable().optional(),
+  promoEndsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable().optional(),
 });
 
 const UpdatePlanInput = z.object({
@@ -78,12 +84,16 @@ export async function updatePlanAction(input: z.infer<typeof UpdatePlanInput>) {
   }
 
   const { plan } = parsed.data;
+  const promoError = validatePlanPromoForSave(plan);
+  if (promoError) throw new Error(promoError);
+
   const plans = await readPlansConfig();
   const idx = plans.findIndex((p) => p.id === plan.id);
   if (idx === -1) throw new Error(`Plan "${plan.id}" not found`);
 
   plans[idx] = plan;
-  await writePlansConfig(plans);
+  const { plans: normalized, changed } = deactivateExpiredPlanPromos(plans);
+  await writePlansConfig(changed ? normalized : plans);
 
   revalidatePath("/pricing");
   revalidatePath("/");

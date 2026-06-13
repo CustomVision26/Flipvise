@@ -14,6 +14,7 @@ import {
   CircleAlert,
   Shield,
   ShieldAlert,
+  LifeBuoy,
   MailOpen,
   CheckCheck,
   History,
@@ -39,6 +40,7 @@ import {
   acceptAdminPlanInviteAction,
   declineAdminPlanInviteAction,
 } from "@/actions/admin-plan-invite";
+import { SupportTicketInboxDialog } from "@/components/support-ticket-inbox-dialog";
 import { ViewQuizResultDialog } from "@/components/view-quiz-result-dialog";
 import type { UnifiedInboxItem, InboxItemType } from "@/lib/inbox-item-types";
 const INBOX_PAGE_SIZE = 10;
@@ -82,6 +84,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   admin_plan_invite: <Shield className="size-4 text-violet-400" aria-hidden />,
   admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
   quiz_security_notice: <ShieldAlert className="size-4 text-rose-400" aria-hidden />,
+  support_ticket: <LifeBuoy className="size-4 text-sky-400" aria-hidden />,
 };
 
 type SortKey = "newest" | "oldest" | "type";
@@ -99,6 +102,7 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         affiliate_notice: 6,
         admin_plan_log: 7,
         quiz_security_notice: 8,
+        support_ticket: 1,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -501,6 +505,14 @@ function InboxItemRow({
                 {item.payload.isOwnerCopy ? "Admin notice" : "Terminated"}
               </Badge>
             )}
+            {item.type === "support_ticket" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-sky-500/35 text-xs text-sky-400"
+              >
+                {item.payload.kind === "status_resolved" ? "Resolved" : "Support reply"}
+              </Badge>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">{item.description}</p>
@@ -565,6 +577,10 @@ function InboxItemRow({
 
         {item.type === "affiliate_broadcast" && (
           <AffiliateBroadcastDialog item={item} />
+        )}
+
+        {item.type === "support_ticket" && (
+          <SupportTicketInboxDialog item={item} triggerLabel="Open thread" />
         )}
 
         {/* Mark as read */}

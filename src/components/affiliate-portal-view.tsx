@@ -23,7 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AffiliateCombinedPromoRow } from "@/lib/affiliate-portal-combined-codes";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type {
+  AffiliateCombinedPromoRow,
+  AffiliatePromoHistoryGroup,
+} from "@/lib/affiliate-portal-combined-codes";
+import { formatPromoDateTimeLabel } from "@/lib/plan-promo-window";
 import { cn } from "@/lib/utils";
 
 export type AffiliatePortalViewData = {
@@ -36,18 +41,116 @@ export type AffiliatePortalViewData = {
   paidReferralsThisMonth: number;
   monthLabel: string;
   combinedPromos: AffiliateCombinedPromoRow[];
+  expiredPromoHistory: AffiliatePromoHistoryGroup[];
   referralQuotaEnabled?: boolean;
   periodPaidReferrals?: number;
   referralQuotaTarget?: number | null;
 };
 
-function formatValidThrough(isoDate: string | null): string {
-  if (!isoDate) return "Open — no tier end date set";
-  return new Date(`${isoDate}T23:59:59`).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+function formatValidThrough(endsAt: string | null): string {
+  if (!endsAt) return "Open — no end time set";
+  return formatPromoDateTimeLabel(endsAt);
+}
+
+function PromoCodesTable({ rows }: { rows: AffiliateCombinedPromoRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="px-6 py-8 text-sm text-muted-foreground">
+        No active checkout codes right now. Expired promotions appear under History.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Plan</TableHead>
+            <TableHead>Combined code</TableHead>
+            <TableHead className="whitespace-nowrap">Affiliate discount</TableHead>
+            <TableHead className="whitespace-nowrap">Valid through</TableHead>
+            <TableHead className="w-[5.5rem] text-right">Copy</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.planId}>
+              <TableCell className="font-medium whitespace-nowrap">{row.planName}</TableCell>
+              <TableCell>
+                <code className="rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-xs">
+                  {row.combinedCode}
+                </code>
+              </TableCell>
+              <TableCell className="whitespace-nowrap">{row.affiliatePercent}% off</TableCell>
+              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                {formatValidThrough(row.endsAt)}
+              </TableCell>
+              <TableCell className="text-right">
+                <CopyCodeButton value={row.combinedCode} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function PromoHistoryPanel({ groups }: { groups: AffiliatePromoHistoryGroup[] }) {
+  if (groups.length === 0) {
+    return (
+      <p className="px-6 py-8 text-sm text-muted-foreground">
+        No expired promotion codes yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4 px-6 py-6">
+      {groups.map((group) => (
+        <div
+          key={`${group.promoLabel}-${group.startsAt}-${group.endsAt}`}
+          className="rounded-lg border border-border/60 bg-background/40"
+        >
+          <div className="border-b border-border/50 px-4 py-3">
+            <p className="font-medium text-foreground">{group.promoLabel}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatPromoDateTimeLabel(group.startsAt)}
+              {" → "}
+              {formatPromoDateTimeLabel(group.endsAt)}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Combined code</TableHead>
+                  <TableHead>General discount</TableHead>
+                  <TableHead>Affiliate discount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.items.map((item) => (
+                  <TableRow key={`${group.promoLabel}-${item.planName}-${item.combinedCode}`}>
+                    <TableCell className="font-medium whitespace-nowrap">{item.planName}</TableCell>
+                    <TableCell>
+                      <code className="rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-xs">
+                        {item.combinedCode}
+                      </code>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{item.generalDiscountDisplay}</TableCell>
+                    <TableCell className="whitespace-nowrap">{item.affiliatePercent}% off</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function CopyCodeButton({ value }: { value: string }) {
@@ -233,55 +336,29 @@ export function AffiliatePortalView({ data }: { data: AffiliatePortalViewData })
           </p>
         </CardHeader>
         <CardContent className="p-0">
-          {data.combinedPromos.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-muted-foreground">
-              No affiliate checkout tiers are configured right now. Contact
-              support if you expected promotion codes here.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Combined code</TableHead>
-                    <TableHead className="whitespace-nowrap">
-                      Affiliate discount
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap">
-                      Valid through
-                    </TableHead>
-                    <TableHead className="w-[5.5rem] text-right">
-                      Copy
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.combinedPromos.map((row) => (
-                    <TableRow key={row.planId}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {row.planName}
-                      </TableCell>
-                      <TableCell>
-                        <code className="rounded-md border border-border/60 bg-muted/30 px-2 py-1 font-mono text-xs">
-                          {row.combinedCode}
-                        </code>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {row.affiliatePercent}% off
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatValidThrough(row.validThrough)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <CopyCodeButton value={row.combinedCode} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          <Tabs defaultValue="active" className="gap-0">
+            <div className="border-b border-border/50 px-6 pt-2">
+              <TabsList className="h-9 bg-transparent p-0">
+                <TabsTrigger value="active" className="data-[state=active]:bg-muted/60">
+                  Active codes
+                </TabsTrigger>
+                <TabsTrigger value="history" className="data-[state=active]:bg-muted/60">
+                  History
+                  {data.expiredPromoHistory.length > 0 ? (
+                    <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
+                      ({data.expiredPromoHistory.length})
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
             </div>
-          )}
+            <TabsContent value="active" className="mt-0">
+              <PromoCodesTable rows={data.combinedPromos} />
+            </TabsContent>
+            <TabsContent value="history" className="mt-0">
+              <PromoHistoryPanel groups={data.expiredPromoHistory} />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 

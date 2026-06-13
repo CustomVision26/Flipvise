@@ -1,15 +1,28 @@
 import type { PlanConfig } from "@/components/pricing-content";
 import { formatCombinedPromotionCode } from "@/lib/affiliate-promotional-code";
+import {
+  formatPromoDateTimeLabel,
+  isAffiliateDiscountEffectivelyActive,
+  isGeneralDiscountEffectivelyActive,
+  resolvePlanPromoWindow,
+} from "@/lib/plan-promo-window";
 
-/** Paid plan with the admin “general discount” switch on and a redeemable coupon id. */
+/** Paid plan with general discount effectively active (schedule + switch + coupon). */
 export function planHasGeneralDiscountActive(plan: PlanConfig): boolean {
-  if (plan.id === "free") return false;
-  const d = plan.discount;
-  return !!(d?.active && d.value > 0 && d.stripeCouponId?.trim());
+  return isGeneralDiscountEffectivelyActive(plan);
 }
 
 export function listPlansWithGeneralDiscount(plans: PlanConfig[]): PlanConfig[] {
   return plans.filter(planHasGeneralDiscountActive);
+}
+
+/** General discount on + affiliate discount on + Stripe coupon id — required for affiliate code broadcasts. */
+export function planHasAffiliateCombinedCode(plan: PlanConfig): boolean {
+  return isAffiliateDiscountEffectivelyActive(plan);
+}
+
+export function listPlansEligibleForAffiliateCodeBroadcast(plans: PlanConfig[]): PlanConfig[] {
+  return plans.filter(planHasAffiliateCombinedCode);
 }
 
 export function formatPlanNameList(names: string[]): string {
@@ -18,13 +31,6 @@ export function formatPlanNameList(names: string[]): string {
   if (names.length === 2) return `the ${names[0]} and ${names[1]} plans`;
   const allButLast = names.slice(0, -1).join(", ");
   return `the ${allButLast}, and ${names[names.length - 1]} plans`;
-}
-
-function formatValidThrough(iso: string | null | undefined): string {
-  if (!iso?.trim()) return "No expiry set";
-  const d = new Date(`${iso.trim()}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
 function discountPercentLabel(plan: PlanConfig): string {
@@ -54,7 +60,7 @@ export function buildAffiliateCodesAutoMessage(subject: string, selectedPlans: P
   const trimmedSubject = subject.trim();
 
   if (!planPhrase) {
-    return "Select at least one plan with an active general discount to generate a message.";
+    return "Select at least one plan with general discount and affiliate discount turned on.";
   }
 
   if (trimmedSubject) {
@@ -83,13 +89,7 @@ export function buildGeneralPromoDetailsBlock(
 
   return lines.length > 0
     ? lines.join("\n")
-    : "No plans were selected for this broadcast.";
-}
-
-export function planHasAffiliateCombinedCode(plan: PlanConfig): boolean {
-  const base = plan.discount?.stripeCouponId?.trim();
-  const aff = plan.affiliateDiscount;
-  return !!(base && aff?.active && aff.value > 0);
+    : "No eligible plans were selected for this broadcast.";
 }
 
 /** Matches the affiliate portal “Promotion codes” table for inbox reference blocks. */
@@ -103,13 +103,7 @@ export function buildAffiliateCombinedDetailsBlock(
   const sections: string[] = [];
 
   for (const p of plans) {
-    if (!idSet.has(p.id) || !planHasGeneralDiscountActive(p)) continue;
-    if (!planHasAffiliateCombinedCode(p)) {
-      sections.push(
-        `${p.name}\n  Combined code: not configured — turn on affiliate discount % for this plan.`,
-      );
-      continue;
-    }
+    if (!idSet.has(p.id) || !planHasAffiliateCombinedCode(p)) continue;
 
     const base = p.discount!.stripeCouponId.trim();
     const combined = formatCombinedPromotionCode(base, suffix);
@@ -120,14 +114,14 @@ export function buildAffiliateCombinedDetailsBlock(
         p.name,
         `  Combined code: ${combined}`,
         `  Affiliate discount: ${affValue}% off`,
-        `  Valid through: ${formatValidThrough(p.discontinueAt)}`,
+        `  Valid through: ${formatPromoDateTimeLabel(resolvePlanPromoWindow(p).endsAt)}`,
       ].join("\n"),
     );
   }
 
   return sections.length > 0
     ? sections.join("\n\n")
-    : "No plans were selected for this broadcast.";
+    : "No eligible plans were selected for this broadcast.";
 }
 
 /** Legacy single-line hints (kept for any callers that still need compact text). */
@@ -141,17 +135,15 @@ export function buildAffiliateCombinedHints(
   const lines: string[] = [];
 
   for (const p of plans) {
-    if (!idSet.has(p.id) || !planHasGeneralDiscountActive(p)) continue;
-    const base = p.discount?.stripeCouponId?.trim();
-    const aff = p.affiliateDiscount;
-    if (!base || !aff?.active || !(aff.value > 0)) continue;
+    if (!idSet.has(p.id) || !planHasAffiliateCombinedCode(p)) continue;
+    const base = p.discount!.stripeCouponId.trim();
     const combined = formatCombinedPromotionCode(base, suffix);
     lines.push(
-      `${p.name}: combined code «${combined}» — ${aff.value}% off at checkout for this tier (affiliate rate).`,
+      `${p.name}: combined code «${combined}» — ${p.affiliateDiscount!.value}% off at checkout for this tier (affiliate rate).`,
     );
   }
 
   return lines.length > 0
     ? lines.join("\n")
-    : "No affiliate checkout codes are available for the selected plans. Turn on affiliate discount % on those plans.";
+    : "No affiliate checkout codes are available. Turn on general discount and affiliate discount on the selected plans.";
 }

@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { isGeneralDiscountEffectivelyActive } from "@/lib/plan-promo-window";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
 import plansConfigData from "@/data/plans-config.json";
 
@@ -54,6 +55,10 @@ export type PlanConfig = {
   affiliateDiscount?: PlanAffiliateDiscount;
   /** ISO date string (YYYY-MM-DD) — when set, marks the date this plan will be discontinued. */
   discontinueAt?: string | null;
+  /** Promotion window start — `YYYY-MM-DDTHH:mm` (required when discounts are active). */
+  promoStartsAt?: string | null;
+  /** Promotion window end — `YYYY-MM-DDTHH:mm` (required when discounts are active). */
+  promoEndsAt?: string | null;
 };
 
 /** Returns the discounted price given a base price and discount config. */
@@ -88,7 +93,7 @@ function PlanCard({
     period === "monthly" ? plan.monthlyPrice : plan.yearlyMonthlyPrice;
   const discount = plan.discount;
   const hasActiveDiscount =
-    !!discount?.active && !!discount.value && basePrice !== null;
+    isGeneralDiscountEffectivelyActive(plan) && basePrice !== null;
   const price = hasActiveDiscount && basePrice !== null
     ? applyDiscount(basePrice, discount!)
     : basePrice;

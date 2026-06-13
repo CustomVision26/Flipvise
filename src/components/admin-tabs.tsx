@@ -58,6 +58,8 @@ import {
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
+import { AdminSupportNotificationsMenu } from "@/components/admin-support-notifications-menu";
+import type { SerializedSupportNotification } from "@/lib/support-ticket-dto";
 import type {
   SerializedAdminInvoice,
   SerializedAdminSubscription,
@@ -115,6 +117,8 @@ export interface AdminTabsProps {
   invoices: SerializedAdminInvoice[];
   supportTickets: SerializedTicket[];
   supportStats: SupportStats;
+  supportNotifications: SerializedSupportNotification[];
+  supportUnreadCount: number;
   plansConfig: PlanConfig[];
   affiliates: SerializedAffiliate[];
   /** Server default (env) — used as the initial value for “accept link” days in the invite form. */
@@ -191,6 +195,8 @@ export function AdminTabs({
   invoices,
   supportTickets,
   supportStats,
+  supportNotifications,
+  supportUnreadCount,
   plansConfig,
   affiliates,
   affiliateInviteDefaultExpiresInDays,
@@ -215,7 +221,7 @@ export function AdminTabs({
       setSidebarHidden(true);
     }
   }, []);
-  const [expandedAllUsersUserId, setExpandedAllUsersUserId] = useState<string | null>(null);
+  const [profileDialogUser, setProfileDialogUser] = useState<SerializedUser | null>(null);
   const [expandedWorkspaceUserId, setExpandedWorkspaceUserId] = useState<string | null>(null);
   const [workspaceDialog, setWorkspaceDialog] = useState<SerializedAdminWorkspace | null>(null);
   const activeSection:
@@ -360,15 +366,21 @@ export function AdminTabs({
           <CardHeader className={adminMenuHeaderClass}>
             <div className="flex items-center justify-between gap-2">
               <CardTitle className={adminMenuTitleClass}>Admin Menu</CardTitle>
-              <button
-                type="button"
-                onClick={() => setSidebarHidden(true)}
-                className={adminMenuIconButtonClass}
-                aria-label="Hide admin menu"
-                title="Hide admin menu"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <AdminSupportNotificationsMenu
+                  unreadCount={supportUnreadCount}
+                  notifications={supportNotifications}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSidebarHidden(true)}
+                  className={adminMenuIconButtonClass}
+                  aria-label="Hide admin menu"
+                  title="Hide admin menu"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className={adminMenuContentClass}>
@@ -440,8 +452,12 @@ export function AdminTabs({
               <span className="flex w-full items-center gap-2.5">
                 <LifeBuoy className="h-4 w-4 shrink-0 opacity-80" />
                 <span className="truncate">Support Center</span>
-                {supportStats.totals.openCount > 0 ? (
+                {supportUnreadCount > 0 ? (
                   <Badge className="ml-auto text-xs" variant="destructive">
+                    {supportUnreadCount}
+                  </Badge>
+                ) : supportStats.totals.openCount > 0 ? (
+                  <Badge className="ml-auto text-xs" variant="secondary">
                     {supportStats.totals.openCount}
                   </Badge>
                 ) : null}
@@ -515,7 +531,7 @@ export function AdminTabs({
                   {filteredUsers.length} of {users.length} users
                   <span className="hidden sm:inline"> · </span>
                   <span className="block sm:inline text-xs sm:text-sm">
-                    Double-click a row to expand plan details
+                    Double-click a row to view profile and plan details
                   </span>
                 </p>
               </div>
@@ -604,20 +620,12 @@ export function AdminTabs({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsers.map((user) => {
-                    const isExpanded = expandedAllUsersUserId === user.id;
-                    return (
-                      <Fragment key={user.id}>
-                        <TableRow
-                          onDoubleClick={() =>
-                            setExpandedAllUsersUserId((current) =>
-                              current === user.id ? null : user.id,
-                            )
-                          }
-                          className={`cursor-pointer ${
-                            isExpanded ? "bg-accent/60 hover:bg-accent/60" : ""
-                          } ${user.isBanned ? "opacity-60" : ""}`}
-                        >
+                  filteredUsers.map((user) => (
+                    <TableRow
+                      key={user.id}
+                      onDoubleClick={() => setProfileDialogUser(user)}
+                      className={`cursor-pointer ${user.isBanned ? "opacity-60" : ""}`}
+                    >
                           <TableCell className="font-medium whitespace-nowrap">
                             <span className="flex items-center gap-2">
                               {user.fullName}
@@ -704,47 +712,145 @@ export function AdminTabs({
                             </div>
                           </TableCell>
                         </TableRow>
-                        {isExpanded ? (
-                          <TableRow>
-                            <TableCell colSpan={9} className="bg-muted/20 py-3">
-                              <div className="overflow-x-auto">
-                                <div className="grid min-w-[52rem] gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                                  <div className="rounded-md border bg-background p-3">
-                                    <p className="text-xs text-muted-foreground">Plan type</p>
-                                    <p className="mt-1 text-sm font-medium">{user.planAccessType}</p>
-                                  </div>
-                                  <div className="rounded-md border bg-background p-3">
-                                    <p className="text-xs text-muted-foreground">Clerk Plan</p>
-                                    <p className="mt-1 text-sm font-medium">{user.clerkPlan}</p>
-                                  </div>
-                                  <div className="rounded-md border bg-background p-3">
-                                    <p className="text-xs text-muted-foreground">Admin Assigned Plan</p>
-                                    <p className="mt-1 text-sm font-medium">{user.adminAssignedPlan}</p>
-                                  </div>
-                                  <div className="rounded-md border bg-background p-3">
-                                    <p className="text-xs text-muted-foreground">Current Personal Plan</p>
-                                    <p className="mt-1 text-sm font-medium">{user.currentPersonalPlan}</p>
-                                  </div>
-                                  <div className="rounded-md border bg-background p-3">
-                                    <p className="text-xs text-muted-foreground">
-                                      Personal Plan Start Time
-                                    </p>
-                                    <p className="mt-1 text-sm font-medium">
-                                      {formatDateTime(user.currentPersonalPlanDateTime)}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ) : null}
-                      </Fragment>
-                    );
-                  })
+                  ))
                 )}
               </TableBody>
             </Table>
           </CardContent>
+          <Dialog
+            open={profileDialogUser != null}
+            onOpenChange={(open) => {
+              if (!open) setProfileDialogUser(null);
+            }}
+          >
+            <DialogContent className="max-h-[min(85vh,32rem)] overflow-y-auto sm:max-w-md">
+              {profileDialogUser ? (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="text-left leading-snug">
+                      {profileDialogUser.fullName}
+                    </DialogTitle>
+                    <DialogDescription className="text-left">
+                      User profile and billing summary
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-5">
+                    <div className="flex flex-wrap gap-2">
+                      {profileDialogUser.isSuperadmin ? (
+                        <Badge variant="default" className="text-xs">
+                          Owner/Superadmin
+                        </Badge>
+                      ) : null}
+                      {profileDialogUser.isAdmin && !profileDialogUser.isSuperadmin ? (
+                        <Badge variant="destructive" className="text-xs">
+                          Admin
+                        </Badge>
+                      ) : null}
+                      {profileDialogUser.isBanned ? (
+                        <Badge
+                          variant="outline"
+                          className="border-destructive text-xs text-destructive"
+                        >
+                          Banned
+                        </Badge>
+                      ) : null}
+                      {profileDialogUser.isOnline ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Online
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Offline
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Profile
+                      </p>
+                      <dl className="grid gap-2 text-sm">
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Email</dt>
+                          <dd className="break-all font-medium">{profileDialogUser.email ?? "—"}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">User ID</dt>
+                          <dd className="break-all font-mono text-xs">{profileDialogUser.id}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Joined</dt>
+                          <dd>{formatDate(profileDialogUser.createdAt)}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Last sign-in</dt>
+                          <dd>
+                            {profileDialogUser.lastSignInAt
+                              ? formatDate(profileDialogUser.lastSignInAt)
+                              : "Never"}
+                          </dd>
+                        </div>
+                        {profileDialogUser.associatePlan ? (
+                          <div className="grid grid-cols-[7rem_1fr] gap-2">
+                            <dt className="text-muted-foreground">Associate plan</dt>
+                            <dd>{profileDialogUser.associatePlan}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </div>
+
+                    <div className="space-y-3 border-t border-border/60 pt-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Current plan
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={
+                            profileDialogUser.planDisplayName === "Free" ? "secondary" : "default"
+                          }
+                          className="text-sm"
+                        >
+                          {profileDialogUser.planDisplayName}
+                        </Badge>
+                        <Badge
+                          variant={planAccessTypeBadgeVariant(profileDialogUser.planAccessType)}
+                          className="text-sm"
+                        >
+                          {profileDialogUser.planAccessType}
+                        </Badge>
+                      </div>
+                      <dl className="grid gap-2 text-sm">
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Personal plan</dt>
+                          <dd className="font-medium">{profileDialogUser.currentPersonalPlan}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Plan type</dt>
+                          <dd className="font-medium">{profileDialogUser.planAccessType}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Plan updated</dt>
+                          <dd>{formatDate(profileDialogUser.planSetAt)}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Active since</dt>
+                          <dd>{formatDateTime(profileDialogUser.currentPersonalPlanDateTime)}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Clerk plan</dt>
+                          <dd>{profileDialogUser.clerkPlan}</dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Admin assigned</dt>
+                          <dd>{profileDialogUser.adminAssignedPlan}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </DialogContent>
+          </Dialog>
         </Card>
       ) : null}
 

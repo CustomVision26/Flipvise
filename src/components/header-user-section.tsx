@@ -20,7 +20,7 @@ import {
 } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
-import { CLERK_MODAL_TEARDOWN_MS } from "@/lib/use-clerk-modal-teardown";
+import { clerkAuthHandoffDelayMs } from "@/lib/clerk-auth-handoff";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
 
@@ -101,14 +101,19 @@ export function HeaderUserSection({
     activeTeamPlan != null &&
     (pathname === "/pricing" || pathname.startsWith("/pricing/"));
 
-  /** Defer Clerk / Radix portals until after sign-in modal teardown (removeChild race). */
+  /** Defer Clerk / Radix portals briefly after sign-in handoff only (removeChild race). */
   const [portalsReady, setPortalsReady] = useState(false);
   useEffect(() => {
     if (!userId) {
       setPortalsReady(false);
       return;
     }
-    const timer = window.setTimeout(() => setPortalsReady(true), CLERK_MODAL_TEARDOWN_MS);
+    const delay = clerkAuthHandoffDelayMs();
+    if (delay === 0) {
+      setPortalsReady(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setPortalsReady(true), delay);
     return () => window.clearTimeout(timer);
   }, [userId]);
 

@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { getAccessContext } from "@/lib/access";
 import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import { readPlansConfig } from "@/lib/admin/read-plans-config";
-import { buildAffiliateCombinedPromoRows } from "@/lib/affiliate-portal-combined-codes";
+import {
+  buildActiveAffiliateCombinedPromoRows,
+  buildExpiredAffiliateCombinedPromoRows,
+  groupExpiredAffiliatePromosByLabel,
+} from "@/lib/affiliate-portal-combined-codes";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { AffiliatePortalView } from "@/components/affiliate-portal-view";
 
@@ -28,9 +32,12 @@ export default async function AffiliatePortalPage() {
   if (!affiliate) redirect("/dashboard");
 
   const plans = await readPlansConfig();
-  const combinedPromos = buildAffiliateCombinedPromoRows(
+  const activePromos = buildActiveAffiliateCombinedPromoRows(
     plans,
     affiliate.promotionalCode,
+  );
+  const expiredPromoHistory = groupExpiredAffiliatePromosByLabel(
+    buildExpiredAffiliateCombinedPromoRows(plans, affiliate.promotionalCode),
   );
 
   const monthKey = new Date().toISOString().slice(0, 7);
@@ -56,7 +63,8 @@ export default async function AffiliatePortalPage() {
         paidReferralsTotal: affiliate.paidReferralsTotal ?? 0,
         paidReferralsThisMonth,
         monthLabel,
-        combinedPromos,
+        combinedPromos: activePromos,
+        expiredPromoHistory,
         referralQuotaEnabled: affiliate.referralQuotaEnabled ?? false,
         periodPaidReferrals: affiliate.periodPaidReferrals ?? 0,
         referralQuotaTarget: affiliate.referralQuotaTarget ?? null,

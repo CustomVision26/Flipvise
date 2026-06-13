@@ -5,6 +5,7 @@ import {
 } from "@/db/queries/teams";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
+import { countUnreadSupportNotificationsForRecipient } from "@/db/queries/support-notifications";
 import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import type { AccessContext } from "@/lib/access";
 import {
@@ -149,7 +150,8 @@ export async function loadRootLayoutShellData(input: {
               () => countUnreadAffiliateBroadcastInboxForUser(userId),
               0,
             ),
-          ]).then(([invites, affiliateBroadcasts]) => invites + affiliateBroadcasts)
+            countUnreadSupportNotificationsForRecipient(userId).catch(() => 0),
+          ]).then(([invites, affiliateBroadcasts, supportAlerts]) => invites + affiliateBroadcasts + supportAlerts)
         : Promise.resolve(0),
 
       needsAffiliate

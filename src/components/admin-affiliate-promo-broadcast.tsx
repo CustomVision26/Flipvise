@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useTransition, useMemo, useCallback, useEffect } from "react";
-import { Mail, Megaphone, Send } from "lucide-react";
+import { Fragment, useState, useTransition, useMemo, useCallback, useEffect } from "react";
+import { ChevronDown, Mail, Megaphone, Send } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -21,8 +30,9 @@ import {
   buildAffiliateCodesAutoMessage,
   buildGeneralPromoAutoMessage,
   listPlansWithGeneralDiscount,
-  planHasAffiliateCombinedCode,
+  listPlansEligibleForAffiliateCodeBroadcast,
 } from "@/lib/affiliate-broadcast-messaging";
+import { buildAffiliateCombinedPromoRows } from "@/lib/affiliate-portal-combined-codes";
 import {
   broadcastAffiliateCodesAction,
   broadcastAffiliateGeneralPromoAction,
@@ -33,16 +43,261 @@ type Props = {
   plans: PlanConfig[];
 };
 
-function discountSummary(plan: PlanConfig): string {
+function generalPromoPlanSummary(plan: PlanConfig): string {
   const d = plan.discount!;
   const amount = d.type === "percentage" ? `${d.value}% off` : `$${d.value} off`;
   const code = d.stripeCouponId.trim();
   return code ? `${amount} · code ${code}` : amount;
 }
 
+function affiliateCombinedCodeForPlan(
+  plan: PlanConfig,
+  promotionalCode: string,
+): { combinedCode: string; affiliatePercent: number } | null {
+  const rows = buildAffiliateCombinedPromoRows([plan], promotionalCode);
+  const row = rows[0];
+  if (!row) return null;
+  return { combinedCode: row.combinedCode, affiliatePercent: row.affiliatePercent };
+}
+
+type AffiliateCodePlanGroup = {
+  combinedCode: string;
+  plans: Array<{ plan: PlanConfig; affiliatePercent: number }>;
+};
+
+function groupPlansByAffiliateCombinedCode(
+  planList: PlanConfig[],
+  promotionalCode: string,
+): AffiliateCodePlanGroup[] {
+  const map = new Map<string, AffiliateCodePlanGroup>();
+
+  for (const plan of planList) {
+    const code = affiliateCombinedCodeForPlan(plan, promotionalCode);
+    if (!code) continue;
+    const existing = map.get(code.combinedCode);
+    const entry = { plan, affiliatePercent: code.affiliatePercent };
+    if (existing) {
+      existing.plans.push(entry);
+    } else {
+      map.set(code.combinedCode, { combinedCode: code.combinedCode, plans: [entry] });
+    }
+  }
+
+  return [...map.values()];
+}
+
+type AffiliateCodeTableRow = {
+  key: string;
+  combinedCode: string;
+  affiliateLabel: string | null;
+  plans: Array<{ plan: PlanConfig; affiliatePercent: number }>;
+};
+
+function buildAffiliateCodeTableRows(
+  planList: PlanConfig[],
+  targetAffiliates: SerializedAffiliate[],
+): AffiliateCodeTableRow[] {
+  const rows: AffiliateCodeTableRow[] = [];
+
+  for (const affiliate of targetAffiliates) {
+    const groups = groupPlansByAffiliateCombinedCode(planList, affiliate.promotionalCode);
+    const showAffiliate = targetAffiliates.length > 1;
+
+    for (const group of groups) {
+      rows.push({
+        key: `${affiliate.id}-${group.combinedCode}`,
+        combinedCode: group.combinedCode,
+        affiliateLabel: showAffiliate ? affiliate.affiliateName : null,
+        plans: group.plans,
+      });
+    }
+  }
+
+  return rows;
+}
+
+function AffiliateCodePlansPicker({
+  planList,
+  emptyMessage,
+  selectedSet,
+  onToggle,
+  onSelectAll,
+  onClear,
+  selectedCount,
+  targetAffiliates,
+}: {
+  planList: PlanConfig[];
+  emptyMessage: string;
+  selectedSet: Set<string>;
+  onToggle: (planId: string, checked: boolean) => void;
+  onSelectAll: () => void;
+  onClear: () => void;
+  selectedCount: number;
+  targetAffiliates: SerializedAffiliate[];
+}) {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const showAffiliateColumn = targetAffiliates.length > 1;
+  const codeRows = useMemo(
+    () => buildAffiliateCodeTableRows(planList, targetAffiliates),
+    [planList, targetAffiliates],
+  );
+
+  function toggleExpanded(key: string) {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  if (planList.length === 0) {
+    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+  }
+
+  if (targetAffiliates.length === 0) {
+    return (
+      <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+        <p className="text-sm text-muted-foreground">
+          Choose recipients to preview combined checkout codes.
+        </p>
+      </div>
+    );
+  }
+
+  if (codeRows.length === 0) {
+    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" className="h-8" onClick={onSelectAll}>
+          Select all
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8"
+          onClick={onClear}
+          disabled={selectedCount === 0}
+        >
+          Clear
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {selectedCount} plan{selectedCount === 1 ? "" : "s"} selected
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Double-click a combined code row to expand plan selection.
+      </p>
+      <Table aria-label="Affiliate combined codes">
+        <TableHeader>
+          <TableRow>
+            {showAffiliateColumn ? (
+              <TableHead className="whitespace-nowrap">Affiliate</TableHead>
+            ) : null}
+            <TableHead>Combined code</TableHead>
+            <TableHead className="w-16 text-right">Plans</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {codeRows.map((row) => {
+            const expanded = expandedKeys.has(row.key);
+            const colSpan = showAffiliateColumn ? 3 : 2;
+            const selectedInGroup = row.plans.filter(({ plan }) => selectedSet.has(plan.id)).length;
+
+            return (
+              <Fragment key={row.key}>
+                <TableRow
+                  className={cn(
+                    "cursor-pointer select-none hover:bg-muted/50",
+                    expanded && "bg-violet-500/[0.06]",
+                  )}
+                  onDoubleClick={() => toggleExpanded(row.key)}
+                  title="Double-click to show plans"
+                >
+                  {showAffiliateColumn ? (
+                    <TableCell className="text-sm font-medium whitespace-nowrap">
+                      {row.affiliateLabel}
+                    </TableCell>
+                  ) : null}
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <ChevronDown
+                        className={cn(
+                          "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                          expanded && "rotate-180",
+                        )}
+                        aria-hidden
+                      />
+                      <code className="font-mono text-xs text-violet-300">{row.combinedCode}</code>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                    {selectedInGroup > 0
+                      ? `${selectedInGroup}/${row.plans.length}`
+                      : row.plans.length}
+                  </TableCell>
+                </TableRow>
+                {expanded ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={colSpan} className="bg-muted/25 p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="w-10" />
+                            <TableHead>Plan</TableHead>
+                            <TableHead className="text-right whitespace-nowrap">
+                              Affiliate discount
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {row.plans.map(({ plan, affiliatePercent }) => {
+                            const id = `bc-plan-codes-${row.key}-${plan.id}`;
+                            return (
+                              <TableRow key={plan.id} className="hover:bg-muted/40">
+                                <TableCell className="py-2">
+                                  <Checkbox
+                                    id={id}
+                                    checked={selectedSet.has(plan.id)}
+                                    onCheckedChange={(c) => onToggle(plan.id, c === true)}
+                                  />
+                                </TableCell>
+                                <TableCell className="py-2 font-medium">{plan.name}</TableCell>
+                                <TableCell className="py-2 text-right text-muted-foreground tabular-nums">
+                                  {affiliatePercent}% off
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
-  const discountPlans = useMemo(() => listPlansWithGeneralDiscount(plans), [plans]);
-  const defaultPlanIds = useMemo(() => discountPlans.map((p) => p.id), [discountPlans]);
+  const generalPromoPlans = useMemo(() => listPlansWithGeneralDiscount(plans), [plans]);
+  const affiliateCodePlans = useMemo(
+    () => listPlansEligibleForAffiliateCodeBroadcast(plans),
+    [plans],
+  );
+  const generalDefaultPlanIds = useMemo(() => generalPromoPlans.map((p) => p.id), [generalPromoPlans]);
+  const affiliateCodeDefaultPlanIds = useMemo(
+    () => affiliateCodePlans.map((p) => p.id),
+    [affiliateCodePlans],
+  );
 
   const activeAffiliates = useMemo(() => {
     const act = affiliates.filter((a) => a.status === "active");
@@ -55,11 +310,11 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
 
   const [generalSubject, setGeneralSubject] = useState("");
   const [generalMessage, setGeneralMessage] = useState("");
-  const [generalSelectedPlanIds, setGeneralSelectedPlanIds] = useState<string[]>(defaultPlanIds);
+  const [generalSelectedPlanIds, setGeneralSelectedPlanIds] = useState<string[]>(generalDefaultPlanIds);
 
   const [codesSubject, setCodesSubject] = useState("");
   const [codesMessage, setCodesMessage] = useState("");
-  const [codesSelectedPlanIds, setCodesSelectedPlanIds] = useState<string[]>(defaultPlanIds);
+  const [codesSelectedPlanIds, setCodesSelectedPlanIds] = useState<string[]>(affiliateCodeDefaultPlanIds);
 
   const [codesRecipientMode, setCodesRecipientMode] = useState<"all_active" | "selected">(
     "all_active",
@@ -74,23 +329,23 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
 
   useEffect(() => {
     setGeneralSelectedPlanIds((prev) => {
-      const valid = prev.filter((id) => defaultPlanIds.includes(id));
-      return valid.length > 0 ? valid : defaultPlanIds;
+      const valid = prev.filter((id) => generalDefaultPlanIds.includes(id));
+      return valid.length > 0 ? valid : generalDefaultPlanIds;
     });
     setCodesSelectedPlanIds((prev) => {
-      const valid = prev.filter((id) => defaultPlanIds.includes(id));
-      return valid.length > 0 ? valid : defaultPlanIds;
+      const valid = prev.filter((id) => affiliateCodeDefaultPlanIds.includes(id));
+      return valid.length > 0 ? valid : affiliateCodeDefaultPlanIds;
     });
-  }, [defaultPlanIds]);
+  }, [generalDefaultPlanIds, affiliateCodeDefaultPlanIds]);
 
   const generalSelectedPlans = useMemo(
-    () => discountPlans.filter((p) => generalSelectedPlanIds.includes(p.id)),
-    [discountPlans, generalSelectedPlanIds],
+    () => generalPromoPlans.filter((p) => generalSelectedPlanIds.includes(p.id)),
+    [generalPromoPlans, generalSelectedPlanIds],
   );
 
   const codesSelectedPlans = useMemo(
-    () => discountPlans.filter((p) => codesSelectedPlanIds.includes(p.id)),
-    [discountPlans, codesSelectedPlanIds],
+    () => affiliateCodePlans.filter((p) => codesSelectedPlanIds.includes(p.id)),
+    [affiliateCodePlans, codesSelectedPlanIds],
   );
 
   useEffect(() => {
@@ -126,16 +381,16 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
   }, []);
 
   const selectAllGeneralPlans = useCallback(() => {
-    setGeneralSelectedPlanIds(defaultPlanIds);
-  }, [defaultPlanIds]);
+    setGeneralSelectedPlanIds(generalDefaultPlanIds);
+  }, [generalDefaultPlanIds]);
 
   const clearGeneralPlans = useCallback(() => {
     setGeneralSelectedPlanIds([]);
   }, []);
 
   const selectAllCodesPlans = useCallback(() => {
-    setCodesSelectedPlanIds(defaultPlanIds);
-  }, [defaultPlanIds]);
+    setCodesSelectedPlanIds(affiliateCodeDefaultPlanIds);
+  }, [affiliateCodeDefaultPlanIds]);
 
   const clearCodesPlans = useCallback(() => {
     setCodesSelectedPlanIds([]);
@@ -213,33 +468,33 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
       ? activeAffiliateCount
       : codesSelectedAffiliateIds.length;
 
-  const codesHasAffiliateTiers = codesSelectedPlans.some(planHasAffiliateCombinedCode);
+  const codesTargetAffiliates = useMemo(() => {
+    if (codesRecipientMode === "all_active") return activeAffiliates;
+    return activeAffiliates.filter((a) => codesSelectedAffiliateIds.includes(a.id));
+  }, [activeAffiliates, codesRecipientMode, codesSelectedAffiliateIds]);
 
   const canSubmitCodes =
     codesSubject.trim().length >= 3 &&
     codesMessage.trim().length > 0 &&
     codesSelectedPlanIds.length > 0 &&
-    codesHasAffiliateTiers &&
+    affiliateCodePlans.length > 0 &&
     activeAffiliateCount > 0 &&
     (codesRecipientMode === "all_active" || codesSelectedAffiliateIds.length > 0);
 
   function renderPlanCheckboxes(opts: {
-    mode: "general" | "codes";
+    planList: PlanConfig[];
+    emptyMessage: string;
     selectedSet: Set<string>;
     onToggle: (planId: string, checked: boolean) => void;
     onSelectAll: () => void;
     onClear: () => void;
     selectedCount: number;
   }) {
-    const { mode, selectedSet, onToggle, onSelectAll, onClear, selectedCount } = opts;
+    const { planList, emptyMessage, selectedSet, onToggle, onSelectAll, onClear, selectedCount } =
+      opts;
 
-    if (discountPlans.length === 0) {
-      return (
-        <p className="text-sm text-muted-foreground">
-          No paid plans have the general discount switch turned on. Enable a discount on a plan in
-          Pricing plans first.
-        </p>
-      );
+    if (planList.length === 0) {
+      return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
     }
 
     return (
@@ -263,9 +518,8 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
           </span>
         </div>
         <ul className="space-y-2 text-sm" aria-label="Plans included in this broadcast">
-          {discountPlans.map((plan) => {
-            const id = `bc-plan-${mode}-${plan.id}`;
-            const affiliateReady = planHasAffiliateCombinedCode(plan);
+          {planList.map((plan) => {
+            const id = `bc-plan-general-${plan.id}`;
             return (
               <li key={plan.id} className="flex items-start gap-2">
                 <Checkbox
@@ -276,12 +530,9 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
                 />
                 <Label htmlFor={id} className="cursor-pointer font-normal leading-snug">
                   <span className="font-medium text-foreground">{plan.name}</span>
-                  <span className="block text-xs text-muted-foreground">{discountSummary(plan)}</span>
-                  {mode === "codes" && !affiliateReady ? (
-                    <span className="block text-xs text-amber-400/90">
-                      Affiliate discount is off — no combined code for this plan.
-                    </span>
-                  ) : null}
+                  <span className="block text-xs text-muted-foreground">
+                    {generalPromoPlanSummary(plan)}
+                  </span>
                 </Label>
               </li>
             );
@@ -309,7 +560,9 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
           <div className="space-y-2">
             <Label>Plans in this promotion</Label>
             {renderPlanCheckboxes({
-              mode: "general",
+              planList: generalPromoPlans,
+              emptyMessage:
+                "No paid plans have the general discount switch turned on. Enable a discount on a plan in Pricing plans first.",
               selectedSet: generalSelectedSet,
               onToggle: toggleGeneralPlanId,
               onSelectAll: selectAllGeneralPlans,
@@ -369,26 +622,26 @@ export function AdminAffiliatePromoBroadcast({ affiliates, plans }: Props) {
             Sends combined-code details to{" "}
             <span className="font-medium text-foreground">active affiliates</span> you choose (
             {activeAffiliateCount} active row{activeAffiliateCount === 1 ? "" : "s"}). Inbox only — no
-            email. Skips recipients with no linked Clerk account. Codes match the Affiliate dashboard
-            promotion table.
+            email. Only plans with <span className="font-medium text-foreground">general discount</span>{" "}
+            and <span className="font-medium text-foreground">affiliate discount</span> both turned on
+            can be included. Codes match the Affiliate dashboard promotion table.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Plans in this broadcast</Label>
-            {renderPlanCheckboxes({
-              mode: "codes",
-              selectedSet: codesSelectedSet,
-              onToggle: toggleCodesPlanId,
-              onSelectAll: selectAllCodesPlans,
-              onClear: clearCodesPlans,
-              selectedCount: codesSelectedPlanIds.length,
-            })}
-            {codesSelectedPlanIds.length > 0 && !codesHasAffiliateTiers ? (
-              <p className="text-xs text-amber-400/90">
-                Turn on affiliate discount % on at least one selected plan to send combined codes.
-              </p>
-            ) : null}
+            <AffiliateCodePlansPicker
+              planList={affiliateCodePlans}
+              emptyMessage={
+                "No plans have both general discount and affiliate discount turned on. Enable both on a paid plan in Pricing plans first."
+              }
+              selectedSet={codesSelectedSet}
+              onToggle={toggleCodesPlanId}
+              onSelectAll={selectAllCodesPlans}
+              onClear={clearCodesPlans}
+              selectedCount={codesSelectedPlanIds.length}
+              targetAffiliates={codesTargetAffiliates}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="bc-recipients-code">Recipients</Label>

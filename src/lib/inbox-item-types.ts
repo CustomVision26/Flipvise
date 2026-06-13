@@ -11,7 +11,8 @@ export type InboxItemType =
   | "affiliate_notice"
   | "admin_plan_log"
   | "admin_plan_invite"
-  | "quiz_security_notice";
+  | "quiz_security_notice"
+  | "support_ticket";
 
 // ── Type-specific payload shapes ──────────────────────────────────────────────
 
@@ -106,6 +107,14 @@ export type QuizSecurityNoticePayload = {
   memberName: string | null;
 };
 
+export type SupportTicketPayload = {
+  notificationId: number;
+  ticketId: number;
+  kind: string;
+  subject: string;
+  preview: string;
+};
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type UnifiedInboxItem =
@@ -162,6 +171,16 @@ export type UnifiedInboxItem =
       isRead: boolean;
       requiresAction: false;
       payload: QuizSecurityNoticePayload;
+    }
+  | {
+      type: "support_ticket";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: boolean;
+      payload: SupportTicketPayload;
     };
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
@@ -174,4 +193,5 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   admin_plan_log: "Plan update",
   admin_plan_invite: "Plan request",
   quiz_security_notice: "Quiz security",
+  support_ticket: "Support ticket",
 };

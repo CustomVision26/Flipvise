@@ -46,6 +46,7 @@ import {
   submitAccountIssueAction,
   uploadSupportAttachmentAction,
 } from "@/actions/support";
+import { HelpCenterMyTickets } from "@/components/help-center-my-tickets";
 
 // ── Shared types ───────────────────────────────────────────────────────────
 
@@ -753,6 +754,13 @@ const BASE_TABS = [
     icon: UserCircle,
     description: "Issues with your account or settings",
     form: <AccountForm />,
+  },
+  {
+    id: "my-tickets",
+    label: "My tickets",
+    icon: MessageSquare,
+    description: "Continue conversations with support",
+    form: <HelpCenterMyTickets />,
   },
 ] as const;
 

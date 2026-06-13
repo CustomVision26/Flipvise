@@ -21,5 +21,5 @@ export function clearClerkAuthHandoff(): void {
 /** Milliseconds to wait before mounting authenticated header chrome after sign-in. */
 export function clerkAuthHandoffDelayMs(): number {
   if (!hasClerkAuthHandoff()) return 0;
-  return CLERK_MODAL_TEARDOWN_MS;
+  return CLERK_MODAL_TEARDOWN_MS + 200;
 }

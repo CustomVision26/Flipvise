@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { supportTickets, supportTicketReplies } from "@/db/schema";
-import { eq, desc, count, sql } from "drizzle-orm";
+import { eq, desc, count, sql, and } from "drizzle-orm";
 
 function isMissingSupportTicketsTableError(error: unknown): boolean {
   let current: unknown = error;
@@ -79,6 +79,7 @@ export interface CreateSupportTicketParams {
   message: string;
   category: SupportCategory;
   priority?: SupportPriority;
+  attachmentUrl?: string | null;
 }
 
 // ── User-facing ────────────────────────────────────────────────────────────
@@ -94,9 +95,26 @@ export async function createSupportTicket(params: CreateSupportTicketParams) {
       message: params.message,
       category: params.category,
       priority: params.priority ?? "normal",
+      attachmentUrl: params.attachmentUrl ?? null,
     })
     .returning();
   return ticket;
+}
+
+export async function getSupportTicketByIdForUser(ticketId: number, userId: string) {
+  const [ticket] = await db
+    .select()
+    .from(supportTickets)
+    .where(and(eq(supportTickets.id, ticketId), eq(supportTickets.userId, userId)));
+  return ticket ?? null;
+}
+
+export async function getSupportTicketById(ticketId: number) {
+  const [ticket] = await db
+    .select()
+    .from(supportTickets)
+    .where(eq(supportTickets.id, ticketId));
+  return ticket ?? null;
 }
 
 export async function getSupportTicketsByUser(userId: string) {
@@ -140,14 +158,23 @@ export async function getTicketWithReplies(ticketId: number) {
 
 export async function addTicketReply(params: {
   ticketId: number;
-  adminId: string;
-  adminName: string;
+  authorUserId: string;
+  authorName: string;
+  authorRole: "admin" | "user";
   message: string;
 }) {
   return db.transaction(async (tx) => {
     const [reply] = await tx
       .insert(supportTicketReplies)
-      .values(params)
+      .values({
+        ticketId: params.ticketId,
+        authorUserId: params.authorUserId,
+        authorName: params.authorName,
+        authorRole: params.authorRole,
+        adminId: params.authorRole === "admin" ? params.authorUserId : null,
+        adminName: params.authorRole === "admin" ? params.authorName : null,
+        message: params.message,
+      })
       .returning();
     const [ticket] = await tx
       .update(supportTickets)

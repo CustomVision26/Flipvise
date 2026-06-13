@@ -19,10 +19,13 @@ import { listAdminPlanAssignmentInboxLogsForUser } from "@/db/queries/admin";
 import { listAdminPlanInvitesForInbox } from "@/db/queries/admin-plan-invites";
 import { listAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
 import { getQuizSecurityInboxForUser } from "@/db/queries/quiz-security";
+import { listSupportNotificationsForRecipient } from "@/db/queries/support-notifications";
+import { getSupportTicketById } from "@/db/queries/support";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
+import { supportNotificationsToInboxItems } from "@/lib/support-ticket-inbox";
 
 // UI
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -56,6 +59,7 @@ export default async function DashboardInboxPage() {
     adminPlanInviteRows,
     affiliateBroadcastRows,
     quizSecurityInboxRows,
+    supportNotificationRows,
     readSet,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
@@ -66,6 +70,7 @@ export default async function DashboardInboxPage() {
     listAdminPlanInvitesForInbox(userId, 80),
     tryTeamQuery(() => listAffiliateBroadcastInboxForUser(userId), []),
     tryTeamQuery(() => getQuizSecurityInboxForUser(userId), []),
+    listSupportNotificationsForRecipient(userId, 50),
     getInboxReadsForUser(userId),
   ]);
 
@@ -413,6 +418,19 @@ export default async function DashboardInboxPage() {
     );
   }
 
+  const supportTicketIds = [...new Set(supportNotificationRows.map((r) => r.ticketId))];
+  const supportTicketsById = new Map<
+    number,
+    NonNullable<Awaited<ReturnType<typeof getSupportTicketById>>>
+  >();
+  await Promise.all(
+    supportTicketIds.map(async (ticketId) => {
+      const ticket = await getSupportTicketById(ticketId);
+      if (ticket) supportTicketsById.set(ticketId, ticket);
+    }),
+  );
+  items.push(...supportNotificationsToInboxItems(supportNotificationRows, supportTicketsById));
+
   const unreadCount = items.filter((i) => !i.isRead).length;
 
   return (
@@ -431,7 +449,7 @@ export default async function DashboardInboxPage() {
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
             Quiz results, team invitations, billing, affiliate invites and notices, affiliate admin
-            broadcasts, administrator plan requests, and completed plan changes.
+            broadcasts, administrator plan requests, completed plan changes, and support replies.
           </p>
         </div>
         <Link
