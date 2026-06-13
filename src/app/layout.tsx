@@ -5,24 +5,13 @@ import { Poppins } from "next/font/google";
 import Image from "next/image";
 import { AppProviders } from "@/components/app-providers";
 import { HeaderLogo } from "@/components/header-logo";
+import { AuthenticatedShellChrome } from "@/components/authenticated-shell-chrome";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
-import { isTeamPlanId } from "@/lib/team-plans";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
-import {
-  getPersonalWorkspaceAccessLabel,
-  getPersonalWorkspaceAccountPlanLabel,
-} from "@/lib/personal-workspace-plan-label";
-import { tryTeamQuery } from "@/lib/team-query-fallback";
-import {
-  countPendingInvitationsForEmail,
-  getRootLayoutTeamNavPayload,
-} from "@/db/queries/teams";
-import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
-import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
+import { loadRootLayoutShellData } from "@/lib/load-root-layout-shell-data";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
-import { shouldHideHelpCenter } from "@/lib/team-help";
 import {
   PRO_UI_THEME_COOKIE,
   resolveProUiThemeDataAttribute,
@@ -73,19 +62,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Batch 1: session + cookies + headers — all independent, run in parallel
   const [
-    {
-      userId,
-      isPro,
-      adminGranted,
-      isAdmin,
-      activeTeamPlan,
-      hasProPlusInterfacePalette,
-      hasClerkPersonalPro,
-      hasClerkPersonalProPlus,
-      primaryEmail,
-    },
+    access,
     cookieStore,
     headerStore,
   ] = await Promise.all([
@@ -94,86 +72,26 @@ export default async function RootLayout({
     headers(),
   ]);
 
-  // Extract cookie / header values synchronously
+  const {
+    userId,
+    isPro,
+    activeTeamPlan,
+    hasProPlusInterfacePalette,
+    hasClerkPersonalPro,
+    hasClerkPersonalProPlus,
+  } = access;
+
   const teamContext = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
   const proCookieValue = cookieStore.get(PRO_UI_THEME_COOKIE)?.value;
   const freeCookieValue = cookieStore.get(FREE_UI_THEME_COOKIE)?.value;
   const pathnameHeader = headerStore.get("x-pathname") ?? "";
   const xSearch = headerStore.get("x-search") ?? "";
 
-  // Batch 2: layout nav + help + inbox — team bootstrap is shared (no duplicate Drizzle loads).
-  const [teamNavPayload, hideHelpCenter, inboxUnreadCount, activeAffiliateRow] =
-    await Promise.all([
-    userId != null
-      ? tryTeamQuery(
-          () =>
-            getRootLayoutTeamNavPayload(userId, { personalProUnlocked: isPro }),
-          {
-            teamAdminHeaderTeams: [],
-            workspaceNav: { teams: [], totalEligibleCount: 0 },
-          },
-        )
-      : Promise.resolve({
-          teamAdminHeaderTeams: [],
-          workspaceNav: { teams: [], totalEligibleCount: 0 },
-        }),
-
-    userId != null && !isAdmin && !adminGranted
-      ? shouldHideHelpCenter(userId, teamContext)
-      : Promise.resolve(false),
-
-    userId != null
-      ? Promise.all([
-          primaryEmail != null && primaryEmail !== ""
-            ? countPendingInvitationsForEmail(primaryEmail).catch(() => 0)
-            : Promise.resolve(0),
-          tryTeamQuery(() => countUnreadAffiliateBroadcastInboxForUser(userId), 0),
-        ]).then(([invites, affiliateBroadcasts]) => invites + affiliateBroadcasts)
-      : Promise.resolve(0),
-
-    userId != null
-      ? getActiveAffiliateForUser(
-          userId,
-          primaryEmail?.toLowerCase() ?? null,
-        ).catch(() => null)
-      : Promise.resolve(null),
-  ]);
-  const showAffiliatePortal = activeAffiliateRow != null;
-
-  const teamAdminHeaderTeams = teamNavPayload.teamAdminHeaderTeams;
-  const workspaceTeams = teamNavPayload.workspaceNav.teams;
-  const workspaceTeamsTotalEligible = teamNavPayload.workspaceNav.totalEligibleCount;
-  /** Team-tier subscribers often have zero `workspaceTeams` (owned tier workspaces are omitted from nav). Still show Personal · Team X + Team Admin link like invited-workspace users. */
-  const showWorkspaceSwitcher =
-    workspaceTeamsTotalEligible > 0 ||
-    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan));
-
-  /** Next to “Personal Dash” — SuperAdmin, Co-Admin, plan name, Subscriber, Complimentary, or Free / tier. */
-  const personalPlanLabelForWorkspace = userId
-    ? await getPersonalWorkspaceAccessLabel()
-    : "Free";
-  const personalAccountPlanLabel = userId
-    ? await getPersonalWorkspaceAccountPlanLabel()
-    : "Free";
-  /** When the workspace nav lacks subscriber-owned team rows, still link Team Dash from admin scope. */
-  const teamDashFallback =
-    userId != null &&
-    activeTeamPlan != null &&
-    isTeamPlanId(activeTeamPlan) &&
-    teamAdminHeaderTeams.length > 0
-      ? (() => {
-          const match = teamAdminHeaderTeams.find(
-            (t) => t.workspacePlanQuery === activeTeamPlan,
-          );
-          const pick = match ?? teamAdminHeaderTeams[0];
-          const planSlug = pick.workspacePlanQuery ?? activeTeamPlan;
-          return {
-            teamId: pick.id,
-            planSlug,
-            teamMemberUrlParam: pick.teamMemberUrlParam,
-          };
-        })()
-      : null;
+  const shell = await loadRootLayoutShellData({
+    pathname: pathnameHeader,
+    access,
+    teamContextCookie: teamContext,
+  });
 
   const dashboardHrefWithUserQuery =
     userId != null
@@ -186,11 +104,11 @@ export default async function RootLayout({
         })
       : "/dashboard";
   const personalWorkspaceHref =
-    userId != null && showWorkspaceSwitcher
+    userId != null && shell.showWorkspaceSwitcher
       ? dashboardHrefWithUserQuery
       : "/dashboard";
 
-  const allowedWorkspaceIds = new Set(workspaceTeams.map((t) => t.id));
+  const allowedWorkspaceIds = new Set(shell.workspaceTeams.map((t) => t.id));
   const teamIdFromUrlShape = teamWorkspaceTeamIdFromUrlShapeIfValid(
     parseSearchParamsRecordFromSearchString(xSearch),
   );
@@ -203,7 +121,6 @@ export default async function RootLayout({
     Number.isFinite(parsedCtx) && allowedWorkspaceIds.has(parsedCtx)
       ? parsedCtx
       : null;
-  /** URL wins over cookie so the switcher matches `/dashboard?team=…` on first paint (layout runs before the page sets the cookie). */
   const activeWorkspaceTeamId = activeFromUrl ?? activeFromCookie;
 
   const proUiTheme = resolveProUiThemeDataAttribute(
@@ -219,6 +136,7 @@ export default async function RootLayout({
   const freeUiThemeSelection = resolveFreeUiThemeSelection(freeCookieValue);
   const appliedTheme = isPro ? proUiTheme : freeUiTheme;
   const isTeamInviteRoute = pathnameHeader.startsWith("/invite/team");
+  const isTeamAdminRoute = shell.profile === "team-admin";
   const showHeaderChrome = Boolean(userId) || isTeamInviteRoute;
 
   return (
@@ -230,9 +148,8 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col relative">
         <AppProviders>
-          <TooltipProvider>
             {showHeaderChrome && (
-              <>
+              <AuthenticatedShellChrome>
                 <header
                   className={
                     isTeamInviteRoute
@@ -243,10 +160,12 @@ export default async function RootLayout({
                   <div className="flex min-w-0 items-center gap-2 justify-self-start">
                     <HeaderLogo dashboardHref={dashboardHrefWithUserQuery} />
                   </div>
-                  {!isTeamInviteRoute && userId && teamAdminHeaderTeams.length > 0 && (
+                  {!isTeamInviteRoute &&
+                    userId &&
+                    shell.teamAdminHeaderTeams.length > 0 && (
                     <div className="flex min-w-0 justify-center justify-self-center px-1 sm:px-2">
                       <TeamAdminHeaderSwitcherClient
-                        teams={teamAdminHeaderTeams}
+                        teams={shell.teamAdminHeaderTeams}
                         userId={userId}
                       />
                     </div>
@@ -256,29 +175,32 @@ export default async function RootLayout({
                       <HeaderUserSection
                         currentProTheme={proUiThemeSelection}
                         currentFreeTheme={freeUiThemeSelection}
-                        hideHelpCenter={hideHelpCenter}
-                        showWorkspaceSwitcher={showWorkspaceSwitcher}
-                        workspaceTeams={workspaceTeams}
-                        workspaceTeamsTotalEligible={workspaceTeamsTotalEligible}
+                        hideHelpCenter={shell.hideHelpCenter}
+                        showWorkspaceSwitcher={shell.showWorkspaceSwitcher}
+                        workspaceTeams={shell.workspaceTeams}
+                        workspaceTeamsTotalEligible={
+                          shell.workspaceTeamsTotalEligible
+                        }
                         activeWorkspaceTeamId={activeWorkspaceTeamId}
                         personalWorkspaceHref={personalWorkspaceHref}
                         personalPlanLabelForWorkspace={
-                          personalPlanLabelForWorkspace
+                          shell.personalPlanLabelForWorkspace
                         }
-                        personalAccountPlanLabel={personalAccountPlanLabel}
-                        showAffiliatePortal={showAffiliatePortal}
-                        teamDashFallback={teamDashFallback}
+                        personalAccountPlanLabel={
+                          shell.personalAccountPlanLabel
+                        }
+                        showAffiliatePortal={shell.showAffiliatePortal}
+                        teamDashFallback={shell.teamDashFallback}
                         resolvedIsPro={isPro}
                         resolvedActiveTeamPlan={activeTeamPlan}
                         resolvedHasProPlusInterfacePalette={
                           hasProPlusInterfacePalette
                         }
-                        inboxUnreadCount={inboxUnreadCount}
+                        inboxUnreadCount={shell.inboxUnreadCount}
                       />
                     </div>
                   )}
                 </header>
-                {/* Faded background logo watermark */}
                 <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
                   <Image
                     src={LOGO_PUBLIC_URL}
@@ -287,14 +209,17 @@ export default async function RootLayout({
                     height={300}
                     className="object-contain opacity-[0.08] select-none"
                     priority={false}
+                    unoptimized
                   />
                 </div>
-              </>
+              </AuthenticatedShellChrome>
             )}
-            <div className="relative flex-1 flex flex-col">
-              {children}
+            <div
+              className="relative flex-1 flex flex-col"
+              data-shell={isTeamAdminRoute ? "team-admin" : undefined}
+            >
+              <TooltipProvider>{children}</TooltipProvider>
             </div>
-          </TooltipProvider>
         </AppProviders>
       </body>
     </html>

@@ -15,8 +15,9 @@ export function HeaderLogo({ dashboardHref }: { dashboardHref: string }) {
       alt="Flipvise"
       width={160}
       height={60}
-      className="object-contain h-10 sm:h-12 w-auto"
+      className="object-contain h-10 sm:h-12 w-auto bg-transparent"
       style={{ width: "auto" }}
+      unoptimized
       priority
     />
   );

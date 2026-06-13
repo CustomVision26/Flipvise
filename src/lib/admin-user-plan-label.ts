@@ -13,10 +13,30 @@ export type AdminUserPlanAccessType =
   | "Complimentary"
   | "Free";
 
+/** User-facing plan source phrase for the personal dashboard footer. */
+export function formatPersonalDashboardPlanAccessPhrase(
+  type: AdminUserPlanAccessType,
+): { article: "a" | "an"; label: string } {
+  switch (type) {
+    case "Paid":
+      return { article: "a", label: "paid plan" };
+    case "Assigned":
+      return { article: "an", label: "assigned plan" };
+    case "Affiliate":
+      return { article: "an", label: "affiliate plan" };
+    case "Complimentary":
+      return { article: "a", label: "complimentary plan" };
+    case "Free":
+      return { article: "a", label: "free plan" };
+  }
+}
+
 type AdminPlanAccessMeta = PlanPublicMetadata & {
   role?: string;
   adminGranted?: boolean;
 };
+
+export type { AdminPlanAccessMeta };
 
 function normalizePlanSlug(slug: string | null | undefined): string | null {
   if (!slug?.trim()) return null;

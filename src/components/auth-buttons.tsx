@@ -2,9 +2,11 @@
 
 import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 
 export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoaded } = useAuth();
+  const keepMounted = useKeepClerkAuthButtonsMounted();
   if (!isLoaded) {
     return (
       <Button variant="outline" size={size} disabled>
@@ -12,7 +14,7 @@ export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
       </Button>
     );
   }
-  if (isSignedIn) return null;
+  if (!keepMounted) return null;
   return (
     <SignInButton
       mode="modal"
@@ -25,7 +27,8 @@ export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
 }
 
 export function SignUpBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoaded } = useAuth();
+  const keepMounted = useKeepClerkAuthButtonsMounted();
   if (!isLoaded) {
     return (
       <Button size={size} disabled>
@@ -33,7 +36,7 @@ export function SignUpBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
       </Button>
     );
   }
-  if (isSignedIn) return null;
+  if (!keepMounted) return null;
   return (
     <SignUpButton
       mode="modal"

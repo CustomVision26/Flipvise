@@ -20,6 +20,7 @@ import {
 } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
+import { CLERK_MODAL_TEARDOWN_MS } from "@/lib/use-clerk-modal-teardown";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
 
@@ -107,7 +108,7 @@ export function HeaderUserSection({
       setPortalsReady(false);
       return;
     }
-    const timer = window.setTimeout(() => setPortalsReady(true), 150);
+    const timer = window.setTimeout(() => setPortalsReady(true), CLERK_MODAL_TEARDOWN_MS);
     return () => window.clearTimeout(timer);
   }, [userId]);
 

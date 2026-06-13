@@ -87,6 +87,7 @@ function CssFlipLoader({ large }: { large: boolean }) {
             width={logoSize}
             height={logoSize}
             className="object-contain"
+            unoptimized
             priority
           />
         </div>
@@ -153,19 +154,20 @@ export function FlipviseLoader({
       )}
     >
       <div className="relative flex items-center justify-center">
-        <div
-          className={cn(
-            "transition-opacity duration-300",
-            showLottie ? "absolute opacity-0" : "opacity-100",
-          )}
-        >
-          <CssFlipLoader large={large} />
-        </div>
         {showLottie ? (
           <div className="animate-in fade-in duration-300">
             <LottieLoader data={lottieData} large={large} />
           </div>
-        ) : null}
+        ) : (
+          <div
+            className={cn(
+              "transition-opacity duration-300",
+              ready ? "opacity-100" : "opacity-70",
+            )}
+          >
+            <CssFlipLoader large={large} />
+          </div>
+        )}
       </div>
 
       {message ? (

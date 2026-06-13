@@ -1,0 +1,192 @@
+import {
+  countPendingInvitationsForEmail,
+  getRootLayoutTeamNavPayload,
+  type RootLayoutTeamAdminHeaderTeam,
+} from "@/db/queries/teams";
+import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
+import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
+import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
+import type { AccessContext } from "@/lib/access";
+import {
+  getPersonalWorkspaceAccessLabel,
+  getPersonalWorkspaceAccountPlanLabel,
+  personalWorkspaceLabelsFromAccessContext,
+} from "@/lib/personal-workspace-plan-label";
+import { shouldHideHelpCenter } from "@/lib/team-help";
+import { tryTeamQuery } from "@/lib/team-query-fallback";
+import { isTeamPlanId } from "@/lib/team-plans";
+import {
+  resolveRootLayoutShellProfile,
+  rootLayoutShellNeedsAffiliatePortal,
+  rootLayoutShellNeedsFullPlanLabels,
+  rootLayoutShellNeedsHelpCenterGate,
+  rootLayoutShellNeedsInboxBadge,
+  rootLayoutShellNeedsTeamNav,
+  type RootLayoutShellProfile,
+} from "@/lib/root-layout-route-kind";
+const EMPTY_TEAM_NAV = {
+  teamAdminHeaderTeams: [] as RootLayoutTeamAdminHeaderTeam[],
+  workspaceNav: { teams: [] as TeamWorkspaceNavTeam[], totalEligibleCount: 0 },
+};
+
+export type RootLayoutTeamDashFallback = {
+  teamId: number;
+  planSlug: string;
+  teamMemberUrlParam: number;
+} | null;
+
+export type RootLayoutShellData = {
+  profile: RootLayoutShellProfile;
+  teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[];
+  workspaceTeams: TeamWorkspaceNavTeam[];
+  workspaceTeamsTotalEligible: number;
+  hideHelpCenter: boolean;
+  inboxUnreadCount: number;
+  showAffiliatePortal: boolean;
+  personalPlanLabelForWorkspace: string;
+  personalAccountPlanLabel: string;
+  showWorkspaceSwitcher: boolean;
+  teamDashFallback: RootLayoutTeamDashFallback;
+};
+
+function resolveTeamDashFallback(
+  userId: string | null,
+  activeTeamPlan: AccessContext["activeTeamPlan"],
+  teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[],
+): RootLayoutTeamDashFallback {
+  if (
+    userId == null ||
+    activeTeamPlan == null ||
+    !isTeamPlanId(activeTeamPlan) ||
+    teamAdminHeaderTeams.length === 0
+  ) {
+    return null;
+  }
+  const match = teamAdminHeaderTeams.find(
+    (t) => t.workspacePlanQuery === activeTeamPlan,
+  );
+  const pick = match ?? teamAdminHeaderTeams[0];
+  const planSlug = pick.workspacePlanQuery ?? activeTeamPlan;
+  return {
+    teamId: pick.id,
+    planSlug,
+    teamMemberUrlParam: pick.teamMemberUrlParam,
+  };
+}
+
+function resolveShowWorkspaceSwitcher(
+  workspaceTeamsTotalEligible: number,
+  activeTeamPlan: AccessContext["activeTeamPlan"],
+): boolean {
+  return (
+    workspaceTeamsTotalEligible > 0 ||
+    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))
+  );
+}
+
+export async function loadRootLayoutShellData(input: {
+  pathname: string;
+  access: AccessContext;
+  teamContextCookie: string | undefined;
+}): Promise<RootLayoutShellData> {
+  const { pathname, access, teamContextCookie } = input;
+  const profile = resolveRootLayoutShellProfile(pathname, access.userId);
+  const { userId, isAdmin, adminGranted, activeTeamPlan, isPro, primaryEmail } =
+    access;
+
+  const emptyGuest: RootLayoutShellData = {
+    profile,
+    teamAdminHeaderTeams: [],
+    workspaceTeams: [],
+    workspaceTeamsTotalEligible: 0,
+    hideHelpCenter: false,
+    inboxUnreadCount: 0,
+    showAffiliatePortal: false,
+    personalPlanLabelForWorkspace: "Free",
+    personalAccountPlanLabel: "Free",
+    showWorkspaceSwitcher: false,
+    teamDashFallback: null,
+  };
+
+  if (profile === "guest" || userId == null) {
+    return emptyGuest;
+  }
+
+  const needsTeamNav = rootLayoutShellNeedsTeamNav(profile);
+  const needsInbox = rootLayoutShellNeedsInboxBadge(profile);
+  const needsAffiliate = rootLayoutShellNeedsAffiliatePortal(profile);
+  const needsFullPlanLabels = rootLayoutShellNeedsFullPlanLabels(profile);
+  const needsHelpGate = rootLayoutShellNeedsHelpCenterGate(
+    profile,
+    isAdmin,
+    adminGranted,
+  );
+
+  const emailLower = primaryEmail?.toLowerCase() ?? null;
+
+  const [teamNavPayload, hideHelpCenter, inboxUnreadCount, activeAffiliateRow] =
+    await Promise.all([
+      needsTeamNav
+        ? tryTeamQuery(
+            () =>
+              getRootLayoutTeamNavPayload(userId, {
+                personalProUnlocked: isPro,
+              }),
+            EMPTY_TEAM_NAV,
+          )
+        : Promise.resolve(EMPTY_TEAM_NAV),
+
+      needsHelpGate
+        ? shouldHideHelpCenter(userId, teamContextCookie)
+        : Promise.resolve(false),
+
+      needsInbox
+        ? Promise.all([
+            primaryEmail != null && primaryEmail !== ""
+              ? countPendingInvitationsForEmail(primaryEmail).catch(() => 0)
+              : Promise.resolve(0),
+            tryTeamQuery(
+              () => countUnreadAffiliateBroadcastInboxForUser(userId),
+              0,
+            ),
+          ]).then(([invites, affiliateBroadcasts]) => invites + affiliateBroadcasts)
+        : Promise.resolve(0),
+
+      needsAffiliate
+        ? getActiveAffiliateForUser(userId, emailLower).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+  const teamAdminHeaderTeams = teamNavPayload.teamAdminHeaderTeams;
+  const workspaceTeams = teamNavPayload.workspaceNav.teams;
+  const workspaceTeamsTotalEligible =
+    teamNavPayload.workspaceNav.totalEligibleCount;
+
+  const planLabels = needsFullPlanLabels
+    ? {
+        personalPlanLabelForWorkspace: await getPersonalWorkspaceAccessLabel(),
+        personalAccountPlanLabel: await getPersonalWorkspaceAccountPlanLabel(),
+      }
+    : personalWorkspaceLabelsFromAccessContext(access);
+
+  return {
+    profile,
+    teamAdminHeaderTeams,
+    workspaceTeams,
+    workspaceTeamsTotalEligible,
+    hideHelpCenter,
+    inboxUnreadCount,
+    showAffiliatePortal: activeAffiliateRow != null,
+    personalPlanLabelForWorkspace: planLabels.personalPlanLabelForWorkspace,
+    personalAccountPlanLabel: planLabels.personalAccountPlanLabel,
+    showWorkspaceSwitcher: resolveShowWorkspaceSwitcher(
+      workspaceTeamsTotalEligible,
+      activeTeamPlan,
+    ),
+    teamDashFallback: resolveTeamDashFallback(
+      userId,
+      activeTeamPlan,
+      teamAdminHeaderTeams,
+    ),
+  };
+}

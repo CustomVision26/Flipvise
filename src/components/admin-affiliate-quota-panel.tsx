@@ -18,9 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { adminPlansSubTabPanelClass } from "@/components/admin-panel-styles";
 import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
-import { cn } from "@/lib/utils";
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -118,7 +116,7 @@ export function AdminAffiliateQuotaPanel({
   }
 
   return (
-    <div className={cn(adminPlansSubTabPanelClass, "space-y-4")}>
+    <div className="space-y-4">
       <div className="space-y-1">
         <p className="text-sm font-medium text-foreground">Referral quotas</p>
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">

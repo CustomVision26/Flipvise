@@ -2,9 +2,11 @@
 
 import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 
 export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isLoaded } = useAuth();
+  const keepMounted = useKeepClerkAuthButtonsMounted();
   if (!isLoaded) {
     return (
       <div className="flex w-full flex-wrap justify-center gap-3">
@@ -17,7 +19,7 @@ export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
       </div>
     );
   }
-  if (isSignedIn) return null;
+  if (!keepMounted) return null;
   return (
     <div className="flex w-full flex-wrap justify-center gap-3">
       <SignInButton

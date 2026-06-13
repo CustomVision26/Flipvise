@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { SignInBtn, SignUpBtn } from "@/components/auth-buttons";
 import { HomeInviteEmailAuthButtons } from "@/components/home-invite-email-auth-buttons";
+import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 
 /**
  * Client-only auth CTAs — avoids Clerk `<Show>` inside the RSC homepage, which
@@ -14,14 +15,15 @@ export function HomeAuthActions({
 }: {
   inviteEmail: string | null;
 }) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded } = useAuth();
+  const keepMounted = useKeepClerkAuthButtonsMounted();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted || !isLoaded || isSignedIn) {
+  if (!mounted || !isLoaded || !keepMounted) {
     return null;
   }
 

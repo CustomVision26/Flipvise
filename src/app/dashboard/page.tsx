@@ -51,6 +51,7 @@ import {
   FREE_CARDS_PER_DECK_LIMIT,
   FREE_PERSONAL_DECK_LIMIT,
 } from "@/lib/personal-plan-limits";
+import { getPersonalDashboardPlanAccessPhrase } from "@/lib/personal-workspace-plan-label";
 /** Team-tier deck extras (speech, images): own Clerk team plan or a subscriber’s team-tier workspace. */
 function teamWorkspaceHasTierExtras(
   hasOwnTeamPlan: boolean,
@@ -541,6 +542,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     });
   }
 
+  const planAccessPhrase = isPro
+    ? await getPersonalDashboardPlanAccessPhrase()
+    : null;
+
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
       <Suspense fallback={null}>
@@ -705,11 +710,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Pro plan — already subscribed */}
-      {isPro && (
+      {isPro && planAccessPhrase && (
         <p className="text-xs text-muted-foreground text-center">
-          You&apos;re on a{" "}
-          <span className="text-foreground font-medium">paid plan</span> — up to{" "}
-          {maxPersonalDecks} personal deck
+          You&apos;re on {planAccessPhrase.article}{" "}
+          <span className="text-foreground font-medium">
+            {planAccessPhrase.label}
+          </span>{" "}
+          — up to {maxPersonalDecks} personal deck
           {maxPersonalDecks === 1 ? "" : "s"} and {maxCardsPerDeck} cards per deck.
         </p>
       )}

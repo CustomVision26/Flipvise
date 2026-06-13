@@ -82,6 +82,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                   height={75}
                   className="mx-auto block h-auto w-36 object-contain sm:w-44"
                   style={{ height: "auto" }}
+                  unoptimized
                   priority
                 />
               </div>

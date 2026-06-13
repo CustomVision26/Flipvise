@@ -6,8 +6,19 @@ import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { LOGO_PUBLIC_URL } from "@/lib/branding";
+import { resolveLogoImageUrl } from "@/lib/branding";
+import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
+import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
+
+const clerkAppearance = {
+  baseTheme: dark,
+  layout: {
+    logoImageUrl: resolveLogoImageUrl(),
+    logoLinkUrl: "/",
+    logoPlacement: "inside" as const,
+  },
+};
 
 /** Drop legacy `system` from localStorage so only light | dark are used. */
 function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
@@ -22,16 +33,9 @@ function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
 
 function ClerkWithTheme({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider
-      appearance={{
-        baseTheme: dark,
-        layout: {
-          logoImageUrl: LOGO_PUBLIC_URL,
-          logoLinkUrl: "/",
-          logoPlacement: "inside",
-        },
-      }}
-    >
+    <ClerkProvider appearance={clerkAppearance}>
+      <ClerkAuthHandoffMarker />
+      <ClerkPostSignInHardNavigation />
       <ClerkSessionRouterSync />
       {children}
     </ClerkProvider>

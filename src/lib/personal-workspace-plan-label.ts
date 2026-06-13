@@ -8,7 +8,14 @@ import {
   resolveBillingTabPlanDisplay,
   type BillingTabPlanDisplay,
 } from "@/lib/billing-tab-plan-display";
+import type { AccessContext } from "@/lib/access";
 import { TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
+import {
+  formatPersonalDashboardPlanAccessPhrase,
+  resolveAdminUserPlanAccessType,
+  type AdminPlanAccessMeta,
+  type AdminUserPlanAccessType,
+} from "@/lib/admin-user-plan-label";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -34,6 +41,43 @@ export function personalWorkspacePlanDisplayLabel(input: {
     return "Pro";
   }
   return "Free";
+}
+
+/**
+ * Fast path for `/admin/*` — avoids affiliate, Stripe, and Clerk metadata round-trips.
+ * Platform admins always show SuperAdmin / Co-Admin + Pro Plus account label.
+ */
+export function personalWorkspaceLabelsFromAccessContext(
+  ctx: Pick<
+    AccessContext,
+    | "isSuperadmin"
+    | "isAdmin"
+    | "activeTeamPlan"
+    | "isPro"
+    | "hasProPlusInterfacePalette"
+  >,
+): { personalPlanLabelForWorkspace: string; personalAccountPlanLabel: string } {
+  if (ctx.isSuperadmin) {
+    return {
+      personalPlanLabelForWorkspace: "SuperAdmin",
+      personalAccountPlanLabel: "Pro Plus",
+    };
+  }
+  if (ctx.isAdmin) {
+    return {
+      personalPlanLabelForWorkspace: "Co-Admin",
+      personalAccountPlanLabel: "Pro Plus",
+    };
+  }
+  const tierLabel = personalWorkspacePlanDisplayLabel({
+    activeTeamPlan: ctx.activeTeamPlan,
+    isPro: ctx.isPro,
+    hasProPlusInterfacePalette: ctx.hasProPlusInterfacePalette,
+  });
+  return {
+    personalPlanLabelForWorkspace: tierLabel,
+    personalAccountPlanLabel: tierLabel,
+  };
 }
 
 /** Maps billing resolution to workspace access type labels shown in the header switcher. */
@@ -63,6 +107,7 @@ export function personalWorkspaceAccessLabelFromPlanDisplay(
 type PersonalWorkspaceLabelContext = {
   ctx: Awaited<ReturnType<typeof getAccessContext>>;
   planDisplay: BillingTabPlanDisplay;
+  planAccessType: AdminUserPlanAccessType;
 };
 
 const loadPersonalWorkspaceLabelContext = cache(
@@ -94,7 +139,14 @@ const loadPersonalWorkspaceLabelContext = cache(
       platformAdminUnlocked: ctx.isAdmin,
     });
 
-    return { ctx, planDisplay };
+    const planAccessType = resolveAdminUserPlanAccessType({
+      meta: meta as AdminPlanAccessMeta,
+      isSuperadmin: ctx.isSuperadmin,
+      isCoAdmin: ctx.isAdmin && !ctx.isSuperadmin,
+      isActiveAffiliate: activeAffiliateGrant != null,
+    });
+
+    return { ctx, planDisplay, planAccessType };
   },
 );
 
@@ -149,5 +201,19 @@ export const getPersonalWorkspaceAccessLabel = cache(
     const loaded = await loadPersonalWorkspaceLabelContext();
     if (!loaded) return "Free";
     return personalWorkspaceAccessLabel(loaded);
+  },
+);
+
+/** Cached plan source for the personal dashboard footer (`paid plan`, `assigned plan`, …). */
+export const getPersonalDashboardPlanAccessPhrase = cache(
+  async function getPersonalDashboardPlanAccessPhrase(): Promise<{
+    article: "a" | "an";
+    label: string;
+  }> {
+    const loaded = await loadPersonalWorkspaceLabelContext();
+    if (!loaded) {
+      return formatPersonalDashboardPlanAccessPhrase("Free");
+    }
+    return formatPersonalDashboardPlanAccessPhrase(loaded.planAccessType);
   },
 );

@@ -63,6 +63,7 @@ export function FlipviseLoaderStatic({
               width={logoSize}
               height={logoSize}
               className="object-contain"
+              unoptimized
               priority={large}
             />
           </div>
