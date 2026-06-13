@@ -48,6 +48,7 @@ import {
   LayoutList,
   Megaphone,
   History,
+  Mail,
 } from "lucide-react";
 import {
   AdminSupportPanel,
@@ -55,6 +56,7 @@ import {
   type SupportStats,
 } from "@/components/admin-support-panel";
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
+import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
 import type {
   SerializedAdminInvoice,
@@ -235,14 +237,25 @@ export function AdminTabs({
         ? "admin-roles"
         : pathname === "/admin/support-center"
           ? "support-center"
-            : pathname === "/admin/plans" || pathname === "/admin/plan-history"
+            : pathname === "/admin/plans" ||
+                pathname === "/admin/plan-history" ||
+                pathname === "/admin/affiliate-messaging"
               ? "plans"
               : pathname === "/admin/marketing-affiliates"
                 ? "marketing-affiliates"
                 : "all-users";
 
   const plansSubTab =
-    pathname === "/admin/plan-history" ? "plan-history" : "pricing-plans";
+    pathname === "/admin/plan-history"
+      ? "plan-history"
+      : pathname === "/admin/affiliate-messaging"
+        ? "affiliate-messaging"
+        : "pricing-plans";
+
+  const activeAffiliateCount = useMemo(
+    () => affiliates.filter((a) => a.status === "active").length,
+    [affiliates],
+  );
 
   const adminRolesSubTab =
     pathname === "/admin/audit-log" ? "audit-log" : "roles";
@@ -1531,7 +1544,11 @@ export function AdminTabs({
               value={plansSubTab}
               onValueChange={(v) =>
                 router.push(
-                  v === "plan-history" ? "/admin/plan-history" : "/admin/plans",
+                  v === "plan-history"
+                    ? "/admin/plan-history"
+                    : v === "affiliate-messaging"
+                      ? "/admin/affiliate-messaging"
+                      : "/admin/plans",
                 )
               }
               className="w-full gap-4"
@@ -1550,20 +1567,50 @@ export function AdminTabs({
                     </Badge>
                   ) : null}
                 </TabsTrigger>
+                <TabsTrigger value="affiliate-messaging" className="gap-1.5">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  Affiliate messaging
+                  {activeAffiliateCount > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                      {activeAffiliateCount}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="pricing-plans" className="mt-0">
+              <TabsContent
+                value="pricing-plans"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
                 <div className={adminPlansSubTabPanelClass}>
                   <p className={adminSupportSectionLabelClass}>Public pricing</p>
                   <p className="text-sm text-muted-foreground">
                     Edit plan names, prices, descriptions, and features. Changes are saved to the pricing
                     page immediately after clicking Save on each plan card.
                   </p>
-                  <AdminPlansEditor initialPlans={plansConfig} affiliates={affiliates} />
+                  <AdminPlansEditor initialPlans={plansConfig} />
                 </div>
               </TabsContent>
 
-              <TabsContent value="plan-history" className="mt-0">
+              <TabsContent
+                value="affiliate-messaging"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
+                <div className={adminPlansSubTabPanelClass}>
+                  <p className={adminSupportSectionLabelClass}>Affiliate messaging (Loops)</p>
+                  <p className="text-sm text-muted-foreground">
+                    General promo posts go to every registered user&apos;s dashboard inbox; affiliate
+                    code posts go to active affiliates only (no Loops email). Requires the affiliate
+                    broadcast inbox table in the database.
+                  </p>
+                  <AdminAffiliatePromoBroadcast affiliates={affiliates} plans={plansConfig} />
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="plan-history"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
                 <div className={adminPlansSubTabPanelClass}>
                   <p className={adminSupportSectionLabelClass}>Assignment audit log</p>
                   <p className="text-sm text-muted-foreground">

@@ -19,12 +19,9 @@ import type { PlanConfig, PlanDiscount, PlanAffiliateDiscount } from "@/componen
 import { updatePlanAction } from "@/actions/admin-plans";
 import { affiliateStripeCouponId } from "@/lib/affiliate-stripe-coupon";
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
-import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
-import type { SerializedAffiliate } from "@/lib/admin-dashboard-types";
 
 interface AdminPlansEditorProps {
   initialPlans: PlanConfig[];
-  affiliates: SerializedAffiliate[];
 }
 
 function PlanEditor({
@@ -645,7 +642,7 @@ function PlanEditor({
   );
 }
 
-export function AdminPlansEditor({ initialPlans, affiliates }: AdminPlansEditorProps) {
+export function AdminPlansEditor({ initialPlans }: AdminPlansEditorProps) {
   const [plans, setPlans] = useState<PlanConfig[]>(initialPlans);
   const [activeTab, setActiveTab] = useState<string>(initialPlans[0]?.id ?? "");
 
@@ -690,19 +687,8 @@ export function AdminPlansEditor({ initialPlans, affiliates }: AdminPlansEditorP
 
       {/* Active plan editor */}
       {activePlan && (
-        <div className="pt-4 space-y-4">
+        <div className="pt-4">
           <PlanEditor key={activePlan.id} plan={activePlan} onSaved={handlePlanSaved} />
-          {activePlan.id !== "free" ? (
-            <div className="space-y-2 pt-4 border-t">
-              <h3 className="text-sm font-semibold text-foreground">Affiliate messaging (Loops)</h3>
-              <p className="text-sm text-muted-foreground">
-                General promo posts to every registered user&apos;s dashboard inbox; affiliate code posts
-                go to active affiliates only (no Loops email). Requires the affiliate broadcast inbox
-                table in the database.
-              </p>
-              <AdminAffiliatePromoBroadcast affiliates={affiliates} />
-            </div>
-          ) : null}
         </div>
       )}
     </div>

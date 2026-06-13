@@ -36,18 +36,18 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": false,
+      "active": true,
       "type": "percentage",
       "value": 20,
       "label": "Summer Launch 2026",
-      "stripeCouponId": "SummerLaunch26"
+      "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
       "active": true,
-      "value": 18,
+      "value": 10,
       "label": " "
     },
-    "discontinueAt": "2026-07-21"
+    "discontinueAt": "2026-06-12"
   },
   {
     "id": "pro_plus",

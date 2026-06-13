@@ -48,6 +48,40 @@ import type { PlanConfig } from "@/components/pricing-content";
 const OVERVIEW_INVOICE_LIMIT = 500;
 const INVOICES_TAB_LIMIT = 2000;
 
+function serializeAffiliatesForAdmin(
+  rawAffiliates: Awaited<ReturnType<typeof listAffiliates>>,
+): SerializedAffiliate[] {
+  return rawAffiliates.map((a) => ({
+    id: a.id,
+    invitedEmail: a.invitedEmail,
+    invitedUserId: a.invitedUserId ?? null,
+    affiliateName: a.affiliateName,
+    planAssigned: a.planAssigned,
+    startedAt: a.startedAt.toISOString(),
+    endsAt: a.endsAt.toISOString(),
+    inviteExpiresAt: a.inviteExpiresAt.toISOString(),
+    addedByUserId: a.addedByUserId,
+    addedByName: a.addedByName,
+    status: a.status as SerializedAffiliate["status"],
+    token: null,
+    inviteAcceptedAt: a.inviteAcceptedAt ? a.inviteAcceptedAt.toISOString() : null,
+    revokedAt: a.revokedAt ? a.revokedAt.toISOString() : null,
+    revokedByName: a.revokedByName ?? null,
+    createdAt: a.createdAt.toISOString(),
+    promotionalCode: a.promotionalCode,
+    paidReferralsTotal: a.paidReferralsTotal ?? 0,
+    paidReferralsMonth: a.paidReferralsMonth ?? 0,
+    paidReferralsMonthKey: a.paidReferralsMonthKey ?? null,
+    referralQuotaEnabled: a.referralQuotaEnabled ?? false,
+    referralQuotaTarget: a.referralQuotaTarget ?? null,
+    periodPaidReferrals: a.periodPaidReferrals ?? 0,
+    quotaPeriodStartedAt: a.quotaPeriodStartedAt?.toISOString() ?? null,
+    pendingPlanAssigned: a.pendingPlanAssigned ?? null,
+    pendingEndsAt: a.pendingEndsAt?.toISOString() ?? null,
+    arrangementChangeExpiresAt: a.arrangementChangeExpiresAt?.toISOString() ?? null,
+  }));
+}
+
 export type AdminOverviewData = {
   totalUsers: number;
   totalDecks: number;
@@ -151,13 +185,19 @@ export async function loadAdminTabsData(
     }
 
     case "plans": {
-      const [plansConfig, rawPlanAssignmentLogs] = await runDbTasksWithConcurrencyLimit(
-        [() => readPlansConfig(), () => getAdminPlanAssignmentLogs(500)] as const,
-        2,
-      );
+      const [plansConfig, rawPlanAssignmentLogs, rawAffiliates] =
+        await runDbTasksWithConcurrencyLimit(
+          [
+            () => readPlansConfig(),
+            () => getAdminPlanAssignmentLogs(500),
+            () => listAffiliates(),
+          ] as const,
+          3,
+        );
       return {
         ...empty,
         plansConfig,
+        affiliates: serializeAffiliatesForAdmin(rawAffiliates),
         planAssignmentLogs: rawPlanAssignmentLogs.map((log) => ({
           id: log.id,
           targetUserId: log.targetUserId,
@@ -182,35 +222,7 @@ export async function loadAdminTabsData(
       const rawAffiliates = await listAffiliates();
       return {
         ...empty,
-        affiliates: rawAffiliates.map((a) => ({
-          id: a.id,
-          invitedEmail: a.invitedEmail,
-          invitedUserId: a.invitedUserId ?? null,
-          affiliateName: a.affiliateName,
-          planAssigned: a.planAssigned,
-          startedAt: a.startedAt.toISOString(),
-          endsAt: a.endsAt.toISOString(),
-          inviteExpiresAt: a.inviteExpiresAt.toISOString(),
-          addedByUserId: a.addedByUserId,
-          addedByName: a.addedByName,
-          status: a.status as "pending" | "active" | "revoked",
-          token: null,
-          inviteAcceptedAt: a.inviteAcceptedAt ? a.inviteAcceptedAt.toISOString() : null,
-          revokedAt: a.revokedAt ? a.revokedAt.toISOString() : null,
-          revokedByName: a.revokedByName ?? null,
-          createdAt: a.createdAt.toISOString(),
-          promotionalCode: a.promotionalCode,
-          paidReferralsTotal: a.paidReferralsTotal ?? 0,
-          paidReferralsMonth: a.paidReferralsMonth ?? 0,
-          paidReferralsMonthKey: a.paidReferralsMonthKey ?? null,
-          referralQuotaEnabled: a.referralQuotaEnabled ?? false,
-          referralQuotaTarget: a.referralQuotaTarget ?? null,
-          periodPaidReferrals: a.periodPaidReferrals ?? 0,
-          quotaPeriodStartedAt: a.quotaPeriodStartedAt?.toISOString() ?? null,
-          pendingPlanAssigned: a.pendingPlanAssigned ?? null,
-          pendingEndsAt: a.pendingEndsAt?.toISOString() ?? null,
-          arrangementChangeExpiresAt: a.arrangementChangeExpiresAt?.toISOString() ?? null,
-        })),
+        affiliates: serializeAffiliatesForAdmin(rawAffiliates),
       };
     }
 

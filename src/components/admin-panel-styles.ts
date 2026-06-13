@@ -98,10 +98,10 @@ export const adminSupportFilterBarClass =
 export const adminSupportEmptyStateClass =
   "flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/60 bg-muted/10 px-4 text-center";
 
-/** Plans tab — bordered sub-panels (pricing editor, plan history). */
+/** Plans tab — bordered sub-panels (pricing editor, plan history); no top rule under sub-tabs. */
 export const adminPlansSubTabPanelClass = cn(
-  adminSubTabPanelClass,
-  "space-y-4 shadow-sm",
+  tabPanelContentClass,
+  "mt-0 space-y-4 border-t-0 rounded-t-none p-4 shadow-sm",
 );
 
 export const adminPlanHistoryTableShellClass = cn(

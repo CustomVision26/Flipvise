@@ -17,7 +17,12 @@ import {
   type AffiliateBroadcastVariant,
 } from "@/db/queries/affiliate-broadcast-inbox";
 import { resolveAppUrl } from "@/lib/stripe";
-import { formatCombinedPromotionCode } from "@/lib/affiliate-promotional-code";
+import {
+  buildAffiliateCombinedDetailsBlock,
+  buildGeneralPromoDetailsBlock,
+  listPlansWithGeneralDiscount,
+  planHasAffiliateCombinedCode,
+} from "@/lib/affiliate-broadcast-messaging";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -104,45 +109,15 @@ async function readPlans(): Promise<PlanConfig[]> {
   return JSON.parse(raw) as PlanConfig[];
 }
 
-function buildGeneralPromoDetails(plans: PlanConfig[]): string {
-  const lines: string[] = [];
-  for (const p of plans) {
-    if (p.id === "free") continue;
-    const d = p.discount;
-    const base = d?.stripeCouponId?.trim();
-    if (!d?.active || !base || !(d.value > 0)) continue;
-    const pct =
-      d.type === "percentage" ? `${d.value}%` : `$${d.value}`;
-    lines.push(
-      `${p.name} (${p.id}): use «${base}» on the pricing page before checkout — ${pct} off${d.label ? ` (${d.label})` : ""}.`,
-    );
-  }
-  return lines.length > 0
-    ? lines.join("\n")
-    : "No active public promotions are configured on paid plans right now.";
-}
-
-function buildAffiliateCombinedHints(plans: PlanConfig[], promotionalCode: string): string {
-  const lines: string[] = [];
-  const suffix = promotionalCode.trim().toLowerCase();
-  for (const p of plans) {
-    if (p.id === "free") continue;
-    const base = p.discount?.stripeCouponId?.trim();
-    const aff = p.affiliateDiscount;
-    if (!base || !aff?.active || !(aff.value > 0)) continue;
-    const combined = formatCombinedPromotionCode(base, suffix);
-    lines.push(
-      `${p.name}: combined code «${combined}» — ${aff.value}% off at checkout for this tier (affiliate rate).`,
-    );
-  }
-  return lines.length > 0
-    ? lines.join("\n")
-    : "Turn on affiliate discount % on at least one paid plan (and set a Stripe coupon id on that plan) to generate per-tier combined codes.";
-}
+const selectedPlanIdsSchema = z
+  .array(z.string().min(1).max(64))
+  .min(1, "Select at least one plan.")
+  .max(32);
 
 const generalPromoBroadcastSchema = z.object({
   subject: z.string().min(3).max(200),
   message: z.string().min(1).max(8000),
+  selectedPlanIds: selectedPlanIdsSchema,
 });
 
 export type GeneralPromoBroadcastInput = z.infer<typeof generalPromoBroadcastSchema>;
@@ -151,6 +126,7 @@ const codesBroadcastSchema = z
   .object({
     subject: z.string().min(3).max(200),
     message: z.string().min(1).max(8000),
+    selectedPlanIds: selectedPlanIdsSchema,
     recipientMode: z.enum(["all_active", "selected"]),
     selectedAffiliateIds: z.array(z.number().int().positive()).max(200).optional(),
   })
@@ -174,6 +150,26 @@ function assertAtLeastOneInboxDelivery(inboxDelivered: number) {
   );
 }
 
+function assertSelectedPlansEligible(plans: PlanConfig[], selectedPlanIds: string[]) {
+  const eligibleIds = new Set(listPlansWithGeneralDiscount(plans).map((p) => p.id));
+  const invalid = selectedPlanIds.filter((id) => !eligibleIds.has(id));
+  if (invalid.length > 0) {
+    throw new Error("One or more selected plans no longer have an active general discount.");
+  }
+}
+
+function assertAffiliateCodesAvailable(plans: PlanConfig[], selectedPlanIds: string[]) {
+  const idSet = new Set(selectedPlanIds);
+  const hasCode = plans.some(
+    (p) => idSet.has(p.id) && planHasAffiliateCombinedCode(p),
+  );
+  if (!hasCode) {
+    throw new Error(
+      "No affiliate combined codes are available for the selected plans. Turn on affiliate discount % on at least one selected plan.",
+    );
+  }
+}
+
 function assertGeneralPromoDelivered(inboxDelivered: number) {
   if (inboxDelivered > 0) return;
   throw new Error(
@@ -191,10 +187,11 @@ export async function broadcastAffiliateGeneralPromoAction(
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { subject, message } = parsed.data;
+  const { subject, message, selectedPlanIds } = parsed.data;
 
   const plans = await readPlans();
-  const promoDetails = buildGeneralPromoDetails(plans);
+  assertSelectedPlansEligible(plans, selectedPlanIds);
+  const promoDetails = buildGeneralPromoDetailsBlock(plans, selectedPlanIds);
   const base = resolveAppUrl();
   const pricingPageUrl = `${base}/pricing`;
 
@@ -216,6 +213,7 @@ export async function broadcastAffiliateGeneralPromoAction(
   assertGeneralPromoDelivered(inboxDelivered);
 
   revalidatePath("/admin/plans");
+  revalidatePath("/admin/affiliate-messaging");
   revalidatePath("/dashboard/inbox");
   return { sent, inboxDelivered };
 }
@@ -230,7 +228,7 @@ export async function broadcastAffiliateCodesAction(
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { subject, message, recipientMode, selectedAffiliateIds } = parsed.data;
+  const { subject, message, selectedPlanIds, recipientMode, selectedAffiliateIds } = parsed.data;
   const recipients = await listActiveAffiliatesForBroadcast(
     recipientMode === "selected"
       ? { affiliateIds: selectedAffiliateIds }
@@ -246,12 +244,18 @@ export async function broadcastAffiliateCodesAction(
   }
 
   const plans = await readPlans();
+  assertSelectedPlansEligible(plans, selectedPlanIds);
+  assertAffiliateCodesAvailable(plans, selectedPlanIds);
   const base = resolveAppUrl();
   const pricingPageUrl = `${base}/pricing`;
 
   let inboxDelivered = 0;
   for (const r of recipients) {
-    const combinedCodeHints = buildAffiliateCombinedHints(plans, r.promotionalCode);
+    const combinedCodeHints = buildAffiliateCombinedDetailsBlock(
+      plans,
+      r.promotionalCode,
+      selectedPlanIds,
+    );
 
     const clerkId = await resolveAffiliateClerkRecipientId(r.invitedUserId, r.invitedEmail);
     if (!clerkId) continue;
@@ -269,6 +273,7 @@ export async function broadcastAffiliateCodesAction(
   assertAtLeastOneInboxDelivery(inboxDelivered);
 
   revalidatePath("/admin/plans");
+  revalidatePath("/admin/affiliate-messaging");
   revalidatePath("/dashboard/inbox");
   return { sent: recipients.length, inboxDelivered };
 }

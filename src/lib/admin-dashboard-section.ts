@@ -16,7 +16,7 @@ export function adminDashboardSectionFromPath(pathname: string): AdminDashboardS
   if (pathname === "/admin/invoices") return "invoices";
   if (pathname === "/admin/admin-roles" || pathname === "/admin/audit-log") return "admin-roles";
   if (pathname === "/admin/support-center") return "support-center";
-  if (pathname === "/admin/plans" || pathname === "/admin/plan-history") return "plans";
+  if (pathname === "/admin/plans" || pathname === "/admin/plan-history" || pathname === "/admin/affiliate-messaging") return "plans";
   if (pathname === "/admin/marketing-affiliates") return "marketing-affiliates";
   return DEFAULT_ADMIN_DASHBOARD_SECTION;
 }
