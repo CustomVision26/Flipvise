@@ -382,8 +382,17 @@ export function UserBillingPage() {
                   <TableCell className="text-muted-foreground tabular-nums">
                     {row.endAt ? formatDateTime(row.endAt) : "Ongoing"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm max-w-[200px]">
-                    {row.promoDisplay ?? "—"}
+                  <TableCell className="text-muted-foreground text-sm max-w-[220px]">
+                    {row.promoDisplay ? (
+                      <span
+                        className="line-clamp-2"
+                        title={row.promoDisplay}
+                      >
+                        {row.promoDisplay}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     {row.receiptUrl ? (

@@ -372,6 +372,55 @@ export async function getMergedPlanHistoryForUser(
   }
 }
 
+async function enrichPlanHistoryPromoFromReceipts(
+  userId: string,
+  userEmail: string | null,
+  rows: PlanHistoryRow[],
+  invoices: StoredBillingInvoice[],
+): Promise<void> {
+  const invoiceByExternalId = new Map(
+    invoices.map((inv) => [inv.externalId, inv]),
+  );
+  const invoiceByNumber = new Map<string, StoredBillingInvoice>();
+  for (const inv of invoices) {
+    const number = inv.invoiceNumber?.trim();
+    if (number) invoiceByNumber.set(number, inv);
+  }
+
+  const { backfillInvoicePromoForUser } = await import(
+    "@/lib/stripe-invoice-persist"
+  );
+
+  for (const row of rows) {
+    if (row.promoDisplay?.trim()) continue;
+    if (row.planType !== "Paid subscription") continue;
+
+    let inv: StoredBillingInvoice | undefined;
+    if (row.id.startsWith("inv-")) {
+      inv = invoiceByExternalId.get(row.id.slice(4));
+    } else if (row.receiptLabel?.trim()) {
+      inv = invoiceByNumber.get(row.receiptLabel.trim());
+    }
+
+    const fromDb = inv ? promoDisplayForInvoice(inv) : null;
+    if (fromDb) {
+      row.promoDisplay = fromDb;
+      continue;
+    }
+
+    const invoiceId =
+      (row.id.startsWith("inv-") ? row.id.slice(4) : null) ?? inv?.externalId ?? null;
+    if (!invoiceId?.startsWith("in_")) continue;
+
+    const fromStripe = await backfillInvoicePromoForUser(
+      userId,
+      userEmail,
+      invoiceId,
+    );
+    if (fromStripe) row.promoDisplay = fromStripe;
+  }
+}
+
 async function buildMergedPlanHistoryForUser(
   userId: string,
   userEmail: string | null,
@@ -522,6 +571,8 @@ async function buildMergedPlanHistoryForUser(
   }
 
   await appendActiveStripeSubscriptionRow(userId, rows, invoices);
+
+  await enrichPlanHistoryPromoFromReceipts(userId, emailLower, rows, invoices);
 
   rows.sort(
     (a, b) =>

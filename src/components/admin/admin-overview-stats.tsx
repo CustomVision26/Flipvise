@@ -87,7 +87,7 @@ export async function AdminOverviewStats() {
           style={{ animationDelay: "180ms" }}
         >
           <PaidSubscribersCard
-            paidSubscriberCount={data.paidSubscriberCount}
+            paidPlanAccessCount={data.paidPlanAccessCount}
             dbPaidSubscriberCount={data.dbPaidSubscriberCount}
             subscriptions={data.subscriptions}
             invoices={data.invoices}

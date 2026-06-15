@@ -8,6 +8,7 @@ import {
   normalizeAdminInvoicePromoKind,
   normalizeBillingInvoiceDiscountLabel,
   parsePromoFromDiscountLabel,
+  formatUserInvoicePromoDisplay,
   type AdminInvoicePromoKind,
 } from "@/lib/admin-invoice-promo-display";
 import { stampStripeCouponInvoiceLabel } from "@/lib/stripe-checkout-discount";
@@ -625,4 +626,60 @@ export async function refreshLatestPaidInvoiceForUser(
     if (forPlan) return forPlan;
   }
   return paid[0] ?? null;
+}
+
+async function promoDisplayFromStripeInvoice(
+  invoice: Stripe.Invoice,
+): Promise<string | null> {
+  const invoicePlan = await resolvePlanSlugForInvoice(invoice);
+  const rawDiscountLabel = invoiceDiscountLabel(invoice);
+  const { promoCode, promoKind, percentOff } = await resolveInvoicePromoFromStripe(
+    invoice,
+    rawDiscountLabel,
+    invoicePlan,
+  );
+  const discountLabel = normalizeBillingInvoiceDiscountLabel({
+    promoCode,
+    promoKind,
+    discountLabel: rawDiscountLabel,
+    percentOff,
+  });
+  return formatUserInvoicePromoDisplay({
+    promoCode,
+    promoKind,
+    discountLabel,
+    percentOff,
+  });
+}
+
+/** Promo label from a Stripe invoice (general or affiliate), matching hosted receipt text. */
+export async function resolvePromoDisplayForStripeInvoiceId(
+  invoiceId: string,
+): Promise<string | null> {
+  const id = invoiceId.trim();
+  if (!id.startsWith("in_")) return null;
+  try {
+    const invoice = await retrieveInvoiceForPersist(id);
+    return promoDisplayFromStripeInvoice(invoice);
+  } catch (error) {
+    console.error("[resolvePromoDisplayForStripeInvoiceId]", id, error);
+    return null;
+  }
+}
+
+/** Re-fetch invoice from Stripe, persist promo fields, return display label for plan history. */
+export async function backfillInvoicePromoForUser(
+  userId: string,
+  userEmail: string | null,
+  invoiceId: string,
+): Promise<string | null> {
+  const id = invoiceId.trim();
+  if (!id.startsWith("in_")) return null;
+  try {
+    await persistInvoiceRefForUser(userId, userEmail, id);
+    return resolvePromoDisplayForStripeInvoiceId(id);
+  } catch (error) {
+    console.error("[backfillInvoicePromoForUser]", id, error);
+    return null;
+  }
 }

@@ -29,6 +29,7 @@ import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
 import { supportNotificationsToInboxItems } from "@/lib/support-ticket-inbox";
 import { subscriptionCheckoutConfirmationDescription } from "@/lib/record-subscription-checkout-inbox";
+import { normalizeBroadcastMessageForDisplay } from "@/lib/affiliate-broadcast-messaging";
 
 // UI
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -318,7 +319,9 @@ export default async function DashboardInboxPage() {
       type: "affiliate_broadcast",
       key,
       title: row.subject,
-      description: truncateInboxPreview(row.messageBody),
+      description: truncateInboxPreview(
+        normalizeBroadcastMessageForDisplay(row.messageBody, variant),
+      ),
       dateIso: row.createdAt.toISOString(),
       isRead,
       requiresAction: false,

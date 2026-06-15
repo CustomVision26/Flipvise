@@ -136,7 +136,8 @@ function statusLabel(status: string, cancelAtPeriodEnd: boolean): string {
 // ─── component ──────────────────────────────────────────────────────────────
 
 type Props = {
-  paidSubscriberCount: number;
+  /** Matches All Users table Plan type = Paid. */
+  paidPlanAccessCount: number;
   dbPaidSubscriberCount: number;
   subscriptions: SerializedAdminSubscription[];
   invoices: SerializedAdminInvoice[];
@@ -144,7 +145,7 @@ type Props = {
 };
 
 export function PaidSubscribersCard({
-  paidSubscriberCount,
+  paidPlanAccessCount,
   dbPaidSubscriberCount,
   subscriptions,
   invoices,
@@ -242,12 +243,18 @@ export function PaidSubscribersCard({
         </CardHeader>
         <CardContent>
           <p className="text-2xl font-bold tabular-nums text-green-500 sm:text-3xl">
-            {dbPaidSubscriberCount.toLocaleString()}
+            {paidPlanAccessCount.toLocaleString()}
           </p>
           <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-            Paid via Stripe
-            {paidSubscriberCount > 0 && (
-              <> · <span className="text-green-500">{paidSubscriberCount} active</span></>
+            Plan type Paid · matches All Users
+            {dbPaidSubscriberCount !== paidPlanAccessCount && (
+              <>
+                {" "}
+                ·{" "}
+                <span className="text-muted-foreground">
+                  {dbPaidSubscriberCount.toLocaleString()} with paid invoice history
+                </span>
+              </>
             )}
           </p>
         </CardContent>
@@ -282,8 +289,13 @@ export function PaidSubscribersCard({
               <div className="rounded-xl border bg-muted/40 px-5 py-4 flex items-center gap-4">
                 <Users className="h-7 w-7 text-green-500 shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Paid (Stripe DB)</p>
-                  <p className="text-2xl font-bold text-green-500">{dbPaidSubscriberCount}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan type Paid</p>
+                  <p className="text-2xl font-bold text-green-500">{paidPlanAccessCount}</p>
+                  {dbPaidSubscriberCount !== paidPlanAccessCount && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {dbPaidSubscriberCount} with paid invoice history
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="rounded-xl border bg-muted/40 px-5 py-4 flex items-center gap-4">

@@ -16,7 +16,12 @@ export function parsePromoFromDiscountLabel(label: string | null | undefined): {
   const trimmed = label?.trim();
   if (!trimmed) return { promoCode: null, promoKind: null };
 
-  const affiliateMatch = trimmed.match(/^(.+?)\s+\(affiliate\s+\d+% off\)/i);
+  /** Stripe receipts often append `(5% off)` after the stamped coupon name. */
+  const normalized = trimmed
+    .replace(/\s*\(\d+(?:\.\d+)?%\s*off\)\s*$/i, "")
+    .trim();
+
+  const affiliateMatch = normalized.match(/^(.+?)\s+\(affiliate\s+\d+% off\)/i);
   if (affiliateMatch) {
     return {
       promoCode: affiliateMatch[1]!.trim(),
@@ -24,7 +29,7 @@ export function parsePromoFromDiscountLabel(label: string | null | undefined): {
     };
   }
 
-  const generalDiscountPctMatch = trimmed.match(
+  const generalDiscountPctMatch = normalized.match(
     /^(.+?)\s+\(General Discount (\d+)%\)$/i,
   );
   if (generalDiscountPctMatch) {
@@ -34,7 +39,7 @@ export function parsePromoFromDiscountLabel(label: string | null | undefined): {
     };
   }
 
-  const generalDiscountMatch = trimmed.match(/^(.+?)\s+\(General Discount\)$/i);
+  const generalDiscountMatch = normalized.match(/^(.+?)\s+\(General Discount\)$/i);
   if (generalDiscountMatch) {
     return {
       promoCode: generalDiscountMatch[1]!.trim(),
@@ -42,7 +47,7 @@ export function parsePromoFromDiscountLabel(label: string | null | undefined): {
     };
   }
 
-  const generalMatch = trimmed.match(/^(.+?)\s+\(general\s+\d+% off\)/i);
+  const generalMatch = normalized.match(/^(.+?)\s+\(general\s+\d+% off\)/i);
   if (generalMatch) {
     return {
       promoCode: generalMatch[1]!.trim(),
@@ -91,8 +96,12 @@ export function normalizeBillingInvoiceDiscountLabel(input: {
     });
   }
 
-  if (/\(General Discount \d+%\)/i.test(label)) return label;
-  if (/\(affiliate \d+% off\)/i.test(label)) return label;
+  if (/\(General Discount \d+%\)/i.test(label)) {
+    return label.replace(/\s*\(\d+(?:\.\d+)?%\s*off\)\s*$/i, "").trim();
+  }
+  if (/\(affiliate \d+% off\)/i.test(label)) {
+    return label.replace(/\s*\(\d+(?:\.\d+)?%\s*off\)\s*$/i, "").trim();
+  }
 
   return label;
 }

@@ -44,6 +44,10 @@ import {
 import { SupportTicketInboxDialog } from "@/components/support-ticket-inbox-dialog";
 import { ViewQuizResultDialog } from "@/components/view-quiz-result-dialog";
 import type { UnifiedInboxItem, InboxItemType } from "@/lib/inbox-item-types";
+import {
+  normalizeBroadcastDetailsForDisplay,
+  normalizeBroadcastMessageForDisplay,
+} from "@/lib/affiliate-broadcast-messaging";
 const INBOX_PAGE_SIZE = 10;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -316,16 +320,65 @@ function AffiliateActions({
   return null;
 }
 
+function BroadcastDetailsBlock({ body }: { body: string }) {
+  const lines = body.split("\n");
+  const sectionHeadings = new Set([
+    "Eligible plans and promotion codes",
+    "Eligible plans and codes",
+    "Your promotion codes by plan",
+    "Your promotion codes",
+    "Public promotions (reference)",
+    "Your combined checkout codes (reference)",
+  ]);
+
+  return (
+    <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-3 text-sm leading-relaxed">
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={index} className="h-2" aria-hidden />;
+
+        if (sectionHeadings.has(trimmed)) {
+          return null;
+        }
+
+        if (trimmed.startsWith("·")) {
+          return (
+            <p key={index} className="font-mono text-[13px] text-foreground">
+              {trimmed}
+            </p>
+          );
+        }
+
+        if (line.startsWith("  ")) {
+          return (
+            <p key={index} className="pl-3 text-muted-foreground">
+              {trimmed}
+            </p>
+          );
+        }
+
+        return (
+          <p key={index} className="whitespace-pre-wrap text-foreground">
+            {trimmed}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function AffiliateBroadcastDialog({
   item,
 }: {
   item: UnifiedInboxItem & { type: "affiliate_broadcast" };
 }) {
   const p = item.payload;
+  const messageBody = normalizeBroadcastMessageForDisplay(p.messageBody, p.variant);
+  const detailsBlock = normalizeBroadcastDetailsForDisplay(p.detailsBlock, p.variant);
   const detailsLabel =
     p.variant === "general"
-      ? "Public promotions (reference)"
-      : "Your combined checkout codes (reference)";
+      ? "Eligible plans and promotion codes"
+      : "Your promotion codes by plan";
 
   return (
     <Dialog>
@@ -340,14 +393,16 @@ function AffiliateBroadcastDialog({
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-2 pr-1">
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">Message</p>
-            <p className="text-sm whitespace-pre-wrap text-foreground">{p.messageBody}</p>
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Overview
+            </p>
+            <p className="text-sm leading-relaxed text-foreground">{messageBody}</p>
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">{detailsLabel}</p>
-            <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
-              {p.detailsBlock}
-            </pre>
+            <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {detailsLabel}
+            </p>
+            <BroadcastDetailsBlock body={detailsBlock} />
           </div>
           <a
             href={p.pricingPageUrl}

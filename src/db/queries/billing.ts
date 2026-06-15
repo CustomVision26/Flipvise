@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { billingInvoices } from "@/db/schema";
-import { countDistinct, desc, eq, or } from "drizzle-orm";
+import { countDistinct, desc, eq, or, inArray, and } from "drizzle-orm";
 
 type InvoiceLike = {
   id?: string | null;
@@ -314,14 +314,25 @@ export async function listBillingInvoicesForAdmin(limit = 1000) {
 
 /**
  * Count of distinct users who have at least one invoice with status 'paid' in the DB.
- * This is a DB-level cross-check against the Clerk Billing subscriber count.
+ * When `userIds` is provided, only registered Clerk users are counted (excludes orphan invoice rows).
  */
-export async function countPaidSubscribersFromDB(): Promise<number> {
+export async function countPaidSubscribersFromDB(
+  userIds?: readonly string[],
+): Promise<number> {
   try {
+    const scopedIds = userIds?.filter((id) => id.trim().length > 0) ?? [];
+    const whereClause =
+      scopedIds.length > 0
+        ? and(
+            eq(billingInvoices.status, "paid"),
+            inArray(billingInvoices.userId, scopedIds),
+          )
+        : eq(billingInvoices.status, "paid");
+
     const [result] = await db
       .select({ count: countDistinct(billingInvoices.userId) })
       .from(billingInvoices)
-      .where(eq(billingInvoices.status, "paid"));
+      .where(whereClause);
     return result?.count ?? 0;
   } catch (error) {
     if (isMissingBillingInvoicesTableError(error)) return 0;

@@ -48,10 +48,10 @@ export function buildGeneralPromoAutoMessage(subject: string, selectedPlans: Pla
   }
 
   if (trimmedSubject) {
-    return `This promotion, "${trimmedSubject}", applies to ${planPhrase}. Enter the promo code on the pricing page before checkout to receive the discount.`;
+    return `The ${trimmedSubject} promotion is now available for ${planPhrase}. To apply your discount, enter the appropriate promotion code on the Pricing page before checkout. Eligible plans, codes, and savings rates are provided below.`;
   }
 
-  return `This promotion applies to ${planPhrase}. Enter the promo code on the pricing page before checkout to receive the discount.`;
+  return `A limited-time promotion is now available for ${planPhrase}. To apply your discount, enter the appropriate promotion code on the Pricing page before checkout. Eligible plans, codes, and savings rates are provided below.`;
 }
 
 export function buildAffiliateCodesAutoMessage(subject: string, selectedPlans: PlanConfig[]): string {
@@ -64,10 +64,10 @@ export function buildAffiliateCodesAutoMessage(subject: string, selectedPlans: P
   }
 
   if (trimmedSubject) {
-    return `"${trimmedSubject}" — your combined checkout codes for ${planPhrase} are listed below. Share these codes with customers on the pricing page before they subscribe. You can also copy them anytime from your Affiliate dashboard.`;
+    return `${trimmedSubject}: combined checkout codes for ${planPhrase} are listed below. Please share the code that corresponds to the customer's selected plan on the Pricing page prior to checkout. These codes remain available in your Affiliate dashboard at any time.`;
   }
 
-  return `Your combined checkout codes for ${planPhrase} are listed below. Share these codes with customers on the pricing page before they subscribe. You can also copy them anytime from your Affiliate dashboard.`;
+  return `Combined checkout codes for ${planPhrase} are listed below. Please share the code that corresponds to the customer's selected plan on the Pricing page prior to checkout. These codes remain available in your Affiliate dashboard at any time.`;
 }
 
 export function buildGeneralPromoDetailsBlock(
@@ -82,14 +82,10 @@ export function buildGeneralPromoDetailsBlock(
     const d = p.discount!;
     const base = d.stripeCouponId.trim();
     const pct = discountPercentLabel(p);
-    lines.push(
-      `${p.name} (${p.id}): use «${base}» on the pricing page before checkout — ${pct} off${d.label?.trim() ? ` (${d.label.trim()})` : ""}.`,
-    );
+    lines.push(`· ${p.name} — Code: ${base} · ${pct} off`);
   }
 
-  return lines.length > 0
-    ? lines.join("\n")
-    : "No eligible plans were selected for this broadcast.";
+  return lines.length > 0 ? lines.join("\n") : "No eligible plans were selected for this broadcast.";
 }
 
 /** Matches the affiliate portal “Promotion codes” table for inbox reference blocks. */
@@ -111,17 +107,114 @@ export function buildAffiliateCombinedDetailsBlock(
 
     sections.push(
       [
-        p.name,
-        `  Combined code: ${combined}`,
-        `  Affiliate discount: ${affValue}% off`,
+        `· ${p.name}`,
+        `  Code: ${combined}`,
+        `  Discount: ${affValue}% off`,
         `  Valid through: ${formatPromoDateTimeLabel(resolvePlanPromoWindow(p).endsAt)}`,
       ].join("\n"),
     );
   }
 
-  return sections.length > 0
-    ? sections.join("\n\n")
-    : "No eligible plans were selected for this broadcast.";
+  return sections.length > 0 ? sections.join("\n\n") : "No eligible plans were selected for this broadcast.";
+}
+
+const LEGACY_GENERAL_MESSAGE_WITH_SUBJECT =
+  /^This promotion, "([^"]+)", applies to (.+)\. Enter the promo code on the pricing page before checkout to receive the discount\.?$/i;
+
+const LEGACY_GENERAL_MESSAGE_NO_SUBJECT =
+  /^This promotion applies to (.+)\. Enter the promo code on the pricing page before checkout to receive the discount\.?$/i;
+
+const LEGACY_GENERAL_DETAIL_LINE =
+  /^(.+?) \([^)]+\): use «([^»]+)» on the pricing page before checkout — ([\d$%]+ off)(?: \([^)]+\))?\.?$/i;
+
+const LEGACY_AFFILIATE_MESSAGE_WITH_SUBJECT =
+  /^"([^"]+)" — your combined checkout codes for (.+) are listed below\./i;
+
+/** Refine legacy inbox copy at display time (stored rows are unchanged). */
+export function normalizeBroadcastMessageForDisplay(
+  messageBody: string,
+  variant: "general" | "codes",
+): string {
+  const body = messageBody.trim();
+  if (!body) return body;
+
+  if (variant === "general") {
+    const withSubject = body.match(LEGACY_GENERAL_MESSAGE_WITH_SUBJECT);
+    if (withSubject) {
+      return `The ${withSubject[1]!.trim()} promotion is now available for ${withSubject[2]!.trim()}. To apply your discount, enter the appropriate promotion code on the Pricing page before checkout. Eligible plans, codes, and savings rates are provided below.`;
+    }
+    const noSubject = body.match(LEGACY_GENERAL_MESSAGE_NO_SUBJECT);
+    if (noSubject) {
+      return `A limited-time promotion is now available for ${noSubject[1]}. To apply your discount, enter the appropriate promotion code on the Pricing page before checkout. Eligible plans, codes, and savings rates are provided below.`;
+    }
+  }
+
+  if (variant === "codes" && LEGACY_AFFILIATE_MESSAGE_WITH_SUBJECT.test(body)) {
+    return body
+      .replace(
+        /Share these codes with customers on the pricing page before they subscribe\./i,
+        "Please share the code that corresponds to the customer's selected plan on the Pricing page prior to checkout.",
+      )
+      .replace(
+        /You can also copy them anytime from your Affiliate dashboard\./i,
+        "These codes remain available in your Affiliate dashboard at any time.",
+      );
+  }
+
+  return body;
+}
+
+/** Neaten legacy reference blocks for inbox display. */
+export function normalizeBroadcastDetailsForDisplay(
+  detailsBlock: string,
+  variant: "general" | "codes",
+): string {
+  const raw = detailsBlock.trim();
+  if (!raw) return raw;
+
+  if (
+    raw.includes("Eligible plans and promotion codes") ||
+    raw.includes("Eligible plans and codes") ||
+    raw.includes("Your promotion codes by plan") ||
+    raw.includes("Your promotion codes")
+  ) {
+    return raw
+      .replace(/^Eligible plans and codes$/m, "Eligible plans and promotion codes")
+      .replace(/^Your promotion codes$/m, "Your promotion codes by plan");
+  }
+
+  if (variant === "general") {
+    const converted: string[] = [];
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || /^Public promotions/i.test(trimmed)) continue;
+
+      const legacy = trimmed.match(LEGACY_GENERAL_DETAIL_LINE);
+      if (legacy) {
+        converted.push(`· ${legacy[1]!.trim()} — Code: ${legacy[2]!.trim()} · ${legacy[3]!.trim()}`);
+        continue;
+      }
+
+      if (trimmed.startsWith("·")) {
+        converted.push(trimmed);
+        continue;
+      }
+
+      const modern = trimmed.match(/^(.+?) — Code: (.+?) · (.+ off)$/i);
+      if (modern) {
+        converted.push(`· ${modern[1]!.trim()} — Code: ${modern[2]!.trim()} · ${modern[3]!.trim()}`);
+        continue;
+      }
+
+      converted.push(trimmed);
+    }
+
+    if (converted.length > 0) {
+      return converted.join("\n");
+    }
+  }
+
+  return raw;
 }
 
 /** Legacy single-line hints (kept for any callers that still need compact text). */

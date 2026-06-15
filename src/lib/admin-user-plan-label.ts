@@ -115,6 +115,33 @@ export function resolveAdminUserPlanAccessType(input: {
   return "Free";
 }
 
+/** Count users whose All Users table Plan type is Paid (active Stripe, not affiliate/admin grant). */
+export function countClerkUsersWithPaidPlanAccess(
+  clerkUsers: {
+    id: string;
+    publicMetadata: unknown;
+  }[],
+  activeAffiliateUserIds: Set<string>,
+  isSuperadminUser: (userId: string) => boolean,
+): number {
+  let count = 0;
+  for (const user of clerkUsers) {
+    const meta = (user.publicMetadata ?? {}) as AdminPlanAccessMeta & {
+      role?: string;
+    };
+    const isSuperadmin = meta.role === "superadmin" || isSuperadminUser(user.id);
+    const isCoAdmin = meta.role === "admin";
+    const planAccessType = resolveAdminUserPlanAccessType({
+      meta,
+      isSuperadmin,
+      isCoAdmin,
+      isActiveAffiliate: activeAffiliateUserIds.has(user.id),
+    });
+    if (planAccessType === "Paid") count++;
+  }
+  return count;
+}
+
 /**
  * Resolves a single line for the admin users table "Plan" column, in order:
  * admin role (super/co-admin) → subscribed product (`publicMetadata.plan` or

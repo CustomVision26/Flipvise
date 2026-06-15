@@ -8,6 +8,12 @@ import Link from "next/link";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
+import { listAffiliates } from "@/db/queries/affiliates";
+import {
+  buildActiveAffiliateUserIds,
+  clerkUsersToBillingMeta,
+} from "@/lib/admin/admin-billing-snapshot";
+import { countClerkUsersWithPaidPlanAccess } from "@/lib/admin-user-plan-label";
 import type { SerializedAdminSubscription, SerializedAdminInvoice } from "@/lib/admin-dashboard-types";
 import {
   formatAdminInvoicePromoCell,
@@ -216,10 +222,22 @@ export default async function PaidSubscribersPage({
   // Paid subscriber count (live Stripe metadata)
   const paidSubscriberCount = minimalUsers.filter((u) => u.isPaidPro).length;
 
-  const [dbPaidSubscriberCount, persistedBillingInvoices] = await Promise.all([
-    countPaidSubscribersFromDB(),
+  const clerkUserIds = clerkUsers.map((u) => u.id);
+  const [dbPaidSubscriberCount, persistedBillingInvoices, rawAffiliates] = await Promise.all([
+    countPaidSubscribersFromDB(clerkUserIds),
     listBillingInvoicesForAdmin(2000),
+    listAffiliates(),
   ]);
+
+  const activeAffiliateUserIds = buildActiveAffiliateUserIds(
+    rawAffiliates,
+    clerkUsersToBillingMeta(clerkUsers),
+  );
+  const paidPlanAccessCount = countClerkUsersWithPaidPlanAccess(
+    clerkUsers,
+    activeAffiliateUserIds,
+    isPlatformSuperadminAllowListed,
+  );
 
   const userById = new Map(minimalUsers.map((u) => [u.id, u]));
 
@@ -455,10 +473,12 @@ export default async function PaidSubscribersPage({
           <div className="rounded-xl border bg-muted/40 px-5 py-4 flex items-center gap-4">
             <Users className="h-7 w-7 text-green-500 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Paid (Stripe DB)</p>
-              <p className="text-2xl font-bold text-green-500">{dbPaidSubscriberCount}</p>
-              {paidSubscriberCount > 0 && (
-                <p className="text-xs text-green-500 mt-0.5">{paidSubscriberCount} active via metadata</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan type Paid</p>
+              <p className="text-2xl font-bold text-green-500">{paidPlanAccessCount}</p>
+              {dbPaidSubscriberCount !== paidPlanAccessCount && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {dbPaidSubscriberCount} with paid invoice history
+                </p>
               )}
             </div>
           </div>
@@ -493,10 +513,10 @@ export default async function PaidSubscribersPage({
           </div>
         </div>
 
-        {paidSubscriberCount !== dbPaidSubscriberCount && (
+        {paidPlanAccessCount !== dbPaidSubscriberCount && (
           <p className="text-xs text-muted-foreground mt-3">
-            Metadata reports{" "}
-            <span className="font-semibold">{paidSubscriberCount}</span> active via Clerk — may differ from DB if a webhook was delayed or a subscription was canceled.
+            <span className="font-semibold">{dbPaidSubscriberCount}</span> users have paid invoice history
+            (includes canceled subscriptions and users labeled Affiliate or Assigned in All Users).
           </p>
         )}
 

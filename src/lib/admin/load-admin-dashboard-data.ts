@@ -12,6 +12,8 @@ import {
 } from "@/db/queries/admin";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import { listAffiliates } from "@/db/queries/affiliates";
+import { countClerkUsersWithPaidPlanAccess } from "@/lib/admin-user-plan-label";
+import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { evaluateAllActiveAffiliateQuotas } from "@/lib/affiliate-quota-renewal";
 import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
@@ -87,6 +89,8 @@ export type AdminOverviewData = {
   totalDecks: number;
   totalCards: number;
   adminGrantedProPlusCount: number;
+  /** Matches All Users table Plan type = Paid. */
+  paidPlanAccessCount: number;
   paidSubscriberCount: number;
   dbPaidSubscriberCount: number;
   subscriptions: SerializedAdminSubscription[];
@@ -97,7 +101,6 @@ export async function loadAdminOverviewData(): Promise<AdminOverviewData> {
   const [
     { data: clerkUsers, totalCount },
     dbStats,
-    dbPaidSubscriberCount,
     persistedBillingInvoices,
     rawAffiliates,
     stripeSubscriptions,
@@ -105,7 +108,6 @@ export async function loadAdminOverviewData(): Promise<AdminOverviewData> {
     [
       () => getAdminClerkUserList(),
       () => getAdminOverviewStats(),
-      () => countPaidSubscribersFromDB(),
       () => listBillingInvoicesForAdmin(OVERVIEW_INVOICE_LIMIT),
       () => listAffiliates(),
       () => listStripeSubscriptionsForAdmin(),
@@ -113,10 +115,18 @@ export async function loadAdminOverviewData(): Promise<AdminOverviewData> {
     ADMIN_DASHBOARD_DB_CONCURRENCY,
   );
 
+  const clerkUserIds = clerkUsers.map((u) => u.id);
+  const dbPaidSubscriberCount = await countPaidSubscribersFromDB(clerkUserIds);
+
   const billingUsers = clerkUsersToBillingMeta(clerkUsers);
   const activeAffiliateUserIds = buildActiveAffiliateUserIds(
     rawAffiliates,
     billingUsers,
+  );
+  const paidPlanAccessCount = countClerkUsersWithPaidPlanAccess(
+    clerkUsers,
+    activeAffiliateUserIds,
+    isPlatformSuperadminAllowListed,
   );
   const { paidSubscriberCount, subscriptions, invoices } = buildAdminBillingSnapshot({
     users: billingUsers,
@@ -130,6 +140,7 @@ export async function loadAdminOverviewData(): Promise<AdminOverviewData> {
     totalDecks: dbStats.totalDecks,
     totalCards: dbStats.totalCards,
     adminGrantedProPlusCount: countAdminGrantedProPlus(clerkUsers),
+    paidPlanAccessCount,
     paidSubscriberCount,
     dbPaidSubscriberCount,
     subscriptions,
