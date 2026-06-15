@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { createClerkClient } from "@clerk/backend";
+import { z } from "zod";
 import {
   appendComplimentaryAccessHistoryRows,
   getMergedPlanHistoryForUser,
@@ -16,7 +17,10 @@ import {
   getManageableStripeSubscription,
 } from "@/db/queries/stripe-subscriptions";
 import { syncActiveSubscriptionFromStripeForUser } from "@/lib/stripe-billing-sync";
-import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
+import { syncBillingInvoicesForUser, syncCheckoutSessionInvoicesForUser } from "@/lib/stripe-invoice-persist";
+import { recordSubscriptionCheckoutInboxForSession } from "@/lib/record-subscription-checkout-inbox";
+import { resolveLatestBillingReceiptForUser } from "@/lib/billing-receipt-url";
+import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { getAccessContext } from "@/lib/access";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
@@ -80,7 +84,7 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
     const email = await resolveUserEmail(userId);
 
     try {
-      await syncRecentStripeInvoicesForUser(userId);
+      await syncBillingInvoicesForUser(userId);
     } catch (error) {
       console.error("[loadBillingTabDataAction] invoice sync:", error);
     }
@@ -163,28 +167,64 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
 }
 
 /** After Checkout redirect when webhooks did not run (e.g. local `stripe listen` missing). */
-export async function syncBillingAfterCheckoutAction(): Promise<{
+const syncBillingAfterCheckoutSchema = z.object({
+  checkoutSessionId: z.string().max(256).optional(),
+});
+
+export async function syncBillingAfterCheckoutAction(
+  data: z.infer<typeof syncBillingAfterCheckoutSchema> = {},
+): Promise<{
   synced: boolean;
   planSlug: string | null;
   planLabel: string | null;
+  receiptUrl: string | null;
+  receiptIsProration: boolean;
 }> {
+  const parsed = syncBillingAfterCheckoutSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
+  const email = await resolveUserEmail(userId);
+  const checkoutSessionId = parsed.data.checkoutSessionId?.trim() ?? "";
+
+  if (isStripeCheckoutSessionId(checkoutSessionId)) {
+    try {
+      await syncCheckoutSessionInvoicesForUser(userId, checkoutSessionId);
+    } catch (error) {
+      console.error("[syncBillingAfterCheckoutAction] checkout session:", error);
+    }
+  }
+
   const result = await syncActiveSubscriptionFromStripeForUser(userId);
   try {
-    await syncRecentStripeInvoicesForUser(userId);
+    await syncBillingInvoicesForUser(userId);
   } catch (error) {
     console.error("[syncBillingAfterCheckoutAction] invoice sync:", error);
   }
+
+  const receipt = await resolveLatestBillingReceiptForUser(userId, email);
   const planLabel =
     result.planSlug != null
       ? displayNameForBillingPlanSlug(result.planSlug)
       : null;
 
+  if (isStripeCheckoutSessionId(checkoutSessionId)) {
+    try {
+      await recordSubscriptionCheckoutInboxForSession(userId, checkoutSessionId, {
+        receiptUrl: receipt.receiptUrl,
+      });
+    } catch (error) {
+      console.error("[syncBillingAfterCheckoutAction] subscription inbox:", error);
+    }
+  }
+
   return {
     synced: result.synced,
     planSlug: result.planSlug,
     planLabel,
+    receiptUrl: receipt.receiptUrl,
+    receiptIsProration: receipt.isProration,
   };
 }

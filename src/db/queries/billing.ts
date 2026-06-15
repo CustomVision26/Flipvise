@@ -118,6 +118,8 @@ function selectBillingInvoicesWithoutStripeReason() {
     paidAt: billingInvoices.paidAt,
     discountAmountCents: billingInvoices.discountAmountCents,
     discountLabel: billingInvoices.discountLabel,
+    promoCode: billingInvoices.promoCode,
+    promoKind: billingInvoices.promoKind,
     createdAt: billingInvoices.createdAt,
     updatedAt: billingInvoices.updatedAt,
   };
@@ -167,6 +169,8 @@ export async function upsertBillingInvoiceRecord(input: {
   paidAt?: Date | null;
   discountAmountCents?: number | null;
   discountLabel?: string | null;
+  promoCode?: string | null;
+  promoKind?: string | null;
   stripeBillingReason?: string | null;
 }) {
   const now = new Date();
@@ -192,6 +196,8 @@ export async function upsertBillingInvoiceRecord(input: {
         paidAt: input.paidAt ?? null,
         discountAmountCents: input.discountAmountCents ?? null,
         discountLabel: input.discountLabel ?? null,
+        promoCode: input.promoCode ?? null,
+        promoKind: input.promoKind ?? null,
         stripeBillingReason: input.stripeBillingReason ?? null,
         updatedAt: now,
       })
@@ -215,6 +221,8 @@ export async function upsertBillingInvoiceRecord(input: {
           paidAt: input.paidAt ?? null,
           discountAmountCents: input.discountAmountCents ?? null,
           discountLabel: input.discountLabel ?? null,
+          promoCode: input.promoCode ?? null,
+          promoKind: input.promoKind ?? null,
           stripeBillingReason: input.stripeBillingReason ?? null,
           updatedAt: now,
         },
@@ -274,6 +282,8 @@ export async function listBillingInvoicesForAdmin(limit = 1000) {
       .limit(limit);
     return rows.map((row) => ({
       ...row,
+      promoCode: null as string | null,
+      promoKind: null as string | null,
       stripeBillingReason: null as string | null,
     }));
   } catch (error2) {
@@ -293,6 +303,8 @@ export async function listBillingInvoicesForAdmin(limit = 1000) {
       ...row,
       discountAmountCents: null as number | null,
       discountLabel: null as string | null,
+      promoCode: null as string | null,
+      promoKind: null as string | null,
       stripeBillingReason: null as string | null,
     }));
   } catch {
@@ -343,6 +355,8 @@ export async function listBillingInvoicesForUser(userId: string, userEmail?: str
       .orderBy(desc(billingInvoices.createdAt));
     return rows.map((row) => ({
       ...row,
+      promoCode: null as string | null,
+      promoKind: null as string | null,
       stripeBillingReason: null as string | null,
     }));
   } catch (error2) {
@@ -361,6 +375,8 @@ export async function listBillingInvoicesForUser(userId: string, userEmail?: str
       ...row,
       discountAmountCents: null as number | null,
       discountLabel: null as string | null,
+      promoCode: null as string | null,
+      promoKind: null as string | null,
       stripeBillingReason: null as string | null,
     }));
   } catch {

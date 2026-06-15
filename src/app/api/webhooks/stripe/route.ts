@@ -1,12 +1,13 @@
 import { createClerkClient } from "@clerk/backend";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { upsertBillingInvoiceRecord } from "@/db/queries/billing";
-import { replaceProrationLinesForStripeInvoice } from "@/db/queries/billing-proration";
 import { markStripeSubscriptionStatus } from "@/db/queries/stripe-subscriptions";
 import { incrementAffiliatePaidReferral } from "@/db/queries/affiliates";
 import type { BillingStatusValue } from "@/lib/plan-metadata-billing-resolution";
 import { stripe } from "@/lib/stripe";
+import { persistStripeInvoiceForUser, syncCheckoutSessionInvoicesForUser } from "@/lib/stripe-invoice-persist";
+import { recordSubscriptionCheckoutInboxForSession } from "@/lib/record-subscription-checkout-inbox";
+import { cancelOtherActiveSubscriptionsForCustomer } from "@/lib/apply-plan-upgrade";
 import {
   asPaidPlanId,
   setStripeBillingState,
@@ -37,90 +38,6 @@ function getStripeWebhookSecret(): string {
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-function invoiceAmountCents(invoice: Stripe.Invoice): number | null {
-  if (typeof invoice.amount_paid === "number") return invoice.amount_paid;
-  if (typeof invoice.amount_due === "number") return invoice.amount_due;
-  if (typeof invoice.total === "number") return invoice.total;
-  return null;
-}
-
-function invoiceSubtotalCents(invoice: Stripe.Invoice): number | null {
-  if (typeof invoice.subtotal === "number") return invoice.subtotal;
-  return null;
-}
-
-/**
- * Sum of all discount amounts on the invoice (in cents).
- * Stripe stores these in `total_discount_amounts[].amount`.
- */
-function invoiceDiscountCents(invoice: Stripe.Invoice): number | null {
-  const raw = invoice as unknown as Record<string, unknown>;
-  if (Array.isArray(raw.total_discount_amounts) && raw.total_discount_amounts.length > 0) {
-    const sum = (raw.total_discount_amounts as { amount?: number }[]).reduce(
-      (acc, entry) => acc + (entry.amount ?? 0),
-      0,
-    );
-    return sum > 0 ? sum : null;
-  }
-  return null;
-}
-
-/**
- * Human-readable discount label built from the first coupon on the invoice.
- * E.g. "LAUNCH50 — 50% off" or "SAVE10 — $10.00 off".
- */
-function invoiceDiscountLabel(invoice: Stripe.Invoice): string | null {
-  const raw = invoice as unknown as Record<string, unknown>;
-  const discounts = Array.isArray(raw.total_discount_amounts)
-    ? (raw.total_discount_amounts as { discount?: Record<string, unknown> }[])
-    : [];
-
-  for (const entry of discounts) {
-    const coupon = entry.discount?.coupon as Record<string, unknown> | undefined;
-    if (!coupon) continue;
-    const name = typeof coupon.name === "string" ? coupon.name.trim() : "";
-    const id = typeof coupon.id === "string" ? coupon.id.trim() : "";
-    const label = name || id;
-    if (!label) continue;
-
-    if (coupon.percent_off != null) {
-      return `${label} — ${coupon.percent_off}% off`;
-    }
-    if (typeof coupon.amount_off === "number" && typeof coupon.currency === "string") {
-      const formatted = (coupon.amount_off / 100).toFixed(2);
-      return `${label} — $${formatted} off`;
-    }
-    return label;
-  }
-  return null;
-}
-
-function invoiceTaxCents(invoice: Stripe.Invoice): number | null {
-  // `tax` and `total_tax_amounts` are present in the Stripe API payload but
-  // not exposed in the v22 SDK TypeScript types — cast to access them safely.
-  const raw = invoice as unknown as Record<string, unknown>;
-
-  // Prefer the explicit `tax` field.
-  if (typeof raw.tax === "number") return raw.tax > 0 ? raw.tax : null;
-
-  // Sum individual tax amounts when `tax` is absent.
-  if (Array.isArray(raw.total_tax_amounts) && raw.total_tax_amounts.length > 0) {
-    const sum = (raw.total_tax_amounts as { amount?: number }[]).reduce(
-      (acc, entry) => acc + (entry.amount ?? 0),
-      0,
-    );
-    return sum > 0 ? sum : null;
-  }
-
-  // Last resort: derive tax from total − subtotal (valid when no discounts exist).
-  if (typeof invoice.total === "number" && typeof invoice.subtotal === "number") {
-    const diff = invoice.total - invoice.subtotal;
-    return diff > 0 ? diff : null;
-  }
-
-  return null;
 }
 
 async function getClerkUserEmail(userId: string): Promise<string | null> {
@@ -198,6 +115,12 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        if (session.metadata?.checkoutKind === "plan_change") {
+          // Subscription swap runs in finalizePlanChangePaymentAction after SetupIntent redirect.
+          break;
+        }
+
         const userId = stringOrNull(session.metadata?.clerkUserId);
         const selectedPlan = asPaidPlanId(session.metadata?.plan) ?? "pro";
         if (userId) {
@@ -227,6 +150,10 @@ export async function POST(req: NextRequest) {
                 sub,
                 selectedPlan,
               );
+              await cancelOtherActiveSubscriptionsForCustomer(
+                customerId,
+                subscriptionId,
+              );
             } catch {
               // Best-effort — billing state already written above.
             }
@@ -242,11 +169,24 @@ export async function POST(req: NextRequest) {
         }
 
         const affiliateIdRaw = stringOrNull(session.metadata?.affiliateId);
-        if (affiliateIdRaw && /^\d+$/.test(affiliateIdRaw)) {
+          if (affiliateIdRaw && /^\d+$/.test(affiliateIdRaw)) {
           try {
             await incrementAffiliatePaidReferral(Number(affiliateIdRaw));
           } catch {
             // best-effort; attribution is non-blocking for billing writes
+          }
+        }
+
+        if (userId && session.id) {
+          try {
+            await syncCheckoutSessionInvoicesForUser(userId, session.id);
+          } catch (error) {
+            console.error("[stripe webhook] checkout session invoice sync", session.id, error);
+          }
+          try {
+            await recordSubscriptionCheckoutInboxForSession(userId, session.id);
+          } catch (error) {
+            console.error("[stripe webhook] subscription inbox", session.id, error);
           }
         }
         break;
@@ -355,95 +295,10 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Derive the billing period.
-        // Primary: first subscription line item period (most accurate for subscriptions).
-        // Fallback: top-level invoice.period_start / period_end fields.
-        const raw = invoice as unknown as Record<string, unknown>;
-        const firstLine = invoice.lines?.data?.[0];
-        const lineStart =
-          typeof firstLine?.period?.start === "number" ? firstLine.period.start : null;
-        const lineEnd =
-          typeof firstLine?.period?.end === "number" ? firstLine.period.end : null;
-        const topStart =
-          typeof raw.period_start === "number" ? (raw.period_start as number) : null;
-        const topEnd =
-          typeof raw.period_end === "number" ? (raw.period_end as number) : null;
-        const invoicePeriodStart =
-          lineStart != null
-            ? new Date(lineStart * 1000)
-            : topStart != null
-              ? new Date(topStart * 1000)
-              : null;
-        const invoicePeriodEnd =
-          lineEnd != null
-            ? new Date(lineEnd * 1000)
-            : topEnd != null
-              ? new Date(topEnd * 1000)
-              : null;
-
-        await upsertBillingInvoiceRecord({
-          externalId: invoice.id,
-          source: "invoice",
-          userId,
-          userEmail,
-          planSlug: invoicePlan,
-          invoiceNumber: stringOrNull(invoice.number),
-          status: invoice.status ?? "unknown",
-          amountCents: invoiceAmountCents(invoice),
-          subtotalCents: invoiceSubtotalCents(invoice),
-          taxAmountCents: invoiceTaxCents(invoice),
-          currency: stringOrNull(invoice.currency),
-          hostedInvoiceUrl: stringOrNull(invoice.hosted_invoice_url),
-          invoicePdfUrl: stringOrNull(invoice.invoice_pdf),
-          periodStart: invoicePeriodStart,
-          periodEnd: invoicePeriodEnd,
-          paidAt:
-            typeof invoice.status_transitions?.paid_at === "number"
-              ? new Date(invoice.status_transitions.paid_at * 1000)
-              : null,
-          discountAmountCents: invoiceDiscountCents(invoice),
-          discountLabel: invoiceDiscountLabel(invoice),
-          stripeBillingReason: stringOrNull(invoice.billing_reason),
-        });
-
         try {
-          const currency = stringOrNull(invoice.currency);
-          const prorationPayload: Array<{
-            stripeLineId: string;
-            amountCents: number | null;
-            currency: string | null;
-            description: string | null;
-            periodStart: Date | null;
-            periodEnd: Date | null;
-          }> = [];
-          for (const line of invoice.lines?.data ?? []) {
-            const isProration = Boolean(
-              (line as { proration?: boolean }).proration,
-            );
-            if (!isProration) continue;
-            const period = line.period;
-            prorationPayload.push({
-              stripeLineId: line.id,
-              amountCents: typeof line.amount === "number" ? line.amount : null,
-              currency,
-              description: stringOrNull(line.description),
-              periodStart:
-                typeof period?.start === "number"
-                  ? new Date(period.start * 1000)
-                  : null,
-              periodEnd:
-                typeof period?.end === "number"
-                  ? new Date(period.end * 1000)
-                  : null,
-            });
-          }
-          await replaceProrationLinesForStripeInvoice({
-            userId,
-            stripeInvoiceId: invoice.id,
-            lines: prorationPayload,
-          });
-        } catch {
-          // Best-effort — invoice row already persisted.
+          await persistStripeInvoiceForUser(userId, userEmail, invoice);
+        } catch (error) {
+          console.error("[stripe webhook] persist invoice", invoice.id, error);
         }
         break;
       }

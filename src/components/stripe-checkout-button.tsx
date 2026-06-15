@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { createStripeCheckoutSessionAction } from "@/actions/stripe";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { STRIPE_PAID_PLAN_IDS, type StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,8 +20,8 @@ export function StripeCheckoutButton({
   label?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [period, setPeriod] = useState<BillingPeriod>("monthly");
+  const router = useRouter();
 
   function onCheckout() {
     setError(null);
@@ -29,14 +29,9 @@ export function StripeCheckoutButton({
       setError("Unsupported plan selected.");
       return;
     }
-    startTransition(async () => {
-      try {
-        const result = await createStripeCheckoutSessionAction({ plan, period });
-        window.location.href = result.url;
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Unable to start checkout.");
-      }
-    });
+    router.push(
+      `/pricing/checkout?plan=${encodeURIComponent(plan)}&period=${encodeURIComponent(period)}`,
+    );
   }
 
   return (
@@ -50,8 +45,8 @@ export function StripeCheckoutButton({
           <TabsTrigger value="yearly">Yearly</TabsTrigger>
         </TabsList>
       </Tabs>
-      <Button type="button" size="lg" onClick={onCheckout} disabled={isPending} className="w-full">
-        {isPending ? "Redirecting to Stripe..." : `${label} (${period})`}
+      <Button type="button" size="lg" onClick={onCheckout} className="w-full">
+        {`${label} (${period})`}
       </Button>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </div>

@@ -2,9 +2,9 @@
  * applyPlanUpgrade — smart plan application with Stripe proration.
  *
  * If the user has an active Stripe subscription (stored in stripe_subscriptions),
- * swaps the price on that subscription with proration_behavior="create_prorations".
+ * swaps the price on that subscription with proration_behavior="always_invoice".
  * Stripe will then:
- *   1. Immediately invoice the prorated difference.
+ *   1. Immediately invoice the prorated difference (credit for unused time + new plan charge).
  *   2. Email the receipt to the customer's email on file.
  *   3. Fire customer.subscription.updated → our webhook updates Clerk metadata.
  *
@@ -16,15 +16,21 @@ import { createClerkClient } from "@clerk/backend";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import {
+  STRIPE_CLEAR_DISCOUNTS,
+  STRIPE_CLEAR_SUBSCRIPTION_DISCOUNTS,
+  STRIPE_CLEAR_SUBSCRIPTION_ITEM_DISCOUNTS,
+} from "@/lib/stripe-clear-discounts";
+import {
+  findActiveSubscriptionForClerkUser,
+  setStripeBillingState,
+  syncActiveSubscriptionFromStripeForUser,
+  upsertStripeSubscriptionFromStripeSub,
+} from "@/lib/stripe-billing-sync";
+import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
   markStripeSubscriptionStatus,
 } from "@/db/queries/stripe-subscriptions";
-import {
-  findActiveSubscriptionForClerkUser,
-  setStripeBillingState,
-  upsertStripeSubscriptionFromStripeSub,
-} from "@/lib/stripe-billing-sync";
 import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import {
   publicMetadataPatchForAdminPlanAssignment,
@@ -43,6 +49,8 @@ import {
   type StripePaidPlanId,
 } from "@/lib/billing-plan-ids";
 import { resolveStripePriceIdForPlan } from "@/lib/stripe-plan-price-env";
+import { resolveCatalogAlignedStripePriceId } from "@/lib/stripe-catalog-price";
+import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -187,6 +195,35 @@ async function persistUpgradableSubscriptionRow(
 export async function fetchUpgradableStripeSubscription(
   userId: string,
 ): Promise<UpgradableStripeSubscription | null> {
+  const fromStripeApi = await resolveUpgradableFromStripeApis(userId);
+  if (fromStripeApi) return fromStripeApi;
+
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    const meta = user.publicMetadata as Record<string, unknown>;
+    const billingStatus = meta.billingStatus;
+    const billingPlan =
+      typeof meta.billingPlan === "string" ? meta.billingPlan.trim() : "";
+    const clerkPaidActive =
+      (billingStatus === "active" || billingStatus === "trialing") &&
+      billingPlan.length > 0 &&
+      billingPlan !== "free" &&
+      isStripePaidPlan(billingPlan);
+
+    if (clerkPaidActive) {
+      await syncActiveSubscriptionFromStripeForUser(userId);
+      return await resolveUpgradableFromStripeApis(userId);
+    }
+  } catch (error) {
+    console.error("[fetchUpgradableStripeSubscription] clerk sync:", error);
+  }
+
+  return null;
+}
+
+async function resolveUpgradableFromStripeApis(
+  userId: string,
+): Promise<UpgradableStripeSubscription | null> {
   const row =
     (await getActiveStripeSubscription(userId)) ??
     (await getManageableStripeSubscription(userId));
@@ -246,7 +283,7 @@ function priceIdOnSubscriptionItem(
 }
 
 /** Ends duplicate active subscriptions on the same Stripe customer (keeps one canonical sub). */
-async function cancelOtherActiveSubscriptionsForCustomer(
+export async function cancelOtherActiveSubscriptionsForCustomer(
   customerId: string,
   keepSubscriptionId: string,
 ): Promise<void> {
@@ -279,7 +316,16 @@ async function swapStripeSubscriptionPlan(input: {
   stripeSubscriptionItemId: string;
   stripeCustomerId: string;
 }): Promise<string> {
-  const newPriceId = priceIdForPlanAndPeriod(input.planSlug, input.period);
+  const plansConfig = await readPlansConfigFromDisk();
+  const planRow = plansConfig.find((p) => p.id === input.planSlug);
+  const newPriceId = planRow
+    ? await resolveCatalogAlignedStripePriceId({
+        plan: input.planSlug,
+        period: input.period,
+        monthlyPrice: planRow.monthlyPrice,
+        yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
+      })
+    : priceIdForPlanAndPeriod(input.planSlug, input.period);
   if (!newPriceId) {
     throw new Error(
       `No Stripe price configured for plan "${input.planSlug}" (${input.period}).`,
@@ -304,12 +350,24 @@ async function swapStripeSubscriptionPlan(input: {
   }
 
   const updated = await stripe.subscriptions.update(input.stripeSubscriptionId, {
-    items: [{ id: input.stripeSubscriptionItemId, price: newPriceId }],
-    proration_behavior: "create_prorations",
+    items: [
+      {
+        id: input.stripeSubscriptionItemId,
+        price: newPriceId,
+        discounts: STRIPE_CLEAR_SUBSCRIPTION_ITEM_DISCOUNTS,
+      },
+    ],
+    proration_behavior: "always_invoice",
+    proration_date: Math.floor(Date.now() / 1000),
     cancel_at_period_end: false,
+    discounts: STRIPE_CLEAR_SUBSCRIPTION_DISCOUNTS,
     metadata: {
+      ...current.metadata,
       clerkUserId: input.userId,
       plan: input.planSlug,
+      period: input.period,
+      promoCode: "",
+      promoKind: "",
     },
   });
 

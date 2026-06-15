@@ -2,10 +2,8 @@ import { db } from "@/db";
 import { affiliates } from "@/db/schema";
 import { eq, desc, or, and, sql, inArray } from "drizzle-orm";
 import { evaluateAffiliateQuotaRenewal } from "@/lib/affiliate-quota-renewal";
-import {
-  buildAffiliatePromotionalCandidate,
-  slugifyAffiliatePromoBase,
-} from "@/lib/affiliate-promotional-code";
+import { buildAffiliatePromotionalCandidate } from "@/lib/affiliate-promotional-code-server";
+import { slugifyAffiliatePromoBase } from "@/lib/affiliate-promotional-code";
 
 export async function listAffiliates() {
   return db.select().from(affiliates).orderBy(desc(affiliates.createdAt));

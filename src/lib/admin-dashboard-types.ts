@@ -174,6 +174,10 @@ export type SerializedAdminInvoice = {
   periodEnd: string | null;
   hostedInvoiceUrl: string | null;
   invoicePdfUrl: string | null;
+  /** Customer-facing promo code used at checkout. */
+  promoCode: string | null;
+  /** `general` or `affiliate`. */
+  promoKind: "general" | "affiliate" | null;
   /** Human-readable discount label, e.g. "LAUNCH50 — 50% off". Null when no discount. */
   discount: string | null;
 };

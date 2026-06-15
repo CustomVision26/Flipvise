@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { syncBillingAfterCheckoutAction } from "@/actions/billing-page";
+import { finalizePlanChangePaymentAction } from "@/actions/plan-change-checkout";
+import { showSubscriptionSuccessToast } from "@/lib/subscription-success-toast";
 
 export const BILLING_SYNCED_EVENT = "flipvise:billing-synced";
 
@@ -28,12 +30,25 @@ export function StripeCheckoutToast() {
     if (handled.current) return;
 
     const checkout = searchParams.get("checkout")?.trim();
-    if (checkout !== "success" && checkout !== "canceled") return;
+    if (
+      checkout !== "success" &&
+      checkout !== "canceled" &&
+      checkout !== "plan_change"
+    ) {
+      return;
+    }
 
     handled.current = true;
 
+    const checkoutSessionId = searchParams.get("session_id")?.trim() ?? "";
+    const setupIntentId = searchParams.get("setup_intent")?.trim() ?? "";
+
     const next = new URL(window.location.href);
     next.searchParams.delete("checkout");
+    next.searchParams.delete("session_id");
+    next.searchParams.delete("setup_intent");
+    next.searchParams.delete("setup_intent_client_secret");
+    next.searchParams.delete("redirect_status");
     const qs = next.searchParams.toString();
     router.replace(`${next.pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
 
@@ -46,13 +61,42 @@ export function StripeCheckoutToast() {
 
     void (async () => {
       try {
-        const result = await syncBillingAfterCheckoutAction();
+        if (checkout === "plan_change") {
+          const result = await finalizePlanChangePaymentAction({
+            ...(setupIntentId ? { setupIntentId } : {}),
+          });
+          await reloadClerkUserSession();
+
+          if (result.synced && result.planLabel) {
+            showSubscriptionSuccessToast({
+              title: "Plan updated",
+              planLabel: result.planLabel,
+              receiptUrl: result.receiptUrl,
+              isProration: result.receiptIsProration,
+            });
+          } else {
+            toast.success("Plan change recorded", {
+              description:
+                "Your subscription was updated. Open Billing if your plan has not refreshed yet.",
+              duration: 12_000,
+            });
+          }
+
+          window.dispatchEvent(new CustomEvent(BILLING_SYNCED_EVENT));
+          router.refresh();
+          return;
+        }
+
+        const result = await syncBillingAfterCheckoutAction({
+          ...(checkoutSessionId ? { checkoutSessionId } : {}),
+        });
         await reloadClerkUserSession();
 
         if (result.synced && result.planLabel) {
-          toast.success("Subscription active", {
-            description: `Your plan is now ${result.planLabel}.`,
-            duration: 10_000,
+          showSubscriptionSuccessToast({
+            planLabel: result.planLabel,
+            receiptUrl: result.receiptUrl,
+            isProration: result.receiptIsProration,
           });
         } else {
           toast.success("Payment received", {

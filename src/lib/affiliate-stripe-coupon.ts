@@ -39,7 +39,7 @@ export function buildAffiliatePlanCouponName(
   const d = discontinueRaw.trim();
   /** `2026-05-18` → `26-05-18` to save characters */
   const dateCompact =
-    /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(2, 4)}-${d.slice(5, 7)}-${d.slice(8, 10)}` : d;
+    /^\d{4}-\d{2}-\d{2}/.test(d) ? `${d.slice(2, 4)}-${d.slice(5, 7)}-${d.slice(8, 10)}` : d;
 
   const tryName = (compact: boolean): string => {
     const tag = compact ? "Aff" : "Affiliate";
@@ -53,4 +53,28 @@ export function buildAffiliatePlanCouponName(
     name = name.slice(0, STRIPE_COUPON_NAME_MAX_LEN);
   }
   return name;
+}
+
+/** Shown on Stripe Checkout / invoices after `stampStripeCouponInvoiceLabel`. */
+export function buildGeneralCheckoutDiscountSuffix(percentOff: number): string {
+  return ` (General Discount ${Math.round(percentOff)}%)`;
+}
+
+/** Customer-facing label on Stripe invoices/receipts (coupon `name` field, max 40 chars). */
+export function buildCheckoutInvoiceCouponName(opts: {
+  customerPromoCode: string;
+  kind: "general" | "affiliate";
+  percentOff: number;
+}): string {
+  const suffix =
+    opts.kind === "affiliate"
+      ? ` (affiliate ${opts.percentOff}% off)`
+      : buildGeneralCheckoutDiscountSuffix(opts.percentOff);
+  const maxCodeLen = STRIPE_COUPON_NAME_MAX_LEN - suffix.length;
+  let code = opts.customerPromoCode.trim();
+  if (maxCodeLen < 1) return suffix.trim();
+  if (code.length > maxCodeLen) {
+    code = code.slice(0, Math.max(1, maxCodeLen - 1)) + "…";
+  }
+  return `${code}${suffix}`;
 }

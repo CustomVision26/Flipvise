@@ -17,4 +17,6 @@ export type PlanHistoryRow = {
   receiptUrl: string | null;
   /** Stripe receipt / invoice number for receipt link label (e.g. 2815-9731) */
   receiptLabel: string | null;
+  /** Promo applied on this invoice, e.g. `SUMMER26 (General Discount 5%)`. */
+  promoDisplay: string | null;
 };

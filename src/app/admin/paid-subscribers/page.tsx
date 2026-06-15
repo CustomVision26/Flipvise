@@ -9,6 +9,10 @@ import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import type { SerializedAdminSubscription, SerializedAdminInvoice } from "@/lib/admin-dashboard-types";
+import {
+  formatAdminInvoicePromoCell,
+  normalizeAdminInvoicePromoKind,
+} from "@/lib/admin-invoice-promo-display";
 import { PaidSubscribersFilters } from "@/components/paid-subscribers-filters";
 import {
   Table,
@@ -69,6 +73,35 @@ function formatPrice(amountCents: number | null, currency: string | null): strin
   } catch {
     return `${(amountCents / 100).toFixed(2)} ${curr}`;
   }
+}
+
+function renderPromoCodeCell(inv: SerializedAdminInvoice | undefined) {
+  if (!inv) return "—";
+  const { code, kindLabel, detail } = formatAdminInvoicePromoCell({
+    promoCode: inv.promoCode,
+    promoKind: inv.promoKind,
+    discountLabel: inv.discount,
+  });
+  if (!code && !detail) return "—";
+  return (
+    <div className="space-y-1">
+      {code ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-sm font-semibold text-emerald-500">{code}</span>
+          {kindLabel ? (
+            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+              {kindLabel}
+            </Badge>
+          ) : null}
+        </div>
+      ) : (
+        <span className="text-sm font-semibold text-emerald-500">{detail}</span>
+      )}
+      {code && detail ? (
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function formatPlanLabel(slug: string): string {
@@ -208,6 +241,8 @@ export default async function PaidSubscribersPage({
         periodEnd: row.periodEnd?.toISOString() ?? null,
         hostedInvoiceUrl: row.hostedInvoiceUrl,
         invoicePdfUrl: row.invoicePdfUrl,
+        promoCode: row.promoCode ?? null,
+        promoKind: normalizeAdminInvoicePromoKind(row.promoKind),
         discount: row.discountLabel ?? null,
       };
     })
@@ -528,7 +563,7 @@ export default async function PaidSubscribersPage({
                           <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">User</TableHead>
                           <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Plan</TableHead>
                           <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Billing Period</TableHead>
-                          <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Discount</TableHead>
+                          <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Promo code</TableHead>
                           <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide text-right">Price</TableHead>
                           <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Status</TableHead>
                         </TableRow>
@@ -536,7 +571,6 @@ export default async function PaidSubscribersPage({
                       <TableBody>
                         {rows.map((sub) => {
                           const inv = latestInvoiceByUser.get(sub.userId);
-                          const discount = inv?.discount ?? null;
                           return (
                             <TableRow key={sub.userId} className="hover:bg-muted/30 transition-colors">
                               {/* User */}
@@ -575,11 +609,9 @@ export default async function PaidSubscribersPage({
                                 )}
                               </TableCell>
 
-                              {/* Discount */}
+                              {/* Promo code */}
                               <TableCell className="py-5 text-sm text-muted-foreground">
-                                {discount ? (
-                                  <span className="text-emerald-500 font-semibold">{discount}</span>
-                                ) : "—"}
+                                {renderPromoCodeCell(inv)}
                               </TableCell>
 
                               {/* Price */}

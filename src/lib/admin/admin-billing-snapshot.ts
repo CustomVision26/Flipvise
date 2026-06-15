@@ -5,6 +5,7 @@ import type {
   SerializedAdminSubscription,
 } from "@/lib/admin-dashboard-types";
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
+import { normalizeAdminInvoicePromoKind } from "@/lib/admin-invoice-promo-display";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
 import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
@@ -192,6 +193,8 @@ export function buildAdminBillingSnapshot(input: {
         periodEnd: row.periodEnd?.toISOString() ?? null,
         hostedInvoiceUrl: row.hostedInvoiceUrl,
         invoicePdfUrl: row.invoicePdfUrl,
+        promoCode: row.promoCode ?? null,
+        promoKind: normalizeAdminInvoicePromoKind(row.promoKind),
         discount: row.discountLabel ?? null,
       };
     })

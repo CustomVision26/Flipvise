@@ -1,7 +1,6 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   BILLING_SYNCED_EVENT,
@@ -10,6 +9,7 @@ import { loadBillingTabDataAction } from "@/actions/billing-page";
 import { resolveBillingTabPlanDisplay } from "@/lib/billing-tab-plan-display";
 import type { CancelSubscriptionPreview } from "@/lib/stripe-cancel-subscription";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -21,6 +21,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+
+function ViewPlansButton({
+  variant = "secondary",
+  className,
+}: {
+  variant?: "default" | "secondary" | "outline";
+  className?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      size="sm"
+      className={cn("gap-2", className)}
+      onClick={() => {
+        window.location.assign(PRICING_PAGE_PATH);
+      }}
+    >
+      {variant === "default" ? (
+        <Zap className="size-3.5" aria-hidden />
+      ) : (
+        <ExternalLink className="size-3.5" aria-hidden />
+      )}
+      View plans
+    </Button>
+  );
+}
 import { CancelSubscriptionButton } from "@/components/cancel-subscription-button";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import type { PlanHistoryRow } from "@/lib/plan-history-types";
@@ -261,16 +288,7 @@ export function UserBillingPage() {
                 variant="outline"
                 size="sm"
               />
-              <Link
-                href={PRICING_PAGE_PATH}
-                className={cn(
-                  buttonVariants({ variant: "secondary", size: "sm" }),
-                  "gap-2",
-                )}
-              >
-                <ExternalLink className="size-3.5" aria-hidden />
-                View plans
-              </Link>
+              <ViewPlansButton variant="secondary" />
             </div>
           </div>
         )}
@@ -283,16 +301,7 @@ export function UserBillingPage() {
             <p className="text-xs text-muted-foreground mb-2">
               Unlock AI flashcard generation, custom themes, and more.
             </p>
-            <Link
-              href={PRICING_PAGE_PATH}
-              className={cn(
-                buttonVariants({ variant: "default", size: "sm" }),
-                "w-fit gap-2",
-              )}
-            >
-              <Zap className="size-3.5" aria-hidden />
-              View plans
-            </Link>
+            <ViewPlansButton variant="default" className="w-fit" />
           </div>
         )}
 
@@ -301,16 +310,7 @@ export function UserBillingPage() {
             <p className="text-sm font-medium text-foreground">
               {isComplimentary ? "Complimentary access" : "Change or upgrade plan"}
             </p>
-            <Link
-              href={PRICING_PAGE_PATH}
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "w-fit gap-2",
-              )}
-            >
-              <ExternalLink className="size-3.5" aria-hidden />
-              View plans
-            </Link>
+            <ViewPlansButton variant="outline" className="w-fit" />
           </div>
         )}
       </div>
@@ -358,6 +358,9 @@ export function UserBillingPage() {
                 <TableHead className="whitespace-nowrap min-w-[140px]">
                   Ended
                 </TableHead>
+                <TableHead className="whitespace-nowrap min-w-[160px]">
+                  Promo
+                </TableHead>
                 <TableHead className="whitespace-nowrap text-right w-[1%]">
                   Receipt
                 </TableHead>
@@ -378,6 +381,9 @@ export function UserBillingPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground tabular-nums">
                     {row.endAt ? formatDateTime(row.endAt) : "Ongoing"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm max-w-[200px]">
+                    {row.promoDisplay ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     {row.receiptUrl ? (

@@ -5,6 +5,7 @@ import type { AdminPlanAssignment } from "@/lib/admin-assignable-plans";
 export type InboxItemType =
   | "quiz_result"
   | "team_invite"
+  | "subscription_confirmed"
   | "billing"
   | "affiliate"
   | "affiliate_broadcast"
@@ -36,6 +37,19 @@ export type BillingPayload = {
   hostedInvoiceUrl: string | null;
   invoicePdfUrl: string | null;
   paidAtIso: string | null;
+  promoDisplay: string | null;
+};
+
+export type SubscriptionConfirmedPayload = {
+  confirmationId: number;
+  checkoutSessionId: string;
+  planSlug: string;
+  planLabel: string;
+  period: "monthly" | "yearly";
+  amountCents: number | null;
+  currency: string | null;
+  promoDisplay: string | null;
+  receiptUrl: string | null;
 };
 
 export type AffiliatePayload = {
@@ -120,6 +134,16 @@ export type SupportTicketPayload = {
 export type UnifiedInboxItem =
   | { type: "quiz_result"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: false; payload: QuizResultPayload }
   | { type: "team_invite"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: boolean; payload: TeamInvitePayload }
+  | {
+      type: "subscription_confirmed";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: false;
+      payload: SubscriptionConfirmedPayload;
+    }
   | { type: "billing"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: false; payload: BillingPayload }
   | { type: "affiliate"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: boolean; payload: AffiliatePayload }
   | {
@@ -186,6 +210,7 @@ export type UnifiedInboxItem =
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   quiz_result: "Quiz Result",
   team_invite: "Team Invitation",
+  subscription_confirmed: "Subscription",
   billing: "Billing",
   affiliate: "Affiliate Invite",
   affiliate_broadcast: "Affiliate message",

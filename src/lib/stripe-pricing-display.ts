@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
+import { roundMajor } from "@/lib/money-math";
 import {
   isStripePaidPlanId,
   STRIPE_PAID_PLAN_IDS,
@@ -16,9 +17,7 @@ export type PlanStripePriceDisplay = {
   currency: string | null;
 };
 
-function roundMajor(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+export { roundMajor } from "@/lib/money-math";
 
 /** ISO 4217 currencies where Stripe amounts are already in whole major units. */
 const ZERO_DECIMAL_CURRENCIES = new Set([
@@ -135,6 +134,13 @@ function monthsPerBillingCycle(rec: Stripe.Price.Recurring): number {
   }
 }
 
+/** Amount charged once per billing cycle (e.g. $120/year or $15/month). */
+export function majorPerBillingCycleFromSubscriptionPrice(
+  price: Stripe.Price,
+): number | null {
+  return majorCurrencyAmount(price);
+}
+
 /** Average $/month for a subscription Price (monthly + yearly env IDs both use this). */
 function majorPerMonthFromSubscriptionPrice(price: Stripe.Price): number | null {
   const perCycle = majorCurrencyAmount(price);
@@ -212,6 +218,69 @@ export async function fetchStripePricingForPaidPlans(): Promise<
   }
 }
 
+const CATALOG_STRIPE_PRICE_TOLERANCE = 0.02;
+
+export class CatalogStripePriceMismatchError extends Error {
+  readonly plan: StripePaidPlanId;
+  readonly period: "monthly" | "yearly";
+  readonly expectedMajor: number;
+  readonly actualMajor: number;
+  readonly priceId: string;
+
+  constructor(input: {
+    plan: StripePaidPlanId;
+    period: "monthly" | "yearly";
+    expectedMajor: number;
+    actualMajor: number;
+    priceId: string;
+  }) {
+    super(
+      `Catalog ${input.period} price for ${input.plan} ($${input.expectedMajor}) does not match Stripe price ${input.priceId} ($${input.actualMajor}).`,
+    );
+    this.name = "CatalogStripePriceMismatchError";
+    this.plan = input.plan;
+    this.period = input.period;
+    this.expectedMajor = input.expectedMajor;
+    this.actualMajor = input.actualMajor;
+    this.priceId = input.priceId;
+  }
+}
+
+/** Ensures Stripe checkout line items match catalog amounts before redirecting. */
+export async function validateStripePriceMatchesCatalog(input: {
+  plan: StripePaidPlanId;
+  period: "monthly" | "yearly";
+  monthlyPrice: number | null;
+  yearlyMonthlyPrice: number | null;
+}): Promise<void> {
+  const priceId = resolveStripePriceIdForPlan(input.plan, input.period);
+  if (!priceId) return;
+
+  const stripePrice = await retrievePrice(priceId);
+  const actualMajor = majorPerBillingCycleFromSubscriptionPrice(stripePrice);
+  if (actualMajor == null) return;
+
+  const expectedMajor =
+    input.period === "yearly"
+      ? input.yearlyMonthlyPrice != null
+        ? roundMajor(input.yearlyMonthlyPrice * 12)
+        : null
+      : input.monthlyPrice;
+
+  if (expectedMajor == null || expectedMajor <= 0) return;
+
+  const relativeDelta = Math.abs(actualMajor - expectedMajor) / expectedMajor;
+  if (relativeDelta <= CATALOG_STRIPE_PRICE_TOLERANCE) return;
+
+  throw new CatalogStripePriceMismatchError({
+    plan: input.plan,
+    period: input.period,
+    expectedMajor,
+    actualMajor,
+    priceId,
+  });
+}
+
 export function mergePlansConfigWithStripePricing<
   T extends {
     id: string;
@@ -232,8 +301,8 @@ export function mergePlansConfigWithStripePricing<
       ...plan,
       /**
        * `plans-config.json` (edited in `/admin/plans`) is the marketing source of truth for
-       * features and display prices. Stripe fills price gaps only when catalog omits an amount (`null`).
-       * Checkout writes the same feature bullets into `subscription_data.description` for Stripe invoices.
+       * display prices. Stripe fills gaps only when catalog omits an amount (`null`).
+       * Checkout validates Stripe line items against catalog before redirecting.
        */
       monthlyPrice:
         plan.monthlyPrice != null

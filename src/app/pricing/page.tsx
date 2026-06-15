@@ -32,7 +32,13 @@ async function loadPlansForPricingUi(): Promise<PlanConfig[]> {
   }
 }
 
-export default async function PricingPage() {
+interface PricingPageProps {
+  searchParams: Promise<{ promo?: string }>;
+}
+
+export default async function PricingPage({ searchParams }: PricingPageProps) {
+  const { promo: promoFromUrl } = await searchParams;
+
   let access = guestAccessContext();
   try {
     access = await getAccessContext();
@@ -149,6 +155,7 @@ export default async function PricingPage() {
           userId={userId}
           currentPlanHighlightId={currentPlanHighlightId}
           plans={plansForUi}
+          initialPromotionCode={promoFromUrl?.trim() ?? ""}
         />
       </div>
     </div>

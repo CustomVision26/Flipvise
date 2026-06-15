@@ -7,7 +7,7 @@
   },
   "scripts": {
     "postinstall": "patch-package",
-    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=10240 next dev",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=10240 next dev --webpack",
     "build": "next build",
     "start": "next start -p $PORT",
     "db:push:local": "drizzle-kit push --config=drizzle.config.local.ts",
@@ -26,6 +26,7 @@
     "db:ensure-affiliate-promo-columns": "tsx scripts/ensure-affiliate-promo-columns.ts",
     "db:ensure-affiliate-pending-arrangement-columns": "tsx scripts/ensure-affiliate-pending-arrangement-columns.ts",
     "db:ensure-affiliate-broadcast-inbox": "tsx scripts/ensure-affiliate-broadcast-inbox-table.ts",
+    "db:ensure-subscription-checkout-inbox": "tsx scripts/ensure-subscription-checkout-inbox-table.ts",
     "db:ensure-support-ticket-messaging": "tsx scripts/ensure-support-ticket-messaging.ts",
     "db:ensure-affiliate-referral-quota-columns": "tsx scripts/ensure-affiliate-referral-quota-columns.ts",
     "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.mjs",
@@ -39,6 +40,7 @@
     "db:migrate-cloudfront": "tsx scripts/migrate-cloudfront-to-s3.ts",
     "db:verify-s3": "tsx scripts/verify-s3-setup.ts",
     "stripe:cancel-duplicate-subs": "tsx scripts/cancel-duplicate-stripe-subs.ts",
+    "stripe:reconcile-duplicate-subs": "tsx scripts/reconcile-duplicate-stripe-subs.ts",
     "lint": "eslint",
     "logo:transparent": "node scripts/remove-logo-background.cjs"
   },
@@ -50,6 +52,8 @@
     "@clerk/nextjs": "^7.0.7",
     "@clerk/themes": "^2.4.57",
     "@neondatabase/serverless": "^1.0.2",
+    "@stripe/react-stripe-js": "^6.6.0",
+    "@stripe/stripe-js": "^9.8.0",
     "@tailwindcss/postcss": "^4",
     "@vercel/blob": "^2.3.3",
     "ai": "^6.0.149",

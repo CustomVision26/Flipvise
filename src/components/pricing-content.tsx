@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
-import { Check, Loader2, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { createStripeCheckoutSessionAction } from "@/actions/stripe";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PricingBillingPeriodToggle } from "@/components/pricing-billing-period-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,56 +19,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { isGeneralDiscountEffectivelyActive } from "@/lib/plan-promo-window";
+import {
+  computePlanPeriodPricing,
+  formatPlanMoney,
+} from "@/lib/pricing-period-display";
+import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
+import type {
+  PlanAffiliateDiscount,
+  PlanConfig,
+  PlanDiscount,
+} from "@/lib/plan-config-types";
 import plansConfigData from "@/data/plans-config.json";
 
 type PaidPlanId = StripePaidPlanId;
-type BillingPeriod = "monthly" | "yearly";
+type BillingPeriod = PricingBillingPeriod;
 type AnyPlanId = "free" | PaidPlanId;
 
-export type PlanDiscount = {
-  active: boolean;
-  type: "percentage" | "fixed";
-  value: number;
-  label: string;
-  stripeCouponId: string;
-};
-
-/** Separate from the public “general” discount — used with combined Stripe coupon + affiliate promotional code at checkout. */
-export type PlanAffiliateDiscount = {
-  active: boolean;
-  /** Percentage off subscription when checkout uses the combined code. */
-  value: number;
-  /** Optional label for admin UI only. */
-  label?: string;
-};
-
-export type PlanConfig = {
-  id: string;
-  name: string;
-  monthlyPrice: number | null;
-  yearlyMonthlyPrice: number | null;
-  description: string;
-  features: string[];
-  highlighted?: boolean;
-  discount?: PlanDiscount;
-  affiliateDiscount?: PlanAffiliateDiscount;
-  /** ISO date string (YYYY-MM-DD) — when set, marks the date this plan will be discontinued. */
-  discontinueAt?: string | null;
-  /** Promotion window start — `YYYY-MM-DDTHH:mm` (required when discounts are active). */
-  promoStartsAt?: string | null;
-  /** Promotion window end — `YYYY-MM-DDTHH:mm` (required when discounts are active). */
-  promoEndsAt?: string | null;
-};
-
-/** Returns the discounted price given a base price and discount config. */
-export function applyDiscount(price: number, discount: PlanDiscount): number {
-  if (!discount.active || discount.value <= 0) return price;
-  if (discount.type === "percentage") {
-    return Math.max(0, price - price * (discount.value / 100));
-  }
-  return Math.max(0, price - discount.value);
-}
+export type { PlanAffiliateDiscount, PlanConfig, PlanDiscount };
+export { applyDiscount } from "@/lib/plan-pricing";
+export { computePlanPeriodPricing, formatPlanMoney } from "@/lib/pricing-period-display";
 
 const PLANS: PlanConfig[] = plansConfigData as PlanConfig[];
 
@@ -77,7 +47,6 @@ function PlanCard({
   period,
   isCurrent,
   userId,
-  isPending,
   error,
   onCheckout,
 }: {
@@ -85,20 +54,13 @@ function PlanCard({
   period: BillingPeriod;
   isCurrent: boolean;
   userId: string | null;
-  isPending: boolean;
   error: string | null;
   onCheckout: (planId: PaidPlanId) => void;
 }) {
-  const basePrice =
-    period === "monthly" ? plan.monthlyPrice : plan.yearlyMonthlyPrice;
+  const periodPricing = computePlanPeriodPricing(plan, period);
   const discount = plan.discount;
-  const hasActiveDiscount =
-    isGeneralDiscountEffectivelyActive(plan) && basePrice !== null;
-  const price = hasActiveDiscount && basePrice !== null
-    ? applyDiscount(basePrice, discount!)
-    : basePrice;
+  const hasActiveDiscount = periodPricing?.hasActiveDiscount ?? false;
   const isFree = plan.id === "free";
-  const isPaid = !isFree;
 
   const cta = (() => {
     if (!userId) {
@@ -129,17 +91,11 @@ function PlanCard({
       <Button
         size="lg"
         className="w-full"
-        disabled={isPending}
         onClick={() => onCheckout(plan.id as PaidPlanId)}
       >
-        {isPending ? (
-          <>
-            <Loader2 className="mr-2 size-4 animate-spin" />
-            Redirecting…
-          </>
-        ) : (
-          `Choose ${plan.name}`
-        )}
+        {userId && !isCurrent && !isFree
+          ? `Change to ${plan.name}`
+          : `Choose ${plan.name}`}
       </Button>
     );
   })();
@@ -169,36 +125,76 @@ function PlanCard({
         </div>
 
         {hasActiveDiscount && discount?.label && (
-          <Badge className="mt-2 text-xs bg-amber-500/15 text-amber-400 border-amber-500/20 w-fit">
-            {discount.label}
-          </Badge>
+          <div className="mt-2 space-y-1">
+            <Badge className="text-xs bg-amber-500/15 text-amber-400 border-amber-500/20 w-fit">
+              {discount.label}
+            </Badge>
+            {discount.stripeCouponId?.trim() ? (
+              <p className="text-xs text-muted-foreground">
+                Promo code:{" "}
+                <span className="font-mono font-medium text-foreground">
+                  {discount.stripeCouponId.trim()}
+                </span>
+              </p>
+            ) : null}
+          </div>
         )}
 
         <div className="mt-2">
-          {price !== null ? (
-            <>
-              {hasActiveDiscount && basePrice !== null && (
-                <span className="text-base text-muted-foreground line-through mr-2">
-                  ${basePrice}
+          {periodPricing ? (
+            period === "yearly" && periodPricing.discountedAnnualTotal != null ? (
+              <>
+                {hasActiveDiscount && periodPricing.baseAnnualTotal != null && (
+                  <span className="text-base text-muted-foreground line-through mr-2">
+                    ${formatPlanMoney(periodPricing.baseAnnualTotal)}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    "text-3xl font-bold",
+                    hasActiveDiscount && "text-primary",
+                  )}
+                >
+                  ${formatPlanMoney(periodPricing.discountedAnnualTotal)}
                 </span>
-              )}
-              <span className={cn("text-3xl font-bold", hasActiveDiscount && "text-primary")}>
-                ${Math.round(price * 100) / 100}
-              </span>
-              <span className="text-muted-foreground text-sm"> /mo</span>
-              {hasActiveDiscount && discount && (
-                <span className="ml-2 text-xs font-medium text-amber-400">
-                  {discount.type === "percentage"
-                    ? `${discount.value}% off`
-                    : `$${discount.value} off`}
-                </span>
-              )}
-              {period === "yearly" && isPaid && (
+                <span className="text-muted-foreground text-sm"> /yr</span>
+                {hasActiveDiscount && discount && (
+                  <span className="ml-2 text-xs font-medium text-amber-400">
+                    {discount.type === "percentage"
+                      ? `${discount.value}% off`
+                      : `$${discount.value} off`}
+                  </span>
+                )}
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Billed annually
+                  ${formatPlanMoney(periodPricing.discountedPeriodicRate)} /mo when billed
+                  annually
                 </p>
-              )}
-            </>
+              </>
+            ) : (
+              <>
+                {hasActiveDiscount && (
+                  <span className="text-base text-muted-foreground line-through mr-2">
+                    ${formatPlanMoney(periodPricing.basePeriodicRate)}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    "text-3xl font-bold",
+                    hasActiveDiscount && "text-primary",
+                  )}
+                >
+                  ${formatPlanMoney(periodPricing.discountedPeriodicRate)}
+                </span>
+                <span className="text-muted-foreground text-sm"> /mo</span>
+                {hasActiveDiscount && discount && (
+                  <span className="ml-2 text-xs font-medium text-amber-400">
+                    {discount.type === "percentage"
+                      ? `${discount.value}% off`
+                      : `$${discount.value} off`}
+                  </span>
+                )}
+              </>
+            )
           ) : (
             <span className="text-3xl font-bold">Free</span>
           )}
@@ -230,10 +226,24 @@ function PlanCard({
   );
 }
 
+function activePublicPromoCodes(plans: PlanConfig[]): Array<{ planName: string; code: string }> {
+  const seen = new Set<string>();
+  const rows: Array<{ planName: string; code: string }> = [];
+  for (const plan of plans) {
+    if (!isGeneralDiscountEffectivelyActive(plan)) continue;
+    const code = plan.discount?.stripeCouponId?.trim();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    rows.push({ planName: plan.name, code });
+  }
+  return rows;
+}
+
 export function PricingContent({
   userId,
   currentPlanHighlightId,
   plans = PLANS,
+  initialPromotionCode = "",
 }: {
   userId: string | null;
   /**
@@ -243,13 +253,17 @@ export function PricingContent({
   currentPlanHighlightId: "free" | PaidPlanId | null;
   /** Optional — defaults to static JSON; `/pricing` passes Stripe-synced rows. */
   plans?: PlanConfig[];
+  /** Prefill from `/pricing?promo=…` (affiliate or campaign links). */
+  initialPromotionCode?: string;
 }) {
   const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [promotionCode, setPromotionCode] = useState("");
-  const [, startTransition] = useTransition();
+  const [promotionCode, setPromotionCode] = useState(initialPromotionCode.trim());
+  const router = useRouter();
+  const promoSectionRef = useRef<HTMLDivElement>(null);
+
+  const publicPromoCodes = activePublicPromoCodes(plans);
 
   const visiblePlans = selectedPlanId
     ? plans.filter((p) => p.id === selectedPlanId)
@@ -259,34 +273,15 @@ export function PricingContent({
 
   function handleCheckout(planId: PaidPlanId) {
     setErrors({});
-    setPendingPlan(planId);
-    startTransition(async () => {
-      try {
-        const result = await createStripeCheckoutSessionAction({
-          plan: planId,
-          period,
-          ...(promotionCode.trim()
-            ? { promotionCode: promotionCode.trim() }
-            : {}),
-        });
-        if (result.upgradedInPlace) {
-          toast.success("Plan updated", {
-            description:
-              "Your subscription was changed in place. Stripe may email a proration receipt for the difference.",
-            duration: 10_000,
-          });
-        }
-        window.location.href = result.url;
-      } catch (e) {
-        const message =
-          e instanceof Error ? e.message : "Unable to start checkout.";
-        toast.error("Could not start checkout", {
-          description: message,
-          duration: 12_000,
-        });
-        setPendingPlan(null);
-      }
+    const params = new URLSearchParams({
+      plan: planId,
+      period,
     });
+    const hasPaidPlan =
+      currentPlanHighlightId != null && currentPlanHighlightId !== "free";
+    const promo = promotionCode.trim();
+    if (promo && !hasPaidPlan) params.set("promo", promo);
+    router.push(`/pricing/checkout?${params.toString()}`);
   }
 
   const isCurrentPlan = (planId: string) => {
@@ -298,47 +293,15 @@ export function PricingContent({
   return (
     <div className="space-y-8">
       <div className="overflow-hidden rounded-xl border border-border/80 bg-card/40">
-        <div className="flex flex-col gap-4 border-b border-border/60 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex flex-col items-center gap-2 sm:items-start">
             <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
               Billing period
             </span>
-            <div
-              className="inline-flex rounded-lg border border-border/80 bg-muted/20 p-1"
-              role="group"
-              aria-label="Billing period"
-            >
-              <Button
-                type="button"
-                size="sm"
-                variant={period === "monthly" ? "secondary" : "ghost"}
-                className={cn(
-                  "h-8 min-w-[5.5rem] rounded-md px-4 text-sm font-medium",
-                  period === "monthly" && "shadow-sm",
-                )}
-                onClick={() => setPeriod("monthly")}
-              >
-                Monthly
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={period === "yearly" ? "secondary" : "ghost"}
-                className={cn(
-                  "h-8 min-w-[5.5rem] gap-2 rounded-md px-4 text-sm font-medium",
-                  period === "yearly" && "shadow-sm",
-                )}
-                onClick={() => setPeriod("yearly")}
-              >
-                Annual
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0 text-[10px] font-medium text-emerald-300"
-                >
-                  Save
-                </Badge>
-              </Button>
-            </div>
+            <PricingBillingPeriodToggle
+              period={period}
+              onPeriodChange={setPeriod}
+            />
           </div>
 
           <div className="flex flex-col items-center gap-2 sm:items-end">
@@ -392,33 +355,56 @@ export function PricingContent({
           </div>
         </div>
 
-        {userId ? (
-          <div className="space-y-3 px-4 py-4 sm:px-5">
-            <div className="space-y-1">
-              <Label htmlFor="checkout-promo" className="text-sm font-medium text-foreground">
-                Promotion code
-              </Label>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                Optional. Apply a public promo or affiliate code at checkout.
-              </p>
-            </div>
-            <Input
-              id="checkout-promo"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="Enter your code"
-              value={promotionCode}
-              onChange={(e) => setPromotionCode(e.target.value)}
-              className="h-10 max-w-md bg-background/80 text-sm"
-            />
-            <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-              Use the code listed for your selected tier, or a combined affiliate code made from
-              the tier&apos;s base promo plus your affiliate ID. The discount matches the plan you
-              choose at checkout.
+      </div>
+
+      <div
+        ref={promoSectionRef}
+        className="rounded-xl border border-border/80 bg-card/50 px-4 py-4 sm:px-5"
+      >
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="checkout-promo" className="text-sm font-medium text-foreground">
+              Promotion code
+            </Label>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Optional. Enter a public promo or combined affiliate code before you choose a plan.
             </p>
           </div>
-        ) : null}
+          <Input
+            id="checkout-promo"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="e.g. SUMMER26 or SummerLaunchusera1276"
+            value={promotionCode}
+            onChange={(e) => setPromotionCode(e.target.value)}
+            className="h-10 max-w-md bg-background/80 text-sm font-mono"
+          />
+          {publicPromoCodes.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="shrink-0">Active codes:</span>
+              {publicPromoCodes.map(({ code }) => (
+                <Button
+                  key={code}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 font-mono text-xs"
+                  onClick={() => setPromotionCode(code)}
+                >
+                  <span className="font-sans text-muted-foreground">Promo</span>
+                  {code}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            General codes apply to the matching tier. Affiliate codes combine the tier&apos;s base
+            promo with an affiliate ID (shown on each plan card when a sale is running). Each promo
+            can only be used once per account. Plan upgrades and downgrades use Stripe proration
+            without an additional promo. Sign in before checkout if you have not already.
+          </p>
+        </div>
       </div>
 
       {/* Plan cards grid */}
@@ -437,7 +423,6 @@ export function PricingContent({
             period={period}
             isCurrent={isCurrentPlan(plan.id)}
             userId={userId}
-            isPending={pendingPlan === plan.id}
             error={errors[plan.id] ?? null}
             onCheckout={handleCheckout}
           />

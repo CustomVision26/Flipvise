@@ -3,6 +3,7 @@ import { getAffiliateByPromotionalCode } from "@/db/queries/affiliates";
 import {
   affiliateStripeCouponId,
   buildAffiliatePlanCouponName,
+  buildCheckoutInvoiceCouponName,
   STRIPE_COUPON_NAME_MAX_LEN,
 } from "@/lib/affiliate-stripe-coupon";
 import {
@@ -15,6 +16,8 @@ import {
 } from "@/lib/plan-promo-window";
 import { stripe } from "@/lib/stripe";
 import { STRIPE_PAID_PLAN_IDS, type StripePaidPlanId } from "@/lib/billing-plan-ids";
+import { checkoutPlanNoDiscountPromoError } from "@/lib/checkout-promo-errors";
+import { assertPromoAvailableForCheckout } from "@/lib/promo-redemption";
 import type Stripe from "stripe";
 
 type PaidPlanId = StripePaidPlanId;
@@ -23,7 +26,42 @@ export type ResolvedCheckoutDiscount = {
   couponId: string | null;
   allowPromotionCodes: boolean;
   affiliateId: number | null;
+  /** Code the customer entered (or the tier’s general code when auto-applied). */
+  customerPromoCode: string | null;
+  promoKind: "general" | "affiliate" | null;
+  percentOff: number | null;
 };
+
+/** Sets Stripe coupon `name` so hosted invoices/receipts show the promo code used. */
+export async function stampStripeCouponInvoiceLabel(opts: {
+  couponId: string;
+  customerPromoCode: string;
+  kind: "general" | "affiliate";
+  percentOff: number;
+}): Promise<void> {
+  let percentOff = Math.round(opts.percentOff);
+  if (opts.kind === "general") {
+    try {
+      const coupon = await stripe.coupons.retrieve(opts.couponId);
+      if (typeof coupon.percent_off === "number" && coupon.percent_off > 0) {
+        percentOff = Math.round(coupon.percent_off);
+      }
+    } catch {
+      // Keep plan-config percent when Stripe lookup fails.
+    }
+  }
+
+  const name = buildCheckoutInvoiceCouponName({
+    customerPromoCode: opts.customerPromoCode,
+    kind: opts.kind,
+    percentOff,
+  });
+  try {
+    await stripe.coupons.update(opts.couponId, { name });
+  } catch (err) {
+    console.error("[stampStripeCouponInvoiceLabel]", opts.couponId, err);
+  }
+}
 
 function isStripeResourceMissing(err: unknown): boolean {
   return (
@@ -79,6 +117,48 @@ export async function resolveStripeCheckoutDiscountPayload(
   throw new Error(
     `No Stripe coupon or active promotion code matches "${id}". In the Stripe Dashboard, either create a Coupon with this exact id, or create a Promotion code with this customer-facing code (same Stripe mode as STRIPE_SECRET_KEY).`,
   );
+}
+
+/** Coupon id Stripe applies on the invoice (direct coupon id or promotion code’s backing coupon). */
+export async function resolveUnderlyingStripeCouponId(
+  configuredId: string,
+): Promise<string> {
+  const id = configuredId.trim();
+  if (!id) {
+    throw new Error("Discount identifier is empty.");
+  }
+
+  try {
+    await stripe.coupons.retrieve(id);
+    return id;
+  } catch (err) {
+    if (!isStripeResourceMissing(err)) throw err;
+  }
+
+  const listed = await stripe.promotionCodes.list({
+    code: id,
+    active: true,
+    limit: 1,
+  });
+  const pc = listed.data[0];
+  if (pc && promotionCodeIsUsable(pc)) {
+    const expanded = await stripe.promotionCodes.retrieve(pc.id, {
+      expand: ["promotion.coupon"],
+    });
+    const raw = expanded as unknown as Record<string, unknown>;
+    const promotion = raw.promotion as Record<string, unknown> | undefined;
+    const coupon = promotion?.coupon;
+    if (typeof coupon === "string") return coupon;
+    if (
+      coupon &&
+      typeof coupon === "object" &&
+      typeof (coupon as { id?: string }).id === "string"
+    ) {
+      return (coupon as { id: string }).id;
+    }
+  }
+
+  throw new Error(`No Stripe coupon matches "${id}".`);
 }
 
 function generalCouponDisplayName(
@@ -249,8 +329,9 @@ export async function resolveCheckoutDiscount(opts: {
   planId: string;
   promotionCodeInput: string | null | undefined;
   plansConfig: PlanConfig[];
+  userId?: string | null;
 }): Promise<ResolvedCheckoutDiscount> {
-  const { plansConfig, promotionCodeInput } = opts;
+  const { plansConfig, promotionCodeInput, userId } = opts;
   const planId = opts.planId;
 
   if (!isPaidPlanId(planId)) {
@@ -266,21 +347,45 @@ export async function resolveCheckoutDiscount(opts: {
 
   const trimmed = (promotionCodeInput ?? "").trim();
 
+  const finalize = async (
+    resolved: ResolvedCheckoutDiscount,
+  ): Promise<ResolvedCheckoutDiscount> => {
+    if (userId) {
+      await assertPromoAvailableForCheckout({
+        userId,
+        discount: resolved,
+        plansConfig,
+      });
+    }
+    return resolved;
+  };
+
   if (!trimmed) {
-    if (generalActive) {
-      return {
+    if (generalActive && planRow?.discount) {
+      return finalize({
         couponId: baseCoupon,
         allowPromotionCodes: false,
         affiliateId: null,
-      };
+        customerPromoCode: baseCoupon,
+        promoKind: "general",
+        percentOff:
+          planRow.discount.type === "percentage"
+            ? Math.round(planRow.discount.value)
+            : null,
+      });
     }
-    return { couponId: null, allowPromotionCodes: true, affiliateId: null };
+    return {
+      couponId: null,
+      allowPromotionCodes: true,
+      affiliateId: null,
+      customerPromoCode: null,
+      promoKind: null,
+      percentOff: null,
+    };
   }
 
   if (!baseCoupon) {
-    throw new Error(
-      "This plan does not have a Stripe coupon id configured in admin — entering a code is not supported for this tier.",
-    );
+    throw checkoutPlanNoDiscountPromoError(planRow?.name ?? planId);
   }
 
   const lower = trimmed.toLowerCase();
@@ -297,7 +402,17 @@ export async function resolveCheckoutDiscount(opts: {
       }
       throw new Error("This general promotion is not active for checkout.");
     }
-    return { couponId: baseCoupon, allowPromotionCodes: false, affiliateId: null };
+    return finalize({
+      couponId: baseCoupon,
+      allowPromotionCodes: false,
+      affiliateId: null,
+      customerPromoCode: trimmed,
+      promoKind: "general",
+      percentOff:
+        planRow?.discount?.type === "percentage"
+          ? Math.round(planRow.discount.value)
+          : null,
+    });
   }
 
   const affiliate = await resolveAffiliateFromCombinedPromotionInput(lower, plansConfig);
@@ -320,7 +435,14 @@ export async function resolveCheckoutDiscount(opts: {
       percent: pct,
       discontinueAt: promoEndsAt ?? planRow.discontinueAt ?? null,
     });
-    return { couponId, allowPromotionCodes: false, affiliateId: affiliate.id };
+    return finalize({
+      couponId,
+      allowPromotionCodes: false,
+      affiliateId: affiliate.id,
+      customerPromoCode: trimmed,
+      promoKind: "affiliate",
+      percentOff: pct,
+    });
   }
 
   if (lower.startsWith(baseLower)) {

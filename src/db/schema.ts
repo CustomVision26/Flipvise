@@ -386,6 +386,10 @@ export const billingInvoices = pgTable(
     discountAmountCents: integer(),
     /** Human-readable coupon/discount label (e.g. "LAUNCH50 — 50% off"). */
     discountLabel: varchar({ length: 255 }),
+    /** Customer-facing promo code entered at checkout (e.g. SUMMER26 or combined affiliate code). */
+    promoCode: varchar({ length: 128 }),
+    /** `general` or `affiliate` — distinguishes tier promo vs affiliate combined code. */
+    promoKind: varchar({ length: 16 }),
     /** Stripe-only: invoice.billing_reason (e.g. subscription_cycle, subscription_update). */
     stripeBillingReason: varchar({ length: 64 }),
     createdAt: timestamp().notNull().defaultNow(),
@@ -491,6 +495,34 @@ export const affiliateBroadcastInboxMessages = pgTable(
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [index('affiliate_broadcast_inbox_messages_recipient_idx').on(t.recipientUserId)],
+);
+
+/**
+ * Post-checkout subscription confirmation shown in the user inbox (distinct from invoice rows).
+ * One row per Stripe Checkout Session (`cs_…`).
+ */
+export const subscriptionCheckoutConfirmations = pgTable(
+  'subscription_checkout_confirmations',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    checkoutSessionId: varchar({ length: 255 }).notNull(),
+    planSlug: varchar({ length: 128 }).notNull(),
+    planLabel: varchar({ length: 128 }).notNull(),
+    /** `monthly` or `yearly` from checkout metadata. */
+    period: varchar({ length: 16 }).notNull(),
+    amountCents: integer(),
+    currency: varchar({ length: 16 }),
+    promoDisplay: varchar({ length: 255 }),
+    receiptUrl: text(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('subscription_checkout_confirmations_session_uidx').on(
+      t.checkoutSessionId,
+    ),
+    index('subscription_checkout_confirmations_user_idx').on(t.userId),
+  ],
 );
 
 /**

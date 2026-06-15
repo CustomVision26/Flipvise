@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { billingActivePlanSlug } from "@/lib/plan-metadata-billing-resolution";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 
@@ -97,7 +98,14 @@ export async function BillingInboxSection({
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">No billing receipts yet.</p>
         ) : (
-          rows.map((row) => (
+          rows.map((row) => {
+            const promoDisplay = formatUserInvoicePromoDisplay({
+              promoCode: row.promoCode,
+              promoKind: row.promoKind,
+              discountLabel: row.discountLabel,
+            });
+
+            return (
             <div
               key={row.externalId}
               className="flex flex-col gap-3 rounded-lg border border-border bg-card/50 p-4 sm:flex-row sm:items-center sm:justify-between"
@@ -117,6 +125,14 @@ export async function BillingInboxSection({
                     <p className="text-sm text-muted-foreground">
                       Subtotal: {formatAmount(row.subtotalCents, row.currency)}
                     </p>
+                    {row.discountAmountCents != null && row.discountAmountCents > 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Discount: −{formatAmount(row.discountAmountCents, row.currency)}
+                        {promoDisplay ? ` · ${promoDisplay}` : ""}
+                      </p>
+                    ) : promoDisplay ? (
+                      <p className="text-sm text-muted-foreground">{promoDisplay}</p>
+                    ) : null}
                     <p className="text-sm text-muted-foreground">
                       Tax: {formatAmount(row.taxAmountCents, row.currency)}
                     </p>
@@ -125,9 +141,19 @@ export async function BillingInboxSection({
                     </p>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {formatAmount(row.amountCents, row.currency)}
-                  </p>
+                  <div className="space-y-0.5">
+                    <p className="text-sm text-muted-foreground">
+                      {formatAmount(row.amountCents, row.currency)}
+                    </p>
+                    {row.discountAmountCents != null && row.discountAmountCents > 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Discount: −{formatAmount(row.discountAmountCents, row.currency)}
+                        {promoDisplay ? ` · ${promoDisplay}` : ""}
+                      </p>
+                    ) : promoDisplay ? (
+                      <p className="text-sm text-muted-foreground">{promoDisplay}</p>
+                    ) : null}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground">
                   {formatDate(row.paidAt ?? row.createdAt)}
@@ -170,7 +196,8 @@ export async function BillingInboxSection({
                 ) : null}
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </CardContent>
     </Card>

@@ -24,6 +24,7 @@ import type {
   SerializedAdminSubscription,
   SerializedAdminInvoice,
 } from "@/lib/admin-dashboard-types";
+import { formatAdminInvoicePromoCell } from "@/lib/admin-invoice-promo-display";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,35 @@ function formatPrice(amountCents: number | null, currency: string | null): strin
   } catch {
     return `${(amountCents / 100).toFixed(2)} ${curr}`;
   }
+}
+
+function renderPromoCodeCell(inv: SerializedAdminInvoice | undefined) {
+  if (!inv) return "—";
+  const { code, kindLabel, detail } = formatAdminInvoicePromoCell({
+    promoCode: inv.promoCode,
+    promoKind: inv.promoKind,
+    discountLabel: inv.discount,
+  });
+  if (!code && !detail) return "—";
+  return (
+    <div className="space-y-1">
+      {code ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-sm font-semibold text-emerald-500">{code}</span>
+          {kindLabel ? (
+            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+              {kindLabel}
+            </Badge>
+          ) : null}
+        </div>
+      ) : (
+        <span className="text-sm font-semibold text-emerald-500">{detail}</span>
+      )}
+      {code && detail ? (
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      ) : null}
+    </div>
+  );
 }
 
 type StatusVariant = "default" | "destructive" | "secondary" | "outline";
@@ -327,7 +357,7 @@ export function PaidSubscribersCard({
                               <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">User</TableHead>
                               <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Plan</TableHead>
                               <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Billing Period</TableHead>
-                              <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Discount</TableHead>
+                              <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Promo code</TableHead>
                               <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide text-right">Price</TableHead>
                               <TableHead className="py-4 text-sm font-semibold uppercase tracking-wide">Status</TableHead>
                             </TableRow>
@@ -335,9 +365,6 @@ export function PaidSubscribersCard({
                           <TableBody>
                             {rows.map((sub) => {
                               const inv = latestInvoiceByUser.get(sub.userId);
-                              const discount = inv
-                                ? (inv as SerializedAdminInvoice & { discount?: string | null }).discount ?? null
-                                : null;
                               return (
                                 <TableRow key={sub.userId} className="hover:bg-muted/30 transition-colors">
                                   {/* User */}
@@ -376,11 +403,9 @@ export function PaidSubscribersCard({
                                     )}
                                   </TableCell>
 
-                                  {/* Discount */}
+                                  {/* Promo code */}
                                   <TableCell className="py-5 text-sm text-muted-foreground">
-                                    {discount ? (
-                                      <span className="text-emerald-500 font-semibold">{discount}</span>
-                                    ) : "—"}
+                                    {renderPromoCodeCell(inv)}
                                   </TableCell>
 
                                   {/* Price */}

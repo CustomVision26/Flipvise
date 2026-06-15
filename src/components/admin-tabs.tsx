@@ -69,6 +69,7 @@ import type {
   SerializedPlanAssignmentLog,
   SerializedUser,
 } from "@/lib/admin-dashboard-types";
+import { formatAdminInvoicePromoCell } from "@/lib/admin-invoice-promo-display";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { TEAM_PLAN_LABELS } from "@/lib/team-plans";
 import type { PlanConfig } from "@/components/pricing-content";
@@ -142,6 +143,34 @@ function formatDateTime(dateStr: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function renderAdminInvoicePromoCell(invoice: SerializedAdminInvoice) {
+  const { code, kindLabel, detail } = formatAdminInvoicePromoCell({
+    promoCode: invoice.promoCode,
+    promoKind: invoice.promoKind,
+    discountLabel: invoice.discount,
+  });
+  if (!code && !detail) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="space-y-1">
+      {code ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-xs font-semibold text-emerald-500">{code}</span>
+          {kindLabel ? (
+            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+              {kindLabel}
+            </Badge>
+          ) : null}
+        </div>
+      ) : (
+        <span className="text-xs font-semibold text-emerald-500">{detail}</span>
+      )}
+      {code && detail ? (
+        <p className="text-[11px] text-muted-foreground">{detail}</p>
+      ) : null}
+    </div>
+  );
 }
 
 type PlanFilter = "all" | "pro" | "free";
@@ -1304,6 +1333,9 @@ export function AdminTabs({
                       "User",
                       "Email",
                       "Status",
+                      "Promo Code",
+                      "Promo Type",
+                      "Discount",
                       "Amount Due",
                       "Currency",
                       "Created",
@@ -1312,18 +1344,28 @@ export function AdminTabs({
                       "Hosted Invoice URL",
                       "Invoice PDF URL",
                     ],
-                    invoiceRows.map((row) => [
-                      row.invoiceNumber,
-                      row.userName,
-                      row.email,
-                      row.status,
-                      formatCurrencyFromCents(row.amountDue, row.currency),
-                      row.createdAt,
-                      row.periodStart,
-                      row.periodEnd,
-                      row.hostedInvoiceUrl,
-                      row.invoicePdfUrl,
-                    ]),
+                    invoiceRows.map((row) => {
+                      const promo = formatAdminInvoicePromoCell({
+                        promoCode: row.promoCode,
+                        promoKind: row.promoKind,
+                        discountLabel: row.discount,
+                      });
+                      return [
+                        row.invoiceNumber,
+                        row.userName,
+                        row.email,
+                        row.status,
+                        promo.code,
+                        promo.kindLabel,
+                        row.discount,
+                        formatCurrencyFromCents(row.amountDue, row.currency),
+                        row.createdAt,
+                        row.periodStart,
+                        row.periodEnd,
+                        row.hostedInvoiceUrl,
+                        row.invoicePdfUrl,
+                      ];
+                    }),
                   )
                 }
               >
@@ -1377,6 +1419,7 @@ export function AdminTabs({
                   <TableHead>Invoice #</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Promo code</TableHead>
                   <TableHead>Amount Due</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Period</TableHead>
@@ -1386,7 +1429,7 @@ export function AdminTabs({
               <TableBody>
                 {invoiceRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                       No invoice data returned by the billing provider yet.
                     </TableCell>
                   </TableRow>
@@ -1406,6 +1449,9 @@ export function AdminTabs({
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {invoice.status}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {renderAdminInvoicePromoCell(invoice)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap tabular-nums">
                         {formatCurrencyFromCents(invoice.amountDue, invoice.currency)}

@@ -13,6 +13,7 @@ import {
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { receiptPlanTitle } from "@/lib/stripe-receipt-plan-title";
 
 export type { PlanHistoryRow, PlanHistoryTypeLabel };
@@ -180,8 +181,6 @@ type StoredBillingInvoice = Awaited<
   ReturnType<typeof listBillingInvoicesForUser>
 >[number];
 
-const PERIOD_END_MATCH_TOLERANCE_MS = 86_400_000 * 2;
-
 function planNamesMatch(rowPlanName: string, planSlug: string): boolean {
   const normalizedRow = rowPlanName.trim().toLowerCase();
   const fromReceipt = receiptPlanTitle(planSlug).trim().toLowerCase();
@@ -189,23 +188,70 @@ function planNamesMatch(rowPlanName: string, planSlug: string): boolean {
   return normalizedRow === fromReceipt || normalizedRow === fromSlug;
 }
 
+function invoiceEventTime(inv: StoredBillingInvoice): number {
+  const raw = inv.paidAt ?? inv.periodStart ?? inv.createdAt;
+  if (raw instanceof Date) return raw.getTime();
+  if (raw) return new Date(raw).getTime();
+  return 0;
+}
+
+function latestPaidInvoiceForPlan(
+  invoices: StoredBillingInvoice[],
+  planSlug: string,
+): StoredBillingInvoice | undefined {
+  return invoices
+    .filter(
+      (inv) =>
+        inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase() &&
+        inv.status?.toLowerCase() === "paid",
+    )
+    .sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a))[0];
+}
+
 function rowCoversActiveSubscriptionPeriod(
   row: PlanHistoryRow,
   planSlug: string,
-  periodEnd: Date | null,
+  latestPaidExternalId: string | null,
+  subUpdatedAt: Date | null,
 ): boolean {
   if (row.planType === "Proration") return false;
   if (!planNamesMatch(row.planName, planSlug)) return false;
 
-  const endMs = row.endAt ? new Date(row.endAt).getTime() : null;
-  const targetEndMs = periodEnd?.getTime() ?? null;
-
-  if (targetEndMs != null && endMs != null) {
-    return Math.abs(endMs - targetEndMs) <= PERIOD_END_MATCH_TOLERANCE_MS;
+  if (latestPaidExternalId && row.id === `inv-${latestPaidExternalId}`) {
+    return true;
   }
 
-  if (endMs == null) return true;
-  return endMs > Date.now();
+  if (subUpdatedAt) {
+    const rowStart = new Date(row.startAt).getTime();
+    if (rowStart >= subUpdatedAt.getTime() - 60_000) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function inferPromoPercentFromInvoice(inv: StoredBillingInvoice): number | null {
+  const subtotal = inv.subtotalCents;
+  const discount = inv.discountAmountCents;
+  if (
+    typeof subtotal === "number" &&
+    subtotal > 0 &&
+    typeof discount === "number" &&
+    discount > 0
+  ) {
+    return Math.round((discount / subtotal) * 100);
+  }
+  return null;
+}
+
+function promoDisplayForInvoice(inv: StoredBillingInvoice): string | null {
+  return formatUserInvoicePromoDisplay({
+    promoCode: inv.promoCode,
+    promoKind: inv.promoKind,
+    discountLabel: inv.discountLabel,
+    percentOff: inferPromoPercentFromInvoice(inv),
+  });
 }
 
 function pushPaidInvoiceHistoryRow(
@@ -218,7 +264,7 @@ function pushPaidInvoiceHistoryRow(
   if (!startIso) return;
 
   rows.push({
-    id: `inv-${inv.id}`,
+    id: `inv-${inv.externalId}`,
     planName: receiptPlanTitle(inv.planSlug),
     planType,
     statusLabel: invoiceStatusLabel(inv.status),
@@ -226,6 +272,7 @@ function pushPaidInvoiceHistoryRow(
     endAt: toIsoString(inv.periodEnd),
     receiptUrl,
     receiptLabel: inv.invoiceNumber?.trim() || null,
+    promoDisplay: promoDisplayForInvoice(inv),
   });
 }
 
@@ -246,23 +293,50 @@ async function appendActiveStripeSubscriptionRow(
         ? new Date(activeSub.currentPeriodEnd)
         : null;
 
+  const subUpdatedAt =
+    activeSub.updatedAt instanceof Date
+      ? activeSub.updatedAt
+      : activeSub.updatedAt
+        ? new Date(activeSub.updatedAt)
+        : null;
+
+  const latestPaidInvoice =
+    latestPaidInvoiceForPlan(invoices, planSlug) ??
+    invoices
+      .filter((inv) => inv.status?.toLowerCase() === "paid")
+      .sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a))[0];
+
+  let paidInvoice = latestPaidInvoice;
+  if (!paidInvoice || !receiptUrlFromStoredInvoice(paidInvoice)) {
+    try {
+      const { refreshLatestPaidInvoiceForUser } = await import(
+        "@/lib/stripe-invoice-persist"
+      );
+      const refreshed = await refreshLatestPaidInvoiceForUser(userId, planSlug);
+      if (refreshed) paidInvoice = refreshed;
+    } catch (error) {
+      console.error("[plan-history] refresh latest paid invoice:", error);
+    }
+  }
+
+  const latestPaidExternalId = paidInvoice?.externalId?.trim() || null;
+
   if (
     rows.some((row) =>
-      rowCoversActiveSubscriptionPeriod(row, planSlug, periodEnd),
+      rowCoversActiveSubscriptionPeriod(
+        row,
+        planSlug,
+        latestPaidExternalId,
+        subUpdatedAt,
+      ),
     )
   ) {
     return;
   }
 
-  const latestPaidInvoice = invoices.find(
-    (inv) =>
-      inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase() &&
-      inv.status?.toLowerCase() === "paid",
-  );
-
   const startIso = toIsoString(
-    latestPaidInvoice?.periodStart ??
-      latestPaidInvoice?.paidAt ??
+    paidInvoice?.periodStart ??
+      paidInvoice?.paidAt ??
       activeSub.updatedAt ??
       activeSub.createdAt,
   );
@@ -275,15 +349,14 @@ async function appendActiveStripeSubscriptionRow(
     statusLabel:
       activeSub.status === "trialing"
         ? "Trialing"
-        : latestPaidInvoice
-          ? invoiceStatusLabel(latestPaidInvoice.status)
+        : paidInvoice
+          ? invoiceStatusLabel(paidInvoice.status)
           : "Active",
     startAt: startIso,
-    endAt: toIsoString(periodEnd ?? latestPaidInvoice?.periodEnd),
-    receiptUrl: latestPaidInvoice
-      ? receiptUrlFromStoredInvoice(latestPaidInvoice)
-      : null,
-    receiptLabel: latestPaidInvoice?.invoiceNumber?.trim() || null,
+    endAt: toIsoString(periodEnd ?? paidInvoice?.periodEnd),
+    receiptUrl: paidInvoice ? receiptUrlFromStoredInvoice(paidInvoice) : null,
+    receiptLabel: paidInvoice?.invoiceNumber?.trim() || null,
+    promoDisplay: paidInvoice ? promoDisplayForInvoice(paidInvoice) : null,
   });
 }
 
@@ -304,6 +377,15 @@ async function buildMergedPlanHistoryForUser(
   userEmail: string | null,
 ): Promise<PlanHistoryRow[]> {
   const emailLower = userEmail?.toLowerCase() ?? null;
+
+  try {
+    const { syncBillingInvoicesForUser } = await import(
+      "@/lib/stripe-invoice-persist"
+    );
+    await syncBillingInvoicesForUser(userId);
+  } catch (error) {
+    console.error("[plan-history] invoice sync:", error);
+  }
 
   const settled = await Promise.allSettled([
     listBillingInvoicesForUser(userId, emailLower),
@@ -352,12 +434,7 @@ async function buildMergedPlanHistoryForUser(
       continue;
     }
 
-    const planType: PlanHistoryTypeLabel =
-      inv.source === "invoice" && billingReason === "subscription_update"
-        ? "Proration"
-        : "Paid subscription";
-
-    pushPaidInvoiceHistoryRow(rows, inv, planType);
+    pushPaidInvoiceHistoryRow(rows, inv, "Paid subscription");
   }
 
   const prorationByInvoice = groupProrationLinesByInvoice(prorationLines);
@@ -380,6 +457,7 @@ async function buildMergedPlanHistoryForUser(
       endAt: endIso,
       receiptUrl,
       receiptLabel: receiptNumber,
+      promoDisplay: null,
     });
   }
 
@@ -399,6 +477,7 @@ async function buildMergedPlanHistoryForUser(
       endAt: toIsoString(seg.end),
       receiptUrl: null,
       receiptLabel: null,
+      promoDisplay: null,
     });
   }
 
@@ -438,6 +517,7 @@ async function buildMergedPlanHistoryForUser(
       endAt: endIso,
       receiptUrl: null,
       receiptLabel: null,
+      promoDisplay: null,
     });
   }
 
@@ -509,5 +589,6 @@ export async function appendComplimentaryAccessHistoryRows(
     endAt: null,
     receiptUrl: null,
     receiptLabel: null,
+    promoDisplay: null,
   });
 }

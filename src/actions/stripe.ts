@@ -7,9 +7,8 @@ import {
 } from "@/lib/billing-plan-ids";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { z } from "zod";
-import { promises as fs } from "fs";
-import path from "path";
-import type { PlanConfig } from "@/components/pricing-content";
+import type { PlanConfig } from "@/lib/plan-config-types";
+import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
 import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
@@ -22,6 +21,8 @@ import {
   ensureGeneralPlanStripeCoupon,
   resolveCheckoutDiscount,
   resolveStripeCheckoutDiscountPayload,
+  resolveUnderlyingStripeCouponId,
+  stampStripeCouponInvoiceLabel,
 } from "@/lib/stripe-checkout-discount";
 import {
   fetchCancelSubscriptionPreview,
@@ -29,15 +30,15 @@ import {
   type CancelSubscriptionPreview,
 } from "@/lib/stripe-cancel-subscription";
 import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
-import {
-  fetchUpgradableStripeSubscription,
-  tryUpgradeExistingStripeSubscription,
-} from "@/lib/apply-plan-upgrade";
+import { fetchUpgradableStripeSubscription } from "@/lib/apply-plan-upgrade";
+import { checkoutPlanChangeRequiredError } from "@/lib/checkout-promo-errors";
 import { personalDashboardHrefAfterCheckoutSuccess } from "@/lib/personal-dashboard-url";
+import { stripeCheckoutElementsSessionParams } from "@/lib/stripe-checkout-branding";
 import {
   isGeneralDiscountEffectivelyActive,
   resolvePlanPromoWindow,
 } from "@/lib/plan-promo-window";
+import { resolveCatalogAlignedStripePriceId } from "@/lib/stripe-catalog-price";
 
 const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
 type PaidPlanId = StripePaidPlanId;
@@ -110,14 +111,6 @@ const PLAN_FEATURES_FALLBACK: Record<PaidPlanId, string[]> = {
     "Team progress tracker",
   ],
 };
-
-async function readPlansConfig(): Promise<PlanConfig[]> {
-  const raw = await fs.readFile(
-    path.join(process.cwd(), "src", "data", "plans-config.json"),
-    "utf-8",
-  );
-  return JSON.parse(raw) as PlanConfig[];
-}
 
 /**
  * Matches `/pricing` and admin Plans editor: pulls `name` + `features` from `plans-config.json`
@@ -226,7 +219,7 @@ function checkoutActionErrorMessage(error: unknown): string {
 
 export async function createStripeCheckoutSessionAction(
   data: CreateCheckoutSessionInput,
-): Promise<{ url: string; upgradedInPlace?: boolean }> {
+): Promise<CheckoutSessionActionResult> {
   try {
     return await createStripeCheckoutSessionActionInner(data);
   } catch (error) {
@@ -234,9 +227,19 @@ export async function createStripeCheckoutSessionAction(
   }
 }
 
+export type CheckoutSessionActionResult = {
+  url?: string;
+  sessionId?: string;
+  clientSecret?: string;
+  upgradedInPlace?: boolean;
+  planLabel?: string;
+  receiptUrl?: string | null;
+  receiptIsProration?: boolean;
+};
+
 async function createStripeCheckoutSessionActionInner(
   data: CreateCheckoutSessionInput,
-): Promise<{ url: string; upgradedInPlace?: boolean }> {
+): Promise<CheckoutSessionActionResult> {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
@@ -245,59 +248,40 @@ async function createStripeCheckoutSessionActionInner(
   const { plan, period, promotionCode } = parsed.data;
 
   const appUrl = resolveAppUrl();
-  const successReturnUrl = `${appUrl}${personalDashboardHrefAfterCheckoutSuccess({
+  const successReturnPath = personalDashboardHrefAfterCheckoutSuccess({
     userId,
     purchasedPlanSlug: plan,
-  })}`;
+  });
 
-  const trimmedPromo = promotionCode?.trim() ?? "";
-  let upgradableSub = null;
-  try {
-    upgradableSub = await fetchUpgradableStripeSubscription(userId);
-  } catch (error) {
-    console.error("[createStripeCheckoutSessionAction] upgradable lookup:", error);
-  }
-
-  if (upgradableSub) {
-    if (trimmedPromo) {
-      throw new Error(
-        "Promotion codes only apply to new subscriptions. Clear the promo field to change your existing plan — Stripe will prorate automatically.",
-      );
-    }
-    try {
-      const upgraded = await tryUpgradeExistingStripeSubscription({
-        userId,
-        planSlug: plan,
-        period,
-      });
-      if (upgraded) {
-        return { url: successReturnUrl, upgradedInPlace: true };
-      }
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("already on this plan")
-      ) {
-        return { url: successReturnUrl, upgradedInPlace: true };
-      }
-      throw error;
-    }
+  const upgradable = await fetchUpgradableStripeSubscription(userId);
+  if (upgradable) {
+    throw checkoutPlanChangeRequiredError();
   }
 
   let plansConfig: PlanConfig[] = [];
   try {
-    plansConfig = await readPlansConfig();
+    plansConfig = await readPlansConfigFromDisk();
   } catch {
     // Same resilience as legacy coupon loader — checkout can proceed with fallbacks.
   }
 
-  const priceId = priceIdForPlan(plan, period);
+  const planRow = plansConfig.find((p) => p.id === plan);
+  const priceId = planRow
+    ? await resolveCatalogAlignedStripePriceId({
+        plan,
+        period,
+        monthlyPrice: planRow.monthlyPrice,
+        yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
+      })
+    : priceIdForPlan(plan, period);
+
   const description = subscriptionDescriptionFromPlansConfig(plan, period, plansConfig);
 
   const discountResolution = await resolveCheckoutDiscount({
     planId: plan,
     promotionCodeInput: promotionCode,
     plansConfig,
+    userId,
   });
 
   if (
@@ -325,8 +309,24 @@ async function createStripeCheckoutSessionActionInner(
       ? await resolveStripeCheckoutDiscountPayload(discountResolution.couponId)
       : null;
 
-  const successUrl = successReturnUrl;
-  const cancelUrl = `${appUrl}/pricing?checkout=canceled`;
+  if (
+    discountResolution.couponId != null &&
+    discountResolution.customerPromoCode != null &&
+    discountResolution.promoKind != null &&
+    discountResolution.percentOff != null
+  ) {
+    const stripeCouponId = await resolveUnderlyingStripeCouponId(
+      discountResolution.couponId,
+    );
+    await stampStripeCouponInvoiceLabel({
+      couponId: stripeCouponId,
+      customerPromoCode: discountResolution.customerPromoCode,
+      kind: discountResolution.promoKind,
+      percentOff: discountResolution.percentOff,
+    });
+  }
+
+  const returnUrl = `${appUrl}${successReturnPath}${successReturnPath.includes("?") ? "&" : "?"}checkout=success&session_id={CHECKOUT_SESSION_ID}`;
 
   const subscriptionMetadata: Record<string, string> = {
     clerkUserId: userId,
@@ -336,6 +336,10 @@ async function createStripeCheckoutSessionActionInner(
   if (discountResolution.affiliateId != null) {
     subscriptionMetadata.affiliateId = String(discountResolution.affiliateId);
   }
+  if (discountResolution.customerPromoCode && discountResolution.promoKind) {
+    subscriptionMetadata.promoCode = discountResolution.customerPromoCode;
+    subscriptionMetadata.promoKind = discountResolution.promoKind;
+  }
 
   const checkoutCustomer = await resolveCheckoutCustomerParams(userId);
 
@@ -344,6 +348,7 @@ async function createStripeCheckoutSessionActionInner(
     session = await stripe.checkout.sessions.create({
       mode: "subscription",
       ...checkoutCustomer,
+      ...stripeCheckoutElementsSessionParams(),
       line_items: [
         {
           price: priceId,
@@ -361,8 +366,7 @@ async function createStripeCheckoutSessionActionInner(
       automatic_tax: { enabled: true },
       billing_address_collection: "required",
       tax_id_collection: { enabled: true },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
+      return_url: returnUrl,
       metadata: subscriptionMetadata,
     });
   } catch (error) {
@@ -381,11 +385,14 @@ async function createStripeCheckoutSessionActionInner(
     throw error;
   }
 
-  if (!session.url) {
+  if (!session.client_secret) {
     throw new Error("Failed to create checkout session");
   }
 
-  return { url: session.url };
+  return {
+    sessionId: session.id,
+    clientSecret: session.client_secret,
+  };
 }
 
 export async function createBillingPortalSessionAction(): Promise<{

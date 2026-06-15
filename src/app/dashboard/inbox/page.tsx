@@ -13,6 +13,7 @@ import { isTeamInviteExpired } from "@/lib/team-invite-expiry";
 import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { listBillingInvoicesForUser } from "@/db/queries/billing";
+import { listSubscriptionCheckoutConfirmationsForUser } from "@/db/queries/subscription-checkout-inbox";
 import { getAllAffiliatesByEmailOrUserId } from "@/db/queries/affiliates";
 import { getInboxReadsForUser } from "@/db/queries/inbox-reads";
 import { listAdminPlanAssignmentInboxLogsForUser } from "@/db/queries/admin";
@@ -23,9 +24,11 @@ import { listSupportNotificationsForRecipient } from "@/db/queries/support-notif
 import { getSupportTicketById } from "@/db/queries/support";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
+import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
 import { supportNotificationsToInboxItems } from "@/lib/support-ticket-inbox";
+import { subscriptionCheckoutConfirmationDescription } from "@/lib/record-subscription-checkout-inbox";
 
 // UI
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -54,6 +57,7 @@ export default async function DashboardInboxPage() {
     quizEntries,
     teamInviteRows,
     billingRows,
+    subscriptionCheckoutRows,
     affiliateRows,
     adminPlanLogRows,
     adminPlanInviteRows,
@@ -65,6 +69,7 @@ export default async function DashboardInboxPage() {
     getQuizResultInboxForUser(userId),
     tryTeamQuery(() => listTeamInvitationsForInviteeEmail(inboxEmail), []),
     listBillingInvoicesForUser(userId, inboxEmail),
+    listSubscriptionCheckoutConfirmationsForUser(userId),
     getAllAffiliatesByEmailOrUserId(inboxEmail, userId),
     listAdminPlanAssignmentInboxLogsForUser(userId, 100),
     listAdminPlanInvitesForInbox(userId, 80),
@@ -199,7 +204,40 @@ export default async function DashboardInboxPage() {
     });
   }
 
-  // 3. Billing invoices
+  // 3. Subscription checkout confirmations
+  for (const row of subscriptionCheckoutRows) {
+    const key = `subscription_confirmed:${row.id}`;
+    const isRead = readSet.has(key);
+    const period = row.period === "yearly" ? "yearly" : "monthly";
+
+    items.push({
+      type: "subscription_confirmed",
+      key,
+      title: `Subscription confirmed — ${row.planLabel}`,
+      description: subscriptionCheckoutConfirmationDescription({
+        period: row.period,
+        amountCents: row.amountCents ?? null,
+        currency: row.currency ?? null,
+        promoDisplay: row.promoDisplay ?? null,
+      }),
+      dateIso: row.createdAt.toISOString(),
+      isRead,
+      requiresAction: false,
+      payload: {
+        confirmationId: row.id,
+        checkoutSessionId: row.checkoutSessionId,
+        planSlug: row.planSlug,
+        planLabel: row.planLabel,
+        period,
+        amountCents: row.amountCents ?? null,
+        currency: row.currency ?? null,
+        promoDisplay: row.promoDisplay ?? null,
+        receiptUrl: row.receiptUrl ?? null,
+      },
+    });
+  }
+
+  // 4. Billing invoices
   for (const invoice of billingRows) {
     const key = `billing:${invoice.id}`;
     const isRead = readSet.has(key);
@@ -210,12 +248,19 @@ export default async function DashboardInboxPage() {
           maximumFractionDigits: 2,
         }).format(invoice.amountCents / 100)
       : "";
+    const promoDisplay = formatUserInvoicePromoDisplay({
+      promoCode: invoice.promoCode,
+      promoKind: invoice.promoKind,
+      discountLabel: invoice.discountLabel,
+    });
 
     items.push({
       type: "billing",
       key,
       title: `Invoice${invoice.invoiceNumber ? ` #${invoice.invoiceNumber}` : ""}`,
-      description: [amountText, invoice.status].filter(Boolean).join(" · "),
+      description: [amountText, invoice.status, promoDisplay]
+        .filter(Boolean)
+        .join(" · "),
       dateIso: (invoice.paidAt ?? invoice.createdAt).toISOString(),
       isRead,
       requiresAction: false,
@@ -228,6 +273,7 @@ export default async function DashboardInboxPage() {
         hostedInvoiceUrl: invoice.hostedInvoiceUrl ?? null,
         invoicePdfUrl: invoice.invoicePdfUrl ?? null,
         paidAtIso: invoice.paidAt?.toISOString() ?? null,
+        promoDisplay,
       },
     });
   }
@@ -448,7 +494,7 @@ export default async function DashboardInboxPage() {
             )}
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Quiz results, team invitations, billing, affiliate invites and notices, affiliate admin
+            Quiz results, team invitations, subscription confirmations, billing, affiliate invites and notices, affiliate admin
             broadcasts, administrator plan requests, completed plan changes, and support replies.
           </p>
         </div>

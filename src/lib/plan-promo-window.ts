@@ -1,4 +1,4 @@
-import type { PlanConfig } from "@/components/pricing-content";
+import type { PlanConfig } from "@/lib/plan-config-types";
 
 /** Local datetime stored as `YYYY-MM-DDTHH:mm` (admin schedule). */
 export const PROMO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;

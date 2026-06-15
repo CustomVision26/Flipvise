@@ -22,6 +22,7 @@ import {
   ArrowDownUp,
   ExternalLink,
   Mail,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Dialog,
@@ -77,6 +78,9 @@ function formatAmount(cents: number | null, currency: string | null): string {
 const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   quiz_result: <BookCheck className="size-4 text-purple-400" aria-hidden />,
   team_invite: <Users className="size-4 text-blue-400" aria-hidden />,
+  subscription_confirmed: (
+    <CheckCircle2 className="size-4 text-emerald-400" aria-hidden />
+  ),
   billing: <Receipt className="size-4 text-emerald-400" aria-hidden />,
   affiliate: <Megaphone className="size-4 text-amber-400" aria-hidden />,
   affiliate_broadcast: <Mail className="size-4 text-amber-400" aria-hidden />,
@@ -95,13 +99,14 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
       const typeOrder: Record<InboxItemType, number> = {
         team_invite: 0,
         admin_plan_invite: 1,
-        quiz_result: 2,
-        billing: 3,
-        affiliate: 4,
-        affiliate_broadcast: 5,
-        affiliate_notice: 6,
-        admin_plan_log: 7,
-        quiz_security_notice: 8,
+        subscription_confirmed: 2,
+        quiz_result: 3,
+        billing: 4,
+        affiliate: 5,
+        affiliate_broadcast: 6,
+        affiliate_notice: 7,
+        admin_plan_log: 8,
+        quiz_security_notice: 9,
         support_ticket: 1,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
@@ -487,6 +492,14 @@ function InboxItemRow({
                     : "Direct update"}
               </Badge>
             )}
+            {item.type === "subscription_confirmed" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-emerald-500/40 text-xs text-emerald-400"
+              >
+                Confirmed
+              </Badge>
+            )}
             {item.type === "billing" && (
               <Badge variant="outline" className="shrink-0 text-xs capitalize">
                 {item.payload.status}
@@ -539,6 +552,18 @@ function InboxItemRow({
 
         {item.type === "team_invite" && (
           <TeamInviteActions item={item} onMutate={onMutate} />
+        )}
+
+        {item.type === "subscription_confirmed" && item.payload.receiptUrl && (
+          <a
+            href={item.payload.receiptUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+          >
+            <ExternalLink className="size-3" aria-hidden />
+            Receipt
+          </a>
         )}
 
         {item.type === "billing" && (
