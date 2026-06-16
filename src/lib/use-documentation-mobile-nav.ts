@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNarrowViewport } from "@/lib/use-narrow-viewport";
 
-/** Mobile / narrow layout: TOC list vs content panel (master–detail). */
+/** Mobile / narrow layout: topic list vs content panel (master–detail). */
 export function useDocumentationMobileNav(options: {
   mounted: boolean;
   activeId: string | null;
@@ -13,39 +13,49 @@ export function useDocumentationMobileNav(options: {
   const [mobileContentOpen, setMobileContentOpen] = useState(false);
 
   useEffect(() => {
-    if (!mounted || !isNarrow) return;
+    if (!isNarrow) {
+      setMobileContentOpen(false);
+      return;
+    }
+    if (!mounted) return;
     if (activeId) {
       setMobileContentOpen(true);
     }
-  }, [mounted, isNarrow, activeId]);
-
-  useEffect(() => {
-    if (!isNarrow) {
-      setMobileContentOpen(false);
-    }
-  }, [isNarrow]);
+  }, [mounted, activeId, isNarrow]);
 
   const openMobileContent = useCallback(() => {
-    if (isNarrow) {
-      setMobileContentOpen(true);
-    }
-  }, [isNarrow]);
+    setMobileContentOpen(true);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, []);
 
   const closeMobileContent = useCallback(() => {
     setMobileContentOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const showToc = !isNarrow || !mobileContentOpen;
-  const showContent = !isNarrow || mobileContentOpen;
-  const showMobileBack = isNarrow && mobileContentOpen;
-
   return {
-    isNarrow,
-    showToc,
-    showContent,
-    showMobileBack,
+    mobileContentOpen,
+    showMobileBack: mounted && mobileContentOpen,
     openMobileContent,
     closeMobileContent,
   };
+}
+
+/** Tailwind visibility: one panel on mobile, both on lg+. SSR-safe until `layoutReady`. */
+export function documentationTocAsideClass(
+  mobileContentOpen: boolean,
+  layoutReady: boolean,
+): string {
+  if (!layoutReady) return "block";
+  return mobileContentOpen ? "max-lg:hidden lg:block" : "block";
+}
+
+export function documentationContentPanelClass(
+  mobileContentOpen: boolean,
+  layoutReady: boolean,
+): string {
+  if (!layoutReady) return "max-lg:hidden lg:block";
+  return !mobileContentOpen ? "max-lg:hidden lg:block" : "block";
 }

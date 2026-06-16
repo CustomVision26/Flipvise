@@ -38,7 +38,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClientMounted } from "@/lib/use-client-mounted";
-import { useDocumentationMobileNav } from "@/lib/use-documentation-mobile-nav";
+import { useDocumentationMobileNav, documentationContentPanelClass, documentationTocAsideClass } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
 import {
   AlertCircle,
@@ -601,8 +601,7 @@ export function UserDocumentationView() {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const {
-    showToc,
-    showContent,
+    mobileContentOpen,
     showMobileBack,
     openMobileContent,
     closeMobileContent,
@@ -662,7 +661,7 @@ export function UserDocumentationView() {
         <aside
           className={cn(
             "lg:sticky lg:top-20 lg:self-start",
-            !showToc && "hidden lg:block",
+            documentationTocAsideClass(mobileContentOpen, mounted),
           )}
         >
           <div
@@ -684,7 +683,7 @@ export function UserDocumentationView() {
           </div>
         </aside>
 
-        <article className={cn("min-w-0 space-y-6", !showContent && "hidden lg:block")}>
+        <article className={cn("min-w-0 space-y-6", documentationContentPanelClass(mobileContentOpen, mounted))}>
           {showMobileBack ? (
             <DocumentationMobileBack onClick={closeMobileContent} />
           ) : null}

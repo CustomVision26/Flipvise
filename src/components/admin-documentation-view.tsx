@@ -33,7 +33,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClientMounted } from "@/lib/use-client-mounted";
-import { useDocumentationMobileNav } from "@/lib/use-documentation-mobile-nav";
+import { useDocumentationMobileNav, documentationContentPanelClass, documentationTocAsideClass } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
 import {
   AlertCircle,
@@ -463,8 +463,7 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const {
-    showToc,
-    showContent,
+    mobileContentOpen,
     showMobileBack,
     openMobileContent,
     closeMobileContent,
@@ -511,7 +510,7 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
         <aside
           className={cn(
             "lg:sticky lg:top-4 lg:self-start",
-            !showToc && "hidden lg:block",
+            documentationTocAsideClass(mobileContentOpen, mounted),
           )}
         >
           <div className="max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border border-border/70 bg-card/40 p-4 ring-1 ring-border/30">
@@ -522,7 +521,7 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
             )}
           </div>
         </aside>
-        <div className={cn("min-w-0 space-y-4", !showContent && "hidden lg:block")}>
+        <div className={cn("min-w-0 space-y-4", documentationContentPanelClass(mobileContentOpen, mounted))}>
           {showMobileBack ? (
             <DocumentationMobileBack onClick={closeMobileContent} />
           ) : null}
