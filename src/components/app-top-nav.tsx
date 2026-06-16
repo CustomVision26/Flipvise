@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, HelpCircle, Home, Mail } from "lucide-react";
-import { openHelpCenter } from "@/lib/help-center-open";
+import { BookOpen, Home, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AppTopNavProps = {
@@ -11,10 +10,6 @@ type AppTopNavProps = {
   className?: string;
   /** When true, Home and Contact Us are hidden (authenticated header). */
   signedIn?: boolean;
-  /** When false, Help Center is omitted (e.g. plain team members in team workspace). */
-  showHelpCenter?: boolean;
-  /** When true, Help Center opens the in-app sheet; otherwise links to documentation. */
-  helpCenterOpensSheet?: boolean;
 };
 
 const navItemClassName =
@@ -24,8 +19,6 @@ export function AppTopNav({
   homeHref = "/",
   className,
   signedIn = false,
-  showHelpCenter = true,
-  helpCenterOpensSheet = false,
 }: AppTopNavProps) {
   const pathname = usePathname() ?? "";
   const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
@@ -68,26 +61,6 @@ export function AppTopNav({
           <span className="sm:hidden">{shortLabel}</span>
         </Link>
       ))}
-
-      {showHelpCenter &&
-        !isGuestHomepage &&
-        (helpCenterOpensSheet ? (
-          <button
-            type="button"
-            className={navItemClassName}
-            onClick={() => openHelpCenter()}
-          >
-            <HelpCircle className="size-3.5 shrink-0 opacity-80" aria-hidden />
-            <span className="hidden sm:inline">Help Center</span>
-            <span className="sm:hidden">Help</span>
-          </button>
-        ) : (
-          <Link href="/docs#help-center-overview" className={navItemClassName}>
-            <HelpCircle className="size-3.5 shrink-0 opacity-80" aria-hidden />
-            <span className="hidden sm:inline">Help Center</span>
-            <span className="sm:hidden">Help</span>
-          </Link>
-        ))}
 
       {!signedIn && (
         <Link

@@ -13,6 +13,7 @@ import {
   USER_DOCUMENTATION_ARTICLE_COUNT,
 } from "@/data/user-documentation-articles";
 import { DocumentationSearchPanel } from "@/components/documentation-search-panel";
+import { DocumentationMobileBack } from "@/components/documentation-mobile-back";
 import {
   docArticleHash,
   parseDocArticleHash,
@@ -37,6 +38,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClientMounted } from "@/lib/use-client-mounted";
+import { useDocumentationMobileNav } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
 import {
   AlertCircle,
@@ -598,12 +600,21 @@ export function UserDocumentationView() {
   const mounted = useClientMounted();
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const {
+    showToc,
+    showContent,
+    showMobileBack,
+    openMobileContent,
+    closeMobileContent,
+  } = useDocumentationMobileNav({ mounted, activeId });
+
   const selectTarget = useCallback((id: string) => {
     const nextId = id || null;
     setActiveId(nextId);
     const hash = nextId ? `#${nextId}` : "";
     window.history.replaceState(null, "", `${window.location.pathname}${hash}`);
-  }, []);
+    openMobileContent();
+  }, [openMobileContent]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -648,7 +659,12 @@ export function UserDocumentationView() {
       )}
 
       <div className="grid items-start gap-8 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)] xl:gap-10">
-        <aside className="lg:sticky lg:top-20 lg:self-start">
+        <aside
+          className={cn(
+            "lg:sticky lg:top-20 lg:self-start",
+            !showToc && "hidden lg:block",
+          )}
+        >
           <div
             className={cn(
               "rounded-xl border border-border/70 bg-card/40 p-4 ring-1 ring-border/30",
@@ -668,7 +684,10 @@ export function UserDocumentationView() {
           </div>
         </aside>
 
-        <article className="min-w-0 space-y-6">
+        <article className={cn("min-w-0 space-y-6", !showContent && "hidden lg:block")}>
+          {showMobileBack ? (
+            <DocumentationMobileBack onClick={closeMobileContent} />
+          ) : null}
           {mounted ? (
             <DocContentPanel target={target} onSelect={selectTarget} />
           ) : (

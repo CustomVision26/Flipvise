@@ -13,7 +13,7 @@ export const HELP_CENTER_ARTICLES: DocArticle[] = [
   a(
     "help-center-overview",
     "Help Center Overview — In-Depth Guide",
-    "The Help Center is an in-app support sheet for signed-in users — opened from the ? icon in the header.",
+    "The Help Center covers categorized support tickets for signed-in users — see this guide for categories, requirements, and My tickets.",
     [
       {
         id: "navigation",

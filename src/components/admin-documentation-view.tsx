@@ -8,6 +8,7 @@ import {
   hasAdminDocumentationArticle,
 } from "@/data/admin-documentation-articles";
 import { DocumentationSearchPanel } from "@/components/documentation-search-panel";
+import { DocumentationMobileBack } from "@/components/documentation-mobile-back";
 import type { DocPage, DocSection } from "@/lib/documentation-content-types";
 import {
   docArticleHash,
@@ -32,6 +33,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClientMounted } from "@/lib/use-client-mounted";
+import { useDocumentationMobileNav } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
 import {
   AlertCircle,
@@ -460,12 +462,21 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
   const mounted = useClientMounted();
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  const {
+    showToc,
+    showContent,
+    showMobileBack,
+    openMobileContent,
+    closeMobileContent,
+  } = useDocumentationMobileNav({ mounted, activeId });
+
   const selectTarget = useCallback((id: string) => {
     const nextId = id || null;
     setActiveId(nextId);
     const hash = nextId ? `#${nextId}` : "";
     window.history.replaceState(null, "", `${window.location.pathname}${hash}`);
-  }, []);
+    openMobileContent();
+  }, [openMobileContent]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -497,7 +508,12 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
         />
       ) : null}
       <div className="grid items-start gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-4 lg:self-start">
+        <aside
+          className={cn(
+            "lg:sticky lg:top-4 lg:self-start",
+            !showToc && "hidden lg:block",
+          )}
+        >
           <div className="max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border border-border/70 bg-card/40 p-4 ring-1 ring-border/30">
             {mounted ? (
               <AdminDocToc activeId={activeId} onSelect={selectTarget} />
@@ -506,7 +522,10 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
             )}
           </div>
         </aside>
-        <div className="min-w-0 space-y-4">
+        <div className={cn("min-w-0 space-y-4", !showContent && "hidden lg:block")}>
+          {showMobileBack ? (
+            <DocumentationMobileBack onClick={closeMobileContent} />
+          ) : null}
           {mounted ? (
             <AdminDocContentPanel target={target} onSelect={selectTarget} />
           ) : (

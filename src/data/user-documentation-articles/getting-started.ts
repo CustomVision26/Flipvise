@@ -66,7 +66,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
             ["Home", "Homepage", "Personal dashboard"],
             ["Documentation", "Yes", "Yes"],
             ["Contact Us", "Top nav link", "Use /contact or inbox"],
-            ["Help Center (?)", "Docs section only", "Header icon → support sheet"],
+            ["Help Center", "Docs section", "Docs section + /contact"],
             ["Plan label", "Hidden", "Shows effective plan"],
             ["Workspace switcher", "Hidden", "Personal + team workspaces"],
             ["Inbox", "Hidden", "Badge when unread items"],
@@ -87,9 +87,9 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
       },
       {
         id: "help-inbox",
-        title: "Help Center and inbox",
+        title: "Support and inbox",
         bullets: [
-          "Help Center (?) opens a right-side sheet for categorized support tickets.",
+          "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",
           "Badge count reflects actionable unread items.",
         ],

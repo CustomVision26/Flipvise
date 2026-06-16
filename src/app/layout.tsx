@@ -169,8 +169,6 @@ export default async function RootLayout({
                       <AppTopNav
                         homeHref={dashboardHrefWithUserQuery}
                         signedIn={Boolean(userId)}
-                        showHelpCenter={!shell.hideHelpCenter}
-                        helpCenterOpensSheet={!shell.hideHelpCenter}
                       />
                     )}
                   </div>

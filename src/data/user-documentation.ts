@@ -33,13 +33,12 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Home returns to your dashboard when signed in, or the homepage when signed out.",
           "Documentation opens this guide.",
-          "Help Center opens the in-app support sheet when signed in, or jumps to the Help Center section in this guide for guests on Documentation or Contact pages.",
           "Contact Us appears in the top nav for guests only — it opens the public Contact Support page with live chat.",
-          "Signed-in users see Documentation and Help Center in the nav (not Contact Us); visit /contact directly or use the link in this guide.",
-          "Guest homepage nav shows Contact Us only; on /docs or /contact you also see Home, Documentation, and Help Center.",
+          "Signed-in users see Documentation in the nav (not Contact Us); visit /contact directly or use the link in this guide.",
+          "Guest homepage nav shows Contact Us only; on /docs or /contact you also see Home and Documentation.",
           "Signed-in users also see plan label, workspace switcher, inbox, and account menu.",
         ],
-        requirements: ["Signed in for inbox, help center, and account controls."],
+        requirements: ["Signed in for inbox and account controls."],
         doNots: [
           "Do not rely on browser back alone after switching workspaces — use the workspace switcher.",
         ],
@@ -218,7 +217,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Side panel for submitting support tickets and tracking replies without leaving Flipvise.",
         howItWorks: [
-          "Click the question-mark icon in the header to open the Help Center sheet (slides in from the right).",
+          "Open the Help Center section in Documentation (/docs#help-center-overview) for ticket categories and workflows.",
           "The landing screen lists every ticket category — tap a row to open its form.",
           "Use ← Back in the sheet header to return to the category list.",
           "Closing the sheet resets to the landing screen.",
@@ -233,7 +232,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not submit the same issue in multiple categories — pick the best match.",
           "Do not include passwords, full payment card numbers, or secret API keys in any ticket.",
-          "Do not expect Help Center on pages where the header help icon is hidden.",
+          "Do not expect Help Center while plain team members are actively viewing a team workspace.",
         ],
       },
       {
@@ -479,7 +478,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Choose the right support channel: public live chat on Contact Us or categorized in-app tickets in Help Center.",
         howItWorks: [
           "Contact Us (/contact): public page, live chat thread, available to guests and signed-in users; best for general outreach or when not signed in.",
-          "Help Center (header ? icon when signed in): categorized tickets (Support, Bug Report, Feature Request, Feedback, Billing, Account) with optional attachments.",
+          "Help Center (Documentation → Help Center section): categorized tickets (Support, Bug Report, Feature Request, Feedback, Billing, Account) with optional attachments.",
           "Help Center My tickets tracks formal ticket threads with resolve/reopen — separate from Contact Us live chat.",
           "Priority Support (Pro Plus / team tier) appears inside Help Center, not on Contact Us.",
           "Contact details (email, phone, social) on /contact are managed by platform administrators and apply to both channels.",
