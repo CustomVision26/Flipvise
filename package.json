@@ -41,6 +41,10 @@
     "db:verify-s3": "tsx scripts/verify-s3-setup.ts",
     "stripe:cancel-duplicate-subs": "tsx scripts/cancel-duplicate-stripe-subs.ts",
     "stripe:reconcile-duplicate-subs": "tsx scripts/reconcile-duplicate-stripe-subs.ts",
+    "docs:validate": "tsx scripts/documentation-sync.ts validate",
+    "docs:baseline": "tsx scripts/documentation-sync.ts baseline",
+    "docs:stale": "tsx scripts/documentation-sync.ts stale",
+    "prebuild": "npm run docs:validate",
     "lint": "eslint",
     "logo:transparent": "node scripts/remove-logo-background.cjs"
   },
