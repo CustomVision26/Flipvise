@@ -5,10 +5,15 @@ import { resolve } from "node:path";
 import type { DocPage } from "@/lib/documentation-content-types";
 import type { DocArticle } from "@/lib/user-documentation-article-types";
 
-export const DOCUMENTATION_SYNC_VERSION = 1;
+export const DOCUMENTATION_SYNC_VERSION = 2;
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+/** Normalize so Windows (CRLF) and Linux (LF) deployments produce identical fingerprints. */
+function normalizeFileContent(content: string): string {
+  return content.replace(/\r\n/g, "\n");
 }
 
 export function fingerprintWatchPaths(paths: readonly string[], rootDir: string): string {
@@ -19,7 +24,7 @@ export function fingerprintWatchPaths(paths: readonly string[], rootDir: string)
       chunks.push(`${relativePath}:missing`);
       continue;
     }
-    const content = readFileSync(absolutePath, "utf8");
+    const content = normalizeFileContent(readFileSync(absolutePath, "utf8"));
     chunks.push(`${relativePath}:${sha256(content)}`);
   }
   return sha256(chunks.join("\n"));

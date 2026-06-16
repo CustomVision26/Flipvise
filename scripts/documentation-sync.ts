@@ -16,6 +16,7 @@ import {
 
 const rootDir = process.cwd();
 const command = process.argv[2] ?? "validate";
+const isCi = command === "validate-ci";
 
 function printIssues(result: ReturnType<typeof validateDocumentationSync>): void {
   for (const issue of result.issues) {
@@ -26,8 +27,9 @@ function printIssues(result: ReturnType<typeof validateDocumentationSync>): void
 }
 
 switch (command) {
-  case "validate": {
-    const result = validateDocumentationSync({ rootDir, checkStale: true });
+  case "validate":
+  case "validate-ci": {
+    const result = validateDocumentationSync({ rootDir, checkStale: !isCi });
     printIssues(result);
     if (!result.ok) {
       console.error(
@@ -62,6 +64,8 @@ switch (command) {
   }
 
   default:
-    console.error(`Unknown command: ${command}\nUsage: tsx scripts/documentation-sync.ts [validate|baseline|stale]`);
+    console.error(
+      `Unknown command: ${command}\nUsage: tsx scripts/documentation-sync.ts [validate|validate-ci|baseline|stale]`,
+    );
     process.exit(1);
 }
