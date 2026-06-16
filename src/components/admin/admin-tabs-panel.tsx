@@ -29,6 +29,9 @@ export async function AdminTabsPanel({
       invoices={data.invoices}
       supportTickets={data.supportTickets}
       supportStats={data.supportStats}
+      contactSettings={data.contactSettings}
+      contactMessages={data.contactMessages}
+      contactUsStats={data.contactUsStats}
       supportNotifications={supportAlerts.notifications}
       supportUnreadCount={supportAlerts.unreadCount}
       plansConfig={data.plansConfig}

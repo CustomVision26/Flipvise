@@ -5,6 +5,7 @@ import { Poppins } from "next/font/google";
 import Image from "next/image";
 import { AppProviders } from "@/components/app-providers";
 import { HeaderLogo } from "@/components/header-logo";
+import { AppTopNav } from "@/components/app-top-nav";
 import { AuthenticatedShellChrome } from "@/components/authenticated-shell-chrome";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,6 +33,10 @@ import "./globals.css";
 /** Turbopack: avoid static SSR import of these client chunks from the root layout. */
 const TeamAdminHeaderSwitcherClient = dynamic(
   () => import("@/components/team-admin-header-switcher-client"),
+  { loading: () => null },
+);
+const HelpCenter = dynamic(
+  () => import("@/components/help-center").then((mod) => mod.HelpCenter),
   { loading: () => null },
 );
 const poppins = Poppins({
@@ -77,6 +82,7 @@ export default async function RootLayout({
     isPro,
     activeTeamPlan,
     hasProPlusInterfacePalette,
+    hasPrioritySupport,
     hasClerkPersonalPro,
     hasClerkPersonalProPlus,
   } = access;
@@ -157,8 +163,16 @@ export default async function RootLayout({
                       : "grid grid-cols-[1fr_auto_1fr] items-center border-b border-border px-3 py-2 sm:px-6 sm:py-3 relative z-10 gap-2"
                   }
                 >
-                  <div className="flex min-w-0 items-center gap-2 justify-self-start">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start">
                     <HeaderLogo dashboardHref={dashboardHrefWithUserQuery} />
+                    {!isTeamInviteRoute && (
+                      <AppTopNav
+                        homeHref={dashboardHrefWithUserQuery}
+                        signedIn={Boolean(userId)}
+                        showHelpCenter={!shell.hideHelpCenter}
+                        helpCenterOpensSheet={!shell.hideHelpCenter}
+                      />
+                    )}
                   </div>
                   {!isTeamInviteRoute &&
                     userId &&
@@ -175,7 +189,6 @@ export default async function RootLayout({
                       <HeaderUserSection
                         currentProTheme={proUiThemeSelection}
                         currentFreeTheme={freeUiThemeSelection}
-                        hideHelpCenter={shell.hideHelpCenter}
                         showWorkspaceSwitcher={shell.showWorkspaceSwitcher}
                         workspaceTeams={shell.workspaceTeams}
                         workspaceTeamsTotalEligible={
@@ -201,6 +214,12 @@ export default async function RootLayout({
                     </div>
                   )}
                 </header>
+                {userId && !isTeamInviteRoute && !shell.hideHelpCenter ? (
+                  <HelpCenter
+                    showPrioritySupport={hasPrioritySupport}
+                    showTrigger={false}
+                  />
+                ) : null}
                 <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
                   <Image
                     src={LOGO_PUBLIC_URL}

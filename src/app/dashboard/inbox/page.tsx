@@ -21,7 +21,11 @@ import { listAdminPlanInvitesForInbox } from "@/db/queries/admin-plan-invites";
 import { listAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
 import { getQuizSecurityInboxForUser } from "@/db/queries/quiz-security";
 import { listSupportNotificationsForRecipient } from "@/db/queries/support-notifications";
+import { listContactUsNotificationsForRecipient } from "@/db/queries/contact-us-notifications";
+import { getContactUsMessageById } from "@/db/queries/contact-us";
 import { getSupportTicketById } from "@/db/queries/support";
+import { getAccessContext } from "@/lib/access";
+import { contactUsNotificationsToInboxItems } from "@/lib/contact-us-inbox";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
@@ -53,6 +57,9 @@ export default async function DashboardInboxPage() {
   const { userId } = await auth();
   if (!userId) redirect("/");
 
+  const access = await getAccessContext();
+  const isPlatformAdmin = access.isAdmin;
+
   // ── Fetch everything in parallel ──────────────────────────────────────────
   const [
     quizEntries,
@@ -65,6 +72,7 @@ export default async function DashboardInboxPage() {
     affiliateBroadcastRows,
     quizSecurityInboxRows,
     supportNotificationRows,
+    contactUsNotificationRows,
     readSet,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
@@ -77,6 +85,9 @@ export default async function DashboardInboxPage() {
     tryTeamQuery(() => listAffiliateBroadcastInboxForUser(userId), []),
     tryTeamQuery(() => getQuizSecurityInboxForUser(userId), []),
     listSupportNotificationsForRecipient(userId, 50),
+    isPlatformAdmin
+      ? listContactUsNotificationsForRecipient(userId, 50).catch(() => [])
+      : listContactUsNotificationsForRecipient(userId, 50).catch(() => []),
     getInboxReadsForUser(userId),
   ]);
 
@@ -479,6 +490,27 @@ export default async function DashboardInboxPage() {
     }),
   );
   items.push(...supportNotificationsToInboxItems(supportNotificationRows, supportTicketsById));
+
+  const contactMessageIds = [
+    ...new Set(contactUsNotificationRows.map((r) => r.messageId)),
+  ];
+  const contactMessagesById = new Map<
+    number,
+    NonNullable<Awaited<ReturnType<typeof getContactUsMessageById>>>
+  >();
+  await Promise.all(
+    contactMessageIds.map(async (messageId) => {
+      const message = await getContactUsMessageById(messageId);
+      if (message) contactMessagesById.set(messageId, message);
+    }),
+  );
+  items.push(
+    ...contactUsNotificationsToInboxItems(
+      contactUsNotificationRows,
+      contactMessagesById,
+      { forAdmin: isPlatformAdmin },
+    ),
+  );
 
   const unreadCount = items.filter((i) => !i.isRead).length;
 

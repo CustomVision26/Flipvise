@@ -7,6 +7,7 @@ import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
 import { countUnreadSubscriptionCheckoutConfirmationsForUser } from "@/db/queries/subscription-checkout-inbox";
 import { countUnreadSupportNotificationsForRecipient } from "@/db/queries/support-notifications";
+import { countUnreadContactUsNotificationsForRecipient } from "@/db/queries/contact-us-notifications";
 import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import type { AccessContext } from "@/lib/access";
 import {
@@ -155,9 +156,16 @@ export async function loadRootLayoutShellData(input: {
               () => 0,
             ),
             countUnreadSupportNotificationsForRecipient(userId).catch(() => 0),
+            isAdmin
+              ? countUnreadContactUsNotificationsForRecipient(userId).catch(() => 0)
+              : Promise.resolve(0),
           ]).then(
-            ([invites, affiliateBroadcasts, subscriptionConfirmations, supportAlerts]) =>
-              invites + affiliateBroadcasts + subscriptionConfirmations + supportAlerts,
+            ([invites, affiliateBroadcasts, subscriptionConfirmations, supportAlerts, contactUsAlerts]) =>
+              invites +
+              affiliateBroadcasts +
+              subscriptionConfirmations +
+              supportAlerts +
+              contactUsAlerts,
           )
         : Promise.resolve(0),
 

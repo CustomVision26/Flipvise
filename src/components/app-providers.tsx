@@ -10,6 +10,7 @@ import { resolveLogoImageUrl } from "@/lib/branding";
 import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
+import { useClientMounted } from "@/lib/use-client-mounted";
 
 const clerkAppearance = {
   baseTheme: dark,
@@ -23,10 +24,12 @@ const clerkAppearance = {
 /** Drop legacy `system` from localStorage so only light | dark are used. */
 function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
+  const mounted = useClientMounted();
 
   React.useEffect(() => {
+    if (!mounted) return;
     if (theme === "system") setTheme("dark");
-  }, [theme, setTheme]);
+  }, [mounted, theme, setTheme]);
 
   return <>{children}</>;
 }

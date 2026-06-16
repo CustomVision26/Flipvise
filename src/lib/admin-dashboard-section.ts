@@ -6,7 +6,8 @@ export type AdminDashboardSection =
   | "admin-roles"
   | "support-center"
   | "plans"
-  | "marketing-affiliates";
+  | "marketing-affiliates"
+  | "documentation";
 
 export const DEFAULT_ADMIN_DASHBOARD_SECTION: AdminDashboardSection = "all-users";
 
@@ -15,8 +16,11 @@ export function adminDashboardSectionFromPath(pathname: string): AdminDashboardS
   if (pathname === "/admin/subscription") return "subscription";
   if (pathname === "/admin/invoices") return "invoices";
   if (pathname === "/admin/admin-roles" || pathname === "/admin/audit-log") return "admin-roles";
-  if (pathname === "/admin/support-center") return "support-center";
+  if (pathname === "/admin/support-center" || pathname.startsWith("/admin/support-center/")) {
+    return "support-center";
+  }
   if (pathname === "/admin/plans" || pathname === "/admin/plan-history" || pathname === "/admin/affiliate-messaging") return "plans";
   if (pathname === "/admin/marketing-affiliates") return "marketing-affiliates";
+  if (pathname === "/admin/documentation") return "documentation";
   return DEFAULT_ADMIN_DASHBOARD_SECTION;
 }

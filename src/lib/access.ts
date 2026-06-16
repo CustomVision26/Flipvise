@@ -30,6 +30,7 @@ import {
   type PersonalPlanResolution,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
+import { resolvePrioritySupportAccess } from "@/lib/priority-support-eligibility";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -56,6 +57,7 @@ export type AccessContext = {
   hasAI: boolean;
   /** Pro Plus semantic feature — text-to-speech / reading aids gated in UI. */
   hasAiReading: boolean;
+  /** Pro Plus personal or team-tier plan only — not standard Pro. Platform admins included. */
   hasPrioritySupport: boolean;
   hasCustomColors: boolean;
   /**
@@ -80,6 +82,20 @@ function personalPaidSlugFromStripeSlug(
 ): "pro" | "pro_plus" | null {
   if (slug === "pro" || slug === "pro_plus") return slug;
   return null;
+}
+
+function prioritySupportForAccess(input: {
+  isPlatformAdmin: boolean;
+  activeTeamPlan: TeamPlanId | null;
+  personalPlanSlug: "pro" | "pro_plus" | null | undefined;
+  hasClerkProPlusPlan: boolean;
+}): boolean {
+  return resolvePrioritySupportAccess({
+    isPlatformAdmin: input.isPlatformAdmin,
+    activeTeamPlan: input.activeTeamPlan,
+    personalPlanSlug: input.personalPlanSlug ?? null,
+    hasClerkProPlusPlan: input.hasClerkProPlusPlan,
+  });
 }
 
 function personalWorkspaceLimits(input: {
@@ -193,7 +209,6 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   const paidProFromHas = Boolean(has({ plan: "pro" }));
   const paidProPlusFromHas = Boolean(has({ plan: "pro_plus" }));
   const paidAI = Boolean(has({ feature: "ai_flashcard_generation" }));
-  const paidPrioritySupport = Boolean(has({ feature: "priority_support" }));
   const paidCustomColors = Boolean(has({ feature: "12_interface_colors" }));
   const proFeatureBundle = proBillingFeatureBundleSatisfied(has);
 
@@ -319,7 +334,12 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
         has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
         hasAiReading: aiReadingForTier(stripeSlug),
-        hasPrioritySupport: paidPrioritySupport,
+        hasPrioritySupport: prioritySupportForAccess({
+          isPlatformAdmin: false,
+          activeTeamPlan: null,
+          personalPlanSlug: personalPaidSlugFromStripeSlug(stripeSlug),
+          hasClerkProPlusPlan: paidProPlusFromHas,
+        }),
         hasCustomColors: paidCustomColors || Boolean(stripeSlug),
         hasProPlusInterfacePalette:
           paidCustomColors || personalPaidSlugFromStripeSlug(stripeSlug) === "pro_plus",
@@ -387,7 +407,12 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
           has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
           hasAI: true,
           hasAiReading: aiReadingForTier(rawBillingPlan),
-          hasPrioritySupport: paidPrioritySupport,
+          hasPrioritySupport: prioritySupportForAccess({
+            isPlatformAdmin: false,
+            activeTeamPlan: null,
+            personalPlanSlug: personalPaidSlugFromStripeSlug(rawBillingPlan),
+            hasClerkProPlusPlan: paidProPlusFromHas,
+          }),
           hasCustomColors: true,
           hasProPlusInterfacePalette:
             rawBillingPlan === "pro_plus" || paidCustomColors,
@@ -448,7 +473,12 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       jwtPaid &&
       (paidAI || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
     hasAiReading: aiReadingForTier(inferredStripeSlug),
-    hasPrioritySupport: jwtPaid && paidPrioritySupport,
+    hasPrioritySupport: prioritySupportForAccess({
+      isPlatformAdmin: unlocked,
+      activeTeamPlan: null,
+      personalPlanSlug: personalPaidSlugFromStripeSlug(inferredStripeSlug),
+      hasClerkProPlusPlan: paidProPlusFromHas,
+    }),
     hasCustomColors:
       jwtPaid &&
       (paidCustomColors || paidProFromHas || paidProPlusFromHas || proFeatureBundle),

@@ -49,15 +49,18 @@ import {
   Megaphone,
   History,
   Mail,
+  BookOpen,
 } from "lucide-react";
 import {
   AdminSupportPanel,
   type SerializedTicket,
   type SupportStats,
 } from "@/components/admin-support-panel";
+import { AdminContactUsPanel } from "@/components/admin-contact-us-panel";
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
+import { AdminDocumentationView } from "@/components/admin-documentation-view";
 import { AdminSupportNotificationsMenu } from "@/components/admin-support-notifications-menu";
 import type { SerializedSupportNotification } from "@/lib/support-ticket-dto";
 import type {
@@ -73,6 +76,11 @@ import { formatAdminInvoicePromoCell } from "@/lib/admin-invoice-promo-display";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { TEAM_PLAN_LABELS } from "@/lib/team-plans";
 import type { PlanConfig } from "@/components/pricing-content";
+import type {
+  ContactUsStats,
+  SerializedContactMessage,
+  SerializedContactSettings,
+} from "@/lib/contact-us-admin-dto";
 import {
   adminFilterInputClass,
   adminMenuCardClass,
@@ -118,6 +126,9 @@ export interface AdminTabsProps {
   invoices: SerializedAdminInvoice[];
   supportTickets: SerializedTicket[];
   supportStats: SupportStats;
+  contactSettings: SerializedContactSettings;
+  contactMessages: SerializedContactMessage[];
+  contactUsStats: ContactUsStats;
   supportNotifications: SerializedSupportNotification[];
   supportUnreadCount: number;
   plansConfig: PlanConfig[];
@@ -224,6 +235,9 @@ export function AdminTabs({
   invoices,
   supportTickets,
   supportStats,
+  contactSettings,
+  contactMessages,
+  contactUsStats,
   supportNotifications,
   supportUnreadCount,
   plansConfig,
@@ -261,7 +275,8 @@ export function AdminTabs({
     | "admin-roles"
     | "support-center"
     | "plans"
-    | "marketing-affiliates" =
+    | "marketing-affiliates"
+    | "documentation" =
     pathname === "/admin/team-workspaces"
       ? "workspace-admin"
       : pathname === "/admin/subscription"
@@ -270,7 +285,8 @@ export function AdminTabs({
           ? "invoices"
       : pathname === "/admin/admin-roles" || pathname === "/admin/audit-log"
         ? "admin-roles"
-        : pathname === "/admin/support-center"
+        : pathname === "/admin/support-center" ||
+            pathname.startsWith("/admin/support-center/")
           ? "support-center"
             : pathname === "/admin/plans" ||
                 pathname === "/admin/plan-history" ||
@@ -278,6 +294,8 @@ export function AdminTabs({
               ? "plans"
               : pathname === "/admin/marketing-affiliates"
                 ? "marketing-affiliates"
+                : pathname === "/admin/documentation"
+                  ? "documentation"
                 : "all-users";
 
   const plansSubTab =
@@ -286,6 +304,11 @@ export function AdminTabs({
       : pathname === "/admin/affiliate-messaging"
         ? "affiliate-messaging"
         : "pricing-plans";
+
+  const supportSubTab =
+    pathname === "/admin/support-center/contact-us" ? "contact-us" : "tickets";
+
+  const contactUsOpenCount = contactUsStats.openCount;
 
   const activeAffiliateCount = useMemo(
     () => affiliates.filter((a) => a.status === "active").length,
@@ -530,6 +553,16 @@ export function AdminTabs({
                     </span>
                   ) : null;
                 })()}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/documentation")}
+              className={adminMenuTabClass(activeSection === "documentation")}
+            >
+              <span className="flex w-full items-center gap-2.5">
+                <BookOpen className="h-4 w-4 shrink-0 opacity-80" />
+                <span className="truncate">Documentation</span>
               </span>
             </button>
           </CardContent>
@@ -1679,7 +1712,66 @@ export function AdminTabs({
 
       {/* ── Support Center ── */}
       {activeSection === "support-center" ? (
-        <AdminSupportPanel tickets={supportTickets} stats={supportStats} />
+        <Card className={adminSectionCardClass}>
+          <CardHeader>
+            <CardTitle>Support Center</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Monitor support tickets and manage public Contact Us settings and messages.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Tabs
+              value={supportSubTab}
+              onValueChange={(v) =>
+                router.push(
+                  v === "contact-us"
+                    ? "/admin/support-center/contact-us"
+                    : "/admin/support-center",
+                )
+              }
+              className="w-full gap-4"
+            >
+              <TabsList variant="line" className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit">
+                <TabsTrigger value="tickets" className="gap-1.5">
+                  <LifeBuoy className="h-4 w-4 shrink-0" />
+                  Tickets
+                  {supportStats.totals.openCount > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                      {supportStats.totals.openCount}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="contact-us" className="gap-1.5">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  Contact Us
+                  {contactUsOpenCount > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                      {contactUsOpenCount}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent
+                value="tickets"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
+                <AdminSupportPanel tickets={supportTickets} stats={supportStats} />
+              </TabsContent>
+
+              <TabsContent
+                value="contact-us"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
+                <AdminContactUsPanel
+                  settings={contactSettings}
+                  messages={contactMessages}
+                  stats={contactUsStats}
+                />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       ) : null}
 
       {/* ── Plans (pricing editor + assignment history) ── */}
@@ -1858,6 +1950,25 @@ export function AdminTabs({
         <AdminAffiliatesPanel
           affiliates={affiliates}
           defaultInviteExpiresInDays={affiliateInviteDefaultExpiresInDays}
+        />
+      ) : null}
+
+      {activeSection === "documentation" ? (
+        <AdminDocumentationView
+          headerSlot={
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Platform admin
+              </p>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+                Admin documentation
+              </h2>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Quick reference and in-depth guides for every Admin Menu section. Visible only to
+                platform administrators.
+              </p>
+            </div>
+          }
         />
       ) : null}
       </div>

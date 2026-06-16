@@ -1,16 +1,16 @@
 # Quick Start: Testing Billing Features
 
-## Testing Priority Support (Pro Feature)
+## Testing Priority Support (Pro Plus & team tier)
 
-1. **As Free User:**
-   - Open Settings menu (gear icon in header)
-   - Priority Support option should NOT appear
+1. **As Free or Pro user:**
+   - Open Help Center (question-mark icon in header)
+   - **Priority Support** row should NOT appear
 
-2. **As Pro User (or Admin):**
-   - Open Settings menu (gear icon in header)
-   - Click "Priority Support" menu item
-   - Dialog opens with support details and email link
-   - Click "Send Email" to compose priority support request
+2. **As Pro Plus or team-tier subscriber (or admin):**
+   - Open Help Center
+   - **Priority Support** appears first with **Pro Plus / Team** badge
+   - Tap to view benefits and email link
+   - Click **Send Email** to compose a priority support request
 
 ## Testing 12 Interface Colors (Pro Feature)
 
@@ -76,15 +76,15 @@ Admins automatically get all Pro features.
 - [x] Paid tiers — Higher personal deck caps than free (**10** Pro, **15** Pro Plus); enforced via `maxPersonalDecks` (see `personal-plan-limits.ts`)
 - [x] `75_cards_per_deck` (legacy JWT flag name) — May still appear in Clerk; numeric per-deck caps are **30** (Pro) and **52** (Pro Plus) in code
 - [x] `ai_flashcard_generation` - AI card generation for Pro users
-- [x] `priority_support` - Priority support dialog access for Pro users
+- [x] `priority_support` — Help Center Priority Support tab (Pro Plus, team tier, and admins only — not standard Pro)
 - [x] `12_interface_colors` - 12 color themes for Pro users with this feature
 
 ## Troubleshooting
 
 **Priority Support not showing:**
-- Verify user has `priority_support` feature in Clerk
-- Check `hasPrioritySupport` in browser dev tools
-- Verify admin role is set if testing as admin
+- Expected for Free and standard **Pro** — upgrade to **Pro Plus** or a **team-tier** plan
+- Verify `hasPrioritySupport` from `getAccessContext()` (layout passes it to Help Center)
+- Platform admins always qualify
 
 **Wrong card limit:**
 - Check `has75CardsPerDeck` flag

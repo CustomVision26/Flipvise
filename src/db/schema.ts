@@ -44,6 +44,23 @@ export const supportNotificationKindEnum = pgEnum('support_notification_kind', [
   'status_resolved',
 ]);
 
+export const contactUsStatusEnum = pgEnum('contact_us_status', [
+  'open',
+  'read',
+  'archived',
+]);
+
+export const contactUsAuthorRoleEnum = pgEnum('contact_us_author_role', [
+  'admin',
+  'user',
+]);
+
+export const contactUsNotificationKindEnum = pgEnum('contact_us_notification_kind', [
+  'new_message',
+  'admin_reply',
+  'user_reply',
+]);
+
 export const cardTypeEnum = pgEnum('card_type', ['standard', 'multiple_choice']);
 
 export const teamMemberRoleEnum = pgEnum('team_member_role', [
@@ -354,6 +371,78 @@ export const supportTicketNotifications = pgTable(
   (t) => [
     index('support_ticket_notifications_recipient_idx').on(t.recipientUserId),
     index('support_ticket_notifications_ticket_idx').on(t.ticketId),
+  ],
+);
+
+/** Singleton row — public contact details shown on `/contact`. */
+export const platformContactSettings = pgTable('platform_contact_settings', {
+  id: integer().primaryKey().default(1),
+  email: varchar({ length: 255 }).notNull(),
+  phone: varchar({ length: 64 }),
+  socialLinks: json().$type<
+    { platform: string; label: string; url: string }[]
+  >().notNull().default([]),
+  updatedAt: timestamp().notNull().defaultNow(),
+  updatedByUserId: varchar({ length: 255 }),
+});
+
+/** Messages submitted from the public Contact Us page. */
+export const contactUsMessages = pgTable(
+  'contact_us_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    name: varchar({ length: 255 }).notNull(),
+    email: varchar({ length: 255 }).notNull(),
+    subject: varchar({ length: 500 }).notNull(),
+    message: text().notNull(),
+    userId: varchar({ length: 255 }),
+    /** Guest thread access — required to open `/contact/thread/[id]` without sign-in. */
+    accessToken: varchar({ length: 64 }).notNull(),
+    status: contactUsStatusEnum().notNull().default('open'),
+    readAt: timestamp(),
+    readByUserId: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('contact_us_messages_status_idx').on(t.status),
+    uniqueIndex('contact_us_messages_access_token_uidx').on(t.accessToken),
+  ],
+);
+
+export const contactUsReplies = pgTable(
+  'contact_us_replies',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    messageId: integer()
+      .notNull()
+      .references(() => contactUsMessages.id, { onDelete: 'cascade' }),
+    authorUserId: varchar({ length: 255 }),
+    authorName: varchar({ length: 255 }).notNull(),
+    authorRole: contactUsAuthorRoleEnum().notNull(),
+    message: text().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('contact_us_replies_message_idx').on(t.messageId)],
+);
+
+/** In-app alerts for platform admins and users on Contact Us thread activity. */
+export const contactUsNotifications = pgTable(
+  'contact_us_notifications',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    messageId: integer()
+      .notNull()
+      .references(() => contactUsMessages.id, { onDelete: 'cascade' }),
+    kind: contactUsNotificationKindEnum().notNull().default('new_message'),
+    preview: varchar({ length: 500 }).notNull(),
+    readAt: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('contact_us_notifications_recipient_idx').on(t.recipientUserId),
+    index('contact_us_notifications_message_idx').on(t.messageId),
   ],
 );
 

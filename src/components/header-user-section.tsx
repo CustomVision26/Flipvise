@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
-import { HelpCenter } from "@/components/help-center";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
@@ -27,8 +26,6 @@ import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
 interface HeaderUserSectionProps {
   currentProTheme?: ProUiThemeId;
   currentFreeTheme?: FreeUiThemeId;
-  /** When true, Help Center is not shown (team member in team workspace mode). Off for platform admins / complimentary Pro. */
-  hideHelpCenter?: boolean;
   /** Personal vs team-tier workspace cookie for `/dashboard`. */
   showWorkspaceSwitcher?: boolean;
   workspaceTeams?: WorkspaceTeamOption[];
@@ -62,7 +59,6 @@ interface HeaderUserSectionProps {
 export function HeaderUserSection({
   currentProTheme,
   currentFreeTheme,
-  hideHelpCenter = false,
   showWorkspaceSwitcher = false,
   workspaceTeams = [],
   workspaceTeamsTotalEligible = 0,
@@ -210,12 +206,7 @@ export function HeaderUserSection({
           </>
         ) : null}
       </div>
-      {portalsReady ? (
-        <>
-          <InboxNavIconButton unreadCount={inboxUnreadCount} />
-          {!hideHelpCenter && <HelpCenter />}
-        </>
-      ) : null}
+      {portalsReady ? <InboxNavIconButton unreadCount={inboxUnreadCount} /> : null}
     </div>
   );
 }

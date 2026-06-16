@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition, useRef, useCallback } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useMemo, useState, useTransition, useRef, useCallback, useEffect } from "react";
+import { HELP_CENTER_OPEN_EVENT } from "@/lib/help-center-open";
+import { useUser } from "@clerk/nextjs";
 import {
   HelpCircle,
   MessageSquare,
@@ -638,9 +639,9 @@ function PrioritySupportContent() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2">
-        <Badge className="text-xs">Pro</Badge>
+        <Badge className="text-xs">Pro Plus / Team</Badge>
         <p className="text-sm text-muted-foreground">
-          Fast, personalized help from our support team.
+          Fast, personalized help for Pro Plus and team-tier subscribers.
         </p>
       </div>
 
@@ -768,7 +769,7 @@ const PRIORITY_TAB = {
   id: "priority",
   label: "Priority Support",
   icon: Zap,
-  description: "Fast-tracked Pro support",
+  description: "Fast-tracked support for Pro Plus & team plans",
   form: <PrioritySupportContent />,
 } as const;
 
@@ -807,7 +808,7 @@ function HelpLanding({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium leading-none">{label}</p>
-                {isPriority && <Badge className="text-[10px] px-1.5 py-0">Pro</Badge>}
+                {isPriority && <Badge className="text-[10px] px-1.5 py-0">Pro Plus / Team</Badge>}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
             </div>
@@ -821,22 +822,27 @@ function HelpLanding({
 
 // ── Root component ─────────────────────────────────────────────────────────
 
-export function HelpCenter() {
+export function HelpCenter({
+  showPrioritySupport = false,
+  showTrigger = true,
+}: {
+  /** Server-resolved: Pro Plus, team tier, or platform admin only. */
+  showPrioritySupport?: boolean;
+  /** When false, only the sheet is mounted (opened via top nav or `openHelpCenter()`). */
+  showTrigger?: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const { has } = useAuth();
   const { user } = useUser();
 
-  const hasPrioritySupport = has?.({ feature: "priority_support" }) ?? false;
   const meta = user?.publicMetadata as
     | { adminGranted?: boolean; role?: string }
     | undefined;
   const isAdmin = isClerkPlatformAdminRole(meta?.role);
-  const showPrioritySupport = hasPrioritySupport || isAdmin;
 
   const tabs = useMemo<readonly HelpTab[]>(
-    () => (showPrioritySupport ? [PRIORITY_TAB, ...BASE_TABS] : [...BASE_TABS]),
-    [showPrioritySupport],
+    () => (showPrioritySupport || isAdmin ? [PRIORITY_TAB, ...BASE_TABS] : [...BASE_TABS]),
+    [showPrioritySupport, isAdmin],
   );
 
   const activeTabData = activeTab ? tabs.find((t) => t.id === activeTab) : null;
@@ -846,20 +852,27 @@ export function HelpCenter() {
     if (!v) setActiveTab(null);
   }
 
+  useEffect(() => {
+    const openFromNav = () => setOpen(true);
+    window.addEventListener(HELP_CENTER_OPEN_EVENT, openFromNav);
+    return () => window.removeEventListener(HELP_CENTER_OPEN_EVENT, openFromNav);
+  }, []);
+
   return (
     <>
-      {/* Native title avoids Tooltip portal + Sheet portal tearing down together (removeChild race). */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 rounded-full"
-        aria-label="Open Help Center"
-        title="Help Center"
-        onClick={() => setOpen(true)}
-      >
-        <HelpCircle className="h-[18px] w-[18px]" />
-      </Button>
+      {showTrigger ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full"
+          aria-label="Open Help Center"
+          title="Help Center"
+          onClick={() => setOpen(true)}
+        >
+          <HelpCircle className="h-[18px] w-[18px]" />
+        </Button>
+      ) : null}
       <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 py-5 border-b border-border shrink-0">
@@ -878,7 +891,7 @@ export function HelpCenter() {
               {activeTabData ? activeTabData.label : "Help Center"}
             </SheetTitle>
             {activeTabData?.id === "priority" && (
-              <Badge className="text-[10px] px-1.5 py-0">Pro</Badge>
+              <Badge className="text-[10px] px-1.5 py-0">Pro Plus / Team</Badge>
             )}
           </div>
           {activeTabData && (

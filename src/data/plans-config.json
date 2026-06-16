@@ -36,14 +36,14 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": true,
+      "active": false,
       "type": "percentage",
       "value": 5,
       "label": "Summer save 2026",
       "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": true,
+      "active": false,
       "value": 10,
       "label": " "
     },
@@ -127,14 +127,14 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": true,
+      "active": false,
       "type": "percentage",
       "value": 8,
       "label": "Summer save 2026",
       "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": true,
+      "active": false,
       "value": 13,
       "label": "13 percent off"
     },
@@ -158,14 +158,14 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": true,
+      "active": false,
       "type": "percentage",
       "value": 11,
       "label": "Summer save 2026",
       "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": true,
+      "active": false,
       "value": 16,
       "label": "16 % off"
     },
@@ -189,14 +189,14 @@
     ],
     "highlighted": false,
     "discount": {
-      "active": true,
+      "active": false,
       "type": "percentage",
       "value": 15,
       "label": "Summer save 2026",
       "stripeCouponId": "SUMMER26"
     },
     "affiliateDiscount": {
-      "active": true,
+      "active": false,
       "value": 20,
       "label": "20 % off"
     },

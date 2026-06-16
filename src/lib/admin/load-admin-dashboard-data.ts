@@ -17,6 +17,18 @@ import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { evaluateAllActiveAffiliateQuotas } from "@/lib/affiliate-quota-renewal";
 import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
+import {
+  getContactUsStats,
+  getPlatformContactSettings,
+  listContactUsMessages,
+} from "@/db/queries/contact-us";
+import {
+  serializeContactMessage,
+  serializeContactSettings,
+  type ContactUsStats as ContactUsMessageStats,
+  type SerializedContactMessage,
+  type SerializedContactSettings,
+} from "@/lib/contact-us-admin-dto";
 import type { AdminDashboardSection } from "@/lib/admin-dashboard-section";
 import { getAdminClerkUserList } from "@/lib/admin/admin-clerk-cache";
 import {
@@ -156,8 +168,26 @@ export type AdminTabsData = {
   invoices: SerializedAdminInvoice[];
   supportTickets: SerializedTicket[];
   supportStats: SupportStats;
+  contactSettings: SerializedContactSettings;
+  contactMessages: SerializedContactMessage[];
+  contactUsStats: ContactUsMessageStats;
   plansConfig: PlanConfig[];
   affiliates: SerializedAffiliate[];
+};
+
+const EMPTY_CONTACT_SETTINGS: SerializedContactSettings = {
+  email: "customvision26@gmail.com",
+  phone: null,
+  socialLinks: [],
+  updatedAt: null,
+};
+
+const EMPTY_CONTACT_US_STATS: ContactUsMessageStats = {
+  total: 0,
+  openCount: 0,
+  readCount: 0,
+  archivedCount: 0,
+  thisWeekCount: 0,
 };
 
 const EMPTY_SUPPORT_STATS: SupportStats = {
@@ -178,20 +208,41 @@ export async function loadAdminTabsData(
     invoices: [],
     supportTickets: [],
     supportStats: EMPTY_SUPPORT_STATS,
+    contactSettings: EMPTY_CONTACT_SETTINGS,
+    contactMessages: [],
+    contactUsStats: EMPTY_CONTACT_US_STATS,
     plansConfig: [],
     affiliates: [],
   };
 
   switch (section) {
+    case "documentation":
+      return empty;
+
     case "support-center": {
-      const [rawSupportTickets, supportStats] = await runDbTasksWithConcurrencyLimit(
-        [() => getAllSupportTickets(), () => getSupportTicketStats()] as const,
-        2,
+      const [
+        rawSupportTickets,
+        supportStats,
+        contactSettingsRow,
+        rawContactMessages,
+        contactUsStats,
+      ] = await runDbTasksWithConcurrencyLimit(
+        [
+          () => getAllSupportTickets(),
+          () => getSupportTicketStats(),
+          () => getPlatformContactSettings(),
+          () => listContactUsMessages(),
+          () => getContactUsStats(),
+        ] as const,
+        ADMIN_DASHBOARD_DB_CONCURRENCY,
       );
       return {
         ...empty,
         supportTickets: rawSupportTickets.map(serializeSupportTicketRow),
         supportStats,
+        contactSettings: serializeContactSettings(contactSettingsRow),
+        contactMessages: rawContactMessages.map(serializeContactMessage),
+        contactUsStats,
       };
     }
 

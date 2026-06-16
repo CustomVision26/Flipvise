@@ -3,8 +3,12 @@ import { redirect } from "next/navigation";
 import { getAccessContext } from "@/lib/access";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import Image from "next/image";
+import Link from "next/link";
+import { BookOpen } from "lucide-react";
 import { HomeAuthActions } from "@/components/home-auth-actions";
 import { HomeBackground } from "@/components/home-background";
+import { AppTopNav } from "@/components/app-top-nav";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import {
   Card,
@@ -68,7 +72,14 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   return (
     <ForceDarkTheme>
-      <div className="relative flex min-h-screen flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6">
+      <div className="relative flex min-h-screen flex-1 flex-col">
+        <div className="relative z-30 border-b border-white/10 bg-black/20 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-7xl justify-center px-4 py-3 sm:px-6">
+            <AppTopNav homeHref="/" />
+          </div>
+        </div>
+
+        <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6">
         <HomeBackground />
 
         <div className="relative z-20 flex w-full max-w-2xl flex-col items-center gap-8">
@@ -102,6 +113,19 @@ export default async function Home({ searchParams }: HomePageProps) {
             <CardContent className="flex flex-col items-center gap-6 pt-6">
               <HomeAuthActions inviteEmail={inviteEmailForAuth} />
 
+              <Link
+                href="/docs"
+                className={buttonVariants({
+                  variant: "outline",
+                  size: "sm",
+                  className:
+                    "gap-1.5 border-white/20 bg-white/5 text-foreground hover:bg-white/10",
+                })}
+              >
+                <BookOpen className="size-3.5" aria-hidden />
+                Read the user documentation
+              </Link>
+
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 Flip. Learn. Master.
               </p>
@@ -129,6 +153,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               </Card>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </ForceDarkTheme>

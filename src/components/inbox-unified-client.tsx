@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { markInboxItemReadAction, markAllInboxItemsReadAction } from "@/actions/inbox";
+import { markContactUsInboxNotificationReadAction } from "@/actions/contact-us";
 import {
   acceptTeamInvitationByIdAction,
   rejectTeamInvitationByIdAction,
@@ -93,6 +95,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
   quiz_security_notice: <ShieldAlert className="size-4 text-rose-400" aria-hidden />,
   support_ticket: <LifeBuoy className="size-4 text-sky-400" aria-hidden />,
+  contact_us_message: <Mail className="size-4 text-orange-400" aria-hidden />,
 };
 
 type SortKey = "newest" | "oldest" | "type";
@@ -111,7 +114,8 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         affiliate_notice: 7,
         admin_plan_log: 8,
         quiz_security_notice: 9,
-        support_ticket: 1,
+        support_ticket: 10,
+        contact_us_message: 11,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -581,6 +585,14 @@ function InboxItemRow({
                 {item.payload.kind === "status_resolved" ? "Resolved" : "Support reply"}
               </Badge>
             )}
+            {item.type === "contact_us_message" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-orange-500/35 text-xs text-orange-400"
+              >
+                Contact Us
+              </Badge>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">{item.description}</p>
@@ -661,6 +673,17 @@ function InboxItemRow({
 
         {item.type === "support_ticket" && (
           <SupportTicketInboxDialog item={item} triggerLabel="Open thread" />
+        )}
+
+        {item.type === "contact_us_message" && (
+          <Link
+            href={item.payload.threadHref}
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+            onClick={() => onMarkRead(item)}
+          >
+            <ExternalLink className="size-3" aria-hidden />
+            {item.payload.forAdmin ? "Open in admin" : "Open chat"}
+          </Link>
         )}
 
         {/* Mark as read */}
@@ -853,8 +876,14 @@ export function InboxUnifiedClient({ items }: { items: UnifiedInboxItem[] }) {
   );
 
   function handleMarkRead(item: UnifiedInboxItem) {
-    const [type, id] = item.key.split(":");
     setSessionRead((prev) => new Set([...prev, item.key]));
+    if (item.type === "contact_us_message") {
+      markContactUsInboxNotificationReadAction({
+        notificationId: item.payload.notificationId,
+      }).catch(() => {});
+      return;
+    }
+    const [type, id] = item.key.split(":");
     markInboxItemReadAction({ itemType: type, itemId: id }).catch(() => {});
   }
 

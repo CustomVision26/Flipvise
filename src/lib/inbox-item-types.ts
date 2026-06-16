@@ -13,7 +13,8 @@ export type InboxItemType =
   | "admin_plan_log"
   | "admin_plan_invite"
   | "quiz_security_notice"
-  | "support_ticket";
+  | "support_ticket"
+  | "contact_us_message";
 
 // ── Type-specific payload shapes ──────────────────────────────────────────────
 
@@ -129,6 +130,18 @@ export type SupportTicketPayload = {
   preview: string;
 };
 
+export type ContactUsMessagePayload = {
+  notificationId: number;
+  messageId: number;
+  kind: string;
+  subject: string;
+  preview: string;
+  senderName: string | null;
+  senderEmail: string | null;
+  threadHref: string;
+  forAdmin: boolean;
+};
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type UnifiedInboxItem =
@@ -205,6 +218,16 @@ export type UnifiedInboxItem =
       isRead: boolean;
       requiresAction: boolean;
       payload: SupportTicketPayload;
+    }
+  | {
+      type: "contact_us_message";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: boolean;
+      payload: ContactUsMessagePayload;
     };
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
@@ -219,4 +242,5 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   admin_plan_invite: "Plan request",
   quiz_security_notice: "Quiz security",
   support_ticket: "Support ticket",
+  contact_us_message: "Contact Us",
 };
