@@ -116,6 +116,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Shows workspace names, member counts, and plan slug per owned team.",
           "Search and role/status filters match All Users patterns.",
           "Quiz question formats (multiple choice, true/false, fill-in-the-blank) are configured by subscribers in Team Admin → Deck Manager → Study privileges — not from this platform admin view.",
+          "Subscribers can reshuffle which format each card uses after saving formats and generating AI content where required.",
         ],
         requirements: ["Platform admin access."],
         doNots: [

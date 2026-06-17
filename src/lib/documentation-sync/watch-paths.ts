@@ -19,8 +19,13 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/decks/[deckId]/study/quiz-study.tsx",
     "src/lib/quiz-formats.ts",
     "src/lib/quiz-questions.ts",
+    "src/lib/quiz-format-assignments.ts",
   ],
-  "quiz-result-detail": ["src/app/dashboard/quiz-results/[resultId]/page.tsx"],
+  "quiz-result-detail": [
+    "src/app/dashboard/quiz-results/[resultId]/page.tsx",
+    "src/components/quiz-result-detail-view.tsx",
+    "src/lib/quiz-pdf-server.ts",
+  ],
   inbox: ["src/components/inbox-unified-client.tsx"],
   "help-center-overview": ["src/components/help-center.tsx"],
   "help-center-support": ["src/components/help-center.tsx", "src/components/contact-support-view.tsx"],
@@ -67,6 +72,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/dashboard/(team-admin)/team-admin/deck-manager/study-privileges/page.tsx",
     "src/actions/quiz-formats.ts",
     "src/lib/generate-quiz-variants-ai.ts",
+    "src/lib/quiz-format-assignments.ts",
   ],
   "invite-members": [
     "src/app/dashboard/(team-admin)/team-admin/invite-members/pending-invitations/page.tsx",

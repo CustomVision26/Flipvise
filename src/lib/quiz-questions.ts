@@ -195,17 +195,63 @@ function buildFillInBlankQuestion(card: QuizCardInput): QuizQuestion | null {
   };
 }
 
+export function getAvailableQuestionTypesForCard(
+  card: QuizCardInput,
+  allCards: QuizCardInput[],
+  formats: QuizFormatsSettings,
+): QuizQuestionType[] {
+  const types: QuizQuestionType[] = [];
+  if (formats.multipleChoice && buildMultipleChoiceQuestion(card, allCards)) {
+    types.push("multiple_choice");
+  }
+  if (formats.trueFalse && buildTrueFalseQuestion(card)) {
+    types.push("true_false");
+  }
+  if (formats.fillInBlank && buildFillInBlankQuestion(card)) {
+    types.push("fill_in_blank");
+  }
+  return types;
+}
+
+export function buildQuestionForCardType(
+  card: QuizCardInput,
+  allCards: QuizCardInput[],
+  type: QuizQuestionType,
+  formats: QuizFormatsSettings,
+): QuizQuestion | null {
+  if (type === "multiple_choice" && formats.multipleChoice) {
+    return buildMultipleChoiceQuestion(card, allCards);
+  }
+  if (type === "true_false" && formats.trueFalse) {
+    return buildTrueFalseQuestion(card);
+  }
+  if (type === "fill_in_blank" && formats.fillInBlank) {
+    return buildFillInBlankQuestion(card);
+  }
+  return null;
+}
+
 /**
  * Builds one quiz question per card, choosing randomly among enabled formats
- * that have content for that card.
+ * that have content for that card, or using admin {@link assignments} when set.
  */
 export function buildQuizQuestions(
   cards: QuizCardInput[],
   formats: QuizFormatsSettings,
+  assignments?: Record<number, QuizQuestionType> | null,
 ): QuizQuestion[] {
   const questions: QuizQuestion[] = [];
 
   for (const card of cards) {
+    const assigned = assignments?.[card.id];
+    if (assigned) {
+      const assignedQuestion = buildQuestionForCardType(card, cards, assigned, formats);
+      if (assignedQuestion) {
+        questions.push(assignedQuestion);
+        continue;
+      }
+    }
+
     const candidates: QuizQuestion[] = [];
 
     if (formats.multipleChoice) {

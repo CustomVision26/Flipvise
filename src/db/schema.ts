@@ -161,6 +161,8 @@ export const decks = pgTable('decks', {
   quizFormatMultipleChoice: boolean(),
   quizFormatTrueFalse: boolean(),
   quizFormatFillInBlank: boolean(),
+  /** Admin-reshuffled per-card quiz format assignments (see DeckQuizFormatAssignments). */
+  quizFormatAssignments: json().$type<import("@/lib/quiz-format-assignments").DeckQuizFormatAssignments>(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });

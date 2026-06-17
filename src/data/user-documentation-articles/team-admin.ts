@@ -134,12 +134,62 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "quiz-formats",
         title: "Quiz question formats (Study privileges)",
         bullets: [
-          "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks.",
+          "Route: /dashboard/team-admin/deck-manager/study-privileges",
+          "Workspace selector shows the workspace name — pick the workspace before editing defaults or per-deck overrides.",
+          "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
           "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
           "Multiple choice works from card content; true/false and fill-in-the-blank need AI-generated quiz sentences.",
-          "Save workspace or deck formats before clicking Generate AI quiz sentences.",
-          "Generation fills missing variants only — cards that already have content are skipped.",
-          "Requires Pro Plus, team-tier workspace, or platform admin; production needs a valid OpenAI API key.",
+        ],
+      },
+      {
+        id: "quiz-format-distribution",
+        title: "Questions per format (required counts)",
+        bullets: [
+          "After format checkboxes are saved, each deck shows a Questions per format panel with a live total (e.g. 7 / 10 cards).",
+          "Enter how many questions of each enabled type should appear in quizzes for that deck — counts must be whole numbers and add up to the deck’s eligible card total (cards with front and back text).",
+          "Example for a 10-card deck: Multiple choice 5, True / false 2, Fill in the blank 3 — order of entry does not matter.",
+          "Disabled formats must stay at 0; enabled formats can be 0 only if you are not using that type in the mix.",
+          "The total turns red with an error message until counts match the card total.",
+          "Saving workspace or deck format changes clears entered counts and any prior reshuffle — set counts again after saving.",
+        ],
+      },
+      {
+        id: "quiz-formats-workflow",
+        title: "Format setup workflow (save → counts → generate → reshuffle)",
+        table: {
+          headers: ["Step", "When it appears", "What it does"],
+          rows: [
+            [
+              "Save deck formats",
+              "After you change format checkboxes or toggle Use workspace defaults",
+              "Writes settings to the deck (or clears per-deck override when inheriting workspace defaults). Clears prior counts and reshuffle mix.",
+            ],
+            [
+              "Save workspace formats",
+              "After you change workspace default checkboxes",
+              "Applies defaults to inheriting decks and clears their counts and reshuffle mixes.",
+            ],
+            [
+              "Questions per format",
+              "After formats are saved and the deck has at least one eligible card",
+              "Number inputs per enabled format. Generate and Reshuffle stay hidden until counts add up to the deck total.",
+            ],
+            [
+              "Generate AI quiz sentences",
+              "After counts are valid and true/false or fill-in-the-blank is enabled but not enough cards have AI content for those counts",
+              "Creates only as many true/false and/or fill-in-the-blank variants as your counts require (not necessarily every card).",
+            ],
+            [
+              "Reshuffle format questions",
+              "After counts are valid, AI content is ready when needed, and at least two formats have a count greater than zero",
+              "Assigns exactly your requested counts across cards (e.g. 5 MCQ, 2 True/False, 3 Fill in the blank), shuffling which card gets which format. Tooltip confirms success; last reshuffled time is shown.",
+            ],
+          ],
+        },
+        bullets: [
+          "Only one action button shows at a time per deck — follow the order above.",
+          "Requires Pro Plus, team-tier workspace, or platform admin for AI generation; production needs a valid OpenAI API key.",
+          "Members see the admin’s distribution on the quiz lobby at /decks/[deckId]/study and on each question — in-progress sessions are not updated mid-quiz.",
         ],
       },
     ],

@@ -65,10 +65,27 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Multiple choice — pick the best answer from several options (uses card front/back or stored choices).",
           "True / false — decide whether an AI-generated statement is true or false.",
           "Fill in the blank — type the missing word or phrase in an AI-generated sentence.",
-          "Admins enable formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
-          "The quiz lobby lists enabled formats and estimates the mix for the current session.",
-          "Each question shows a format badge while you answer.",
-          "When multiple formats are enabled, the app picks one format per card at random for variety.",
+          "Admins enable formats and set how many questions of each type per deck in Team Admin → Deck Manager → Study privileges.",
+        ],
+      },
+      {
+        id: "quiz-lobby-mix",
+        title: "Quiz lobby and session mix",
+        bullets: [
+          "Before you start a quiz, the lobby lists which formats are enabled and how many questions of each type you will see (e.g. 5 multiple choice, 2 true/false, 3 fill in the blank).",
+          "When a team admin has entered question counts and used Reshuffle format questions, the lobby reflects that exact distribution.",
+          "Without an admin reshuffle, the lobby estimates a random mix across enabled formats.",
+          "Each question shows a format badge while you answer (Multiple choice, True / false, or Fill in the blank).",
+          "When reshuffled, each card keeps its assigned format for every member until the admin reshuffles again.",
+        ],
+      },
+      {
+        id: "quiz-results-review",
+        title: "Quiz results review",
+        bullets: [
+          "After you submit a quiz, the Review section labels each question with its format: Question N (MCQ), (True/False), or (Fill in the blank).",
+          "Saved results in your inbox and on /dashboard/quiz-results/[id] show the same format labels.",
+          "PDF exports include the format on each question line when the result was saved with format metadata.",
         ],
       },
       {
@@ -108,8 +125,18 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "What you see",
         bullets: [
           "Overall score percentage and correct/wrong/skipped counts.",
-          "Per-question answers and timing.",
+          "Per-question answers, format label (MCQ, True/False, Fill in the blank), and timing.",
+          "Expandable question cards in the review list — filter by correct, incorrect, or unanswered.",
           "Deck name and attempt timestamp.",
+        ],
+      },
+      {
+        id: "formats",
+        title: "Question format labels",
+        bullets: [
+          "Each row shows Question N (MCQ), Question N (True/False), or Question N (Fill in the blank) above the prompt.",
+          "Labels come from the question type used in that attempt (including admin-defined question counts and reshuffled deck assignments).",
+          "Older saved results from before format metadata was stored may show Question N without a parenthetical format.",
         ],
       },
       {

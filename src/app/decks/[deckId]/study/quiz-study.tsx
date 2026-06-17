@@ -100,6 +100,7 @@ import {
   summarizeSessionQuestionFormats,
   type QuizCardInput,
   type QuizQuestion,
+  type QuizQuestionType,
 } from "@/lib/quiz-questions";
 import {
   buildPerCardSnapshotForSave,
@@ -157,6 +158,8 @@ interface QuizStudyProps {
   };
   /** Enabled quiz question formats (workspace/deck resolved). */
   quizFormats?: QuizFormatsSettings;
+  /** Admin-assigned format per card; overrides random format selection. */
+  quizFormatAssignments?: Record<number, QuizQuestionType> | null;
 }
 
 type QuizSecurityStatus = NonNullable<QuizStudyProps["quizSecurity"]>["initialSession"] extends infer S
@@ -255,6 +258,7 @@ export function QuizStudy({
   quizSchedule,
   quizSecurity,
   quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
+  quizFormatAssignments = null,
 }: QuizStudyProps) {
   const router = useRouter();
   const preparedCards = useMemo(() => prepareCardsForQuiz(cards), [cards]);
@@ -279,16 +283,21 @@ export function QuizStudy({
         } as CSSProperties)
       : undefined;
 
+  const buildQuestions = useCallback(
+    () => buildQuizQuestions(preparedCards, quizFormats, quizFormatAssignments),
+    [preparedCards, quizFormats, quizFormatAssignments],
+  );
+
   const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
     restoredState
       ? questionsFromSessionState(restoredState)
-      : buildQuizQuestions(preparedCards, quizFormats),
+      : buildQuestions(),
   );
   const [currentIndex, setCurrentIndex] = useState(() => restoredState?.currentIndex ?? 0);
   const [selectedByIndex, setSelectedByIndex] = useState<(number | null)[]>(() =>
     restoredState
       ? restoredState.selectedByIndex
-      : Array(buildQuizQuestions(preparedCards, quizFormats).length).fill(null),
+      : Array(buildQuestions().length).fill(null),
   );
   const [typedAnswersByIndex, setTypedAnswersByIndex] = useState<(string | null)[]>(() => {
     if (restoredState) {
@@ -297,7 +306,7 @@ export function QuizStudy({
         Array(restoredState.questions.length).fill(null)
       );
     }
-    return Array(buildQuizQuestions(preparedCards, quizFormats).length).fill(null);
+    return Array(buildQuestions().length).fill(null);
   });
   const [voice, setVoice] = useState<TtsVoice>("nova");
 
@@ -772,7 +781,7 @@ export function QuizStudy({
 
   function handleRetake() {
     if (securityEnabled) return;
-    const fresh = buildQuizQuestions(preparedCards, quizFormats);
+    const fresh = buildQuestions();
     setQuestions(fresh);
     setSelectedByIndex(Array(fresh.length).fill(null));
     setTypedAnswersByIndex(Array(fresh.length).fill(null));

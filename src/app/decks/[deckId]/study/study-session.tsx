@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BookOpen, ListChecks } from "lucide-react";
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
+import type { QuizQuestionType } from "@/lib/quiz-questions";
 import type { CardQuizVariants } from "@/lib/card-quiz-variants";
 import type { QuizSecuritySessionState } from "@/db/schema";
 import { FlashcardStudy } from "./flashcard-study";
@@ -69,6 +70,8 @@ export interface StudySessionProps {
   };
   /** Resolved quiz question formats for this study session. */
   quizFormats?: QuizFormatsSettings;
+  /** Admin-reshuffled per-card format map; when set, quiz uses these instead of random picks. */
+  quizFormatAssignments?: Record<number, QuizQuestionType> | null;
 }
 
 export function StudySession({
@@ -89,6 +92,7 @@ export function StudySession({
   quizSchedule,
   quizSecurity,
   quizFormats,
+  quizFormatAssignments,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
   const showQuizTab = memberAllowQuiz && allowsQuizStudy;
@@ -221,6 +225,7 @@ export function StudySession({
               quizSchedule={quizSchedule}
               quizSecurity={quizSecurity}
               quizFormats={quizFormats}
+              quizFormatAssignments={quizFormatAssignments}
             />
           </TabsContent>
         ) : null}

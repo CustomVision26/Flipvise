@@ -281,7 +281,8 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Team owners and co-admins configure quiz question formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
           "Formats: multiple choice (from card content), true/false, and fill-in-the-blank (AI-generated sentences).",
-          "Platform admins troubleshooting missing true/false or fill-in-the-blank questions should verify formats are saved and AI generation completed — not Stripe or Clerk metadata.",
+          "After setup, admins can Reshuffle format questions to change which format each card uses in team quizzes.",
+          "Platform admins troubleshooting missing formats should verify settings are saved, AI generation completed, and reshuffle was run when multiple formats are enabled.",
         ],
       },
       {
