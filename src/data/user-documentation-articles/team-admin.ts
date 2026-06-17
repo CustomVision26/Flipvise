@@ -69,6 +69,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Owner row always shown with Owner (subscriber) role — cannot be removed.",
           "Columns: User, Created, Updated, Added by (inviter), Role, Actions.",
           "Inviter shows workspace owner vs team admin who sent the invite.",
+          "Double-click any member row to open a details dialog with name, email, acceptance date, role, workspace, and assigned deck names.",
         ],
       },
       {
@@ -127,6 +128,18 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "/dashboard/team-admin/deck-manager/study-privileges",
           "Change review vs quiz access per member per assigned deck.",
           "Applies to team members in the privileges table.",
+        ],
+      },
+      {
+        id: "quiz-formats",
+        title: "Quiz question formats (Study privileges)",
+        bullets: [
+          "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks.",
+          "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
+          "Multiple choice works from card content; true/false and fill-in-the-blank need AI-generated quiz sentences.",
+          "Save workspace or deck formats before clicking Generate AI quiz sentences.",
+          "Generation fills missing variants only — cards that already have content are skipped.",
+          "Requires Pro Plus, team-tier workspace, or platform admin; production needs a valid OpenAI API key.",
         ],
       },
     ],

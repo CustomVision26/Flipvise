@@ -152,7 +152,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Review flashcards and take quizzes with progress tracking.",
         howItWorks: [
           "Flashcard review flips cards and tracks familiarity.",
-          "Quiz mode presents multiple-choice or typed questions.",
+          "Quiz mode supports multiple question formats: multiple choice, true/false, and fill-in-the-blank.",
+          "The quiz start screen lists enabled formats and shows how many of each type appear in the session.",
+          "Each question shows a format badge (e.g. True / false, Fill in the blank) while you answer.",
           "Team quizzes may enforce timers, schedules, and security rules set by admins.",
           "AI Reading (text-to-speech) is available on Pro Plus when enabled.",
         ],
@@ -160,6 +162,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "At least one card in the deck.",
           "Quiz mode requires a paid or team-tier deck (above free card cap).",
           "Team members: review/quiz modes depend on admin study privileges per assignment.",
+          "True/false and fill-in-the-blank require admin-enabled formats and AI-generated quiz content on cards.",
         ],
         doNots: [
           "Do not attempt to bypass quiz security or schedule locks — contact your team admin.",
@@ -796,6 +799,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "View roster, change roles, and remove members.",
         howItWorks: [
           "List all members with roles (Member, Team Admin).",
+          "Double-click a member row to open a details dialog (name, email, acceptance date, role, workspace, assigned decks).",
           "Promote or demote co-admins.",
           "Remove members who should no longer access the workspace.",
         ],
@@ -813,11 +817,18 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Assign decks from the subscriber’s personal library to team members.",
           "Study Privileges sub-tab controls review vs quiz access per member per deck.",
+          "Study Privileges also configures quiz question formats (multiple choice, true/false, fill-in-the-blank) per workspace or per deck.",
+          "Enable true/false or fill-in-the-blank, save formats, then use Generate AI quiz sentences on each deck.",
         ],
-        requirements: ["Team owner or team_admin.", "Decks authored on personal dashboard."],
+        requirements: [
+          "Team owner or team_admin.",
+          "Decks authored on personal dashboard.",
+          "AI quiz generation: Pro Plus, team-tier workspace, or platform admin; OpenAI API key configured in production.",
+        ],
         doNots: [
           "Do not expect members to see unassigned decks.",
           "Do not disable all study modes without notifying members.",
+          "Do not click Generate before saving format checkboxes — save deck or workspace formats first.",
         ],
       },
       {

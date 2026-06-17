@@ -11,11 +11,15 @@ import {
   listPendingInvitations,
   listTeamInvitationHistoryForTeam,
   listTeamMembers,
-  countMembersForTeam,
-  countPendingInvitationsForTeam,
   getLatestInviteeDisplayNamesForTeamIds,
   roleReceivesDeckAssignments,
 } from "@/db/queries/teams";
+import {
+  countMembersWithinSubscriptionLimit,
+  enforceSubscriptionPlanLimitsForOwner,
+  teamMemberInviteCapacity,
+} from "@/db/queries/team-plan-limits";
+import { selectNewestMembersWithinMemberLimit } from "@/lib/team-plan-limit-selection";
 import {
   canonicalTeamPlanId,
   isTeamPlanId,
@@ -122,7 +126,7 @@ export default async function TeamAdminDashboardView({
     assignWorkspaceSnapshots,
   ] = await Promise.all([
     Promise.all([
-      countMembersForTeam(selected.id),
+      countMembersWithinSubscriptionLimit(selected.id, selected.planSlug),
       listTeamMembers(selected.id),
       listPendingInvitations(selected.id),
       listTeamInvitationHistoryForTeam(selected.id),
@@ -156,7 +160,10 @@ export default async function TeamAdminDashboardView({
           id: t.id,
           name: t.name,
           ownerUserId: t.ownerUserId,
-          normalMembers: allMembers.filter((m) => roleReceivesDeckAssignments(m.role)),
+          normalMembers: selectNewestMembersWithinMemberLimit(
+            allMembers.filter((m) => roleReceivesDeckAssignments(m.role)),
+            t.planSlug,
+          ),
           allMembers,
           decks,
           assignments,
@@ -202,12 +209,8 @@ export default async function TeamAdminDashboardView({
       getAccessContext(),
       Promise.all(
         teamsForSubscriber.map(async (t) => {
-          const lim = isTeamPlanId(t.planSlug)
-            ? limitsForPlan(t.planSlug)
-            : { maxMembersPerTeam: 0 };
-          const [m, p, memberRows] = await Promise.all([
-            countMembersForTeam(t.id),
-            countPendingInvitationsForTeam(t.id),
+          const [capacity, memberRows] = await Promise.all([
+            teamMemberInviteCapacity(t.planSlug, t.id),
             listTeamMembers(t.id),
           ]);
           const acceptedMemberEmails = await getClerkPrimaryEmailsByUserIds(
@@ -216,7 +219,7 @@ export default async function TeamAdminDashboardView({
           return {
             id: t.id,
             name: t.name,
-            atCapacity: m + p >= lim.maxMembersPerTeam,
+            atCapacity: capacity.atCapacity,
             acceptedMemberEmails,
           };
         }),
@@ -267,6 +270,32 @@ export default async function TeamAdminDashboardView({
     userFieldDisplayById[selected.ownerUserId]?.primaryEmail?.trim().toLowerCase() ?? null;
 
   const isOwner = selected.ownerUserId === userId;
+
+  const selectedAssignSnapshot = assignWorkspaceSnapshots.find((w) => w.id === selected.id);
+  const deckNameById = new Map(
+    (selectedAssignSnapshot?.decks ?? []).map((d) => [d.id, d.name] as const),
+  );
+  const deckNamesByMemberUserId: Record<string, string[]> = {};
+  for (const a of selectedAssignSnapshot?.assignments ?? []) {
+    const deckName = deckNameById.get(a.deckId);
+    if (!deckName) continue;
+    const existing = deckNamesByMemberUserId[a.memberUserId] ?? [];
+    if (!existing.includes(deckName)) {
+      deckNamesByMemberUserId[a.memberUserId] = [...existing, deckName];
+    }
+  }
+  for (const uid of Object.keys(deckNamesByMemberUserId)) {
+    deckNamesByMemberUserId[uid]!.sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }
+  const workspaceDeckNames = [...deckNameById.values()].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
+
+  if (isOwner && isTeamPlanId(selected.planSlug)) {
+    await enforceSubscriptionPlanLimitsForOwner(selected.ownerUserId, selected.planSlug);
+  }
 
   const ownedWorkspaceInviteOptions = inviteWorkspaceOptions.filter((opt) => {
     const t = teamsForSubscriber.find((x) => x.id === opt.id);
@@ -382,6 +411,8 @@ export default async function TeamAdminDashboardView({
           viewerTeamMemberUrlParam,
         )}
         teamName={selected.name}
+        deckNamesByMemberUserId={deckNamesByMemberUserId}
+        workspaceDeckNames={workspaceDeckNames}
         ownerUserId={selected.ownerUserId}
         teamCreatedAt={selected.createdAt}
         currentUserId={userId}

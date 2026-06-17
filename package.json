@@ -20,6 +20,7 @@
     "db:ensure-owner-quiz-enforce-column": "tsx scripts/ensure-owner-quiz-enforce-column.ts",
     "db:ensure-quiz-security-tables": "tsx scripts/ensure-quiz-security-tables.ts",
     "db:ensure-quiz-schedule-columns": "tsx scripts/ensure-quiz-schedule-columns.ts",
+    "db:ensure-quiz-question-formats": "tsx scripts/ensure-quiz-question-formats.ts",
     "db:ensure-stripe-subscriptions": "tsx scripts/ensure-stripe-subscriptions.ts",
     "db:ensure-affiliate-invite-expires-at": "tsx scripts/ensure-affiliate-invite-expires-at.ts",
     "db:ensure-affiliates-camelcase-columns": "tsx scripts/ensure-affiliates-camelcase-columns.ts",

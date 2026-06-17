@@ -1,3 +1,4 @@
+import type { CardQuizVariants } from "@/lib/card-quiz-variants";
 import { db } from "@/db";
 import { cards, decks } from "@/db/schema";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
@@ -213,4 +214,30 @@ export async function updateMultipleChoiceCard(
       updatedAt: new Date(),
     })
     .where(and(eq(cards.id, cardId), eq(cards.deckId, deckId)));
+}
+
+export async function updateCardQuizVariants(
+  cardId: number,
+  deckId: number,
+  quizVariants: CardQuizVariants | null,
+) {
+  return db
+    .update(cards)
+    .set({ quizVariants, updatedAt: new Date() })
+    .where(and(eq(cards.id, cardId), eq(cards.deckId, deckId)));
+}
+
+export async function mergeCardQuizVariants(
+  cardId: number,
+  deckId: number,
+  patch: CardQuizVariants,
+) {
+  const existing = await getCardById(cardId, deckId);
+  if (!existing) return null;
+  const merged: CardQuizVariants = {
+    ...(existing.quizVariants ?? {}),
+    ...patch,
+  };
+  await updateCardQuizVariants(cardId, deckId, merged);
+  return merged;
 }

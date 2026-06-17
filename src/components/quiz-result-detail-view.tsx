@@ -18,6 +18,7 @@ import {
   Download,
 } from "lucide-react";
 import type { PerCardSnapshot } from "@/db/schema";
+import { formatQuestionWithTypeLabel, questionTypeResultLabel } from "@/lib/quiz-questions";
 import { cn } from "@/lib/utils";
 
 export type QuizResultSummary = {
@@ -316,6 +317,9 @@ function QuizResultPerCardReview({
                       </span>
                       {statusBadge(status)}
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatQuestionWithTypeLabel(questionNumber, card.questionType)}
+                    </p>
                     <p
                       className={cn(
                         "font-semibold leading-relaxed text-foreground",
@@ -604,7 +608,10 @@ async function downloadPdf(result: QuizResultSummary) {
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(20);
-      const qText = `Q${idx + 1}.  ${card.question ?? "(no question text)"}`;
+      const formatSuffix = card.questionType
+        ? ` (${questionTypeResultLabel(card.questionType)})`
+        : "";
+      const qText = `Q${idx + 1}${formatSuffix}.  ${card.question ?? "(no question text)"}`;
       const qLines = doc.splitTextToSize(qText, contentW - 70);
       doc.text(qLines, margin, y);
 

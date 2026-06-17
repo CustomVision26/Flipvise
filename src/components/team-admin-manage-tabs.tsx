@@ -114,6 +114,10 @@ export type TeamAdminManageTabsProps = {
   quizScheduleHref: string;
   quizSecurityHref: string;
   teamName: string;
+  /** Deck names assigned to each member in this workspace (`team_members.userId` → names). */
+  deckNamesByMemberUserId: Record<string, string[]>;
+  /** All deck names linked to this workspace (for the subscriber owner row). */
+  workspaceDeckNames: string[];
   ownerUserId: string;
   teamCreatedAt: Date;
   currentUserId: string;
@@ -171,6 +175,8 @@ export function TeamAdminManageTabs({
   quizScheduleHref,
   quizSecurityHref,
   teamName,
+  deckNamesByMemberUserId,
+  workspaceDeckNames,
   ownerUserId,
   teamCreatedAt,
   currentUserId,
@@ -248,10 +254,13 @@ export function TeamAdminManageTabs({
         <TeamAdminPanelCard
           panelId={TEAM_ADMIN_PANEL_IDS.members}
           title="Members"
-          description="Change roles or remove members. Subscribers and team admins can access this dashboard."
+          description="Change roles or remove members. Double-click a row to view member details."
         >
           <TeamMemberTable
             teamId={teamId}
+            teamName={teamName}
+            deckNamesByMemberUserId={deckNamesByMemberUserId}
+            workspaceDeckNames={workspaceDeckNames}
             ownerUserId={ownerUserId}
             teamCreatedAt={teamCreatedAt}
             members={members}

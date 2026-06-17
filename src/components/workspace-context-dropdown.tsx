@@ -93,10 +93,13 @@ export function WorkspaceContextDropdown({
    * null during SSR hydration and cause a structural mismatch (removeChild crash).
    */
   const subscriberOwnsTeamTierWorkspace = React.useMemo(() => {
+    if (teamDashFallback != null) {
+      return true;
+    }
     return teams.some(
       (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
     );
-  }, [teams]);
+  }, [teams, teamDashFallback]);
 
   const subscriberOwnedTeamTierWorkspaces = React.useMemo(() => {
     return teams.filter(
@@ -225,6 +228,15 @@ export function WorkspaceContextDropdown({
     }
   }
 
+  function goToTeamAdmin(href: string) {
+    setOpen(false);
+    setQuery("");
+    requestAnimationFrame(() => {
+      router.push(href);
+      router.refresh();
+    });
+  }
+
   function teamWorkspaceMenuItem(t: TeamWorkspaceNavTeam) {
     const isActive = t.id === activeTeamId;
     const teamAdminHref = buildTeamAdminPath(t.id, t.teamMemberUrlParam);
@@ -259,22 +271,17 @@ export function WorkspaceContextDropdown({
         </span>
         {t.canAccessTeamAdmin && !shouldHidePlatformAdminNav(pathname) ? (
           <Button
-            nativeButton={false}
+            data-team-admin-dash-link
+            type="button"
             variant="secondary"
             size="sm"
             className="h-8 shrink-0 px-2 text-xs whitespace-nowrap"
-            render={
-              <Link
-                data-team-admin-dash-link
-                href={teamAdminHref}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                  setQuery("");
-                }}
-              />
-            }
+            disabled={pending || !sessionLoaded}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              goToTeamAdmin(teamAdminHref);
+            }}
           >
             To Admin Dash
           </Button>
@@ -387,23 +394,20 @@ export function WorkspaceContextDropdown({
             {teamDashTarget != null && (
                 <div className="px-2 pb-1 pt-0.5">
                   <Button
+                    type="button"
                     variant="secondary"
                     size="sm"
                     className="h-9 w-full text-xs font-medium"
-                    nativeButton={false}
-                    render={
-                      <Link
-                        href={buildTeamAdminPath(
+                    disabled={pending || !sessionLoaded}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      goToTeamAdmin(
+                        buildTeamAdminPath(
                           teamDashTarget.id,
                           teamDashTarget.teamMemberUrlParam,
-                        )}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={() => {
-                          setOpen(false);
-                          setQuery("");
-                        }}
-                      />
-                    }
+                        ),
+                      );
+                    }}
                   >
                     Team Admin Dash
                   </Button>

@@ -14,6 +14,11 @@ import {
   TEAM_PLAN_IDS,
   type TeamPlanId,
 } from "@/lib/team-plans";
+import {
+  isMemberWithinMemberLimit,
+  isTeamWithinWorkspaceLimit,
+} from "@/lib/team-plan-limit-selection";
+import { teamMemberInviteCapacity } from "@/db/queries/team-plan-limits";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 import {
@@ -21,8 +26,6 @@ import {
   MIN_TEAM_QUIZ_DURATION_MINUTES,
 } from "@/lib/team-quiz-duration";
 import {
-  countMembersForTeam,
-  countPendingInvitationsForTeam,
   countTeamsForOwner,
   deleteInvitation,
   deleteTeamMember,
@@ -175,9 +178,35 @@ const inviteSchema = z.object({
 async function assertCanManageTeam(userId: string, teamId: number) {
   const team = await getTeamById(teamId);
   if (!team) throw new Error("Team not found");
-  if (team.ownerUserId === userId) return team;
+  if (team.ownerUserId === userId) {
+    if (isTeamPlanId(team.planSlug)) {
+      const owned = await getTeamsByOwner(userId);
+      if (!isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug)) {
+        throw new Error(
+          "This workspace is not available on your current plan. Upgrade your plan or remove older workspaces to regain access.",
+        );
+      }
+    }
+    return team;
+  }
   const m = await getMemberRecord(teamId, userId);
-  if (m?.role === "team_admin") return team;
+  if (m?.role === "team_admin") {
+    if (isTeamPlanId(team.planSlug)) {
+      const owned = await getTeamsByOwner(team.ownerUserId);
+      if (!isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug)) {
+        throw new Error(
+          "This workspace is not available on the subscriber's current plan.",
+        );
+      }
+      const members = await listTeamMembers(teamId);
+      if (!isMemberWithinMemberLimit(userId, members, team.planSlug)) {
+        throw new Error(
+          "Your admin access is not available on the subscriber's current plan.",
+        );
+      }
+    }
+    return team;
+  }
   throw new Error("Forbidden");
 }
 
@@ -277,13 +306,10 @@ export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
   if (!parsed.success) throw new Error("Invalid input");
 
   const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  const limits = limitsForPlan(team.planSlug as TeamPlanId);
-
-  const members = await countMembersForTeam(team.id);
-  const pending = await countPendingInvitationsForTeam(team.id);
-  if (members + pending >= limits.maxMembersPerTeam) {
+  const capacity = await teamMemberInviteCapacity(team.planSlug, team.id);
+  if (capacity.atCapacity) {
     throw new Error(
-      `Member limit reached for this team (${limits.maxMembersPerTeam} on your plan).`,
+      `Member limit reached for this team (${capacity.maxMembersPerTeam} on your plan).`,
     );
   }
 

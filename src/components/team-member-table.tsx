@@ -31,13 +31,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { TeamMemberRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 
 type MemberRow = TeamMemberRow;
 
+type MemberDetailTarget =
+  | { kind: "owner" }
+  | { kind: "member"; member: MemberRow };
+
 interface TeamMemberTableProps {
   teamId: number;
+  teamName: string;
+  deckNamesByMemberUserId: Record<string, string[]>;
+  workspaceDeckNames: string[];
   ownerUserId: string;
   /** Workspace `teams.createdAt` — for the owner row, not a `team_members` row. */
   teamCreatedAt: Date;
@@ -100,6 +114,53 @@ function InvitedByCell({
   );
 }
 
+function emailForDisplay(
+  userId: string,
+  display: ClerkUserFieldDisplay | undefined,
+): string | null {
+  const fromPrimary = display?.primaryEmail?.trim();
+  if (fromPrimary) return fromPrimary;
+  return emailFromClerkSecondLine(display?.secondaryLine ?? null);
+}
+
+function roleLabel(role: "team_admin" | "team_member" | "owner") {
+  if (role === "owner") return "Owner (subscriber)";
+  if (role === "team_admin") return "Team admin";
+  return "Member";
+}
+
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+function DeckList({ names }: { names: string[] }) {
+  if (names.length === 0) {
+    return <span className="text-muted-foreground">None assigned yet</span>;
+  }
+  return (
+    <ul className="list-inside list-disc space-y-0.5">
+      {names.map((name) => (
+        <li key={name} className="text-sm">
+          {name}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function UserCell({
   userId,
   display,
@@ -136,6 +197,9 @@ function UserCell({
 
 export function TeamMemberTable({
   teamId,
+  teamName,
+  deckNamesByMemberUserId,
+  workspaceDeckNames,
   ownerUserId,
   teamCreatedAt,
   members,
@@ -147,8 +211,50 @@ export function TeamMemberTable({
   const [busy, setBusy] = React.useState<string | null>(null);
   const [removeDialogUserId, setRemoveDialogUserId] = React.useState<string | null>(null);
   const [removeSaving, setRemoveSaving] = React.useState(false);
+  const [detailTarget, setDetailTarget] = React.useState<MemberDetailTarget | null>(null);
   /** Stable id for confirm action — dialog close can clear state before the server call finishes. */
   const removeTargetUserIdRef = React.useRef<string | null>(null);
+
+  function openDetailFromRow(
+    target: MemberDetailTarget,
+    e: React.MouseEvent<HTMLTableRowElement>,
+  ) {
+    if ((e.target as HTMLElement).closest("button, a, [data-slot=select-trigger]")) {
+      return;
+    }
+    setDetailTarget(target);
+  }
+
+  const detailUserId =
+    detailTarget?.kind === "owner"
+      ? ownerUserId
+      : detailTarget?.kind === "member"
+        ? detailTarget.member.userId
+        : null;
+  const detailDisplay =
+    detailUserId != null ? userFieldDisplayById[detailUserId] : undefined;
+  const detailName = detailDisplay?.primaryLine?.trim() || detailUserId || "—";
+  const detailEmail = detailUserId
+    ? emailForDisplay(detailUserId, detailDisplay)
+    : null;
+  const detailAcceptedAt =
+    detailTarget?.kind === "owner"
+      ? teamCreatedAt
+      : detailTarget?.kind === "member"
+        ? detailTarget.member.createdAt
+        : null;
+  const detailRole =
+    detailTarget?.kind === "owner"
+      ? "owner"
+      : detailTarget?.kind === "member"
+        ? detailTarget.member.role
+        : null;
+  const detailDecks =
+    detailTarget?.kind === "owner"
+      ? workspaceDeckNames
+      : detailTarget?.kind === "member"
+        ? (deckNamesByMemberUserId[detailTarget.member.userId] ?? [])
+        : [];
 
   async function onRoleChange(memberUserId: string, role: "team_admin" | "team_member") {
     setError(null);
@@ -205,7 +311,11 @@ export function TeamMemberTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow>
+            <TableRow
+              className="cursor-pointer"
+              onDoubleClick={(e) => openDetailFromRow({ kind: "owner" }, e)}
+              title="Double-click for details"
+            >
               <TableCell>
                 <UserCell
                   userId={ownerUserId}
@@ -222,7 +332,12 @@ export function TeamMemberTable({
             </TableRow>
             {members.map((m) => {
               return (
-                <TableRow key={m.id}>
+                <TableRow
+                  key={m.id}
+                  className="cursor-pointer"
+                  onDoubleClick={(e) => openDetailFromRow({ kind: "member", member: m }, e)}
+                  title="Double-click for details"
+                >
                   <TableCell>
                     <UserCell
                       userId={m.userId}
@@ -295,6 +410,46 @@ export function TeamMemberTable({
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        open={detailTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Member details</DialogTitle>
+            <DialogDescription>
+              Workspace membership and deck assignments for {teamName}.
+            </DialogDescription>
+          </DialogHeader>
+          <dl className="grid gap-4">
+            <DetailField label="Name">{detailName}</DetailField>
+            <DetailField label="Email">
+              {detailEmail ?? <span className="text-muted-foreground">—</span>}
+            </DetailField>
+            <DetailField label="Acceptance date">
+              {detailAcceptedAt
+                ? formatMemberTimestamp(detailAcceptedAt)
+                : "—"}
+            </DetailField>
+            <DetailField label="Role">
+              {detailRole ? roleLabel(detailRole) : "—"}
+            </DetailField>
+            <DetailField label="Workspace">{teamName}</DetailField>
+            <DetailField
+              label={
+                detailTarget?.kind === "owner"
+                  ? "Decks in workspace"
+                  : "Decks assigned to user"
+              }
+            >
+              <DeckList names={detailDecks} />
+            </DetailField>
+          </dl>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={removeDialogUserId !== null}

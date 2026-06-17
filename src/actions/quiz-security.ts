@@ -34,15 +34,30 @@ const sessionStateSchema = z.object({
   questions: z
     .array(
       z.object({
+        type: z.enum(["multiple_choice", "true_false", "fill_in_blank"]).optional(),
         cardId: z.number().int().positive(),
         question: z.string().nullable(),
         questionImageUrl: z.string().nullable(),
-        options: z.array(z.string()).min(2),
+        options: z.array(z.string()),
         correctIndex: z.number().int().min(0),
+        statement: z.string().optional(),
+        correctAnswer: z.boolean().optional(),
+        segments: z
+          .array(
+            z.discriminatedUnion("type", [
+              z.object({ type: z.literal("text"), value: z.string() }),
+              z.object({
+                type: z.literal("blank"),
+                acceptedAnswers: z.array(z.string().min(1)).min(1),
+              }),
+            ]),
+          )
+          .optional(),
       }),
     )
     .min(1),
   selectedByIndex: z.array(z.number().int().min(0).nullable()),
+  typedAnswersByIndex: z.array(z.string().nullable()).optional(),
   currentIndex: z.number().int().min(0),
   remainingSeconds: z.number().int().min(0),
 });

@@ -22,6 +22,11 @@ import {
   isTeamPlanId,
   labelForTeamPlanSlug,
 } from "@/lib/team-plans";
+import {
+  isMemberWithinMemberLimit,
+  isTeamWithinWorkspaceLimit,
+  selectNewestTeamsWithinWorkspaceLimit,
+} from "@/lib/team-plan-limit-selection";
 import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
@@ -834,6 +839,31 @@ async function resolveTeamAdminWorkspaceDeckAccess(
   }
 }
 
+async function viewerHasActiveTeamMembershipAccess(
+  teamId: number,
+  viewerUserId: string,
+): Promise<boolean> {
+  const team = await getTeamById(teamId);
+  if (!team || !isTeamPlanId(team.planSlug)) return false;
+  const owned = await getTeamsByOwner(team.ownerUserId);
+  if (!isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug)) return false;
+  const members = await listTeamMembers(teamId);
+  return isMemberWithinMemberLimit(viewerUserId, members, team.planSlug);
+}
+
+/**
+ * Co-admins on one workspace from a subscriber omit other `team_member`-only workspaces
+ * from that same subscriber (stale member invites). Pure `team_member` users are unaffected.
+ */
+function shouldOmitMemberOnlyWorkspaceForCoAdmin(
+  team: InferSelectModel<typeof teams>,
+  viewerUserId: string,
+  manageTeams: InferSelectModel<typeof teams>[],
+): boolean {
+  if (team.ownerUserId === viewerUserId) return false;
+  return manageTeams.some((mt) => mt.ownerUserId === team.ownerUserId);
+}
+
 export async function resolveDeckViewerAccess(
   deckId: number,
   viewerUserId: string,
@@ -848,7 +878,7 @@ export async function resolveDeckViewerAccess(
   /** Subscriber-owned decks with `teamId` unset are shared only via assignments. */
   if (!deck.teamId) {
     try {
-      const [memberPick] = await db
+      const memberPicks = await db
         .select({ teamId: teamDeckAssignments.teamId })
         .from(teamDeckAssignments)
         .innerJoin(teams, eq(teams.id, teamDeckAssignments.teamId))
@@ -859,18 +889,19 @@ export async function resolveDeckViewerAccess(
             eq(teams.ownerUserId, deck.userId),
           ),
         )
-        .limit(1);
+        .orderBy(desc(teamDeckAssignments.createdAt));
 
-      if (memberPick) {
+      for (const memberPick of memberPicks) {
         const memberRecord = await getMemberRecord(memberPick.teamId, viewerUserId);
-        if (memberRecord?.role === "team_member") {
+        if (memberRecord?.role !== "team_member") continue;
+        if (await viewerHasActiveTeamMembershipAccess(memberPick.teamId, viewerUserId)) {
           return { kind: "team_member", teamId: memberPick.teamId };
         }
       }
 
-      let adminByLink: { teamId: number } | undefined;
+      let adminByLinkRows: { teamId: number }[] = [];
       try {
-        const rows = await db
+        adminByLinkRows = await db
           .select({ teamId: deckWorkspaceLinks.teamId })
           .from(deckWorkspaceLinks)
           .innerJoin(teams, eq(teams.id, deckWorkspaceLinks.teamId))
@@ -888,18 +919,19 @@ export async function resolveDeckViewerAccess(
               eq(teams.ownerUserId, deck.userId),
             ),
           )
-          .limit(1);
-        adminByLink = rows[0];
+          .orderBy(desc(deckWorkspaceLinks.createdAt));
       } catch (e) {
         if (!isMissingDeckWorkspaceLinksTableError(e)) throw e;
         warnMissingDeckWorkspaceLinksTableOnce();
       }
 
-      if (adminByLink) {
-        return { kind: "team_admin", teamId: adminByLink.teamId };
+      for (const row of adminByLinkRows) {
+        if (await viewerHasActiveTeamMembershipAccess(row.teamId, viewerUserId)) {
+          return { kind: "team_admin", teamId: row.teamId };
+        }
       }
 
-      const [adminPick] = await db
+      const adminPicks = await db
         .select({ teamId: teamMembers.teamId })
         .from(teamMembers)
         .innerJoin(
@@ -917,10 +949,12 @@ export async function resolveDeckViewerAccess(
             eq(teams.ownerUserId, deck.userId),
           ),
         )
-        .limit(1);
+        .orderBy(desc(teamDeckAssignments.createdAt));
 
-      if (adminPick) {
-        return { kind: "team_admin", teamId: adminPick.teamId };
+      for (const adminPick of adminPicks) {
+        if (await viewerHasActiveTeamMembershipAccess(adminPick.teamId, viewerUserId)) {
+          return { kind: "team_admin", teamId: adminPick.teamId };
+        }
       }
 
       const workspaceAdminTeamId = await resolveTeamAdminWorkspaceDeckAccess(
@@ -929,7 +963,9 @@ export async function resolveDeckViewerAccess(
         viewerUserId,
       );
       if (workspaceAdminTeamId != null) {
-        return { kind: "team_admin", teamId: workspaceAdminTeamId };
+        if (await viewerHasActiveTeamMembershipAccess(workspaceAdminTeamId, viewerUserId)) {
+          return { kind: "team_admin", teamId: workspaceAdminTeamId };
+        }
       }
 
       return null;
@@ -950,6 +986,9 @@ export async function resolveDeckViewerAccess(
     if (!member) return null;
 
     if (member.role === "team_admin") {
+      if (!(await viewerHasActiveTeamMembershipAccess(deck.teamId, viewerUserId))) {
+        return null;
+      }
       return { kind: "team_admin", teamId: deck.teamId };
     }
 
@@ -968,6 +1007,9 @@ export async function resolveDeckViewerAccess(
     if (assignedRows.length === 0) return null;
 
     if (member.role === "team_member") {
+      if (!(await viewerHasActiveTeamMembershipAccess(deck.teamId, viewerUserId))) {
+        return null;
+      }
       return { kind: "team_member", teamId: deck.teamId };
     }
 
@@ -980,14 +1022,31 @@ export async function resolveDeckViewerAccess(
 /** Teams the user owns or manages as `team_admin` (for `/dashboard/team-admin`). */
 export async function getTeamsForTeamDashboard(userId: string) {
   const owned = await getTeamsByOwner(userId);
+  const ownedPlanTeam = owned.find((t) => isTeamPlanId(t.planSlug));
+  const ownedAccessible =
+    ownedPlanTeam != null
+      ? selectNewestTeamsWithinWorkspaceLimit(owned, ownedPlanTeam.planSlug)
+      : owned;
+
   const adminRows = await db
     .select({ teamId: teamMembers.teamId })
     .from(teamMembers)
     .where(and(eq(teamMembers.userId, userId), eq(teamMembers.role, "team_admin")));
   const ids = [...new Set(adminRows.map((r) => r.teamId))].filter(Boolean);
   const extra = ids.length > 0 ? await selectTeamRows(inArray(teams.id, ids)) : [];
+
+  const extraAccessible: InferSelectModel<typeof teams>[] = [];
+  for (const t of extra) {
+    if (!isTeamPlanId(t.planSlug)) continue;
+    const subscriberOwned = await getTeamsByOwner(t.ownerUserId);
+    if (!isTeamWithinWorkspaceLimit(t.id, subscriberOwned, t.planSlug)) continue;
+    const members = await listTeamMembers(t.id);
+    if (!isMemberWithinMemberLimit(userId, members, t.planSlug)) continue;
+    extraAccessible.push(t);
+  }
+
   const map = new Map<number, InferSelectModel<typeof teams>>();
-  for (const t of [...owned, ...extra]) {
+  for (const t of [...ownedAccessible, ...extraAccessible]) {
     map.set(t.id, t);
   }
   return [...map.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -996,8 +1055,8 @@ export async function getTeamsForTeamDashboard(userId: string) {
 /**
  * Team-tier workspaces shown in the header switcher — aligned with `/dashboard/team-admin`:
  * - **Subscriber owners** see every team workspace they own, plus any `team_member` workspaces (study).
- * - **Invited co-admins** who do **not** own a team-tier workspace see **only** `team_admin` teams — not
- *   `team_member`-only rows on other workspaces from the same subscriber (stale or accidental invites).
+ * - **Invited co-admins** who co-manage a workspace omit other `team_member`-only workspaces from the
+ *   same subscriber (stale member invites).
  * - **Pure team members** (no ownership, no `team_admin`) see each `team_member` workspace for study.
  */
 export async function getEligibleWorkspaceTeamsForUser(
@@ -1008,12 +1067,6 @@ export async function getEligibleWorkspaceTeamsForUser(
     bootstrap?.manageTeams ?? (await getTeamsForTeamDashboard(userId));
   const memberships =
     bootstrap?.memberships ?? (await getTeamMembershipsForUser(userId));
-
-  const ownsTeamTierWorkspace = manageTeams.some(
-    (t) => t.ownerUserId === userId && isTeamPlanId(t.planSlug),
-  );
-  const hasTeamAdminMembership = memberships.some((m) => m.role === "team_admin");
-  const isNonOwnerCoAdmin = !ownsTeamTierWorkspace && hasTeamAdminMembership;
 
   const memberOnlyIds = [
     ...new Set(
@@ -1027,10 +1080,11 @@ export async function getEligibleWorkspaceTeamsForUser(
   for (const t of manageTeams) {
     if (isTeamPlanId(t.planSlug)) map.set(t.id, t);
   }
-  if (!isNonOwnerCoAdmin) {
-    for (const t of memberOnlyTeams) {
-      if (isTeamPlanId(t.planSlug)) map.set(t.id, t);
-    }
+  for (const t of memberOnlyTeams) {
+    if (!isTeamPlanId(t.planSlug)) continue;
+    if (shouldOmitMemberOnlyWorkspaceForCoAdmin(t, userId, manageTeams)) continue;
+    if (!(await viewerHasActiveTeamMembershipAccess(t.id, userId))) continue;
+    map.set(t.id, t);
   }
 
   return [...map.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -1043,7 +1097,7 @@ function planLabelForTeam(planSlug: string): string {
 export type WorkspaceNavTeamsResult = {
   /** Teams the user may select (limited for free personal accounts). */
   teams: TeamWorkspaceNavTeam[];
-  /** Count of workspaces shown through the switcher (excludes subscriber-owned team tiers). */
+  /** Count of workspaces in the switcher (owned within plan + invited/member). */
   totalEligibleCount: number;
 };
 
@@ -1065,25 +1119,55 @@ export type RootLayoutTeamAdminHeaderTeam = {
  * Header workspace switcher: `teamMemberUrlParam` is 0 for the subscriber owner, else the
  * viewer’s `team_members.id` (for display grouping). Workspace dashboard URLs include
  * `team`, `userid`, `plan`, and `teamMemberId`.
- * Subscriber-owned **team-tier** workspaces are intentionally omitted — those subscribers author decks on
- * the Personal Dashboard only and manage sharing from Team Admin ({@link getEligibleWorkspaceTeamsForUser}
- * still lists them for assign/move logic). Personal Pro (or admin unlock) lists every eligible team;
- * Free personal shows at most {@link FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT} (oldest first).
+ * Subscriber-owned team-tier workspaces within plan limits appear as “Team: …” rows (open
+ * `/dashboard?team=`). Personal Pro (or admin unlock) lists every eligible team; Free personal
+ * shows at most {@link FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT} (oldest first).
  */
 export async function getWorkspaceNavTeamsForUser(
   userId: string,
   options: { personalProUnlocked: boolean },
   bootstrap?: HeaderTeamsBootstrap,
 ): Promise<WorkspaceNavTeamsResult> {
+  const memberships =
+    bootstrap?.memberships ?? (await getTeamMembershipsForUser(userId));
+  const manageTeams =
+    bootstrap?.manageTeams ?? (await getTeamsForTeamDashboard(userId));
+
   const eligible = await getEligibleWorkspaceTeamsForUser(userId, bootstrap);
-  const eligibleForSwitcher = eligible.filter((t) => {
+  const invitedForSwitcher = eligible.filter((t) => {
     const isSubscriberOwnedTeamTier =
       t.ownerUserId === userId && isTeamPlanId(t.planSlug);
     return !isSubscriberOwnedTeamTier;
   });
+
+  const ownedForSwitcher = manageTeams.filter(
+    (t) => t.ownerUserId === userId && isTeamPlanId(t.planSlug),
+  );
+
+  const byId = new Map<number, InferSelectModel<typeof teams>>();
+  for (const t of ownedForSwitcher) byId.set(t.id, t);
+  for (const t of invitedForSwitcher) byId.set(t.id, t);
+
+  const memberTeamIds = [
+    ...new Set(
+      memberships.filter((m) => m.role === "team_member").map((m) => m.teamId),
+    ),
+  ];
+  if (memberTeamIds.length > 0) {
+    const memberTeams = await getTeamsByIds(memberTeamIds);
+    for (const t of memberTeams) {
+      if (!isTeamPlanId(t.planSlug)) continue;
+      if (byId.has(t.id)) continue;
+      if (shouldOmitMemberOnlyWorkspaceForCoAdmin(t, userId, manageTeams)) continue;
+      if (!(await viewerHasActiveTeamMembershipAccess(t.id, userId))) continue;
+      byId.set(t.id, t);
+    }
+  }
+
+  const eligibleForSwitcher = [...byId.values()].sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  );
   const totalEligibleCount = eligibleForSwitcher.length;
-  const memberships =
-    bootstrap?.memberships ?? (await getTeamMembershipsForUser(userId));
   const membershipByTeamId = new Map(
     memberships.map((m) => [m.teamId, m] as const),
   );
@@ -1134,6 +1218,7 @@ export async function getRootLayoutTeamNavPayload(
 ): Promise<{
   teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[];
   workspaceNav: WorkspaceNavTeamsResult;
+  teamMembershipCount: number;
 }> {
   const [manageTeams, memberships] = await Promise.all([
     getTeamsForTeamDashboard(userId),
@@ -1141,9 +1226,10 @@ export async function getRootLayoutTeamNavPayload(
   ]);
   const bootstrap: HeaderTeamsBootstrap = { manageTeams, memberships };
   const workspaceNav = await getWorkspaceNavTeamsForUser(userId, options, bootstrap);
+  const teamMembershipCount = memberships.length;
 
   if (manageTeams.length === 0) {
-    return { teamAdminHeaderTeams: [], workspaceNav };
+    return { teamAdminHeaderTeams: [], workspaceNav, teamMembershipCount };
   }
 
   const membershipByTeamId = new Map(
@@ -1161,7 +1247,7 @@ export async function getRootLayoutTeamNavPayload(
     }),
   );
 
-  return { teamAdminHeaderTeams, workspaceNav };
+  return { teamAdminHeaderTeams, workspaceNav, teamMembershipCount };
 }
 
 export async function userHasTeamAdminDashboardAccess(userId: string): Promise<boolean> {
@@ -1228,6 +1314,13 @@ export async function updateOwnedTeamsPlanSlug(
     .update(teams)
     .set({ planSlug: resolvedPlanSlug })
     .where(eq(teams.ownerUserId, ownerUserId));
+
+  if (isTeamPlanId(resolvedPlanSlug)) {
+    const { enforceSubscriptionPlanLimitsForOwner } = await import(
+      "@/db/queries/team-plan-limits"
+    );
+    await enforceSubscriptionPlanLimitsForOwner(ownerUserId, resolvedPlanSlug);
+  }
 }
 
 export async function insertTeamMember(
@@ -1739,31 +1832,29 @@ export async function attachPersonalDeckToOwnedTeamWorkspace(params: {
   }
 
   try {
-    await db.transaction(async (tx) => {
-      if (deck.teamId != null) {
-        const priorTeam = await getTeamById(deck.teamId);
-        if (!priorTeam || priorTeam.ownerUserId !== deck.userId) {
-          throw new Error("Deck is scoped to a workspace that is not owned by this subscriber.");
-        }
-        await tx
-          .insert(deckWorkspaceLinks)
-          .values({ teamId: deck.teamId, deckId: deck.id })
-          .onConflictDoNothing({
-            target: [deckWorkspaceLinks.teamId, deckWorkspaceLinks.deckId],
-          });
-        await tx
-          .update(decks)
-          .set({ teamId: null, updatedAt: new Date() })
-          .where(and(eq(decks.id, deck.id), eq(decks.userId, deck.userId)));
+    if (deck.teamId != null) {
+      const priorTeam = await getTeamById(deck.teamId);
+      if (!priorTeam || priorTeam.ownerUserId !== deck.userId) {
+        throw new Error("Deck is scoped to a workspace that is not owned by this subscriber.");
       }
-
-      await tx
+      await db
         .insert(deckWorkspaceLinks)
-        .values({ teamId: params.teamId, deckId: params.deckId })
+        .values({ teamId: deck.teamId, deckId: deck.id })
         .onConflictDoNothing({
           target: [deckWorkspaceLinks.teamId, deckWorkspaceLinks.deckId],
         });
-    });
+      await db
+        .update(decks)
+        .set({ teamId: null, updatedAt: new Date() })
+        .where(and(eq(decks.id, deck.id), eq(decks.userId, deck.userId)));
+    }
+
+    await db
+      .insert(deckWorkspaceLinks)
+      .values({ teamId: params.teamId, deckId: params.deckId })
+      .onConflictDoNothing({
+        target: [deckWorkspaceLinks.teamId, deckWorkspaceLinks.deckId],
+      });
   } catch (e) {
     if (isMissingDeckWorkspaceLinksTableError(e)) {
       throw new Error(

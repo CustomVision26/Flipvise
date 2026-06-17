@@ -30,6 +30,7 @@ import {
 const EMPTY_TEAM_NAV = {
   teamAdminHeaderTeams: [] as RootLayoutTeamAdminHeaderTeam[],
   workspaceNav: { teams: [] as TeamWorkspaceNavTeam[], totalEligibleCount: 0 },
+  teamMembershipCount: 0,
 };
 
 export type RootLayoutTeamDashFallback = {
@@ -65,10 +66,15 @@ function resolveTeamDashFallback(
   ) {
     return null;
   }
-  const match = teamAdminHeaderTeams.find(
-    (t) => t.workspacePlanQuery === activeTeamPlan,
+  // "Team Admin Dash" is for the subscriber owner only — not invited co-admin workspaces.
+  const ownedTeams = teamAdminHeaderTeams.filter(
+    (t) => t.ownerUserId === userId,
   );
-  const pick = match ?? teamAdminHeaderTeams[0];
+  if (ownedTeams.length === 0) {
+    return null;
+  }
+  const match = ownedTeams.find((t) => t.workspacePlanQuery === activeTeamPlan);
+  const pick = match ?? ownedTeams[0]!;
   const planSlug = pick.workspacePlanQuery ?? activeTeamPlan;
   return {
     teamId: pick.id,
@@ -80,10 +86,14 @@ function resolveTeamDashFallback(
 function resolveShowWorkspaceSwitcher(
   workspaceTeamsTotalEligible: number,
   activeTeamPlan: AccessContext["activeTeamPlan"],
+  isPro: boolean,
+  hasTeamMembership: boolean,
 ): boolean {
   return (
     workspaceTeamsTotalEligible > 0 ||
-    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))
+    hasTeamMembership ||
+    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan)) ||
+    isPro
   );
 }
 
@@ -178,6 +188,7 @@ export async function loadRootLayoutShellData(input: {
   const workspaceTeams = teamNavPayload.workspaceNav.teams;
   const workspaceTeamsTotalEligible =
     teamNavPayload.workspaceNav.totalEligibleCount;
+  const hasTeamMembership = teamNavPayload.teamMembershipCount > 0;
 
   const planLabels = needsFullPlanLabels
     ? {
@@ -199,6 +210,8 @@ export async function loadRootLayoutShellData(input: {
     showWorkspaceSwitcher: resolveShowWorkspaceSwitcher(
       workspaceTeamsTotalEligible,
       activeTeamPlan,
+      isPro,
+      hasTeamMembership,
     ),
     teamDashFallback: resolveTeamDashFallback(
       userId,

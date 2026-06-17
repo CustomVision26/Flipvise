@@ -14,7 +14,12 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/decks/[deckId]/card-grid.tsx",
     "src/app/decks/[deckId]/edit-deck-dialog.tsx",
   ],
-  "study-session": ["src/app/decks/[deckId]/study/page.tsx"],
+  "study-session": [
+    "src/app/decks/[deckId]/study/page.tsx",
+    "src/app/decks/[deckId]/study/quiz-study.tsx",
+    "src/lib/quiz-formats.ts",
+    "src/lib/quiz-questions.ts",
+  ],
   "quiz-result-detail": ["src/app/dashboard/quiz-results/[resultId]/page.tsx"],
   inbox: ["src/components/inbox-unified-client.tsx"],
   "help-center-overview": ["src/components/help-center.tsx"],
@@ -50,11 +55,18 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/team-admin-manage-tabs.tsx",
     "src/components/team-admin-quick-nav-panel.tsx",
   ],
-  members: ["src/components/team-admin-invitation-tables.tsx", "src/actions/teams.ts"],
+  members: [
+    "src/components/team-admin-invitation-tables.tsx",
+    "src/components/team-member-table.tsx",
+    "src/actions/teams.ts",
+  ],
   "deck-manager": [
     "src/components/team-deck-assign-list.tsx",
     "src/components/team-deck-manager-sub-tabs.tsx",
+    "src/components/team-quiz-formats-settings.tsx",
     "src/app/dashboard/(team-admin)/team-admin/deck-manager/study-privileges/page.tsx",
+    "src/actions/quiz-formats.ts",
+    "src/lib/generate-quiz-variants-ai.ts",
   ],
   "invite-members": [
     "src/app/dashboard/(team-admin)/team-admin/invite-members/pending-invitations/page.tsx",

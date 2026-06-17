@@ -115,6 +115,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Lists users on team-tier plans with expandable workspace detail rows.",
           "Shows workspace names, member counts, and plan slug per owned team.",
           "Search and role/status filters match All Users patterns.",
+          "Quiz question formats (multiple choice, true/false, fill-in-the-blank) are configured by subscribers in Team Admin → Deck Manager → Study privileges — not from this platform admin view.",
         ],
         requirements: ["Platform admin access."],
         doNots: [

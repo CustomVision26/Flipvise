@@ -27,13 +27,22 @@ import {
   type QuizResultInboxTarget,
 } from "@/lib/quiz-result-inbox-targets";
 
+import { parseCardQuizVariants } from "@/lib/card-quiz-variants";
+import {
+  gradeQuizAnswer,
+  type QuizQuestionType,
+} from "@/lib/quiz-questions";
+
 const quizAnswerSchema = z.object({
   cardId: z.number().int().positive(),
+  questionType: z.enum(["multiple_choice", "true_false", "fill_in_blank"]),
   /**
-   * The exact text of the option the user picked. Null means the question was
-   * left unanswered (either skipped or timer ran out before the user got to it).
+   * Selected option text for multiple-choice and true/false. Null when unanswered
+   * or for fill-in-the-blank questions.
    */
   selectedText: z.string().nullable(),
+  /** Typed response for fill-in-the-blank. Null for other formats. */
+  typedAnswer: z.string().nullable(),
 });
 
 const submitQuizResultSchema = z.object({
@@ -66,24 +75,12 @@ export type QuizResult = {
 };
 
 /**
- * Server-side source of truth for what the correct answer to a given card
- * is. For multiple-choice cards we read `choices[correctChoiceIndex]`; for
- * standard cards we fall back to `back`. Whitespace is normalized so client-
- * side rendering/whitespace differences do not cause false negatives.
- */
-function normalize(text: string): string {
-  return text.replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-/**
  * Validates a quiz submission on the server and returns the final score.
  * Does not persist — personal study flows opt in via `saveQuizResultAction` on the results screen;
  * team workspace study saves immediately after submit on the client.
  *
- * The client sends the text string the user picked for each card, and the
- * server re-derives the correct text from the database. This means the
- * client cannot lie about correctness even when options were generated or
- * shuffled client-side.
+ * The client sends question type and answer payload per card; the server
+ * re-grades from stored card content and quiz variants.
  */
 export async function submitQuizResultAction(
   data: SubmitQuizResultInput,
@@ -123,28 +120,17 @@ export async function submitQuizResultAction(
     if (!card) continue;
     total++;
 
-    // Must match the client-side check in `quiz-study.tsx#buildQuestions`
-    // exactly, otherwise a card with borderline `choices` could be treated
-    // as multiple-choice by one side and free-response by the other, which
-    // would silently mis-score the user.
-    const hasStoredChoices =
-      Array.isArray(card.choices) &&
-      card.choices.length >= 2 &&
-      card.correctChoiceIndex !== null &&
-      card.correctChoiceIndex !== undefined &&
-      card.correctChoiceIndex >= 0 &&
-      card.correctChoiceIndex < card.choices.length;
+    const variants = parseCardQuizVariants(card.quizVariants);
+    const cardInput = { ...card, quizVariants: variants };
 
-    const correctText = hasStoredChoices
-      ? (card.choices as string[])[card.correctChoiceIndex as number] ?? ""
-      : card.back ?? "";
-
-    const isAnswered = answer.selectedText !== null;
-    let wasCorrect = false;
-
-    if (isAnswered && correctText) {
-      wasCorrect = normalize(answer.selectedText as string) === normalize(correctText);
-    }
+    const { correctText, wasCorrect, isAnswered } = gradeQuizAnswer(
+      cardInput,
+      answer.questionType as QuizQuestionType,
+      {
+        selectedText: answer.selectedText,
+        typedAnswer: answer.typedAnswer,
+      },
+    );
 
     if (!isAnswered) unanswered++;
     if (wasCorrect) correct++;
@@ -178,6 +164,7 @@ export async function submitQuizResultAction(
 const perCardSnapshotSchema = z.object({
   cardId: z.number().int(),
   question: z.string().nullable(),
+  questionType: z.enum(["multiple_choice", "true_false", "fill_in_blank"]).optional(),
   correctAnswer: z.string(),
   selectedAnswer: z.string().nullable(),
   correct: z.boolean(),

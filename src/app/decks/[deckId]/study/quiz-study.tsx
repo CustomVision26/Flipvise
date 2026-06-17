@@ -61,6 +61,8 @@ import {
   BookCheck,
   ShieldAlert,
   Lock,
+  PenLine,
+  ToggleLeft,
 } from "lucide-react";
 import {
   submitQuizResultAction,
@@ -83,7 +85,29 @@ import {
   type ResolvedQuizStartSchedule,
 } from "@/lib/quiz-start-schedule";
 import type { QuizResultInboxTarget } from "@/lib/quiz-result-inbox-targets";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import type { QuizFormatKey, QuizFormatsSettings } from "@/lib/quiz-formats";
+import {
+  enabledQuizFormatKeys,
+  QUIZ_FORMAT_META,
+} from "@/lib/quiz-formats";
+import { parseCardQuizVariants } from "@/lib/card-quiz-variants";
+import {
+  buildQuizQuestions,
+  formatQuestionWithTypeLabel,
+  questionPromptText,
+  questionTypeLabel,
+  summarizeSessionQuestionFormats,
+  type QuizCardInput,
+  type QuizQuestion,
+} from "@/lib/quiz-questions";
+import {
+  buildPerCardSnapshotForSave,
+  buildQuizSessionState,
+  isQuizQuestionAnswered,
+  questionsFromSessionState,
+  trueFalseOptions,
+} from "@/lib/quiz-study-helpers";
 
 type SubmitQuizOptions = {
   timedOut: boolean;
@@ -91,23 +115,15 @@ type SubmitQuizOptions = {
   inboxTargets?: QuizResultInboxTarget[];
 };
 
-type CardData = {
-  id: number;
-  front: string | null;
-  frontImageUrl?: string | null;
-  back: string | null;
-  backImageUrl?: string | null;
-  choices?: string[] | null;
-  correctChoiceIndex?: number | null;
+import { cn } from "@/lib/utils";
+
+const QUIZ_FORMAT_ICONS: Record<QuizFormatKey, typeof CircleHelp> = {
+  multipleChoice: CircleHelp,
+  trueFalse: ToggleLeft,
+  fillInBlank: PenLine,
 };
 
-type QuizQuestion = {
-  cardId: number;
-  question: string | null;
-  questionImageUrl: string | null;
-  options: string[];
-  correctIndex: number;
-};
+type CardData = QuizCardInput;
 
 interface QuizStudyProps {
   cards: CardData[];
@@ -139,6 +155,8 @@ interface QuizStudyProps {
       sessionState: QuizSecuritySessionState | null;
     } | null;
   };
+  /** Enabled quiz question formats (workspace/deck resolved). */
+  quizFormats?: QuizFormatsSettings;
 }
 
 type QuizSecurityStatus = NonNullable<QuizStudyProps["quizSecurity"]>["initialSession"] extends infer S
@@ -146,36 +164,6 @@ type QuizSecurityStatus = NonNullable<QuizStudyProps["quizSecurity"]>["initialSe
     ? St
     : never
   : never;
-
-function questionsFromSessionState(state: QuizSecuritySessionState): QuizQuestion[] {
-  return state.questions.map((q) => ({
-    cardId: q.cardId,
-    question: q.question,
-    questionImageUrl: q.questionImageUrl,
-    options: q.options,
-    correctIndex: q.correctIndex,
-  }));
-}
-
-function buildSessionState(
-  questions: QuizQuestion[],
-  selectedByIndex: (number | null)[],
-  currentIndex: number,
-  remainingSeconds: number,
-): QuizSecuritySessionState {
-  return {
-    questions: questions.map((q) => ({
-      cardId: q.cardId,
-      question: q.question,
-      questionImageUrl: q.questionImageUrl,
-      options: q.options,
-      correctIndex: q.correctIndex,
-    })),
-    selectedByIndex,
-    currentIndex,
-    remainingSeconds,
-  };
-}
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -245,100 +233,11 @@ function formatClock(totalSeconds: number): string {
   return `${mm}:${ss}`;
 }
 
-/**
- * Converts a deck of cards into multiple-choice questions.
- *
- * - Cards that already have stored `choices` + `correctChoiceIndex` use
- *   them directly (and we shuffle the options).
- * - Cards without stored choices fall back to a "correct + 3 sampled
- *   backs" construction using other cards in the deck as distractors.
- * - Cards whose back is empty *and* have no stored choices are skipped
- *   because there is no correct answer to compare against.
- */
-function buildQuestions(cards: CardData[]): QuizQuestion[] {
-  const textBacks = cards
-    .map((c) => (c.back ?? "").trim())
-    .filter((t) => t.length > 0);
-
-  const questions: QuizQuestion[] = [];
-
-  for (const card of cards) {
-    // Must match the server-side check in `submitQuizResultAction` exactly,
-    // otherwise a borderline card could be shown as free-response here but
-    // scored as multiple-choice on the server, mis-grading the user.
-    const hasStoredChoices =
-      Array.isArray(card.choices) &&
-      card.choices.length >= 2 &&
-      card.correctChoiceIndex !== null &&
-      card.correctChoiceIndex !== undefined &&
-      card.correctChoiceIndex >= 0 &&
-      card.correctChoiceIndex < card.choices.length;
-
-    if (hasStoredChoices) {
-      const correctText = (card.choices as string[])[card.correctChoiceIndex as number];
-      if (!correctText || !correctText.trim()) continue;
-      const shuffled = shuffleArray(card.choices as string[]);
-      const correctIndex = shuffled.findIndex(
-        (text) => normalizeText(text) === normalizeText(correctText),
-      );
-      questions.push({
-        cardId: card.id,
-        question: card.front,
-        questionImageUrl: card.frontImageUrl ?? null,
-        options: shuffled,
-        correctIndex: correctIndex === -1 ? 0 : correctIndex,
-      });
-      continue;
-    }
-
-    const back = (card.back ?? "").trim();
-    if (!back) continue;
-
-    const correctNorm = normalizeText(back);
-    const distractorPool = Array.from(
-      new Set(
-        textBacks
-          .map((t) => t.trim())
-          .filter((t) => normalizeText(t) !== correctNorm),
-      ),
-    );
-    const distractors = shuffleArray(distractorPool).slice(0, 3);
-
-    if (distractors.length === 0) continue;
-
-    const options = shuffleArray([back, ...distractors]);
-    const correctIndex = options.findIndex((o) => normalizeText(o) === correctNorm);
-
-    questions.push({
-      cardId: card.id,
-      question: card.front,
-      questionImageUrl: card.frontImageUrl ?? null,
-      options,
-      correctIndex: correctIndex === -1 ? 0 : correctIndex,
-    });
-  }
-
-  return shuffleArray(questions);
-}
-
-function buildPerCardSnapshotForSave(
-  result: QuizResult,
-  questions: QuizQuestion[],
-  selectedByIndex: (number | null)[],
-) {
-  return questions.map((q, i) => {
-    const perCardEntry = result.perCard.find((p) => p.cardId === q.cardId);
-    const selectedIdx = selectedByIndex[i];
-    const selectedAnswer =
-      selectedIdx !== null && selectedIdx !== undefined ? q.options[selectedIdx] ?? null : null;
-    return {
-      cardId: q.cardId,
-      question: q.question,
-      correctAnswer: perCardEntry?.correctText ?? q.options[q.correctIndex] ?? "",
-      selectedAnswer,
-      correct: perCardEntry?.correct ?? false,
-    };
-  });
+function prepareCardsForQuiz(cards: CardData[]): QuizCardInput[] {
+  return cards.map((c) => ({
+    ...c,
+    quizVariants: parseCardQuizVariants(c.quizVariants) ?? null,
+  }));
 }
 
 export function QuizStudy({
@@ -355,8 +254,10 @@ export function QuizStudy({
   ownerInboxAvailable = false,
   quizSchedule,
   quizSecurity,
+  quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
 }: QuizStudyProps) {
   const router = useRouter();
+  const preparedCards = useMemo(() => prepareCardsForQuiz(cards), [cards]);
   const leaveStudy = useCallback(() => router.push(exitHref), [router, exitHref]);
   const securityEnabled = Boolean(quizSecurity?.enabled);
   const resultTeamId = quizSecurity?.teamId ?? teamId;
@@ -379,14 +280,25 @@ export function QuizStudy({
       : undefined;
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
-    restoredState ? questionsFromSessionState(restoredState) : buildQuestions(cards),
+    restoredState
+      ? questionsFromSessionState(restoredState)
+      : buildQuizQuestions(preparedCards, quizFormats),
   );
   const [currentIndex, setCurrentIndex] = useState(() => restoredState?.currentIndex ?? 0);
   const [selectedByIndex, setSelectedByIndex] = useState<(number | null)[]>(() =>
     restoredState
       ? restoredState.selectedByIndex
-      : Array(buildQuestions(cards).length).fill(null),
+      : Array(buildQuizQuestions(preparedCards, quizFormats).length).fill(null),
   );
+  const [typedAnswersByIndex, setTypedAnswersByIndex] = useState<(string | null)[]>(() => {
+    if (restoredState) {
+      return (
+        restoredState.typedAnswersByIndex ??
+        Array(restoredState.questions.length).fill(null)
+      );
+    }
+    return Array(buildQuizQuestions(preparedCards, quizFormats).length).fill(null);
+  });
   const [voice, setVoice] = useState<TtsVoice>("nova");
 
   const totalSeconds = useMemo(
@@ -501,7 +413,14 @@ export function QuizStudy({
   const [autoPersistError, setAutoPersistError] = useState<string | null>(null);
 
   const totalQuestions = questions.length;
-  const answeredCount = selectedByIndex.filter((x) => x !== null).length;
+  const enabledFormats = useMemo(() => enabledQuizFormatKeys(quizFormats), [quizFormats]);
+  const sessionFormatSummary = useMemo(
+    () => summarizeSessionQuestionFormats(questions),
+    [questions],
+  );
+  const answeredCount = questions.filter((q, i) =>
+    isQuizQuestionAnswered(q, selectedByIndex[i] ?? null, typedAnswersByIndex[i] ?? null),
+  ).length;
   const unansweredCount = totalQuestions - answeredCount;
   const progressPercent =
     totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
@@ -521,9 +440,31 @@ export function QuizStudy({
       );
       const answers = questions.map((q, i) => {
         const sel = selectedByIndex[i];
+        const typed = typedAnswersByIndex[i];
+        if (q.type === "fill_in_blank") {
+          return {
+            cardId: q.cardId,
+            questionType: "fill_in_blank" as const,
+            selectedText: null,
+            typedAnswer: typed?.trim() ? typed.trim() : null,
+          };
+        }
+        if (q.type === "true_false") {
+          const options = trueFalseOptions();
+          return {
+            cardId: q.cardId,
+            questionType: "true_false" as const,
+            selectedText:
+              sel !== null && sel !== undefined ? (options[sel] ?? null) : null,
+            typedAnswer: null,
+          };
+        }
         return {
           cardId: q.cardId,
-          selectedText: sel !== null && sel !== undefined ? q.options[sel] : null,
+          questionType: "multiple_choice" as const,
+          selectedText:
+            sel !== null && sel !== undefined ? q.options[sel] ?? null : null,
+          typedAnswer: null,
         };
       });
       setSubmitError(null);
@@ -540,7 +481,12 @@ export function QuizStudy({
             Boolean(reason.saveResult && reason.inboxTargets && reason.inboxTargets.length > 0);
           if (shouldSave) {
             try {
-              const perCard = buildPerCardSnapshotForSave(res, questions, selectedByIndex);
+              const perCard = buildPerCardSnapshotForSave(
+                res,
+                questions,
+                selectedByIndex,
+                typedAnswersByIndex,
+              );
               await saveQuizResultAction({
                 deckId,
                 deckName,
@@ -583,6 +529,7 @@ export function QuizStudy({
       totalSeconds,
       questions,
       selectedByIndex,
+      typedAnswersByIndex,
       deckId,
       shouldAutoSaveResult,
       autoSaveQuizResult,
@@ -608,9 +555,10 @@ export function QuizStudy({
     lockingRef.current = true;
     setSecurityLocking(true);
     try {
-      const sessionState = buildSessionState(
+      const sessionState = buildQuizSessionState(
         questions,
         selectedByIndex,
+        typedAnswersByIndex,
         currentIndex,
         remainingSeconds,
       );
@@ -632,6 +580,7 @@ export function QuizStudy({
     securityStatus,
     questions,
     selectedByIndex,
+    typedAnswersByIndex,
     currentIndex,
     remainingSeconds,
   ]);
@@ -754,6 +703,14 @@ export function QuizStudy({
     return "Choose whether to save this result before viewing your score.";
   }
 
+  function handleTypedAnswer(value: string) {
+    setTypedAnswersByIndex((prev) => {
+      const next = [...prev];
+      next[currentIndex] = value;
+      return next;
+    });
+  }
+
   function handleSelect(optionIndex: number) {
     setSelectedByIndex((prev) => {
       const next = [...prev];
@@ -783,9 +740,10 @@ export function QuizStudy({
 
   async function handleStartQuiz() {
     if (securityEnabled && quizSecurity) {
-      const sessionState = buildSessionState(
+      const sessionState = buildQuizSessionState(
         questions,
         selectedByIndex,
+        typedAnswersByIndex,
         currentIndex,
         remainingSeconds,
       );
@@ -814,9 +772,10 @@ export function QuizStudy({
 
   function handleRetake() {
     if (securityEnabled) return;
-    const fresh = buildQuestions(cards);
+    const fresh = buildQuizQuestions(preparedCards, quizFormats);
     setQuestions(fresh);
     setSelectedByIndex(Array(fresh.length).fill(null));
+    setTypedAnswersByIndex(Array(fresh.length).fill(null));
     setCurrentIndex(0);
     setResult(null);
     setSubmitError(null);
@@ -950,6 +909,7 @@ export function QuizStudy({
         result={result}
         questions={questions}
         selectedByIndex={selectedByIndex}
+        typedAnswersByIndex={typedAnswersByIndex}
         deckId={deckId}
         deckName={deckName}
         teamId={teamId}
@@ -1051,7 +1011,7 @@ export function QuizStudy({
         className="flex flex-1 items-center justify-center px-4 py-6"
         style={deckAccentCss}
       >
-        <Card className="w-full max-w-md shadow-md">
+        <Card className="w-full max-w-lg shadow-md">
           <CardHeader className="text-center">
             <div
               className={cn(
@@ -1081,6 +1041,42 @@ export function QuizStudy({
               </span>{" "}
               on the clock
             </p>
+            {enabledFormats.length > 0 ? (
+              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 text-left">
+                <p className="text-center text-xs font-medium text-foreground">
+                  Question formats in this quiz
+                </p>
+                <div className="flex flex-col gap-2">
+                  {enabledFormats.map((formatKey) => {
+                    const Icon = QUIZ_FORMAT_ICONS[formatKey];
+                    const meta = QUIZ_FORMAT_META[formatKey];
+                    return (
+                      <div
+                        key={formatKey}
+                        className="flex items-start gap-2.5 rounded-md border border-border/50 bg-background/40 px-2.5 py-2"
+                      >
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                          <Icon className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        <span className="min-w-0 text-left">
+                          <span className="block text-xs font-medium text-foreground">
+                            {meta.label}
+                          </span>
+                          <span className="block text-[11px] leading-snug text-muted-foreground">
+                            {meta.description}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {sessionFormatSummary ? (
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    {sessionFormatSummary}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {securityEnabled ? (
               <p className="text-xs text-amber-400/90">
                 Quiz security is on. Stay on this tab until you submit — leaving will lock your
@@ -1136,8 +1132,18 @@ export function QuizStudy({
       </div>
     );
   } else {
-  const current = questions[currentIndex];
+  const current = questions[currentIndex]!;
   const selectedForCurrent = selectedByIndex[currentIndex];
+  const typedForCurrent = typedAnswersByIndex[currentIndex] ?? "";
+  const promptText = questionPromptText(current);
+  const answerHint =
+    current.type === "true_false"
+      ? "True or false"
+      : current.type === "fill_in_blank"
+        ? "Type the missing word or phrase"
+        : "Select the best answer";
+  const choiceOptions =
+    current.type === "true_false" ? trueFalseOptions() : current.type === "multiple_choice" ? current.options : [];
   const timerWarning = remainingSeconds <= 60;
   const timerCritical = remainingSeconds <= 30;
 
@@ -1188,7 +1194,11 @@ export function QuizStudy({
         <div className="flex flex-wrap gap-1.5">
           {questions.map((_, i) => {
             const isCurrent = i === currentIndex;
-            const isAnswered = selectedByIndex[i] !== null;
+            const isAnswered = isQuizQuestionAnswered(
+              questions[i]!,
+              selectedByIndex[i] ?? null,
+              typedAnswersByIndex[i] ?? null,
+            );
             const answeredDeckStyle: CSSProperties | undefined =
               deckAccent.hasDeckAccent && deckAccent.accent && !isCurrent && isAnswered
                 ? {
@@ -1250,15 +1260,26 @@ export function QuizStudy({
         )}
       >
         <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
-          <Badge
-            variant="secondary"
-            className={cn(
-              "text-xs",
-              deckAccent.hasDeckAccent && "border border-white/30 bg-white/20 text-white",
-            )}
-          >
-            Question {currentIndex + 1}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant="secondary"
+              className={cn(
+                "text-xs",
+                deckAccent.hasDeckAccent && "border border-white/30 bg-white/20 text-white",
+              )}
+            >
+              Question {currentIndex + 1}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-xs",
+                deckAccent.hasDeckAccent && "border-white/30 bg-white/10 text-white",
+              )}
+            >
+              {questionTypeLabel(current.type)}
+            </Badge>
+          </div>
           <div className="flex items-center gap-2">
             <span
               className={cn(
@@ -1266,10 +1287,10 @@ export function QuizStudy({
                 deckAccent.hasDeckAccent ? "text-white/70" : "text-muted-foreground",
               )}
             >
-              Select the best answer
+              {answerHint}
             </span>
-            {current.question && hasAiReading ? (
-              <SpeakButton text={current.question} voice={voice} stopKey={currentIndex} />
+            {promptText && hasAiReading ? (
+              <SpeakButton text={promptText} voice={voice} stopKey={currentIndex} />
             ) : null}
           </div>
         </div>
@@ -1291,7 +1312,42 @@ export function QuizStudy({
           </div>
         )}
         <div className="px-4 sm:px-8 py-5 sm:py-6">
-          {current.question ? (
+          {current.type === "fill_in_blank" ? (
+            <div
+              className={cn(
+                "flex flex-wrap items-center justify-center gap-x-1 gap-y-2 text-base sm:text-xl font-semibold leading-relaxed break-words",
+                deckAccent.hasDeckAccent && "text-white",
+              )}
+            >
+              {current.segments.map((seg, segIdx) =>
+                seg.type === "text" ? (
+                  <span key={`${current.cardId}-t-${segIdx}`}>{seg.value}</span>
+                ) : (
+                  <Input
+                    key={`${current.cardId}-b-${segIdx}`}
+                    value={typedForCurrent}
+                    onChange={(e) => handleTypedAnswer(e.target.value)}
+                    className={cn(
+                      "inline-flex h-10 min-w-[7rem] max-w-[12rem] sm:max-w-xs text-center font-semibold",
+                      deckAccent.hasDeckAccent &&
+                        "border-white/40 bg-white/10 text-white placeholder:text-white/50",
+                    )}
+                    aria-label="Fill in the blank"
+                    autoComplete="off"
+                  />
+                ),
+              )}
+            </div>
+          ) : current.type === "true_false" ? (
+            <p
+              className={cn(
+                "text-center text-base sm:text-xl font-semibold leading-relaxed break-words",
+                deckAccent.hasDeckAccent && "text-white",
+              )}
+            >
+              {current.statement}
+            </p>
+          ) : current.question ? (
             <p
               className={cn(
                 "text-center text-base sm:text-xl font-semibold leading-relaxed break-words",
@@ -1313,12 +1369,13 @@ export function QuizStudy({
         </div>
       </div>
 
+      {current.type !== "fill_in_blank" ? (
       <div
         className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3"
         role="radiogroup"
         aria-label="Answer options"
       >
-        {current.options.map((text, i) => {
+        {choiceOptions.map((text, i) => {
           const isSelected = selectedForCurrent === i;
           const displayText = formatQuizOptionForDisplay(text);
           return (
@@ -1359,6 +1416,7 @@ export function QuizStudy({
           );
         })}
       </div>
+      ) : null}
 
       <div className="w-full max-w-2xl flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
         <Button
@@ -1427,6 +1485,7 @@ function QuizResultCard({
   result,
   questions,
   selectedByIndex,
+  typedAnswersByIndex,
   deckId,
   deckName,
   teamId,
@@ -1444,6 +1503,7 @@ function QuizResultCard({
   result: QuizResult;
   questions: QuizQuestion[];
   selectedByIndex: (number | null)[];
+  typedAnswersByIndex: (string | null)[];
   deckId: number;
   deckName: string;
   teamId: number | null;
@@ -1478,8 +1538,9 @@ function QuizResultCard({
   );
 
   const perCardSnapshot = useMemo(
-    () => buildPerCardSnapshotForSave(result, questions, selectedByIndex),
-    [questions, selectedByIndex, result],
+    () =>
+      buildPerCardSnapshotForSave(result, questions, selectedByIndex, typedAnswersByIndex),
+    [questions, selectedByIndex, typedAnswersByIndex, result],
   );
 
   function handleSaveConfirm() {
@@ -1532,8 +1593,6 @@ function QuizResultCard({
   };
   const style = tierStyles[tier];
   const Icon = style.Icon;
-  const perCardMap = new Map(result.perCard.map((c) => [c.cardId, c]));
-
   return (
     <div
       className="flex flex-1 flex-col items-center gap-6 px-2 sm:px-4 py-2 sm:py-4 w-full min-w-0"
@@ -1692,21 +1751,17 @@ function QuizResultCard({
       <div className="w-full max-w-xl flex flex-col gap-2">
         <h3 className="text-sm font-semibold text-muted-foreground px-1">Review</h3>
         <ol className="flex flex-col gap-2">
-          {questions.map((q, i) => {
-            const perCard = perCardMap.get(q.cardId);
-            const sel = selectedByIndex[i];
-            const selectedRaw = sel !== null && sel !== undefined ? q.options[sel] : null;
-            const wasCorrect = perCard?.correct ?? false;
-            const wasAnswered = perCard?.answered ?? false;
-            const correctText = perCard?.correctText ?? q.options[q.correctIndex];
+          {perCardSnapshot.map((row, i) => {
+            const wasCorrect = row.correct;
+            const wasAnswered = row.selectedAnswer !== null;
             const selectedDisplay =
-              selectedRaw !== null && selectedRaw !== undefined
-                ? formatQuizOptionForDisplay(selectedRaw)
+              row.selectedAnswer !== null
+                ? formatQuizOptionForDisplay(row.selectedAnswer)
                 : null;
-            const correctDisplay = formatQuizOptionForDisplay(correctText ?? "");
+            const correctDisplay = formatQuizOptionForDisplay(row.correctAnswer);
             return (
               <li
-                key={`${q.cardId}-${i}`}
+                key={`${row.cardId}-${i}`}
                 className={`rounded-lg border p-3 text-left ${
                   wasCorrect
                     ? "border-emerald-500/30 bg-emerald-500/5"
@@ -1725,10 +1780,10 @@ function QuizResultCard({
                   )}
                   <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <p className="text-xs text-muted-foreground">
-                      Question {i + 1}
+                      {formatQuestionWithTypeLabel(i + 1, questions[i]?.type)}
                     </p>
                     <p className="text-sm font-medium break-words">
-                      {q.question ?? "(Image only)"}
+                      {row.question ?? "(Image only)"}
                     </p>
                     <p className="text-xs break-words">
                       <span className="text-muted-foreground">Your answer: </span>

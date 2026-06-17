@@ -42,6 +42,7 @@ import {
   CARDS_PER_DECK_LIMIT_FREE,
   resolveDeckCardCap,
 } from "@/lib/deck-limits";
+import { resolveQuizFormatsForStudy } from "@/db/queries/quiz-formats";
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -180,6 +181,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
       ? (await getTeamById(studyTeamId))?.ownerUserId !== userId
       : false;
 
+  const quizFormats = await resolveQuizFormatsForStudy(
+    id,
+    studyTeamId ?? deck.teamId ?? null,
+  );
+
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -248,6 +254,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         exitHref={studyBackHref}
         exitLabel={studyExitLabel}
         ownerInboxAvailable={ownerInboxAvailable}
+        quizFormats={quizFormats}
       />
     </div>
   );

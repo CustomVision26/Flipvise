@@ -276,6 +276,15 @@ const ALL_ARTICLES: DocArticle[] = [
         ],
       },
       {
+        id: "subscriber-features",
+        title: "Subscriber-managed quiz settings",
+        bullets: [
+          "Team owners and co-admins configure quiz question formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
+          "Formats: multiple choice (from card content), true/false, and fill-in-the-blank (AI-generated sentences).",
+          "Platform admins troubleshooting missing true/false or fill-in-the-blank questions should verify formats are saved and AI generation completed — not Stripe or Clerk metadata.",
+        ],
+      },
+      {
         id: "cautions",
         title: "Do not",
         bullets: [

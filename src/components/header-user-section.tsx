@@ -119,6 +119,13 @@ export function HeaderUserSection({
 
   const hidePlatformAdminLink = shouldHidePlatformAdminNav(pathname);
 
+  const workspaceDropdownEligible =
+    workspaceTeams.length > 0 ||
+    workspaceTeamsTotalEligible > 0 ||
+    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan)) ||
+    teamDashFallback != null ||
+    isPro;
+
   return (
     <div className="flex items-center gap-1 sm:gap-2">
       {isAdmin && !hidePlatformAdminLink && (
@@ -159,8 +166,7 @@ export function HeaderUserSection({
         {portalsReady ? (
           <>
             {showWorkspaceSwitcher &&
-              (workspaceTeams.length > 0 ||
-                (activeTeamPlan != null && isTeamPlanId(activeTeamPlan))) &&
+              workspaceDropdownEligible &&
               !hideWorkspaceSwitcherOnWorkspaceManagement &&
               !hideWorkspaceSwitcherOnTeamRoute &&
               !hideWorkspaceSwitcherOnPricingForTeamTier && (

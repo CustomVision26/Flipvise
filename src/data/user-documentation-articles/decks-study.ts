@@ -54,8 +54,21 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Study modes",
         bullets: [
           "Flashcard review — flip cards and track familiarity.",
-          "Quiz mode — multiple-choice or typed questions with scoring.",
+          "Quiz mode — timed session with scoring and optional team policies.",
           "Team members may be restricted to review only, quiz only, or both per assignment.",
+        ],
+      },
+      {
+        id: "quiz-formats",
+        title: "Quiz question formats",
+        bullets: [
+          "Multiple choice — pick the best answer from several options (uses card front/back or stored choices).",
+          "True / false — decide whether an AI-generated statement is true or false.",
+          "Fill in the blank — type the missing word or phrase in an AI-generated sentence.",
+          "Admins enable formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
+          "The quiz lobby lists enabled formats and estimates the mix for the current session.",
+          "Each question shows a format badge while you answer.",
+          "When multiple formats are enabled, the app picks one format per card at random for variety.",
         ],
       },
       {

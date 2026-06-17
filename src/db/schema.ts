@@ -10,7 +10,8 @@ import {
   index,
   json,
 } from 'drizzle-orm/pg-core';
-import type { InferSelectModel } from 'drizzle-orm';
+import type { CardQuizVariants, FillInBlankSegment } from '@/lib/card-quiz-variants';
+import type { QuizQuestionType } from '@/lib/quiz-questions';
 
 export const supportCategoryEnum = pgEnum('support_category', [
   'general_support',
@@ -115,6 +116,12 @@ export const teams = pgTable('teams', {
   quizStartScheduleEnabled: boolean().notNull().default(false),
   /** Earliest moment members may start a quiz (workspace default when deck schedule is off). */
   quizStartAt: timestamp(),
+  /** When true, quizzes may include multiple-choice questions (default on). */
+  quizFormatMultipleChoice: boolean().notNull().default(true),
+  /** When true, quizzes may include AI-generated true/false statements. */
+  quizFormatTrueFalse: boolean().notNull().default(false),
+  /** When true, quizzes may include AI-generated fill-in-the-blank sentences. */
+  quizFormatFillInBlank: boolean().notNull().default(false),
   createdAt: timestamp().notNull().defaultNow(),
 });
 
@@ -150,6 +157,10 @@ export const decks = pgTable('decks', {
    * When true or false, overrides the workspace for this deck only.
    */
   quizSecurityEnabled: boolean(),
+  /** Per-deck quiz format overrides — null inherits workspace defaults. */
+  quizFormatMultipleChoice: boolean(),
+  quizFormatTrueFalse: boolean(),
+  quizFormatFillInBlank: boolean(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });
@@ -644,6 +655,8 @@ export type PerCardSnapshot = {
   cardId: number;
   /** Question / front text shown to the user. */
   question: string | null;
+  /** Quiz format used for this question when the result was saved. */
+  questionType?: "multiple_choice" | "true_false" | "fill_in_blank";
   /** The correct answer text. */
   correctAnswer: string;
   /** What the user selected; null means unanswered. */
@@ -702,13 +715,20 @@ export const quizResults = pgTable('quiz_results', {
 /** Serialized quiz progress for secured team-workspace quiz sessions. */
 export type QuizSecuritySessionState = {
   questions: {
+    type: QuizQuestionType;
     cardId: number;
     question: string | null;
     questionImageUrl: string | null;
     options: string[];
     correctIndex: number;
+    statement?: string;
+    correctAnswer?: boolean;
+    segments?: FillInBlankSegment[];
   }[];
+  /** Choice index for MC/TF; null when unanswered or FIB. */
   selectedByIndex: (number | null)[];
+  /** Typed answers for fill-in-the-blank questions. */
+  typedAnswersByIndex: (string | null)[];
   currentIndex: number;
   remainingSeconds: number;
 };
@@ -779,6 +799,8 @@ export const cards = pgTable('cards', {
   choices: text().array(),
   /** Index into `choices` pointing to the correct answer (0..3). Null for standard cards. */
   correctChoiceIndex: integer(),
+  /** AI-generated true/false and fill-in-the-blank quiz content for this card. */
+  quizVariants: json().$type<CardQuizVariants>(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });

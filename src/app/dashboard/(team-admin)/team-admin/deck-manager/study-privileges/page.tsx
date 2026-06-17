@@ -40,6 +40,11 @@ import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
 import { TeamDeckManagerSubTabs } from "@/components/team-deck-manager-sub-tabs";
 import { TeamStudyPrivilegesTable } from "@/components/team-study-privileges-table";
+import { TeamQuizFormatsSettings } from "@/components/team-quiz-formats-settings";
+import {
+  listQuizFormatsDecksForWorkspace,
+  listQuizFormatsWorkspacesForOwner,
+} from "@/db/queries/quiz-formats";
 
 interface PageProps {
   searchParams: Promise<{
@@ -84,7 +89,8 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
   }
   const { selected, teamsForSubscriber, viewerTeamMemberUrlParam } = resolution;
 
-  const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
+  const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts, quizFormatWorkspaces] =
+    await Promise.all([
     Promise.all(
       teamsForSubscriber.map(async (t) => {
         const [teamMembers, decks, assignments] = await Promise.all([
@@ -102,7 +108,25 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
       }),
     ),
     getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
+    listQuizFormatsWorkspacesForOwner(userId),
   ]);
+
+  const subscriberTeamIds = new Set(teamsForSubscriber.map((t) => t.id));
+  const quizFormatsWorkspacesForUi = quizFormatWorkspaces.filter((w) =>
+    subscriberTeamIds.has(w.id),
+  );
+  const decksByWorkspaceId: Record<
+    number,
+    Awaited<ReturnType<typeof listQuizFormatsDecksForWorkspace>>
+  > = {};
+  await Promise.all(
+    teamsForSubscriber.map(async (t) => {
+      decksByWorkspaceId[t.id] = await listQuizFormatsDecksForWorkspace(
+        t.id,
+        t.ownerUserId,
+      );
+    }),
+  );
 
   const memberUserIds = privilegeWorkspaceSnapshots.flatMap((w) =>
     w.teamMembers.map((m) => m.userId),
@@ -200,6 +224,12 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
           selected.id,
           viewerTeamMemberUrlParam,
         )}
+      />
+
+      <TeamQuizFormatsSettings
+        workspaces={toClientJson(quizFormatsWorkspacesForUi)}
+        decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
+        defaultWorkspaceId={selected.id}
       />
 
       <Card className={teamAdminActivePanelClass}>

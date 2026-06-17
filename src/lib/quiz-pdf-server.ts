@@ -1,4 +1,5 @@
 import type { PerCardSnapshot } from "@/db/schema";
+import { questionTypeResultLabel, type QuizQuestionType } from "@/lib/quiz-questions";
 
 export type QuizPdfData = {
   deckName: string;
@@ -175,7 +176,10 @@ export async function generateQuizResultPdfBuffer(data: QuizPdfData): Promise<Bu
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(20);
-      const qText = `Q${idx + 1}.  ${card.question ?? "(no question text)"}`;
+      const formatSuffix = card.questionType
+        ? ` (${questionTypeResultLabel(card.questionType as QuizQuestionType)})`
+        : "";
+      const qText = `Q${idx + 1}${formatSuffix}.  ${card.question ?? "(no question text)"}`;
       const qLines = doc.splitTextToSize(qText, contentW - 70);
       doc.text(qLines, margin, y);
 

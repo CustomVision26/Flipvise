@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { BookOpen, ListChecks } from "lucide-react";
+import type { QuizFormatsSettings } from "@/lib/quiz-formats";
+import type { CardQuizVariants } from "@/lib/card-quiz-variants";
+import type { QuizSecuritySessionState } from "@/db/schema";
 import { FlashcardStudy } from "./flashcard-study";
 import { QuizStudy } from "./quiz-study";
 
@@ -22,6 +25,7 @@ type CardData = {
   backImageUrl: string | null;
   choices: string[] | null;
   correctChoiceIndex: number | null;
+  quizVariants?: CardQuizVariants | null;
 };
 
 export interface StudySessionProps {
@@ -60,20 +64,11 @@ export interface StudySessionProps {
     initialSession: {
       id: number;
       status: "active" | "locked" | "granted_resume" | "terminated" | "completed";
-      sessionState: {
-        questions: {
-          cardId: number;
-          question: string | null;
-          questionImageUrl: string | null;
-          options: string[];
-          correctIndex: number;
-        }[];
-        selectedByIndex: (number | null)[];
-        currentIndex: number;
-        remainingSeconds: number;
-      } | null;
+      sessionState: QuizSecuritySessionState | null;
     } | null;
   };
+  /** Resolved quiz question formats for this study session. */
+  quizFormats?: QuizFormatsSettings;
 }
 
 export function StudySession({
@@ -93,6 +88,7 @@ export function StudySession({
   ownerInboxAvailable = false,
   quizSchedule,
   quizSecurity,
+  quizFormats,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
   const showQuizTab = memberAllowQuiz && allowsQuizStudy;
@@ -224,6 +220,7 @@ export function StudySession({
               ownerInboxAvailable={ownerInboxAvailable}
               quizSchedule={quizSchedule}
               quizSecurity={quizSecurity}
+              quizFormats={quizFormats}
             />
           </TabsContent>
         ) : null}
