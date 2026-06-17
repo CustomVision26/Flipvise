@@ -292,6 +292,9 @@ const teamRowSelectWithoutQuizSchedule = {
   planSlug: teams.planSlug,
   quizDurationMinutes: teams.quizDurationMinutes,
   quizSecurityEnabled: teams.quizSecurityEnabled,
+  quizFormatMultipleChoice: teams.quizFormatMultipleChoice,
+  quizFormatTrueFalse: teams.quizFormatTrueFalse,
+  quizFormatFillInBlank: teams.quizFormatFillInBlank,
   createdAt: teams.createdAt,
 } as const;
 
@@ -1201,11 +1204,11 @@ export async function getWorkspaceNavTeamsForUser(
     };
   });
 
-  const teams = options.personalProUnlocked
+  const navTeams = options.personalProUnlocked
     ? full
     : full.slice(0, FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT);
 
-  return { teams, totalEligibleCount };
+  return { teams: navTeams, totalEligibleCount };
 }
 
 /**
