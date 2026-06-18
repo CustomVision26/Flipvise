@@ -59,7 +59,7 @@ const AddTeamDialog = dynamic(
 );
 import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
 
-interface PageProps {
+interface TeamAdminDashboardViewProps {
   searchParams: Promise<{
     team?: string;
     teamMemberId?: string;
@@ -73,7 +73,7 @@ interface PageProps {
 export default async function TeamAdminDashboardView({
   searchParams,
   buildCanonicalPath = buildTeamAdminMembersPath,
-}: PageProps) {
+}: TeamAdminDashboardViewProps) {
   const { userId } = await auth();
   if (!userId) redirect("/");
 

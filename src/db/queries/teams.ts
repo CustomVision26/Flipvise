@@ -15,6 +15,7 @@ import {
   deckRowSelectWithoutCover,
   getDeckRowById,
   isMissingDeckCoverColumnError,
+  withNullCover,
   type DeckRow,
 } from "@/db/queries/decks";
 import {
@@ -626,11 +627,7 @@ export async function getDecksForTeam(
         .select(deckRowSelectWithoutCover)
         .from(decks)
         .where(where);
-      return rows.map((r) => ({
-        ...r,
-        coverImageUrl: null,
-        gradient: null,
-      }));
+      return rows.map(withNullCover);
     }
   }
 
@@ -708,11 +705,7 @@ export async function getAssignedDecksForMember(
           eq(teamDeckAssignments.memberUserId, memberUserId),
         ),
       );
-    return rows.map((r) => ({
-      ...r,
-      coverImageUrl: null,
-      gradient: null,
-    }));
+    return rows.map(withNullCover);
   }
 }
 

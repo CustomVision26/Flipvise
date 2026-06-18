@@ -119,15 +119,19 @@ export async function generateQuizVariantsForCard(input: {
   }
 
   const result: CardQuizVariants = {};
-  if (includeTrueFalse && parsed.data.trueFalse?.statement?.trim()) {
+  const data = parsed.data as {
+    trueFalse?: { statement: string; correctAnswer: boolean };
+    fillInBlank?: { segments: z.infer<typeof aiFillInBlankSegmentSchema>[] };
+  };
+  if (includeTrueFalse && data.trueFalse?.statement?.trim()) {
     result.trueFalse = {
-      statement: parsed.data.trueFalse.statement.trim(),
-      correctAnswer: parsed.data.trueFalse.correctAnswer,
+      statement: data.trueFalse.statement.trim(),
+      correctAnswer: data.trueFalse.correctAnswer,
     };
   }
 
-  if (includeFillInBlank && parsed.data.fillInBlank?.segments?.length) {
-    const segments = normalizeAiFillInBlankSegments(parsed.data.fillInBlank.segments);
+  if (includeFillInBlank && data.fillInBlank?.segments?.length) {
+    const segments = normalizeAiFillInBlankSegments(data.fillInBlank.segments);
     if (segments) {
       result.fillInBlank = { segments };
     }

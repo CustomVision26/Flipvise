@@ -13,6 +13,10 @@ export const deckRowSelectWithoutCover = {
   quizStartScheduleEnabled: decks.quizStartScheduleEnabled,
   quizStartAt: decks.quizStartAt,
   quizSecurityEnabled: decks.quizSecurityEnabled,
+  quizFormatMultipleChoice: decks.quizFormatMultipleChoice,
+  quizFormatTrueFalse: decks.quizFormatTrueFalse,
+  quizFormatFillInBlank: decks.quizFormatFillInBlank,
+  quizFormatAssignments: decks.quizFormatAssignments,
   createdAt: decks.createdAt,
   updatedAt: decks.updatedAt,
 } as const;
@@ -46,7 +50,7 @@ export function isMissingDeckCoverColumnError(error: unknown): boolean {
   return false;
 }
 
-function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient">>(row: T): DeckRow {
+export function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient">>(row: T): DeckRow {
   return {
     ...row,
     coverImageUrl: null,
