@@ -31,6 +31,8 @@ import {
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 import { resolvePrioritySupportAccess } from "@/lib/priority-support-eligibility";
+import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
+import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -123,7 +125,93 @@ function stripeSlugForPersonalTier(resolution: PersonalPlanResolution): string |
 function isClerkBackendRateLimitError(error: unknown): boolean {
   if (!isClerkAPIResponseError(error)) return false;
   const msg = error.message.toLowerCase();
-  return msg.includes("too many requests") || msg.includes("rate limit");
+  return (
+    msg.includes("too many requests") ||
+    msg.includes("rate limit") ||
+    msg.includes("429")
+  );
+}
+
+async function accessContextFromActiveAffiliateGrant(input: {
+  userId: string;
+  primaryEmail: string | null;
+  paidProFromHas: boolean;
+  paidProPlusFromHas: boolean;
+  paidCustomColors: boolean;
+  aiReadingForTier: (stripeSlug: string | undefined | null) => boolean;
+}): Promise<AccessContext | null> {
+  const affiliates = await listAffiliatesForPlanHistory(
+    input.userId,
+    input.primaryEmail?.toLowerCase() ?? null,
+  );
+  const grant = resolveActiveAffiliateGrant(affiliates);
+  if (!grant) return null;
+
+  const planSlug = canonicalTeamPlanId(grant.planSlug) ?? grant.planSlug;
+
+  if (isTeamPlanId(planSlug)) {
+    const teamPlan = canonicalTeamPlanId(planSlug)!;
+    const lim = personalWorkspaceLimits({
+      unlocked: false,
+      activeTeamPlan: teamPlan,
+      stripeSlug: undefined,
+    });
+    return {
+      userId: input.userId,
+      isPro: true,
+      maxPersonalDecks: lim.maxPersonalDecks,
+      maxCardsPerDeck: lim.maxCardsPerDeck,
+      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+      hasAI: true,
+      hasAiReading: true,
+      hasPrioritySupport: true,
+      hasCustomColors: true,
+      hasProPlusInterfacePalette: true,
+      adminGranted: false,
+      isAdmin: false,
+      isSuperadmin: false,
+      activeTeamPlan: teamPlan,
+      hasClerkPersonalPro: input.paidProFromHas,
+      hasClerkPersonalProPlus: input.paidProPlusFromHas,
+      primaryEmail: input.primaryEmail,
+    };
+  }
+
+  if (planSlug === "pro" || planSlug === "pro_plus") {
+    const lim = personalWorkspaceLimits({
+      unlocked: false,
+      activeTeamPlan: null,
+      stripeSlug: planSlug,
+    });
+    return {
+      userId: input.userId,
+      isPro: true,
+      maxPersonalDecks: lim.maxPersonalDecks,
+      maxCardsPerDeck: lim.maxCardsPerDeck,
+      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+      hasAI: true,
+      hasAiReading: input.aiReadingForTier(planSlug),
+      hasPrioritySupport: prioritySupportForAccess({
+        isPlatformAdmin: false,
+        activeTeamPlan: null,
+        personalPlanSlug: planSlug,
+        hasClerkProPlusPlan: input.paidProPlusFromHas,
+      }),
+      hasCustomColors: true,
+      hasProPlusInterfacePalette: planSlug === "pro_plus" || input.paidCustomColors,
+      adminGranted: false,
+      isAdmin: false,
+      isSuperadmin: false,
+      activeTeamPlan: null,
+      hasClerkPersonalPro: input.paidProFromHas,
+      hasClerkPersonalProPlus: input.paidProPlusFromHas,
+      primaryEmail: input.primaryEmail,
+    };
+  }
+
+  return null;
 }
 
 /** Clerk Backend `User` — avoid importing heavy types; used only for inbox badge email reuse in layout. */
@@ -426,6 +514,18 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
         };
       }
     }
+  }
+
+  if (!unlocked && !superadminAllowListed) {
+    const affiliateAccess = await accessContextFromActiveAffiliateGrant({
+      userId,
+      primaryEmail,
+      paidProFromHas,
+      paidProPlusFromHas,
+      paidCustomColors,
+      aiReadingForTier,
+    });
+    if (affiliateAccess) return affiliateAccess;
   }
 
   const jwtPaid = !metadataForcedPersonalFree;
