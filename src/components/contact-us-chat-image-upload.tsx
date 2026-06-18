@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
-import { uploadContactUsChatImageAction } from "@/actions/contact-us";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -57,8 +56,17 @@ export function ContactUsChatImageUpload({
         formData.append("messageId", String(messageId));
         if (accessToken) formData.append("token", accessToken);
         formData.append("image", file);
-        const url = await uploadContactUsChatImageAction(formData);
-        onChange(url);
+
+        const response = await fetch("/api/contact-us/chat-image", {
+          method: "POST",
+          body: formData,
+        });
+        const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+        if (!response.ok || !data?.url) {
+          throw new Error(data?.error ?? "Upload failed");
+        }
+
+        onChange(data.url);
         setUploadState("done");
       } catch (err) {
         setUploadError(err instanceof Error ? err.message : "Upload failed");

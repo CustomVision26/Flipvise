@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { auth, currentUser } from "@/lib/clerk-auth";
+import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { createClerkClient } from "@clerk/backend";
 import {
   addContactUsReply,
@@ -37,13 +37,14 @@ import {
 } from "@/lib/contact-us-access";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
+import { getContactUsSessionUser } from "@/lib/contact-us-session";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
 async function requireAdmin() {
-  const { userId } = await auth();
+  const { userId } = await clerkAuth();
   if (!userId) throw new Error("Unauthorized");
   const caller = await clerkClient.users.getUser(userId);
   const role = (caller.publicMetadata as { role?: string })?.role;
@@ -58,14 +59,7 @@ async function requireAdmin() {
 }
 
 async function getOptionalSessionUser() {
-  const { userId } = await auth();
-  if (!userId) return { userId: null as string | null, userEmail: null as string | null, userName: null as string | null };
-  const user = await currentUser();
-  return {
-    userId,
-    userEmail: user?.primaryEmailAddress?.emailAddress ?? null,
-    userName: user?.fullName ?? user?.username ?? null,
-  };
+  return getContactUsSessionUser();
 }
 
 async function assertContactUsThreadAccess(messageId: number, token?: string) {
@@ -122,50 +116,13 @@ const replySchema = z
     message: "Add a message or attach an image",
   });
 
-const CHAT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
-const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-
-async function canUploadToContactUsThread(messageId: number, token?: string) {
-  const session = await getOptionalSessionUser();
-  const { userId } = await auth();
-  if (userId) {
-    const caller = await clerkClient.users.getUser(userId);
-    const role = (caller.publicMetadata as { role?: string })?.role;
-    if (isClerkPlatformAdminRole(role) || isPlatformSuperadminAllowListed(userId)) {
-      return { scope: "admin" as const };
-    }
-  }
-
-  await assertContactUsThreadAccess(messageId, token);
-  return { scope: "participant" as const, session };
-}
-
-export async function uploadContactUsChatImageAction(formData: FormData): Promise<string> {
-  const messageId = z.coerce.number().int().positive().parse(formData.get("messageId"));
-  const token = formData.get("token")?.toString();
-
-  await canUploadToContactUsThread(messageId, token);
-
-  const file = formData.get("image");
-  if (!(file instanceof File)) throw new Error("No image file provided");
-  if (!CHAT_IMAGE_TYPES.includes(file.type as (typeof CHAT_IMAGE_TYPES)[number])) {
-    throw new Error("Only JPEG, PNG, WebP, and GIF images are allowed");
-  }
-  if (file.size > CHAT_IMAGE_MAX_BYTES) {
-    throw new Error("Image must be smaller than 10 MB");
-  }
-
-  const { uploadContactUsChatImageToS3 } = await import("@/lib/s3");
-  return uploadContactUsChatImageToS3({ messageId, file });
-}
-
 export async function submitContactUsMessageAction(data: z.infer<typeof submitContactMessageSchema>) {
   const parsed = submitContactMessageSchema.safeParse(data);
   if (!parsed.success) {
     return { ok: false as const, error: "Please check your message and try again." };
   }
 
-  const { userId } = await auth();
+  const { userId } = await clerkAuth();
 
   try {
     const message = await createContactUsMessage({
@@ -403,7 +360,7 @@ export async function markContactUsInboxNotificationReadAction(data: {
   const notificationId = z.number().int().positive().safeParse(data.notificationId);
   if (!notificationId.success) throw new Error("Invalid notification");
 
-  const { userId } = await auth();
+  const { userId } = await clerkAuth();
   if (!userId) throw new Error("Unauthorized");
   await markContactUsNotificationRead(userId, notificationId.data);
 
