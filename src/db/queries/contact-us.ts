@@ -5,6 +5,8 @@ import { SUPPORT_EMAIL } from "@/lib/support-contact";
 import {
   defaultPlatformContactSettingsRow,
   isContactUsSchemaUnavailableError,
+  isMissingContactUsReplyImageUrlColumnError,
+  warnMissingContactUsReplyImageUrlColumnOnce,
   withContactUsReadFallback,
 } from "@/lib/contact-us-db-fallback";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
@@ -123,13 +125,35 @@ export async function getContactUsWithReplies(messageId: number) {
   const message = await getContactUsMessageById(messageId);
   if (!message) return null;
 
-  const replies = await db
-    .select()
-    .from(contactUsReplies)
-    .where(eq(contactUsReplies.messageId, messageId))
-    .orderBy(contactUsReplies.createdAt);
-
+  const replies = await listContactUsRepliesForMessage(messageId);
   return { message, replies };
+}
+
+async function listContactUsRepliesForMessage(messageId: number) {
+  try {
+    return await db
+      .select()
+      .from(contactUsReplies)
+      .where(eq(contactUsReplies.messageId, messageId))
+      .orderBy(contactUsReplies.createdAt);
+  } catch (error) {
+    if (!isMissingContactUsReplyImageUrlColumnError(error)) throw error;
+    warnMissingContactUsReplyImageUrlColumnOnce();
+    const rows = await db
+      .select({
+        id: contactUsReplies.id,
+        messageId: contactUsReplies.messageId,
+        authorUserId: contactUsReplies.authorUserId,
+        authorName: contactUsReplies.authorName,
+        authorRole: contactUsReplies.authorRole,
+        message: contactUsReplies.message,
+        createdAt: contactUsReplies.createdAt,
+      })
+      .from(contactUsReplies)
+      .where(eq(contactUsReplies.messageId, messageId))
+      .orderBy(contactUsReplies.createdAt);
+    return rows.map((row) => ({ ...row, imageUrl: null }));
+  }
 }
 
 export async function getContactUsByAccessToken(messageId: number, accessToken: string) {
@@ -152,9 +176,31 @@ export async function addContactUsReply(input: {
   authorName: string;
   authorRole: "admin" | "user";
   message: string;
+  imageUrl?: string | null;
 }) {
-  return db.transaction(async (tx) => {
-    const [reply] = await tx
+  // neon-http driver does not support transactions — insert reply then update message.
+  let reply;
+  try {
+    [reply] = await db
+      .insert(contactUsReplies)
+      .values({
+        messageId: input.messageId,
+        authorUserId: input.authorUserId,
+        authorName: input.authorName,
+        authorRole: input.authorRole,
+        message: input.message,
+        imageUrl: input.imageUrl ?? null,
+      })
+      .returning();
+  } catch (error) {
+    if (!isMissingContactUsReplyImageUrlColumnError(error)) throw error;
+    if (input.imageUrl) {
+      throw new Error(
+        "Image attachments need a database update. Run: npm run db:ensure-contact-us-reply-images",
+      );
+    }
+    warnMissingContactUsReplyImageUrlColumnOnce();
+    [reply] = await db
       .insert(contactUsReplies)
       .values({
         messageId: input.messageId,
@@ -164,20 +210,21 @@ export async function addContactUsReply(input: {
         message: input.message,
       })
       .returning();
+    reply = { ...reply!, imageUrl: null };
+  }
 
-    const now = new Date();
-    const patch =
-      input.authorRole === "user"
-        ? { updatedAt: now, status: "open" as const }
-        : { updatedAt: now };
+  const now = new Date();
+  const patch =
+    input.authorRole === "user"
+      ? { updatedAt: now, status: "open" as const }
+      : { updatedAt: now };
 
-    await tx
-      .update(contactUsMessages)
-      .set(patch)
-      .where(eq(contactUsMessages.id, input.messageId));
+  await db
+    .update(contactUsMessages)
+    .set(patch)
+    .where(eq(contactUsMessages.id, input.messageId));
 
-    return reply!;
-  });
+  return reply!;
 }
 
 export async function listContactUsMessagesForUser(userId: string, email: string, limit = 50) {

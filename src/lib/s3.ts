@@ -109,6 +109,33 @@ export async function uploadSupportAttachmentToS3(options: UploadSupportAttachme
   const fileName = `attachment-${timestamp}-${randomString}${extension}`;
   const key = `support-attachments/${userId}/${fileName}`;
 
+  return uploadImageFileToS3({ key, file });
+}
+
+export interface UploadContactUsChatImageOptions {
+  messageId: number;
+  file: File;
+}
+
+export async function uploadContactUsChatImageToS3(
+  options: UploadContactUsChatImageOptions,
+): Promise<string> {
+  const { messageId, file } = options;
+
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const extension = file.name.includes(".")
+    ? file.name.substring(file.name.lastIndexOf("."))
+    : "";
+  const fileName = `image-${timestamp}-${randomString}${extension}`;
+  const key = `contact-us-chat/${messageId}/${fileName}`;
+
+  return uploadImageFileToS3({ key, file });
+}
+
+async function uploadImageFileToS3(options: { key: string; file: File }): Promise<string> {
+  const { key, file } = options;
+
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 

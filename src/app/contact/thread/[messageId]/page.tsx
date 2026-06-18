@@ -50,7 +50,7 @@ export default async function ContactUsThreadPage({ params, searchParams }: Page
               New replies appear automatically every few seconds.
             </p>
           </CardHeader>
-          <CardContent className="pt-5">
+          <CardContent className="flex max-h-[min(70dvh,640px)] min-h-[280px] flex-col overflow-hidden pt-5">
             <UserContactUsThreadPanel
               messageId={messageId}
               accessToken={token}

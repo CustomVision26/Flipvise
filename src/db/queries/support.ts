@@ -163,26 +163,25 @@ export async function addTicketReply(params: {
   authorRole: "admin" | "user";
   message: string;
 }) {
-  return db.transaction(async (tx) => {
-    const [reply] = await tx
-      .insert(supportTicketReplies)
-      .values({
-        ticketId: params.ticketId,
-        authorUserId: params.authorUserId,
-        authorName: params.authorName,
-        authorRole: params.authorRole,
-        adminId: params.authorRole === "admin" ? params.authorUserId : null,
-        adminName: params.authorRole === "admin" ? params.authorName : null,
-        message: params.message,
-      })
-      .returning();
-    const [ticket] = await tx
-      .update(supportTickets)
-      .set({ updatedAt: new Date() })
-      .where(eq(supportTickets.id, params.ticketId))
-      .returning();
-    return { reply, ticket: ticket ?? null };
-  });
+  // neon-http driver does not support transactions — insert reply then touch ticket row.
+  const [reply] = await db
+    .insert(supportTicketReplies)
+    .values({
+      ticketId: params.ticketId,
+      authorUserId: params.authorUserId,
+      authorName: params.authorName,
+      authorRole: params.authorRole,
+      adminId: params.authorRole === "admin" ? params.authorUserId : null,
+      adminName: params.authorRole === "admin" ? params.authorName : null,
+      message: params.message,
+    })
+    .returning();
+  const [ticket] = await db
+    .update(supportTickets)
+    .set({ updatedAt: new Date() })
+    .where(eq(supportTickets.id, params.ticketId))
+    .returning();
+  return { reply, ticket: ticket ?? null };
 }
 
 export async function updateSupportTicketStatus(

@@ -111,11 +111,53 @@ const threadAccessSchema = z.object({
   token: z.string().trim().min(1).max(64).optional(),
 });
 
-const replySchema = z.object({
-  messageId: z.number().int().positive(),
-  message: z.string().trim().min(1).max(5000),
-  token: z.string().trim().min(1).max(64).optional(),
-});
+const replySchema = z
+  .object({
+    messageId: z.number().int().positive(),
+    message: z.string().trim().max(5000).optional().default(""),
+    imageUrl: z.string().url().max(2000).nullable().optional(),
+    token: z.string().trim().min(1).max(64).optional(),
+  })
+  .refine((data) => data.message.trim().length > 0 || Boolean(data.imageUrl), {
+    message: "Add a message or attach an image",
+  });
+
+const CHAT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+async function canUploadToContactUsThread(messageId: number, token?: string) {
+  const session = await getOptionalSessionUser();
+  const { userId } = await auth();
+  if (userId) {
+    const caller = await clerkClient.users.getUser(userId);
+    const role = (caller.publicMetadata as { role?: string })?.role;
+    if (isClerkPlatformAdminRole(role) || isPlatformSuperadminAllowListed(userId)) {
+      return { scope: "admin" as const };
+    }
+  }
+
+  await assertContactUsThreadAccess(messageId, token);
+  return { scope: "participant" as const, session };
+}
+
+export async function uploadContactUsChatImageAction(formData: FormData): Promise<string> {
+  const messageId = z.coerce.number().int().positive().parse(formData.get("messageId"));
+  const token = formData.get("token")?.toString();
+
+  await canUploadToContactUsThread(messageId, token);
+
+  const file = formData.get("image");
+  if (!(file instanceof File)) throw new Error("No image file provided");
+  if (!CHAT_IMAGE_TYPES.includes(file.type as (typeof CHAT_IMAGE_TYPES)[number])) {
+    throw new Error("Only JPEG, PNG, WebP, and GIF images are allowed");
+  }
+  if (file.size > CHAT_IMAGE_MAX_BYTES) {
+    throw new Error("Image must be smaller than 10 MB");
+  }
+
+  const { uploadContactUsChatImageToS3 } = await import("@/lib/s3");
+  return uploadContactUsChatImageToS3({ messageId, file });
+}
 
 export async function submitContactUsMessageAction(data: z.infer<typeof submitContactMessageSchema>) {
   const parsed = submitContactMessageSchema.safeParse(data);
@@ -187,23 +229,44 @@ export async function replyToContactUsAction(data: z.infer<typeof replySchema>) 
   );
   if (thread.message.status === "archived") throw new Error("This conversation is archived");
 
-  await addContactUsReply({
-    messageId: parsed.data.messageId,
-    authorUserId: session.userId,
-    authorName: session.userName ?? thread.message.name,
-    authorRole: "user",
-    message: parsed.data.message,
-  });
+  const messageText = parsed.data.message.trim();
+  const imageUrl = parsed.data.imageUrl ?? null;
 
-  await notifyAdminsOfContactUsUserReply({
-    messageId: parsed.data.messageId,
-    subject: thread.message.subject,
-    message: parsed.data.message,
-    userName: session.userName ?? thread.message.name,
-  });
+  try {
+    await addContactUsReply({
+      messageId: parsed.data.messageId,
+      authorUserId: session.userId,
+      authorName: session.userName ?? thread.message.name,
+      authorRole: "user",
+      message: messageText,
+      imageUrl,
+    });
+  } catch (error) {
+    if (isContactUsSchemaUnavailableError(error)) {
+      throw new Error(
+        "Contact messaging is temporarily unavailable. Please try again later or email support.",
+      );
+    }
+    throw error;
+  }
 
-  revalidatePath("/admin/support-center/contact-us");
-  revalidatePath(`/contact/thread/${parsed.data.messageId}`);
+  try {
+    await notifyAdminsOfContactUsUserReply({
+      messageId: parsed.data.messageId,
+      subject: thread.message.subject,
+      message: messageText || "[Image attachment]",
+      userName: session.userName ?? thread.message.name,
+    });
+  } catch (error) {
+    console.error("[contact-us] notify admins of user reply failed", error);
+  }
+
+  try {
+    revalidatePath("/admin/support-center/contact-us");
+    revalidatePath(`/contact/thread/${parsed.data.messageId}`);
+  } catch (error) {
+    console.error("[contact-us] revalidate after user reply failed", error);
+  }
 
   const updated = await getContactUsWithReplies(parsed.data.messageId);
   if (!updated) throw new Error("Conversation not found");
@@ -219,29 +282,54 @@ export async function adminReplyToContactUsAction(data: z.infer<typeof replySche
   if (!thread) throw new Error("Conversation not found");
   if (thread.message.status === "archived") throw new Error("This conversation is archived");
 
-  await addContactUsReply({
-    messageId: parsed.data.messageId,
-    authorUserId: userId,
-    authorName: name,
-    authorRole: "admin",
-    message: parsed.data.message,
-  });
+  const messageText = parsed.data.message.trim();
+  const imageUrl = parsed.data.imageUrl ?? null;
 
-  if (thread.message.userId) {
-    await notifyUserOfContactUsAdminReply({
+  try {
+    await addContactUsReply({
       messageId: parsed.data.messageId,
-      recipientUserId: thread.message.userId,
-      subject: thread.message.subject,
-      message: parsed.data.message,
-      adminName: name,
+      authorUserId: userId,
+      authorName: name,
+      authorRole: "admin",
+      message: messageText,
+      imageUrl,
     });
+  } catch (error) {
+    if (isContactUsSchemaUnavailableError(error)) {
+      throw new Error(
+        "Contact messaging is temporarily unavailable. Please try again later.",
+      );
+    }
+    throw error;
   }
 
-  await markContactUsMessageRead(parsed.data.messageId, userId);
+  if (thread.message.userId) {
+    try {
+      await notifyUserOfContactUsAdminReply({
+        messageId: parsed.data.messageId,
+        recipientUserId: thread.message.userId,
+        subject: thread.message.subject,
+        message: messageText || "[Image attachment]",
+        adminName: name,
+      });
+    } catch (error) {
+      console.error("[contact-us] notify user of admin reply failed", error);
+    }
+  }
 
-  revalidatePath("/admin/support-center/contact-us");
-  revalidatePath("/dashboard/inbox");
-  revalidatePath(`/contact/thread/${parsed.data.messageId}`);
+  try {
+    await markContactUsMessageRead(parsed.data.messageId, userId);
+  } catch (error) {
+    console.error("[contact-us] mark message read failed", error);
+  }
+
+  try {
+    revalidatePath("/admin/support-center/contact-us");
+    revalidatePath("/dashboard/inbox");
+    revalidatePath(`/contact/thread/${parsed.data.messageId}`);
+  } catch (error) {
+    console.error("[contact-us] revalidate after admin reply failed", error);
+  }
 
   const updated = await getContactUsWithReplies(parsed.data.messageId);
   if (!updated) throw new Error("Conversation not found");

@@ -435,6 +435,7 @@ export const contactUsReplies = pgTable(
     authorName: varchar({ length: 255 }).notNull(),
     authorRole: contactUsAuthorRoleEnum().notNull(),
     message: text().notNull(),
+    imageUrl: text(),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [index('contact_us_replies_message_idx').on(t.messageId)],

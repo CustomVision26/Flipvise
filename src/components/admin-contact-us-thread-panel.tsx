@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import {
   adminReplyToContactUsAction,
@@ -9,7 +9,13 @@ import {
 import { ContactUsThreadClient } from "@/components/contact-us-thread-client";
 import type { ContactUsThread } from "@/lib/contact-us-thread-dto";
 
-export function AdminContactUsThreadPanel({ messageId }: { messageId: number }) {
+export function AdminContactUsThreadPanel({
+  messageId,
+  stickyFooterExtra,
+}: {
+  messageId: number;
+  stickyFooterExtra?: ReactNode;
+}) {
   const [initialThread, setInitialThread] = useState<ContactUsThread | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -37,22 +43,29 @@ export function AdminContactUsThreadPanel({ messageId }: { messageId: number }) 
 
   if (!initialThread) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center">
+      <div className="flex min-h-[200px] flex-1 items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
       </div>
     );
   }
 
   return (
-    <ContactUsThreadClient
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <ContactUsThreadClient
       messageId={messageId}
       viewerRole="admin"
       initialThread={initialThread}
       fetchThread={() => getAdminContactUsThreadAction({ messageId })}
-      sendReply={async (message) => {
-        const result = await adminReplyToContactUsAction({ messageId, message });
+      sendReply={async (payload) => {
+        const result = await adminReplyToContactUsAction({
+          messageId,
+          message: payload.message,
+          imageUrl: payload.imageUrl,
+        });
         return result.thread;
       }}
+      stickyFooterExtra={stickyFooterExtra}
     />
+    </div>
   );
 }

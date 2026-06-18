@@ -35,9 +35,11 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Table,
   TableBody,
@@ -461,32 +463,72 @@ export function AdminContactUsPanel({
       </div>
 
       <Sheet open={selectedMessage != null} onOpenChange={handleCloseSheet}>
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-xl">
+        <SheetContent
+          side="right"
+          className="flex h-dvh max-h-dvh w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
+        >
           {selectedMessage ? (
             <>
-              <SheetHeader className="shrink-0 border-b border-border/40 pb-4">
-                <SheetTitle>{selectedMessage.subject}</SheetTitle>
-                <p className="text-sm text-muted-foreground">
-                  Conversation with {selectedMessage.name} · {selectedMessage.email}
+              <SheetHeader className="shrink-0 space-y-3 border-b border-border/50 px-5 py-4 text-left sm:px-6">
+                <div className="flex items-start gap-3 pr-8">
+                  <Avatar size="default" className="mt-0.5 shrink-0">
+                    <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
+                      {selectedMessage.name
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part) => part[0]?.toUpperCase() ?? "")
+                        .join("") || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <SheetTitle className="text-base leading-snug">
+                      {selectedMessage.subject}
+                    </SheetTitle>
+                    <SheetDescription className="text-sm leading-snug">
+                      <span className="font-medium text-foreground/90">
+                        {selectedMessage.name}
+                      </span>
+                      <span> · </span>
+                      <span>{selectedMessage.email}</span>
+                    </SheetDescription>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "shrink-0 text-[11px] font-medium capitalize",
+                      selectedMessage.status === "open" &&
+                        "border-sky-500/40 bg-sky-500/10 text-sky-300",
+                      selectedMessage.status === "read" &&
+                        "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+                    )}
+                  >
+                    {STATUS_LABELS[selectedMessage.status]}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Received {formatDateTime(selectedMessage.createdAt)}
                 </p>
               </SheetHeader>
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden py-4">
-                <AdminContactUsThreadPanel messageId={selectedMessage.id} />
-                {selectedMessage.status !== "archived" ? (
-                  <div className="mt-4 shrink-0 border-t border-border/40 pt-4">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={isPending}
-                      onClick={() => handleArchive(selectedMessage.id)}
-                    >
-                      <Archive className="size-3.5" aria-hidden />
-                      Archive conversation
-                    </Button>
-                  </div>
-                ) : null}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-4 pt-3 sm:px-6">
+                <AdminContactUsThreadPanel
+                  messageId={selectedMessage.id}
+                  stickyFooterExtra={
+                    selectedMessage.status !== "archived" ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="w-full gap-1.5 sm:w-auto"
+                        disabled={isPending}
+                        onClick={() => handleArchive(selectedMessage.id)}
+                      >
+                        <Archive className="size-3.5" aria-hidden />
+                        Archive conversation
+                      </Button>
+                    ) : null
+                  }
+                />
               </div>
             </>
           ) : null}
