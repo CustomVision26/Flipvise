@@ -17,8 +17,10 @@ import {
   ImagePlus,
   X,
   Zap,
+  Eye,
 } from "lucide-react";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
+import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -71,7 +73,10 @@ function ImageUploader({ value, onChange }: ImageUploaderProps) {
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const displaySrc = value ?? preview;
 
   const handleFile = useCallback(async (file: File) => {
     setUploadError(null);
@@ -106,6 +111,7 @@ function ImageUploader({ value, onChange }: ImageUploaderProps) {
   }
 
   function handleRemove() {
+    setViewOpen(false);
     setPreview(null);
     onChange(null);
     setUploadState("idle");
@@ -115,37 +121,50 @@ function ImageUploader({ value, onChange }: ImageUploaderProps) {
 
   if (preview && (uploadState === "uploading" || uploadState === "done")) {
     return (
-      <div className="relative rounded-lg overflow-hidden border border-border bg-muted/30">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={preview} alt="Attachment preview" className="w-full max-h-48 object-cover" />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity opacity-0 hover:opacity-100">
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={handleRemove}
-            className="gap-1"
-          >
-            <X className="h-3.5 w-3.5" />
-            Remove
-          </Button>
+      <>
+        <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="Attachment preview" className="w-full max-h-48 object-contain" />
+          {uploadState === "uploading" && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <Loader2 className="h-6 w-6 animate-spin text-white" />
+            </div>
+          )}
+          {uploadState === "done" && displaySrc ? (
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-3 pb-2.5 pt-8">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setViewOpen(true)}
+                className="gap-1"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                View
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleRemove}
+                className="gap-1"
+              >
+                <X className="h-3.5 w-3.5" />
+                Remove
+              </Button>
+            </div>
+          ) : null}
         </div>
-        {uploadState === "uploading" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <Loader2 className="h-6 w-6 text-white animate-spin" />
-          </div>
-        )}
-        {uploadState === "done" && value && (
-          <button
-            type="button"
-            onClick={handleRemove}
-            className="absolute top-1.5 right-1.5 rounded-full bg-black/60 p-0.5 text-white hover:bg-black/80 transition-colors"
-            aria-label="Remove attachment"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
+        {displaySrc ? (
+          <ImageEnlargeOverlay
+            open={viewOpen}
+            onClose={() => setViewOpen(false)}
+            src={displaySrc}
+            alt="Attachment preview"
+            title="Screenshot preview"
+          />
+        ) : null}
+      </>
     );
   }
 

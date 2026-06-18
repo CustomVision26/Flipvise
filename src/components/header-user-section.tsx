@@ -13,6 +13,7 @@ import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 import type { WorkspaceTeamOption } from "@/components/workspace-context-dropdown";
 import { WorkspaceContextDropdown } from "@/components/workspace-context-dropdown";
 import { InboxNavIconButton } from "@/components/inbox-nav-icon-button";
+import { HelpCenterNavIconButton } from "@/components/help-center-nav-icon-button";
 import {
   shouldHidePlatformAdminNav,
   shouldHideWorkspaceSwitcher,
@@ -54,6 +55,8 @@ interface HeaderUserSectionProps {
   resolvedHasProPlusInterfacePalette?: boolean;
   /** Count of open (pending + non-expired) inbox invitations for the nav badge. */
   inboxUnreadCount?: number;
+  /** When true, show the Help Center question-mark icon (hidden for team workspace members). */
+  showHelpCenter?: boolean;
 }
 
 export function HeaderUserSection({
@@ -72,6 +75,7 @@ export function HeaderUserSection({
   resolvedActiveTeamPlan = null,
   resolvedHasProPlusInterfacePalette = false,
   inboxUnreadCount = 0,
+  showHelpCenter = false,
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
   const { userId } = useAuth();
@@ -212,6 +216,7 @@ export function HeaderUserSection({
           </>
         ) : null}
       </div>
+      {portalsReady && showHelpCenter ? <HelpCenterNavIconButton /> : null}
       {portalsReady ? <InboxNavIconButton unreadCount={inboxUnreadCount} /> : null}
     </div>
   );

@@ -208,6 +208,7 @@ export default async function RootLayout({
                           hasProPlusInterfacePalette
                         }
                         inboxUnreadCount={shell.inboxUnreadCount}
+                        showHelpCenter={!shell.hideHelpCenter}
                       />
                     </div>
                   )}

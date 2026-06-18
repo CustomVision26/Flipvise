@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useCallback } from "react";
 import { Loader2, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import type {
   SerializedTicketMessage,
   SupportTicketThreadTicket,
 } from "@/lib/support-ticket-dto";
+import { useSupportTicketThreadPoll } from "@/hooks/use-support-ticket-thread-poll";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -83,6 +84,28 @@ export function HelpCenterMyTickets() {
     setTickets(rows);
   }
 
+  const fetchThread = useCallback(async () => {
+    if (activeTicketId == null) {
+      throw new Error("No active ticket");
+    }
+    return getMySupportTicketThreadAction(activeTicketId);
+  }, [activeTicketId]);
+
+  const handleThreadUpdate = useCallback(
+    (thread: { ticket: SupportTicketThreadTicket; messages: SerializedTicketMessage[] }) => {
+      setThreadTicket(thread.ticket);
+      setMessages(thread.messages);
+    },
+    [],
+  );
+
+  useSupportTicketThreadPoll({
+    ticketId: activeTicketId ?? 0,
+    enabled: activeTicketId != null,
+    fetchThread,
+    onThread: handleThreadUpdate,
+  });
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -123,13 +146,13 @@ export function HelpCenterMyTickets() {
       )}
 
       <Dialog open={activeTicketId != null} onOpenChange={closeDialog}>
-        <DialogContent className="flex max-h-[min(85vh,40rem)] flex-col gap-0 overflow-hidden sm:max-w-lg">
+        <DialogContent className="flex h-[min(85vh,40rem)] max-h-[min(85vh,40rem)] flex-col gap-0 overflow-hidden p-4 sm:max-w-lg">
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-left text-base leading-snug">
               {threadTicket ? `#${threadTicket.id} — ${threadTicket.subject}` : "Support ticket"}
             </DialogTitle>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden px-1 py-2">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 py-2">
             {isThreadLoading && !threadTicket ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

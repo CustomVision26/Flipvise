@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import type {
   SerializedTicketMessage,
   SupportTicketThreadTicket,
 } from "@/lib/support-ticket-dto";
+import { useSupportTicketThreadPoll } from "@/hooks/use-support-ticket-thread-poll";
 
 export function SupportTicketInboxDialog({
   item,
@@ -50,18 +51,38 @@ export function SupportTicketInboxDialog({
     });
   }, [open, item.payload.ticketId]);
 
+  const fetchThread = useCallback(
+    () => getMySupportTicketThreadAction(item.payload.ticketId),
+    [item.payload.ticketId],
+  );
+
+  const handleThreadUpdate = useCallback(
+    (thread: { ticket: SupportTicketThreadTicket; messages: SerializedTicketMessage[] }) => {
+      setThreadTicket(thread.ticket);
+      setMessages(thread.messages);
+    },
+    [],
+  );
+
+  useSupportTicketThreadPoll({
+    ticketId: item.payload.ticketId,
+    enabled: open,
+    fetchThread,
+    onThread: handleThreadUpdate,
+  });
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" />}>
         {triggerLabel}
       </DialogTrigger>
-      <DialogContent className="flex max-h-[min(85vh,40rem)] flex-col gap-0 overflow-hidden sm:max-w-lg">
+      <DialogContent className="flex h-[min(85vh,40rem)] max-h-[min(85vh,40rem)] flex-col gap-0 overflow-hidden p-4 sm:max-w-lg">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-left text-base leading-snug">
             {item.payload.subject}
           </DialogTitle>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-hidden px-1 py-2">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-1 py-2">
           {isLoading && !threadTicket ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

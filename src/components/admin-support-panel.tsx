@@ -64,6 +64,7 @@ import {
   getAdminSupportTicketThreadAction,
 } from "@/actions/support-admin";
 import { SupportTicketThread } from "@/components/support-ticket-thread";
+import { useSupportTicketThreadPoll } from "@/hooks/use-support-ticket-thread-poll";
 import type {
   SerializedTicketMessage,
   SupportTicketThreadTicket,
@@ -223,6 +224,26 @@ function TicketDetailSheet({
       }
     });
   }, [ticket.id]);
+
+  const fetchThread = useCallback(
+    () => getAdminSupportTicketThreadAction(ticket.id),
+    [ticket.id],
+  );
+
+  const handleThreadUpdate = useCallback(
+    (thread: { ticket: SupportTicketThreadTicket; messages: SerializedTicketMessage[] }) => {
+      setThreadTicket(thread.ticket);
+      setMessages(thread.messages);
+    },
+    [],
+  );
+
+  useSupportTicketThreadPoll({
+    ticketId: ticket.id,
+    enabled: open,
+    fetchThread,
+    onThread: handleThreadUpdate,
+  });
 
   useEffect(() => {
     if (!open) return;

@@ -1,30 +1,32 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+function isLocalImageSrc(src: string): boolean {
+  return src.startsWith("blob:") || src.startsWith("data:");
+}
+
 type ImageEnlargeOverlayProps = {
   open: boolean;
   onClose: () => void;
   src: string;
-  alt: string;
-  title: string;
-  footer?: React.ReactNode;
-  unoptimized?: boolean;
+  alt?: string;
+  title?: string;
+  footer?: ReactNode;
 };
 
-/** Full-screen image preview via portal — avoids nested Dialog portal teardown crashes. */
+/** Full-screen enlarged image preview — portals to `document.body` to avoid nested modal issues. */
 export function ImageEnlargeOverlay({
   open,
   onClose,
   src,
-  alt,
-  title,
+  alt = "Enlarged image preview",
+  title = "Image preview",
   footer,
-  unoptimized = false,
 }: ImageEnlargeOverlayProps) {
   useEffect(() => {
     if (!open) return;
@@ -39,42 +41,38 @@ export function ImageEnlargeOverlay({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4 supports-backdrop-filter:backdrop-blur-xs"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4 supports-backdrop-filter:backdrop-blur-xs"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-label={alt}
     >
       <div
-        className="relative flex max-h-[min(92vh,40rem)] max-w-[min(calc(100vw-1.5rem),36rem)] flex-col overflow-hidden rounded-xl border-2 border-primary bg-card shadow-lg shadow-primary/30"
+        className="relative flex max-h-[min(92vh,48rem)] max-w-[min(calc(100vw-2rem),56rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="border-b border-primary/40 bg-primary px-3 py-2 pr-10">
-          <p className="text-xs font-semibold text-primary-foreground">{title}</p>
+        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5 pr-12">
+          <p className="text-sm font-medium text-foreground">{title}</p>
         </div>
-        <div className="flex flex-col gap-3 overflow-y-auto p-4">
+        <div className="overflow-auto p-4">
           <Image
             src={src}
             alt={alt}
-            width={640}
-            height={480}
-            className="mx-auto block h-auto max-h-[min(55vh,26rem)] w-auto max-w-[min(calc(100vw-3rem),32rem)] rounded-md border border-primary/35 bg-muted object-contain"
-            unoptimized={unoptimized}
+            width={1200}
+            height={900}
+            className="mx-auto block h-auto max-h-[min(78vh,42rem)] w-auto max-w-full rounded-md border border-border/60 bg-muted object-contain"
+            unoptimized={isLocalImageSrc(src)}
             priority
           />
-          {footer ? (
-            <div className="border-t border-border/60 pt-3 text-base leading-relaxed">
-              {footer}
-            </div>
-          ) : null}
+          {footer ? <div className="mt-3">{footer}</div> : null}
         </div>
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
-          className="absolute top-2 right-2 text-primary-foreground hover:bg-primary-foreground/20"
+          className="absolute top-2 right-2"
           onClick={onClose}
-          aria-label="Close enlarged image"
+          aria-label="Close enlarged preview"
         >
           <X className="h-4 w-4" />
         </Button>

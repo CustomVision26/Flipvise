@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { CheckCircle2, Loader2, RotateCcw, SendHorizonal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -53,10 +53,22 @@ export function SupportTicketThread({
   const [isPendingReply, startReply] = useTransition();
   const [isPendingResolve, startResolve] = useTransition();
   const [isPendingReopen, startReopen] = useTransition();
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(messages.length);
+
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current) {
+      messagesScrollRef.current?.scrollTo({
+        top: messagesScrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages]);
 
   const isClosed = ticket.status === "closed";
   const isResolved = ticket.status === "resolved";
-  const canReply = !disabled && !isClosed && viewerRole === "user" ? true : !disabled && !isClosed;
+  const canReply = !disabled && !isClosed && !isResolved;
 
   function handleReply(e: React.FormEvent) {
     e.preventDefault();
@@ -95,7 +107,7 @@ export function SupportTicketThread({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="text-xs capitalize">
           {STATUS_LABELS[ticket.status] ?? ticket.status}
@@ -105,7 +117,7 @@ export function SupportTicketThread({
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         <div
           className={cn(
             "rounded-lg border px-4 py-3",
