@@ -30,7 +30,7 @@ import {
 } from "@/lib/resolve-team-workspace-url";
 import "./globals.css";
 
-/** Turbopack: avoid static SSR import of these client chunks from the root layout. */
+/** Defer heavy optional UI — keep AppProviders static so Clerk hydrates without mismatch. */
 const TeamAdminHeaderSwitcherClient = dynamic(
   () => import("@/components/team-admin-header-switcher-client"),
   { loading: () => null },

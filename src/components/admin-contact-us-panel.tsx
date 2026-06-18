@@ -1,9 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Archive,
+  ArchiveRestore,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -17,9 +18,9 @@ import {
 import {
   adminArchiveContactUsMessageAction,
   adminMarkContactUsMessageReadAction,
+  adminUnarchiveContactUsMessageAction,
   updatePlatformContactSettingsAction,
 } from "@/actions/contact-us";
-import { AdminContactUsThreadPanel } from "@/components/admin-contact-us-thread-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,8 +66,28 @@ import type {
   SerializedContactMessage,
   SerializedContactSettings,
 } from "@/lib/contact-us-admin-dto";
+import {
+  canReopenContactUsConversation,
+  contactUsAdminStatusBadgeClass,
+  getContactUsAdminStatusLabel,
+  isGuestContactUsMessage,
+} from "@/lib/contact-us-admin-status";
 import type { ContactSocialLink } from "@/db/queries/contact-us";
 import { cn } from "@/lib/utils";
+
+const AdminContactUsThreadPanel = dynamic(
+  () =>
+    import("@/components/admin-contact-us-thread-panel").then(
+      (mod) => mod.AdminContactUsThreadPanel,
+    ),
+  {
+    loading: () => (
+      <div className="flex min-h-[200px] flex-1 items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    ),
+  },
+);
 
 const SOCIAL_PLATFORMS = [
   "Twitter / X",
@@ -79,12 +100,6 @@ const SOCIAL_PLATFORMS = [
   "Discord",
   "Other",
 ] as const;
-
-const STATUS_LABELS: Record<SerializedContactMessage["status"], string> = {
-  open: "Open",
-  read: "Read",
-  archived: "Archived",
-};
 
 interface AdminContactUsPanelProps {
   settings: SerializedContactSettings;
@@ -183,11 +198,21 @@ export function AdminContactUsPanel({
     });
   }
 
-  function handleArchive(messageId: number) {
+  function handleResolve(messageId: number) {
     startTransition(async () => {
       await adminArchiveContactUsMessageAction({ messageId });
       setSelectedMessage(null);
       router.replace("/admin/support-center/contact-us");
+      router.refresh();
+    });
+  }
+
+  function handleReopen(messageId: number) {
+    startTransition(async () => {
+      await adminUnarchiveContactUsMessageAction({ messageId });
+      setSelectedMessage((prev) =>
+        prev && prev.id === messageId ? { ...prev, status: "read" } : prev,
+      );
       router.refresh();
     });
   }
@@ -400,7 +425,7 @@ export function AdminContactUsPanel({
                   <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="open">Open</SelectItem>
                   <SelectItem value="read">Read</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="archived">Resolved</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -432,6 +457,9 @@ export function AdminContactUsPanel({
                         <div className="space-y-0.5">
                           <p className="font-medium">{message.name}</p>
                           <p className="text-xs text-muted-foreground">{message.email}</p>
+                          {isGuestContactUsMessage(message) ? (
+                            <p className="text-[10px] text-muted-foreground">Guest · not signed in</p>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="max-w-[240px] truncate">{message.subject}</TableCell>
@@ -439,12 +467,11 @@ export function AdminContactUsPanel({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-xs capitalize",
-                            message.status === "open" && "border-sky-500/40 text-sky-400",
-                            message.status === "read" && "border-emerald-500/40 text-emerald-400",
+                            "text-xs font-medium normal-case",
+                            contactUsAdminStatusBadgeClass(message),
                           )}
                         >
-                          {STATUS_LABELS[message.status]}
+                          {getContactUsAdminStatusLabel(message)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
@@ -491,19 +518,21 @@ export function AdminContactUsPanel({
                       </span>
                       <span> · </span>
                       <span>{selectedMessage.email}</span>
+                      {isGuestContactUsMessage(selectedMessage) ? (
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          Guest (not signed in)
+                        </span>
+                      ) : null}
                     </SheetDescription>
                   </div>
                   <Badge
                     variant="outline"
                     className={cn(
-                      "shrink-0 text-[11px] font-medium capitalize",
-                      selectedMessage.status === "open" &&
-                        "border-sky-500/40 bg-sky-500/10 text-sky-300",
-                      selectedMessage.status === "read" &&
-                        "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+                      "shrink-0 text-[11px] font-medium normal-case",
+                      contactUsAdminStatusBadgeClass(selectedMessage),
                     )}
                   >
-                    {STATUS_LABELS[selectedMessage.status]}
+                    {getContactUsAdminStatusLabel(selectedMessage)}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -512,21 +541,41 @@ export function AdminContactUsPanel({
               </SheetHeader>
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-4 pt-3 sm:px-6">
                 <AdminContactUsThreadPanel
+                  key={`${selectedMessage.id}-${selectedMessage.status}`}
                   messageId={selectedMessage.id}
                   stickyFooterExtra={
-                    selectedMessage.status !== "archived" ? (
+                    selectedMessage.status === "archived" ? (
+                      canReopenContactUsConversation(selectedMessage) ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full gap-1.5 sm:w-auto"
+                          disabled={isPending}
+                          onClick={() => handleReopen(selectedMessage.id)}
+                        >
+                          <ArchiveRestore className="size-3.5" aria-hidden />
+                          Reopen conversation
+                        </Button>
+                      ) : isGuestContactUsMessage(selectedMessage) ? (
+                        <p className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+                          This guest conversation is Unactive Archived and cannot be reopened. The
+                          visitor must start a new message from Contact Us (they are not signed in).
+                        </p>
+                      ) : null
+                    ) : (
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
                         className="w-full gap-1.5 sm:w-auto"
                         disabled={isPending}
-                        onClick={() => handleArchive(selectedMessage.id)}
+                        onClick={() => handleResolve(selectedMessage.id)}
                       >
-                        <Archive className="size-3.5" aria-hidden />
-                        Archive conversation
+                        <CheckCircle2 className="size-3.5" aria-hidden />
+                        Resolved
                       </Button>
-                    ) : null
+                    )
                   }
                 />
               </div>

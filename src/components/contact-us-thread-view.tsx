@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 const STATUS_LABELS: Record<ContactUsThread["status"], string> = {
   open: "Open",
   read: "In progress",
-  archived: "Archived",
+  archived: "Resolved",
 };
 
 function formatDateTime(iso: string) {
@@ -53,7 +53,7 @@ type Props = {
   disabled?: boolean;
   /** Hide the top meta row when the parent shell already shows status (e.g. admin sheet header). */
   showMeta?: boolean;
-  /** Extra actions pinned below the reply composer (e.g. Archive). */
+  /** Extra actions pinned below the reply composer (e.g. Resolved). */
   stickyFooterExtra?: ReactNode;
 };
 
@@ -288,7 +288,8 @@ export function ContactUsThreadView({
           </form>
         ) : isArchived ? (
           <p className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-            This conversation has been archived and no longer accepts new messages.
+            This issue has been marked as resolved. New messages are not accepted unless support reopens the
+            conversation.
           </p>
         ) : null}
         {stickyFooterExtra}

@@ -7,6 +7,7 @@ import { createClerkClient } from "@clerk/backend";
 import {
   addContactUsReply,
   archiveContactUsMessage,
+  unarchiveContactUsMessage,
   createContactUsMessage,
   getContactUsByAccessToken,
   getContactUsMessageById,
@@ -14,6 +15,7 @@ import {
   getPlatformContactSettings,
   isContactUsSchemaUnavailableError,
   markContactUsMessageRead,
+  resolveContactUsMessageByParticipant,
   upsertPlatformContactSettings,
   type ContactSocialLink,
 } from "@/db/queries/contact-us";
@@ -38,6 +40,7 @@ import {
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { getContactUsSessionUser } from "@/lib/contact-us-session";
+import { isGuestContactUsMessage } from "@/lib/contact-us-admin-status";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -176,6 +179,37 @@ export async function getAdminContactUsThreadAction(data: z.infer<typeof message
   return serializeContactUsThread(thread.message, thread.replies);
 }
 
+export async function userResolveContactUsThreadAction(
+  data: z.infer<typeof threadAccessSchema>,
+) {
+  const parsed = threadAccessSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid conversation");
+
+  const { thread } = await assertContactUsThreadAccess(parsed.data.messageId, parsed.data.token);
+  if (thread.message.status === "archived") {
+    return { ok: true as const, alreadyResolved: true as const };
+  }
+
+  try {
+    await resolveContactUsMessageByParticipant(parsed.data.messageId);
+  } catch (error) {
+    if (isContactUsSchemaUnavailableError(error)) {
+      throw new Error("Contact messaging is temporarily unavailable.");
+    }
+    throw error;
+  }
+
+  try {
+    revalidatePath("/admin/support-center/contact-us");
+    revalidatePath("/dashboard/inbox");
+    revalidatePath(`/contact/thread/${parsed.data.messageId}`);
+  } catch (error) {
+    console.error("[contact-us] revalidate after user resolve failed", error);
+  }
+
+  return { ok: true as const, alreadyResolved: false as const };
+}
+
 export async function replyToContactUsAction(data: z.infer<typeof replySchema>) {
   const parsed = replySchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid reply");
@@ -184,7 +218,7 @@ export async function replyToContactUsAction(data: z.infer<typeof replySchema>) 
     parsed.data.messageId,
     parsed.data.token,
   );
-  if (thread.message.status === "archived") throw new Error("This conversation is archived");
+  if (thread.message.status === "archived") throw new Error("This conversation has been resolved");
 
   const messageText = parsed.data.message.trim();
   const imageUrl = parsed.data.imageUrl ?? null;
@@ -237,7 +271,7 @@ export async function adminReplyToContactUsAction(data: z.infer<typeof replySche
   const { userId, name } = await requireAdmin();
   const thread = await getContactUsWithReplies(parsed.data.messageId);
   if (!thread) throw new Error("Conversation not found");
-  if (thread.message.status === "archived") throw new Error("This conversation is archived");
+  if (thread.message.status === "archived") throw new Error("This conversation has been resolved");
 
   const messageText = parsed.data.message.trim();
   const imageUrl = parsed.data.imageUrl ?? null;
@@ -350,8 +384,32 @@ export async function adminArchiveContactUsMessageAction(data: z.infer<typeof me
 
   revalidatePath("/admin/support-center/contact-us");
   revalidatePath("/dashboard/inbox");
+  revalidatePath(`/contact/thread/${parsed.data.messageId}`);
 
   return { ok: true as const };
+}
+
+export async function adminUnarchiveContactUsMessageAction(data: z.infer<typeof messageIdSchema>) {
+  const parsed = messageIdSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid message");
+
+  await requireAdmin();
+  const message = await getContactUsMessageById(parsed.data.messageId);
+  if (!message) throw new Error("Message not found");
+  if (isGuestContactUsMessage({ userId: message.userId ?? null })) {
+    throw new Error(
+      "Guest conversations cannot be reopened. The visitor must submit a new Contact Us message.",
+    );
+  }
+
+  const row = await unarchiveContactUsMessage(parsed.data.messageId);
+  if (!row) throw new Error("Message not found");
+
+  revalidatePath("/admin/support-center/contact-us");
+  revalidatePath("/dashboard/inbox");
+  revalidatePath(`/contact/thread/${parsed.data.messageId}`);
+
+  return { ok: true as const, status: row.status };
 }
 
 export async function markContactUsInboxNotificationReadAction(data: {

@@ -9,7 +9,7 @@ import {
   warnMissingContactUsReplyImageUrlColumnOnce,
   withContactUsReadFallback,
 } from "@/lib/contact-us-db-fallback";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 export type ContactSocialLink = {
   platform: string;
@@ -318,10 +318,43 @@ export async function archiveContactUsMessage(id: number, adminUserId: string) {
       status: "archived",
       readAt: now,
       readByUserId: adminUserId,
+      updatedAt: now,
     })
     .where(eq(contactUsMessages.id, id));
 
   return getContactUsMessageById(id);
+}
+
+export async function unarchiveContactUsMessage(id: number) {
+  const now = new Date();
+  await db
+    .update(contactUsMessages)
+    .set({
+      status: "read",
+      updatedAt: now,
+    })
+    .where(and(eq(contactUsMessages.id, id), eq(contactUsMessages.status, "archived")));
+
+  return getContactUsMessageById(id);
+}
+
+/** User closed the chat — mark resolved without admin attribution. */
+export async function resolveContactUsMessageByParticipant(messageId: number) {
+  const now = new Date();
+  await db
+    .update(contactUsMessages)
+    .set({
+      status: "archived",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(contactUsMessages.id, messageId),
+        inArray(contactUsMessages.status, ["open", "read"]),
+      ),
+    );
+
+  return getContactUsMessageById(messageId);
 }
 
 export function contactUsPreview(text: string, max = 500): string {

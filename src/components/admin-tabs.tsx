@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,6 +49,7 @@ import {
   LayoutList,
   Megaphone,
   History,
+  Loader2,
   Mail,
   BookOpen,
 } from "lucide-react";
@@ -56,7 +58,6 @@ import {
   type SerializedTicket,
   type SupportStats,
 } from "@/components/admin-support-panel";
-import { AdminContactUsPanel } from "@/components/admin-contact-us-panel";
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
@@ -98,6 +99,17 @@ import {
 } from "@/components/admin-panel-styles";
 import { cn } from "@/lib/utils";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
+
+const AdminContactUsPanel = dynamic(
+  () => import("@/components/admin-contact-us-panel").then((mod) => mod.AdminContactUsPanel),
+  {
+    loading: () => (
+      <div className="flex min-h-[240px] items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    ),
+  },
+);
 
 export type { SerializedUser, SerializedLog } from "@/lib/admin-dashboard-types";
 

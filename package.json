@@ -8,6 +8,7 @@
   "scripts": {
     "postinstall": "patch-package",
     "dev": "cross-env NODE_OPTIONS=--max-old-space-size=10240 next dev --webpack",
+    "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && npm run dev",
     "build": "next build",
     "start": "next start -p $PORT",
     "db:push:local": "drizzle-kit push --config=drizzle.config.local.ts",
