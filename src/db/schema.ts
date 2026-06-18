@@ -415,6 +415,8 @@ export const contactUsMessages = pgTable(
     status: contactUsStatusEnum().notNull().default('open'),
     readAt: timestamp(),
     readByUserId: varchar({ length: 255 }),
+    /** Last heartbeat while a guest has `/contact/thread/[id]` open in the browser. */
+    guestChatLastSeenAt: timestamp(),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },

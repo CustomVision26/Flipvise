@@ -9,7 +9,7 @@ import {
   warnMissingContactUsReplyImageUrlColumnOnce,
   withContactUsReadFallback,
 } from "@/lib/contact-us-db-fallback";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 export type ContactSocialLink = {
   platform: string;
@@ -106,6 +106,7 @@ export async function createContactUsMessage(input: {
   userId?: string | null;
 }) {
   const accessToken = randomBytes(32).toString("hex");
+  const now = new Date();
   const rows = await db
     .insert(contactUsMessages)
     .values({
@@ -115,6 +116,7 @@ export async function createContactUsMessage(input: {
       message: input.message,
       userId: input.userId ?? null,
       accessToken,
+      guestChatLastSeenAt: input.userId ? null : now,
     })
     .returning();
 
@@ -355,6 +357,24 @@ export async function resolveContactUsMessageByParticipant(messageId: number) {
     );
 
   return getContactUsMessageById(messageId);
+}
+
+/** Guest has the public thread page open — refresh UI presence for admin Active status. */
+export async function touchContactUsGuestChatPresence(messageId: number) {
+  const now = new Date();
+  await db
+    .update(contactUsMessages)
+    .set({
+      guestChatLastSeenAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(contactUsMessages.id, messageId),
+        isNull(contactUsMessages.userId),
+        inArray(contactUsMessages.status, ["open", "read"]),
+      ),
+    );
 }
 
 export function contactUsPreview(text: string, max = 500): string {

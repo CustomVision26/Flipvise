@@ -16,6 +16,7 @@ import {
   isContactUsSchemaUnavailableError,
   markContactUsMessageRead,
   resolveContactUsMessageByParticipant,
+  touchContactUsGuestChatPresence,
   upsertPlatformContactSettings,
   type ContactSocialLink,
 } from "@/db/queries/contact-us";
@@ -333,9 +334,33 @@ export async function loadContactUsThreadPageAction(data: z.infer<typeof threadA
 
   try {
     const { thread } = await assertContactUsThreadAccess(parsed.data.messageId, parsed.data.token);
+    if (!thread.message.userId) {
+      try {
+        await touchContactUsGuestChatPresence(parsed.data.messageId);
+      } catch {
+        // Presence is optional if column not migrated yet.
+      }
+    }
     return serializeContactUsThread(thread.message, thread.replies);
   } catch {
     return null;
+  }
+}
+
+export async function pingContactUsGuestChatActiveAction(
+  data: z.infer<typeof threadAccessSchema>,
+) {
+  const parsed = threadAccessSchema.safeParse(data);
+  if (!parsed.success) return { ok: false as const };
+
+  try {
+    const { thread } = await assertContactUsThreadAccess(parsed.data.messageId, parsed.data.token);
+    if (thread.message.userId) return { ok: true as const };
+    if (thread.message.status === "archived") return { ok: true as const };
+    await touchContactUsGuestChatPresence(parsed.data.messageId);
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const };
   }
 }
 

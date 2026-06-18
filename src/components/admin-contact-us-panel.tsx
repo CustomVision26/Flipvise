@@ -147,6 +147,18 @@ export function AdminContactUsPanel({
     if (match) setSelectedMessage(match);
   }, [searchParams, messages]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => router.refresh(), 20_000);
+    return () => window.clearInterval(timer);
+  }, [router]);
+
+  useEffect(() => {
+    setSelectedMessage((prev) => {
+      if (!prev) return prev;
+      return messages.find((m) => m.id === prev.id) ?? prev;
+    });
+  }, [messages]);
+
   const filteredMessages = useMemo(() => {
     const q = search.trim().toLowerCase();
     return messages.filter((m) => {
@@ -559,7 +571,7 @@ export function AdminContactUsPanel({
                         </Button>
                       ) : isGuestContactUsMessage(selectedMessage) ? (
                         <p className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-                          This guest conversation is Unactive Archived and cannot be reopened. The
+                          This guest conversation is Inactive Archived and cannot be reopened. The
                           visitor must start a new message from Contact Us (they are not signed in).
                         </p>
                       ) : null

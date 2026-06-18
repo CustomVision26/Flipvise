@@ -32,6 +32,7 @@
     "db:ensure-subscription-checkout-inbox": "tsx scripts/ensure-subscription-checkout-inbox-table.ts",
     "db:ensure-support-ticket-messaging": "tsx scripts/ensure-support-ticket-messaging.ts",
     "db:ensure-contact-us-reply-images": "tsx scripts/ensure-contact-us-reply-images.ts",
+    "db:ensure-contact-us-guest-chat-presence": "tsx scripts/ensure-contact-us-guest-chat-presence.ts",
     "db:ensure-affiliate-referral-quota-columns": "tsx scripts/ensure-affiliate-referral-quota-columns.ts",
     "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.mjs",
     "db:generate:local": "drizzle-kit generate --config=drizzle.config.local.ts",

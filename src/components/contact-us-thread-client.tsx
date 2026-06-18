@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { ContactUsThreadView } from "@/components/contact-us-thread-view";
+import { pingContactUsGuestChatActiveAction } from "@/actions/contact-us";
 import type { ContactUsThread } from "@/lib/contact-us-thread-dto";
 
 type ContactUsThreadClientProps = {
@@ -48,6 +49,30 @@ export function ContactUsThreadClient({
     const timer = window.setInterval(refreshThread, pollMs);
     return () => window.clearInterval(timer);
   }, [messageId, accessToken, pollMs, refreshThread]);
+
+  useEffect(() => {
+    if (viewerRole !== "user" || thread.status === "archived") return;
+
+    let cancelled = false;
+
+    const pingPresence = () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      void pingContactUsGuestChatActiveAction({ messageId, token: accessToken });
+    };
+
+    pingPresence();
+    const timer = window.setInterval(pingPresence, 20_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") pingPresence();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [viewerRole, messageId, accessToken, thread.status]);
 
   async function handleSendReply(payload: { message: string; imageUrl?: string | null }) {
     const next = await sendReply(payload);

@@ -17,6 +17,7 @@ export type SerializedContactMessage = {
   message: string;
   userId: string | null;
   status: "open" | "read" | "archived";
+  guestChatLastSeenAt: string | null;
   readAt: string | null;
   createdAt: string;
 };
@@ -51,6 +52,7 @@ export function serializeContactMessage(
     message: row.message,
     userId: row.userId ?? null,
     status: row.status,
+    guestChatLastSeenAt: row.guestChatLastSeenAt?.toISOString() ?? null,
     readAt: row.readAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };

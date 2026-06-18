@@ -1,5 +1,8 @@
 import type { SerializedContactMessage } from "@/lib/contact-us-admin-dto";
 
+/** Guest chat UI is considered open when last seen is within this window. */
+export const GUEST_CHAT_UI_ACTIVE_TTL_MS = 45_000;
+
 const SIGNED_IN_STATUS_LABELS: Record<SerializedContactMessage["status"], string> = {
   open: "Open",
   read: "Read",
@@ -10,20 +13,26 @@ export function isGuestContactUsMessage(message: { userId: string | null }): boo
   return message.userId == null;
 }
 
-export function isActiveContactUsDialogue(status: SerializedContactMessage["status"]): boolean {
-  return status === "open" || status === "read";
+export function isGuestChatUiCurrentlyOpen(
+  message: Pick<SerializedContactMessage, "status" | "userId" | "guestChatLastSeenAt">,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!isGuestContactUsMessage(message)) return false;
+  if (message.status === "archived") return false;
+  if (!message.guestChatLastSeenAt) return false;
+  return nowMs - new Date(message.guestChatLastSeenAt).getTime() < GUEST_CHAT_UI_ACTIVE_TTL_MS;
 }
 
 export function getContactUsAdminStatusLabel(message: SerializedContactMessage): string {
   if (isGuestContactUsMessage(message)) {
-    return isActiveContactUsDialogue(message.status) ? "Active" : "Unactive Archived";
+    return isGuestChatUiCurrentlyOpen(message) ? "Active" : "Inactive Archived";
   }
   return SIGNED_IN_STATUS_LABELS[message.status];
 }
 
 export function contactUsAdminStatusBadgeClass(message: SerializedContactMessage): string {
   if (isGuestContactUsMessage(message)) {
-    return isActiveContactUsDialogue(message.status)
+    return isGuestChatUiCurrentlyOpen(message)
       ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
       : "border-border/60 bg-muted/30 text-muted-foreground";
   }
