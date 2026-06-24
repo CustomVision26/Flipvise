@@ -19,6 +19,7 @@ import {
   OFFLINE_DB_VERSION,
   OFFLINE_SCHEMA_STATEMENTS,
 } from "./schema";
+import { isFlipviseNativeApp } from "./is-flipvise-native-app";
 
 let sqlite: SQLiteConnection | null = null;
 let dbConnection: SQLiteDBConnection | null = null;
@@ -26,16 +27,24 @@ let openPromise: Promise<SQLiteDBConnection> | null = null;
 
 /** True on native (iOS/Android). On web, SQLite requires the jeep-sqlite element + WASM. */
 export function isNativePlatform(): boolean {
-  return Capacitor.isNativePlatform();
+  return Capacitor.isNativePlatform() || isFlipviseNativeApp();
 }
 
 /** Whether an offline DB can be opened in the current runtime. */
 export async function isOfflineDbAvailable(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   if (isNativePlatform()) return true;
+  try {
+    const { getNativeAppFlag } = await import("./session");
+    if (await getNativeAppFlag()) return true;
+  } catch {
+    // Preferences plugin unavailable (plain browser).
+  }
   // Web fallback requires the jeep-sqlite custom element to be registered.
-  return typeof customElements !== "undefined" &&
-    customElements.get("jeep-sqlite") != null;
+  return (
+    typeof customElements !== "undefined" &&
+    customElements.get("jeep-sqlite") != null
+  );
 }
 
 function getConnectionManager(): SQLiteConnection {

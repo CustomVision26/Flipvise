@@ -41,6 +41,7 @@ import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-bann
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialog } from "@/components/add-deck-dialog";
 import { NativeAppBackButton } from "@/components/native-app-back-button";
+import { NativeAppBootstrap } from "@/components/native-app-bootstrap";
 import { OfflineAvailabilityButton } from "@/components/offline-availability-button";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
@@ -550,6 +551,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+      <NativeAppBootstrap />
       <Suspense fallback={null}>
         <TeamInviteAcceptedBanner />
         <StripeCheckoutToast />

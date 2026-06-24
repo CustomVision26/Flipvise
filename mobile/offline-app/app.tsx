@@ -16,6 +16,7 @@ import {
   getStoredApiBaseUrl,
   getStoredSyncToken,
   getStoredUserId,
+  setNativeAppFlag,
 } from "../../src/lib/offline/session";
 import { runSync } from "../../src/lib/offline/sync";
 
@@ -53,6 +54,10 @@ export function App() {
   const loadDecks = useCallback(async (uid: string) => {
     const rows = await listDecks(uid);
     setDecks(rows);
+  }, []);
+
+  useEffect(() => {
+    void setNativeAppFlag().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -111,6 +116,7 @@ export function App() {
     } catch {
       // ignore
     }
+    void setNativeAppFlag().catch(() => {});
     // replace() keeps navigation in the Capacitor WebView (allowNavigation) instead of spawning Chrome.
     window.location.replace(target);
   }, []);

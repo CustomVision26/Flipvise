@@ -23,6 +23,17 @@ export function OfflineAvailabilityButton() {
 
   React.useEffect(() => {
     setIsNative(isFlipviseNativeApp());
+    void (async () => {
+      if (isFlipviseNativeApp()) return;
+      try {
+        const { isFlipviseNativeAppAsync } = await import(
+          "@/lib/offline/is-flipvise-native-app"
+        );
+        if (await isFlipviseNativeAppAsync()) setIsNative(true);
+      } catch {
+        // ignore
+      }
+    })();
     try {
       if (isFlipviseNativeApp()) {
         sessionStorage.setItem("flipvise.native", "1");
@@ -46,7 +57,14 @@ export function OfflineAvailabilityButton() {
 
       await session.setStoredUserId(userId);
 
-      // Mint + persist a device token so the bundled offline app can sync on its own later.
+      try {
+        const { setNativeAppFlag } = await import("@/lib/offline/session");
+        await setNativeAppFlag();
+      } catch {
+        // non-fatal
+      }
+
+      // Mint + persist a device token
       try {
         const { token } = await createDeviceSyncTokenAction({
           label: navigator.userAgent.slice(0, 128),

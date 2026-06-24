@@ -39,3 +39,14 @@ export function isFlipviseNativeApp(): boolean {
 
   return false;
 }
+
+/** Like {@link isFlipviseNativeApp} but also checks native Preferences (set by the offline shell). */
+export async function isFlipviseNativeAppAsync(): Promise<boolean> {
+  if (isFlipviseNativeApp()) return true;
+  try {
+    const { getNativeAppFlag } = await import("./session");
+    return await getNativeAppFlag();
+  } catch {
+    return false;
+  }
+}

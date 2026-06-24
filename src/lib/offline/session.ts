@@ -12,6 +12,18 @@ import { Preferences } from "@capacitor/preferences";
 const USER_ID_KEY = "flipvise.offline.userId";
 const SYNC_TOKEN_KEY = "flipvise.offline.syncToken";
 const API_BASE_URL_KEY = "flipvise.offline.apiBaseUrl";
+/** Set by the bundled offline shell so the live site can detect the native app. */
+const NATIVE_APP_FLAG_KEY = "flipvise.nativeApp";
+
+/** Marks this install as the Flipvise native app (survives navigation to the live site). */
+export async function setNativeAppFlag(): Promise<void> {
+  await Preferences.set({ key: NATIVE_APP_FLAG_KEY, value: "1" });
+}
+
+export async function getNativeAppFlag(): Promise<boolean> {
+  const { value } = await Preferences.get({ key: NATIVE_APP_FLAG_KEY });
+  return value === "1";
+}
 
 export async function setStoredUserId(userId: string): Promise<void> {
   await Preferences.set({ key: USER_ID_KEY, value: userId });

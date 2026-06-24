@@ -29,7 +29,6 @@ import {
 import { createDeckAction } from "@/actions/decks";
 import { createCardAction, uploadCardImageAction } from "@/actions/cards";
 import { cn } from "@/lib/utils";
-import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
 import { GradientPicker } from "@/components/gradient-picker";
 import type { GradientSlug } from "@/lib/deck-gradients";
 
@@ -269,10 +268,6 @@ export function AddDeckDialog({
         typeof navigator !== "undefined" && !navigator.onLine;
 
       if (isOffline) {
-        if (!isFlipviseNativeApp()) {
-          setError("You're offline. Connect to the internet to create a deck.");
-          return;
-        }
         if (forTeamWorkspace || (teamId !== undefined && !forPersonalWorkspace)) {
           setError("Team decks can't be created offline. Try again when you're online.");
           return;
@@ -292,7 +287,9 @@ export function AddDeckDialog({
           ]);
 
         if (!(await isOfflineDbAvailable())) {
-          setError("Offline storage isn't available in this browser.");
+          setError(
+            "You're offline and offline storage isn't available. Open the Flipvise app, tap Open Flipvise once while online, then try again.",
+          );
           return;
         }
 
@@ -306,12 +303,19 @@ export function AddDeckDialog({
           await session.setStoredUserId(userId).catch(() => {});
         }
 
-        await createOfflineDeck({
-          userId: uid,
-          name,
-          description: description || null,
-          gradient: gradientValue ?? null,
-        });
+        try {
+          await createOfflineDeck({
+            userId: uid,
+            name,
+            description: description || null,
+            gradient: gradientValue ?? null,
+          });
+        } catch {
+          setError(
+            "Couldn't save to offline storage. Reopen the app from the home screen and try again.",
+          );
+          return;
+        }
 
         setOpen(false);
         form.reset();

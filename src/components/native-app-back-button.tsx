@@ -13,14 +13,20 @@ export function NativeAppBackButton() {
   const [isNative, setIsNative] = React.useState(false);
 
   React.useEffect(() => {
-    setIsNative(isFlipviseNativeApp());
-    try {
+    void (async () => {
       if (isFlipviseNativeApp()) {
-        sessionStorage.setItem("flipvise.native", "1");
+        setIsNative(true);
+        return;
       }
-    } catch {
-      // ignore
-    }
+      try {
+        const { isFlipviseNativeAppAsync } = await import(
+          "@/lib/offline/is-flipvise-native-app"
+        );
+        if (await isFlipviseNativeAppAsync()) setIsNative(true);
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   if (!isNative) return null;
