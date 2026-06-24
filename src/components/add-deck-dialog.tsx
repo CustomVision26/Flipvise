@@ -336,8 +336,8 @@ export function AddDeckDialog({
     }
 
     setIsPending(true);
+    const gradientValue = gradient !== "none" ? gradient : undefined;
     try {
-      const gradientValue = gradient !== "none" ? gradient : undefined;
       const networkOffline =
         typeof navigator !== "undefined" && !navigator.onLine;
 
