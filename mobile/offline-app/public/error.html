@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#09090b" />
+    <title>Flipvise — Connection problem</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #09090b;
+        --panel: #121216;
+        --border: #2a2a32;
+        --fg: #fafafa;
+        --muted: #a1a1aa;
+        --accent: #6366f1;
+        --accent-2: #7c3aed;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        padding-top: calc(24px + env(safe-area-inset-top));
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+        text-align: center;
+      }
+      .mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0 0 8px;
+        max-width: 320px;
+        font-size: 14px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+      .url {
+        margin: 12px 0 24px;
+        padding: 10px 12px;
+        max-width: 100%;
+        width: min(100%, 360px);
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--muted);
+        word-break: break-all;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: min(100%, 280px);
+      }
+      button {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 14px 18px;
+        border-radius: 12px;
+        width: 100%;
+      }
+      .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+      .secondary {
+        background: var(--panel);
+        color: var(--fg);
+        border: 1px solid var(--border);
+      }
+      .hint {
+        margin-top: 20px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="mark" aria-hidden="true">F</div>
+      <h1>Page couldn’t load</h1>
+      <p id="message">
+        Check your connection and try again, or return to offline study on this device.
+      </p>
+      <div class="url" id="failed-url" hidden></div>
+      <div class="actions">
+        <button type="button" class="primary" id="refresh-btn">Refresh</button>
+        <button type="button" class="secondary" id="offline-btn">Offline study</button>
+      </div>
+      <p class="hint" id="status-hint"></p>
+    </div>
+    <script>
+      (function () {
+        var OFFLINE_HOME = "https://localhost/";
+        var DEFAULT_RETRY =
+          "https://flipvise-sjgw.onrender.com/dashboard?flipvise_native=1";
+
+        function getRetryUrl() {
+          try {
+            var stored = sessionStorage.getItem("flipvise.lastNavigationUrl");
+            if (stored) return stored;
+          } catch (e) {}
+          var params = new URLSearchParams(location.search);
+          var fromQuery = params.get("url");
+          if (fromQuery) return fromQuery;
+          return DEFAULT_RETRY;
+        }
+
+        function setOnlineHint() {
+          var hint = document.getElementById("status-hint");
+          if (!hint) return;
+          if (navigator.onLine) {
+            hint.textContent = "You appear to be online — tap Refresh to retry.";
+          } else {
+            hint.textContent = "You appear to be offline.";
+          }
+        }
+
+        var retryUrl = getRetryUrl();
+        var urlEl = document.getElementById("failed-url");
+        if (urlEl) {
+          urlEl.textContent = retryUrl;
+          urlEl.hidden = false;
+        }
+
+        var params = new URLSearchParams(location.search);
+        if (params.get("offline") === "1") {
+          var msg = document.getElementById("message");
+          if (msg) {
+            msg.textContent =
+              "The dashboard needs an internet connection. Study your downloaded decks offline, or connect and tap Refresh.";
+          }
+        }
+
+        document.getElementById("refresh-btn").addEventListener("click", function () {
+          window.location.href = getRetryUrl();
+        });
+
+        document.getElementById("offline-btn").addEventListener("click", function () {
+          window.location.href = OFFLINE_HOME;
+        });
+
+        window.addEventListener("online", setOnlineHint);
+        window.addEventListener("offline", setOnlineHint);
+        setOnlineHint();
+      })();
+    </script>
+  </body>
+</html>

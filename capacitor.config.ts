@@ -56,6 +56,8 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
     hostname: "localhost",
+    // Custom page when a main-frame load fails (replaces the system "Webpage not available" screen).
+    errorPath: "error.html",
     // Keep navigation to the live site inside the app WebView (preserves the Clerk session).
     allowNavigation: [...allowNavigation],
   },

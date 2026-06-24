@@ -118,10 +118,17 @@ export function App() {
     const target = `${LIVE_URL}/dashboard?flipvise_native=1`;
     try {
       sessionStorage.setItem("flipvise.native", "1");
+      sessionStorage.setItem("flipvise.lastNavigationUrl", target);
     } catch {
       // ignore
     }
     void setNativeAppFlag().catch(() => {});
+
+    if (!navigator.onLine) {
+      window.location.href = "./error.html?offline=1";
+      return;
+    }
+
     // replace() keeps navigation in the Capacitor WebView (allowNavigation) instead of spawning Chrome.
     window.location.replace(target);
   }, []);
