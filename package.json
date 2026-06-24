@@ -58,9 +58,11 @@
     "logo:transparent": "node scripts/remove-logo-background.cjs",
     "cap": "cap",
     "mobile:build": "vite build -c mobile/vite.config.ts",
+    "mobile:build:prod": "cross-env VITE_LIVE_URL=https://flipvise-sjgw.onrender.com vite build -c mobile/vite.config.ts",
     "mobile:add:android": "cap add android",
     "mobile:add:ios": "cap add ios",
     "mobile:sync": "npm run mobile:build && cap sync",
+    "mobile:sync:prod": "cross-env CAP_LIVE_HOST=https://flipvise-sjgw.onrender.com VITE_LIVE_URL=https://flipvise-sjgw.onrender.com npm run mobile:build:prod && cap sync",
     "mobile:open:android": "cap open android",
     "mobile:open:ios": "cap open ios"
   },

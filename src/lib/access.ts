@@ -122,13 +122,49 @@ function stripeSlugForPersonalTier(resolution: PersonalPlanResolution): string |
   return resolution.effectiveStripeSlug;
 }
 
-function isClerkBackendRateLimitError(error: unknown): boolean {
+function clerkApiStatus(error: unknown): number | null {
+  if (!isClerkAPIResponseError(error)) return null;
+  if ("status" in error && typeof error.status === "number") return error.status;
+  if (
+    "statusCode" in error &&
+    typeof (error as { statusCode: unknown }).statusCode === "number"
+  ) {
+    return (error as { statusCode: number }).statusCode;
+  }
+  return null;
+}
+
+/** Clerk Backend outages we can survive by falling back to JWT session claims. */
+function isClerkBackendDegradableError(error: unknown): boolean {
   if (!isClerkAPIResponseError(error)) return false;
+
+  const status = clerkApiStatus(error);
+  if (status === 429 || status === 502 || status === 503 || status === 504) return true;
+
   const msg = error.message.toLowerCase();
-  return (
+  if (
     msg.includes("too many requests") ||
     msg.includes("rate limit") ||
-    msg.includes("429")
+    msg.includes("fetch failed") ||
+    msg.includes("network") ||
+    msg.includes("timeout") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout")
+  ) {
+    return true;
+  }
+
+  return (
+    error.errors?.some((e) => {
+      const code = (e.code ?? "").toLowerCase();
+      const text = `${e.message ?? ""} ${e.longMessage ?? ""}`.toLowerCase();
+      return (
+        code === "unexpected_error" ||
+        text.includes("fetch failed") ||
+        text.includes("network") ||
+        text.includes("timeout")
+      );
+    }) ?? false
   );
 }
 
@@ -279,8 +315,14 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     if (isClerkUserNotFoundError(error)) {
       redirect(CLEAR_STALE_SESSION_PATH);
     }
-    if (!isClerkBackendRateLimitError(error)) throw error;
-    // Degrade to JWT-only resolution when Clerk Backend returns 429 (still better than hard-failing the tree).
+    if (!isClerkBackendDegradableError(error)) throw error;
+    // Degrade to JWT-only resolution when Clerk Backend is unreachable or rate-limited.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[getAccessContext] Clerk Backend unavailable; using JWT-only access.",
+        error,
+      );
+    }
     meta = {} as PublicMeta;
   }
   const planResolution = await resolvePersonalPlanMetadataVsBilling({

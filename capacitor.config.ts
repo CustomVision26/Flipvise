@@ -18,13 +18,23 @@ import type { CapacitorConfig } from "@capacitor/cli";
  *
  * NOTE: iOS builds require macOS + Xcode. Android builds work on Windows with Android Studio.
  */
-const LIVE_HOST = (
+function parseLiveHost(raw: string): string {
+  return raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+}
+
+const PROD_HOST = "flipvise-sjgw.onrender.com";
+
+const LIVE_HOST = parseLiveHost(
   process.env.CAP_LIVE_HOST ??
-  process.env.NEXT_PUBLIC_APP_URL ??
-  "https://flipvise-sjgw.onrender.com"
-)
-  .replace(/^https?:\/\//, "")
-  .replace(/\/.*$/, "");
+    process.env.NEXT_PUBLIC_APP_URL ??
+    `https://${PROD_HOST}`,
+);
+
+/** Hostnames the in-app WebView may navigate to (live site + optional local dev). */
+const allowNavigation = new Set([LIVE_HOST, PROD_HOST]);
+if (process.env.CAP_ANDROID_DEV_HOST) {
+  allowNavigation.add(parseLiveHost(process.env.CAP_ANDROID_DEV_HOST));
+}
 
 const config: CapacitorConfig = {
   appId: "com.flipvise.app",
@@ -34,7 +44,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: "https",
     // Keep navigation to the live site inside the app WebView (preserves the Clerk session).
-    allowNavigation: [LIVE_HOST],
+    allowNavigation: [...allowNavigation],
   },
   plugins: {
     CapacitorSQLite: {
