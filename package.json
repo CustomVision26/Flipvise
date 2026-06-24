@@ -59,6 +59,8 @@
     "cap": "cap",
     "mobile:build": "vite build -c mobile/vite.config.ts",
     "mobile:build:prod": "cross-env VITE_LIVE_URL=https://flipvise-sjgw.onrender.com vite build -c mobile/vite.config.ts",
+    "mobile:assets": "capacitor-assets generate --android --iconBackgroundColor \"#0f172a\" --splashBackgroundColor \"#0f172a\"",
+    "mobile:assets:ios": "capacitor-assets generate --ios --iconBackgroundColor \"#0f172a\" --splashBackgroundColor \"#0f172a\"",
     "mobile:add:android": "cap add android",
     "mobile:add:ios": "cap add ios",
     "mobile:sync": "npm run mobile:build && cap sync",
@@ -112,6 +114,7 @@
     "esbuild": "^0.25.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.1",
     "@types/node": "^20",
     "@types/react": "^19",
