@@ -1,0 +1,84 @@
+# Codemagic CI/CD — builds the Flipvise iOS app on a cloud Mac and ships to TestFlight.
+#
+# Why this exists: iOS apps can only be compiled on macOS/Xcode. Flipvise is developed on
+# Windows, so this pipeline runs on Codemagic's hosted Mac instances. It generates the
+# native iOS project from the Capacitor config, builds a signed .ipa, and uploads it to
+# TestFlight.
+#
+# ── ONE-TIME SETUP (in the Codemagic UI, not in code) ─────────────────────────────────
+# 1. Connect this Git repository to a new Codemagic app.
+# 2. Apple integration: Team settings → Integrations → Developer Portal → connect an
+#    App Store Connect API key (Issuer ID + Key ID + .p8). Name it exactly:  FlipviseASC
+#    (or change `app_store_connect:` below to match the name you choose).
+# 3. In App Store Connect, create the app record with bundle id  com.flipvise.app
+#    and copy its numeric Apple ID into the APP_STORE_APP_ID var below.
+# 4. (Recommended) Register the bundle id under Certificates, Identifiers & Profiles.
+# Automatic signing then provisions certificates/profiles from the API key on each build.
+# ──────────────────────────────────────────────────────────────────────────────────────
+
+workflows:
+  ios-testflight:
+    name: Flipvise iOS — TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      # Must match the App Store Connect API key name configured in the Codemagic UI.
+      app_store_connect: FlipviseASC
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.flipvise.app
+      vars:
+        BUNDLE_ID: "com.flipvise.app"
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+        # Numeric Apple ID of the app in App Store Connect (App Information → General).
+        APP_STORE_APP_ID: 0000000000
+        # Live host baked into the bundled offline app (matches NEXT_PUBLIC_APP_URL).
+        CAP_LIVE_HOST: "https://flipvise-sjgw.onrender.com"
+        VITE_LIVE_URL: "https://flipvise-sjgw.onrender.com"
+      node: 20
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install JS dependencies
+        script: npm ci
+      - name: Build offline web bundle
+        script: npm run mobile:build
+      - name: Generate / sync native iOS project
+        script: |
+          set -e
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+      - name: Set up code signing (automatic via API key)
+        script: xcode-project use-profiles
+      - name: Bump build number from latest TestFlight build
+        script: |
+          set -e
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo "0")
+          cd ios/App
+          agvtool new-version -all $((LATEST + 1))
+      - name: Build signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Uploads to TestFlight. Leave beta groups empty for internal testers only.
+        submit_to_testflight: true
+        # beta_groups:
+        #   - "External Testers"
+      email:
+        recipients:
+          # Add the address that should receive build notifications.
+          - you@example.com
+        notify:
+          success: true
+          failure: true
