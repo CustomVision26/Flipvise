@@ -165,11 +165,8 @@ export default async function RootLayout({
                 >
                   <div className="flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start">
                     <HeaderLogo dashboardHref={dashboardHrefWithUserQuery} />
-                    {!isTeamInviteRoute && (
-                      <AppTopNav
-                        homeHref={dashboardHrefWithUserQuery}
-                        signedIn={Boolean(userId)}
-                      />
+                    {!isTeamInviteRoute && !userId && (
+                      <AppTopNav homeHref={dashboardHrefWithUserQuery} />
                     )}
                   </div>
                   {!isTeamInviteRoute &&

@@ -657,6 +657,28 @@ export const stripeSubscriptions = pgTable('stripe_subscriptions', {
   updatedAt: timestamp().notNull().defaultNow(),
 });
 
+/**
+ * Long-lived per-device tokens that let the bundled offline mobile app authenticate to
+ * `/api/sync` without a Clerk session cookie. Minted from an authenticated session
+ * (see `createDeviceSyncTokenAction`); only the SHA-256 hash is stored. Revoked on
+ * account deletion.
+ */
+export const deviceSyncTokens = pgTable(
+  'device_sync_tokens',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    /** SHA-256 hex of the raw token (the raw value is shown to the device once). */
+    tokenHash: varchar({ length: 64 }).notNull().unique(),
+    /** Optional human label (e.g. device/platform). */
+    label: varchar({ length: 128 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    lastUsedAt: timestamp(),
+    revokedAt: timestamp(),
+  },
+  (t) => [index('device_sync_tokens_user_idx').on(t.userId)],
+);
+
 export type PerCardSnapshot = {
   cardId: number;
   /** Question / front text shown to the user. */

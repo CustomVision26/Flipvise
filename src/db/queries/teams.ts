@@ -3,6 +3,7 @@ import {
   cards,
   deckWorkspaceLinks,
   decks,
+  inboxReads,
   teamDeckAssignments,
   teamInvitations,
   teamMembers,
@@ -29,6 +30,8 @@ import {
   selectNewestTeamsWithinWorkspaceLimit,
 } from "@/lib/team-plan-limit-selection";
 import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
+import { isTeamInviteExpired } from "@/lib/team-invite-expiry";
+import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
 import {
@@ -1481,6 +1484,38 @@ export async function countPendingInvitationsForEmail(
       ),
     );
   return rows[0]?.value ?? 0;
+}
+
+/** Unread team invites for the header inbox badge (matches dashboard inbox read rules). */
+export async function countUnreadTeamInvitationsForInboxBadge(
+  inviteeEmail: string,
+  userId: string,
+): Promise<number> {
+  const rows = await listTeamInvitationsForInviteeEmail(inviteeEmail);
+  if (rows.length === 0) return 0;
+
+  const readRows = await db
+    .select({ itemId: inboxReads.itemId })
+    .from(inboxReads)
+    .where(
+      and(eq(inboxReads.userId, userId), eq(inboxReads.itemType, "team_invite")),
+    );
+  const readIds = new Set(readRows.map((r) => r.itemId));
+
+  let unread = 0;
+  for (const row of rows) {
+    const expired = isTeamInviteExpired(row.invitation.expiresAt);
+    const outcome = resolveTeamInviteInboxOutcome(row.invitation.status, expired);
+    const autoRead =
+      outcome === "accepted" ||
+      outcome === "rejected" ||
+      outcome === "expired" ||
+      outcome === "revoked";
+    if (autoRead) continue;
+    if (readIds.has(String(row.invitation.id))) continue;
+    unread++;
+  }
+  return unread;
 }
 
 /** Invitations sent to this email (any status), newest first — for personal inbox. */

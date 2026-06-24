@@ -1,12 +1,12 @@
 import {
-  countPendingInvitationsForEmail,
+  countUnreadTeamInvitationsForInboxBadge,
   getRootLayoutTeamNavPayload,
   type RootLayoutTeamAdminHeaderTeam,
 } from "@/db/queries/teams";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
 import { countUnreadSubscriptionCheckoutConfirmationsForUser } from "@/db/queries/subscription-checkout-inbox";
-import { countUnreadSupportNotificationsForRecipient } from "@/db/queries/support-notifications";
+import { countUnreadSupportNotificationsForInboxBadge } from "@/db/queries/support-notifications";
 import { countUnreadContactUsNotificationsForRecipient } from "@/db/queries/contact-us-notifications";
 import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import type { AccessContext } from "@/lib/access";
@@ -156,7 +156,11 @@ export async function loadRootLayoutShellData(input: {
       needsInbox
         ? Promise.all([
             primaryEmail != null && primaryEmail !== ""
-              ? countPendingInvitationsForEmail(primaryEmail).catch(() => 0)
+              ? tryTeamQuery(
+                  () =>
+                    countUnreadTeamInvitationsForInboxBadge(primaryEmail, userId),
+                  0,
+                )
               : Promise.resolve(0),
             tryTeamQuery(
               () => countUnreadAffiliateBroadcastInboxForUser(userId),
@@ -165,7 +169,7 @@ export async function loadRootLayoutShellData(input: {
             countUnreadSubscriptionCheckoutConfirmationsForUser(userId).catch(
               () => 0,
             ),
-            countUnreadSupportNotificationsForRecipient(userId).catch(() => 0),
+            countUnreadSupportNotificationsForInboxBadge(userId).catch(() => 0),
             isAdmin
               ? countUnreadContactUsNotificationsForRecipient(userId).catch(() => 0)
               : Promise.resolve(0),

@@ -10,6 +10,7 @@ import {
   cards,
   deactivated,
   decks,
+  deviceSyncTokens,
   inboxReads,
   quizResultInboxMessages,
   quizResults,
@@ -165,6 +166,7 @@ export async function purgeAllUserData(
     .delete(quizSecurityInboxMessages)
     .where(eq(quizSecurityInboxMessages.recipientUserId, userId));
   await db.delete(inboxReads).where(eq(inboxReads.userId, userId));
+  await db.delete(deviceSyncTokens).where(eq(deviceSyncTokens.userId, userId));
   await db
     .delete(affiliateBroadcastInboxMessages)
     .where(eq(affiliateBroadcastInboxMessages.recipientUserId, userId));

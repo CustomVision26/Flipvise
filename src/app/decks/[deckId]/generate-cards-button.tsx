@@ -22,6 +22,7 @@ import {
   buildAiBatchOptions,
   CARDS_PER_DECK_LIMIT_FREE,
 } from "@/lib/deck-limits";
+import { useOnlineStatus } from "@/lib/use-online-status";
 
 interface GenerateCardsButtonProps {
   deckId: number;
@@ -73,6 +74,7 @@ export function GenerateCardsButton({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const online = useOnlineStatus();
 
   const manualCardCount = totalCardCount - aiGeneratedCount;
   const remainingAiSlots = AI_GENERATION_CAP_PER_DECK - aiGeneratedCount;
@@ -153,7 +155,9 @@ export function GenerateCardsButton({
         </p>
       </div>
 
-      {atAiQuota ? (
+      {!online ? (
+        <DisabledAiButton tooltip="AI generation needs an internet connection. Reconnect to generate cards." />
+      ) : atAiQuota ? (
         <DisabledAiButton
           tooltip={`AI generation is limited to ${AI_GENERATION_CAP_PER_DECK} cards per deck. This deck already has ${aiGeneratedCount}.`}
         />

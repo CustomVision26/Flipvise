@@ -23,6 +23,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "AI card generation on Pro Plus and team-tier workspaces.",
           "Deck cover image upload when your plan allows (Pro personal, team-tier workspace).",
           "Open Study to launch flashcard review or quiz mode.",
+          "AI generation requires a connection — the Generate button is disabled and explains why when you are offline.",
         ],
       },
       {

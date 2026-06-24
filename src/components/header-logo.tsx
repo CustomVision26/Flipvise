@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 
 export function HeaderLogo({ dashboardHref }: { dashboardHref: string }) {
@@ -27,8 +28,10 @@ export function HeaderLogo({ dashboardHref }: { dashboardHref: string }) {
   }
 
   return (
-    <Link href={dashboardHref} className="flex items-center">
-      {image}
-    </Link>
+    <HeaderNavTooltip label="Go to dashboard">
+      <Link href={dashboardHref} className="flex items-center" aria-label="Go to dashboard">
+        {image}
+      </Link>
+    </HeaderNavTooltip>
   );
 }

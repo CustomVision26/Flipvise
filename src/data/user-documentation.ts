@@ -34,7 +34,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Home returns to your dashboard when signed in, or the homepage when signed out.",
           "Documentation opens this guide.",
           "Contact Us appears in the top nav for guests only — it opens the public Contact Support page with live chat.",
-          "Signed-in users see Documentation in the nav (not Contact Us); visit /contact directly or use the link in this guide.",
+          "Signed-in users open Documentation from the book icon beside Help and Inbox (right side of the header).",
           "Guest homepage nav shows Contact Us only; on /docs or /contact you also see Home and Documentation.",
           "Signed-in users also see plan label, workspace switcher, inbox, and account menu.",
         ],
@@ -61,6 +61,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Deck opens the deck creation dialog (title, optional AI generation on eligible plans).",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
+          "In the Flipvise mobile app, a “Make available offline” button downloads your decks for offline study (it does not appear on the web).",
         ],
         requirements: [
           "Signed-in account.",
@@ -132,6 +133,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Generate cards with AI on eligible plans.",
           "Upload a deck cover image when your plan allows.",
           "Open Study to start flashcard review or quiz mode.",
+          "AI generation needs an internet connection — the Generate button is disabled while offline.",
         ],
         requirements: [
           "Deck owner or team admin/co-admin with edit access.",
@@ -184,6 +186,36 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         requirements: ["You must be the result owner or have permission to view it."],
         doNots: ["Do not share result URLs — they are tied to your account access."],
+      },
+    ],
+  },
+  {
+    id: "offline-mobile",
+    title: "Offline & Mobile App",
+    description: "Install Flipvise on your phone and study without a connection.",
+    pages: [
+      {
+        id: "offline-mobile",
+        title: "Offline & Mobile App",
+        purpose:
+          "Use Flipvise on iPhone and Android, and study your downloaded decks with no internet connection.",
+        howItWorks: [
+          "Install the app: on Android/iOS via the Flipvise app, or add the website to your home screen (PWA).",
+          "Sign in while online, open your dashboard, and tap “Make available offline” to download your decks and cards onto the device.",
+          "When you have no connection, the app opens an offline Study view: pick a deck and flip through its cards.",
+          "Edits and quiz results made offline are saved on the device and upload automatically the next time you sync.",
+          "Tap “Sync” (or reopen Flipvise online) to upload offline changes and download updates from your other devices.",
+          "An amber banner appears across the app whenever you are offline so you know online-only features are paused.",
+        ],
+        requirements: [
+          "Signed-in account; download your decks at least once while online.",
+          "“Make available offline” appears only inside the installed mobile app, not on the website.",
+          "Syncing across devices uses a secure per-device token created when you first tap “Make available offline”.",
+        ],
+        doNots: [
+          "Do not expect AI generation, billing, sign-in, or admin tools to work offline — these need a connection.",
+          "Do not sign out on the device if you have unsynced offline changes — sync first so nothing is lost.",
+        ],
       },
     ],
   },

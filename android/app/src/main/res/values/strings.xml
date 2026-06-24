@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Flipvise</string>
+    <string name="title_activity_main">Flipvise</string>
+    <string name="package_name">com.flipvise.app</string>
+    <string name="custom_url_scheme">com.flipvise.app</string>
+</resources>

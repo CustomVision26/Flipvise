@@ -13,7 +13,9 @@ import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 import type { WorkspaceTeamOption } from "@/components/workspace-context-dropdown";
 import { WorkspaceContextDropdown } from "@/components/workspace-context-dropdown";
 import { InboxNavIconButton } from "@/components/inbox-nav-icon-button";
+import { DocsNavIconButton } from "@/components/docs-nav-icon-button";
 import { HelpCenterNavIconButton } from "@/components/help-center-nav-icon-button";
+import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 import {
   shouldHidePlatformAdminNav,
   shouldHideWorkspaceSwitcher,
@@ -133,40 +135,48 @@ export function HeaderUserSection({
   return (
     <div className="flex items-center gap-1 sm:gap-2">
       {isAdmin && !hidePlatformAdminLink && (
-        <Link
-          href="/admin/all-users"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
-          )}
-        >
-          <Shield className="size-3.5 shrink-0" aria-hidden />
-          Platform Admin
-        </Link>
+        <HeaderNavTooltip label="Platform Admin">
+          <Link
+            href="/admin/all-users"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
+            )}
+            aria-label="Platform Admin"
+          >
+            <Shield className="size-3.5 shrink-0" aria-hidden />
+            Platform Admin
+          </Link>
+        </HeaderNavTooltip>
       )}
       {showAffiliatePortal && (
-        <Link
-          href="/dashboard/affiliate"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
-          )}
-        >
-          <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
-          Affiliate
-        </Link>
+        <HeaderNavTooltip label="Affiliate portal">
+          <Link
+            href="/dashboard/affiliate"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+            )}
+            aria-label="Affiliate portal"
+          >
+            <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
+            Affiliate
+          </Link>
+        </HeaderNavTooltip>
       )}
       <div className="flex min-w-0 flex-row items-center gap-2">
-        <Link
-          href="/pricing"
-          title={`${personalAccountPlanLabel} plan — Opens the pricing page`}
-          className={cn(
-            "min-w-0 max-w-[9rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors sm:max-w-[11rem] xl:max-w-[14rem]",
-            isPro && "text-foreground",
-          )}
-        >
-          {personalAccountPlanLabel}
-        </Link>
+        <HeaderNavTooltip label={`${personalAccountPlanLabel} plan — view pricing`}>
+          <Link
+            href="/pricing"
+            className={cn(
+              "min-w-0 max-w-[9rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors sm:max-w-[11rem] xl:max-w-[14rem]",
+              isPro && "text-foreground",
+            )}
+            aria-label={`${personalAccountPlanLabel} plan — view pricing`}
+          >
+            {personalAccountPlanLabel}
+          </Link>
+        </HeaderNavTooltip>
         {portalsReady ? (
           <>
             {showWorkspaceSwitcher &&
@@ -188,7 +198,7 @@ export function HeaderUserSection({
             {/* Avoid Tooltip wrapping UserButton (both use portals) — teardown race → removeChild on null parent. */}
             <span
               className="inline-flex shrink-0 items-center"
-              title="Account"
+              title="Account — profile, appearance, and billing"
             >
               <UserButton>
                 <UserButton.UserProfilePage
@@ -216,6 +226,7 @@ export function HeaderUserSection({
           </>
         ) : null}
       </div>
+      {portalsReady ? <DocsNavIconButton /> : null}
       {portalsReady && showHelpCenter ? <HelpCenterNavIconButton /> : null}
       {portalsReady ? <InboxNavIconButton unreadCount={inboxUnreadCount} /> : null}
     </div>

@@ -64,7 +64,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           headers: ["Element", "Guests", "Signed-in users"],
           rows: [
             ["Home", "Homepage", "Personal dashboard"],
-            ["Documentation", "Yes", "Yes"],
+            ["Documentation", "Top nav pill", "Book icon (right, beside Help)"],
             ["Contact Us", "Top nav link", "Use /contact or inbox"],
             ["Help Center", "Docs section", "Docs section + /contact"],
             ["Plan label", "Hidden", "Shows effective plan"],
@@ -89,6 +89,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         id: "help-inbox",
         title: "Support and inbox",
         bullets: [
+          "Documentation — book icon on the right of the header (beside Help and Inbox).",
           "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",
           "Badge count reflects actionable unread items.",

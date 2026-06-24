@@ -10,6 +10,8 @@ import { resolveLogoImageUrl } from "@/lib/branding";
 import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { OfflineBanner } from "@/components/offline-banner";
 import { useClientMounted } from "@/lib/use-client-mounted";
 
 const clerkAppearance = {
@@ -55,8 +57,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     >
       <ThemeStorageNormalize>
         <ClerkWithTheme>
+          <OfflineBanner />
           {children}
           <Toaster richColors closeButton position="top-right" />
+          <ServiceWorkerRegister />
         </ClerkWithTheme>
       </ThemeStorageNormalize>
     </ThemeProvider>

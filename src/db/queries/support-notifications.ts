@@ -1,6 +1,9 @@
 import { db } from "@/db";
 import { supportTicketNotifications } from "@/db/schema";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+
+/** Kinds surfaced in `/dashboard/inbox` (see `supportNotificationsToInboxItems`). */
+const INBOX_SUPPORT_NOTIFICATION_KINDS = ["admin_reply", "status_resolved"] as const;
 
 export type SupportNotificationKind =
   | "new_ticket"
@@ -49,6 +52,23 @@ export async function countUnreadSupportNotificationsForRecipient(
       and(
         eq(supportTicketNotifications.recipientUserId, recipientUserId),
         isNull(supportTicketNotifications.readAt),
+      ),
+    );
+  return Number(rows[0]?.count ?? 0);
+}
+
+/** Unread support alerts for the header inbox badge (matches dashboard inbox visibility). */
+export async function countUnreadSupportNotificationsForInboxBadge(
+  recipientUserId: string,
+): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(supportTicketNotifications)
+    .where(
+      and(
+        eq(supportTicketNotifications.recipientUserId, recipientUserId),
+        isNull(supportTicketNotifications.readAt),
+        inArray(supportTicketNotifications.kind, [...INBOX_SUPPORT_NOTIFICATION_KINDS]),
       ),
     );
   return Number(rows[0]?.count ?? 0);

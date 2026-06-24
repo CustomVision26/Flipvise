@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BookOpen, Home, Mail } from "lucide-react";
+import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 import { cn } from "@/lib/utils";
 
 type AppTopNavProps = {
@@ -31,10 +32,28 @@ export function AppTopNav({
 
   const linkItems = [
     ...(!signedIn && !isGuestHomepage
-      ? [{ href: homeHref, label: "Home", shortLabel: "Home", icon: Home, active: isHome }]
+      ? [
+          {
+            href: homeHref,
+            label: "Home",
+            shortLabel: "Home",
+            tooltip: "Home",
+            icon: Home,
+            active: isHome,
+          },
+        ]
       : []),
     ...(!isGuestHomepage
-      ? [{ href: "/docs", label: "Documentation", shortLabel: "Docs", icon: BookOpen, active: isDocs }]
+      ? [
+          {
+            href: "/docs",
+            label: "Documentation",
+            shortLabel: "Docs",
+            tooltip: "Documentation",
+            icon: BookOpen,
+            active: isDocs,
+          },
+        ]
       : []),
   ] as const;
 
@@ -46,35 +65,40 @@ export function AppTopNav({
         className,
       )}
     >
-      {linkItems.map(({ href, label, shortLabel, icon: Icon, active }) => (
-        <Link
-          key={href + label}
-          href={href}
-          className={cn(
-            navItemClassName,
-            active && "bg-muted/70 text-foreground",
-          )}
-          aria-current={active ? "page" : undefined}
-        >
-          <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
-          <span className="hidden sm:inline">{label}</span>
-          <span className="sm:hidden">{shortLabel}</span>
-        </Link>
+      {linkItems.map(({ href, label, shortLabel, tooltip, icon: Icon, active }) => (
+        <HeaderNavTooltip key={href + label} label={tooltip}>
+          <Link
+            href={href}
+            className={cn(
+              navItemClassName,
+              active && "bg-muted/70 text-foreground",
+            )}
+            aria-current={active ? "page" : undefined}
+            aria-label={label}
+          >
+            <Icon className="size-3.5 shrink-0 opacity-80" aria-hidden />
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sm:hidden">{shortLabel}</span>
+          </Link>
+        </HeaderNavTooltip>
       ))}
 
       {!signedIn && (
-        <Link
-          href="/contact"
-          className={cn(
-            navItemClassName,
-            isContact && "bg-muted/70 text-foreground",
-          )}
-          aria-current={isContact ? "page" : undefined}
-        >
-          <Mail className="size-3.5 shrink-0 opacity-80" aria-hidden />
-          <span className="hidden sm:inline">Contact Us</span>
-          <span className="sm:hidden">Contact</span>
-        </Link>
+        <HeaderNavTooltip label="Contact Us">
+          <Link
+            href="/contact"
+            className={cn(
+              navItemClassName,
+              isContact && "bg-muted/70 text-foreground",
+            )}
+            aria-current={isContact ? "page" : undefined}
+            aria-label="Contact Us"
+          >
+            <Mail className="size-3.5 shrink-0 opacity-80" aria-hidden />
+            <span className="hidden sm:inline">Contact Us</span>
+            <span className="sm:hidden">Contact</span>
+          </Link>
+        </HeaderNavTooltip>
       )}
     </nav>
   );

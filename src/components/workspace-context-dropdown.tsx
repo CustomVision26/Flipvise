@@ -299,8 +299,9 @@ export function WorkspaceContextDropdown({
             {...props}
             variant="outline"
             size="sm"
+            title="Switch workspace — personal dashboard or a team workspace"
             className="h-9 min-w-[9.5rem] max-w-[12rem] justify-between gap-1.5 px-2.5 font-normal sm:min-w-[10.5rem] sm:max-w-[14rem]"
-            aria-label={`Workspace: ${triggerLabel}`}
+            aria-label={`Workspace: ${triggerLabel}. Switch workspace.`}
           >
             <span
               className="truncate text-left"

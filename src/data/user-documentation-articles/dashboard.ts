@@ -54,6 +54,16 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "After successful Stripe checkout you may land with ?checkout=success and a confirmation toast.",
         ],
       },
+      {
+        id: "offline",
+        title: "Offline (mobile app)",
+        bullets: [
+          "Inside the installed Flipvise mobile app, a “Make available offline” button appears next to Add Deck.",
+          "Tapping it downloads your decks and cards to the device so you can study them with no connection.",
+          "This control is hidden on the website — it only appears in the native app.",
+          "See the Offline & Mobile App guide for the full offline study and sync flow.",
+        ],
+      },
     ],
   ),
   a(

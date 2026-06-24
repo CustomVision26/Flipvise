@@ -1,0 +1,263 @@
+"use client";
+
+/**
+ * Client sync engine for the offline Study database.
+ *
+ * Flow (single round-trip):
+ *  1. Collect all `dirty` rows (decks, cards, quiz results) from local SQLite.
+ *  2. POST them to `/api/sync` along with `last_pulled_ms`.
+ *  3. Apply the returned id map (local_id -> server_id) and clear dirty flags / purge
+ *     tombstones for rows the server confirmed.
+ *  4. Merge pulled server rows (last-write-wins by `updated_at_ms`).
+ *
+ * Auth: from the live (same-origin) site this relies on the Clerk session cookie. From
+ * the bundled native app it sends a long-lived device sync token as a Bearer header
+ * (minted from the authenticated session via "Make available offline").
+ */
+
+import { getOfflineDb, persistOfflineDb } from "./db";
+import type {
+  OfflineCardRow,
+  OfflineDeckRow,
+  OfflineQuizResultRow,
+} from "./schema";
+
+interface IdMapping {
+  localId: string;
+  serverId: number;
+}
+
+interface SyncResponse {
+  idMap: {
+    deckIds: IdMapping[];
+    cardIds: IdMapping[];
+    quizResultIds: IdMapping[];
+  };
+  pull: {
+    decks: {
+      serverId: number;
+      name: string;
+      description: string | null;
+      gradient: string | null;
+      coverImageUrl: string | null;
+      updatedAtMs: number;
+    }[];
+    cards: {
+      serverId: number;
+      deckServerId: number;
+      front: string | null;
+      back: string | null;
+      frontImageUrl: string | null;
+      backImageUrl: string | null;
+      cardType: string;
+      choices: string[] | null;
+      correctChoiceIndex: number | null;
+      updatedAtMs: number;
+    }[];
+    serverTimeMs: number;
+  };
+}
+
+export interface SyncOptions {
+  /** Current Clerk user id — stamped onto pulled rows so local reads filter correctly. */
+  userId: string;
+  /** Origin of the live app (e.g. https://flipvise-sjgw.onrender.com). Defaults to same-origin. */
+  apiBaseUrl?: string;
+  /**
+   * Device sync token. When set, sent as `Authorization: Bearer <token>` (used by the
+   * bundled native app, which has no Clerk cookie). When omitted, the request relies on
+   * the same-origin Clerk session cookie.
+   */
+  token?: string;
+  /** Forwarded to fetch — defaults to "include" (cookie) or "omit" when a token is used. */
+  credentials?: RequestCredentials;
+}
+
+async function collectDirty(): Promise<{
+  decks: OfflineDeckRow[];
+  cards: OfflineCardRow[];
+  quizResults: OfflineQuizResultRow[];
+  lastPulledMs: number;
+}> {
+  const db = await getOfflineDb();
+  const decks = ((await db.query(`SELECT * FROM decks WHERE dirty = 1;`)).values ??
+    []) as OfflineDeckRow[];
+  const cards = ((await db.query(`SELECT * FROM cards WHERE dirty = 1;`)).values ??
+    []) as OfflineCardRow[];
+  const quizResults = ((await db.query(
+    `SELECT * FROM quiz_results WHERE dirty = 1 AND deleted = 0;`,
+  )).values ?? []) as OfflineQuizResultRow[];
+  const stateRows = ((await db.query(`SELECT last_pulled_ms FROM sync_state WHERE id = 1;`))
+    .values ?? []) as { last_pulled_ms: number }[];
+  return {
+    decks,
+    cards,
+    quizResults,
+    lastPulledMs: stateRows[0]?.last_pulled_ms ?? 0,
+  };
+}
+
+/** Runs a full push+pull cycle. Returns the server time used as the new pull cursor. */
+export async function runSync(options: SyncOptions): Promise<{
+  pushed: number;
+  pulled: number;
+}> {
+  const { decks, cards, quizResults, lastPulledMs } = await collectDirty();
+
+  const payload = {
+    since: lastPulledMs,
+    push: {
+      decks: decks.map((d) => ({
+        localId: d.local_id,
+        serverId: d.server_id,
+        name: d.name,
+        description: d.description,
+        gradient: d.gradient,
+        updatedAtMs: d.updated_at_ms,
+        deleted: d.deleted === 1,
+      })),
+      cards: cards.map((c) => ({
+        localId: c.local_id,
+        serverId: c.server_id,
+        deckLocalId: c.deck_local_id,
+        deckServerId: c.deck_server_id,
+        front: c.front,
+        back: c.back,
+        cardType: c.card_type === "multiple_choice" ? "multiple_choice" : "standard",
+        choices: c.choices_json ? (JSON.parse(c.choices_json) as string[]) : null,
+        correctChoiceIndex: c.correct_choice_index,
+        updatedAtMs: c.updated_at_ms,
+        deleted: c.deleted === 1,
+      })),
+      quizResults: quizResults.map((q) => ({
+        localId: q.local_id,
+        deckServerId: q.deck_server_id,
+        deckName: q.deck_name,
+        correct: q.correct,
+        incorrect: q.incorrect,
+        unanswered: q.unanswered,
+        total: q.total,
+        percent: q.percent,
+        elapsedSeconds: q.elapsed_seconds,
+        perCard: q.per_card_json ? JSON.parse(q.per_card_json) : null,
+      })),
+    },
+  };
+
+  const base = options.apiBaseUrl ?? "";
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  const res = await fetch(`${base}/api/sync`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    // With a Bearer token we don't need (cross-origin) cookies; otherwise send the cookie.
+    credentials: options.credentials ?? (options.token ? "omit" : "include"),
+  });
+  if (!res.ok) {
+    throw new Error(`Sync failed: ${res.status} ${res.statusText}`);
+  }
+  const data = (await res.json()) as SyncResponse;
+
+  await applyServerResponse(data, options.userId);
+
+  const pushedCount = decks.length + cards.length + quizResults.length;
+  const pulledCount = data.pull.decks.length + data.pull.cards.length;
+  return { pushed: pushedCount, pulled: pulledCount };
+}
+
+async function applyServerResponse(
+  data: SyncResponse,
+  userId: string,
+): Promise<void> {
+  const db = await getOfflineDb();
+
+  // 1. Stamp server ids onto pushed rows and clear dirty flags.
+  for (const m of data.idMap.deckIds) {
+    await db.run(
+      `UPDATE decks SET server_id = ?, dirty = 0 WHERE local_id = ?;`,
+      [m.serverId, m.localId],
+    );
+    // Backfill children that referenced this deck only by local id.
+    await db.run(
+      `UPDATE cards SET deck_server_id = ? WHERE deck_local_id = ?;`,
+      [m.serverId, m.localId],
+    );
+  }
+  for (const m of data.idMap.cardIds) {
+    await db.run(`UPDATE cards SET server_id = ?, dirty = 0 WHERE local_id = ?;`, [
+      m.serverId,
+      m.localId,
+    ]);
+  }
+  for (const m of data.idMap.quizResultIds) {
+    await db.run(
+      `UPDATE quiz_results SET server_id = ?, dirty = 0 WHERE local_id = ?;`,
+      [m.serverId, m.localId],
+    );
+  }
+
+  // 2. Purge confirmed tombstones.
+  await db.run(`DELETE FROM decks WHERE deleted = 1 AND dirty = 0;`);
+  await db.run(`DELETE FROM cards WHERE deleted = 1 AND dirty = 0;`);
+
+  // 3. Merge pulled rows (last-write-wins; skip rows with newer local edits).
+  //    `lower(hex(randomblob(16)))` mints a local id when the row is new locally.
+  for (const d of data.pull.decks) {
+    await db.run(
+      `INSERT INTO decks (local_id, server_id, user_id, name, description, gradient,
+         cover_image_url, created_at_ms, updated_at_ms, dirty, deleted)
+       VALUES (
+         COALESCE((SELECT local_id FROM decks WHERE server_id = ?), lower(hex(randomblob(16)))),
+         ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+       ON CONFLICT(local_id) DO UPDATE SET
+         server_id = excluded.server_id,
+         user_id = excluded.user_id,
+         name = excluded.name,
+         description = excluded.description,
+         gradient = excluded.gradient,
+         cover_image_url = excluded.cover_image_url,
+         updated_at_ms = excluded.updated_at_ms
+       WHERE decks.dirty = 0 AND decks.updated_at_ms <= excluded.updated_at_ms;`,
+      [d.serverId, d.serverId, userId, d.name, d.description, d.gradient, d.coverImageUrl, d.updatedAtMs, d.updatedAtMs],
+    );
+  }
+  for (const c of data.pull.cards) {
+    await db.run(
+      `INSERT INTO cards (local_id, server_id, deck_local_id, deck_server_id, front, back,
+         front_image_url, back_image_url, card_type, choices_json, correct_choice_index,
+         created_at_ms, updated_at_ms, dirty, deleted)
+       VALUES (
+         COALESCE((SELECT local_id FROM cards WHERE server_id = ?), lower(hex(randomblob(16)))),
+         ?,
+         COALESCE((SELECT local_id FROM decks WHERE server_id = ?), ''), ?,
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+       ON CONFLICT(local_id) DO UPDATE SET
+         server_id = excluded.server_id,
+         deck_server_id = excluded.deck_server_id,
+         front = excluded.front,
+         back = excluded.back,
+         front_image_url = excluded.front_image_url,
+         back_image_url = excluded.back_image_url,
+         card_type = excluded.card_type,
+         choices_json = excluded.choices_json,
+         correct_choice_index = excluded.correct_choice_index,
+         updated_at_ms = excluded.updated_at_ms
+       WHERE cards.dirty = 0 AND cards.updated_at_ms <= excluded.updated_at_ms;`,
+      [
+        c.serverId, c.serverId, c.deckServerId, c.deckServerId,
+        c.front, c.back, c.frontImageUrl, c.backImageUrl, c.cardType,
+        c.choices ? JSON.stringify(c.choices) : null, c.correctChoiceIndex,
+        c.updatedAtMs, c.updatedAtMs,
+      ],
+    );
+  }
+
+  // 4. Advance the pull cursor.
+  await db.run(`UPDATE sync_state SET last_pulled_ms = ?, last_synced_ms = ? WHERE id = 1;`, [
+    data.pull.serverTimeMs,
+    Date.now(),
+  ]);
+
+  await persistOfflineDb();
+}
