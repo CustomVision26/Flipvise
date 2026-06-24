@@ -30,8 +30,16 @@ const LIVE_HOST = parseLiveHost(
     `https://${PROD_HOST}`,
 );
 
-/** Hostnames the in-app WebView may navigate to (live site + optional local dev). */
-const allowNavigation = new Set([LIVE_HOST, PROD_HOST]);
+/** Hostnames the in-app WebView may navigate to (live site + Clerk auth + optional dev). */
+const allowNavigation = new Set([
+  LIVE_HOST,
+  PROD_HOST,
+  "*.onrender.com",
+  "accounts.clerk.dev",
+  "*.clerk.accounts.dev",
+  "clerk.com",
+  "*.clerk.com",
+]);
 if (process.env.CAP_ANDROID_DEV_HOST) {
   allowNavigation.add(parseLiveHost(process.env.CAP_ANDROID_DEV_HOST));
 }
@@ -41,8 +49,13 @@ const config: CapacitorConfig = {
   appName: "Flipvise",
   // Bundled offline Study app. `npm run mobile:build` populates this folder.
   webDir: "mobile/www",
+  android: {
+    // Detectable on the live site when Capacitor bridge is not injected after navigation.
+    appendUserAgent: "FlipviseNative/1",
+  },
   server: {
     androidScheme: "https",
+    hostname: "localhost",
     // Keep navigation to the live site inside the app WebView (preserves the Clerk session).
     allowNavigation: [...allowNavigation],
   },

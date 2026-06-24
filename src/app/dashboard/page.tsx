@@ -40,6 +40,7 @@ import {
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialog } from "@/components/add-deck-dialog";
+import { NativeAppBackButton } from "@/components/native-app-back-button";
 import { OfflineAvailabilityButton } from "@/components/offline-availability-button";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
@@ -581,7 +582,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           )}
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your flashcard decks</p>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <NativeAppBackButton />
           <OfflineAvailabilityButton />
           <AddDeckDialog
             isAtLimit={isAtLimit}

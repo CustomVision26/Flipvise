@@ -105,7 +105,14 @@ export function App() {
   }, [userId, online, loadDecks]);
 
   const openLiveApp = useCallback(() => {
-    window.location.href = LIVE_URL;
+    const target = `${LIVE_URL}/dashboard?flipvise_native=1`;
+    try {
+      sessionStorage.setItem("flipvise.native", "1");
+    } catch {
+      // ignore
+    }
+    // replace() keeps navigation in the Capacitor WebView (allowNavigation) instead of spawning Chrome.
+    window.location.replace(target);
   }, []);
 
   if (dbReady === false) {
@@ -160,7 +167,7 @@ export function App() {
             <h2>No downloaded decks yet</h2>
             <p>
               {online
-                ? "Tap “Open Flipvise”, sign in, then choose “Make available offline” on a deck to study it here without a connection."
+                ? "Tap “Open Flipvise”, sign in, then tap “Make available offline” at the top of your dashboard. Return here with “Offline study” to practice without a connection."
                 : "You're offline and have no downloaded decks. Reconnect and download decks to study offline."}
             </p>
           </div>

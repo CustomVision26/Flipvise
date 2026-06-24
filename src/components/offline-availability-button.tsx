@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
 
 /**
  * "Make available offline" — downloads the signed-in user's decks/cards into the
@@ -21,9 +22,14 @@ export function OfflineAvailabilityButton() {
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
-      .Capacitor;
-    setIsNative(Boolean(cap?.isNativePlatform?.()));
+    setIsNative(isFlipviseNativeApp());
+    try {
+      if (isFlipviseNativeApp()) {
+        sessionStorage.setItem("flipvise.native", "1");
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   if (!isNative || !isSignedIn || !userId) return null;
