@@ -63,8 +63,8 @@
     "mobile:assets:ios": "capacitor-assets generate --ios --iconBackgroundColor \"#0f172a\" --splashBackgroundColor \"#0f172a\"",
     "mobile:add:android": "cap add android",
     "mobile:add:ios": "cap add ios",
-    "mobile:sync": "npm run mobile:build && cap sync",
-    "mobile:sync:prod": "cross-env CAP_LIVE_HOST=https://flipvise-sjgw.onrender.com VITE_LIVE_URL=https://flipvise-sjgw.onrender.com npm run mobile:build:prod && cap sync",
+    "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:assets",
+    "mobile:sync:prod": "cross-env CAP_LIVE_HOST=https://flipvise-sjgw.onrender.com VITE_LIVE_URL=https://flipvise-sjgw.onrender.com npm run mobile:build:prod && cap sync && npm run mobile:assets",
     "mobile:open:android": "cap open android",
     "mobile:open:ios": "cap open ios"
   },
