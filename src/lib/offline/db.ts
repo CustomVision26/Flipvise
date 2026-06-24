@@ -33,13 +33,34 @@ export function isNativePlatform(): boolean {
 /** Whether an offline DB can be opened in the current runtime. */
 export async function isOfflineDbAvailable(): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  if (isNativePlatform()) return true;
-  try {
-    const { getNativeAppFlag } = await import("./session");
-    if (await getNativeAppFlag()) return true;
-  } catch {
-    // Preferences plugin unavailable (plain browser).
+
+  let shouldTry = isNativePlatform();
+  if (!shouldTry) {
+    try {
+      const { getNativeAppFlag } = await import("./session");
+      shouldTry = await getNativeAppFlag();
+    } catch {
+      // Preferences plugin unavailable (plain browser).
+    }
   }
+  if (!shouldTry) {
+    try {
+      const { isFlipviseNativeAppAsync } = await import("./is-flipvise-native-app");
+      shouldTry = await isFlipviseNativeAppAsync();
+    } catch {
+      // ignore
+    }
+  }
+
+  if (shouldTry) {
+    try {
+      await getOfflineDb();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   // Web fallback requires the jeep-sqlite custom element to be registered.
   return (
     typeof customElements !== "undefined" &&

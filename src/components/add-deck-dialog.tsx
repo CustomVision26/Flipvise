@@ -246,6 +246,80 @@ export function AddDeckDialog({
     stopDictation();
   }
 
+  /** Saves a personal deck to on-device SQLite (Flipvise native app only). */
+  async function savePersonalDeckOffline(
+    form: HTMLFormElement,
+    name: string,
+    description: string,
+    gradientValue: string | undefined,
+  ): Promise<
+    | { ok: true }
+    | { ok: false; reason: "team" | "image" | "storage" | "user" | "failed" }
+  > {
+    if (forTeamWorkspace || (teamId !== undefined && !forPersonalWorkspace)) {
+      return { ok: false, reason: "team" };
+    }
+    if (showDeckFrontImage && frontImageFile) {
+      return { ok: false, reason: "image" };
+    }
+
+    const [{ createDeck: createOfflineDeck }, { isOfflineDbAvailable }, session] =
+      await Promise.all([
+        import("@/lib/offline/repository"),
+        import("@/lib/offline/db"),
+        import("@/lib/offline/session"),
+      ]);
+
+    if (!(await isOfflineDbAvailable())) {
+      return { ok: false, reason: "storage" };
+    }
+
+    const uid = userId ?? (await session.getStoredUserId());
+    if (!uid) {
+      return { ok: false, reason: "user" };
+    }
+
+    if (userId) {
+      await session.setStoredUserId(userId).catch(() => {});
+    }
+
+    try {
+      await createOfflineDeck({
+        userId: uid,
+        name,
+        description: description || null,
+        gradient: gradientValue ?? null,
+      });
+    } catch {
+      return { ok: false, reason: "failed" };
+    }
+
+    setOpen(false);
+    form.reset();
+    resetDialogFormState();
+    toast.success(
+      "Deck saved on this device. Tap Offline study to open it — it will sync when you're back online.",
+    );
+    return { ok: true };
+  }
+
+  function offlineCreateError(
+    reason: "team" | "image" | "storage" | "user" | "failed",
+  ): string {
+    switch (reason) {
+      case "team":
+        return "Team decks can't be created offline. Try again when you're online.";
+      case "image":
+        return "Image uploads need a connection. Remove the image or try when online.";
+      case "storage":
+        return "Offline storage isn't available. Open Flipvise from the home screen, tap Open Flipvise once while online, then try again.";
+      case "user":
+        return "Sign in while online once, then you can create decks offline.";
+      case "failed":
+        return "Couldn't save to offline storage. Close the app fully and reopen it from the home screen.";
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -264,65 +338,18 @@ export function AddDeckDialog({
     setIsPending(true);
     try {
       const gradientValue = gradient !== "none" ? gradient : undefined;
-      const isOffline =
+      const networkOffline =
         typeof navigator !== "undefined" && !navigator.onLine;
 
-      if (isOffline) {
-        if (forTeamWorkspace || (teamId !== undefined && !forPersonalWorkspace)) {
-          setError("Team decks can't be created offline. Try again when you're online.");
-          return;
-        }
-        if (showDeckFrontImage && frontImageFile) {
-          setError(
-            "Image uploads need a connection. Remove the image or try when online.",
-          );
-          return;
-        }
-
-        const [{ createDeck: createOfflineDeck }, { isOfflineDbAvailable }, session] =
-          await Promise.all([
-            import("@/lib/offline/repository"),
-            import("@/lib/offline/db"),
-            import("@/lib/offline/session"),
-          ]);
-
-        if (!(await isOfflineDbAvailable())) {
-          setError(
-            "You're offline and offline storage isn't available. Open the Flipvise app, tap Open Flipvise once while online, then try again.",
-          );
-          return;
-        }
-
-        const uid = userId ?? (await session.getStoredUserId());
-        if (!uid) {
-          setError("Sign in while online once, then you can create decks offline.");
-          return;
-        }
-
-        if (userId) {
-          await session.setStoredUserId(userId).catch(() => {});
-        }
-
-        try {
-          await createOfflineDeck({
-            userId: uid,
-            name,
-            description: description || null,
-            gradient: gradientValue ?? null,
-          });
-        } catch {
-          setError(
-            "Couldn't save to offline storage. Reopen the app from the home screen and try again.",
-          );
-          return;
-        }
-
-        setOpen(false);
-        form.reset();
-        resetDialogFormState();
-        toast.success(
-          "Deck saved on this device. Tap Offline study to open it — it will sync when you're back online.",
+      if (networkOffline) {
+        const offlineResult = await savePersonalDeckOffline(
+          form,
+          name,
+          description,
+          gradientValue,
         );
+        if (offlineResult.ok) return;
+        setError(offlineCreateError(offlineResult.reason));
         return;
       }
 
@@ -375,13 +402,30 @@ export function AddDeckDialog({
       resetDialogFormState();
       router.refresh();
     } catch (err) {
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        setError("You're offline. Connect to the internet to create a deck.");
-      } else {
-        setError(
-          err instanceof Error ? err.message : "Something went wrong. Please try again.",
+      const { isFlipviseNativeAppAsync } = await import(
+        "@/lib/offline/is-flipvise-native-app"
+      );
+      const inNativeApp = await isFlipviseNativeAppAsync();
+      const networkOffline =
+        typeof navigator !== "undefined" && !navigator.onLine;
+
+      if (inNativeApp || networkOffline) {
+        const offlineFallback = await savePersonalDeckOffline(
+          form,
+          name,
+          description,
+          gradientValue,
         );
+        if (offlineFallback.ok) return;
+        if (networkOffline || inNativeApp) {
+          setError(offlineCreateError(offlineFallback.reason));
+          return;
+        }
       }
+
+      setError(
+        err instanceof Error ? err.message : "Something went wrong. Please try again.",
+      );
     } finally {
       setIsPending(false);
     }
