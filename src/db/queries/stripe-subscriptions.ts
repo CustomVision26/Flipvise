@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { stripeSubscriptions } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isRecoverableNeonReadError } from "@/lib/neon-recoverable-error";
 
 /** Table missing (migration `0015_stripe_subscriptions` not applied) — common in fresh local DBs. */
 function isMissingStripeSubscriptionsTableError(error: unknown): boolean {
@@ -41,24 +42,7 @@ function isStripeSubscriptionsSchemaMismatch(error: unknown): boolean {
 function isRecoverableStripeSubscriptionsReadError(error: unknown): boolean {
   if (isMissingStripeSubscriptionsTableError(error)) return true;
   if (isStripeSubscriptionsSchemaMismatch(error)) return true;
-  let current: unknown = error;
-  for (let depth = 0; depth < 10 && current && typeof current === "object"; depth++) {
-    const obj = current as Record<string, unknown>;
-    if (obj["neon:retryable"] === true) return true;
-    const message = typeof obj.message === "string" ? obj.message : "";
-    if (
-      /too many database connection attempts/i.test(message) ||
-      /failed to acquire permit/i.test(message)
-    ) {
-      return true;
-    }
-    current = obj.cause;
-  }
-  const flat = String(error);
-  return (
-    /too many database connection attempts/i.test(flat) ||
-    /failed to acquire permit/i.test(flat)
-  );
+  return isRecoverableNeonReadError(error);
 }
 
 export type UpsertStripeSubscriptionInput = {

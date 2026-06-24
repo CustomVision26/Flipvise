@@ -196,8 +196,15 @@ export async function loadRootLayoutShellData(input: {
 
   const planLabels = needsFullPlanLabels
     ? {
-        personalPlanLabelForWorkspace: await getPersonalWorkspaceAccessLabel(),
-        personalAccountPlanLabel: await getPersonalWorkspaceAccountPlanLabel(),
+        personalPlanLabelForWorkspace: await getPersonalWorkspaceAccessLabel().catch(
+          () =>
+            personalWorkspaceLabelsFromAccessContext(access)
+              .personalPlanLabelForWorkspace,
+        ),
+        personalAccountPlanLabel: await getPersonalWorkspaceAccountPlanLabel().catch(
+          () =>
+            personalWorkspaceLabelsFromAccessContext(access).personalAccountPlanLabel,
+        ),
       }
     : personalWorkspaceLabelsFromAccessContext(access);
 

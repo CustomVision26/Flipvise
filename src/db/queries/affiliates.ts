@@ -4,6 +4,7 @@ import { eq, desc, or, and, sql, inArray } from "drizzle-orm";
 import { evaluateAffiliateQuotaRenewal } from "@/lib/affiliate-quota-renewal";
 import { buildAffiliatePromotionalCandidate } from "@/lib/affiliate-promotional-code-server";
 import { slugifyAffiliatePromoBase } from "@/lib/affiliate-promotional-code";
+import { isRecoverableNeonReadError } from "@/lib/neon-recoverable-error";
 
 export async function listAffiliates() {
   return db.select().from(affiliates).orderBy(desc(affiliates.createdAt));
@@ -320,7 +321,9 @@ export async function listAffiliatesForPlanHistory(
       .where(eq(affiliates.invitedUserId, userId))
       .orderBy(desc(affiliates.createdAt));
   } catch (error) {
-    console.error("[plan-history] listAffiliatesForPlanHistory:", error);
+    if (!isRecoverableNeonReadError(error)) {
+      console.error("[plan-history] listAffiliatesForPlanHistory:", error);
+    }
     return [];
   }
 }
