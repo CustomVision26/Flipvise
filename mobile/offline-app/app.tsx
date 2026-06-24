@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   isOfflineDbAvailable,
 } from "../../src/lib/offline/db";
 import {
+  createCard,
+  createDeck,
   listCards,
   listDecks,
   recordQuizResult,
@@ -50,6 +52,8 @@ export function App() {
   const [deckView, setDeckView] = useState<"menu" | "flash" | "quiz">("menu");
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showNewDeck, setShowNewDeck] = useState(false);
+  const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
 
   const loadDecks = useCallback(async (uid: string) => {
     const rows = await listDecks(uid);
@@ -138,6 +142,21 @@ export function App() {
     );
   }
 
+  if (addCardsDeck) {
+    return (
+      <AddCardView
+        deck={addCardsDeck}
+        onBack={() => setAddCardsDeck(null)}
+        onSaved={async () => {
+          if (userId) await loadDecks(userId);
+          setAddCardsDeck(null);
+          setActiveDeck(addCardsDeck);
+          setDeckView("menu");
+        }}
+      />
+    );
+  }
+
   if (activeDeck) {
     if (deckView === "flash") {
       return <StudyView deck={activeDeck} onBack={() => setDeckView("menu")} />;
@@ -157,6 +176,7 @@ export function App() {
         onBack={() => setActiveDeck(null)}
         onFlashcards={() => setDeckView("flash")}
         onQuiz={() => setDeckView("quiz")}
+        onAddCards={() => setAddCardsDeck(activeDeck)}
       />
     );
   }
@@ -168,13 +188,19 @@ export function App() {
         {message && (
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>{message}</p>
         )}
+        <div className="row" style={{ marginBottom: 14 }}>
+          <button className="btn" style={{ flex: 1 }} onClick={() => setShowNewDeck(true)}>
+            + New deck
+          </button>
+        </div>
         {decks.length === 0 ? (
-          <div className="empty">
-            <h2>No downloaded decks yet</h2>
+          <div className="empty" style={{ marginTop: 8 }}>
+            <h2>No decks on this device yet</h2>
             <p>
+              Tap <strong>+ New deck</strong> to create one here without a connection.
               {online
-                ? "Tap “Open Flipvise”, sign in, then tap “Make available offline” at the top of your dashboard. Return here with “Offline study” to practice without a connection."
-                : "You're offline and have no downloaded decks. Reconnect and download decks to study offline."}
+                ? " Or tap Dashboard to open the full app and download existing decks."
+                : " When you're back online, tap Sync to upload to your account."}
             </p>
           </div>
         ) : (
@@ -190,6 +216,17 @@ export function App() {
           ))
         )}
       </div>
+      {showNewDeck && (
+        <NewDeckSheet
+          userId={userId}
+          onClose={() => setShowNewDeck(false)}
+          onCreated={async () => {
+            if (userId) await loadDecks(userId);
+            setShowNewDeck(false);
+            setMessage("Deck saved on this device — add cards, then sync when online.");
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -219,11 +256,9 @@ function Topbar({
       <button className="btn secondary" onClick={onSync} disabled={syncing}>
         {syncing ? "Syncing…" : "Sync"}
       </button>
-      {online && (
-        <button className="btn" onClick={onOpen}>
-          Open Flipvise
-        </button>
-      )}
+      <button className="btn secondary" onClick={onOpen} title={online ? undefined : "Needs a connection"}>
+        Dashboard
+      </button>
     </div>
   );
 }
@@ -258,12 +293,23 @@ function DeckMenu({
   onBack,
   onFlashcards,
   onQuiz,
+  onAddCards,
 }: {
   deck: OfflineDeckRow;
   onBack: () => void;
   onFlashcards: () => void;
   onQuiz: () => void;
+  onAddCards: () => void;
 }) {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    listCards(deck.local_id)
+      .then((cards) => setCount(cards.length))
+      .catch(() => setCount(null));
+  }, [deck.local_id]);
+
+  const hasCards = count != null && count > 0;
+
   return (
     <div className="app">
       <div className="topbar">
@@ -281,14 +327,202 @@ function DeckMenu({
             {deck.description}
           </p>
         )}
+        <p style={{ color: "var(--muted)", fontSize: 13 }}>
+          {count == null ? "…" : `${count} card${count === 1 ? "" : "s"}`}
+        </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
-          <button className="btn" style={{ padding: 16 }} onClick={onFlashcards}>
+          <button className="btn secondary" style={{ padding: 16 }} onClick={onAddCards}>
+            Add cards
+          </button>
+          <button
+            className="btn"
+            style={{ padding: 16 }}
+            onClick={onFlashcards}
+            disabled={!hasCards}
+          >
             Study flashcards
           </button>
-          <button className="btn secondary" style={{ padding: 16 }} onClick={onQuiz}>
+          <button
+            className="btn secondary"
+            style={{ padding: 16 }}
+            onClick={onQuiz}
+            disabled={!hasCards}
+          >
             Take a quiz
           </button>
+          {!hasCards && count === 0 && (
+            <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
+              Add at least one card to study or quiz.
+            </p>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function NewDeckSheet({
+  userId,
+  onClose,
+  onCreated,
+}: {
+  userId: string | null;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Deck name is required.");
+      return;
+    }
+    if (!userId) {
+      setError("Sign in on the Dashboard while online once, then you can create decks offline.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await createDeck({
+        userId,
+        name: trimmed,
+        description: description.trim() || null,
+      });
+      onCreated();
+    } catch {
+      setError("Couldn't save the deck. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>New deck</h2>
+        <p className="sheet-hint">Saved on this device. Sync uploads it when you're online.</p>
+        <form onSubmit={handleSubmit} className="form-stack">
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Animal names"
+              autoFocus
+            />
+          </label>
+          <label className="field">
+            <span>Description (optional)</span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this deck about?"
+              rows={3}
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <div className="row">
+            <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn" style={{ flex: 1 }} disabled={busy}>
+              {busy ? "Saving…" : "Create deck"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AddCardView({
+  deck,
+  onBack,
+  onSaved,
+}: {
+  deck: OfflineDeckRow;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const [front, setFront] = useState("");
+  const [back, setBack] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [added, setAdded] = useState(0);
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const f = front.trim();
+    const b = back.trim();
+    if (!f || !b) {
+      setError("Front and back are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await createCard({ deckLocalId: deck.local_id, front: f, back: b });
+      setFront("");
+      setBack("");
+      setAdded((n) => n + 1);
+    } catch {
+      setError("Couldn't save the card.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <button className="btn secondary" onClick={onBack}>
+          ← {deck.name}
+        </button>
+        <div className="spacer" />
+        {added > 0 && (
+          <button className="btn" onClick={onSaved}>
+            Done ({added})
+          </button>
+        )}
+      </div>
+      <div className="content">
+        <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Add cards</h2>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
+          Cards save on this device and sync when you're online.
+        </p>
+        <form onSubmit={handleAdd} className="form-stack" style={{ marginTop: 16 }}>
+          <label className="field">
+            <span>Front (question)</span>
+            <input
+              value={front}
+              onChange={(e) => setFront(e.target.value)}
+              placeholder="e.g. Dog"
+            />
+          </label>
+          <label className="field">
+            <span>Back (answer)</span>
+            <input
+              value={back}
+              onChange={(e) => setBack(e.target.value)}
+              placeholder="e.g. An animal"
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <button type="submit" className="btn" disabled={busy}>
+            {busy ? "Saving…" : "Add card"}
+          </button>
+        </form>
+        {added > 0 && (
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>
+            {added} card{added === 1 ? "" : "s"} added this session.
+          </p>
+        )}
       </div>
     </div>
   );
