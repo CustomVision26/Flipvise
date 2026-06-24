@@ -21,6 +21,7 @@ import {
   setNativeAppFlag,
 } from "../../src/lib/offline/session";
 import { runSync } from "../../src/lib/offline/sync";
+import { DeckLibrary } from "./deck-library";
 
 const LIVE_URL =
   (import.meta.env.VITE_LIVE_URL as string | undefined) ??
@@ -184,37 +185,16 @@ export function App() {
   return (
     <div className="app">
       <Topbar online={online} onOpen={openLiveApp} onSync={handleSync} syncing={syncing} />
-      <div className="content">
-        {message && (
-          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>{message}</p>
-        )}
-        <div className="row" style={{ marginBottom: 14 }}>
-          <button className="btn" style={{ flex: 1 }} onClick={() => setShowNewDeck(true)}>
-            + New deck
-          </button>
-        </div>
-        {decks.length === 0 ? (
-          <div className="empty" style={{ marginTop: 8 }}>
-            <h2>No decks on this device yet</h2>
-            <p>
-              Tap <strong>+ New deck</strong> to create one here without a connection.
-              {online
-                ? " Or tap Dashboard to open the full app and download existing decks."
-                : " When you're back online, tap Sync to upload to your account."}
-            </p>
-          </div>
-        ) : (
-          decks.map((deck) => (
-            <DeckCard
-              key={deck.local_id}
-              deck={deck}
-              onOpen={() => {
-                setActiveDeck(deck);
-                setDeckView("menu");
-              }}
-            />
-          ))
-        )}
+      <div className="content content--library">
+        <DeckLibrary
+          decks={decks}
+          message={message}
+          onNewDeck={() => setShowNewDeck(true)}
+          onOpenDeck={(deck) => {
+            setActiveDeck(deck);
+            setDeckView("menu");
+          }}
+        />
       </div>
       {showNewDeck && (
         <NewDeckSheet
@@ -243,48 +223,36 @@ function Topbar({
   syncing: boolean;
 }) {
   return (
-    <div className="topbar">
+    <header className="topbar">
       <div className="brand">
-        <span className="mark">F</span>
-        <span>Flipvise</span>
+        <span className="mark" aria-hidden>F</span>
+        <div className="brand-text">
+          <span className="brand-name">Flipvise</span>
+          <span className="brand-tag">Offline study</span>
+        </div>
       </div>
       <div className="spacer" />
-      <span className="status">
-        <span className={online ? "dot online" : "dot"} />
+      <span className={`status-pill${online ? " online" : ""}`}>
+        <span className={`dot${online ? " online" : ""}`} aria-hidden />
         {online ? "Online" : "Offline"}
       </span>
-      <button className="btn secondary" onClick={onSync} disabled={syncing}>
+      <button
+        type="button"
+        className="btn secondary btn--sm"
+        onClick={onSync}
+        disabled={syncing}
+      >
         {syncing ? "Syncing…" : "Sync"}
       </button>
-      <button className="btn secondary" onClick={onOpen} title={online ? undefined : "Needs a connection"}>
+      <button
+        type="button"
+        className="btn secondary btn--sm"
+        onClick={onOpen}
+        title={online ? undefined : "Requires a connection"}
+      >
         Dashboard
       </button>
-    </div>
-  );
-}
-
-function DeckCard({
-  deck,
-  onOpen,
-}: {
-  deck: OfflineDeckRow;
-  onOpen: () => void;
-}) {
-  const [count, setCount] = useState<number | null>(null);
-  useEffect(() => {
-    listCards(deck.local_id)
-      .then((cards) => setCount(cards.length))
-      .catch(() => setCount(null));
-  }, [deck.local_id]);
-
-  return (
-    <button className="deck-card" onClick={onOpen}>
-      <h3>{deck.name}</h3>
-      {deck.description && <p>{deck.description}</p>}
-      <div className="count">
-        {count == null ? "…" : `${count} card${count === 1 ? "" : "s"}`}
-      </div>
-    </button>
+    </header>
   );
 }
 
