@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { HelpCircle, ImagePlus, Mic, Square } from "lucide-react";
+import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +29,7 @@ import {
 import { createDeckAction } from "@/actions/decks";
 import { createCardAction, uploadCardImageAction } from "@/actions/cards";
 import { cn } from "@/lib/utils";
+import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
 import { GradientPicker } from "@/components/gradient-picker";
 import type { GradientSlug } from "@/lib/deck-gradients";
 
@@ -108,6 +111,7 @@ export function AddDeckDialog({
   deckFrontImageUploadEnabled = false,
 }: AddDeckDialogProps) {
   const router = useRouter();
+  const { userId } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [isPending, setIsPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -261,6 +265,63 @@ export function AddDeckDialog({
     setIsPending(true);
     try {
       const gradientValue = gradient !== "none" ? gradient : undefined;
+      const isOffline =
+        typeof navigator !== "undefined" && !navigator.onLine;
+
+      if (isOffline) {
+        if (!isFlipviseNativeApp()) {
+          setError("You're offline. Connect to the internet to create a deck.");
+          return;
+        }
+        if (forTeamWorkspace || (teamId !== undefined && !forPersonalWorkspace)) {
+          setError("Team decks can't be created offline. Try again when you're online.");
+          return;
+        }
+        if (showDeckFrontImage && frontImageFile) {
+          setError(
+            "Image uploads need a connection. Remove the image or try when online.",
+          );
+          return;
+        }
+
+        const [{ createDeck: createOfflineDeck }, { isOfflineDbAvailable }, session] =
+          await Promise.all([
+            import("@/lib/offline/repository"),
+            import("@/lib/offline/db"),
+            import("@/lib/offline/session"),
+          ]);
+
+        if (!(await isOfflineDbAvailable())) {
+          setError("Offline storage isn't available in this browser.");
+          return;
+        }
+
+        const uid = userId ?? (await session.getStoredUserId());
+        if (!uid) {
+          setError("Sign in while online once, then you can create decks offline.");
+          return;
+        }
+
+        if (userId) {
+          await session.setStoredUserId(userId).catch(() => {});
+        }
+
+        await createOfflineDeck({
+          userId: uid,
+          name,
+          description: description || null,
+          gradient: gradientValue ?? null,
+        });
+
+        setOpen(false);
+        form.reset();
+        resetDialogFormState();
+        toast.success(
+          "Deck saved on this device. Tap Offline study to open it — it will sync when you're back online.",
+        );
+        return;
+      }
+
       let deckId: number;
       if (forPersonalWorkspace) {
         const r = await createDeckAction({
@@ -309,8 +370,14 @@ export function AddDeckDialog({
       form.reset();
       resetDialogFormState();
       router.refresh();
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError("You're offline. Connect to the internet to create a deck.");
+      } else {
+        setError(
+          err instanceof Error ? err.message : "Something went wrong. Please try again.",
+        );
+      }
     } finally {
       setIsPending(false);
     }
