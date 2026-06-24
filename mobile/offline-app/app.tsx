@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   isOfflineDbAvailable,
 } from "../../src/lib/offline/db";
@@ -6,9 +6,18 @@ import {
   createCard,
   createDeck,
   listCards,
-  listDecks,
+  listDecksForScope,
+  OfflineLimitError,
   recordQuizResult,
 } from "../../src/lib/offline/repository";
+import type {
+  OfflineAccessContext,
+  OfflineWorkspaceContext,
+} from "../../src/lib/offline/access-context";
+import {
+  defaultOfflineAccessContext,
+  getOfflineAccessContext,
+} from "../../src/lib/offline/access-context";
 import type {
   OfflineCardRow,
   OfflineDeckRow,
@@ -21,11 +30,41 @@ import {
   setNativeAppFlag,
 } from "../../src/lib/offline/session";
 import { runSync } from "../../src/lib/offline/sync";
+import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { DeckLibrary } from "./deck-library";
+import {
+  loadWorkspaceScope,
+  saveWorkspaceScope,
+  type SavedWorkspaceScope,
+} from "./workspace-prefs";
 
 const LIVE_URL =
   (import.meta.env.VITE_LIVE_URL as string | undefined) ??
   "https://flipvise-sjgw.onrender.com";
+
+function maxCardsForDeck(
+  deck: OfflineDeckRow,
+  access: OfflineAccessContext,
+): number {
+  if (deck.team_id != null) {
+    const ws = access.workspaces.find((w) => w.teamId === deck.team_id);
+    if (ws) return ws.maxCardsPerDeck;
+  }
+  return access.maxCardsPerDeck;
+}
+
+function canEditDeckContent(deck: OfflineDeckRow): boolean {
+  return (deck.member_assigned ?? 0) === 0;
+}
+
+function resolveCanCreateDeck(
+  scope: SavedWorkspaceScope,
+  access: OfflineAccessContext,
+): boolean {
+  if (scope === "personal") return true;
+  const ws = access.workspaces.find((w) => w.teamId === scope);
+  return ws?.canCreateDeck ?? false;
+}
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(
@@ -49,6 +88,12 @@ export function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [dbReady, setDbReady] = useState<boolean | null>(null);
   const [decks, setDecks] = useState<OfflineDeckRow[]>([]);
+  const [accessContext, setAccessContext] = useState<OfflineAccessContext>(
+    defaultOfflineAccessContext(),
+  );
+  const [workspaceScope, setWorkspaceScope] = useState<SavedWorkspaceScope>(() =>
+    loadWorkspaceScope(),
+  );
   const [activeDeck, setActiveDeck] = useState<OfflineDeckRow | null>(null);
   const [deckView, setDeckView] = useState<"menu" | "flash" | "quiz">("menu");
   const [syncing, setSyncing] = useState(false);
@@ -56,9 +101,21 @@ export function App() {
   const [showNewDeck, setShowNewDeck] = useState(false);
   const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
 
-  const loadDecks = useCallback(async (uid: string) => {
-    const rows = await listDecks(uid);
-    setDecks(rows);
+  const loadDecks = useCallback(
+    async (uid: string, scope: SavedWorkspaceScope) => {
+      const rows = await listDecksForScope(
+        uid,
+        scope === "personal" ? { kind: "personal" } : { kind: "team", teamId: scope },
+      );
+      setDecks(rows);
+    },
+    [],
+  );
+
+  const refreshAccessContext = useCallback(async () => {
+    const ctx = (await getOfflineAccessContext()) ?? defaultOfflineAccessContext();
+    setAccessContext(ctx);
+    return ctx;
   }, []);
 
   useEffect(() => {
@@ -72,9 +129,10 @@ export function App() {
       if (!available) return;
       const uid = await getStoredUserId();
       setUserId(uid);
-      if (uid) await loadDecks(uid);
+      await refreshAccessContext();
+      if (uid) await loadDecks(uid, workspaceScope);
     })().catch((err) => setMessage(String(err)));
-  }, [loadDecks]);
+  }, [loadDecks, refreshAccessContext, workspaceScope]);
 
   const handleSync = useCallback(async () => {
     if (!userId) {
@@ -102,20 +160,65 @@ export function App() {
         userId,
         apiBaseUrl: storedBase ?? LIVE_URL,
         token,
+        fullPull: true,
       });
-      await loadDecks(userId);
+      await refreshAccessContext();
+      await loadDecks(userId, workspaceScope);
+      const downloadParts: string[] = [];
+      if (result.deckCount > 0) {
+        downloadParts.push(`${result.deckCount} deck${result.deckCount === 1 ? "" : "s"}`);
+      }
+      if (result.cardCount > 0) {
+        downloadParts.push(`${result.cardCount} card${result.cardCount === 1 ? "" : "s"}`);
+      }
+      const downloaded =
+        downloadParts.length > 0 ? downloadParts.join(" and ") : "nothing new";
       setMessage(
-        `Synced — ${result.pushed} change${result.pushed === 1 ? "" : "s"} uploaded, ${result.pulled} downloaded.`,
+        `Synced — ${result.pushed} change${result.pushed === 1 ? "" : "s"} uploaded, ${downloaded} downloaded.`,
       );
     } catch {
       setMessage("Couldn't sync right now. Your changes are saved and will sync later.");
     } finally {
       setSyncing(false);
     }
-  }, [userId, online, loadDecks]);
+  }, [userId, online, loadDecks, workspaceScope, refreshAccessContext]);
 
-  const openLiveApp = useCallback(() => {
-    const target = `${LIVE_URL}/dashboard?flipvise_native=1`;
+  const handleWorkspaceChange = useCallback(
+    (scope: SavedWorkspaceScope) => {
+      setWorkspaceScope(scope);
+      saveWorkspaceScope(scope);
+      if (userId) void loadDecks(userId, scope);
+    },
+    [userId, loadDecks],
+  );
+
+  const canCreateDeck = useMemo(
+    () => resolveCanCreateDeck(workspaceScope, accessContext),
+    [workspaceScope, accessContext],
+  );
+
+  const activeWorkspace: OfflineWorkspaceContext | null = useMemo(() => {
+    if (workspaceScope === "personal") return null;
+    return accessContext.workspaces.find((w) => w.teamId === workspaceScope) ?? null;
+  }, [workspaceScope, accessContext.workspaces]);
+
+  const ownerWorkspace = useMemo(
+    () => accessContext.workspaces.find((w) => w.role === "owner") ?? null,
+    [accessContext.workspaces],
+  );
+
+  const coAdminWorkspace = useMemo(
+    () => accessContext.workspaces.find((w) => w.role === "team_admin") ?? null,
+    [accessContext.workspaces],
+  );
+
+  const showTeamAdminDash = ownerWorkspace != null;
+  const showToAdminDash = coAdminWorkspace != null;
+
+  const openLivePath = useCallback(async (path: string) => {
+    const storedBase = await getStoredApiBaseUrl().catch(() => null);
+    const base = storedBase ?? LIVE_URL;
+    const target = `${base}${path}${path.includes("?") ? "&" : "?"}flipvise_native=1`;
     try {
       sessionStorage.setItem("flipvise.native", "1");
       sessionStorage.setItem("flipvise.lastNavigationUrl", target);
@@ -129,9 +232,37 @@ export function App() {
       return;
     }
 
-    // replace() keeps navigation in the Capacitor WebView (allowNavigation) instead of spawning Chrome.
     window.location.replace(target);
   }, []);
+
+  const openTeamAdminDash = useCallback(() => {
+    if (!online || !ownerWorkspace) return;
+    const path = buildTeamAdminMembersPath(
+      ownerWorkspace.teamId,
+      ownerWorkspace.teamMemberId ?? 0,
+    );
+    void openLivePath(path);
+  }, [online, ownerWorkspace, openLivePath]);
+
+  const openToAdminDash = useCallback(() => {
+    if (!online || !coAdminWorkspace) return;
+    const path = buildTeamAdminMembersPath(
+      coAdminWorkspace.teamId,
+      coAdminWorkspace.teamMemberId ?? 0,
+    );
+    void openLivePath(path);
+  }, [online, coAdminWorkspace, openLivePath]);
+
+  useEffect(() => {
+    if (workspaceScope === "personal") return;
+    if (!accessContext.workspaces.some((w) => w.teamId === workspaceScope)) {
+      handleWorkspaceChange("personal");
+    }
+  }, [accessContext.workspaces, workspaceScope, handleWorkspaceChange]);
+
+  const openLiveApp = useCallback(() => {
+    void openLivePath("/dashboard");
+  }, [openLivePath]);
 
   if (dbReady === false) {
     return (
@@ -154,9 +285,10 @@ export function App() {
     return (
       <AddCardView
         deck={addCardsDeck}
+        maxCardsPerDeck={maxCardsForDeck(addCardsDeck, accessContext)}
         onBack={() => setAddCardsDeck(null)}
         onSaved={async () => {
-          if (userId) await loadDecks(userId);
+          if (userId) await loadDecks(userId, workspaceScope);
           setAddCardsDeck(null);
           setActiveDeck(addCardsDeck);
           setDeckView("menu");
@@ -181,6 +313,7 @@ export function App() {
     return (
       <DeckMenu
         deck={activeDeck}
+        canEdit={canEditDeckContent(activeDeck)}
         onBack={() => setActiveDeck(null)}
         onFlashcards={() => setDeckView("flash")}
         onQuiz={() => setDeckView("quiz")}
@@ -196,6 +329,15 @@ export function App() {
         <DeckLibrary
           decks={decks}
           message={message}
+          online={online}
+          workspaceScope={workspaceScope}
+          workspaces={accessContext.workspaces}
+          canCreateDeck={canCreateDeck}
+          showTeamAdminDash={showTeamAdminDash}
+          showToAdminDash={showToAdminDash}
+          onWorkspaceChange={handleWorkspaceChange}
+          onTeamAdminDash={openTeamAdminDash}
+          onToAdminDash={openToAdminDash}
           onNewDeck={() => setShowNewDeck(true)}
           onOpenDeck={(deck) => {
             setActiveDeck(deck);
@@ -206,9 +348,12 @@ export function App() {
       {showNewDeck && (
         <NewDeckSheet
           userId={userId}
+          workspaceScope={workspaceScope}
+          accessContext={accessContext}
+          activeWorkspace={activeWorkspace}
           onClose={() => setShowNewDeck(false)}
           onCreated={async () => {
-            if (userId) await loadDecks(userId);
+            if (userId) await loadDecks(userId, workspaceScope);
             setShowNewDeck(false);
             setMessage("Deck saved on this device — add cards, then sync when online.");
           }}
@@ -265,12 +410,14 @@ function Topbar({
 
 function DeckMenu({
   deck,
+  canEdit,
   onBack,
   onFlashcards,
   onQuiz,
   onAddCards,
 }: {
   deck: OfflineDeckRow;
+  canEdit: boolean;
   onBack: () => void;
   onFlashcards: () => void;
   onQuiz: () => void;
@@ -306,9 +453,11 @@ function DeckMenu({
           {count == null ? "…" : `${count} card${count === 1 ? "" : "s"}`}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
-          <button className="btn secondary" style={{ padding: 16 }} onClick={onAddCards}>
-            Add cards
-          </button>
+          {canEdit && (
+            <button className="btn secondary" style={{ padding: 16 }} onClick={onAddCards}>
+              Add cards
+            </button>
+          )}
           <button
             className="btn"
             style={{ padding: 16 }}
@@ -327,7 +476,9 @@ function DeckMenu({
           </button>
           {!hasCards && count === 0 && (
             <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
-              Add at least one card to study or quiz.
+              {canEdit
+                ? "Add at least one card to study or quiz."
+                : "This assigned deck has no downloaded cards yet."}
             </p>
           )}
         </div>
@@ -338,10 +489,16 @@ function DeckMenu({
 
 function NewDeckSheet({
   userId,
+  workspaceScope,
+  accessContext,
+  activeWorkspace,
   onClose,
   onCreated,
 }: {
   userId: string | null;
+  workspaceScope: SavedWorkspaceScope;
+  accessContext: OfflineAccessContext;
+  activeWorkspace: OfflineWorkspaceContext | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -364,14 +521,25 @@ function NewDeckSheet({
     }
     setBusy(true);
     try {
+      const teamId =
+        workspaceScope === "personal" ? null : workspaceScope;
       await createDeck({
         userId,
         name: trimmed,
         description: description.trim() || null,
+        teamId,
+        maxPersonalDecks:
+          teamId == null ? accessContext.maxPersonalDecks : undefined,
+        maxDecksPerWorkspace:
+          teamId != null ? activeWorkspace?.maxDecksPerWorkspace : undefined,
       });
       onCreated();
-    } catch {
-      setError("Couldn't save the deck. Please try again.");
+    } catch (err) {
+      if (err instanceof OfflineLimitError) {
+        setError(err.message);
+      } else {
+        setError("Couldn't save the deck. Please try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -381,7 +549,11 @@ function NewDeckSheet({
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h2>New deck</h2>
-        <p className="sheet-hint">Saved on this device. Sync uploads it when you're online.</p>
+        <p className="sheet-hint">
+          {workspaceScope === "personal"
+            ? "Saved to your personal dashboard on this device. Sync uploads it when you're online."
+            : `Saved to ${activeWorkspace?.name ?? "team workspace"} on this device.`}
+        </p>
         <form onSubmit={handleSubmit} className="form-stack">
           <label className="field">
             <span>Name</span>
@@ -418,10 +590,12 @@ function NewDeckSheet({
 
 function AddCardView({
   deck,
+  maxCardsPerDeck,
   onBack,
   onSaved,
 }: {
   deck: OfflineDeckRow;
+  maxCardsPerDeck: number;
   onBack: () => void;
   onSaved: () => void;
 }) {
@@ -442,12 +616,21 @@ function AddCardView({
     }
     setBusy(true);
     try {
-      await createCard({ deckLocalId: deck.local_id, front: f, back: b });
+      await createCard({
+        deckLocalId: deck.local_id,
+        front: f,
+        back: b,
+        maxCardsPerDeck,
+      });
       setFront("");
       setBack("");
       setAdded((n) => n + 1);
-    } catch {
-      setError("Couldn't save the card.");
+    } catch (err) {
+      if (err instanceof OfflineLimitError) {
+        setError(err.message);
+      } else {
+        setError("Couldn't save the card.");
+      }
     } finally {
       setBusy(false);
     }
@@ -469,7 +652,8 @@ function AddCardView({
       <div className="content">
         <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Add cards</h2>
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0 }}>
-          Cards save on this device and sync when you're online.
+          Cards save on this device and sync when you're online. Up to{" "}
+          {maxCardsPerDeck} cards per deck on your plan.
         </p>
         <form onSubmit={handleAdd} className="form-stack" style={{ marginTop: 16 }}>
           <label className="field">

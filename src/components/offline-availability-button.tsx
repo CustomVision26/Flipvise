@@ -75,10 +75,19 @@ export function OfflineAvailabilityButton() {
         // Non-fatal — offline reading still works even if token minting fails.
       }
 
-      // Seed/refresh the shared native SQLite DB using the current (cookie) session.
-      const result = await runSync({ userId, credentials: "include" });
+      // Full pull seeds every accessible deck on the device (not just rows changed since last sync).
+      const result = await runSync({ userId, credentials: "include", fullPull: true });
+      const parts: string[] = [];
+      if (result.deckCount > 0) {
+        parts.push(`${result.deckCount} deck${result.deckCount === 1 ? "" : "s"}`);
+      }
+      if (result.cardCount > 0) {
+        parts.push(`${result.cardCount} card${result.cardCount === 1 ? "" : "s"}`);
+      }
       toast.success(
-        `Saved for offline — ${result.pulled} item${result.pulled === 1 ? "" : "s"} downloaded.`,
+        parts.length > 0
+          ? `Saved for offline — ${parts.join(" and ")} downloaded.`
+          : "Saved for offline — your library is up to date (nothing new to download).",
       );
     } catch {
       toast.error("Couldn't save your decks for offline use. Please try again.");

@@ -17,7 +17,7 @@
  */
 
 export const OFFLINE_DB_NAME = "flipvise_offline";
-export const OFFLINE_DB_VERSION = 1;
+export const OFFLINE_DB_VERSION = 2;
 
 /** DDL executed on first open / upgrade. Statements are idempotent (IF NOT EXISTS). */
 export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
@@ -32,11 +32,14 @@ export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
      created_at_ms INTEGER NOT NULL,
      updated_at_ms INTEGER NOT NULL,
      dirty         INTEGER NOT NULL DEFAULT 0,
-     deleted       INTEGER NOT NULL DEFAULT 0
+     deleted         INTEGER NOT NULL DEFAULT 0,
+     team_id         INTEGER,
+     member_assigned INTEGER NOT NULL DEFAULT 0
    );`,
   `CREATE UNIQUE INDEX IF NOT EXISTS decks_server_id_uidx
      ON decks(server_id) WHERE server_id IS NOT NULL;`,
   `CREATE INDEX IF NOT EXISTS decks_user_idx ON decks(user_id);`,
+  `CREATE INDEX IF NOT EXISTS decks_team_idx ON decks(team_id);`,
 
   `CREATE TABLE IF NOT EXISTS cards (
      local_id           TEXT PRIMARY KEY NOT NULL,
@@ -89,6 +92,12 @@ export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
   `INSERT OR IGNORE INTO sync_state (id, last_pulled_ms, last_synced_ms) VALUES (1, 0, 0);`,
 ];
 
+/** Idempotent ALTERs for devices opened on schema v1. */
+export const OFFLINE_SCHEMA_MIGRATIONS: string[] = [
+  `ALTER TABLE decks ADD COLUMN team_id INTEGER;`,
+  `ALTER TABLE decks ADD COLUMN member_assigned INTEGER NOT NULL DEFAULT 0;`,
+];
+
 /** Local row shapes (snake_case to match the SQLite columns above). */
 export interface OfflineDeckRow {
   local_id: string;
@@ -102,6 +111,8 @@ export interface OfflineDeckRow {
   updated_at_ms: number;
   dirty: number;
   deleted: number;
+  team_id: number | null;
+  member_assigned: number;
 }
 
 export interface OfflineCardRow {

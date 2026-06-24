@@ -1,6 +1,29 @@
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, or } from "drizzle-orm";
+import { createClerkClient } from "@clerk/backend";
 import { db } from "@/db";
 import { cards, decks, quizResults } from "@/db/schema";
+import { getDecksByUser, countPersonalDecksForUser } from "@/db/queries/decks";
+import {
+  getAssignedDecksForMember,
+  getDecksForTeam,
+  getEligibleWorkspaceTeamsForUser,
+  getTeamById,
+  getTeamMembershipsForUser,
+} from "@/db/queries/teams";
+import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
+import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
+import {
+  FREE_CARDS_PER_DECK_LIMIT,
+  FREE_PERSONAL_DECK_LIMIT,
+  limitsForPersonalIndividualTier,
+  proPlusPersonalLimits,
+} from "@/lib/personal-plan-limits";
+import { resolvePersonalPlanMetadataVsBilling } from "@/lib/plan-metadata-billing-resolution";
+import {
+  isTeamPlanId,
+  labelForTeamPlanSlug,
+  limitsForPlan,
+} from "@/lib/team-plans";
 
 /**
  * Server-side push/pull helpers for the offline mobile Study database.
@@ -21,6 +44,8 @@ export interface PushDeck {
   gradient: string | null;
   updatedAtMs: number;
   deleted: boolean;
+  /** When set, creates/updates a team workspace deck (owner/co-admin only). */
+  teamId?: number | null;
 }
 
 export interface PushCard {
@@ -93,6 +118,43 @@ export async function pushOfflineChanges(
       continue;
     }
 
+    const teamId = d.teamId ?? null;
+
+    if (teamId != null) {
+      const team = await getTeamById(teamId);
+      if (!team || team.ownerUserId !== userId) continue;
+      if (d.serverId != null) {
+        await db
+          .update(decks)
+          .set({
+            name: d.name,
+            description: d.description,
+            gradient: d.gradient,
+            updatedAt: new Date(d.updatedAtMs),
+          })
+          .where(and(eq(decks.id, d.serverId), eq(decks.userId, userId)));
+        deckLocalToServer.set(d.localId, d.serverId);
+        deckIds.push({ localId: d.localId, serverId: d.serverId });
+      } else if (isTeamPlanId(team.planSlug)) {
+        const limits = limitsForPlan(team.planSlug);
+        const inWorkspace = await getDecksForTeam(team.id, team.ownerUserId);
+        if (inWorkspace.length >= limits.maxDecksPerWorkspace) continue;
+        const [inserted] = await db
+          .insert(decks)
+          .values({
+            userId,
+            name: d.name,
+            description: d.description,
+            gradient: d.gradient,
+            teamId,
+          })
+          .returning({ id: decks.id });
+        deckLocalToServer.set(d.localId, inserted.id);
+        deckIds.push({ localId: d.localId, serverId: inserted.id });
+      }
+      continue;
+    }
+
     if (d.serverId != null) {
       await db
         .update(decks)
@@ -101,6 +163,9 @@ export async function pushOfflineChanges(
       deckLocalToServer.set(d.localId, d.serverId);
       deckIds.push({ localId: d.localId, serverId: d.serverId });
     } else {
+      const limits = await personalLimitsForSyncUser(userId);
+      const personalCount = await countPersonalDecksForUser(userId);
+      if (personalCount >= limits.maxPersonalDecks) continue;
       const [inserted] = await db
         .insert(decks)
         .values({ userId, name: d.name, description: d.description, gradient: d.gradient })
@@ -185,6 +250,8 @@ export async function pushOfflineChanges(
 
 export interface PullDeck {
   serverId: number;
+  teamId: number | null;
+  memberAssigned: boolean;
   name: string;
   description: string | null;
   gradient: string | null;
@@ -211,42 +278,251 @@ export interface SyncPullResult {
   serverTimeMs: number;
 }
 
+export type OfflineSyncWorkspaceContext = {
+  teamId: number;
+  name: string;
+  planSlug: string;
+  planLabel: string;
+  role: "owner" | "team_admin" | "team_member";
+  /** `0` for subscriber owner; else `team_members.id` for co-admin URLs. */
+  teamMemberId: number;
+  canAccessTeamAdmin: boolean;
+  maxDecksPerWorkspace: number;
+  maxCardsPerDeck: number;
+  canCreateDeck: boolean;
+};
+
+export type OfflineSyncContext = {
+  maxPersonalDecks: number;
+  maxCardsPerDeck: number;
+  workspaces: OfflineSyncWorkspaceContext[];
+  updatedAtMs: number;
+};
+
+type AccessibleDeckMeta = {
+  teamId: number | null;
+  memberAssigned: boolean;
+};
+
+async function collectAccessibleDeckMeta(
+  userId: string,
+): Promise<Map<number, AccessibleDeckMeta>> {
+  const map = new Map<number, AccessibleDeckMeta>();
+
+  const owned = await getDecksByUser(userId);
+  for (const d of owned) {
+    map.set(d.id, { teamId: d.teamId ?? null, memberAssigned: false });
+  }
+
+  const [workspaces, memberships] = await Promise.all([
+    getEligibleWorkspaceTeamsForUser(userId),
+    getTeamMembershipsForUser(userId),
+  ]);
+  const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
+
+  for (const team of workspaces) {
+    const membership = membershipByTeam.get(team.id);
+    const role =
+      team.ownerUserId === userId
+        ? "owner"
+        : membership?.role === "team_admin"
+          ? "team_admin"
+          : "team_member";
+
+    if (role === "team_member") {
+      const assigned = await getAssignedDecksForMember(team.id, userId);
+      for (const d of assigned) {
+        map.set(d.id, { teamId: team.id, memberAssigned: true });
+      }
+      continue;
+    }
+
+    const teamDecks = await getDecksForTeam(team.id, team.ownerUserId);
+    for (const d of teamDecks) {
+      const existing = map.get(d.id);
+      map.set(d.id, {
+        teamId: team.id,
+        memberAssigned: existing?.memberAssigned ?? false,
+      });
+    }
+  }
+
+  return map;
+}
+
+async function personalLimitsForSyncUser(userId: string): Promise<{
+  maxPersonalDecks: number;
+  maxCardsPerDeck: number;
+}> {
+  if (isPlatformSuperadminAllowListed(userId)) {
+    return proPlusPersonalLimits();
+  }
+
+  const clerkClient = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY,
+  });
+
+  let meta: Record<string, unknown> = {};
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    meta = (user.publicMetadata ?? {}) as Record<string, unknown>;
+    const liveRole = meta.role;
+    if (liveRole === "admin" || liveRole === "superadmin" || meta.adminGranted === true) {
+      return proPlusPersonalLimits();
+    }
+  } catch {
+    // Fall through to free-tier defaults when Clerk is unreachable.
+  }
+
+  const planResolution = await resolvePersonalPlanMetadataVsBilling({
+    clerkClient,
+    userId,
+    has: () => false,
+    publicMetadata: meta,
+  });
+
+  if (planResolution.activeTeamPlan !== null) {
+    return proPlusPersonalLimits();
+  }
+
+  const stripeSlug = planResolution.effectiveStripeSlug;
+  if (stripeSlug === "pro_plus") return limitsForPersonalIndividualTier("pro_plus");
+  if (stripeSlug === "pro" || planResolution.personalPro) {
+    return limitsForPersonalIndividualTier("pro");
+  }
+
+  return {
+    maxPersonalDecks: FREE_PERSONAL_DECK_LIMIT,
+    maxCardsPerDeck: FREE_CARDS_PER_DECK_LIMIT,
+  };
+}
+
+/** Plan limits + workspace roles for the offline Study shell (refreshed each sync). */
+export async function buildOfflineSyncContext(
+  userId: string,
+): Promise<OfflineSyncContext> {
+  const personal = await personalLimitsForSyncUser(userId);
+  const [workspaces, memberships] = await Promise.all([
+    getEligibleWorkspaceTeamsForUser(userId),
+    getTeamMembershipsForUser(userId),
+  ]);
+  const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
+
+  const workspaceContexts: OfflineSyncWorkspaceContext[] = workspaces
+    .filter((t) => isTeamPlanId(t.planSlug))
+    .map((team) => {
+      const membership = membershipByTeam.get(team.id);
+      const role: OfflineSyncWorkspaceContext["role"] =
+        team.ownerUserId === userId
+          ? "owner"
+          : membership?.role === "team_admin"
+            ? "team_admin"
+            : "team_member";
+      const limits = limitsForPlan(team.planSlug);
+      const teamMemberId =
+        team.ownerUserId === userId ? 0 : (membership?.id ?? 0);
+      return {
+        teamId: team.id,
+        name: team.name,
+        planSlug: team.planSlug,
+        planLabel: labelForTeamPlanSlug(team.planSlug) ?? team.planSlug,
+        role,
+        teamMemberId,
+        canAccessTeamAdmin: role === "owner" || role === "team_admin",
+        maxDecksPerWorkspace: limits.maxDecksPerWorkspace,
+        maxCardsPerDeck: CARDS_PER_DECK_LIMIT_PRO_PLUS,
+        canCreateDeck: role === "owner" || role === "team_admin",
+      };
+    });
+
+  return {
+    maxPersonalDecks: personal.maxPersonalDecks,
+    maxCardsPerDeck: personal.maxCardsPerDeck,
+    workspaces: workspaceContexts,
+    updatedAtMs: Date.now(),
+  };
+}
+
 /**
- * Returns the user's decks and their cards changed since `sinceMs` (epoch ms).
- * Caller (route handler) supplies a session-derived `userId`.
+ * Returns decks/cards the user may study offline, plus workspace metadata.
+ * Caller supplies a session-derived `userId`.
  */
 export async function pullOfflineChanges(
   userId: string,
   sinceMs: number,
 ): Promise<SyncPullResult> {
   const since = new Date(sinceMs);
+  const accessible = await collectAccessibleDeckMeta(userId);
+  const accessibleIds = [...accessible.keys()];
 
-  const deckRows = await db
-    .select()
-    .from(decks)
-    .where(and(eq(decks.userId, userId), gt(decks.updatedAt, since)));
+  if (accessibleIds.length === 0) {
+    return { decks: [], cards: [], serverTimeMs: Date.now() };
+  }
 
-  const ownedDeckIds = (
-    await db.select({ id: decks.id }).from(decks).where(eq(decks.userId, userId))
-  ).map((r) => r.id);
-
-  const cardRows =
-    ownedDeckIds.length > 0
-      ? await db
+  let deckRows =
+    sinceMs === 0
+      ? await db.select().from(decks).where(inArray(decks.id, accessibleIds))
+      : await db
           .select()
-          .from(cards)
-          .where(and(inArray(cards.deckId, ownedDeckIds), gt(cards.updatedAt, since)))
+          .from(decks)
+          .where(and(inArray(decks.id, accessibleIds), gt(decks.updatedAt, since)));
+
+  let missingDeckIds: number[] = [];
+  if (sinceMs > 0) {
+    const have = new Set(deckRows.map((r) => r.id));
+    missingDeckIds = accessibleIds.filter((id) => !have.has(id));
+    if (missingDeckIds.length > 0) {
+      const extra = await db
+        .select()
+        .from(decks)
+        .where(inArray(decks.id, missingDeckIds));
+      deckRows = [...deckRows, ...extra];
+    }
+  }
+
+  const pulledDeckIds = deckRows.map((d) => d.id);
+  const cardRows =
+    pulledDeckIds.length > 0
+      ? sinceMs === 0
+        ? await db.select().from(cards).where(inArray(cards.deckId, pulledDeckIds))
+        : missingDeckIds.length > 0
+          ? await db
+              .select()
+              .from(cards)
+              .where(
+                or(
+                  and(
+                    inArray(cards.deckId, pulledDeckIds),
+                    gt(cards.updatedAt, since),
+                  ),
+                  inArray(cards.deckId, missingDeckIds),
+                ),
+              )
+          : await db
+              .select()
+              .from(cards)
+              .where(
+                and(inArray(cards.deckId, pulledDeckIds), gt(cards.updatedAt, since)),
+              )
       : [];
 
   return {
-    decks: deckRows.map((d) => ({
-      serverId: d.id,
-      name: d.name,
-      description: d.description,
-      gradient: d.gradient,
-      coverImageUrl: d.coverImageUrl,
-      updatedAtMs: (d.updatedAt ?? d.createdAt ?? new Date()).getTime(),
-    })),
+    decks: deckRows.map((d) => {
+      const meta = accessible.get(d.id) ?? {
+        teamId: d.teamId ?? null,
+        memberAssigned: false,
+      };
+      return {
+        serverId: d.id,
+        teamId: meta.teamId,
+        memberAssigned: meta.memberAssigned,
+        name: d.name,
+        description: d.description,
+        gradient: d.gradient,
+        coverImageUrl: d.coverImageUrl,
+        updatedAtMs: (d.updatedAt ?? d.createdAt ?? new Date()).getTime(),
+      };
+    }),
     cards: cardRows.map((c) => ({
       serverId: c.id,
       deckServerId: c.deckId,

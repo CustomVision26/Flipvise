@@ -5,6 +5,7 @@ import { resolveUserIdByDeviceToken } from "@/db/queries/device-sync-tokens";
 import {
   pullOfflineChanges,
   pushOfflineChanges,
+  buildOfflineSyncContext,
 } from "@/db/queries/offline-sync";
 
 /**
@@ -73,6 +74,7 @@ const pushDeckSchema = z.object({
   gradient: z.string().nullable(),
   updatedAtMs: z.number().int().nonnegative(),
   deleted: z.boolean(),
+  teamId: z.number().int().positive().nullable().optional(),
 });
 
 const pushCardSchema = z.object({
@@ -104,6 +106,7 @@ const pushQuizResultSchema = z.object({
 
 const syncRequestSchema = z.object({
   since: z.number().int().nonnegative().default(0),
+  fullPull: z.boolean().optional(),
   push: z
     .object({
       decks: z.array(pushDeckSchema).default([]),
@@ -136,7 +139,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { since, push } = parsed.data;
+  const { since, fullPull, push } = parsed.data;
+  const effectiveSince = fullPull ? 0 : since;
 
   // Apply the client's offline changes first, then return everything newer than
   // `since` so the client converges to the server state in a single round-trip.
@@ -146,7 +150,10 @@ export async function POST(request: Request) {
     quizResults: push.quizResults.map((q) => ({ ...q, perCard: q.perCard ?? null })),
   });
 
-  const pull = await pullOfflineChanges(userId, since);
+  const [pull, context] = await Promise.all([
+    pullOfflineChanges(userId, effectiveSince),
+    buildOfflineSyncContext(userId),
+  ]);
 
-  return NextResponse.json({ idMap, pull }, { headers: cors });
+  return NextResponse.json({ idMap, pull, context }, { headers: cors });
 }

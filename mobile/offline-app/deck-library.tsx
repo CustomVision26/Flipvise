@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { listCards } from "../../src/lib/offline/repository";
+import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
 import { offlineDeckGradientStyle } from "./deck-gradients";
 import {
@@ -12,6 +13,8 @@ import {
   type OfflineDeckSort,
   type OfflineDeckViewMode,
 } from "./deck-library-prefs";
+import type { SavedWorkspaceScope } from "./workspace-prefs";
+import { WorkspaceSelector } from "./workspace-selector";
 
 export type DeckWithCount = OfflineDeckRow & { cardCount: number };
 
@@ -204,11 +207,29 @@ function ViewSortSheet({
 export function DeckLibrary({
   decks,
   message,
+  online,
+  workspaceScope,
+  workspaces,
+  canCreateDeck,
+  showTeamAdminDash,
+  showToAdminDash,
+  onWorkspaceChange,
+  onTeamAdminDash,
+  onToAdminDash,
   onNewDeck,
   onOpenDeck,
 }: {
   decks: OfflineDeckRow[];
   message: string | null;
+  online: boolean;
+  workspaceScope: SavedWorkspaceScope;
+  workspaces: OfflineWorkspaceContext[];
+  canCreateDeck: boolean;
+  showTeamAdminDash: boolean;
+  showToAdminDash: boolean;
+  onWorkspaceChange: (scope: SavedWorkspaceScope) => void;
+  onTeamAdminDash: () => void;
+  onToAdminDash: () => void;
   onNewDeck: () => void;
   onOpenDeck: (deck: OfflineDeckRow) => void;
 }) {
@@ -268,16 +289,86 @@ export function DeckLibrary({
           ? "deck-collection list"
           : "deck-collection detail";
 
+  const isTeamScope = workspaceScope !== "personal";
+  const activeTeam =
+    isTeamScope && typeof workspaceScope === "number"
+      ? workspaces.find((w) => w.teamId === workspaceScope)
+      : null;
+  const subtitle = isTeamScope
+    ? activeTeam?.role === "team_member"
+      ? "Study assigned decks — sync when online"
+      : "Team workspace on this device — sync when online"
+    : "Study on this device — sync when online";
+
+  const emptyTitle = isTeamScope
+    ? activeTeam?.role === "team_member"
+      ? "No assigned decks on this device"
+      : "No workspace decks on this device"
+    : "No decks on this device";
+
+  const emptyBody = isTeamScope ? (
+    activeTeam?.role === "team_member" ? (
+      <>
+        Your admin hasn&apos;t assigned decks yet, or open the Dashboard while online
+        and tap <strong>Make available offline</strong> to download them.
+      </>
+    ) : canCreateDeck ? (
+      <>
+        Create a deck with <strong>+ New deck</strong>, or open the Dashboard while
+        online to download workspace decks.
+      </>
+    ) : (
+      <>
+        Open the Dashboard while online and tap <strong>Make available offline</strong>{" "}
+        to download workspace decks.
+      </>
+    )
+  ) : (
+    <>
+      Create a deck with <strong>+ New deck</strong>, or open the Dashboard while online
+      to download existing decks.
+    </>
+  );
+
   return (
     <>
       <header className="page-header">
-        <div>
+        <div className="page-header__main">
           <h1 className="page-title">Your decks</h1>
-          <p className="page-subtitle">Study on this device — sync when online</p>
+          <p className="page-subtitle">{subtitle}</p>
+          <WorkspaceSelector
+            scope={workspaceScope}
+            workspaces={workspaces}
+            onChange={onWorkspaceChange}
+          />
+          {online && (showTeamAdminDash || showToAdminDash) && (
+            <div className="workspace-admin-actions">
+              {showTeamAdminDash && workspaceScope === "personal" && (
+                <button
+                  type="button"
+                  className="btn secondary btn--sm"
+                  onClick={onTeamAdminDash}
+                >
+                  Team Admin Dash
+                </button>
+              )}
+              {showToAdminDash && (
+                <button
+                  type="button"
+                  className="btn secondary btn--sm"
+                  onClick={onToAdminDash}
+                >
+                  To Admin Dash
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        <button type="button" className="btn" onClick={onNewDeck}>
-          + New deck
-        </button>
+        {canCreateDeck && (
+          <button type="button" className="btn" onClick={onNewDeck}>
+            + New deck
+          </button>
+        )}
       </header>
 
       {message && <p className="banner banner--info">{message}</p>}
@@ -299,11 +390,8 @@ export function DeckLibrary({
 
       {sorted.length === 0 ? (
         <div className="empty">
-          <h2>No decks on this device</h2>
-          <p>
-            Create a deck with <strong>+ New deck</strong>, or open the Dashboard
-            while online to download existing decks.
-          </p>
+          <h2>{emptyTitle}</h2>
+          <p>{emptyBody}</p>
         </div>
       ) : (
         <>

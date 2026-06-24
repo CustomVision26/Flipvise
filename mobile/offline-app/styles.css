@@ -81,8 +81,102 @@ html, body, #root {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 12px; margin-bottom: 14px;
 }
+.page-header__main { min-width: 0; flex: 1; }
 .page-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .page-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+.workspace-scope {
+  position: relative;
+  margin-top: 10px;
+  max-width: 100%;
+}
+.workspace-scope__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.workspace-scope__label {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-scope__plan {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  flex-shrink: 0;
+}
+.workspace-scope__chev {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.workspace-scope__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+}
+.workspace-scope__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.workspace-scope__item:last-child { border-bottom: none; }
+.workspace-scope__item.active { background: var(--accent-soft); }
+.workspace-scope__item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.workspace-scope__item-main strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.workspace-scope__item-main small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.workspace-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 
 .banner {
   margin: 0 0 12px; padding: 10px 12px; border-radius: var(--radius);

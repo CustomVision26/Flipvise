@@ -16,6 +16,7 @@
  */
 
 import { getOfflineDb, persistOfflineDb } from "./db";
+import { setOfflineAccessContext } from "./access-context";
 import type {
   OfflineCardRow,
   OfflineDeckRow,
@@ -36,6 +37,8 @@ interface SyncResponse {
   pull: {
     decks: {
       serverId: number;
+      teamId: number | null;
+      memberAssigned: boolean;
       name: string;
       description: string | null;
       gradient: string | null;
@@ -56,6 +59,23 @@ interface SyncResponse {
     }[];
     serverTimeMs: number;
   };
+  context?: {
+    maxPersonalDecks: number;
+    maxCardsPerDeck: number;
+    workspaces: {
+      teamId: number;
+      name: string;
+      planSlug: string;
+      planLabel: string;
+      role: "owner" | "team_admin" | "team_member";
+      teamMemberId: number;
+      canAccessTeamAdmin: boolean;
+      maxDecksPerWorkspace: number;
+      maxCardsPerDeck: number;
+      canCreateDeck: boolean;
+    }[];
+    updatedAtMs: number;
+  };
 }
 
 export interface SyncOptions {
@@ -71,6 +91,18 @@ export interface SyncOptions {
   token?: string;
   /** Forwarded to fetch — defaults to "include" (cookie) or "omit" when a token is used. */
   credentials?: RequestCredentials;
+  /**
+   * When true, requests a full library download (`since: 0`) — used by
+   * "Make available offline" so every accessible deck is seeded on the device.
+   */
+  fullPull?: boolean;
+}
+
+/** Clears the incremental pull cursor so the next sync re-downloads all accessible rows. */
+export async function resetSyncPullCursor(): Promise<void> {
+  const db = await getOfflineDb();
+  await db.run(`UPDATE sync_state SET last_pulled_ms = 0 WHERE id = 1;`);
+  await persistOfflineDb();
 }
 
 async function collectDirty(): Promise<{
@@ -101,11 +133,15 @@ async function collectDirty(): Promise<{
 export async function runSync(options: SyncOptions): Promise<{
   pushed: number;
   pulled: number;
+  deckCount: number;
+  cardCount: number;
 }> {
   const { decks, cards, quizResults, lastPulledMs } = await collectDirty();
+  const since = options.fullPull ? 0 : lastPulledMs;
 
   const payload = {
-    since: lastPulledMs,
+    since,
+    fullPull: options.fullPull === true,
     push: {
       decks: decks.map((d) => ({
         localId: d.local_id,
@@ -115,6 +151,7 @@ export async function runSync(options: SyncOptions): Promise<{
         gradient: d.gradient,
         updatedAtMs: d.updated_at_ms,
         deleted: d.deleted === 1,
+        teamId: d.team_id ?? null,
       })),
       cards: cards.map((c) => ({
         localId: c.local_id,
@@ -161,9 +198,18 @@ export async function runSync(options: SyncOptions): Promise<{
 
   await applyServerResponse(data, options.userId);
 
+  if (data.context) {
+    await setOfflineAccessContext(data.context);
+  }
+
   const pushedCount = decks.length + cards.length + quizResults.length;
   const pulledCount = data.pull.decks.length + data.pull.cards.length;
-  return { pushed: pushedCount, pulled: pulledCount };
+  return {
+    pushed: pushedCount,
+    pulled: pulledCount,
+    deckCount: data.pull.decks.length,
+    cardCount: data.pull.cards.length,
+  };
 }
 
 async function applyServerResponse(
@@ -204,12 +250,13 @@ async function applyServerResponse(
   // 3. Merge pulled rows (last-write-wins; skip rows with newer local edits).
   //    `lower(hex(randomblob(16)))` mints a local id when the row is new locally.
   for (const d of data.pull.decks) {
+    const memberAssigned = d.memberAssigned ? 1 : 0;
     await db.run(
       `INSERT INTO decks (local_id, server_id, user_id, name, description, gradient,
-         cover_image_url, created_at_ms, updated_at_ms, dirty, deleted)
+         cover_image_url, created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
        VALUES (
          COALESCE((SELECT local_id FROM decks WHERE server_id = ?), lower(hex(randomblob(16)))),
-         ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+         ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
        ON CONFLICT(local_id) DO UPDATE SET
          server_id = excluded.server_id,
          user_id = excluded.user_id,
@@ -217,9 +264,23 @@ async function applyServerResponse(
          description = excluded.description,
          gradient = excluded.gradient,
          cover_image_url = excluded.cover_image_url,
-         updated_at_ms = excluded.updated_at_ms
+         updated_at_ms = excluded.updated_at_ms,
+         team_id = excluded.team_id,
+         member_assigned = excluded.member_assigned
        WHERE decks.dirty = 0 AND decks.updated_at_ms <= excluded.updated_at_ms;`,
-      [d.serverId, d.serverId, userId, d.name, d.description, d.gradient, d.coverImageUrl, d.updatedAtMs, d.updatedAtMs],
+      [
+        d.serverId,
+        d.serverId,
+        userId,
+        d.name,
+        d.description,
+        d.gradient,
+        d.coverImageUrl,
+        d.updatedAtMs,
+        d.updatedAtMs,
+        d.teamId,
+        memberAssigned,
+      ],
     );
   }
   for (const c of data.pull.cards) {

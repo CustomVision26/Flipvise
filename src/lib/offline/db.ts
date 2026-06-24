@@ -18,6 +18,7 @@ import {
   OFFLINE_DB_NAME,
   OFFLINE_DB_VERSION,
   OFFLINE_SCHEMA_STATEMENTS,
+  OFFLINE_SCHEMA_MIGRATIONS,
 } from "./schema";
 import { isFlipviseNativeApp } from "./is-flipvise-native-app";
 
@@ -109,6 +110,13 @@ export async function getOfflineDb(): Promise<SQLiteDBConnection> {
 
     await conn.open();
     await conn.execute(OFFLINE_SCHEMA_STATEMENTS.join("\n"));
+    for (const stmt of OFFLINE_SCHEMA_MIGRATIONS) {
+      try {
+        await conn.run(stmt);
+      } catch {
+        // Column already exists on upgraded devices.
+      }
+    }
 
     dbConnection = conn;
     return conn;

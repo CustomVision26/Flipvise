@@ -1,18 +1,9 @@
 "use client";
 
-/**
- * Typed CRUD over the offline SQLite database. Every write stamps `updated_at_ms`
- * and sets `dirty = 1` so the sync engine (`./sync`) can push changes later.
- *
- * Local rows are keyed by client-generated UUID (`local_id`) so they can be created
- * offline before they ever receive a server id.
- */
-
 import { getOfflineDb, persistOfflineDb } from "./db";
 import type {
   OfflineCardRow,
   OfflineDeckRow,
-  OfflineQuizResultRow,
 } from "./schema";
 
 function uuid(): string {
@@ -30,17 +21,60 @@ function now(): number {
   return Date.now();
 }
 
+export type OfflineWorkspaceScope =
+  | { kind: "personal" }
+  | { kind: "team"; teamId: number };
+
+export class OfflineLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OfflineLimitError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Decks
 // ---------------------------------------------------------------------------
 
-export async function listDecks(userId: string): Promise<OfflineDeckRow[]> {
+/** Personal dashboard — owned decks (excludes member-assigned study copies). */
+export async function listPersonalDecks(userId: string): Promise<OfflineDeckRow[]> {
   const db = await getOfflineDb();
   const res = await db.query(
-    `SELECT * FROM decks WHERE user_id = ? AND deleted = 0 ORDER BY updated_at_ms DESC;`,
+    `SELECT * FROM decks
+     WHERE user_id = ? AND deleted = 0
+       AND COALESCE(member_assigned, 0) = 0
+     ORDER BY updated_at_ms DESC;`,
     [userId],
   );
   return (res.values ?? []) as OfflineDeckRow[];
+}
+
+/** Team workspace — decks in a workspace (owner/admin library or member assignments). */
+export async function listTeamWorkspaceDecks(
+  userId: string,
+  teamId: number,
+): Promise<OfflineDeckRow[]> {
+  const db = await getOfflineDb();
+  const res = await db.query(
+    `SELECT * FROM decks
+     WHERE user_id = ? AND deleted = 0 AND team_id = ?
+     ORDER BY updated_at_ms DESC;`,
+    [userId, teamId],
+  );
+  return (res.values ?? []) as OfflineDeckRow[];
+}
+
+export async function listDecksForScope(
+  userId: string,
+  scope: OfflineWorkspaceScope,
+): Promise<OfflineDeckRow[]> {
+  if (scope.kind === "personal") return listPersonalDecks(userId);
+  return listTeamWorkspaceDecks(userId, scope.teamId);
+}
+
+/** @deprecated Use listDecksForScope — returns all non-assigned decks for the user. */
+export async function listDecks(userId: string): Promise<OfflineDeckRow[]> {
+  return listPersonalDecks(userId);
 }
 
 export async function getDeck(localId: string): Promise<OfflineDeckRow | null> {
@@ -51,21 +85,86 @@ export async function getDeck(localId: string): Promise<OfflineDeckRow | null> {
   return ((res.values ?? [])[0] as OfflineDeckRow) ?? null;
 }
 
+export async function countOwnedDecks(userId: string): Promise<number> {
+  const db = await getOfflineDb();
+  const res = await db.query(
+    `SELECT COUNT(*) AS n FROM decks
+     WHERE user_id = ? AND deleted = 0 AND COALESCE(member_assigned, 0) = 0;`,
+    [userId],
+  );
+  const row = (res.values ?? [])[0] as { n: number } | undefined;
+  return Number(row?.n ?? 0);
+}
+
+export async function countWorkspaceDecks(
+  userId: string,
+  teamId: number,
+): Promise<number> {
+  const db = await getOfflineDb();
+  const res = await db.query(
+    `SELECT COUNT(*) AS n FROM decks
+     WHERE user_id = ? AND deleted = 0 AND team_id = ?
+       AND COALESCE(member_assigned, 0) = 0;`,
+    [userId, teamId],
+  );
+  const row = (res.values ?? [])[0] as { n: number } | undefined;
+  return Number(row?.n ?? 0);
+}
+
 export async function createDeck(input: {
   userId: string;
   name: string;
   description?: string | null;
   gradient?: string | null;
+  teamId?: number | null;
+  memberAssigned?: boolean;
+  maxPersonalDecks?: number;
+  maxDecksPerWorkspace?: number;
 }): Promise<string> {
+  const teamId = input.teamId ?? null;
+  const memberAssigned = input.memberAssigned ? 1 : 0;
+
+  if (teamId == null) {
+    const max = input.maxPersonalDecks;
+    if (max != null) {
+      const count = await countOwnedDecks(input.userId);
+      if (count >= max) {
+        throw new OfflineLimitError(
+          `Deck limit reached — up to ${max} personal deck(s) on your plan.`,
+        );
+      }
+    }
+  } else if (!input.memberAssigned) {
+    const max = input.maxDecksPerWorkspace;
+    if (max != null) {
+      const count = await countWorkspaceDecks(input.userId, teamId);
+      if (count >= max) {
+        throw new OfflineLimitError(
+          `Workspace deck limit reached — up to ${max} decks in this workspace on your plan.`,
+        );
+      }
+    }
+  }
+
   const db = await getOfflineDb();
   const localId = uuid();
   const ts = now();
   await db.run(
     `INSERT INTO decks
        (local_id, server_id, user_id, name, description, gradient, cover_image_url,
-        created_at_ms, updated_at_ms, dirty, deleted)
-     VALUES (?, NULL, ?, ?, ?, ?, NULL, ?, ?, 1, 0);`,
-    [localId, input.userId, input.name, input.description ?? null, input.gradient ?? null, ts, ts],
+        created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
+     VALUES (?, NULL, ?, ?, ?, ?, NULL, ?, ?, 1, 0, ?, ?);`,
+    [
+      localId,
+      input.userId,
+      input.name,
+      input.description ?? null,
+      input.gradient ?? null,
+      ts,
+      ts,
+      teamId,
+      memberAssigned,
+    ],
   );
   await persistOfflineDb();
   return localId;
@@ -116,6 +215,11 @@ export async function listCards(deckLocalId: string): Promise<OfflineCardRow[]> 
   return (res.values ?? []) as OfflineCardRow[];
 }
 
+export async function countCardsInDeck(deckLocalId: string): Promise<number> {
+  const cards = await listCards(deckLocalId);
+  return cards.length;
+}
+
 export async function createCard(input: {
   deckLocalId: string;
   front?: string | null;
@@ -123,7 +227,17 @@ export async function createCard(input: {
   cardType?: "standard" | "multiple_choice";
   choices?: string[] | null;
   correctChoiceIndex?: number | null;
+  maxCardsPerDeck?: number;
 }): Promise<string> {
+  if (input.maxCardsPerDeck != null) {
+    const existing = await countCardsInDeck(input.deckLocalId);
+    if (existing >= input.maxCardsPerDeck) {
+      throw new OfflineLimitError(
+        `Card limit reached — up to ${input.maxCardsPerDeck} cards per deck on your plan.`,
+      );
+    }
+  }
+
   const db = await getOfflineDb();
   const deck = await getDeck(input.deckLocalId);
   const localId = uuid();
