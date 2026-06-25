@@ -414,9 +414,10 @@ function Topbar({
         type="button"
         className="btn secondary btn--sm"
         onClick={onOpen}
-        title={online ? undefined : "Requires a connection"}
+        disabled={!online}
+        title={online ? "Open the live dashboard" : "Requires an internet connection"}
       >
-        Dashboard
+        Online Dashboard
       </button>
     </header>
   );

@@ -337,7 +337,11 @@ html, body, #root {
   color: var(--fg);
 }
 .btn--sm { padding: 8px 11px; font-size: 12px; border-radius: 10px; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; color: var(--muted); }
+.btn.secondary:disabled {
+  background: var(--panel);
+  border-color: var(--border-subtle);
+}
 
 .row { display: flex; gap: 8px; align-items: center; }
 .icon-btn {
