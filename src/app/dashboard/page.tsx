@@ -15,7 +15,6 @@ import {
   resolveTeamWorkspaceFromSearchParams,
   searchParamsLooksLikeTeamWorkspace,
   shouldRedirectUnauthorizedDashboardUseridParam,
-  teamWorkspaceSearchParamsHaveLegacyIdentityFields,
 } from "@/lib/resolve-team-workspace-url";
 import {
   Card,
@@ -47,10 +46,7 @@ import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
-import {
-  clearTeamContextCookie,
-  syncTeamContextCookieForUser,
-} from "@/lib/team-context-cookie-server";
+import { syncTeamContextCookieForUser } from "@/lib/team-context-cookie-server";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { isTeamPlanId } from "@/lib/team-plans";
 import {
@@ -194,32 +190,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
   const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
 
-  /** Team Admin / bookmark URLs with legacy `userid`/`plan`/`teamMemberId` — keep query string on the subscriber-owned workspace dashboard. */
-  const keepSubscriberOwnerLegacyWorkspaceBookmark =
-    teamWorkspaceUrl != null &&
-    teamWorkspaceUrl.canEditTeamDecks &&
-    teamWorkspaceUrl.ownerUserId === userId &&
-    teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp);
-
-  /** Team-tier subscriber owners author on Personal Dashboard — never a duplicate team deck dashboard. */
-  if (
-    teamWorkspaceUrl?.canEditTeamDecks &&
-    teamWorkspaceUrl.ownerUserId === userId &&
-    !keepSubscriberOwnerLegacyWorkspaceBookmark
-  ) {
-    await tryTeamQuery(() => clearTeamContextCookie(), undefined);
-    const next = new URLSearchParams();
-    const ti = sp.team_invite;
-    const inviteRaw = Array.isArray(ti) ? ti[0] : ti;
-    if (
-      typeof inviteRaw === "string" &&
-      inviteRaw.trim() !== ""
-    ) {
-      next.set("team_invite", inviteRaw.trim());
-    }
-    redirect(next.size ? `/dashboard?${next.toString()}` : "/dashboard");
-  }
-
   if (searchParamsLooksLikeTeamWorkspace(sp) && !teamWorkspaceUrl) {
     redirect("/dashboard");
   }
@@ -245,15 +215,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const teamCtxRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
   const teamCtxId = teamCtxRaw ? Number(teamCtxRaw) : NaN;
 
-  if (teamWorkspaceUrl?.isTeamAdminWorkspaceViewer) {
+  const isTeamWorkspaceDeckViewer =
+    teamWorkspaceUrl?.isTeamAdminWorkspaceViewer ||
+    teamWorkspaceUrl?.canEditTeamDecks;
+
+  if (isTeamWorkspaceDeckViewer && teamWorkspaceUrl != null) {
+    const tw = teamWorkspaceUrl;
     const [workspaceHeadingRow, workspaceDecksRaw] = await Promise.all([
-      tryTeamQuery(() => getTeamById(teamWorkspaceUrl.teamId), null),
+      tryTeamQuery(() => getTeamById(tw.teamId), null),
       tryTeamQuery(
         () =>
-          getDecksForTeamWithCardCount(
-            teamWorkspaceUrl.teamId,
-            teamWorkspaceUrl.ownerUserId,
-          ),
+          getDecksForTeamWithCardCount(tw.teamId, tw.ownerUserId),
         [],
       ),
     ]);

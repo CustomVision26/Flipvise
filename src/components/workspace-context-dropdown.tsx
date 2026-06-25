@@ -193,11 +193,6 @@ export function WorkspaceContextDropdown({
 
   async function selectTeam(team: TeamWorkspaceNavTeam) {
     if (!sessionLoaded) return;
-    /** Subscriber-owned team-tier workspaces use Personal Dashboard — avoid stale team cookie + checkmark. */
-    if (team.isSubscriberOwned) {
-      await selectPersonal();
-      return;
-    }
     setPending(true);
     try {
       await refreshSessionCookieForAction();

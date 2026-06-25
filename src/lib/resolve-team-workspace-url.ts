@@ -10,8 +10,7 @@ export type ResolvedTeamWorkspaceUrl = {
   teamId: number;
   ownerUserId: string;
   /**
-   * Subscriber/workspace owner — team-tier workspaces redirect this viewer to Personal Dashboard
-   * (all decks, all owned workspaces). Kept for the redirect guard only.
+   * Subscriber/workspace owner — may open and edit workspace decks on `/dashboard?team=`.
    */
   canEditTeamDecks: boolean;
   /**
