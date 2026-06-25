@@ -18,6 +18,7 @@ import type {
 import {
   defaultOfflineAccessContext,
   getOfflineAccessContext,
+  resolveOfflinePersonalPlanLabel,
 } from "../../src/lib/offline/access-context";
 import type {
   OfflineCardRow,
@@ -292,6 +293,11 @@ export function App() {
     }
   }, [accessContext.workspaces, workspaceScope, handleWorkspaceChange]);
 
+  const personalPlanLabel = useMemo(
+    () => resolveOfflinePersonalPlanLabel(accessContext),
+    [accessContext],
+  );
+
   const openLiveApp = useCallback(() => {
     void openLivePath("/dashboard");
   }, [openLivePath]);
@@ -374,7 +380,7 @@ export function App() {
           online={online}
           workspaceScope={workspaceScope}
           workspaces={accessContext.workspaces}
-          personalPlanLabel={accessContext.personalPlanLabel ?? "Free"}
+          personalPlanLabel={personalPlanLabel}
           canCreateDeck={canCreateDeck}
           onWorkspaceChange={handleWorkspaceChange}
           onTeamAdminDash={showTeamAdminDash ? openTeamAdminDash : undefined}

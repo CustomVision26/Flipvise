@@ -294,10 +294,13 @@ export function DeckLibrary({
     isTeamScope && typeof workspaceScope === "number"
       ? workspaces.find((w) => w.teamId === workspaceScope)
       : null;
+
+  const pageTitle = isTeamScope ? "Team Dashboard" : "Personal Dash";
+
   const subtitle = isTeamScope
-    ? activeTeam?.role === "team_member"
-      ? "Study assigned decks — sync when online"
-      : "Team workspace on this device — sync when online"
+    ? activeTeam
+      ? `${activeTeam.name} · OWNER · ${activeTeam.ownerDisplayName ?? "Subscriber"}`
+      : "Team workspace on this device"
     : "Study on this device — sync when online";
 
   const emptyTitle = isTeamScope
@@ -334,8 +337,10 @@ export function DeckLibrary({
     <>
       <header className="page-header">
         <div className="page-header__main">
-          <h1 className="page-title">Your decks</h1>
+          <h1 className="page-title">{pageTitle}</h1>
           <p className="page-subtitle">{subtitle}</p>
+        </div>
+        <div className="page-header__actions">
           <WorkspaceSelector
             scope={workspaceScope}
             workspaces={workspaces}
@@ -345,12 +350,12 @@ export function DeckLibrary({
             onTeamAdminDash={onTeamAdminDash}
             onToAdminDash={onToAdminDash}
           />
+          {canCreateDeck && (
+            <button type="button" className="btn" onClick={onNewDeck}>
+              + New deck
+            </button>
+          )}
         </div>
-        {canCreateDeck && (
-          <button type="button" className="btn" onClick={onNewDeck}>
-            + New deck
-          </button>
-        )}
       </header>
 
       {message && <p className="banner banner--info">{message}</p>}

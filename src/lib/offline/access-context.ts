@@ -78,3 +78,20 @@ export function defaultOfflineAccessContext(): OfflineAccessContext {
     updatedAtMs: 0,
   };
 }
+
+/** Personal plan label for the workspace switcher — uses sync payload with sensible fallbacks. */
+export function resolveOfflinePersonalPlanLabel(
+  ctx: OfflineAccessContext,
+): string {
+  const stored = ctx.personalPlanLabel?.trim();
+  if (stored && stored !== "Free") return stored;
+
+  const ownedTeam = ctx.workspaces.find((w) => w.role === "owner");
+  if (ownedTeam) {
+    return `${ownedTeam.planLabel} (Affiliate)`;
+  }
+
+  if (ctx.maxPersonalDecks >= 15) return "Pro Plus";
+  if (ctx.maxPersonalDecks > 2) return "Pro";
+  return stored || "Free";
+}

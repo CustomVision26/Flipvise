@@ -82,14 +82,26 @@ html, body, #root {
   gap: 12px; margin-bottom: 14px;
 }
 .page-header__main { min-width: 0; flex: 1; }
+.page-header__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  flex-shrink: 0;
+  width: min(11.5rem, 44vw);
+}
+.page-header__actions .btn {
+  width: 100%;
+  justify-content: center;
+}
 .page-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.page-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.page-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
 
 .workspace-scope {
   position: relative;
-  margin-top: 10px;
+  margin-top: 0;
   max-width: 100%;
-  width: min(100%, 20rem);
+  width: 100%;
 }
 .workspace-scope__trigger {
   display: inline-flex;
