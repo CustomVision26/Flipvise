@@ -263,6 +263,10 @@ export async function runSync(options: SyncOptions): Promise<{
   const { decks, cards, quizResults, lastPulledMs } = await collectDirty();
   const since = options.fullPull ? 0 : lastPulledMs;
 
+  const deckServerIdByLocal = new Map(
+    decks.map((d) => [d.local_id, d.server_id] as const),
+  );
+
   const payload = {
     since,
     fullPull: options.fullPull === true,
@@ -292,7 +296,10 @@ export async function runSync(options: SyncOptions): Promise<{
       })),
       quizResults: quizResults.map((q) => ({
         localId: q.local_id,
-        deckServerId: q.deck_server_id,
+        deckLocalId: q.deck_local_id,
+        deckServerId:
+          q.deck_server_id ??
+          (q.deck_local_id ? deckServerIdByLocal.get(q.deck_local_id) ?? null : null),
         deckName: q.deck_name,
         correct: q.correct,
         incorrect: q.incorrect,

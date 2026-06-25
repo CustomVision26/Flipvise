@@ -1,7 +1,8 @@
 import { and, eq, gt, inArray, or } from "drizzle-orm";
 import { createClerkClient } from "@clerk/backend";
 import { db } from "@/db";
-import { cards, decks, quizResults } from "@/db/schema";
+import { cards, decks, type PerCardSnapshot } from "@/db/schema";
+import { saveQuizResult } from "@/db/queries/quiz-results";
 import { getDecksByUser, countPersonalDecksForUser } from "@/db/queries/decks";
 import {
   getAssignedDecksForMember,
@@ -69,6 +70,8 @@ export interface PushCard {
 
 export interface PushQuizResult {
   localId: string;
+  /** Resolves `deckServerId` on the server when the client row only has a local deck id. */
+  deckLocalId?: string | null;
   deckServerId: number | null;
   deckName: string;
   correct: number;
@@ -231,23 +234,37 @@ export async function pushOfflineChanges(
   }
 
   for (const q of payload.quizResults) {
-    const [inserted] = await db
-      .insert(quizResults)
-      .values({
-        userId,
-        deckId: q.deckServerId,
-        deckName: q.deckName,
-        correct: q.correct,
-        incorrect: q.incorrect,
-        unanswered: q.unanswered,
-        total: q.total,
-        percent: q.percent,
-        elapsedSeconds: q.elapsedSeconds,
-        // perCard JSON column is typed; cast through unknown for the sync boundary.
-        perCard: (q.perCard as never) ?? null,
-      })
-      .returning({ id: quizResults.id });
-    quizResultIds.push({ localId: q.localId, serverId: inserted.id });
+    const deckServerId =
+      q.deckServerId ??
+      (q.deckLocalId ? (deckLocalToServer.get(q.deckLocalId) ?? null) : null);
+
+    let teamId: number | null = null;
+    if (deckServerId != null) {
+      const [deckRow] = await db
+        .select({ teamId: decks.teamId })
+        .from(decks)
+        .where(eq(decks.id, deckServerId));
+      teamId = deckRow?.teamId ?? null;
+    }
+
+    const perCard = Array.isArray(q.perCard)
+      ? (q.perCard as PerCardSnapshot[])
+      : [];
+
+    const { result: saved } = await saveQuizResult({
+      userId,
+      deckId: deckServerId,
+      deckName: q.deckName,
+      teamId,
+      correct: q.correct,
+      incorrect: q.incorrect,
+      unanswered: q.unanswered,
+      total: q.total,
+      percent: q.percent,
+      elapsedSeconds: q.elapsedSeconds,
+      perCard,
+    });
+    quizResultIds.push({ localId: q.localId, serverId: saved.id });
   }
 
   return { deckIds, cardIds, quizResultIds };

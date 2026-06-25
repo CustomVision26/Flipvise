@@ -93,6 +93,7 @@ const pushCardSchema = z.object({
 
 const pushQuizResultSchema = z.object({
   localId: z.string().min(1),
+  deckLocalId: z.string().min(1).nullable().optional(),
   deckServerId: z.number().int().nullable(),
   deckName: z.string().min(1).max(255),
   correct: z.number().int().nonnegative(),

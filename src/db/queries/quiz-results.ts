@@ -9,7 +9,7 @@ import {
   resolveQuizResultInboxRecipients,
   type QuizResultInboxTarget,
 } from "@/lib/quiz-result-inbox-targets";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type QuizResultRow = InferSelectModel<typeof quizResults>;
@@ -159,10 +159,62 @@ export type QuizResultInboxEntry = QuizResultInboxMessageRow & {
   quizResult: QuizResultRow;
 };
 
+/**
+ * Offline sync historically inserted `quiz_results` without inbox rows. Create any
+ * missing inbox messages for results this user should see (taker or team owner).
+ */
+async function backfillMissingQuizResultInboxMessages(
+  recipientUserId: string,
+): Promise<void> {
+  const asTaker = await db
+    .select({ id: quizResults.id })
+    .from(quizResults)
+    .leftJoin(
+      quizResultInboxMessages,
+      and(
+        eq(quizResultInboxMessages.quizResultId, quizResults.id),
+        eq(quizResultInboxMessages.recipientUserId, recipientUserId),
+      ),
+    )
+    .where(and(eq(quizResults.userId, recipientUserId), isNull(quizResultInboxMessages.id)));
+
+  const asOwner = await db
+    .select({ id: quizResults.id })
+    .from(quizResults)
+    .innerJoin(teams, eq(quizResults.teamId, teams.id))
+    .leftJoin(
+      quizResultInboxMessages,
+      and(
+        eq(quizResultInboxMessages.quizResultId, quizResults.id),
+        eq(quizResultInboxMessages.recipientUserId, recipientUserId),
+      ),
+    )
+    .where(
+      and(
+        eq(teams.ownerUserId, recipientUserId),
+        isNull(quizResultInboxMessages.id),
+      ),
+    );
+
+  const quizResultIds = [
+    ...new Set([...asTaker, ...asOwner].map((r) => r.id)),
+  ];
+  if (quizResultIds.length === 0) return;
+
+  await db.insert(quizResultInboxMessages).values(
+    quizResultIds.map((quizResultId) => ({
+      recipientUserId,
+      quizResultId,
+    })),
+  );
+}
+
 /** Inbox messages addressed to a recipient, joined with the full result row. */
 export async function getQuizResultInboxForUser(
   recipientUserId: string,
 ): Promise<QuizResultInboxEntry[]> {
+  await backfillMissingQuizResultInboxMessages(recipientUserId);
+
   const rows = await db
     .select({
       msg: quizResultInboxMessages,
