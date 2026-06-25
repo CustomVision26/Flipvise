@@ -24,12 +24,18 @@ export type OfflineWorkspaceContext = {
   maxCardsPerDeck: number;
   /** Owner or co-admin may add decks to the workspace; plain members may not. */
   canCreateDeck: boolean;
+  /** Resolved subscriber display name for the workspace switcher. */
+  ownerDisplayName?: string;
+  /** True when the signed-in user is the subscriber owner of this workspace. */
+  isSubscriberOwned?: boolean;
 };
 
 export type OfflineAccessContext = {
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineWorkspaceContext[];
+  /** Label beside “Personal Dash” in the workspace switcher (e.g. Team Basic, Pro). */
+  personalPlanLabel?: string;
   updatedAtMs: number;
 };
 
@@ -49,11 +55,14 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
     const parsed = JSON.parse(value) as OfflineAccessContext;
     return {
       ...parsed,
+      personalPlanLabel: parsed.personalPlanLabel ?? "Free",
       workspaces: (parsed.workspaces ?? []).map((w) => ({
         ...w,
         teamMemberId: w.teamMemberId ?? 0,
         canAccessTeamAdmin:
           w.canAccessTeamAdmin ?? (w.role === "owner" || w.role === "team_admin"),
+        ownerDisplayName: w.ownerDisplayName ?? "Subscriber",
+        isSubscriberOwned: w.isSubscriberOwned ?? w.role === "owner",
       })),
     };
   } catch {

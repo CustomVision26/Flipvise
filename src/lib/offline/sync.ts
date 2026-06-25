@@ -78,7 +78,10 @@ interface SyncResponse {
       maxDecksPerWorkspace: number;
       maxCardsPerDeck: number;
       canCreateDeck: boolean;
+      ownerDisplayName?: string;
+      isSubscriberOwned?: boolean;
     }[];
+    personalPlanLabel?: string;
     updatedAtMs: number;
   };
 }

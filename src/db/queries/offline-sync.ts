@@ -10,6 +10,8 @@ import {
   getTeamById,
   getTeamMembershipsForUser,
 } from "@/db/queries/teams";
+import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
+import { getPersonalWorkspaceAccessLabel } from "@/lib/personal-workspace-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import {
@@ -290,12 +292,15 @@ export type OfflineSyncWorkspaceContext = {
   maxDecksPerWorkspace: number;
   maxCardsPerDeck: number;
   canCreateDeck: boolean;
+  ownerDisplayName: string;
+  isSubscriberOwned: boolean;
 };
 
 export type OfflineSyncContext = {
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineSyncWorkspaceContext[];
+  personalPlanLabel: string;
   updatedAtMs: number;
 };
 
@@ -402,15 +407,24 @@ export async function buildOfflineSyncContext(
   userId: string,
 ): Promise<OfflineSyncContext> {
   const personal = await personalLimitsForSyncUser(userId);
-  const [workspaces, memberships] = await Promise.all([
+  const [workspaces, memberships, personalPlanLabel] = await Promise.all([
     getEligibleWorkspaceTeamsForUser(userId),
     getTeamMembershipsForUser(userId),
+    getPersonalWorkspaceAccessLabel().catch(() => "Free"),
   ]);
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
 
-  const workspaceContexts: OfflineSyncWorkspaceContext[] = workspaces
-    .filter((t) => isTeamPlanId(t.planSlug))
-    .map((team) => {
+  const teamPlanWorkspaces = workspaces.filter((t) => isTeamPlanId(t.planSlug));
+  const ownerIds = [...new Set(teamPlanWorkspaces.map((t) => t.ownerUserId))];
+  const ownerDisplayNameById = new Map<string, string>();
+  await Promise.all(
+    ownerIds.map(async (oid) => {
+      ownerDisplayNameById.set(oid, await getClerkUserDisplayNameById(oid));
+    }),
+  );
+
+  const workspaceContexts: OfflineSyncWorkspaceContext[] = teamPlanWorkspaces.map(
+    (team) => {
       const membership = membershipByTeam.get(team.id);
       const role: OfflineSyncWorkspaceContext["role"] =
         team.ownerUserId === userId
@@ -432,13 +446,18 @@ export async function buildOfflineSyncContext(
         maxDecksPerWorkspace: limits.maxDecksPerWorkspace,
         maxCardsPerDeck: CARDS_PER_DECK_LIMIT_PRO_PLUS,
         canCreateDeck: role === "owner" || role === "team_admin",
+        ownerDisplayName:
+          ownerDisplayNameById.get(team.ownerUserId) ?? "Subscriber",
+        isSubscriberOwned: team.ownerUserId === userId,
       };
-    });
+    },
+  );
 
   return {
     maxPersonalDecks: personal.maxPersonalDecks,
     maxCardsPerDeck: personal.maxCardsPerDeck,
     workspaces: workspaceContexts,
+    personalPlanLabel,
     updatedAtMs: Date.now(),
   };
 }

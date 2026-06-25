@@ -210,9 +210,8 @@ export function DeckLibrary({
   online,
   workspaceScope,
   workspaces,
+  personalPlanLabel,
   canCreateDeck,
-  showTeamAdminDash,
-  showToAdminDash,
   onWorkspaceChange,
   onTeamAdminDash,
   onToAdminDash,
@@ -224,12 +223,11 @@ export function DeckLibrary({
   online: boolean;
   workspaceScope: SavedWorkspaceScope;
   workspaces: OfflineWorkspaceContext[];
+  personalPlanLabel?: string;
   canCreateDeck: boolean;
-  showTeamAdminDash: boolean;
-  showToAdminDash: boolean;
   onWorkspaceChange: (scope: SavedWorkspaceScope) => void;
-  onTeamAdminDash: () => void;
-  onToAdminDash: () => void;
+  onTeamAdminDash?: () => void;
+  onToAdminDash?: (workspace: OfflineWorkspaceContext) => void;
   onNewDeck: () => void;
   onOpenDeck: (deck: OfflineDeckRow) => void;
 }) {
@@ -339,30 +337,12 @@ export function DeckLibrary({
           <WorkspaceSelector
             scope={workspaceScope}
             workspaces={workspaces}
+            personalPlanLabel={personalPlanLabel}
+            online={online}
             onChange={onWorkspaceChange}
+            onTeamAdminDash={onTeamAdminDash}
+            onToAdminDash={onToAdminDash}
           />
-          {online && (showTeamAdminDash || showToAdminDash) && (
-            <div className="workspace-admin-actions">
-              {showTeamAdminDash && workspaceScope === "personal" && (
-                <button
-                  type="button"
-                  className="btn secondary btn--sm"
-                  onClick={onTeamAdminDash}
-                >
-                  Team Admin Dash
-                </button>
-              )}
-              {showToAdminDash && (
-                <button
-                  type="button"
-                  className="btn secondary btn--sm"
-                  onClick={onToAdminDash}
-                >
-                  To Admin Dash
-                </button>
-              )}
-            </div>
-          )}
         </div>
         {canCreateDeck && (
           <button type="button" className="btn" onClick={onNewDeck}>

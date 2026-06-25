@@ -1,55 +1,166 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 
-export type WorkspaceOption =
-  | { kind: "personal"; label: string }
-  | { kind: "team"; teamId: number; label: string; planLabel: string };
+const PERSONAL_PRIMARY_LABEL = "Personal Dash";
 
-function buildOptions(workspaces: OfflineWorkspaceContext[]): WorkspaceOption[] {
-  return [
-    { kind: "personal", label: "Personal Dashboard" },
-    ...workspaces.map((w) => ({
-      kind: "team" as const,
-      teamId: w.teamId,
-      label: w.name,
-      planLabel: w.planLabel,
-    })),
-  ];
+function workspaceOwnerDisplayName(w: OfflineWorkspaceContext): string {
+  return w.ownerDisplayName ?? "Subscriber";
 }
 
 export function WorkspaceSelector({
   scope,
   workspaces,
+  personalPlanLabel = "Free",
+  online = false,
   onChange,
+  onTeamAdminDash,
+  onToAdminDash,
 }: {
   scope: SavedWorkspaceScope;
   workspaces: OfflineWorkspaceContext[];
+  personalPlanLabel?: string;
+  online?: boolean;
   onChange: (scope: SavedWorkspaceScope) => void;
+  onTeamAdminDash?: () => void;
+  onToAdminDash?: (workspace: OfflineWorkspaceContext) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
-  const options = buildOptions(workspaces);
 
-  const active =
-    scope === "personal"
-      ? options[0]
-      : options.find((o) => o.kind === "team" && o.teamId === scope) ?? options[0];
+  const subscriberOwnsTeamTierWorkspace = workspaces.some(
+    (w) => w.isSubscriberOwned ?? w.role === "owner",
+  );
+  const ownerWorkspace =
+    workspaces.find((w) => w.isSubscriberOwned ?? w.role === "owner") ?? null;
+
+  const selectedTeam =
+    scope !== "personal"
+      ? workspaces.find((w) => w.teamId === scope)
+      : undefined;
+
+  const triggerLabel =
+    scope === "personal" || selectedTeam == null
+      ? `${PERSONAL_PRIMARY_LABEL} · ${personalPlanLabel}`
+      : `${selectedTeam.name} · ${selectedTeam.planLabel}`;
+
+  const q = query.trim().toLowerCase();
+  const personalMatches =
+    q === "" ||
+    "personal".includes(q) ||
+    PERSONAL_PRIMARY_LABEL.toLowerCase().includes(q) ||
+    personalPlanLabel.toLowerCase().includes(q);
+
+  const filteredWorkspaces = useMemo(() => {
+    if (q === "") return workspaces;
+    return workspaces.filter((w) => {
+      const hay =
+        `${w.name} ${w.planLabel} ${workspaceOwnerDisplayName(w)}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [workspaces, q]);
+
+  const ownedTeams = useMemo(() => {
+    if (!subscriberOwnsTeamTierWorkspace) return [];
+    return filteredWorkspaces.filter((w) => w.isSubscriberOwned ?? w.role === "owner");
+  }, [filteredWorkspaces, subscriberOwnsTeamTierWorkspace]);
+
+  const invitedTeams = useMemo(() => {
+    if (subscriberOwnsTeamTierWorkspace) {
+      return filteredWorkspaces.filter((w) => !(w.isSubscriberOwned ?? w.role === "owner"));
+    }
+    return filteredWorkspaces;
+  }, [filteredWorkspaces, subscriberOwnsTeamTierWorkspace]);
+
+  const showInvitedDivider =
+    subscriberOwnsTeamTierWorkspace &&
+    invitedTeams.length > 0 &&
+    ((personalMatches && subscriberOwnsTeamTierWorkspace) || ownedTeams.length > 0);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  if (options.length <= 1) {
+  if (workspaces.length === 0) {
     return (
       <div className="workspace-scope">
-        <span className="workspace-scope__label">Personal Dashboard</span>
+        <span className="workspace-scope__trigger workspace-scope__trigger--static">
+          <span className="workspace-scope__trigger-text">
+            {PERSONAL_PRIMARY_LABEL} · {personalPlanLabel}
+          </span>
+        </span>
       </div>
+    );
+  }
+
+  function selectPersonal() {
+    onChange("personal");
+    setOpen(false);
+    setQuery("");
+  }
+
+  function selectTeam(teamId: number) {
+    onChange(teamId);
+    setOpen(false);
+    setQuery("");
+  }
+
+  function teamRow(w: OfflineWorkspaceContext) {
+    const isActive = scope === w.teamId;
+    return (
+      <button
+        key={w.teamId}
+        type="button"
+        role="option"
+        aria-selected={isActive}
+        className="workspace-scope__item workspace-scope__item--team"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("[data-team-admin-dash-link]")) return;
+          selectTeam(w.teamId);
+        }}
+      >
+        <span
+          className={`workspace-scope__check${isActive ? " visible" : ""}`}
+          aria-hidden
+        >
+          ✓
+        </span>
+        <span className="workspace-scope__item-body">
+          <span className="workspace-scope__item-title">Team: {w.name}</span>
+          <span className="workspace-scope__item-meta">
+            <span>{w.planLabel}</span>
+            <span className="workspace-scope__dot" aria-hidden>
+              ·
+            </span>
+            <span>{workspaceOwnerDisplayName(w)}</span>
+          </span>
+        </span>
+        {online && w.canAccessTeamAdmin && onToAdminDash ? (
+          <button
+            data-team-admin-dash-link
+            type="button"
+            className="workspace-scope__admin-btn"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToAdminDash(w);
+              setOpen(false);
+              setQuery("");
+            }}
+          >
+            To Admin Dash
+          </button>
+        ) : null}
+      </button>
     );
   }
 
@@ -61,13 +172,9 @@ export function WorkspaceSelector({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
+        title="Switch workspace — personal dashboard or a team workspace"
       >
-        <span className="workspace-scope__label">
-          {active.kind === "personal" ? active.label : active.label}
-        </span>
-        {active.kind === "team" && (
-          <span className="workspace-scope__plan">{active.planLabel}</span>
-        )}
+        <span className="workspace-scope__trigger-text">{triggerLabel}</span>
         <span className="workspace-scope__chev" aria-hidden>
           ▾
         </span>
@@ -75,40 +182,92 @@ export function WorkspaceSelector({
 
       {open && (
         <div className="workspace-scope__menu" role="listbox">
-          {options.map((opt) => {
-            const selected =
-              opt.kind === "personal"
-                ? scope === "personal"
-                : scope === opt.teamId;
-            return (
+          <div
+            className="workspace-scope__search-wrap"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <span className="workspace-scope__search-icon" aria-hidden>
+              ⌕
+            </span>
+            <input
+              type="search"
+              className="workspace-scope__search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search workspaces…"
+              autoComplete="off"
+              aria-label="Search workspaces"
+            />
+          </div>
+
+          <div className="workspace-scope__scroll">
+            <div className="workspace-scope__section-label">Workspace</div>
+
+            {personalMatches && (
               <button
-                key={opt.kind === "personal" ? "personal" : opt.teamId}
                 type="button"
                 role="option"
-                aria-selected={selected}
-                className={`workspace-scope__item${selected ? " active" : ""}`}
-                onClick={() => {
-                  onChange(
-                    opt.kind === "personal" ? "personal" : opt.teamId,
-                  );
-                  setOpen(false);
-                }}
+                aria-selected={scope === "personal"}
+                className="workspace-scope__item"
+                onClick={selectPersonal}
               >
-                <span className="workspace-scope__item-main">
-                  <strong>
-                    {opt.kind === "personal" ? opt.label : opt.label}
-                  </strong>
-                  {opt.kind === "team" && (
-                    <small>Team workspace · {opt.planLabel}</small>
-                  )}
-                  {opt.kind === "personal" && (
-                    <small>Your personal decks on this device</small>
-                  )}
+                <span
+                  className={`workspace-scope__check${scope === "personal" ? " visible" : ""}`}
+                  aria-hidden
+                >
+                  ✓
                 </span>
-                {selected && <span className="check">✓</span>}
+                <span className="workspace-scope__item-line">
+                  <span className="workspace-scope__item-title">{PERSONAL_PRIMARY_LABEL}</span>
+                  <span className="workspace-scope__dot" aria-hidden>
+                    ·
+                  </span>
+                  <span className="workspace-scope__item-muted">{personalPlanLabel}</span>
+                </span>
               </button>
-            );
-          })}
+            )}
+
+            {online && ownerWorkspace && onTeamAdminDash && (
+              <div className="workspace-scope__admin-row">
+                <button
+                  type="button"
+                  className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => {
+                    onTeamAdminDash();
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                >
+                  Team Admin Dash
+                </button>
+              </div>
+            )}
+
+            {ownedTeams.map((w) => teamRow(w))}
+
+            {showInvitedDivider && (
+              <>
+                <div className="workspace-scope__divider" role="separator" />
+                <div className="workspace-scope__section-label">Invited workspaces</div>
+              </>
+            )}
+
+            {!subscriberOwnsTeamTierWorkspace &&
+              personalMatches &&
+              invitedTeams.length > 0 && (
+                <>
+                  <div className="workspace-scope__divider" role="separator" />
+                  <div className="workspace-scope__section-label">Invited workspaces</div>
+                </>
+              )}
+
+            {invitedTeams.map((w) => teamRow(w))}
+
+            {!personalMatches && filteredWorkspaces.length === 0 && (
+              <p className="workspace-scope__empty">No matching workspaces.</p>
+            )}
+          </div>
         </div>
       )}
     </div>

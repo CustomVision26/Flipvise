@@ -214,13 +214,7 @@ export function App() {
     [accessContext.workspaces],
   );
 
-  const coAdminWorkspace = useMemo(
-    () => accessContext.workspaces.find((w) => w.role === "team_admin") ?? null,
-    [accessContext.workspaces],
-  );
-
   const showTeamAdminDash = ownerWorkspace != null;
-  const showToAdminDash = coAdminWorkspace != null;
 
   const openLivePath = useCallback(async (path: string) => {
     const storedBase = await getStoredApiBaseUrl().catch(() => null);
@@ -251,14 +245,17 @@ export function App() {
     void openLivePath(path);
   }, [online, ownerWorkspace, openLivePath]);
 
-  const openToAdminDash = useCallback(() => {
-    if (!online || !coAdminWorkspace) return;
-    const path = buildTeamAdminMembersPath(
-      coAdminWorkspace.teamId,
-      coAdminWorkspace.teamMemberId ?? 0,
-    );
-    void openLivePath(path);
-  }, [online, coAdminWorkspace, openLivePath]);
+  const openToAdminDash = useCallback(
+    (workspace: OfflineWorkspaceContext) => {
+      if (!online || !workspace.canAccessTeamAdmin) return;
+      const path = buildTeamAdminMembersPath(
+        workspace.teamId,
+        workspace.teamMemberId ?? 0,
+      );
+      void openLivePath(path);
+    },
+    [online, openLivePath],
+  );
 
   useEffect(() => {
     if (workspaceScope === "personal") return;
@@ -346,11 +343,10 @@ export function App() {
           online={online}
           workspaceScope={workspaceScope}
           workspaces={accessContext.workspaces}
+          personalPlanLabel={accessContext.personalPlanLabel ?? "Free"}
           canCreateDeck={canCreateDeck}
-          showTeamAdminDash={showTeamAdminDash}
-          showToAdminDash={showToAdminDash}
           onWorkspaceChange={handleWorkspaceChange}
-          onTeamAdminDash={openTeamAdminDash}
+          onTeamAdminDash={showTeamAdminDash ? openTeamAdminDash : undefined}
           onToAdminDash={openToAdminDash}
           onNewDeck={() => setShowNewDeck(true)}
           onOpenDeck={(deck) => {
