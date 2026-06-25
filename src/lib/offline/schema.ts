@@ -106,6 +106,16 @@ export const OFFLINE_SCHEMA_MIGRATIONS: string[] = [
   `ALTER TABLE decks ADD COLUMN team_id INTEGER;`,
   `ALTER TABLE decks ADD COLUMN member_assigned INTEGER NOT NULL DEFAULT 0;`,
   `CREATE INDEX IF NOT EXISTS decks_team_idx ON decks(team_id);`,
+  `CREATE TABLE IF NOT EXISTS offline_images (
+     image_id TEXT PRIMARY KEY NOT NULL,
+     remote_url TEXT,
+     local_path TEXT NOT NULL,
+     mime_type TEXT,
+     pending_upload INTEGER NOT NULL DEFAULT 0,
+     updated_at_ms INTEGER NOT NULL
+   );`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS offline_images_remote_url_uidx
+     ON offline_images(remote_url) WHERE remote_url IS NOT NULL;`,
 ];
 
 /** Local row shapes (snake_case to match the SQLite columns above). */

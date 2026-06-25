@@ -49,6 +49,7 @@ export interface PushDeck {
   name: string;
   description: string | null;
   gradient: string | null;
+  coverImageUrl?: string | null;
   updatedAtMs: number;
   deleted: boolean;
   /** When set, creates/updates a team workspace deck (owner/co-admin only). */
@@ -62,6 +63,8 @@ export interface PushCard {
   deckServerId: number | null;
   front: string | null;
   back: string | null;
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
   cardType: "standard" | "multiple_choice";
   choices: string[] | null;
   correctChoiceIndex: number | null;
@@ -139,6 +142,7 @@ export async function pushOfflineChanges(
             name: d.name,
             description: d.description,
             gradient: d.gradient,
+            coverImageUrl: d.coverImageUrl ?? null,
             updatedAt: new Date(d.updatedAtMs),
           })
           .where(and(eq(decks.id, d.serverId), eq(decks.userId, userId)));
@@ -155,6 +159,7 @@ export async function pushOfflineChanges(
             name: d.name,
             description: d.description,
             gradient: d.gradient,
+            coverImageUrl: d.coverImageUrl ?? null,
             teamId,
           })
           .returning({ id: decks.id });
@@ -167,7 +172,13 @@ export async function pushOfflineChanges(
     if (d.serverId != null) {
       await db
         .update(decks)
-        .set({ name: d.name, description: d.description, gradient: d.gradient, updatedAt: new Date(d.updatedAtMs) })
+        .set({
+          name: d.name,
+          description: d.description,
+          gradient: d.gradient,
+          coverImageUrl: d.coverImageUrl ?? null,
+          updatedAt: new Date(d.updatedAtMs),
+        })
         .where(and(eq(decks.id, d.serverId), eq(decks.userId, userId)));
       deckLocalToServer.set(d.localId, d.serverId);
       deckIds.push({ localId: d.localId, serverId: d.serverId });
@@ -177,7 +188,13 @@ export async function pushOfflineChanges(
       if (personalCount >= limits.maxPersonalDecks) continue;
       const [inserted] = await db
         .insert(decks)
-        .values({ userId, name: d.name, description: d.description, gradient: d.gradient })
+        .values({
+          userId,
+          name: d.name,
+          description: d.description,
+          gradient: d.gradient,
+          coverImageUrl: d.coverImageUrl ?? null,
+        })
         .returning({ id: decks.id });
       deckLocalToServer.set(d.localId, inserted.id);
       deckIds.push({ localId: d.localId, serverId: inserted.id });
@@ -211,6 +228,8 @@ export async function pushOfflineChanges(
         .set({
           front: c.front,
           back: c.back,
+          frontImageUrl: c.frontImageUrl ?? null,
+          backImageUrl: c.backImageUrl ?? null,
           cardType: c.cardType,
           choices: c.choices,
           correctChoiceIndex: c.correctChoiceIndex,
@@ -225,6 +244,8 @@ export async function pushOfflineChanges(
           deckId: parentServerId,
           front: c.front,
           back: c.back,
+          frontImageUrl: c.frontImageUrl ?? null,
+          backImageUrl: c.backImageUrl ?? null,
           cardType: c.cardType,
           choices: c.choices,
           correctChoiceIndex: c.correctChoiceIndex,

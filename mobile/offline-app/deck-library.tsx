@@ -17,6 +17,8 @@ import {
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 import { WorkspaceSelector } from "./workspace-selector";
 import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
+import { OfflineImage } from "./offline-image";
+import { ImagePickerField } from "./image-picker-field";
 
 export type DeckWithCount = OfflineDeckRow & { cardCount: number };
 
@@ -56,6 +58,7 @@ function sortDecks(
 function DeckTile({
   deck,
   view,
+  online,
   canEdit,
   onOpen,
   onEdit,
@@ -63,6 +66,7 @@ function DeckTile({
 }: {
   deck: DeckWithCount;
   view: OfflineDeckViewMode;
+  online: boolean;
   canEdit: boolean;
   onOpen: () => void;
   onEdit: () => void;
@@ -72,10 +76,19 @@ function DeckTile({
   const countLabel = `${deck.cardCount} card${deck.cardCount === 1 ? "" : "s"}`;
   const updated = formatUpdated(deck.updated_at_ms);
   const showActions = canEdit && canEditDeckLocally(deck);
+  const hasCover = !!deck.cover_image_url;
   const gradientStyle =
-    (view === "thumbnail" || view === "grid") && gradient
+    !hasCover && (view === "thumbnail" || view === "grid") && gradient
       ? { background: gradient }
       : undefined;
+  const coverImage = hasCover ? (
+    <OfflineImage
+      src={deck.cover_image_url}
+      alt=""
+      className="deck-tile__cover"
+      online={online}
+    />
+  ) : null;
 
   const actions = showActions ? (
     <LibraryTileActions onEdit={onEdit} onDelete={onDelete} />
@@ -85,6 +98,7 @@ function DeckTile({
     return (
       <div className="deck-tile-shell deck-tile list">
         <LibraryTileWatermark label="Deck" />
+        {coverImage}
         <button type="button" className="deck-tile__open" onClick={onOpen}>
           <span className="deck-tile__name">{deck.name}</span>
           <span className="deck-tile__meta">{countLabel}</span>
@@ -101,6 +115,7 @@ function DeckTile({
         style={gradientStyle}
       >
         <LibraryTileWatermark label="Deck" />
+        {coverImage}
         <button type="button" className="deck-tile__open" onClick={onOpen}>
           <span className="deck-tile__thumb-title">{deck.name}</span>
           <span className="deck-tile__thumb-count">{countLabel}</span>
@@ -114,6 +129,7 @@ function DeckTile({
     return (
       <div className="deck-tile-shell deck-tile grid" style={gradientStyle}>
         <LibraryTileWatermark label="Deck" />
+        {coverImage}
         <button type="button" className="deck-tile__open" onClick={onOpen}>
           <h3 className="deck-tile__title">{deck.name}</h3>
           {deck.description && (
@@ -132,6 +148,7 @@ function DeckTile({
   return (
     <div className="deck-tile-shell deck-tile detail">
       <LibraryTileWatermark label="Deck" />
+      {coverImage}
       <button type="button" className="deck-tile__open" onClick={onOpen}>
         <div
           className="deck-tile__accent"
@@ -164,15 +181,18 @@ function DeckTile({
 
 function EditDeckSheet({
   deck,
+  online,
   onClose,
   onSaved,
 }: {
   deck: OfflineDeckRow;
+  online: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(deck.name);
   const [description, setDescription] = useState(deck.description ?? "");
+  const [coverImageUrl, setCoverImageUrl] = useState(deck.cover_image_url ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -189,6 +209,7 @@ function EditDeckSheet({
       await updateDeck(deck.local_id, {
         name: trimmed,
         description: description.trim() || null,
+        coverImageUrl,
       });
       onSaved();
     } catch {
@@ -222,6 +243,12 @@ function EditDeckSheet({
               rows={3}
             />
           </label>
+          <ImagePickerField
+            label="Cover image (optional)"
+            value={coverImageUrl}
+            online={online}
+            onChange={setCoverImageUrl}
+          />
           {error && <p className="form-error">{error}</p>}
           <div className="row">
             <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={onClose}>
@@ -521,6 +548,7 @@ export function DeckLibrary({
                 key={deck.local_id}
                 deck={deck}
                 view={view}
+                online={online}
                 canEdit={canEditDecks}
                 onOpen={() => onOpenDeck(deck)}
                 onEdit={() => setEditingDeck(deck)}
@@ -544,6 +572,7 @@ export function DeckLibrary({
       {editingDeck && (
         <EditDeckSheet
           deck={editingDeck}
+          online={online}
           onClose={() => setEditingDeck(null)}
           onSaved={() => {
             setEditingDeck(null);

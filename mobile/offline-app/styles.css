@@ -1673,3 +1673,85 @@ html, body, #root {
   font-weight: 600;
   color: var(--muted);
 }
+
+/* ── Offline images ─────────────────────────────────────────── */
+.deck-tile__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.45;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.card-tile__media {
+  display: block;
+  width: 100%;
+  max-height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.card-answer-dialog__image {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  margin: 0 0 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.review-card__image {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  margin: 0 0 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.quiz-question-card__image {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.image-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.image-picker__label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.image-picker__preview {
+  display: grid;
+  gap: 8px;
+}
+
+.image-picker__img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  background: var(--panel-2);
+}
+
+.image-picker__file {
+  display: none;
+}

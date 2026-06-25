@@ -18,6 +18,11 @@
 import { getOfflineDb, isOfflineDbAvailable, persistOfflineDb } from "./db";
 import { setOfflineAccessContext } from "./access-context";
 import {
+  cacheLibraryImages,
+  remoteUrlForPush,
+  uploadPendingLocalImages,
+} from "./image-store";
+import {
   clearPendingOfflinePull,
   getPendingOfflinePull,
   setPendingOfflinePull,
@@ -260,6 +265,48 @@ export async function runSync(options: SyncOptions): Promise<{
   deckCount: number;
   cardCount: number;
 }> {
+  const round1 = await executeSyncRound(options);
+  let pushedCount = round1.pushed;
+  let pulledCount = round1.pulled;
+  let deckCount = round1.deckCount;
+  let cardCount = round1.cardCount;
+
+  if (options.token && options.apiBaseUrl) {
+    try {
+      await uploadPendingLocalImages({
+        apiBaseUrl: options.apiBaseUrl,
+        token: options.token,
+      });
+      const round2 = await executeSyncRound(options);
+      pushedCount += round2.pushed;
+      pulledCount += round2.pulled;
+      deckCount = round2.deckCount;
+      cardCount = round2.cardCount;
+    } catch {
+      // Image upload is best-effort — text rows still synced in round 1.
+    }
+  }
+
+  try {
+    await cacheLibraryImages(true);
+  } catch {
+    // Cache failures should not fail the overall sync.
+  }
+
+  return {
+    pushed: pushedCount,
+    pulled: pulledCount,
+    deckCount,
+    cardCount,
+  };
+}
+
+async function executeSyncRound(options: SyncOptions): Promise<{
+  pushed: number;
+  pulled: number;
+  deckCount: number;
+  cardCount: number;
+}> {
   const { decks, cards, quizResults, lastPulledMs } = await collectDirty();
   const since = options.fullPull ? 0 : lastPulledMs;
 
@@ -277,6 +324,7 @@ export async function runSync(options: SyncOptions): Promise<{
         name: d.name,
         description: d.description,
         gradient: d.gradient,
+        coverImageUrl: remoteUrlForPush(d.cover_image_url),
         updatedAtMs: d.updated_at_ms,
         deleted: d.deleted === 1,
         teamId: d.team_id ?? null,
@@ -288,6 +336,8 @@ export async function runSync(options: SyncOptions): Promise<{
         deckServerId: c.deck_server_id,
         front: c.front,
         back: c.back,
+        frontImageUrl: remoteUrlForPush(c.front_image_url),
+        backImageUrl: remoteUrlForPush(c.back_image_url),
         cardType: c.card_type === "multiple_choice" ? "multiple_choice" : "standard",
         choices: c.choices_json ? (JSON.parse(c.choices_json) as string[]) : null,
         correctChoiceIndex: c.correct_choice_index,

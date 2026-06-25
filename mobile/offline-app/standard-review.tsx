@@ -11,6 +11,7 @@ import {
   resolveDeckWorkspaceInfo,
   type DeckWorkspaceContextInput,
 } from "./deck-workspace-context";
+import { OfflineImage } from "./offline-image";
 
 function cardText(value: string | null, fallback: string): string {
   const t = value?.trim();
@@ -97,6 +98,7 @@ export function StandardReview({
   const faceText = flipped
     ? cardText(card?.back ?? null, "No answer provided")
     : cardText(card?.front ?? null, "No question provided");
+  const faceImageUrl = flipped ? card?.back_image_url ?? null : card?.front_image_url ?? null;
 
   return (
     <StudySessionLayout
@@ -142,6 +144,14 @@ export function StandardReview({
         >
           <div className="review-card__frame">
             <span className="review-card__face-tag">{faceLabel}</span>
+            {faceImageUrl ? (
+              <OfflineImage
+                src={faceImageUrl}
+                alt={faceLabel}
+                className="review-card__image"
+                online={online}
+              />
+            ) : null}
             <p className="review-card__text">{faceText}</p>
             <span className="review-card__hint">
               {flipped ? "Tap to show question" : "Tap to reveal answer"}

@@ -1,12 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { resolveUserIdByDeviceToken } from "@/db/queries/device-sync-tokens";
 import {
   pullOfflineChanges,
   pushOfflineChanges,
   buildOfflineSyncContext,
 } from "@/db/queries/offline-sync";
+import { resolveSyncUserId } from "@/lib/offline-api-auth";
 
 /**
  * Offline Study sync endpoint for the native (Capacitor) apps.
@@ -56,14 +55,7 @@ export function OPTIONS(request: Request) {
 
 /** Resolves the acting user from a Bearer device token, falling back to the Clerk session. */
 async function resolveUserId(request: Request): Promise<string | null> {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.toLowerCase().startsWith("bearer ")) {
-    const token = authHeader.slice(7).trim();
-    const tokenUserId = await resolveUserIdByDeviceToken(token);
-    if (tokenUserId) return tokenUserId;
-  }
-  const { userId } = await auth();
-  return userId ?? null;
+  return resolveSyncUserId(request);
 }
 
 const pushDeckSchema = z.object({
@@ -72,6 +64,7 @@ const pushDeckSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().nullable(),
   gradient: z.string().nullable(),
+  coverImageUrl: z.string().url().nullable().optional(),
   updatedAtMs: z.number().int().nonnegative(),
   deleted: z.boolean(),
   teamId: z.number().int().positive().nullable().optional(),
@@ -84,6 +77,8 @@ const pushCardSchema = z.object({
   deckServerId: z.number().int().nullable(),
   front: z.string().nullable(),
   back: z.string().nullable(),
+  frontImageUrl: z.string().url().nullable().optional(),
+  backImageUrl: z.string().url().nullable().optional(),
   cardType: z.enum(["standard", "multiple_choice"]),
   choices: z.array(z.string()).nullable(),
   correctChoiceIndex: z.number().int().nullable(),

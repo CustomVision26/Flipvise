@@ -29,6 +29,7 @@ import {
 import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { DeckLibrary } from "./deck-library";
+import { ImagePickerField } from "./image-picker-field";
 import { DeckDetail } from "./deck-detail";
 import { DeckStudyHub } from "./deck-study-hub";
 import { StandardReview } from "./standard-review";
@@ -377,6 +378,7 @@ export function App() {
     return (
       <AddCardView
         deck={addCardsDeck}
+        online={online}
         maxCardsPerDeck={maxCardsForDeck(addCardsDeck, accessContext)}
         onBack={() => setAddCardsDeck(null)}
         onSaved={async () => {
@@ -468,6 +470,7 @@ export function App() {
       {showNewDeck && (
         <NewDeckSheet
           userId={userId}
+          online={online}
           workspaceScope={workspaceScope}
           accessContext={accessContext}
           activeWorkspace={activeWorkspace}
@@ -528,6 +531,7 @@ function Topbar({
 
 function NewDeckSheet({
   userId,
+  online,
   workspaceScope,
   accessContext,
   activeWorkspace,
@@ -535,6 +539,7 @@ function NewDeckSheet({
   onCreated,
 }: {
   userId: string | null;
+  online: boolean;
   workspaceScope: SavedWorkspaceScope;
   accessContext: OfflineAccessContext;
   activeWorkspace: OfflineWorkspaceContext | null;
@@ -543,6 +548,7 @@ function NewDeckSheet({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -566,6 +572,7 @@ function NewDeckSheet({
         userId,
         name: trimmed,
         description: description.trim() || null,
+        coverImageUrl,
         teamId,
         maxPersonalDecks:
           teamId == null ? accessContext.maxPersonalDecks : undefined,
@@ -612,6 +619,12 @@ function NewDeckSheet({
               rows={3}
             />
           </label>
+          <ImagePickerField
+            label="Cover image (optional)"
+            value={coverImageUrl}
+            online={online}
+            onChange={setCoverImageUrl}
+          />
           {error && <p className="form-error">{error}</p>}
           <div className="row">
             <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={onClose}>
@@ -629,17 +642,21 @@ function NewDeckSheet({
 
 function AddCardView({
   deck,
+  online,
   maxCardsPerDeck,
   onBack,
   onSaved,
 }: {
   deck: OfflineDeckRow;
+  online: boolean;
   maxCardsPerDeck: number;
   onBack: () => void;
   onSaved: () => void;
 }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
+  const [frontImageUrl, setFrontImageUrl] = useState<string | null>(null);
+  const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState(0);
@@ -649,16 +666,18 @@ function AddCardView({
     setError(null);
     const f = front.trim();
     const b = back.trim();
-    if (!f || !b) {
-      setError("Front and back are required.");
+    if ((!f && !frontImageUrl) || (!b && !backImageUrl)) {
+      setError("Each side needs text or an image.");
       return;
     }
     setBusy(true);
     try {
       await createCard({
         deckLocalId: deck.local_id,
-        front: f,
-        back: b,
+        front: f || null,
+        back: b || null,
+        frontImageUrl,
+        backImageUrl,
         maxCardsPerDeck,
       });
       setFront("");
@@ -703,6 +722,12 @@ function AddCardView({
               placeholder="e.g. Dog"
             />
           </label>
+          <ImagePickerField
+            label="Front image (optional)"
+            value={frontImageUrl}
+            online={online}
+            onChange={setFrontImageUrl}
+          />
           <label className="field">
             <span>Back (answer)</span>
             <input
@@ -711,6 +736,12 @@ function AddCardView({
               placeholder="e.g. An animal"
             />
           </label>
+          <ImagePickerField
+            label="Back image (optional)"
+            value={backImageUrl}
+            online={online}
+            onChange={setBackImageUrl}
+          />
           {error && <p className="form-error">{error}</p>}
           <button type="submit" className="btn" disabled={busy}>
             {busy ? "Saving…" : "Add card"}

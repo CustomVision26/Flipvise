@@ -18,6 +18,8 @@ import {
   type DeckWorkspaceContextInput,
 } from "./deck-workspace-context";
 import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
+import { OfflineImage } from "./offline-image";
+import { ImagePickerField } from "./image-picker-field";
 
 function formatUpdated(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -130,10 +132,14 @@ function CardViewSortSheet({
 function CardAnswerDialog({
   front,
   back,
+  backImageUrl,
+  online,
   onClose,
 }: {
   front: string;
   back: string;
+  backImageUrl: string | null;
+  online: boolean;
   onClose: () => void;
 }) {
   return (
@@ -153,6 +159,14 @@ function CardAnswerDialog({
         <p id="card-answer-label" className="card-answer-dialog__label">
           Answer
         </p>
+        {backImageUrl ? (
+          <OfflineImage
+            src={backImageUrl}
+            alt="Answer image"
+            className="card-answer-dialog__image"
+            online={online}
+          />
+        ) : null}
         <p className="card-answer-dialog__answer">{back}</p>
         <button
           type="button"
@@ -170,6 +184,7 @@ function CardTile({
   card,
   view,
   index,
+  online,
   canEdit,
   onOpenAnswer,
   onEdit,
@@ -178,6 +193,7 @@ function CardTile({
   card: OfflineCardRow;
   view: OfflineCardViewMode;
   index: number;
+  online: boolean;
   canEdit: boolean;
   onOpenAnswer: (card: OfflineCardRow) => void;
   onEdit: (card: OfflineCardRow) => void;
@@ -185,6 +201,14 @@ function CardTile({
 }) {
   const front = cardFrontLabel(card);
   const updated = formatUpdated(card.updated_at_ms);
+  const frontImage = card.front_image_url ? (
+    <OfflineImage
+      src={card.front_image_url}
+      alt=""
+      className="card-tile__media"
+      online={online}
+    />
+  ) : null;
   const actions = canEdit ? (
     <LibraryTileActions
       onEdit={() => onEdit(card)}
@@ -202,6 +226,7 @@ function CardTile({
           onClick={() => onOpenAnswer(card)}
           aria-label={`Question: ${front}. Tap to reveal answer.`}
         >
+          {frontImage}
           <span className="card-tile__front">{front}</span>
         </button>
         {actions}
@@ -219,6 +244,7 @@ function CardTile({
           onClick={() => onOpenAnswer(card)}
           aria-label={`Question: ${front}. Tap to reveal answer.`}
         >
+          {frontImage}
           <span className="card-tile__thumb-front">{front}</span>
         </button>
         {actions}
@@ -237,6 +263,7 @@ function CardTile({
           aria-label={`Question: ${front}. Tap to reveal answer.`}
         >
           <p className="card-tile__label">Question</p>
+          {frontImage}
           <p className="card-tile__front">{front}</p>
         </button>
         {actions}
@@ -257,6 +284,7 @@ function CardTile({
         <div className="card-tile__detail-body">
           <div className="card-tile__detail-main">
             <p className="card-tile__label">Question</p>
+            {frontImage}
             <p className="card-tile__front">{front}</p>
           </div>
           <div className="card-tile__detail-meta">
@@ -272,15 +300,19 @@ function CardTile({
 
 function EditCardSheet({
   card,
+  online,
   onClose,
   onSaved,
 }: {
   card: OfflineCardRow;
+  online: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [front, setFront] = useState(card.front ?? "");
   const [back, setBack] = useState(card.back ?? "");
+  const [frontImageUrl, setFrontImageUrl] = useState(card.front_image_url ?? null);
+  const [backImageUrl, setBackImageUrl] = useState(card.back_image_url ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -289,13 +321,18 @@ function EditCardSheet({
     setError(null);
     const f = front.trim();
     const b = back.trim();
-    if (!f || !b) {
-      setError("Front and back are required.");
+    if ((!f && !frontImageUrl) || (!b && !backImageUrl)) {
+      setError("Each side needs text or an image.");
       return;
     }
     setBusy(true);
     try {
-      await updateCard(card.local_id, { front: f, back: b });
+      await updateCard(card.local_id, {
+        front: f || null,
+        back: b || null,
+        frontImageUrl,
+        backImageUrl,
+      });
       onSaved();
     } catch {
       setError("Couldn't save the card. Please try again.");
@@ -319,6 +356,12 @@ function EditCardSheet({
               autoFocus
             />
           </label>
+          <ImagePickerField
+            label="Front image (optional)"
+            value={frontImageUrl}
+            online={online}
+            onChange={setFrontImageUrl}
+          />
           <label className="field">
             <span>Back (answer)</span>
             <input
@@ -327,6 +370,12 @@ function EditCardSheet({
               placeholder="Answer"
             />
           </label>
+          <ImagePickerField
+            label="Back image (optional)"
+            value={backImageUrl}
+            online={online}
+            onChange={setBackImageUrl}
+          />
           {error && <p className="form-error">{error}</p>}
           <div className="row">
             <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={onClose}>
@@ -508,6 +557,7 @@ export function DeckDetail({
                   card={card}
                   view={view}
                   index={i}
+                  online={online}
                   canEdit={canEdit}
                   onOpenAnswer={setAnswerPreview}
                   onEdit={setEditingCard}
@@ -532,6 +582,8 @@ export function DeckDetail({
           <CardAnswerDialog
             front={cardFrontLabel(answerPreview)}
             back={cardBackLabel(answerPreview)}
+            backImageUrl={answerPreview.back_image_url}
+            online={online}
             onClose={() => setAnswerPreview(null)}
           />
         ) : null}
@@ -539,6 +591,7 @@ export function DeckDetail({
         {editingCard && (
           <EditCardSheet
             card={editingCard}
+            online={online}
             onClose={() => setEditingCard(null)}
             onSaved={() => {
               setEditingCard(null);

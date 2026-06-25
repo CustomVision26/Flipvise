@@ -116,6 +116,7 @@ export async function createDeck(input: {
   name: string;
   description?: string | null;
   gradient?: string | null;
+  coverImageUrl?: string | null;
   teamId?: number | null;
   memberAssigned?: boolean;
   maxPersonalDecks?: number;
@@ -146,13 +147,14 @@ export async function createDeck(input: {
     `INSERT INTO decks
        (local_id, server_id, user_id, name, description, gradient, cover_image_url,
         created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
-     VALUES (?, NULL, ?, ?, ?, ?, NULL, ?, ?, 1, 0, ?, ?);`,
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?);`,
     [
       localId,
       input.userId,
       input.name,
       input.description ?? null,
       input.gradient ?? null,
+      input.coverImageUrl ?? null,
       ts,
       ts,
       teamId,
@@ -198,7 +200,12 @@ export async function purgeLocallyCreatedTeamDecks(userId: string): Promise<numb
 
 export async function updateDeck(
   localId: string,
-  patch: { name?: string; description?: string | null; gradient?: string | null },
+  patch: {
+    name?: string;
+    description?: string | null;
+    gradient?: string | null;
+    coverImageUrl?: string | null;
+  },
 ): Promise<void> {
   const db = await getOfflineDb();
   const fields: string[] = [];
@@ -206,6 +213,10 @@ export async function updateDeck(
   if (patch.name !== undefined) { fields.push("name = ?"); params.push(patch.name); }
   if (patch.description !== undefined) { fields.push("description = ?"); params.push(patch.description); }
   if (patch.gradient !== undefined) { fields.push("gradient = ?"); params.push(patch.gradient); }
+  if (patch.coverImageUrl !== undefined) {
+    fields.push("cover_image_url = ?");
+    params.push(patch.coverImageUrl);
+  }
   if (fields.length === 0) return;
   fields.push("updated_at_ms = ?", "dirty = 1");
   params.push(now(), localId);
@@ -250,6 +261,8 @@ export async function createCard(input: {
   deckLocalId: string;
   front?: string | null;
   back?: string | null;
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
   cardType?: "standard" | "multiple_choice";
   choices?: string[] | null;
   correctChoiceIndex?: number | null;
@@ -273,13 +286,15 @@ export async function createCard(input: {
        (local_id, server_id, deck_local_id, deck_server_id, front, back,
         front_image_url, back_image_url, card_type, choices_json, correct_choice_index,
         created_at_ms, updated_at_ms, dirty, deleted)
-     VALUES (?, NULL, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, 1, 0);`,
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0);`,
     [
       localId,
       input.deckLocalId,
       deck?.server_id ?? null,
       input.front ?? null,
       input.back ?? null,
+      input.frontImageUrl ?? null,
+      input.backImageUrl ?? null,
       input.cardType ?? "standard",
       input.choices ? JSON.stringify(input.choices) : null,
       input.correctChoiceIndex ?? null,
@@ -293,13 +308,26 @@ export async function createCard(input: {
 
 export async function updateCard(
   localId: string,
-  patch: { front?: string | null; back?: string | null },
+  patch: {
+    front?: string | null;
+    back?: string | null;
+    frontImageUrl?: string | null;
+    backImageUrl?: string | null;
+  },
 ): Promise<void> {
   const db = await getOfflineDb();
   const fields: string[] = [];
   const params: (string | number | null)[] = [];
   if (patch.front !== undefined) { fields.push("front = ?"); params.push(patch.front); }
   if (patch.back !== undefined) { fields.push("back = ?"); params.push(patch.back); }
+  if (patch.frontImageUrl !== undefined) {
+    fields.push("front_image_url = ?");
+    params.push(patch.frontImageUrl);
+  }
+  if (patch.backImageUrl !== undefined) {
+    fields.push("back_image_url = ?");
+    params.push(patch.backImageUrl);
+  }
   if (fields.length === 0) return;
   fields.push("updated_at_ms = ?", "dirty = 1");
   params.push(now(), localId);

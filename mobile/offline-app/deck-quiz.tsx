@@ -12,6 +12,7 @@ import {
   resolveDeckWorkspaceInfo,
   type DeckWorkspaceContextInput,
 } from "./deck-workspace-context";
+import { OfflineImage } from "./offline-image";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 
@@ -285,6 +286,14 @@ export function DeckQuiz({
             </span>
           </header>
           <p className="quiz-question-card__text">{q.question}</p>
+          {q.questionImageUrl ? (
+            <OfflineImage
+              src={q.questionImageUrl}
+              alt="Question image"
+              className="quiz-question-card__image"
+              online={online}
+            />
+          ) : null}
         </article>
 
         <fieldset className="quiz-options">

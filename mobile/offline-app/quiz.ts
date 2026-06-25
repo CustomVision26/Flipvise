@@ -7,6 +7,7 @@ export interface QuizQuestion {
   /** Server id when known (used for the result snapshot). */
   cardServerId: number | null;
   question: string;
+  questionImageUrl: string | null;
   options: string[];
   correctIndex: number;
 }
@@ -56,12 +57,13 @@ export function buildQuizQuestions(cards: OfflineCardRow[]): QuizQuestion[] {
       }
       const correct =
         card.correct_choice_index != null ? choices[card.correct_choice_index] : undefined;
-      if (choices.length >= 2 && correct != null && question.length > 0) {
+      if (choices.length >= 2 && correct != null && (question.length > 0 || card.front_image_url)) {
         const shuffled = shuffle(choices);
         questions.push({
           cardLocalId: card.local_id,
           cardServerId: card.server_id,
-          question,
+          question: question || "(image question)",
+          questionImageUrl: card.front_image_url,
           options: shuffled,
           correctIndex: shuffled.indexOf(correct),
         });
@@ -71,7 +73,7 @@ export function buildQuizQuestions(cards: OfflineCardRow[]): QuizQuestion[] {
 
     // Standard Q&A card → generate distractors.
     const answer = text(card.back);
-    if (question.length === 0 || answer.length === 0) continue;
+    if ((question.length === 0 && !card.front_image_url) || answer.length === 0) continue;
 
     const distractors = shuffle(
       answerPool.filter((a) => a !== answer),
@@ -82,7 +84,8 @@ export function buildQuizQuestions(cards: OfflineCardRow[]): QuizQuestion[] {
     questions.push({
       cardLocalId: card.local_id,
       cardServerId: card.server_id,
-      question,
+      question: question || "(image question)",
+      questionImageUrl: card.front_image_url,
       options,
       correctIndex: options.indexOf(answer),
     });
