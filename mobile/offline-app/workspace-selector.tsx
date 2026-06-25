@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
+import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 
 const PERSONAL_PRIMARY_LABEL = "Personal Dash";
-
-function workspaceOwnerDisplayName(w: OfflineWorkspaceContext): string {
-  return w.ownerDisplayName ?? "Subscriber";
-}
 
 export function WorkspaceSelector({
   scope,
   workspaces,
   personalPlanLabel = "Free",
+  viewerDisplayName,
+  viewerEmail,
   online = false,
   onChange,
   onTeamAdminDash,
@@ -20,6 +19,8 @@ export function WorkspaceSelector({
   scope: SavedWorkspaceScope;
   workspaces: OfflineWorkspaceContext[];
   personalPlanLabel?: string;
+  viewerDisplayName?: string;
+  viewerEmail?: string | null;
   online?: boolean;
   onChange: (scope: SavedWorkspaceScope) => void;
   onTeamAdminDash?: () => void;
@@ -52,14 +53,23 @@ export function WorkspaceSelector({
     PERSONAL_PRIMARY_LABEL.toLowerCase().includes(q) ||
     personalPlanLabel.toLowerCase().includes(q);
 
+  const viewerCtx = useMemo(
+  () => ({ viewerDisplayName, viewerEmail }),
+  [viewerDisplayName, viewerEmail],
+);
+
+  function ownerLabel(w: OfflineWorkspaceContext): string {
+    return formatOfflineWorkspaceOwnerLabel(w, viewerCtx);
+  }
+
   const filteredWorkspaces = useMemo(() => {
     if (q === "") return workspaces;
     return workspaces.filter((w) => {
       const hay =
-        `${w.name} ${w.planLabel} ${workspaceOwnerDisplayName(w)}`.toLowerCase();
+        `${w.name} ${w.planLabel} ${ownerLabel(w)}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [workspaces, q]);
+  }, [workspaces, q, viewerCtx]);
 
   const ownedTeams = useMemo(() => {
     if (!subscriberOwnsTeamTierWorkspace) return [];
@@ -141,7 +151,7 @@ export function WorkspaceSelector({
             <span className="workspace-scope__dot" aria-hidden>
               ·
             </span>
-            <span>{workspaceOwnerDisplayName(w)}</span>
+            <span>{ownerLabel(w)}</span>
           </span>
         </span>
         {online && w.canAccessTeamAdmin && onToAdminDash ? (

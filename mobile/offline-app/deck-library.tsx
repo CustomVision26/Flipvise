@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listCards } from "../../src/lib/offline/repository";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
+import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
 import { offlineDeckGradientStyle } from "./deck-gradients";
 import {
@@ -212,6 +213,8 @@ export function DeckLibrary({
   workspaceScope,
   workspaces,
   personalPlanLabel,
+  viewerDisplayName,
+  viewerEmail,
   canCreateDeck,
   onWorkspaceChange,
   onTeamAdminDash,
@@ -226,6 +229,8 @@ export function DeckLibrary({
   workspaceScope: SavedWorkspaceScope;
   workspaces: OfflineWorkspaceContext[];
   personalPlanLabel?: string;
+  viewerDisplayName?: string;
+  viewerEmail?: string | null;
   canCreateDeck: boolean;
   onWorkspaceChange: (scope: SavedWorkspaceScope) => void;
   onTeamAdminDash?: () => void;
@@ -299,7 +304,10 @@ export function DeckLibrary({
 
   const subtitle = isTeamScope
     ? activeTeam
-      ? `${activeTeam.name} · OWNER · ${activeTeam.ownerDisplayName ?? "Subscriber"}`
+      ? `${activeTeam.name} · OWNER · ${formatOfflineWorkspaceOwnerLabel(activeTeam, {
+          viewerDisplayName,
+          viewerEmail,
+        })}`
       : "Team workspace on this device"
     : "Study on this device — sync when online";
 
@@ -345,6 +353,8 @@ export function DeckLibrary({
             scope={workspaceScope}
             workspaces={workspaces}
             personalPlanLabel={personalPlanLabel}
+            viewerDisplayName={viewerDisplayName}
+            viewerEmail={viewerEmail}
             online={online}
             onChange={onWorkspaceChange}
             onTeamAdminDash={onTeamAdminDash}

@@ -82,6 +82,8 @@ interface SyncResponse {
       isSubscriberOwned?: boolean;
     }[];
     personalPlanLabel?: string;
+    viewerDisplayName?: string;
+    viewerEmail?: string | null;
     updatedAtMs: number;
   };
 }

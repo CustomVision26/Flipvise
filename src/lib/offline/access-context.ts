@@ -26,6 +26,8 @@ export type OfflineWorkspaceContext = {
   canCreateDeck: boolean;
   /** Resolved subscriber display name for the workspace switcher. */
   ownerDisplayName?: string;
+  /** Primary email when display name is unavailable offline. */
+  ownerEmail?: string | null;
   /** True when the signed-in user is the subscriber owner of this workspace. */
   isSubscriberOwned?: boolean;
 };
@@ -36,6 +38,9 @@ export type OfflineAccessContext = {
   workspaces: OfflineWorkspaceContext[];
   /** Label beside “Personal Dash” in the workspace switcher (e.g. Team Basic, Pro). */
   personalPlanLabel?: string;
+  /** Signed-in user display name (for owned workspaces when owner label is missing). */
+  viewerDisplayName?: string;
+  viewerEmail?: string | null;
   updatedAtMs: number;
 };
 
@@ -62,12 +67,34 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
         canAccessTeamAdmin:
           w.canAccessTeamAdmin ?? (w.role === "owner" || w.role === "team_admin"),
         ownerDisplayName: w.ownerDisplayName ?? "Subscriber",
+        ownerEmail: w.ownerEmail ?? null,
         isSubscriberOwned: w.isSubscriberOwned ?? w.role === "owner",
       })),
     };
   } catch {
     return null;
   }
+}
+
+/** Owner line for team workspace UI — name first, then email; never bare “Subscriber” when we have data. */
+export function formatOfflineWorkspaceOwnerLabel(
+  workspace: OfflineWorkspaceContext,
+  viewer?: Pick<OfflineAccessContext, "viewerDisplayName" | "viewerEmail">,
+): string {
+  if (workspace.isSubscriberOwned ?? workspace.role === "owner") {
+    const selfName = viewer?.viewerDisplayName?.trim();
+    if (selfName) return selfName;
+    const selfEmail = viewer?.viewerEmail?.trim();
+    if (selfEmail) return selfEmail;
+  }
+
+  const name = workspace.ownerDisplayName?.trim();
+  if (name && name !== "Subscriber") return name;
+
+  const email = workspace.ownerEmail?.trim();
+  if (email) return email;
+
+  return name || "Subscriber";
 }
 
 export function defaultOfflineAccessContext(): OfflineAccessContext {

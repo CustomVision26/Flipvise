@@ -10,7 +10,10 @@ import {
   getTeamById,
   getTeamMembershipsForUser,
 } from "@/db/queries/teams";
-import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
+import {
+  getClerkUserFieldDisplayById,
+  getClerkUserFieldDisplaysByIds,
+} from "@/lib/clerk-user-display";
 import { getPersonalWorkspaceAccessLabel } from "@/lib/personal-workspace-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
@@ -293,6 +296,7 @@ export type OfflineSyncWorkspaceContext = {
   maxCardsPerDeck: number;
   canCreateDeck: boolean;
   ownerDisplayName: string;
+  ownerEmail: string | null;
   isSubscriberOwned: boolean;
 };
 
@@ -301,6 +305,8 @@ export type OfflineSyncContext = {
   maxCardsPerDeck: number;
   workspaces: OfflineSyncWorkspaceContext[];
   personalPlanLabel: string;
+  viewerDisplayName: string;
+  viewerEmail: string | null;
   updatedAtMs: number;
 };
 
@@ -407,21 +413,18 @@ export async function buildOfflineSyncContext(
   userId: string,
 ): Promise<OfflineSyncContext> {
   const personal = await personalLimitsForSyncUser(userId);
-  const [workspaces, memberships, personalPlanLabel] = await Promise.all([
-    getEligibleWorkspaceTeamsForUser(userId),
-    getTeamMembershipsForUser(userId),
-    getPersonalWorkspaceAccessLabel().catch(() => "Free"),
-  ]);
+  const [workspaces, memberships, personalPlanLabel, viewerField] =
+    await Promise.all([
+      getEligibleWorkspaceTeamsForUser(userId),
+      getTeamMembershipsForUser(userId),
+      getPersonalWorkspaceAccessLabel().catch(() => "Free"),
+      getClerkUserFieldDisplayById(userId),
+    ]);
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
 
   const teamPlanWorkspaces = workspaces.filter((t) => isTeamPlanId(t.planSlug));
   const ownerIds = [...new Set(teamPlanWorkspaces.map((t) => t.ownerUserId))];
-  const ownerDisplayNameById = new Map<string, string>();
-  await Promise.all(
-    ownerIds.map(async (oid) => {
-      ownerDisplayNameById.set(oid, await getClerkUserDisplayNameById(oid));
-    }),
-  );
+  const ownerFields = await getClerkUserFieldDisplaysByIds(ownerIds);
 
   const workspaceContexts: OfflineSyncWorkspaceContext[] = teamPlanWorkspaces.map(
     (team) => {
@@ -435,6 +438,14 @@ export async function buildOfflineSyncContext(
       const limits = limitsForPlan(team.planSlug);
       const teamMemberId =
         team.ownerUserId === userId ? 0 : (membership?.id ?? 0);
+      const ownerResolved =
+        ownerFields[team.ownerUserId] ??
+        (team.ownerUserId === userId ? viewerField : null);
+      const ownerDisplayName =
+        ownerResolved?.primaryLine?.trim() ||
+        viewerField.primaryLine ||
+        "Subscriber";
+      const ownerEmail = ownerResolved?.primaryEmail ?? null;
       return {
         teamId: team.id,
         name: team.name,
@@ -446,8 +457,8 @@ export async function buildOfflineSyncContext(
         maxDecksPerWorkspace: limits.maxDecksPerWorkspace,
         maxCardsPerDeck: CARDS_PER_DECK_LIMIT_PRO_PLUS,
         canCreateDeck: role === "owner" || role === "team_admin",
-        ownerDisplayName:
-          ownerDisplayNameById.get(team.ownerUserId) ?? "Subscriber",
+        ownerDisplayName,
+        ownerEmail,
         isSubscriberOwned: team.ownerUserId === userId,
       };
     },
@@ -458,6 +469,8 @@ export async function buildOfflineSyncContext(
     maxCardsPerDeck: personal.maxCardsPerDeck,
     workspaces: workspaceContexts,
     personalPlanLabel,
+    viewerDisplayName: viewerField.primaryLine,
+    viewerEmail: viewerField.primaryEmail,
     updatedAtMs: Date.now(),
   };
 }

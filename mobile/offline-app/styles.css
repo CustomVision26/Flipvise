@@ -141,10 +141,12 @@ html, body, #root {
 .workspace-scope__menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
   right: 0;
+  left: auto;
   z-index: 30;
-  width: min(20rem, 100vw - 28px);
+  width: min(18rem, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -216,7 +218,19 @@ html, body, #root {
 }
 .workspace-scope__item--team {
   align-items: flex-start;
+  flex-wrap: wrap;
   padding: 8px 6px 8px 8px;
+}
+.workspace-scope__item--team .workspace-scope__item-body {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.workspace-scope__item--team .workspace-scope__admin-btn {
+  flex: 1 1 100%;
+  margin-top: 6px;
+  margin-left: 24px;
+  width: auto;
+  max-width: calc(100% - 24px);
 }
 .workspace-scope__check {
   flex-shrink: 0;
@@ -282,10 +296,12 @@ html, body, #root {
   background: var(--panel-3);
   color: var(--fg);
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .workspace-scope__admin-btn:hover { background: #2a2a32; }
 .workspace-scope__admin-btn--wide {

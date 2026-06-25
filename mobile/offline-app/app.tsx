@@ -381,6 +381,8 @@ export function App() {
           workspaceScope={workspaceScope}
           workspaces={accessContext.workspaces}
           personalPlanLabel={personalPlanLabel}
+          viewerDisplayName={accessContext.viewerDisplayName}
+          viewerEmail={accessContext.viewerEmail}
           canCreateDeck={canCreateDeck}
           onWorkspaceChange={handleWorkspaceChange}
           onTeamAdminDash={showTeamAdminDash ? openTeamAdminDash : undefined}
