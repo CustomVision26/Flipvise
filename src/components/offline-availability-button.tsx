@@ -48,7 +48,7 @@ export function OfflineAvailabilityButton() {
   const handleClick = async () => {
     setBusy(true);
     try {
-      const [{ runSync }, session, { createDeviceSyncTokenAction }] =
+      const [{ seedOfflineLibrary }, session, { createDeviceSyncTokenAction }] =
         await Promise.all([
           import("@/lib/offline/sync"),
           import("@/lib/offline/session"),
@@ -76,7 +76,11 @@ export function OfflineAvailabilityButton() {
       }
 
       // Full pull seeds every accessible deck on the device (not just rows changed since last sync).
-      const result = await runSync({ userId, credentials: "include", fullPull: true });
+      const result = await seedOfflineLibrary({
+        userId,
+        credentials: "include",
+        fullPull: true,
+      });
       const parts: string[] = [];
       if (result.deckCount > 0) {
         parts.push(`${result.deckCount} deck${result.deckCount === 1 ? "" : "s"}`);
@@ -84,13 +88,29 @@ export function OfflineAvailabilityButton() {
       if (result.cardCount > 0) {
         parts.push(`${result.cardCount} card${result.cardCount === 1 ? "" : "s"}`);
       }
-      toast.success(
-        parts.length > 0
-          ? `Saved for offline — ${parts.join(" and ")} downloaded.`
-          : "Saved for offline — your library is up to date (nothing new to download).",
+      if (result.deferredToOfflineShell) {
+        toast.success(
+          parts.length > 0
+            ? `Saved ${parts.join(" and ")} — tap Offline study to load them on this device.`
+            : "Saved — tap Offline study to refresh your offline library.",
+        );
+      } else {
+        toast.success(
+          parts.length > 0
+            ? `Saved for offline — ${parts.join(" and ")} downloaded.`
+            : "Saved for offline — your library is up to date (nothing new to download).",
+        );
+      }
+    } catch (err) {
+      const { getLastOfflineDbError } = await import("@/lib/offline/db");
+      const hint = getLastOfflineDbError();
+      toast.error(
+        hint
+          ? `Couldn't save for offline: ${hint}`
+          : err instanceof Error
+            ? err.message
+            : "Couldn't save your decks for offline use. Please try again.",
       );
-    } catch {
-      toast.error("Couldn't save your decks for offline use. Please try again.");
     } finally {
       setBusy(false);
     }

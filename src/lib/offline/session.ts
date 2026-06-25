@@ -12,6 +12,9 @@ import { Preferences } from "@capacitor/preferences";
 const USER_ID_KEY = "flipvise.offline.userId";
 const SYNC_TOKEN_KEY = "flipvise.offline.syncToken";
 const API_BASE_URL_KEY = "flipvise.offline.apiBaseUrl";
+/** Stashed `/api/sync` pull payload when SQLite is unavailable on the live dashboard page. */
+const PENDING_PULL_KEY = "flipvise.offline.pendingPull";
+const PENDING_PULL_USER_KEY = "flipvise.offline.pendingPullUserId";
 /** Set by the bundled offline shell so the live site can detect the native app. */
 const NATIVE_APP_FLAG_KEY = "flipvise.nativeApp";
 
@@ -58,8 +61,35 @@ export async function getStoredApiBaseUrl(): Promise<string | null> {
   return value ?? null;
 }
 
+/** Queues a sync pull for the offline shell when the live site cannot open SQLite. */
+export async function setPendingOfflinePull(
+  userId: string,
+  payloadJson: string,
+): Promise<void> {
+  await Preferences.set({ key: PENDING_PULL_USER_KEY, value: userId });
+  await Preferences.set({ key: PENDING_PULL_KEY, value: payloadJson });
+}
+
+export async function getPendingOfflinePull(): Promise<{
+  userId: string;
+  payloadJson: string;
+} | null> {
+  const [{ value: userId }, { value: payloadJson }] = await Promise.all([
+    Preferences.get({ key: PENDING_PULL_USER_KEY }),
+    Preferences.get({ key: PENDING_PULL_KEY }),
+  ]);
+  if (!userId || !payloadJson) return null;
+  return { userId, payloadJson };
+}
+
+export async function clearPendingOfflinePull(): Promise<void> {
+  await Preferences.remove({ key: PENDING_PULL_KEY });
+  await Preferences.remove({ key: PENDING_PULL_USER_KEY });
+}
+
 /** Clears all device sync credentials (e.g. on sign-out). */
 export async function clearStoredSyncCredentials(): Promise<void> {
   await Preferences.remove({ key: SYNC_TOKEN_KEY });
   await Preferences.remove({ key: USER_ID_KEY });
+  await clearPendingOfflinePull();
 }

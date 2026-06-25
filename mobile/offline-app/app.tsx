@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   isOfflineDbAvailable,
+  getLastOfflineDbError,
 } from "../../src/lib/offline/db";
 import {
   createCard,
@@ -29,7 +30,7 @@ import {
   getStoredUserId,
   setNativeAppFlag,
 } from "../../src/lib/offline/session";
-import { runSync } from "../../src/lib/offline/sync";
+import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { DeckLibrary } from "./deck-library";
 import {
@@ -129,6 +130,12 @@ export function App() {
       if (!available) return;
       const uid = await getStoredUserId();
       setUserId(uid);
+      const imported = await consumePendingOfflinePull();
+      if (imported && (imported.deckCount > 0 || imported.cardCount > 0)) {
+        setMessage(
+          `Loaded ${imported.deckCount} deck${imported.deckCount === 1 ? "" : "s"} and ${imported.cardCount} card${imported.cardCount === 1 ? "" : "s"} from your last download.`,
+        );
+      }
       await refreshAccessContext();
       if (uid) await loadDecks(uid, workspaceScope);
     })().catch((err) => setMessage(String(err)));
@@ -265,6 +272,7 @@ export function App() {
   }, [openLivePath]);
 
   if (dbReady === false) {
+    const dbHint = getLastOfflineDbError();
     return (
       <div className="app">
         <Topbar online={online} onOpen={openLiveApp} onSync={handleSync} syncing={syncing} />
@@ -272,9 +280,15 @@ export function App() {
           <div className="empty">
             <h2>Offline storage unavailable</h2>
             <p>
-              The on-device database runs inside the Flipvise mobile app. Build and
-              install the app to use offline study.
+              {dbHint ??
+                "The on-device database could not be opened. Rebuild and reinstall the app with `npm run mobile:sync:prod`, then try again."}
             </p>
+            {online && (
+              <p style={{ marginTop: 12, fontSize: 13, color: "var(--muted)" }}>
+                You can still use the Dashboard online. Tap <strong>Make available offline</strong>{" "}
+                there, then return here — your decks will import automatically.
+              </p>
+            )}
           </div>
         </div>
       </div>

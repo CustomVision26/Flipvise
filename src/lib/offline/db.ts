@@ -17,8 +17,8 @@ import { Capacitor } from "@capacitor/core";
 import {
   OFFLINE_DB_NAME,
   OFFLINE_DB_VERSION,
-  OFFLINE_SCHEMA_STATEMENTS,
   OFFLINE_SCHEMA_MIGRATIONS,
+  OFFLINE_SCHEMA_STATEMENTS,
 } from "./schema";
 import { isFlipviseNativeApp } from "./is-flipvise-native-app";
 
@@ -29,6 +29,40 @@ let openPromise: Promise<SQLiteDBConnection> | null = null;
 /** True on native (iOS/Android). On web, SQLite requires the jeep-sqlite element + WASM. */
 export function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform() || isFlipviseNativeApp();
+}
+
+/** Whether the Capacitor SQLite native plugin is bridged in the current WebView. */
+export function isCapacitorSqlitePluginAvailable(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return Capacitor.isPluginAvailable("CapacitorSQLite");
+  } catch {
+    return false;
+  }
+}
+
+/** Last open failure — surfaced in UI when offline storage is unavailable. */
+let lastOfflineDbError: string | null = null;
+
+export function getLastOfflineDbError(): string | null {
+  return lastOfflineDbError;
+}
+
+async function initializeSchema(conn: SQLiteDBConnection): Promise<void> {
+  for (const statement of OFFLINE_SCHEMA_STATEMENTS) {
+    const sql = statement.trim();
+    if (!sql) continue;
+    await conn.execute(sql);
+  }
+  for (const statement of OFFLINE_SCHEMA_MIGRATIONS) {
+    const sql = statement.trim();
+    if (!sql) continue;
+    try {
+      await conn.execute(sql);
+    } catch {
+      // Column already exists on upgraded devices.
+    }
+  }
 }
 
 /** Whether an offline DB can be opened in the current runtime. */
@@ -53,20 +87,29 @@ export async function isOfflineDbAvailable(): Promise<boolean> {
     }
   }
 
-  if (shouldTry) {
-    try {
-      await getOfflineDb();
-      return true;
-    } catch {
-      return false;
-    }
+  if (!shouldTry) {
+    lastOfflineDbError = "Not running inside the Flipvise mobile app.";
+    return (
+      typeof customElements !== "undefined" &&
+      customElements.get("jeep-sqlite") != null
+    );
   }
 
-  // Web fallback requires the jeep-sqlite custom element to be registered.
-  return (
-    typeof customElements !== "undefined" &&
-    customElements.get("jeep-sqlite") != null
-  );
+  if (!isCapacitorSqlitePluginAvailable()) {
+    lastOfflineDbError =
+      "SQLite plugin is not available in this WebView. Rebuild the app after `npm run mobile:sync:prod`.";
+    return false;
+  }
+
+  try {
+    await getOfflineDb();
+    lastOfflineDbError = null;
+    return true;
+  } catch (err) {
+    lastOfflineDbError =
+      err instanceof Error ? err.message : "Could not open the offline database.";
+    return false;
+  }
 }
 
 function getConnectionManager(): SQLiteConnection {
@@ -83,6 +126,12 @@ export async function getOfflineDb(): Promise<SQLiteDBConnection> {
   if (openPromise) return openPromise;
 
   openPromise = (async () => {
+    if (!isCapacitorSqlitePluginAvailable()) {
+      throw new Error(
+        "CapacitorSQLite plugin is not available. Reinstall the Flipvise app from a fresh `mobile:sync:prod` build.",
+      );
+    }
+
     const manager = getConnectionManager();
 
     // On web, initialize the WASM store backing jeep-sqlite once.
@@ -109,21 +158,19 @@ export async function getOfflineDb(): Promise<SQLiteDBConnection> {
           );
 
     await conn.open();
-    await conn.execute(OFFLINE_SCHEMA_STATEMENTS.join("\n"));
-    for (const stmt of OFFLINE_SCHEMA_MIGRATIONS) {
-      try {
-        await conn.run(stmt);
-      } catch {
-        // Column already exists on upgraded devices.
-      }
-    }
+    await initializeSchema(conn);
 
     dbConnection = conn;
+    lastOfflineDbError = null;
     return conn;
   })();
 
   try {
     return await openPromise;
+  } catch (err) {
+    lastOfflineDbError =
+      err instanceof Error ? err.message : "Could not open the offline database.";
+    throw err;
   } finally {
     openPromise = null;
   }

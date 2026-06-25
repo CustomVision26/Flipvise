@@ -17,7 +17,8 @@
  */
 
 export const OFFLINE_DB_NAME = "flipvise_offline";
-export const OFFLINE_DB_VERSION = 2;
+/** Keep at 1 — column adds use {@link OFFLINE_SCHEMA_MIGRATIONS} (no Capacitor upgrade registration). */
+export const OFFLINE_DB_VERSION = 1;
 
 /** DDL executed on first open / upgrade. Statements are idempotent (IF NOT EXISTS). */
 export const OFFLINE_SCHEMA_STATEMENTS: string[] = [

@@ -15,8 +15,13 @@
  * (minted from the authenticated session via "Make available offline").
  */
 
-import { getOfflineDb, persistOfflineDb } from "./db";
+import { getOfflineDb, isOfflineDbAvailable, persistOfflineDb } from "./db";
 import { setOfflineAccessContext } from "./access-context";
+import {
+  clearPendingOfflinePull,
+  getPendingOfflinePull,
+  setPendingOfflinePull,
+} from "./session";
 import type {
   OfflineCardRow,
   OfflineDeckRow,
@@ -105,6 +110,120 @@ export async function resetSyncPullCursor(): Promise<void> {
   await persistOfflineDb();
 }
 
+const EMPTY_PUSH = { decks: [], cards: [], quizResults: [] };
+
+async function postSyncRequest(
+  options: SyncOptions,
+  body: {
+    since: number;
+    fullPull: boolean;
+    push: {
+      decks: unknown[];
+      cards: unknown[];
+      quizResults: unknown[];
+    };
+  },
+): Promise<SyncResponse> {
+  const base = options.apiBaseUrl ?? "";
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  const res = await fetch(`${base}/api/sync`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    credentials: options.credentials ?? (options.token ? "omit" : "include"),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(
+      `Sync failed: ${res.status} ${res.statusText}${detail ? ` — ${detail.slice(0, 120)}` : ""}`,
+    );
+  }
+  return (await res.json()) as SyncResponse;
+}
+
+/** Downloads the full library from `/api/sync` without reading or writing local SQLite. */
+export async function fetchFullOfflinePull(
+  options: SyncOptions,
+): Promise<SyncResponse> {
+  return postSyncRequest(options, {
+    since: 0,
+    fullPull: true,
+    push: EMPTY_PUSH,
+  });
+}
+
+/**
+ * "Make available offline" entry point — writes to SQLite when possible, otherwise
+ * stashes the pull in Preferences for the bundled offline shell to import on open.
+ */
+export async function seedOfflineLibrary(options: SyncOptions): Promise<{
+  deckCount: number;
+  cardCount: number;
+  deferredToOfflineShell: boolean;
+}> {
+  if (await isOfflineDbAvailable()) {
+    if (options.fullPull) {
+      try {
+        await resetSyncPullCursor();
+      } catch {
+        // non-fatal
+      }
+    }
+    const result = await runSync(options);
+    return {
+      deckCount: result.deckCount,
+      cardCount: result.cardCount,
+      deferredToOfflineShell: false,
+    };
+  }
+
+  const data = await fetchFullOfflinePull(options);
+  await setPendingOfflinePull(options.userId, JSON.stringify(data));
+  if (data.context) {
+    await setOfflineAccessContext(data.context);
+  }
+  return {
+    deckCount: data.pull.decks.length,
+    cardCount: data.pull.cards.length,
+    deferredToOfflineShell: true,
+  };
+}
+
+/** Imports a stashed pull (from the live dashboard) into SQLite, then clears the stash. */
+export async function consumePendingOfflinePull(): Promise<{
+  deckCount: number;
+  cardCount: number;
+} | null> {
+  const pending = await getPendingOfflinePull();
+  if (!pending) return null;
+  if (!(await isOfflineDbAvailable())) return null;
+
+  let data: SyncResponse;
+  try {
+    data = JSON.parse(pending.payloadJson) as SyncResponse;
+  } catch {
+    await clearPendingOfflinePull();
+    return null;
+  }
+
+  try {
+    await resetSyncPullCursor();
+  } catch {
+    // non-fatal
+  }
+  await applyServerResponse(data, pending.userId);
+  if (data.context) {
+    await setOfflineAccessContext(data.context);
+  }
+  await clearPendingOfflinePull();
+
+  return {
+    deckCount: data.pull.decks.length,
+    cardCount: data.pull.cards.length,
+  };
+}
+
 async function collectDirty(): Promise<{
   decks: OfflineDeckRow[];
   cards: OfflineCardRow[];
@@ -181,20 +300,7 @@ export async function runSync(options: SyncOptions): Promise<{
     },
   };
 
-  const base = options.apiBaseUrl ?? "";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (options.token) headers.Authorization = `Bearer ${options.token}`;
-  const res = await fetch(`${base}/api/sync`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-    // With a Bearer token we don't need (cross-origin) cookies; otherwise send the cookie.
-    credentials: options.credentials ?? (options.token ? "omit" : "include"),
-  });
-  if (!res.ok) {
-    throw new Error(`Sync failed: ${res.status} ${res.statusText}`);
-  }
-  const data = (await res.json()) as SyncResponse;
+  const data = await postSyncRequest(options, payload);
 
   await applyServerResponse(data, options.userId);
 
