@@ -317,7 +317,13 @@ export function App() {
 
   useEffect(() => {
     if (workspaceScope === "personal") return;
-    if (!accessContext.workspaces.some((w) => w.teamId === workspaceScope)) {
+    const ws = accessContext.workspaces.find((w) => w.teamId === workspaceScope);
+    if (!ws) {
+      handleWorkspaceChange("personal");
+      return;
+    }
+    // Team-tier owners study and manage from Personal Dash — not subscriber-owned team rows.
+    if (ws.isSubscriberOwned ?? ws.role === "owner") {
       handleWorkspaceChange("personal");
     }
   }, [accessContext.workspaces, workspaceScope, handleWorkspaceChange]);

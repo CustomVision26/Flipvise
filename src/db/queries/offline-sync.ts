@@ -10,6 +10,7 @@ import {
   getEligibleWorkspaceTeamsForUser,
   getTeamById,
   getTeamMembershipsForUser,
+  getWorkspaceNavTeamsForUser,
 } from "@/db/queries/teams";
 import {
   getClerkUserFieldDisplayById,
@@ -430,8 +431,10 @@ export async function buildOfflineSyncContext(
   userId: string,
 ): Promise<OfflineSyncContext> {
   const personal = await personalLimitsForSyncUser(userId);
-  const [workspaces, memberships, personalPlanLabel, viewerField] =
+  const personalProUnlocked = personal.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT;
+  const [navPayload, workspaces, memberships, personalPlanLabel, viewerField] =
     await Promise.all([
+      getWorkspaceNavTeamsForUser(userId, { personalProUnlocked }),
       getEligibleWorkspaceTeamsForUser(userId),
       getTeamMembershipsForUser(userId),
       getPersonalWorkspaceAccessLabel().catch(() => "Free"),
@@ -439,12 +442,16 @@ export async function buildOfflineSyncContext(
     ]);
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
 
-  const teamPlanWorkspaces = workspaces.filter((t) => isTeamPlanId(t.planSlug));
-  const ownerIds = [...new Set(teamPlanWorkspaces.map((t) => t.ownerUserId))];
+  const teamPlanById = new Map(
+    workspaces.filter((t) => isTeamPlanId(t.planSlug)).map((t) => [t.id, t] as const),
+  );
+  const ownerIds = [...new Set(navPayload.teams.map((t) => t.ownerUserId))];
   const ownerFields = await getClerkUserFieldDisplaysByIds(ownerIds);
 
-  const workspaceContexts: OfflineSyncWorkspaceContext[] = teamPlanWorkspaces.map(
-    (team) => {
+  const workspaceContexts: OfflineSyncWorkspaceContext[] = navPayload.teams
+    .map((nav) => {
+      const team = teamPlanById.get(nav.id);
+      if (!team) return null;
       const membership = membershipByTeam.get(team.id);
       const role: OfflineSyncWorkspaceContext["role"] =
         team.ownerUserId === userId
@@ -453,33 +460,26 @@ export async function buildOfflineSyncContext(
             ? "team_admin"
             : "team_member";
       const limits = limitsForPlan(team.planSlug);
-      const teamMemberId =
-        team.ownerUserId === userId ? 0 : (membership?.id ?? 0);
       const ownerResolved =
         ownerFields[team.ownerUserId] ??
         (team.ownerUserId === userId ? viewerField : null);
-      const ownerDisplayName =
-        ownerResolved?.primaryLine?.trim() ||
-        viewerField.primaryLine ||
-        "Subscriber";
-      const ownerEmail = ownerResolved?.primaryEmail ?? null;
       return {
         teamId: team.id,
         name: team.name,
         planSlug: team.planSlug,
         planLabel: labelForTeamPlanSlug(team.planSlug) ?? team.planSlug,
         role,
-        teamMemberId,
-        canAccessTeamAdmin: role === "owner" || role === "team_admin",
+        teamMemberId: nav.teamMemberUrlParam,
+        canAccessTeamAdmin: nav.canAccessTeamAdmin,
         maxDecksPerWorkspace: limits.maxDecksPerWorkspace,
         maxCardsPerDeck: CARDS_PER_DECK_LIMIT_PRO_PLUS,
         canCreateDeck: role === "owner" || role === "team_admin",
-        ownerDisplayName,
-        ownerEmail,
-        isSubscriberOwned: team.ownerUserId === userId,
+        ownerDisplayName: nav.ownerDisplayName,
+        ownerEmail: ownerResolved?.primaryEmail ?? null,
+        isSubscriberOwned: nav.isSubscriberOwned,
       };
-    },
-  );
+    })
+    .filter((row) => row != null);
 
   return {
     maxPersonalDecks: personal.maxPersonalDecks,
