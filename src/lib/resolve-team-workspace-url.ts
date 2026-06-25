@@ -1,5 +1,9 @@
 import { getMemberRecord, getTeamById } from "@/db/queries/teams";
-import { isTeamPlanId, isWorkspaceSubscriberPlanQueryParam } from "@/lib/team-plans";
+import {
+  canonicalTeamPlanId,
+  isTeamPlanId,
+  isWorkspaceSubscriberPlanQueryParam,
+} from "@/lib/team-plans";
 import { TEAM_WORKSPACE_QUERY } from "@/lib/team-workspace-url";
 
 export type ResolvedTeamWorkspaceUrl = {
@@ -61,8 +65,16 @@ export async function resolveTeamWorkspaceFromSearchParams(
   if (plan != null) {
     if (!isWorkspaceSubscriberPlanQueryParam(plan)) return null;
     const planNorm = plan.trim().toLowerCase();
-    if (isTeamPlanId(planNorm) && planNorm !== team.planSlug.toLowerCase()) {
-      return null;
+    if (isTeamPlanId(planNorm)) {
+      const urlTeamPlan = canonicalTeamPlanId(planNorm);
+      const dbTeamPlan = canonicalTeamPlanId(team.planSlug);
+      if (
+        urlTeamPlan == null ||
+        dbTeamPlan == null ||
+        urlTeamPlan !== dbTeamPlan
+      ) {
+        return null;
+      }
     }
   }
 

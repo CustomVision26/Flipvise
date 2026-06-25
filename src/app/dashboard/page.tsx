@@ -47,7 +47,10 @@ import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
-import { syncTeamContextCookieForUser } from "@/lib/team-context-cookie-server";
+import {
+  clearTeamContextCookie,
+  syncTeamContextCookieForUser,
+} from "@/lib/team-context-cookie-server";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { isTeamPlanId } from "@/lib/team-plans";
 import {
@@ -204,6 +207,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     teamWorkspaceUrl.ownerUserId === userId &&
     !keepSubscriberOwnerLegacyWorkspaceBookmark
   ) {
+    await tryTeamQuery(() => clearTeamContextCookie(), undefined);
     const next = new URLSearchParams();
     const ti = sp.team_invite;
     const inviteRaw = Array.isArray(ti) ? ti[0] : ti;
@@ -440,6 +444,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         [],
       ),
     ]);
+    const cookieWorkspaceQueryString =
+      cookieTeamHeadingRow != null
+        ? await buildResolvedTeamWorkspaceQueryString(userId, {
+            teamId: teamCtxId,
+            ownerUserId: cookieTeamHeadingRow.ownerUserId,
+            canEditTeamDecks: false,
+            isAssignedMemberPreview: cookieMembership?.role === "team_member",
+            isTeamAdminWorkspaceViewer: cookieMembership?.role === "team_admin",
+            workspacePlanQuery: cookieTeamHeadingRow.planSlug,
+          })
+        : "";
     const teamWorkspaceTierExtras = teamWorkspaceHasTierExtras(
       ownSubscriberTeamTierExtras,
       cookieTeamHeadingRow,
@@ -500,7 +515,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       deckId={d.id}
                       deckName={d.name}
                       cardCount={d.cardCount}
-                      workspaceQueryString={workspaceQueryString}
+                      workspaceQueryString={cookieWorkspaceQueryString}
                       hasAiReading={hasAiReading}
                     />
                   </CardContent>

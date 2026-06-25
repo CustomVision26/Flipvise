@@ -9,6 +9,12 @@ const COOKIE_OPTIONS = {
   maxAge: 60 * 60 * 24 * 180,
 };
 
+/** Clears team workspace context (e.g. subscriber owner redirected to Personal Dashboard). */
+export async function clearTeamContextCookie() {
+  const store = await cookies();
+  store.delete(TEAM_CONTEXT_COOKIE);
+}
+
 /** Align the team workspace cookie with URL-based team context (no client round-trip). */
 export async function syncTeamContextCookieForUser(teamId: number, userId: string) {
   const team = await getTeamById(teamId);
