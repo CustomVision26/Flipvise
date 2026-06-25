@@ -7,6 +7,10 @@ import {
   StudySessionLayout,
   StudySessionLoading,
 } from "./study-session-layout";
+import {
+  resolveDeckWorkspaceInfo,
+  type DeckWorkspaceContextInput,
+} from "./deck-workspace-context";
 
 function cardText(value: string | null, fallback: string): string {
   const t = value?.trim();
@@ -16,12 +20,15 @@ function cardText(value: string | null, fallback: string): string {
 export function StandardReview({
   deck,
   online,
+  workspaceContext,
   onBack,
 }: {
   deck: OfflineDeckRow;
   online: boolean;
+  workspaceContext: DeckWorkspaceContextInput;
   onBack: () => void;
 }) {
+  const workspaceInfo = resolveDeckWorkspaceInfo(deck, workspaceContext);
   const [cards, setCards] = useState<OfflineCardRow[] | null>(null);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -61,6 +68,7 @@ export function StandardReview({
         backLabel="← Study"
         onBack={onBack}
         online={online}
+        workspaceInfo={workspaceInfo}
       >
         <StudySessionLoading message="Loading cards…" />
       </StudySessionLayout>
@@ -75,6 +83,7 @@ export function StandardReview({
         backLabel="← Study"
         onBack={onBack}
         online={online}
+        workspaceInfo={workspaceInfo}
       >
         <StudySessionEmpty
           title="No cards available"
@@ -96,6 +105,7 @@ export function StandardReview({
       backLabel="← Study"
       onBack={onBack}
       online={online}
+      workspaceInfo={workspaceInfo}
       progressCurrent={index + 1}
       progressTotal={total}
       footer={

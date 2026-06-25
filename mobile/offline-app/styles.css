@@ -583,6 +583,57 @@ html, body, #root {
   color: var(--muted);
 }
 
+.deck-workspace-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.deck-workspace-context--compact {
+  margin: 10px 0 0;
+}
+
+.deck-workspace-context__badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.deck-workspace-context__badge--personal {
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border-subtle);
+}
+
+.deck-workspace-context__badge--team {
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+}
+
+.deck-workspace-context__detail {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.study-session .deck-workspace-context {
+  margin: 12px 0 0;
+}
+
+.study-hub__intro .deck-workspace-context {
+  margin: 10px 0 0;
+}
+
 .study-hub__hint {
   margin: 12px 0 0;
   font-size: 13px;

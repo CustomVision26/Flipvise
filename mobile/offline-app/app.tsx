@@ -33,6 +33,7 @@ import { DeckStudyHub } from "./deck-study-hub";
 import { StandardReview } from "./standard-review";
 import { DeckQuiz } from "./deck-quiz";
 import { ConnectionStatusPill } from "./connection-status";
+import type { DeckWorkspaceContextInput } from "./deck-workspace-context";
 import {
   loadWorkspaceScope,
   saveWorkspaceScope,
@@ -325,6 +326,16 @@ export function App() {
     [accessContext],
   );
 
+  const deckWorkspaceInput = useMemo(
+    (): DeckWorkspaceContextInput => ({
+      workspaces: accessContext.workspaces,
+      personalPlanLabel,
+      viewerDisplayName: accessContext.viewerDisplayName,
+      viewerEmail: accessContext.viewerEmail,
+    }),
+    [accessContext, personalPlanLabel],
+  );
+
   const openLiveApp = useCallback(() => {
     void openLivePath("/dashboard");
   }, [openLivePath]);
@@ -377,6 +388,7 @@ export function App() {
         <StandardReview
           deck={activeDeck}
           online={online}
+          workspaceContext={deckWorkspaceInput}
           onBack={() => setDeckView("study-hub")}
         />
       );
@@ -387,6 +399,7 @@ export function App() {
           deck={activeDeck}
           userId={userId}
           online={online}
+          workspaceContext={deckWorkspaceInput}
           onAutoSync={() => runSyncNow({ showSuccess: false })}
           onBack={() => setDeckView("study-hub")}
         />
@@ -397,6 +410,7 @@ export function App() {
         <DeckStudyHub
           deck={activeDeck}
           online={online}
+          workspaceContext={deckWorkspaceInput}
           onBack={() => setDeckView("menu")}
           onStandardReview={() => setDeckView("flash")}
           onQuiz={() => setDeckView("quiz")}
@@ -408,6 +422,7 @@ export function App() {
         deck={activeDeck}
         canEdit={canEditDeckContent(activeDeck)}
         online={online}
+        workspaceContext={deckWorkspaceInput}
         onBack={() => setActiveDeck(null)}
         onStudy={() => setDeckView("study-hub")}
         onAddCards={() => setAddCardsDeck(activeDeck)}

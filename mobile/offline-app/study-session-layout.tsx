@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ConnectionStatusPill } from "./connection-status";
+import { DeckWorkspaceContext, type DeckWorkspaceInfo } from "./deck-workspace-context";
 
 export function StudySessionLayout({
   modeLabel,
@@ -7,6 +8,7 @@ export function StudySessionLayout({
   backLabel,
   onBack,
   online,
+  workspaceInfo,
   progressCurrent,
   progressTotal,
   children,
@@ -17,6 +19,7 @@ export function StudySessionLayout({
   backLabel?: string;
   onBack: () => void;
   online?: boolean;
+  workspaceInfo?: DeckWorkspaceInfo;
   progressCurrent?: number;
   progressTotal?: number;
   children: ReactNode;
@@ -39,6 +42,7 @@ export function StudySessionLayout({
           </button>
           {online != null ? <ConnectionStatusPill online={online} compact /> : null}
         </div>
+        {workspaceInfo ? <DeckWorkspaceContext info={workspaceInfo} compact /> : null}
         <div className="study-session__heading">
           <span className="study-session__badge">{modeLabel}</span>
           <h1 className="study-session__title">{deckName}</h1>

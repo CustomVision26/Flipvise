@@ -8,6 +8,10 @@ import {
   StudySessionLayout,
   StudySessionLoading,
 } from "./study-session-layout";
+import {
+  resolveDeckWorkspaceInfo,
+  type DeckWorkspaceContextInput,
+} from "./deck-workspace-context";
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 
@@ -70,16 +74,19 @@ export function DeckQuiz({
   deck,
   userId,
   online,
+  workspaceContext,
   onAutoSync,
   onBack,
 }: {
   deck: OfflineDeckRow;
   userId: string | null;
   online: boolean;
+  workspaceContext: DeckWorkspaceContextInput;
   /** When online, uploads dirty rows (including this quiz) to the server. */
   onAutoSync?: () => Promise<boolean>;
   onBack: () => void;
 }) {
+  const workspaceInfo = resolveDeckWorkspaceInfo(deck, workspaceContext);
   const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
@@ -167,6 +174,7 @@ export function DeckQuiz({
         backLabel="← Study"
         onBack={onBack}
         online={online}
+        workspaceInfo={workspaceInfo}
       >
         <StudySessionLoading message="Preparing your quiz…" />
       </StudySessionLayout>
@@ -181,6 +189,7 @@ export function DeckQuiz({
         backLabel="← Study"
         onBack={onBack}
         online={online}
+        workspaceInfo={workspaceInfo}
       >
         <StudySessionEmpty
           title="Quiz unavailable"
@@ -205,6 +214,7 @@ export function DeckQuiz({
         backLabel="← Study"
         onBack={onBack}
         online={online}
+        workspaceInfo={workspaceInfo}
         footer={
           <StudySessionControls>
             <button type="button" className="btn" onClick={onBack}>
@@ -251,6 +261,7 @@ export function DeckQuiz({
       backLabel="← Study"
       onBack={onBack}
       online={online}
+      workspaceInfo={workspaceInfo}
       progressCurrent={index + 1}
       progressTotal={questions.length}
       footer={

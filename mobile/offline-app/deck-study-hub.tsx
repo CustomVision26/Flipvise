@@ -3,16 +3,23 @@ import { listCards } from "../../src/lib/offline/repository";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
 
 import { ConnectionStatusPill } from "./connection-status";
+import {
+  DeckWorkspaceContext,
+  resolveDeckWorkspaceInfo,
+  type DeckWorkspaceContextInput,
+} from "./deck-workspace-context";
 
 export function DeckStudyHub({
   deck,
   online,
+  workspaceContext,
   onBack,
   onStandardReview,
   onQuiz,
 }: {
   deck: OfflineDeckRow;
   online: boolean;
+  workspaceContext: DeckWorkspaceContextInput;
   onBack: () => void;
   onStandardReview: () => void;
   onQuiz: () => void;
@@ -26,6 +33,7 @@ export function DeckStudyHub({
   }, [deck.local_id]);
 
   const hasCards = count != null && count > 0;
+  const workspaceInfo = resolveDeckWorkspaceInfo(deck, workspaceContext);
 
   return (
     <div className="app study-hub">
@@ -42,6 +50,7 @@ export function DeckStudyHub({
           <span className="study-hub__badge">Study session</span>
           <h1 className="study-hub__title">Choose a mode</h1>
           <p className="study-hub__deck-name">{deck.name}</p>
+          <DeckWorkspaceContext info={workspaceInfo} compact />
         </div>
         <p className="study-hub__meta">
           {count == null

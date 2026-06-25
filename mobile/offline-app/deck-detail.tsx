@@ -12,6 +12,11 @@ import {
   type OfflineCardViewMode,
 } from "./card-library-prefs";
 import { ConnectionStatusPill } from "./connection-status";
+import {
+  DeckWorkspaceContext,
+  resolveDeckWorkspaceInfo,
+  type DeckWorkspaceContextInput,
+} from "./deck-workspace-context";
 
 function formatUpdated(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -190,6 +195,7 @@ export function DeckDetail({
   deck,
   canEdit,
   online,
+  workspaceContext,
   onBack,
   onStudy,
   onAddCards,
@@ -197,6 +203,7 @@ export function DeckDetail({
   deck: OfflineDeckRow;
   canEdit: boolean;
   online: boolean;
+  workspaceContext: DeckWorkspaceContextInput;
   onBack: () => void;
   onStudy: () => void;
   onAddCards: () => void;
@@ -236,6 +243,7 @@ export function DeckDetail({
 
   const count = cards?.length ?? null;
   const hasCards = count != null && count > 0;
+  const workspaceInfo = resolveDeckWorkspaceInfo(deck, workspaceContext);
 
   function changeView(next: OfflineCardViewMode) {
     setView(next);
@@ -264,6 +272,7 @@ export function DeckDetail({
       <div className="content content--library">
         <header className="page-header">
           <div className="page-header__main">
+            <DeckWorkspaceContext info={workspaceInfo} />
             <h1 className="page-title">{deck.name}</h1>
             {deck.description ? (
               <p className="page-subtitle">{deck.description}</p>
