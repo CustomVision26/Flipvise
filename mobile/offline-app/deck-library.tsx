@@ -206,6 +206,7 @@ function ViewSortSheet({
 
 export function DeckLibrary({
   decks,
+  loading = false,
   message,
   online,
   workspaceScope,
@@ -219,6 +220,7 @@ export function DeckLibrary({
   onOpenDeck,
 }: {
   decks: OfflineDeckRow[];
+  loading?: boolean;
   message: string | null;
   online: boolean;
   workspaceScope: SavedWorkspaceScope;
@@ -353,7 +355,7 @@ export function DeckLibrary({
 
       {message && <p className="banner banner--info">{message}</p>}
 
-      {sorted.length > 0 && (
+      {sorted.length > 0 && !loading && (
         <div className="library-toolbar">
           <p className="library-count">
             {sorted.length} deck{sorted.length === 1 ? "" : "s"}
@@ -368,7 +370,11 @@ export function DeckLibrary({
         </div>
       )}
 
-      {sorted.length === 0 ? (
+      {loading ? (
+        <div className="library-loading" aria-busy="true" aria-live="polite">
+          <p>Loading decks…</p>
+        </div>
+      ) : sorted.length === 0 ? (
         <div className="empty">
           <h2>{emptyTitle}</h2>
           <p>{emptyBody}</p>

@@ -101,6 +101,8 @@ export function App() {
   const [message, setMessage] = useState<string | null>(null);
   const [showNewDeck, setShowNewDeck] = useState(false);
   const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
+  const [libraryReady, setLibraryReady] = useState(false);
+  const [scopeLoading, setScopeLoading] = useState(false);
 
   const loadDecks = useCallback(
     async (uid: string, scope: SavedWorkspaceScope) => {
@@ -124,22 +126,42 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const available = await isOfflineDbAvailable();
-      setDbReady(available);
-      if (!available) return;
-      const uid = await getStoredUserId();
-      setUserId(uid);
-      const imported = await consumePendingOfflinePull();
-      if (imported && (imported.deckCount > 0 || imported.cardCount > 0)) {
-        setMessage(
-          `Loaded ${imported.deckCount} deck${imported.deckCount === 1 ? "" : "s"} and ${imported.cardCount} card${imported.cardCount === 1 ? "" : "s"} from your last download.`,
-        );
+      try {
+        const available = await isOfflineDbAvailable();
+        if (cancelled) return;
+        setDbReady(available);
+        if (!available) return;
+
+        const uid = await getStoredUserId();
+        if (cancelled) return;
+        setUserId(uid);
+
+        const imported = await consumePendingOfflinePull();
+        if (cancelled) return;
+        if (imported && (imported.deckCount > 0 || imported.cardCount > 0)) {
+          setMessage(
+            `Loaded ${imported.deckCount} deck${imported.deckCount === 1 ? "" : "s"} and ${imported.cardCount} card${imported.cardCount === 1 ? "" : "s"} from your last download.`,
+          );
+        }
+
+        await refreshAccessContext();
+        if (cancelled) return;
+
+        const scope = loadWorkspaceScope();
+        setWorkspaceScope(scope);
+        if (uid) await loadDecks(uid, scope);
+      } catch (err) {
+        if (!cancelled) setMessage(String(err));
+      } finally {
+        if (!cancelled) setLibraryReady(true);
       }
-      await refreshAccessContext();
-      if (uid) await loadDecks(uid, workspaceScope);
-    })().catch((err) => setMessage(String(err)));
-  }, [loadDecks, refreshAccessContext, workspaceScope]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadDecks, refreshAccessContext]);
 
   const handleSync = useCallback(async () => {
     if (!userId) {
@@ -191,10 +213,16 @@ export function App() {
   }, [userId, online, loadDecks, workspaceScope, refreshAccessContext]);
 
   const handleWorkspaceChange = useCallback(
-    (scope: SavedWorkspaceScope) => {
+    async (scope: SavedWorkspaceScope) => {
       setWorkspaceScope(scope);
       saveWorkspaceScope(scope);
-      if (userId) void loadDecks(userId, scope);
+      if (!userId) return;
+      setScopeLoading(true);
+      try {
+        await loadDecks(userId, scope);
+      } finally {
+        setScopeLoading(false);
+      }
     },
     [userId, loadDecks],
   );
@@ -268,6 +296,8 @@ export function App() {
     void openLivePath("/dashboard");
   }, [openLivePath]);
 
+  const libraryLoading = dbReady === null || !libraryReady || scopeLoading;
+
   if (dbReady === false) {
     const dbHint = getLastOfflineDbError();
     return (
@@ -339,6 +369,7 @@ export function App() {
       <div className="content content--library">
         <DeckLibrary
           decks={decks}
+          loading={libraryLoading}
           message={message}
           online={online}
           workspaceScope={workspaceScope}
