@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { listCards } from "../../src/lib/offline/repository";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { deleteCard, listCards, updateCard } from "../../src/lib/offline/repository";
 import type { OfflineCardRow, OfflineDeckRow } from "../../src/lib/offline/schema";
 import {
   CARD_SORT_LABELS,
@@ -17,6 +17,7 @@ import {
   resolveDeckWorkspaceInfo,
   type DeckWorkspaceContextInput,
 } from "./deck-workspace-context";
+import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
 
 function formatUpdated(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -169,80 +170,175 @@ function CardTile({
   card,
   view,
   index,
+  canEdit,
   onOpenAnswer,
+  onEdit,
+  onDelete,
 }: {
   card: OfflineCardRow;
   view: OfflineCardViewMode;
   index: number;
+  canEdit: boolean;
   onOpenAnswer: (card: OfflineCardRow) => void;
+  onEdit: (card: OfflineCardRow) => void;
+  onDelete: (card: OfflineCardRow) => void;
 }) {
   const front = cardFrontLabel(card);
-  const back = cardBackLabel(card);
   const updated = formatUpdated(card.updated_at_ms);
-  const watermark = front.slice(0, 1).toUpperCase() || "?";
+  const actions = canEdit ? (
+    <LibraryTileActions
+      onEdit={() => onEdit(card)}
+      onDelete={() => onDelete(card)}
+    />
+  ) : null;
 
   if (view === "list") {
     return (
-      <button
-        type="button"
-        className="card-tile list card-tile--interactive"
-        onClick={() => onOpenAnswer(card)}
-        aria-label={`Question: ${front}. Tap to reveal answer.`}
-      >
-        <span className="card-tile__front">{front}</span>
-      </button>
+      <div className="card-tile-shell card-tile list card-tile--interactive">
+        <LibraryTileWatermark label="Card" />
+        <button
+          type="button"
+          className="card-tile__open"
+          onClick={() => onOpenAnswer(card)}
+          aria-label={`Question: ${front}. Tap to reveal answer.`}
+        >
+          <span className="card-tile__front">{front}</span>
+        </button>
+        {actions}
+      </div>
     );
   }
 
   if (view === "thumbnail") {
     return (
-      <button
-        type="button"
-        className="card-tile thumbnail card-tile--interactive"
-        onClick={() => onOpenAnswer(card)}
-        aria-label={`Question: ${front}. Tap to reveal answer.`}
-      >
-        <span className="card-tile__watermark" aria-hidden>
-          {watermark}
-        </span>
-        <span className="card-tile__thumb-front">{front}</span>
-      </button>
+      <div className="card-tile-shell card-tile thumbnail card-tile--interactive">
+        <LibraryTileWatermark label="Card" />
+        <button
+          type="button"
+          className="card-tile__open"
+          onClick={() => onOpenAnswer(card)}
+          aria-label={`Question: ${front}. Tap to reveal answer.`}
+        >
+          <span className="card-tile__thumb-front">{front}</span>
+        </button>
+        {actions}
+      </div>
     );
   }
 
   if (view === "grid") {
     return (
-      <button
-        type="button"
-        className="card-tile grid card-tile--interactive"
-        onClick={() => onOpenAnswer(card)}
-        aria-label={`Question: ${front}. Tap to reveal answer.`}
-      >
-        <p className="card-tile__label">Question</p>
-        <p className="card-tile__front">{front}</p>
-      </button>
+      <div className="card-tile-shell card-tile grid card-tile--interactive">
+        <LibraryTileWatermark label="Card" />
+        <button
+          type="button"
+          className="card-tile__open"
+          onClick={() => onOpenAnswer(card)}
+          aria-label={`Question: ${front}. Tap to reveal answer.`}
+        >
+          <p className="card-tile__label">Question</p>
+          <p className="card-tile__front">{front}</p>
+        </button>
+        {actions}
+      </div>
     );
   }
 
   return (
-    <button
-      type="button"
-      className="card-tile detail card-tile--interactive"
-      onClick={() => onOpenAnswer(card)}
-      aria-label={`Question: ${front}. Tap to reveal answer.`}
-    >
-      <span className="card-tile__index">#{index + 1}</span>
-      <div className="card-tile__detail-body">
-        <div className="card-tile__detail-main">
-          <p className="card-tile__label">Question</p>
-          <p className="card-tile__front">{front}</p>
+    <div className="card-tile-shell card-tile detail card-tile--interactive">
+      <LibraryTileWatermark label="Card" />
+      <button
+        type="button"
+        className="card-tile__open"
+        onClick={() => onOpenAnswer(card)}
+        aria-label={`Question: ${front}. Tap to reveal answer.`}
+      >
+        <span className="card-tile__index">#{index + 1}</span>
+        <div className="card-tile__detail-body">
+          <div className="card-tile__detail-main">
+            <p className="card-tile__label">Question</p>
+            <p className="card-tile__front">{front}</p>
+          </div>
+          <div className="card-tile__detail-meta">
+            <span className="card-tile__stat-label">Updated</span>
+            <span className="card-tile__stat-value">{updated}</span>
+          </div>
         </div>
-        <div className="card-tile__detail-meta">
-          <span className="card-tile__stat-label">Updated</span>
-          <span className="card-tile__stat-value">{updated}</span>
-        </div>
+      </button>
+      {actions}
+    </div>
+  );
+}
+
+function EditCardSheet({
+  card,
+  onClose,
+  onSaved,
+}: {
+  card: OfflineCardRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [front, setFront] = useState(card.front ?? "");
+  const [back, setBack] = useState(card.back ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const f = front.trim();
+    const b = back.trim();
+    if (!f || !b) {
+      setError("Front and back are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateCard(card.local_id, { front: f, back: b });
+      onSaved();
+    } catch {
+      setError("Couldn't save the card. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>Edit card</h2>
+        <p className="sheet-hint">Changes save on this device and sync when you&apos;re online.</p>
+        <form onSubmit={handleSubmit} className="form-stack">
+          <label className="field">
+            <span>Front (question)</span>
+            <input
+              value={front}
+              onChange={(e) => setFront(e.target.value)}
+              placeholder="Question"
+              autoFocus
+            />
+          </label>
+          <label className="field">
+            <span>Back (answer)</span>
+            <input
+              value={back}
+              onChange={(e) => setBack(e.target.value)}
+              placeholder="Answer"
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <div className="row">
+            <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn" style={{ flex: 1 }} disabled={busy}>
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -268,6 +364,8 @@ export function DeckDetail({
   const [sort, setSort] = useState<OfflineCardSort>(() => loadCardSort());
   const [showOptions, setShowOptions] = useState(false);
   const [answerPreview, setAnswerPreview] = useState<OfflineCardRow | null>(null);
+  const [editingCard, setEditingCard] = useState<OfflineCardRow | null>(null);
+  const [cardsVersion, setCardsVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,7 +379,27 @@ export function DeckDetail({
     return () => {
       cancelled = true;
     };
-  }, [deck.local_id]);
+  }, [deck.local_id, cardsVersion]);
+
+  async function reloadCards() {
+    const rows = await listCards(deck.local_id).catch(() => []);
+    setCards(rows);
+  }
+
+  async function handleDeleteCard(card: OfflineCardRow) {
+    const front = cardFrontLabel(card);
+    if (!window.confirm(`Delete card "${front}" from this device?`)) {
+      return;
+    }
+    await deleteCard(card.local_id);
+    if (answerPreview?.local_id === card.local_id) {
+      setAnswerPreview(null);
+    }
+    if (editingCard?.local_id === card.local_id) {
+      setEditingCard(null);
+    }
+    await reloadCards();
+  }
 
   const sorted = useMemo(() => {
     if (!cards) return [];
@@ -390,7 +508,10 @@ export function DeckDetail({
                   card={card}
                   view={view}
                   index={i}
+                  canEdit={canEdit}
                   onOpenAnswer={setAnswerPreview}
+                  onEdit={setEditingCard}
+                  onDelete={(c) => void handleDeleteCard(c)}
                 />
               ))}
             </div>
@@ -414,6 +535,17 @@ export function DeckDetail({
             onClose={() => setAnswerPreview(null)}
           />
         ) : null}
+
+        {editingCard && (
+          <EditCardSheet
+            card={editingCard}
+            onClose={() => setEditingCard(null)}
+            onSaved={() => {
+              setEditingCard(null);
+              setCardsVersion((v) => v + 1);
+            }}
+          />
+        )}
       </div>
     </div>
   );

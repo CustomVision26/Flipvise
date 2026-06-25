@@ -376,6 +376,66 @@ html, body, #root {
 }
 
 /* ── Deck tiles ──────────────────────────────────────────── */
+.library-tile__watermark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.09;
+  pointer-events: none;
+  z-index: 0;
+  color: var(--fg);
+}
+
+.library-tile__actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border-subtle);
+  position: relative;
+  z-index: 2;
+  background: rgba(9, 9, 11, 0.35);
+}
+
+.library-tile__action {
+  flex: 1;
+  justify-content: center;
+  min-height: 32px;
+}
+
+.library-tile__action--danger {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.deck-tile-shell,
+.card-tile-shell {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.deck-tile__open,
+.card-tile__open {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+}
+
 .deck-tile {
   appearance: none; border: 1px solid var(--border);
   background: var(--panel); color: var(--fg);
@@ -387,6 +447,16 @@ html, body, #root {
 
 .deck-tile.detail {
   display: grid; grid-template-columns: 4px 1fr; overflow: hidden; padding: 0;
+}
+.deck-tile-shell.deck-tile.detail {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.deck-tile-shell.deck-tile.detail .deck-tile__open {
+  display: grid;
+  grid-template-columns: 4px 1fr;
+  padding: 0;
 }
 .deck-tile__accent {
   background: linear-gradient(180deg, var(--accent), var(--accent-2));
@@ -420,6 +490,23 @@ html, body, #root {
   padding: 14px; min-height: 132px;
   display: flex; flex-direction: column;
 }
+.deck-tile-shell.deck-tile.grid,
+.deck-tile-shell.deck-tile.thumbnail {
+  padding: 0;
+}
+.deck-tile-shell.deck-tile.grid .deck-tile__open {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  min-height: 132px;
+}
+.deck-tile-shell.deck-tile.thumbnail .deck-tile__open {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px;
+  aspect-ratio: 1;
+}
 .deck-tile.grid:not([style*="background"]) { background: var(--panel); }
 
 .deck-tile.list {
@@ -427,6 +514,32 @@ html, body, #root {
   gap: 12px; padding: 11px 14px; border-radius: var(--radius);
   background: transparent; border-color: transparent;
 }
+.deck-tile-shell.deck-tile.list {
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+}
+.deck-tile-shell.deck-tile.list .deck-tile__open {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+}
+.deck-tile-shell.deck-tile.list .library-tile__actions {
+  border-top: 0;
+  padding: 8px 10px 8px 0;
+  background: transparent;
+  flex-shrink: 0;
+  align-self: center;
+}
+.deck-tile-shell.deck-tile.list .library-tile__action {
+  flex: 0 0 auto;
+  min-width: 4.25rem;
+}
+.deck-tile-shell.deck-tile.list:hover { background: var(--panel); border-color: var(--border-subtle); }
 .deck-tile.list:hover { background: var(--panel); border-color: var(--border-subtle); }
 .deck-tile__name {
   font-size: 14px; font-weight: 600; white-space: nowrap;
@@ -444,7 +557,8 @@ html, body, #root {
 }
 .deck-tile__watermark {
   position: absolute; inset: 0; display: grid; place-items: center;
-  font-size: 42px; font-weight: 700; opacity: 0.12; pointer-events: none;
+  font-size: 22px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  opacity: 0.1; pointer-events: none;
 }
 .deck-tile__thumb-title {
   font-size: 12px; font-weight: 600; line-height: 1.25;
@@ -1263,6 +1377,74 @@ html, body, #root {
 
 .card-tile--interactive:active {
   transform: scale(0.98);
+}
+
+.card-tile-shell.card-tile--interactive {
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.card-tile-shell.card-tile--interactive:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.card-tile-shell.card-tile--interactive:active {
+  transform: scale(0.98);
+}
+
+.card-tile-shell.card-tile.list {
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+}
+
+.card-tile-shell.card-tile.list .card-tile__open {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+}
+
+.card-tile-shell.card-tile.list .library-tile__actions {
+  border-top: 0;
+  border-left: 1px solid var(--border-subtle);
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px;
+  background: transparent;
+}
+
+.card-tile-shell.card-tile.list .library-tile__action {
+  flex: 0 0 auto;
+  min-width: 4.25rem;
+}
+
+.card-tile-shell.card-tile.thumbnail,
+.card-tile-shell.card-tile.grid {
+  padding: 0;
+}
+
+.card-tile-shell.card-tile.thumbnail .card-tile__open {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px;
+  aspect-ratio: 1;
+}
+
+.card-tile-shell.card-tile.grid .card-tile__open {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  min-height: 120px;
+}
+
+.card-tile-shell.card-tile.detail .card-tile__open {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  width: 100%;
+  padding: 0;
 }
 
 .card-answer-dialog__backdrop {

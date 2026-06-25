@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { listCards } from "../../src/lib/offline/repository";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { deleteDeck, listCards, updateDeck } from "../../src/lib/offline/repository";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
@@ -16,8 +16,13 @@ import {
 } from "./deck-library-prefs";
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 import { WorkspaceSelector } from "./workspace-selector";
+import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
 
 export type DeckWithCount = OfflineDeckRow & { cardCount: number };
+
+function canEditDeckLocally(deck: OfflineDeckRow): boolean {
+  return deck.team_id == null && (deck.member_assigned ?? 0) === 0;
+}
 
 function formatUpdated(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -51,89 +56,184 @@ function sortDecks(
 function DeckTile({
   deck,
   view,
+  canEdit,
   onOpen,
+  onEdit,
+  onDelete,
 }: {
   deck: DeckWithCount;
   view: OfflineDeckViewMode;
+  canEdit: boolean;
   onOpen: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const gradient = offlineDeckGradientStyle(deck.gradient);
   const countLabel = `${deck.cardCount} card${deck.cardCount === 1 ? "" : "s"}`;
   const updated = formatUpdated(deck.updated_at_ms);
+  const showActions = canEdit && canEditDeckLocally(deck);
+  const gradientStyle =
+    (view === "thumbnail" || view === "grid") && gradient
+      ? { background: gradient }
+      : undefined;
+
+  const actions = showActions ? (
+    <LibraryTileActions onEdit={onEdit} onDelete={onDelete} />
+  ) : null;
 
   if (view === "list") {
     return (
-      <button type="button" className="deck-tile list" onClick={onOpen}>
-        <span className="deck-tile__name">{deck.name}</span>
-        <span className="deck-tile__meta">{countLabel}</span>
-      </button>
+      <div className="deck-tile-shell deck-tile list">
+        <LibraryTileWatermark label="Deck" />
+        <button type="button" className="deck-tile__open" onClick={onOpen}>
+          <span className="deck-tile__name">{deck.name}</span>
+          <span className="deck-tile__meta">{countLabel}</span>
+        </button>
+        {actions}
+      </div>
     );
   }
 
   if (view === "thumbnail") {
     return (
-      <button
-        type="button"
-        className="deck-tile thumbnail"
-        onClick={onOpen}
-        style={gradient ? { background: gradient } : undefined}
+      <div
+        className="deck-tile-shell deck-tile thumbnail"
+        style={gradientStyle}
       >
-        <span className="deck-tile__watermark" aria-hidden>
-          {deck.name.slice(0, 1).toUpperCase()}
-        </span>
-        <span className="deck-tile__thumb-title">{deck.name}</span>
-        <span className="deck-tile__thumb-count">{countLabel}</span>
-      </button>
+        <LibraryTileWatermark label="Deck" />
+        <button type="button" className="deck-tile__open" onClick={onOpen}>
+          <span className="deck-tile__thumb-title">{deck.name}</span>
+          <span className="deck-tile__thumb-count">{countLabel}</span>
+        </button>
+        {actions}
+      </div>
     );
   }
 
   if (view === "grid") {
     return (
-      <button
-        type="button"
-        className="deck-tile grid"
-        onClick={onOpen}
-        style={gradient ? { background: gradient } : undefined}
-      >
-        <h3 className="deck-tile__title">{deck.name}</h3>
-        {deck.description && (
-          <p className="deck-tile__desc">{deck.description}</p>
-        )}
-        <div className="deck-tile__footer">
-          <span>{countLabel}</span>
-          <span>{updated}</span>
-        </div>
-      </button>
-    );
-  }
-
-  // detail
-  return (
-    <button type="button" className="deck-tile detail" onClick={onOpen}>
-      <div
-        className="deck-tile__accent"
-        style={gradient ? { background: gradient } : undefined}
-        aria-hidden
-      />
-      <div className="deck-tile__body">
-        <div className="deck-tile__detail-main">
+      <div className="deck-tile-shell deck-tile grid" style={gradientStyle}>
+        <LibraryTileWatermark label="Deck" />
+        <button type="button" className="deck-tile__open" onClick={onOpen}>
           <h3 className="deck-tile__title">{deck.name}</h3>
           {deck.description && (
             <p className="deck-tile__desc">{deck.description}</p>
           )}
-        </div>
-        <div className="deck-tile__detail-meta">
-          <span className="deck-tile__stat">
-            <span className="deck-tile__stat-label">Cards</span>
-            <span className="deck-tile__stat-value">{deck.cardCount}</span>
-          </span>
-          <span className="deck-tile__stat">
-            <span className="deck-tile__stat-label">Updated</span>
-            <span className="deck-tile__stat-value">{updated}</span>
-          </span>
-        </div>
+          <div className="deck-tile__footer">
+            <span>{countLabel}</span>
+            <span>{updated}</span>
+          </div>
+        </button>
+        {actions}
       </div>
-    </button>
+    );
+  }
+
+  return (
+    <div className="deck-tile-shell deck-tile detail">
+      <LibraryTileWatermark label="Deck" />
+      <button type="button" className="deck-tile__open" onClick={onOpen}>
+        <div
+          className="deck-tile__accent"
+          style={gradient ? { background: gradient } : undefined}
+          aria-hidden
+        />
+        <div className="deck-tile__body">
+          <div className="deck-tile__detail-main">
+            <h3 className="deck-tile__title">{deck.name}</h3>
+            {deck.description && (
+              <p className="deck-tile__desc">{deck.description}</p>
+            )}
+          </div>
+          <div className="deck-tile__detail-meta">
+            <span className="deck-tile__stat">
+              <span className="deck-tile__stat-label">Cards</span>
+              <span className="deck-tile__stat-value">{deck.cardCount}</span>
+            </span>
+            <span className="deck-tile__stat">
+              <span className="deck-tile__stat-label">Updated</span>
+              <span className="deck-tile__stat-value">{updated}</span>
+            </span>
+          </div>
+        </div>
+      </button>
+      {actions}
+    </div>
+  );
+}
+
+function EditDeckSheet({
+  deck,
+  onClose,
+  onSaved,
+}: {
+  deck: OfflineDeckRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(deck.name);
+  const [description, setDescription] = useState(deck.description ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Deck name is required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateDeck(deck.local_id, {
+        name: trimmed,
+        description: description.trim() || null,
+      });
+      onSaved();
+    } catch {
+      setError("Couldn't save the deck. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>Edit deck</h2>
+        <p className="sheet-hint">Changes save on this device and sync when you&apos;re online.</p>
+        <form onSubmit={handleSubmit} className="form-stack">
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Deck name"
+              autoFocus
+            />
+          </label>
+          <label className="field">
+            <span>Description (optional)</span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this deck about?"
+              rows={3}
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <div className="row">
+            <button type="button" className="btn secondary" style={{ flex: 1 }} onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn" style={{ flex: 1 }} disabled={busy}>
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -221,6 +321,7 @@ export function DeckLibrary({
   onToAdminDash,
   onNewDeck,
   onOpenDeck,
+  onDecksChanged,
 }: {
   decks: OfflineDeckRow[];
   loading?: boolean;
@@ -237,10 +338,12 @@ export function DeckLibrary({
   onToAdminDash?: (workspace: OfflineWorkspaceContext) => void;
   onNewDeck: () => void;
   onOpenDeck: (deck: OfflineDeckRow) => void;
+  onDecksChanged: () => void | Promise<void>;
 }) {
   const [view, setView] = useState<OfflineDeckViewMode>(() => loadDeckViewMode());
   const [sort, setSort] = useState<OfflineDeckSort>(() => loadDeckSort());
   const [showOptions, setShowOptions] = useState(false);
+  const [editingDeck, setEditingDeck] = useState<OfflineDeckRow | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -284,6 +387,20 @@ export function DeckLibrary({
     setSort(next);
     saveDeckSort(next);
   }
+
+  async function handleDeleteDeck(deck: OfflineDeckRow) {
+    if (
+      !window.confirm(
+        `Delete "${deck.name}" and all its cards from this device?`,
+      )
+    ) {
+      return;
+    }
+    await deleteDeck(deck.local_id);
+    await onDecksChanged();
+  }
+
+  const canEditDecks = canCreateDeck;
 
   const containerClass =
     view === "thumbnail"
@@ -404,7 +521,10 @@ export function DeckLibrary({
                 key={deck.local_id}
                 deck={deck}
                 view={view}
+                canEdit={canEditDecks}
                 onOpen={() => onOpenDeck(deck)}
+                onEdit={() => setEditingDeck(deck)}
+                onDelete={() => void handleDeleteDeck(deck)}
               />
             ))}
           </div>
@@ -418,6 +538,17 @@ export function DeckLibrary({
           onView={changeView}
           onSort={changeSort}
           onClose={() => setShowOptions(false)}
+        />
+      )}
+
+      {editingDeck && (
+        <EditDeckSheet
+          deck={editingDeck}
+          onClose={() => setEditingDeck(null)}
+          onSaved={() => {
+            setEditingDeck(null);
+            void onDecksChanged();
+          }}
         />
       )}
     </>

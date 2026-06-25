@@ -460,6 +460,9 @@ export function App() {
             setActiveDeck(deck);
             setDeckView("menu");
           }}
+          onDecksChanged={async () => {
+            if (userId) await loadDecks(userId, workspaceScope);
+          }}
         />
       </div>
       {showNewDeck && (
