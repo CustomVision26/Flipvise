@@ -32,6 +32,7 @@ import { DeckDetail } from "./deck-detail";
 import { DeckStudyHub } from "./deck-study-hub";
 import { StandardReview } from "./standard-review";
 import { DeckQuiz } from "./deck-quiz";
+import { ConnectionStatusPill } from "./connection-status";
 import {
   loadWorkspaceScope,
   saveWorkspaceScope,
@@ -164,6 +165,68 @@ export function App() {
     };
   }, [loadDecks, refreshAccessContext]);
 
+  const runSyncNow = useCallback(
+    async (options?: { showSuccess?: boolean }): Promise<boolean> => {
+      if (!userId) return false;
+      if (!online) return false;
+      setSyncing(true);
+      try {
+        const [token, storedBase] = await Promise.all([
+          getStoredSyncToken(),
+          getStoredApiBaseUrl(),
+        ]);
+        if (!token) {
+          if (options?.showSuccess !== false) {
+            setMessage(
+              "Open Flipvise, sign in, and tap “Make available offline” once to enable syncing.",
+            );
+          }
+          return false;
+        }
+        const result = await runSync({
+          userId,
+          apiBaseUrl: storedBase ?? LIVE_URL,
+          token,
+          fullPull: true,
+        });
+        await refreshAccessContext();
+        await loadDecks(userId, workspaceScope);
+        if (options?.showSuccess !== false) {
+          const downloadParts: string[] = [];
+          if (result.deckCount > 0) {
+            downloadParts.push(
+              `${result.deckCount} deck${result.deckCount === 1 ? "" : "s"}`,
+            );
+          }
+          if (result.cardCount > 0) {
+            downloadParts.push(
+              `${result.cardCount} card${result.cardCount === 1 ? "" : "s"}`,
+            );
+          }
+          const downloaded =
+            downloadParts.length > 0 ? downloadParts.join(" and ") : "nothing new";
+          setMessage(
+            `Synced — ${result.pushed} change${result.pushed === 1 ? "" : "s"} uploaded, ${downloaded} downloaded.`,
+          );
+        }
+        return true;
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : "";
+        if (options?.showSuccess !== false) {
+          setMessage(
+            detail.startsWith("Sync failed:")
+              ? `${detail}. Your changes are saved on this device — try Sync again in a moment.`
+              : "Couldn't sync right now. Your changes are saved and will sync later.",
+          );
+        }
+        return false;
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [userId, online, loadDecks, workspaceScope, refreshAccessContext],
+  );
+
   const handleSync = useCallback(async () => {
     if (!userId) {
       setMessage("Sign in on the live app first to download your decks.");
@@ -173,45 +236,9 @@ export function App() {
       setMessage("You're offline — showing your downloaded decks.");
       return;
     }
-    setSyncing(true);
     setMessage(null);
-    try {
-      const [token, storedBase] = await Promise.all([
-        getStoredSyncToken(),
-        getStoredApiBaseUrl(),
-      ]);
-      if (!token) {
-        setMessage(
-          "Open Flipvise, sign in, and tap “Make available offline” once to enable syncing.",
-        );
-        return;
-      }
-      const result = await runSync({
-        userId,
-        apiBaseUrl: storedBase ?? LIVE_URL,
-        token,
-        fullPull: true,
-      });
-      await refreshAccessContext();
-      await loadDecks(userId, workspaceScope);
-      const downloadParts: string[] = [];
-      if (result.deckCount > 0) {
-        downloadParts.push(`${result.deckCount} deck${result.deckCount === 1 ? "" : "s"}`);
-      }
-      if (result.cardCount > 0) {
-        downloadParts.push(`${result.cardCount} card${result.cardCount === 1 ? "" : "s"}`);
-      }
-      const downloaded =
-        downloadParts.length > 0 ? downloadParts.join(" and ") : "nothing new";
-      setMessage(
-        `Synced — ${result.pushed} change${result.pushed === 1 ? "" : "s"} uploaded, ${downloaded} downloaded.`,
-      );
-    } catch {
-      setMessage("Couldn't sync right now. Your changes are saved and will sync later.");
-    } finally {
-      setSyncing(false);
-    }
-  }, [userId, online, loadDecks, workspaceScope, refreshAccessContext]);
+    await runSyncNow({ showSuccess: true });
+  }, [userId, online, runSyncNow]);
 
   const handleWorkspaceChange = useCallback(
     async (scope: SavedWorkspaceScope) => {
@@ -349,6 +376,7 @@ export function App() {
       return (
         <StandardReview
           deck={activeDeck}
+          online={online}
           onBack={() => setDeckView("study-hub")}
         />
       );
@@ -358,6 +386,8 @@ export function App() {
         <DeckQuiz
           deck={activeDeck}
           userId={userId}
+          online={online}
+          onAutoSync={() => runSyncNow({ showSuccess: false })}
           onBack={() => setDeckView("study-hub")}
         />
       );
@@ -366,6 +396,7 @@ export function App() {
       return (
         <DeckStudyHub
           deck={activeDeck}
+          online={online}
           onBack={() => setDeckView("menu")}
           onStandardReview={() => setDeckView("flash")}
           onQuiz={() => setDeckView("quiz")}
@@ -376,6 +407,7 @@ export function App() {
       <DeckDetail
         deck={activeDeck}
         canEdit={canEditDeckContent(activeDeck)}
+        online={online}
         onBack={() => setActiveDeck(null)}
         onStudy={() => setDeckView("study-hub")}
         onAddCards={() => setAddCardsDeck(activeDeck)}
@@ -447,10 +479,7 @@ function Topbar({
         </div>
       </div>
       <div className="spacer" />
-      <span className={`status-pill${online ? " online" : ""}`}>
-        <span className={`dot${online ? " online" : ""}`} aria-hidden />
-        {online ? "Online" : "Offline"}
-      </span>
+      <ConnectionStatusPill online={online} />
       <button
         type="button"
         className="btn secondary btn--sm"

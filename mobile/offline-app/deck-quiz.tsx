@@ -11,13 +11,73 @@ import {
 
 const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
 
+type UploadState = "idle" | "uploading" | "synced" | "failed";
+
+function quizResultNote({
+  userId,
+  online,
+  saved,
+  uploadState,
+}: {
+  userId: string | null;
+  online: boolean;
+  saved: boolean;
+  uploadState: UploadState;
+}): { text: string; className: string } {
+  if (!userId) {
+    return {
+      text: "Sign in on the live app and sync to save this result to your account.",
+      className: "quiz-results__note",
+    };
+  }
+  if (!saved) {
+    return {
+      text: "Saving your result…",
+      className: "quiz-results__note",
+    };
+  }
+  if (uploadState === "uploading") {
+    return {
+      text: "Uploading your result to your account…",
+      className: "quiz-results__note",
+    };
+  }
+  if (uploadState === "synced") {
+    return {
+      text: "Your result was sent to your inbox. Open the online dashboard to view it.",
+      className: "quiz-results__note quiz-results__note--success",
+    };
+  }
+  if (uploadState === "failed") {
+    return {
+      text: "Saved on this device. Tap Sync on the deck list — the server may be waking up.",
+      className: "quiz-results__note",
+    };
+  }
+  if (online) {
+    return {
+      text: "Saved on this device. Tap Sync on the deck list to upload to your inbox.",
+      className: "quiz-results__note",
+    };
+  }
+  return {
+    text: "Saved on this device. Sync when you're back online to send it to your inbox.",
+    className: "quiz-results__note",
+  };
+}
+
 export function DeckQuiz({
   deck,
   userId,
+  online,
+  onAutoSync,
   onBack,
 }: {
   deck: OfflineDeckRow;
   userId: string | null;
+  online: boolean;
+  /** When online, uploads dirty rows (including this quiz) to the server. */
+  onAutoSync?: () => Promise<boolean>;
   onBack: () => void;
 }) {
   const [questions, setQuestions] = useState<QuizQuestion[] | null>(null);
@@ -27,6 +87,7 @@ export function DeckQuiz({
   const [finished, setFinished] = useState(false);
   const [startedAt] = useState(() => Date.now());
   const [saved, setSaved] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
 
   useEffect(() => {
     let cancelled = false;
@@ -85,11 +146,17 @@ export function DeckQuiz({
           perCard,
         });
         setSaved(true);
+
+        if (online && onAutoSync) {
+          setUploadState("uploading");
+          const ok = await onAutoSync();
+          setUploadState(ok ? "synced" : "failed");
+        }
       } catch {
         // Result stays on device only if save fails.
       }
     },
-    [userId, saved, deck.local_id, deck.name, startedAt],
+    [userId, saved, deck.local_id, deck.name, startedAt, online, onAutoSync],
   );
 
   if (questions === null) {
@@ -99,6 +166,7 @@ export function DeckQuiz({
         deckName={deck.name}
         backLabel="← Study"
         onBack={onBack}
+        online={online}
       >
         <StudySessionLoading message="Preparing your quiz…" />
       </StudySessionLayout>
@@ -112,6 +180,7 @@ export function DeckQuiz({
         deckName={deck.name}
         backLabel="← Study"
         onBack={onBack}
+        online={online}
       >
         <StudySessionEmpty
           title="Quiz unavailable"
@@ -127,6 +196,7 @@ export function DeckQuiz({
     ).length;
     const percent = Math.round((correctCount / questions.length) * 100);
     const incorrectCount = questions.length - correctCount;
+    const note = quizResultNote({ userId, online, saved, uploadState });
 
     return (
       <StudySessionLayout
@@ -134,6 +204,7 @@ export function DeckQuiz({
         deckName={deck.name}
         backLabel="← Study"
         onBack={onBack}
+        online={online}
         footer={
           <StudySessionControls>
             <button type="button" className="btn" onClick={onBack}>
@@ -151,11 +222,7 @@ export function DeckQuiz({
               {questions.length} total
             </p>
           </div>
-          <p className="quiz-results__note">
-            {saved
-              ? "Your result is saved on this device and will upload on your next sync."
-              : "Sign in on the live app and sync to save this result to your account."}
-          </p>
+          <p className={note.className}>{note.text}</p>
         </div>
       </StudySessionLayout>
     );
@@ -183,6 +250,7 @@ export function DeckQuiz({
       deckName={deck.name}
       backLabel="← Study"
       onBack={onBack}
+      online={online}
       progressCurrent={index + 1}
       progressTotal={questions.length}
       footer={

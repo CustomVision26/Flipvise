@@ -15,9 +15,11 @@ function cardText(value: string | null, fallback: string): string {
 
 export function StandardReview({
   deck,
+  online,
   onBack,
 }: {
   deck: OfflineDeckRow;
+  online: boolean;
   onBack: () => void;
 }) {
   const [cards, setCards] = useState<OfflineCardRow[] | null>(null);
@@ -58,6 +60,7 @@ export function StandardReview({
         deckName={deck.name}
         backLabel="← Study"
         onBack={onBack}
+        online={online}
       >
         <StudySessionLoading message="Loading cards…" />
       </StudySessionLayout>
@@ -71,6 +74,7 @@ export function StandardReview({
         deckName={deck.name}
         backLabel="← Study"
         onBack={onBack}
+        online={online}
       >
         <StudySessionEmpty
           title="No cards available"
@@ -91,6 +95,7 @@ export function StandardReview({
       deckName={deck.name}
       backLabel="← Study"
       onBack={onBack}
+      online={online}
       progressCurrent={index + 1}
       progressTotal={total}
       footer={

@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { ConnectionStatusPill } from "./connection-status";
 
 export function StudySessionLayout({
   modeLabel,
   deckName,
   backLabel,
   onBack,
+  online,
   progressCurrent,
   progressTotal,
   children,
@@ -14,6 +16,7 @@ export function StudySessionLayout({
   deckName: string;
   backLabel?: string;
   onBack: () => void;
+  online?: boolean;
   progressCurrent?: number;
   progressTotal?: number;
   children: ReactNode;
@@ -30,9 +33,12 @@ export function StudySessionLayout({
   return (
     <div className="app study-session">
       <header className="study-session__header">
-        <button type="button" className="btn secondary btn--sm" onClick={onBack}>
-          {backLabel ?? "← Back"}
-        </button>
+        <div className="study-session__top-row">
+          <button type="button" className="btn secondary btn--sm" onClick={onBack}>
+            {backLabel ?? "← Back"}
+          </button>
+          {online != null ? <ConnectionStatusPill online={online} compact /> : null}
+        </div>
         <div className="study-session__heading">
           <span className="study-session__badge">{modeLabel}</span>
           <h1 className="study-session__title">{deckName}</h1>

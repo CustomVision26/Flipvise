@@ -601,6 +601,26 @@ html, body, #root {
   backdrop-filter: blur(12px);
 }
 
+.study-session__top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.study-hub__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px 0;
+}
+
+.status-pill--compact {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
 .study-session__heading {
   margin-top: 12px;
   min-width: 0;
@@ -1034,13 +1054,20 @@ html, body, #root {
   max-width: 26rem;
 }
 
+.quiz-results__note--muted {
+  color: var(--muted-2);
+}
+
+.quiz-results__note--success {
+  color: #86efac;
+}
+
 /* Study hub (entry) */
 .study-hub {
   background: var(--bg);
 }
 
 .study-hub__header {
-  padding: 12px 16px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 

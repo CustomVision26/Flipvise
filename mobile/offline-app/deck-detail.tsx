@@ -11,6 +11,7 @@ import {
   type OfflineCardSort,
   type OfflineCardViewMode,
 } from "./card-library-prefs";
+import { ConnectionStatusPill } from "./connection-status";
 
 function formatUpdated(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -188,12 +189,14 @@ function CardTile({
 export function DeckDetail({
   deck,
   canEdit,
+  online,
   onBack,
   onStudy,
   onAddCards,
 }: {
   deck: OfflineDeckRow;
   canEdit: boolean;
+  online: boolean;
   onBack: () => void;
   onStudy: () => void;
   onAddCards: () => void;
@@ -251,6 +254,7 @@ export function DeckDetail({
           ← Decks
         </button>
         <div className="spacer" />
+        <ConnectionStatusPill online={online} compact />
         {canEdit && (
           <button type="button" className="btn secondary btn--sm" onClick={onAddCards}>
             Add cards

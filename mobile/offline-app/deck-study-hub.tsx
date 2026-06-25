@@ -2,13 +2,17 @@ import { useEffect, useState } from "react";
 import { listCards } from "../../src/lib/offline/repository";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
 
+import { ConnectionStatusPill } from "./connection-status";
+
 export function DeckStudyHub({
   deck,
+  online,
   onBack,
   onStandardReview,
   onQuiz,
 }: {
   deck: OfflineDeckRow;
+  online: boolean;
   onBack: () => void;
   onStandardReview: () => void;
   onQuiz: () => void;
@@ -26,9 +30,12 @@ export function DeckStudyHub({
   return (
     <div className="app study-hub">
       <header className="study-hub__header">
-        <button type="button" className="btn secondary btn--sm" onClick={onBack}>
-          ← Deck
-        </button>
+        <div className="study-hub__header-row">
+          <button type="button" className="btn secondary btn--sm" onClick={onBack}>
+            ← Deck
+          </button>
+          <ConnectionStatusPill online={online} compact />
+        </div>
       </header>
       <div className="study-hub__body">
         <div className="study-hub__intro">
