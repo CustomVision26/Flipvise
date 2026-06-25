@@ -126,14 +126,55 @@ function CardViewSortSheet({
   );
 }
 
+function CardAnswerDialog({
+  front,
+  back,
+  onClose,
+}: {
+  front: string;
+  back: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="card-answer-dialog__backdrop"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="card-answer-dialog"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="card-answer-label"
+        aria-modal="true"
+      >
+        <p className="card-answer-dialog__question">{front}</p>
+        <p id="card-answer-label" className="card-answer-dialog__label">
+          Answer
+        </p>
+        <p className="card-answer-dialog__answer">{back}</p>
+        <button
+          type="button"
+          className="btn secondary btn--sm card-answer-dialog__close"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CardTile({
   card,
   view,
   index,
+  onOpenAnswer,
 }: {
   card: OfflineCardRow;
   view: OfflineCardViewMode;
   index: number;
+  onOpenAnswer: (card: OfflineCardRow) => void;
 }) {
   const front = cardFrontLabel(card);
   const back = cardBackLabel(card);
@@ -142,52 +183,66 @@ function CardTile({
 
   if (view === "list") {
     return (
-      <div className="card-tile list">
+      <button
+        type="button"
+        className="card-tile list card-tile--interactive"
+        onClick={() => onOpenAnswer(card)}
+        aria-label={`Question: ${front}. Tap to reveal answer.`}
+      >
         <span className="card-tile__front">{front}</span>
-        <span className="card-tile__back">{back}</span>
-      </div>
+      </button>
     );
   }
 
   if (view === "thumbnail") {
     return (
-      <div className="card-tile thumbnail">
+      <button
+        type="button"
+        className="card-tile thumbnail card-tile--interactive"
+        onClick={() => onOpenAnswer(card)}
+        aria-label={`Question: ${front}. Tap to reveal answer.`}
+      >
         <span className="card-tile__watermark" aria-hidden>
           {watermark}
         </span>
         <span className="card-tile__thumb-front">{front}</span>
-        <span className="card-tile__thumb-back">{back}</span>
-      </div>
+      </button>
     );
   }
 
   if (view === "grid") {
     return (
-      <div className="card-tile grid">
+      <button
+        type="button"
+        className="card-tile grid card-tile--interactive"
+        onClick={() => onOpenAnswer(card)}
+        aria-label={`Question: ${front}. Tap to reveal answer.`}
+      >
         <p className="card-tile__label">Question</p>
         <p className="card-tile__front">{front}</p>
-        <p className="card-tile__label">Answer</p>
-        <p className="card-tile__back">{back}</p>
-      </div>
+      </button>
     );
   }
 
   return (
-    <div className="card-tile detail">
+    <button
+      type="button"
+      className="card-tile detail card-tile--interactive"
+      onClick={() => onOpenAnswer(card)}
+      aria-label={`Question: ${front}. Tap to reveal answer.`}
+    >
       <span className="card-tile__index">#{index + 1}</span>
       <div className="card-tile__detail-body">
         <div className="card-tile__detail-main">
           <p className="card-tile__label">Question</p>
           <p className="card-tile__front">{front}</p>
-          <p className="card-tile__label">Answer</p>
-          <p className="card-tile__back">{back}</p>
         </div>
         <div className="card-tile__detail-meta">
           <span className="card-tile__stat-label">Updated</span>
           <span className="card-tile__stat-value">{updated}</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -212,6 +267,7 @@ export function DeckDetail({
   const [view, setView] = useState<OfflineCardViewMode>(() => loadCardViewMode());
   const [sort, setSort] = useState<OfflineCardSort>(() => loadCardSort());
   const [showOptions, setShowOptions] = useState(false);
+  const [answerPreview, setAnswerPreview] = useState<OfflineCardRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,13 +379,19 @@ export function DeckDetail({
             </div>
             {view === "detail" && (
               <div className="card-column-head" aria-hidden>
-                <span>Front / Back</span>
+                <span>Question</span>
                 <span>Updated</span>
               </div>
             )}
             <div className={containerClass}>
               {sorted.map((card, i) => (
-                <CardTile key={card.local_id} card={card} view={view} index={i} />
+                <CardTile
+                  key={card.local_id}
+                  card={card}
+                  view={view}
+                  index={i}
+                  onOpenAnswer={setAnswerPreview}
+                />
               ))}
             </div>
           </>
@@ -344,6 +406,14 @@ export function DeckDetail({
             onClose={() => setShowOptions(false)}
           />
         )}
+
+        {answerPreview ? (
+          <CardAnswerDialog
+            front={cardFrontLabel(answerPreview)}
+            back={cardBackLabel(answerPreview)}
+            onClose={() => setAnswerPreview(null)}
+          />
+        ) : null}
       </div>
     </div>
   );

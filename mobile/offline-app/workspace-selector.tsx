@@ -71,11 +71,6 @@ export function WorkspaceSelector({
     });
   }, [workspaces, q, viewerCtx]);
 
-  const ownedTeams = useMemo(() => {
-    if (!subscriberOwnsTeamTierWorkspace) return [];
-    return filteredWorkspaces.filter((w) => w.isSubscriberOwned ?? w.role === "owner");
-  }, [filteredWorkspaces, subscriberOwnsTeamTierWorkspace]);
-
   const invitedTeams = useMemo(() => {
     if (subscriberOwnsTeamTierWorkspace) {
       return filteredWorkspaces.filter((w) => !(w.isSubscriberOwned ?? w.role === "owner"));
@@ -86,7 +81,7 @@ export function WorkspaceSelector({
   const showInvitedDivider =
     subscriberOwnsTeamTierWorkspace &&
     invitedTeams.length > 0 &&
-    ((personalMatches && subscriberOwnsTeamTierWorkspace) || ownedTeams.length > 0);
+    (personalMatches || ownerWorkspace != null);
 
   useEffect(() => {
     if (!open) return;
@@ -154,7 +149,10 @@ export function WorkspaceSelector({
             <span>{ownerLabel(w)}</span>
           </span>
         </span>
-        {online && w.canAccessTeamAdmin && onToAdminDash ? (
+        {online &&
+        w.canAccessTeamAdmin &&
+        onToAdminDash &&
+        !(w.isSubscriberOwned ?? w.role === "owner") ? (
           <button
             data-team-admin-dash-link
             type="button"
@@ -253,8 +251,6 @@ export function WorkspaceSelector({
                 </button>
               </div>
             )}
-
-            {ownedTeams.map((w) => teamRow(w))}
 
             {showInvitedDivider && (
               <>

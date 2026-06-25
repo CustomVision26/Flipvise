@@ -122,27 +122,20 @@ export async function createDeck(input: {
   maxDecksPerWorkspace?: number;
 }): Promise<string> {
   const teamId = input.teamId ?? null;
+  if (teamId != null) {
+    throw new OfflineLimitError(
+      "Team workspace decks can't be created offline. Use the online dashboard from your personal workspace.",
+    );
+  }
   const memberAssigned = input.memberAssigned ? 1 : 0;
 
-  if (teamId == null) {
-    const max = input.maxPersonalDecks;
-    if (max != null) {
-      const count = await countOwnedDecks(input.userId);
-      if (count >= max) {
-        throw new OfflineLimitError(
-          `Deck limit reached — up to ${max} personal deck(s) on your plan.`,
-        );
-      }
-    }
-  } else if (!input.memberAssigned) {
-    const max = input.maxDecksPerWorkspace;
-    if (max != null) {
-      const count = await countWorkspaceDecks(input.userId, teamId);
-      if (count >= max) {
-        throw new OfflineLimitError(
-          `Workspace deck limit reached — up to ${max} decks in this workspace on your plan.`,
-        );
-      }
+  const max = input.maxPersonalDecks;
+  if (max != null) {
+    const count = await countOwnedDecks(input.userId);
+    if (count >= max) {
+      throw new OfflineLimitError(
+        `Deck limit reached — up to ${max} personal deck(s) on your plan.`,
+      );
     }
   }
 
@@ -168,6 +161,39 @@ export async function createDeck(input: {
   );
   await persistOfflineDb();
   return localId;
+}
+
+/**
+ * Removes team-workspace decks that were created only on-device (never synced).
+ * Team decks must be created on the live dashboard, then downloaded for offline study.
+ */
+export async function purgeLocallyCreatedTeamDecks(userId: string): Promise<number> {
+  const db = await getOfflineDb();
+  const orphans = ((await db.query(
+    `SELECT local_id FROM decks
+     WHERE user_id = ? AND deleted = 0 AND team_id IS NOT NULL AND server_id IS NULL;`,
+    [userId],
+  )).values ?? []) as { local_id: string }[];
+
+  if (orphans.length === 0) return 0;
+
+  const ids = orphans.map((r) => r.local_id);
+  const placeholders = ids.map(() => "?").join(", ");
+
+  await db.run(
+    `DELETE FROM quiz_results WHERE deck_local_id IN (${placeholders});`,
+    ids,
+  );
+  await db.run(
+    `DELETE FROM cards WHERE deck_local_id IN (${placeholders});`,
+    ids,
+  );
+  await db.run(
+    `DELETE FROM decks WHERE local_id IN (${placeholders});`,
+    ids,
+  );
+  await persistOfflineDb();
+  return ids.length;
 }
 
 export async function updateDeck(

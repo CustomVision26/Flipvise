@@ -8,6 +8,7 @@ import {
   createDeck,
   listDecksForScope,
   OfflineLimitError,
+  purgeLocallyCreatedTeamDecks,
 } from "../../src/lib/offline/repository";
 import type {
   OfflineAccessContext,
@@ -55,17 +56,14 @@ function maxCardsForDeck(
   return access.maxCardsPerDeck;
 }
 
-function canEditDeckContent(deck: OfflineDeckRow): boolean {
-  return (deck.member_assigned ?? 0) === 0;
+function resolveCanCreateDeck(scope: SavedWorkspaceScope): boolean {
+  // Team workspace decks are created on the live dashboard (personal dash), not offline.
+  return scope === "personal";
 }
 
-function resolveCanCreateDeck(
-  scope: SavedWorkspaceScope,
-  access: OfflineAccessContext,
-): boolean {
-  if (scope === "personal") return true;
-  const ws = access.workspaces.find((w) => w.teamId === scope);
-  return ws?.canCreateDeck ?? false;
+function canEditDeckContent(deck: OfflineDeckRow): boolean {
+  if (deck.team_id != null) return false;
+  return (deck.member_assigned ?? 0) === 0;
 }
 
 function useOnline(): boolean {
@@ -154,7 +152,10 @@ export function App() {
 
         const scope = loadWorkspaceScope();
         setWorkspaceScope(scope);
-        if (uid) await loadDecks(uid, scope);
+        if (uid) {
+          await purgeLocallyCreatedTeamDecks(uid);
+          await loadDecks(uid, scope);
+        }
       } catch (err) {
         if (!cancelled) setMessage(String(err));
       } finally {
@@ -257,8 +258,8 @@ export function App() {
   );
 
   const canCreateDeck = useMemo(
-    () => resolveCanCreateDeck(workspaceScope, accessContext),
-    [workspaceScope, accessContext],
+    () => resolveCanCreateDeck(workspaceScope),
+    [workspaceScope],
   );
 
   const activeWorkspace: OfflineWorkspaceContext | null = useMemo(() => {

@@ -323,15 +323,10 @@ export function DeckLibrary({
         Your admin hasn&apos;t assigned decks yet, or open the Dashboard while online
         and tap <strong>Make available offline</strong> to download them.
       </>
-    ) : canCreateDeck ? (
-      <>
-        Create a deck with <strong>+ New deck</strong>, or open the Dashboard while
-        online to download workspace decks.
-      </>
     ) : (
       <>
-        Open the Dashboard while online and tap <strong>Make available offline</strong>{" "}
-        to download workspace decks.
+        Create team decks on the online dashboard from your personal workspace, then tap{" "}
+        <strong>Make available offline</strong> to download them here.
       </>
     )
   ) : (

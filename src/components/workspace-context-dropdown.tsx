@@ -126,12 +126,6 @@ export function WorkspaceContextDropdown({
     return null;
   }, [subscriberOwnedTeamTierWorkspaces, activeTeamId, teamDashFallback]);
 
-  /** Team workspaces this session user owns (same subscriber as Personal), filtered — only used when {@link subscriberOwnsTeamTierWorkspace}. */
-  const subscriberOwnTeamsFiltered = React.useMemo(() => {
-    if (!subscriberOwnsTeamTierWorkspace) return [];
-    return filteredTeams.filter((t) => t.isSubscriberOwned);
-  }, [filteredTeams, subscriberOwnsTeamTierWorkspace]);
-
   /** Other subscribers’ workspaces, grouped by `ownerUserId` (dividers between owners). */
   const otherSubscriberWorkspaceGroups = React.useMemo(() => {
     const list =
@@ -157,8 +151,8 @@ export function WorkspaceContextDropdown({
     (g) => g.teams.length > 0,
   );
   const subscriberSectionHasRows =
-    (personalMatches && subscriberOwnsTeamTierWorkspace) ||
-    (subscriberOwnsTeamTierWorkspace && subscriberOwnTeamsFiltered.length > 0);
+    subscriberOwnsTeamTierWorkspace &&
+    (personalMatches || teamDashTarget != null);
 
   async function refreshSessionCookieForAction() {
     try {
@@ -269,7 +263,9 @@ export function WorkspaceContextDropdown({
             <span>{t.ownerDisplayName}</span>
           </span>
         </span>
-        {t.canAccessTeamAdmin && !shouldHidePlatformAdminNav(pathname) ? (
+        {t.canAccessTeamAdmin &&
+        !t.isSubscriberOwned &&
+        !shouldHidePlatformAdminNav(pathname) ? (
           <Button
             data-team-admin-dash-link
             type="button"
@@ -414,9 +410,6 @@ export function WorkspaceContextDropdown({
                   </Button>
                 </div>
               )}
-            {subscriberOwnsTeamTierWorkspace &&
-              subscriberOwnTeamsFiltered.map((t) => teamWorkspaceMenuItem(t))}
-            {/* ── Divider + label before invited workspaces (user doesn't own team-tier) ── */}
             {!subscriberOwnsTeamTierWorkspace &&
               personalMatches &&
               filteredTeams.length > 0 && (
@@ -427,7 +420,6 @@ export function WorkspaceContextDropdown({
                   </div>
                 </>
               )}
-            {/* ── Divider + label before invited workspaces (user owns team-tier too) ── */}
             {subscriberOwnsTeamTierWorkspace &&
               otherSubscriberGroupsNonEmpty &&
               subscriberSectionHasRows && (
