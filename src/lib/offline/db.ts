@@ -17,8 +17,9 @@ import { Capacitor } from "@capacitor/core";
 import {
   OFFLINE_DB_NAME,
   OFFLINE_DB_VERSION,
+  OFFLINE_SCHEMA_DECKS_BASE,
   OFFLINE_SCHEMA_MIGRATIONS,
-  OFFLINE_SCHEMA_STATEMENTS,
+  OFFLINE_SCHEMA_REMAINDER,
 } from "./schema";
 import { isFlipviseNativeApp } from "./is-flipvise-native-app";
 
@@ -49,19 +50,26 @@ export function getLastOfflineDbError(): string | null {
 }
 
 async function initializeSchema(conn: SQLiteDBConnection): Promise<void> {
-  for (const statement of OFFLINE_SCHEMA_STATEMENTS) {
+  for (const statement of OFFLINE_SCHEMA_DECKS_BASE) {
     const sql = statement.trim();
     if (!sql) continue;
     await conn.execute(sql);
   }
+
   for (const statement of OFFLINE_SCHEMA_MIGRATIONS) {
     const sql = statement.trim();
     if (!sql) continue;
     try {
       await conn.execute(sql);
     } catch {
-      // Column already exists on upgraded devices.
+      // Column/index already exists on upgraded devices.
     }
+  }
+
+  for (const statement of OFFLINE_SCHEMA_REMAINDER) {
+    const sql = statement.trim();
+    if (!sql) continue;
+    await conn.execute(sql);
   }
 }
 

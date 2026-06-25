@@ -21,7 +21,7 @@ export const OFFLINE_DB_NAME = "flipvise_offline";
 export const OFFLINE_DB_VERSION = 1;
 
 /** DDL executed on first open / upgrade. Statements are idempotent (IF NOT EXISTS). */
-export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
+export const OFFLINE_SCHEMA_DECKS_BASE: string[] = [
   `CREATE TABLE IF NOT EXISTS decks (
      local_id      TEXT PRIMARY KEY NOT NULL,
      server_id     INTEGER,
@@ -40,8 +40,10 @@ export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS decks_server_id_uidx
      ON decks(server_id) WHERE server_id IS NOT NULL;`,
   `CREATE INDEX IF NOT EXISTS decks_user_idx ON decks(user_id);`,
-  `CREATE INDEX IF NOT EXISTS decks_team_idx ON decks(team_id);`,
+];
 
+/** Remaining tables/indexes — run after {@link OFFLINE_SCHEMA_MIGRATIONS}. */
+export const OFFLINE_SCHEMA_REMAINDER: string[] = [
   `CREATE TABLE IF NOT EXISTS cards (
      local_id           TEXT PRIMARY KEY NOT NULL,
      server_id          INTEGER,
@@ -93,10 +95,17 @@ export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
   `INSERT OR IGNORE INTO sync_state (id, last_pulled_ms, last_synced_ms) VALUES (1, 0, 0);`,
 ];
 
+/** @deprecated Use phased arrays — kept for tests/tools that expect one flat list. */
+export const OFFLINE_SCHEMA_STATEMENTS: string[] = [
+  ...OFFLINE_SCHEMA_DECKS_BASE,
+  ...OFFLINE_SCHEMA_REMAINDER,
+];
+
 /** Idempotent ALTERs for devices opened on schema v1. */
 export const OFFLINE_SCHEMA_MIGRATIONS: string[] = [
   `ALTER TABLE decks ADD COLUMN team_id INTEGER;`,
   `ALTER TABLE decks ADD COLUMN member_assigned INTEGER NOT NULL DEFAULT 0;`,
+  `CREATE INDEX IF NOT EXISTS decks_team_idx ON decks(team_id);`,
 ];
 
 /** Local row shapes (snake_case to match the SQLite columns above). */
