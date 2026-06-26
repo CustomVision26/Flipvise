@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { CheckCircle2 } from "lucide-react";
 import {
@@ -8,11 +8,34 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { FormattedCardAnswer } from "@/components/formatted-card-answer";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { cn } from "@/lib/utils";
 import { isStepAnswer } from "@/lib/parse-step-answer";
 import { CardHoverPreviewProvider } from "./card-hover-preview-context";
+
+/**
+ * True on touch / pen devices that have no hover. On these we open the answer
+ * preview on tap (Popover) instead of on hover (PreviewCard), so the answer is
+ * reachable inside the native mobile app and other touch screens.
+ */
+function useCoarsePointer() {
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia("(hover: none), (pointer: coarse)");
+    const sync = () => setCoarse(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  return coarse;
+}
 
 type CardAnswerHoverProps = {
   children: React.ReactNode;
@@ -33,6 +56,7 @@ export function CardAnswerHover({
 }: CardAnswerHoverProps) {
   const [hoverOpen, setHoverOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const coarsePointer = useCoarsePointer();
   const answerText = answer.trim();
   const hasPreview = Boolean(answerText || backImageUrl);
   if (!hasPreview) return <>{children}</>;
@@ -46,32 +70,30 @@ export function CardAnswerHover({
     setImageOpen(true);
   };
 
-  return (
+  const triggerClassName = cn(
+    "block w-full rounded-xl text-left outline-none",
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    coarsePointer && "cursor-pointer",
+    className,
+  );
+  const contentClassName = cn(
+    "gap-0 overflow-hidden border-2 border-primary bg-card p-0 text-card-foreground shadow-lg shadow-primary/30 ring-0",
+    isStructuredAnswer
+      ? "w-[min(32rem,calc(100vw-1.25rem))]"
+      : "w-[min(26rem,calc(100vw-1.25rem))]",
+  );
+
+  // Render as a div (not the default button/anchor) so cards that embed their own
+  // image button don't produce invalid nested interactive DOM.
+  const triggerInner = (
+    <CardHoverPreviewProvider closeHover={closeHover}>
+      {children}
+    </CardHoverPreviewProvider>
+  );
+
+  const previewBody = (
     <>
-      <HoverCard open={hoverOpen} onOpenChange={setHoverOpen}>
-        <HoverCardTrigger
-          className={cn(
-            "block w-full rounded-xl text-left outline-none",
-            "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            className,
-          )}
-        >
-          <CardHoverPreviewProvider closeHover={closeHover}>
-            {children}
-          </CardHoverPreviewProvider>
-        </HoverCardTrigger>
-        <HoverCardContent
-          side="bottom"
-          align="center"
-          sideOffset={10}
-          className={cn(
-            "overflow-hidden border-2 border-primary bg-card p-0 text-card-foreground shadow-lg shadow-primary/30 ring-0",
-            isStructuredAnswer
-              ? "w-[min(32rem,calc(100vw-1.25rem))]"
-              : "w-[min(26rem,calc(100vw-1.25rem))]",
-          )}
-        >
-          <div className="border-b border-primary/40 bg-primary px-4 py-2.5">
+      <div className="border-b border-primary/40 bg-primary px-4 py-2.5">
             <div className="flex items-center gap-2">
               <div
                 className="h-4 w-1 shrink-0 rounded-full bg-primary-foreground/90"
@@ -111,6 +133,14 @@ export function CardAnswerHover({
                   )}
                   title="Double-click to enlarge"
                   aria-label="Double-click to enlarge answer image"
+                  onClick={(event) => {
+                    // On touch there is no double-click, so a tap enlarges.
+                    if (coarsePointer) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openBackImage();
+                    }
+                  }}
                   onDoubleClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -140,27 +170,71 @@ export function CardAnswerHover({
               )}
             </div>
           </div>
+    </>
+  );
+
+  const overlay = backImageUrl ? (
+    <ImageEnlargeOverlay
+      open={imageOpen}
+      onClose={() => setImageOpen(false)}
+      src={backImageUrl}
+      alt={imageAlt}
+      title={isMC ? "Correct answer" : "Answer"}
+      footer={
+        answerText ? (
+          <FormattedCardAnswer
+            text={answerText}
+            variant="hover"
+            className="text-center"
+          />
+        ) : undefined
+      }
+    />
+  ) : null;
+
+  // Touch / pen (no hover): tap to open, tap-outside / Esc to dismiss. The trigger
+  // renders as a div, so Base UI's Popover.Trigger needs nativeButton={false}.
+  if (coarsePointer) {
+    return (
+      <>
+        <Popover open={hoverOpen} onOpenChange={setHoverOpen}>
+          <PopoverTrigger
+            nativeButton={false}
+            render={<div tabIndex={0} />}
+            className={triggerClassName}
+          >
+            {triggerInner}
+          </PopoverTrigger>
+          <PopoverContent
+            side="bottom"
+            align="center"
+            sideOffset={10}
+            className={contentClassName}
+          >
+            {previewBody}
+          </PopoverContent>
+        </Popover>
+        {overlay}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <HoverCard open={hoverOpen} onOpenChange={setHoverOpen}>
+        <HoverCardTrigger render={<div tabIndex={0} />} className={triggerClassName}>
+          {triggerInner}
+        </HoverCardTrigger>
+        <HoverCardContent
+          side="bottom"
+          align="center"
+          sideOffset={10}
+          className={contentClassName}
+        >
+          {previewBody}
         </HoverCardContent>
       </HoverCard>
-
-      {backImageUrl ? (
-        <ImageEnlargeOverlay
-          open={imageOpen}
-          onClose={() => setImageOpen(false)}
-          src={backImageUrl}
-          alt={imageAlt}
-          title={isMC ? "Correct answer" : "Answer"}
-          footer={
-            answerText ? (
-              <FormattedCardAnswer
-                text={answerText}
-                variant="hover"
-                className="text-center"
-              />
-            ) : undefined
-          }
-        />
-      ) : null}
+      {overlay}
     </>
   );
 }

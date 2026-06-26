@@ -53,6 +53,10 @@ const config: CapacitorConfig = {
     // Detectable on the live site when Capacitor bridge is not injected after navigation.
     appendUserAgent: "FlipviseNative/1",
   },
+  ios: {
+    // Same marker as Android so native-only UI survives in-app navigation on iOS.
+    appendUserAgent: "FlipviseNative/1",
+  },
   server: {
     androidScheme: "https",
     hostname: "localhost",

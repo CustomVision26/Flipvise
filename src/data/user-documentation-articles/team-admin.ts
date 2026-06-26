@@ -108,7 +108,8 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         bullets: [
           "Pulls decks from subscriber’s personal library.",
           "Link adds a deck to the workspace for assignment.",
-          "Co-admins do not see personal library — only owner links decks.",
+          "Already-linked decks show an Unlink from workspace button — unlinking removes the deck from the workspace and drops every member’s access to it (the deck stays on Personal Dashboard and can be re-linked).",
+          "Co-admins do not see personal library — only owner links or unlinks decks.",
         ],
       },
       {

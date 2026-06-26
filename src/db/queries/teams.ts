@@ -1896,6 +1896,63 @@ export async function attachPersonalDeckToOwnedTeamWorkspace(params: {
   }
 }
 
+/**
+ * Unlink a subscriber-owned personal deck from one of their workspaces. Removes the
+ * `deck_workspace_links` row, clears `decks.teamId` if the deck was FK-scoped to this
+ * workspace, and deletes EVERY member assignment for this deck in this workspace — so
+ * all members of that workspace lose access to the deck.
+ */
+export async function detachPersonalDeckFromOwnedTeamWorkspace(params: {
+  deckId: number;
+  teamId: number;
+  subscriberUserId: string;
+}): Promise<void> {
+  const team = await getTeamById(params.teamId);
+  if (!team) throw new Error("Team not found.");
+  if (team.ownerUserId !== params.subscriberUserId) {
+    throw new Error("Only the subscriber can unlink personal decks.");
+  }
+
+  const deck = await getDeckRowById(params.deckId);
+  if (!deck) throw new Error("Deck not found.");
+  if (deck.userId !== team.ownerUserId) {
+    throw new Error("Deck does not belong to this subscriber.");
+  }
+
+  // Members lose access first — remove all assignments for this deck in this workspace.
+  await db
+    .delete(teamDeckAssignments)
+    .where(
+      and(
+        eq(teamDeckAssignments.teamId, params.teamId),
+        eq(teamDeckAssignments.deckId, params.deckId),
+      ),
+    );
+
+  // Drop the multi-workspace link row (no-op if the table predates the migration).
+  try {
+    await db
+      .delete(deckWorkspaceLinks)
+      .where(
+        and(
+          eq(deckWorkspaceLinks.teamId, params.teamId),
+          eq(deckWorkspaceLinks.deckId, params.deckId),
+        ),
+      );
+  } catch (e) {
+    if (!isMissingDeckWorkspaceLinksTableError(e)) throw e;
+    warnMissingDeckWorkspaceLinksTableOnce();
+  }
+
+  // Clear the FK scope when the deck was directly scoped to this workspace.
+  if (deck.teamId === params.teamId) {
+    await db
+      .update(decks)
+      .set({ teamId: null, updatedAt: new Date() })
+      .where(and(eq(decks.id, deck.id), eq(decks.userId, deck.userId)));
+  }
+}
+
 let warnedMissingTeamQuizDurationColumn = false;
 function warnMissingTeamQuizDurationColumnOnce() {
   if (warnedMissingTeamQuizDurationColumn) return;

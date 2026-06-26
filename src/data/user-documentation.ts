@@ -61,7 +61,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Deck opens the deck creation dialog (title, optional AI generation on eligible plans).",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
-          "In the Flipvise mobile app, a “Make available offline” button downloads your decks for offline study (it does not appear on the web).",
+          "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
         ],
         requirements: [
           "Signed-in account.",

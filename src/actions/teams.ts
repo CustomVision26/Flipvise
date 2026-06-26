@@ -45,6 +45,7 @@ import {
   getTeamsByOwner,
   deleteDeckAssignment,
   attachPersonalDeckToOwnedTeamWorkspace,
+  detachPersonalDeckFromOwnedTeamWorkspace,
   markInvitationAccepted,
   markInvitationRejected,
   revokePendingTeamInvitation,
@@ -732,6 +733,33 @@ export async function linkPersonalDeckToTeamWorkspaceAction(
   }
 
   await attachPersonalDeckToOwnedTeamWorkspace({
+    teamId: parsed.data.teamId,
+    deckId: parsed.data.deckId,
+    subscriberUserId: userId,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/decks/${parsed.data.deckId}`);
+  revalidatePath("/dashboard/team-admin", "layout");
+}
+
+export async function unlinkPersonalDeckFromTeamWorkspaceAction(
+  data: z.infer<typeof linkPersonalDeckToWorkspaceSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = linkPersonalDeckToWorkspaceSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await getTeamById(parsed.data.teamId);
+  if (!team || team.ownerUserId !== userId) {
+    throw new Error("Only the workspace subscriber can unlink personal decks.");
+  }
+
+  await assertCanManageTeam(userId, parsed.data.teamId);
+
+  await detachPersonalDeckFromOwnedTeamWorkspace({
     teamId: parsed.data.teamId,
     deckId: parsed.data.deckId,
     subscriberUserId: userId,

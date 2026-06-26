@@ -43,7 +43,6 @@ import { DeleteCardDialog } from "./delete-card-dialog";
 import {
   ItemWatermark,
   itemCardContainerClass,
-  itemPrimaryTextClass,
 } from "@/components/item-watermark";
 
 type CardData = {
@@ -65,6 +64,11 @@ type SortOption = "newest" | "oldest" | "front-asc" | "front-desc" | "ai-first";
 
 const PAGE_SIZE_OPTIONS = [6, 9, 12, 24, 48] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+
+// Elevated, near-opaque surface so card rows lift off the deck's gradient page
+// background and stay clearly legible — matching the dashboard deck rows.
+const cardSurfaceClass =
+  "border border-border/80 bg-card/95 ring-1 ring-foreground/20 shadow-lg shadow-black/30 backdrop-blur-md hover:bg-card";
 
 const SORT_OPTIONS: DropdownSortOption<SortOption>[] = [
   { value: "newest", label: "Newest first" },
@@ -254,7 +258,10 @@ export function CardGrid({
             day: "numeric",
           });
 
-          const cardTextClass = itemPrimaryTextClass();
+          // Card text sits on the solid card surface (not the deck gradient),
+          // so keep it above the "CARD" watermark but skip the gradient-oriented
+          // dark drop-shadow that otherwise muddies the text on a dark card.
+          const cardTextClass = "relative z-[2]";
 
           if (view === "list") {
             return (
@@ -262,7 +269,8 @@ export function CardGrid({
                 key={card.id}
                 className={cn(
                   itemCardContainerClass,
-                  "flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-2 px-3",
+                  cardSurfaceClass,
+                  "flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-2 px-3",
                 )}
                 style={{ animationDelay: `${i * 20}ms` }}
               >
@@ -291,7 +299,7 @@ export function CardGrid({
                     </div>
                     <p
                       className={cn(
-                        "min-w-0 flex-1 text-sm font-medium text-foreground line-clamp-1",
+                        "min-w-0 flex-1 text-sm font-medium text-card-foreground line-clamp-1",
                         cardTextClass,
                       )}
                     >
@@ -320,7 +328,8 @@ export function CardGrid({
                 key={card.id}
                 className={cn(
                   itemCardContainerClass,
-                  "flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-sm",
+                  cardSurfaceClass,
+                  "flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-xl",
                 )}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
@@ -367,7 +376,7 @@ export function CardGrid({
                         cardTextClass,
                         card.frontImageUrl ? "line-clamp-2" : "line-clamp-5",
                         card.front
-                          ? "text-foreground"
+                          ? "text-card-foreground"
                           : "text-transparent select-none",
                       )}
                       title={card.front ?? undefined}
@@ -395,7 +404,8 @@ export function CardGrid({
               key={card.id}
               className={cn(
                 itemCardContainerClass,
-                "flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-md transition-[box-shadow] py-3 px-4 md:flex-row md:items-start md:gap-4",
+                cardSurfaceClass,
+                "flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-4 px-5 md:min-h-[4rem] md:flex-row md:items-center md:gap-6",
               )}
               style={{ animationDelay: `${i * 30}ms` }}
             >
@@ -423,7 +433,7 @@ export function CardGrid({
                   ) : null}
                   <p
                     className={cn(
-                      "text-sm font-medium text-foreground break-words whitespace-pre-wrap min-w-0",
+                      "text-[0.9375rem] leading-relaxed font-semibold text-card-foreground break-words whitespace-pre-wrap min-w-0",
                       cardTextClass,
                     )}
                   >
@@ -435,7 +445,7 @@ export function CardGrid({
                 <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground md:hidden">
                   {isMC ? "Answer" : "Back"}
                 </span>
-                <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                <div className="flex items-start gap-1.5 text-[0.9375rem] leading-relaxed text-card-foreground/90">
                   {isMC && (
                     <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
                   )}

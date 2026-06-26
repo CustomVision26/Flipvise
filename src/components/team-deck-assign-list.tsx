@@ -30,6 +30,7 @@ import {
   assignDeckToMemberAction,
   unassignDeckFromMemberAction,
   linkPersonalDeckToTeamWorkspaceAction,
+  unlinkPersonalDeckFromTeamWorkspaceAction,
 } from "@/actions/teams";
 import { Separator } from "@/components/ui/separator";
 import type { DeckRow, TeamMemberRow } from "@/db/schema";
@@ -219,6 +220,8 @@ export function TeamDeckAssignList({
   const [linkDeckId, setLinkDeckId] = React.useState(LINK_NO_DECK);
   const [linkError, setLinkError] = React.useState<string | null>(null);
   const [linkBusy, setLinkBusy] = React.useState(false);
+  const [unlinkBusy, setUnlinkBusy] = React.useState(false);
+  const [unlinkDialogOpen, setUnlinkDialogOpen] = React.useState(false);
   const [expandedAssignmentKey, setExpandedAssignmentKey] = React.useState<string | null>(null);
   const [removeAccessDialogOpen, setRemoveAccessDialogOpen] = React.useState(false);
   const [removeAccessRow, setRemoveAccessRow] = React.useState<AssignmentTableDisplayRow | null>(
@@ -238,6 +241,13 @@ export function TeamDeckAssignList({
   const normalMembers = workspace?.normalMembers ?? [];
   const decks = workspace?.decks ?? [];
   const assignments = workspace?.assignments ?? [];
+  // Reactive "already linked" status for the personal-deck link dropdown — must
+  // mirror the decks actually scoped to the SELECTED workspace, otherwise the
+  // badge can disagree with the "No workspace-linked decks yet" message below.
+  const workspaceLinkedDeckIds = React.useMemo(
+    () => new Set(decks.map((d) => d.id)),
+    [decks],
+  );
   const viewerOwnsSelectedWorkspace = Boolean(
     workspace && clerkUserId && workspace.ownerUserId === clerkUserId,
   );
@@ -363,6 +373,15 @@ export function TeamDeckAssignList({
     linkDeckId !== LINK_NO_DECK &&
     !Number.isNaN(linkDeckNum) &&
     linkDeckEntry != null;
+  const selectedLinkDeckAlreadyLinked =
+    linkDeckId !== LINK_NO_DECK &&
+    !Number.isNaN(linkDeckNum) &&
+    workspaceLinkedDeckIds.has(linkDeckNum);
+  // Only the workspace subscriber (owner) may unlink — matches the server action.
+  const canUnlinkPersonal =
+    Boolean(canLinkPersonal) &&
+    selectedLinkDeckAlreadyLinked &&
+    viewerOwnsSelectedWorkspace;
 
   async function onLinkPersonalDeck() {
     if (!canLinkPersonal) return;
@@ -379,6 +398,25 @@ export function TeamDeckAssignList({
       setLinkError(e instanceof Error ? e.message : "Link failed.");
     } finally {
       setLinkBusy(false);
+    }
+  }
+
+  async function onUnlinkPersonalDeck() {
+    if (!canUnlinkPersonal) return;
+    setLinkError(null);
+    setUnlinkBusy(true);
+    try {
+      await unlinkPersonalDeckFromTeamWorkspaceAction({
+        teamId: teamIdNum,
+        deckId: linkDeckNum,
+      });
+      setUnlinkDialogOpen(false);
+      setLinkDeckId(LINK_NO_DECK);
+      router.refresh();
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : "Unlink failed.");
+    } finally {
+      setUnlinkBusy(false);
     }
   }
 
@@ -630,28 +668,49 @@ export function TeamDeckAssignList({
               <SelectItem value={LINK_NO_DECK} className="text-muted-foreground">
                 {PLACEHOLDER_LINK_DECK}
               </SelectItem>
-              {subscriberPersonalUnlinkedDecks.map((d) => (
-                <SelectItem key={d.id} value={String(d.id)}>
-                  <span className="truncate">
-                    {d.name}
-                    {d.alreadyLinked ? (
-                      <span className="text-muted-foreground font-normal">
-                        {" "}
-                        (already linked)
-                      </span>
-                    ) : null}
-                  </span>
-                </SelectItem>
-              ))}
+              {subscriberPersonalUnlinkedDecks.map((d) => {
+                const alreadyLinked = workspaceLinkedDeckIds.has(d.id);
+                return (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    <span className="truncate">
+                      {d.name}
+                      {alreadyLinked ? (
+                        <span className="text-muted-foreground font-normal">
+                          {" "}
+                          (already linked)
+                        </span>
+                      ) : null}
+                    </span>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
-          <Button
-            type="button"
-            disabled={!canLinkPersonal || linkBusy}
-            onClick={() => void onLinkPersonalDeck()}
-          >
-            {linkBusy ? "Linking…" : "Link deck to workspace"}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              disabled={!canLinkPersonal || linkBusy || unlinkBusy}
+              onClick={() => void onLinkPersonalDeck()}
+            >
+              {linkBusy ? "Linking…" : "Link deck to workspace"}
+            </Button>
+            {selectedLinkDeckAlreadyLinked ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                disabled={!canUnlinkPersonal || linkBusy || unlinkBusy}
+                onClick={() => setUnlinkDialogOpen(true)}
+              >
+                {unlinkBusy ? "Unlinking…" : "Unlink from workspace"}
+              </Button>
+            ) : null}
+          </div>
+          {selectedLinkDeckAlreadyLinked && !viewerOwnsSelectedWorkspace ? (
+            <p className="text-xs text-muted-foreground">
+              Only the workspace subscriber (owner) can unlink a deck from this workspace.
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -923,6 +982,49 @@ export function TeamDeckAssignList({
         />
       </div>
     </div>
+
+    <AlertDialog
+      open={unlinkDialogOpen}
+      onOpenChange={(open) => {
+        if (!unlinkBusy) setUnlinkDialogOpen(open);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unlink deck from workspace?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {linkDeckEntry ? (
+              <>
+                This unlinks{" "}
+                <span className="font-medium text-foreground">{linkDeckEntry.name}</span>{" "}
+                from{" "}
+                <span className="font-medium text-foreground">
+                  {workspace?.name ?? "this workspace"}
+                </span>
+                . <span className="font-medium text-foreground">Every member</span> of this
+                workspace will lose access to the deck. The deck stays on your Personal
+                Dashboard — you can re-link it later.
+              </>
+            ) : (
+              "Unlink this deck from the workspace? All members will lose access."
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={unlinkBusy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={unlinkBusy || !canUnlinkPersonal}
+            onClick={(e) => {
+              e.preventDefault();
+              void onUnlinkPersonalDeck();
+            }}
+          >
+            {unlinkBusy ? "Unlinking…" : "Unlink deck"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <AlertDialog
       open={removeAccessDialogOpen}

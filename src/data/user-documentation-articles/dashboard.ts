@@ -58,9 +58,9 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "offline",
         title: "Offline (mobile app)",
         bullets: [
-          "Inside the installed Flipvise mobile app, a “Make available offline” button appears next to Add Deck.",
-          "Tapping it downloads your decks and cards to the device so you can study them with no connection.",
-          "This control is hidden on the website — it only appears in the native app.",
+          "Inside the installed Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck.",
+          "“Make available offline” downloads your decks and cards to the device; “Offline study” opens the on-device study shell.",
+          "Both controls appear only in the native iOS/Android app — they are hidden in a web browser and in the installed website (PWA), where they don't work.",
           "See the Offline & Mobile App guide for the full offline study and sync flow.",
         ],
       },

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-26T14:17:35.505Z",
+  "updatedAt": "2026-06-26T16:54:42.340Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "00c084a6f2569d89bce7ff204e0368efde39d2586b5c325a9f81dac8d14f50c1",
@@ -11,8 +11,8 @@
       "docFingerprint": "7b48bf51a054f4825e8c3fad95bc5565e7697068fefffd1175ad1deae6bff43b"
     },
     "personal-dashboard": {
-      "watchFingerprint": "14484f08e7157b681e490b1f379aae2c612ff92c873b09e669d5fb4f54789a67",
-      "docFingerprint": "ce9540b3d7c96f1ac2eaf17877df814c38a9a123c5b6cdc4cc87a75672bcda87"
+      "watchFingerprint": "e6e984a55c9310a2b6d00e6c356b1e2976d92761923a82341095eeece6168fa2",
+      "docFingerprint": "6b3ee98749d2c2e26ffabf208e901338934958ad7118530fba4561cb69f70e06"
     },
     "team-workspace-dashboard": {
       "watchFingerprint": "1bafe030d7e1ccd4ea0fbbd249cc689dca84d980b2392ed1fda4b725beeef5b7",
@@ -23,7 +23,7 @@
       "docFingerprint": "5762adf04cfa75fd56b92d59e627ffa30740319851141c9250a5dbc7d8011445"
     },
     "deck-editor": {
-      "watchFingerprint": "26f18c58eb178ede40ec73fe944e51a4bb72eedf5316de492338931dd1ab555b",
+      "watchFingerprint": "5c31553a7956e94d54881712714160b9e34856b33dc02cca45c65eaba7093c59",
       "docFingerprint": "0c94c4b9a32fd85386a00d1f75f50e275e223406e337e7d61354f3c27b2fe1c6"
     },
     "study-session": {
@@ -35,8 +35,8 @@
       "docFingerprint": "3ea0c3de962ce007b376358c0449dd99744c08f3bb56fc992c7f347688552868"
     },
     "offline-mobile": {
-      "watchFingerprint": "2097d820d6fe13e3fcd4d1c16e730444146a3377e060753e471efe6c46d45e37",
-      "docFingerprint": "0dd75315b27af7019741d9e03b0f05e7b2ededf188d87aa62eec02e1cef5fd65"
+      "watchFingerprint": "29134fe959aed904b013c7b342817e3b3e3e24666e69ee275060a5bbe8cf057b",
+      "docFingerprint": "85bf34a805fa246d14de96946821f6f95541fe449d281f4089f2eaf65b97e6be"
     },
     "inbox": {
       "watchFingerprint": "1ffb8e15c3baca0433b2f2b5141d327444f7d464832f377d52fc395973041402",
@@ -147,12 +147,12 @@
       "docFingerprint": "4be38030c421f6db10763ec43ba29f08ce809b353c3716a7346fb38c52484626"
     },
     "members": {
-      "watchFingerprint": "01afe267c0c9805a3bbf3db37814d9b187c550a8e5d4e52655d4b44d66edefd4",
+      "watchFingerprint": "4a10d94f37e3abfdb6ace359b3a43646c6eefc971d98fa319d938933667d7bb0",
       "docFingerprint": "6225928d5e9c3a4d755ad218ea2f75f72438b768b69524da15e8bcdf036ccac1"
     },
     "deck-manager": {
-      "watchFingerprint": "f327e2c6817bfae878cd97d68e01696939d825fd60c5a0d29798eec6b7f82585",
-      "docFingerprint": "5e359ad32beeef06527726d891004779bce4f774dee414b64f0cb7b4bc1cfcbd"
+      "watchFingerprint": "fdc8f6c358a79cb7e00f1b357fb97b77200ec37e1c47eb4d5904f5167df2019e",
+      "docFingerprint": "931797772808096274a0dbce607bcd16d788b6ad86e9ec45d95db414be3e5686"
     },
     "invite-members": {
       "watchFingerprint": "9a20466556919b3ef919b9bb70a6d26e977efd6799efacae62ce0cfafe3eeecf",

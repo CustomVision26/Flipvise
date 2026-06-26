@@ -34,12 +34,14 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
           "Sign in and open your dashboard inside the mobile app.",
           "Tap “Make available offline” (next to Add Deck) to copy your decks and cards onto the device.",
           "Run it again any time to refresh the offline copy with your latest changes.",
+          "The “Offline study” and “Make available offline” buttons only show in the native iOS/Android app — they are hidden in a web browser and in the installed website (PWA), where they can't work.",
         ],
       },
       {
         id: "studying-offline",
         title: "Studying without a connection",
         bullets: [
+          "The “Online Dashboard” button opens the full website in your device browser (not inside the offline shell) and signs you in automatically, so the live dashboard loads ready to use.",
           "When the device is offline, Flipvise opens an on-device Study view.",
           "Choose a downloaded deck and flip through its cards (question ↔ answer).",
           "Your place, edits, and quiz results are stored locally on the device.",

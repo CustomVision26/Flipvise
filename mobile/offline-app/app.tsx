@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Browser } from "@capacitor/browser";
 import {
   isOfflineDbAvailable,
   getLastOfflineDbError,
@@ -284,23 +285,51 @@ export function App() {
   const showTeamAdminDash = ownerWorkspace != null;
 
   const openLivePath = useCallback(async (path: string) => {
-    const storedBase = await getStoredApiBaseUrl().catch(() => null);
-    const base = storedBase ?? LIVE_URL;
-    const target = `${base}${path}${path.includes("?") ? "&" : "?"}flipvise_native=1`;
-    try {
-      sessionStorage.setItem("flipvise.native", "1");
-      sessionStorage.setItem("flipvise.lastNavigationUrl", target);
-    } catch {
-      // ignore
-    }
-    void setNativeAppFlag().catch(() => {});
-
     if (!navigator.onLine) {
       window.location.href = "./error.html?offline=1";
       return;
     }
 
-    window.location.replace(target);
+    const storedBase = await getStoredApiBaseUrl().catch(() => null);
+    const base = storedBase ?? LIVE_URL;
+
+    // Carry the existing device session into the browser tab so the dashboard
+    // lands already signed-in: mint a short-lived Clerk sign-in ticket from the
+    // stored sync token, then route the browser through /native-signin, which
+    // exchanges the ticket for a real session before redirecting to `path`.
+    let url = `${base}${path}`;
+    try {
+      const syncToken = await getStoredSyncToken().catch(() => null);
+      if (syncToken) {
+        const res = await fetch(`${base}/api/native/clerk-handoff`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${syncToken}` },
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { ticket?: string };
+          if (data.ticket) {
+            url =
+              `${base}/native-signin?ticket=${encodeURIComponent(data.ticket)}` +
+              `&redirect=${encodeURIComponent(path)}`;
+          }
+        }
+      }
+    } catch {
+      // Fall back to the plain URL (user signs in manually in the browser).
+    }
+
+    // Open the live site in the system browser (Chrome Custom Tab) instead of
+    // navigating this lightweight offline WebView into the full Next.js + Clerk
+    // app. Loading the live site inside the offline shell's WebView crashed the
+    // renderer (OOM / SIGTRAP), taking the whole native app down. A real browser
+    // tab has its own process and memory and handles Clerk auth reliably. The
+    // offline shell keeps running underneath and is restored when the tab closes.
+    try {
+      await Browser.open({ url });
+    } catch {
+      // Last-resort fallback if the Browser plugin is unavailable.
+      window.location.href = url;
+    }
   }, []);
 
   const openTeamAdminDash = useCallback(() => {
