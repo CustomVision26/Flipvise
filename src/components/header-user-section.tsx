@@ -23,6 +23,10 @@ import {
 import { cn } from "@/lib/utils";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { clerkAuthHandoffDelayMs } from "@/lib/clerk-auth-handoff";
+import {
+  FLIPVISE_OFFLINE_SHELL_URL,
+  isFlipviseNativeApp,
+} from "@/lib/offline/is-flipvise-native-app";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
 
@@ -97,7 +101,11 @@ export function HeaderUserSection({
 
   useEffect(() => {
     if (!isSigningOut) return;
-    window.location.replace("/");
+    // Native app: land back in the bundled offline shell (works without a
+    // connection) instead of the live homepage's sign-in screen.
+    window.location.replace(
+      isFlipviseNativeApp() ? FLIPVISE_OFFLINE_SHELL_URL : "/",
+    );
   }, [isSigningOut]);
   const meta = user?.publicMetadata as
     | { adminGranted?: boolean; role?: string }

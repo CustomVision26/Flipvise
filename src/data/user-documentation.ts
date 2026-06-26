@@ -206,6 +206,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Edits and quiz results made offline are saved on the device and upload automatically the next time you sync.",
           "Tap “Sync” (or reopen Flipvise online) to upload offline changes and download updates from your other devices.",
           "An amber banner appears across the app whenever you are offline so you know online-only features are paused.",
+          "While offline, the sign-in screen is replaced by a notice plus an “Offline study” button — because sign-in needs a connection, this takes you straight to your downloaded decks.",
+          "Signing out inside the mobile app returns you to offline study (your downloaded decks) rather than the online sign-in page.",
         ],
         requirements: [
           "Signed-in account; download your decks at least once while online.",
