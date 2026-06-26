@@ -25,6 +25,28 @@ function safeRedirect(raw: string | null): string {
   return raw;
 }
 
+/** Pull a human-readable message out of a Clerk error object or thrown error. */
+function describeClerkError(err: unknown): string {
+  if (!err) return "";
+  if (typeof err === "string") return err;
+  const e = err as {
+    message?: string;
+    longMessage?: string;
+    code?: string;
+    errors?: Array<{ longMessage?: string; message?: string; code?: string }>;
+  };
+  const first = e.errors?.[0];
+  return (
+    first?.longMessage ||
+    first?.message ||
+    (first?.code ? `(${first.code})` : "") ||
+    e.longMessage ||
+    e.message ||
+    (e.code ? `(${e.code})` : "") ||
+    ""
+  );
+}
+
 /**
  * In-app sign-in for the native (Capacitor) WebView. Avoids Clerk's heavy modal
  * (which crashed the WebView renderer) by signing in programmatically:
@@ -123,14 +145,16 @@ function SignInForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
 
-  const fail = (msg: string) => setError(msg);
+  const fail = (label: string, raw: unknown) => {
+    const detail = describeClerkError(raw);
+    console.error(`[native-signin] ${label}:`, raw);
+    setError(detail ? `${label}: ${detail}` : label);
+  };
 
   async function complete(): Promise<boolean> {
     const { error: finalizeErr } = await signIn.finalize();
     if (finalizeErr) {
-      fail(
-        "Extra verification is required for this account. Please finish signing in on the website.",
-      );
+      fail("Couldn't finish sign-in", finalizeErr);
       return false;
     }
     window.location.replace(redirectTo);
@@ -148,12 +172,12 @@ function SignInForm({
         password,
       });
       if (pwErr) {
-        fail("That email or password is incorrect.");
+        fail("Sign-in failed", pwErr);
         return;
       }
       await complete();
-    } catch {
-      fail("Couldn't sign you in. Please try again.");
+    } catch (err) {
+      fail("Sign-in error", err);
     } finally {
       setBusy(false);
     }
@@ -169,17 +193,17 @@ function SignInForm({
         identifier: email.trim(),
       });
       if (createErr) {
-        fail("We couldn't find an account for that email.");
+        fail("Couldn't start sign-in", createErr);
         return;
       }
       const { error: sendErr } = await signIn.emailCode.sendCode();
       if (sendErr) {
-        fail("Couldn't send a code to that email. Try a password instead.");
+        fail("Couldn't send code", sendErr);
         return;
       }
       setStep("code");
-    } catch {
-      fail("Couldn't send a code. Please try again.");
+    } catch (err) {
+      fail("Couldn't send code", err);
     } finally {
       setBusy(false);
     }
@@ -195,12 +219,12 @@ function SignInForm({
         code: code.trim(),
       });
       if (verifyErr) {
-        fail("That code is incorrect or expired.");
+        fail("Code verification failed", verifyErr);
         return;
       }
       await complete();
-    } catch {
-      fail("Couldn't verify that code. Please try again.");
+    } catch (err) {
+      fail("Verification error", err);
     } finally {
       setBusy(false);
     }
