@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { deleteCard, listCards, updateCard } from "../../src/lib/offline/repository";
 import type { OfflineCardRow, OfflineDeckRow } from "../../src/lib/offline/schema";
 import {
@@ -18,6 +25,7 @@ import {
   type DeckWorkspaceContextInput,
 } from "./deck-workspace-context";
 import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
+import { ConfirmDialog } from "./confirm-dialog";
 import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
 import { Pagination } from "./pagination";
@@ -183,6 +191,50 @@ function CardAnswerDialog({
   );
 }
 
+function CardHoverPopover({
+  card,
+  anchor,
+  online,
+}: {
+  card: OfflineCardRow;
+  anchor: DOMRect;
+  online: boolean;
+}) {
+  const back = cardBackLabel(card);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const width = Math.min(320, vw - 24);
+  const left = Math.min(
+    Math.max(anchor.left + anchor.width / 2 - width / 2, 12),
+    Math.max(vw - width - 12, 12),
+  );
+  // Prefer above the card; flip below when there isn't room above.
+  const estimated = 240;
+  const placeAbove = anchor.top > estimated || anchor.top > vh - anchor.bottom;
+  const style: CSSProperties = placeAbove
+    ? { left, width, bottom: Math.max(vh - anchor.top + 8, 12) }
+    : { left, width, top: anchor.bottom + 8 };
+
+  return (
+    <div
+      className={`card-hover-pop${placeAbove ? " card-hover-pop--above" : ""}`}
+      style={style}
+      role="presentation"
+    >
+      <p className="card-hover-pop__label">Answer</p>
+      {card.back_image_url ? (
+        <OfflineImage
+          src={card.back_image_url}
+          alt=""
+          className="card-hover-pop__image"
+          online={online}
+        />
+      ) : null}
+      <p className="card-hover-pop__answer">{back}</p>
+    </div>
+  );
+}
+
 function CardTile({
   card,
   view,
@@ -192,6 +244,8 @@ function CardTile({
   onOpenAnswer,
   onEdit,
   onDelete,
+  onHoverStart,
+  onHoverEnd,
 }: {
   card: OfflineCardRow;
   view: OfflineCardViewMode;
@@ -201,9 +255,18 @@ function CardTile({
   onOpenAnswer: (card: OfflineCardRow) => void;
   onEdit: (card: OfflineCardRow) => void;
   onDelete: (card: OfflineCardRow) => void;
+  onHoverStart?: (card: OfflineCardRow, el: HTMLElement) => void;
+  onHoverEnd?: () => void;
 }) {
   const front = cardFrontLabel(card);
   const updated = formatUpdated(card.updated_at_ms);
+  const hoverProps = onHoverStart
+    ? {
+        onMouseEnter: (e: ReactMouseEvent<HTMLDivElement>) =>
+          onHoverStart(card, e.currentTarget),
+        onMouseLeave: () => onHoverEnd?.(),
+      }
+    : {};
   const frontImage = card.front_image_url ? (
     <OfflineImage
       src={card.front_image_url}
@@ -221,7 +284,10 @@ function CardTile({
 
   if (view === "list") {
     return (
-      <div className="card-tile-shell card-tile list card-tile--interactive">
+      <div
+        className="card-tile-shell card-tile list card-tile--interactive"
+        {...hoverProps}
+      >
         <LibraryTileWatermark label="Card" />
         <button
           type="button"
@@ -239,7 +305,10 @@ function CardTile({
 
   if (view === "thumbnail") {
     return (
-      <div className="card-tile-shell card-tile thumbnail card-tile--interactive">
+      <div
+        className="card-tile-shell card-tile thumbnail card-tile--interactive"
+        {...hoverProps}
+      >
         <LibraryTileWatermark label="Card" />
         <button
           type="button"
@@ -257,7 +326,10 @@ function CardTile({
 
   if (view === "grid") {
     return (
-      <div className="card-tile-shell card-tile grid card-tile--interactive">
+      <div
+        className="card-tile-shell card-tile grid card-tile--interactive"
+        {...hoverProps}
+      >
         <LibraryTileWatermark label="Card" />
         <button
           type="button"
@@ -275,7 +347,10 @@ function CardTile({
   }
 
   return (
-    <div className="card-tile-shell card-tile detail card-tile--interactive">
+    <div
+      className="card-tile-shell card-tile detail card-tile--interactive"
+      {...hoverProps}
+    >
       <LibraryTileWatermark label="Card" />
       <button
         type="button"
@@ -417,8 +492,27 @@ export function DeckDetail({
   const [showOptions, setShowOptions] = useState(false);
   const [answerPreview, setAnswerPreview] = useState<OfflineCardRow | null>(null);
   const [editingCard, setEditingCard] = useState<OfflineCardRow | null>(null);
+  const [deletingCard, setDeletingCard] = useState<OfflineCardRow | null>(null);
   const [cardsVersion, setCardsVersion] = useState(0);
   const [page, setPage] = useState(1);
+  // Hover-to-reveal answer preview — only on devices with a real pointer (mouse).
+  // Touch devices keep the tap-to-open answer dialog.
+  const [finePointer] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+  );
+  const [hoveredCard, setHoveredCard] = useState<{
+    card: OfflineCardRow;
+    rect: DOMRect;
+  } | null>(null);
+
+  const handleHoverStart = finePointer
+    ? (card: OfflineCardRow, el: HTMLElement) =>
+        setHoveredCard({ card, rect: el.getBoundingClientRect() })
+    : undefined;
+  const handleHoverEnd = finePointer ? () => setHoveredCard(null) : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -440,10 +534,6 @@ export function DeckDetail({
   }
 
   async function handleDeleteCard(card: OfflineCardRow) {
-    const front = cardFrontLabel(card);
-    if (!window.confirm(`Delete card "${front}" from this device?`)) {
-      return;
-    }
     await deleteCard(card.local_id);
     if (answerPreview?.local_id === card.local_id) {
       setAnswerPreview(null);
@@ -582,7 +672,9 @@ export function DeckDetail({
                   canEdit={canEdit}
                   onOpenAnswer={setAnswerPreview}
                   onEdit={setEditingCard}
-                  onDelete={(c) => void handleDeleteCard(c)}
+                  onDelete={(c) => setDeletingCard(c)}
+                  onHoverStart={handleHoverStart}
+                  onHoverEnd={handleHoverEnd}
                 />
               ))}
             </div>
@@ -615,6 +707,14 @@ export function DeckDetail({
           />
         ) : null}
 
+        {hoveredCard && !answerPreview ? (
+          <CardHoverPopover
+            card={hoveredCard.card}
+            anchor={hoveredCard.rect}
+            online={online}
+          />
+        ) : null}
+
         {editingCard && (
           <EditCardSheet
             card={editingCard}
@@ -623,6 +723,19 @@ export function DeckDetail({
             onSaved={() => {
               setEditingCard(null);
               setCardsVersion((v) => v + 1);
+            }}
+          />
+        )}
+
+        {deletingCard && (
+          <ConfirmDialog
+            title="Delete card?"
+            message={`"${cardFrontLabel(deletingCard)}" will be removed from this device. This can't be undone.`}
+            confirmLabel="Delete card"
+            onCancel={() => setDeletingCard(null)}
+            onConfirm={async () => {
+              await handleDeleteCard(deletingCard);
+              setDeletingCard(null);
             }}
           />
         )}

@@ -17,6 +17,7 @@ import {
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 import { WorkspaceSelector } from "./workspace-selector";
 import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
+import { ConfirmDialog } from "./confirm-dialog";
 import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
 import { Pagination } from "./pagination";
@@ -378,6 +379,7 @@ export function DeckLibrary({
   const [sort, setSort] = useState<OfflineDeckSort>(() => loadDeckSort());
   const [showOptions, setShowOptions] = useState(false);
   const [editingDeck, setEditingDeck] = useState<OfflineDeckRow | null>(null);
+  const [deletingDeck, setDeletingDeck] = useState<OfflineDeckRow | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
 
@@ -440,13 +442,6 @@ export function DeckLibrary({
   }
 
   async function handleDeleteDeck(deck: OfflineDeckRow) {
-    if (
-      !window.confirm(
-        `Delete "${deck.name}" and all its cards from this device?`,
-      )
-    ) {
-      return;
-    }
     await deleteDeck(deck.local_id);
     await onDecksChanged();
   }
@@ -576,7 +571,7 @@ export function DeckLibrary({
                 canEdit={canEditDecks}
                 onOpen={() => onOpenDeck(deck)}
                 onEdit={() => setEditingDeck(deck)}
-                onDelete={() => void handleDeleteDeck(deck)}
+                onDelete={() => setDeletingDeck(deck)}
               />
             ))}
           </div>
@@ -607,6 +602,19 @@ export function DeckLibrary({
           onSaved={() => {
             setEditingDeck(null);
             void onDecksChanged();
+          }}
+        />
+      )}
+
+      {deletingDeck && (
+        <ConfirmDialog
+          title="Delete deck?"
+          message={`"${deletingDeck.name}" and all its cards will be removed from this device. This can't be undone.`}
+          confirmLabel="Delete deck"
+          onCancel={() => setDeletingDeck(null)}
+          onConfirm={async () => {
+            await handleDeleteDeck(deletingDeck);
+            setDeletingDeck(null);
           }}
         />
       )}
