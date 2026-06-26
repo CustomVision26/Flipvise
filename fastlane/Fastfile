@@ -1,0 +1,62 @@
+default_platform(:ios)
+
+APP_IDENTIFIER = "com.flipvise.app"
+XCODE_PROJECT = "ios/App/App.xcodeproj"
+XCODE_SCHEME = "App"
+
+platform :ios do
+  # Builds the iOS app and uploads it to TestFlight.
+  #
+  # Signing uses App Store Connect API key authentication combined with Xcode
+  # automatic provisioning (`-allowProvisioningUpdates`), so no certificates or
+  # provisioning profiles need to be committed or stored as separate secrets.
+  #
+  # Required environment variables (set as GitHub Actions secrets):
+  #   ASC_KEY_ID       - App Store Connect API key ID
+  #   ASC_ISSUER_ID    - App Store Connect API issuer ID
+  #   ASC_KEY_CONTENT  - base64-encoded contents of the .p8 key file
+  #   APPLE_TEAM_ID    - 10-character Apple Developer Team ID
+  desc "Build and upload a new build to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_CONTENT"),
+      is_key_content_base64: true,
+      in_house: false,
+    )
+
+    team_id = ENV.fetch("APPLE_TEAM_ID")
+
+    # Derive the next build number from TestFlight so uploads never collide.
+    # Injected directly at build time (CURRENT_PROJECT_VERSION) to avoid agvtool,
+    # since the project does not use apple-generic versioning.
+    latest_build = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      initial_build_number: 0,
+    )
+    next_build = latest_build + 1
+
+    build_app(
+      project: XCODE_PROJECT,
+      scheme: XCODE_SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{team_id} CURRENT_PROJECT_VERSION=#{next_build}",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: team_id,
+      },
+      output_directory: "build",
+      output_name: "Flipvise.ipa",
+      clean: true,
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end

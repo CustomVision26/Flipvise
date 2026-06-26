@@ -71,3 +71,13 @@ drizzle-local/
 # config summary docs (may contain secrets)
 ENVIRONMENT-CONFIG-SUMMARY.md
 *-CONFIG-SUMMARY.md
+
+# fastlane / iOS CI
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+fastlane/README.md
+*.ipa
+*.dSYM.zip
+vendor/bundle/
+.bundle/
