@@ -26,7 +26,11 @@ const DECKS_PER_PAGE = 12;
 export type DeckWithCount = OfflineDeckRow & { cardCount: number };
 
 function canEditDeckLocally(deck: OfflineDeckRow): boolean {
-  return deck.team_id == null && (deck.member_assigned ?? 0) === 0;
+  // Owned decks (shown on the Personal Dashboard) are editable offline even when
+  // linked to a workspace (team_id set). Member-assigned study copies stay read-only.
+  // Deck tiles only render actions in personal scope (see `canEdit` below), so this
+  // keeps team-workspace tiles read-only while unlocking workspace-linked personal decks.
+  return (deck.member_assigned ?? 0) === 0;
 }
 
 function formatUpdated(ms: number): string {

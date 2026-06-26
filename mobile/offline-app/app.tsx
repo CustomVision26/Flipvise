@@ -64,8 +64,14 @@ function resolveCanCreateDeck(scope: SavedWorkspaceScope): boolean {
   return scope === "personal";
 }
 
-function canEditDeckContent(deck: OfflineDeckRow): boolean {
-  if (deck.team_id != null) return false;
+function canEditDeckContent(
+  deck: OfflineDeckRow,
+  scope: SavedWorkspaceScope,
+): boolean {
+  // Decks on the Personal Dashboard are owned by the user (member_assigned == 0),
+  // so they're editable offline even when linked to a workspace (team_id set).
+  // Team-workspace decks are managed on the online dashboard and stay read-only here.
+  if (scope !== "personal") return false;
   return (deck.member_assigned ?? 0) === 0;
 }
 
@@ -459,7 +465,7 @@ export function App() {
     return (
       <DeckDetail
         deck={activeDeck}
-        canEdit={canEditDeckContent(activeDeck)}
+        canEdit={canEditDeckContent(activeDeck, workspaceScope)}
         online={online}
         workspaceContext={deckWorkspaceInput}
         onBack={() => setActiveDeck(null)}
