@@ -12,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 /** Default landing if the handoff URL doesn't specify a redirect. */
 const DEFAULT_REDIRECT = "/dashboard";
@@ -23,73 +25,309 @@ function safeRedirect(raw: string | null): string {
   return raw;
 }
 
+/**
+ * In-app sign-in for the native (Capacitor) WebView. Avoids Clerk's heavy modal
+ * (which crashed the WebView renderer) by signing in programmatically:
+ *  - already signed in → redirect to `redirect`
+ *  - `ticket` present (returning device) → exchange the sign-in token for a session
+ *  - otherwise → a lightweight email/password (or email-code) form
+ */
 export function NativeSignInClient() {
-  const { isLoaded } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { signIn } = useSignIn();
   const searchParams = useSearchParams();
   const ticket = searchParams.get("ticket");
   const redirectTo = safeRedirect(searchParams.get("redirect"));
-  const [error, setError] = useState<string | null>(null);
+  const [ticketError, setTicketError] = useState<string | null>(null);
   const startedRef = useRef(false);
 
+  // Already authenticated in this WebView session — go straight through.
   useEffect(() => {
-    if (!isLoaded || !signIn || startedRef.current) return;
-    startedRef.current = true;
+    if (isLoaded && isSignedIn) window.location.replace(redirectTo);
+  }, [isLoaded, isSignedIn, redirectTo]);
 
-    if (!ticket) {
-      setError("This sign-in link is missing or invalid.");
+  // Ticket handoff: exchange the backend sign-in token for a session.
+  useEffect(() => {
+    if (!isLoaded || isSignedIn || !ticket || !signIn || startedRef.current) {
       return;
     }
+    startedRef.current = true;
 
     const expired =
-      "This sign-in link has expired. Please open the dashboard again.";
-
+      "This sign-in link has expired. Please sign in below.";
     (async () => {
       try {
-        // New Clerk "future" signals API: exchange the backend sign-in token for
-        // a session, then finalize() to set it active before redirecting.
-        const { error: ticketError } = await signIn.ticket({ ticket });
-        if (ticketError) {
-          setError(expired);
+        const { error: ticketErr } = await signIn.ticket({ ticket });
+        if (ticketErr) {
+          setTicketError(expired);
           return;
         }
-        const { error: finalizeError } = await signIn.finalize();
-        if (finalizeError) {
-          setError(expired);
+        const { error: finalizeErr } = await signIn.finalize();
+        if (finalizeErr) {
+          setTicketError(expired);
           return;
         }
-        // Full navigation so the dashboard renders with the new session cookie.
         window.location.replace(redirectTo);
       } catch {
-        setError(expired);
+        setTicketError(expired);
       }
     })();
-  }, [isLoaded, signIn, ticket, redirectTo]);
+  }, [isLoaded, isSignedIn, ticket, signIn, redirectTo]);
+
+  // While Clerk loads, or while we redirect an already-signed-in session.
+  if (!isLoaded || isSignedIn) {
+    return <CenteredSpinner />;
+  }
+
+  // Ticket flow in progress (and not yet failed).
+  if (ticket && !ticketError) {
+    return <CenteredSpinner label="Signing you in…" />;
+  }
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+      <SignInForm redirectTo={redirectTo} notice={ticketError} />
+    </main>
+  );
+}
+
+function CenteredSpinner({ label }: { label?: string }) {
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background p-6">
       <Card className="w-full max-w-sm">
-        {error ? (
-          <>
-            <CardHeader className="items-center text-center">
-              <ShieldAlert className="size-8 text-destructive" aria-hidden />
-              <CardTitle>Couldn&apos;t sign you in</CardTitle>
-              <CardDescription>{error}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center">
-              <Button render={<a href="/">Go to Flipvise</a>} />
-            </CardContent>
-          </>
-        ) : (
-          <CardHeader className="items-center text-center">
-            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-            <CardTitle>Signing you in…</CardTitle>
-            <CardDescription>
-              Taking you to your dashboard. This only takes a moment.
-            </CardDescription>
-          </CardHeader>
-        )}
+        <CardHeader className="items-center text-center">
+          <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+          <CardTitle>{label ?? "Loading…"}</CardTitle>
+          <CardDescription>This only takes a moment.</CardDescription>
+        </CardHeader>
       </Card>
     </main>
+  );
+}
+
+type Step = "identify" | "code";
+
+function SignInForm({
+  redirectTo,
+  notice,
+}: {
+  redirectTo: string;
+  notice: string | null;
+}) {
+  const { signIn } = useSignIn();
+  const [mode, setMode] = useState<"password" | "code">("password");
+  const [step, setStep] = useState<Step>("identify");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(notice);
+
+  const fail = (msg: string) => setError(msg);
+
+  async function complete(): Promise<boolean> {
+    const { error: finalizeErr } = await signIn.finalize();
+    if (finalizeErr) {
+      fail(
+        "Extra verification is required for this account. Please finish signing in on the website.",
+      );
+      return false;
+    }
+    window.location.replace(redirectTo);
+    return true;
+  }
+
+  async function onPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !password || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: pwErr } = await signIn.password({
+        identifier: email.trim(),
+        password,
+      });
+      if (pwErr) {
+        fail("That email or password is incorrect.");
+        return;
+      }
+      await complete();
+    } catch {
+      fail("Couldn't sign you in. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: createErr } = await signIn.create({
+        identifier: email.trim(),
+      });
+      if (createErr) {
+        fail("We couldn't find an account for that email.");
+        return;
+      }
+      const { error: sendErr } = await signIn.emailCode.sendCode();
+      if (sendErr) {
+        fail("Couldn't send a code to that email. Try a password instead.");
+        return;
+      }
+      setStep("code");
+    } catch {
+      fail("Couldn't send a code. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: verifyErr } = await signIn.emailCode.verifyCode({
+        code: code.trim(),
+      });
+      if (verifyErr) {
+        fail("That code is incorrect or expired.");
+        return;
+      }
+      await complete();
+    } catch {
+      fail("Couldn't verify that code. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-sm">
+      <CardHeader className="text-center">
+        <CardTitle>Sign in to Flipvise</CardTitle>
+        <CardDescription>
+          {mode === "code" && step === "code"
+            ? `Enter the code we emailed to ${email}.`
+            : "Use your email to continue to the dashboard."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error ? (
+          <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>{error}</span>
+          </p>
+        ) : null}
+
+        {mode === "password" ? (
+          <form onSubmit={onPasswordSubmit} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(ev) => setPassword(ev.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={busy} className="mt-1">
+              {busy ? "Signing in…" : "Sign in"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setMode("code");
+                setStep("identify");
+                setError(null);
+              }}
+            >
+              Email me a code instead
+            </Button>
+          </form>
+        ) : step === "identify" ? (
+          <form onSubmit={onSendCode} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email-code">Email</Label>
+              <Input
+                id="email-code"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={busy} className="mt-1">
+              {busy ? "Sending…" : "Email me a code"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setMode("password");
+                setError(null);
+              }}
+            >
+              Use a password instead
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={onVerifyCode} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="code">Verification code</Label>
+              <Input
+                id="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(ev) => setCode(ev.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={busy} className="mt-1">
+              {busy ? "Verifying…" : "Verify & sign in"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setStep("identify");
+                setCode("");
+                setError(null);
+              }}
+            >
+              Use a different email
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }

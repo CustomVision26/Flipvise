@@ -59,6 +59,8 @@
     "cap": "cap",
     "mobile:build": "vite build -c mobile/vite.config.ts",
     "mobile:build:prod": "cross-env VITE_LIVE_URL=https://flipvise-sjgw.onrender.com vite build -c mobile/vite.config.ts",
+    "mobile:build:dev": "cross-env VITE_LIVE_URL=http://10.0.2.2:3000 vite build -c mobile/vite.config.ts",
+    "mobile:sync:dev": "cross-env CAP_ANDROID_DEV_HOST=http://10.0.2.2:3000 VITE_LIVE_URL=http://10.0.2.2:3000 npm run mobile:build:dev && cap sync android",
     "mobile:assets": "capacitor-assets generate --android --iconBackgroundColor \"#0f172a\" --splashBackgroundColor \"#0f172a\"",
     "mobile:assets:ios": "capacitor-assets generate --ios --iconBackgroundColor \"#0f172a\" --splashBackgroundColor \"#0f172a\"",
     "mobile:add:android": "cap add android",

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Browser } from "@capacitor/browser";
 import {
   isOfflineDbAvailable,
   getLastOfflineDbError,
@@ -293,11 +292,18 @@ export function App() {
     const storedBase = await getStoredApiBaseUrl().catch(() => null);
     const base = storedBase ?? LIVE_URL;
 
-    // Carry the existing device session into the browser tab so the dashboard
-    // lands already signed-in: mint a short-lived Clerk sign-in ticket from the
-    // stored sync token, then route the browser through /native-signin, which
-    // exchanges the ticket for a real session before redirecting to `path`.
-    let url = `${base}${path}`;
+    // Navigate the in-app WebView to the live site (keeps the shared native
+    // SQLite/Preferences bridge, so "Make available offline", theme carry-forward,
+    // etc. keep working). We always route through /native-signin so the heavy Clerk
+    // sign-in MODAL — which crashed the WebView renderer (OOM / SIGTRAP) — is never
+    // shown. /native-signin signs the user in without a modal:
+    //   • returning users (device token) → exchange a short-lived Clerk sign-in
+    //     ticket for a session, then redirect to `path`.
+    //   • first-time users → a lightweight in-app email/password (or email code)
+    //     form, then redirect to `path`.
+    //   • already-signed-in WebView sessions → redirect straight to `path`.
+    const enc = (s: string) => encodeURIComponent(s);
+    let target = `${base}/native-signin?redirect=${enc(path)}`;
     try {
       const syncToken = await getStoredSyncToken().catch(() => null);
       if (syncToken) {
@@ -308,28 +314,15 @@ export function App() {
         if (res.ok) {
           const data = (await res.json()) as { ticket?: string };
           if (data.ticket) {
-            url =
-              `${base}/native-signin?ticket=${encodeURIComponent(data.ticket)}` +
-              `&redirect=${encodeURIComponent(path)}`;
+            target = `${base}/native-signin?ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
           }
         }
       }
     } catch {
-      // Fall back to the plain URL (user signs in manually in the browser).
+      // Fall back to the form-based /native-signin (manual sign-in).
     }
 
-    // Open the live site in the system browser (Chrome Custom Tab) instead of
-    // navigating this lightweight offline WebView into the full Next.js + Clerk
-    // app. Loading the live site inside the offline shell's WebView crashed the
-    // renderer (OOM / SIGTRAP), taking the whole native app down. A real browser
-    // tab has its own process and memory and handles Clerk auth reliably. The
-    // offline shell keeps running underneath and is restored when the tab closes.
-    try {
-      await Browser.open({ url });
-    } catch {
-      // Last-resort fallback if the Browser plugin is unavailable.
-      window.location.href = url;
-    }
+    window.location.replace(target);
   }, []);
 
   const openTeamAdminDash = useCallback(() => {

@@ -41,7 +41,7 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         id: "studying-offline",
         title: "Studying without a connection",
         bullets: [
-          "The “Online Dashboard” button opens the full website in your device browser (not inside the offline shell) and signs you in automatically, so the live dashboard loads ready to use.",
+          "The “Online Dashboard” button opens the full website inside the app and signs you in automatically when possible — if you’ve used the app before, the live dashboard loads ready to use; first-time users get a quick in-app sign-in screen.",
           "When the device is offline, Flipvise opens an on-device Study view.",
           "Choose a downloaded deck and flip through its cards (question ↔ answer).",
           "Your place, edits, and quiz results are stored locally on the device.",
