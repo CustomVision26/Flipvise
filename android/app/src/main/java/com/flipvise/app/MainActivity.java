@@ -1,6 +1,7 @@
 package com.flipvise.app;
 
 import android.os.Bundle;
+import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 
@@ -21,6 +22,14 @@ public class MainActivity extends BridgeActivity {
 
         WebView webView = getBridge().getWebView();
         if (webView != null) {
+            // Clerk loads its auth client from a separate domain (e.g. *.clerk.accounts.dev),
+            // so the session/handshake cookies are "third-party" relative to the live site.
+            // Android WebViews block those by default, which prevents sign-in from persisting.
+            // Allow them so in-app sign-in works.
+            CookieManager cookieManager = CookieManager.getInstance();
+            cookieManager.setAcceptCookie(true);
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
+
             webView.setWebViewClient(new BridgeWebViewClient(getBridge()) {
                 @Override
                 public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
