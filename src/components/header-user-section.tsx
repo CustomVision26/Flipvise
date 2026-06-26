@@ -4,7 +4,7 @@ import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { UserBillingPage } from "@/components/user-billing-page";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
@@ -82,6 +82,23 @@ export function HeaderUserSection({
   const pathname = usePathname();
   const { userId } = useAuth();
   const { user } = useUser();
+
+  /**
+   * Sign-out teardown guard. Clerk's `<UserButton>` flips `userId` to null the
+   * moment the user signs out, while its popover portal is still being removed.
+   * Unmounting the button in that same commit triggers React 19's
+   * "removeChild on null parent" crash → the whole tree dies and the app freezes
+   * on the leftover watermark. We instead keep the button mounted and force a
+   * full-document navigation, which tears everything down atomically.
+   */
+  const everSignedInRef = useRef(false);
+  if (userId) everSignedInRef.current = true;
+  const isSigningOut = !userId && everSignedInRef.current;
+
+  useEffect(() => {
+    if (!isSigningOut) return;
+    window.location.replace("/");
+  }, [isSigningOut]);
   const meta = user?.publicMetadata as
     | { adminGranted?: boolean; role?: string }
     | undefined;
@@ -107,6 +124,9 @@ export function HeaderUserSection({
   const [portalsReady, setPortalsReady] = useState(false);
   useEffect(() => {
     if (!userId) {
+      // Mid sign-out: keep portals mounted so Clerk can tear its own popover
+      // down before the hard navigation reloads the document.
+      if (everSignedInRef.current) return;
       setPortalsReady(false);
       return;
     }
@@ -119,7 +139,10 @@ export function HeaderUserSection({
     return () => window.clearTimeout(timer);
   }, [userId]);
 
-  if (!userId) {
+  // Never signed in on this page → nothing to render. When signing out we keep
+  // the tree (and the Clerk UserButton) mounted until `window.location.replace`
+  // reloads, to avoid the React 19 portal-teardown crash.
+  if (!userId && !everSignedInRef.current) {
     return null;
   }
 
