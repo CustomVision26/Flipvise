@@ -11,10 +11,36 @@
   --muted-2: #71717a;
   --accent: #6366f1;
   --accent-2: #7c3aed;
+  --accent-fg: #ffffff;
   --accent-soft: rgba(99, 102, 241, 0.14);
   --danger: #f87171;
+  /* Surfaces that adapt to light/dark mode (see [data-theme="light"]). */
+  --surface-bar: rgba(9, 9, 11, 0.92);
+  --surface-bar-strong: rgba(9, 9, 11, 0.96);
+  --surface-tint: rgba(9, 9, 11, 0.35);
+  --scrim: rgba(0, 0, 0, 0.72);
   --radius: 12px;
   --radius-lg: 16px;
+}
+
+/* Light mode carried from the live dashboard. Captured interface colors are
+   layered on top of these as inline CSS variables (see apply-offline-theme.ts). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --panel: #f4f4f5;
+  --panel-2: #ececef;
+  --panel-3: #e2e2e6;
+  --border: #d4d4d8;
+  --border-subtle: #e4e4e7;
+  --fg: #18181b;
+  --muted: #52525b;
+  --muted-2: #71717a;
+  --accent-fg: #ffffff;
+  --surface-bar: rgba(255, 255, 255, 0.9);
+  --surface-bar-strong: rgba(255, 255, 255, 0.96);
+  --surface-tint: rgba(255, 255, 255, 0.55);
+  --scrim: rgba(24, 24, 27, 0.45);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -30,11 +56,30 @@ html, body, #root {
 }
 
 .app {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   height: 100%;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Logo watermark (behind all offline screens) ──────────── */
+.app-watermark {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.app-watermark img {
+  width: min(62vw, 340px);
+  height: auto;
+  opacity: 0.05;
+  filter: grayscale(1);
 }
 
 /* ── Top bar ─────────────────────────────────────────────── */
@@ -44,7 +89,7 @@ html, body, #root {
   gap: 8px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(9, 9, 11, 0.92);
+  background: var(--surface-bar);
   backdrop-filter: blur(10px);
 }
 
@@ -342,6 +387,38 @@ html, body, #root {
 }
 .library-loading p { margin: 0; }
 
+/* ── Pagination ──────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 16px 0 4px;
+}
+.pagination__btn {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  justify-content: center;
+  text-align: center;
+}
+.pagination__page {
+  font-variant-numeric: tabular-nums;
+}
+.pagination__page.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.pagination__gap {
+  min-width: 20px;
+  text-align: center;
+  color: var(--muted-2);
+  font-size: 12px;
+  user-select: none;
+}
+
 .deck-column-head {
   display: none;
 }
@@ -398,7 +475,7 @@ html, body, #root {
   border-top: 1px solid var(--border-subtle);
   position: relative;
   z-index: 2;
-  background: rgba(9, 9, 11, 0.35);
+  background: var(--surface-tint);
 }
 
 .library-tile__action {
@@ -590,7 +667,7 @@ html, body, #root {
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn {
   appearance: none; border: 0; cursor: pointer;
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: var(--accent-fg);
   font-size: 13px; font-weight: 600;
   padding: 10px 14px; border-radius: var(--radius);
   white-space: nowrap;
@@ -645,7 +722,7 @@ html, body, #root {
 /* ── Sheets / forms ─────────────────────────────────────── */
 .sheet-backdrop {
   position: fixed; inset: 0; z-index: 50;
-  background: rgba(0, 0, 0, 0.72);
+  background: var(--scrim);
   display: flex; align-items: flex-end; justify-content: center;
   padding: 16px;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
@@ -762,7 +839,7 @@ html, body, #root {
 .study-session__header {
   padding: 12px 16px 16px;
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(9, 9, 11, 0.94);
+  background: var(--surface-bar);
   backdrop-filter: blur(12px);
 }
 
@@ -866,7 +943,7 @@ html, body, #root {
 .study-session__footer {
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border-subtle);
-  background: rgba(9, 9, 11, 0.96);
+  background: var(--surface-bar-strong);
   backdrop-filter: blur(12px);
 }
 
@@ -1451,7 +1528,7 @@ html, body, #root {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.58);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;

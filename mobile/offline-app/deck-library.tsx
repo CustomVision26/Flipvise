@@ -19,6 +19,9 @@ import { WorkspaceSelector } from "./workspace-selector";
 import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
 import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
+import { Pagination } from "./pagination";
+
+const DECKS_PER_PAGE = 12;
 
 export type DeckWithCount = OfflineDeckRow & { cardCount: number };
 
@@ -372,6 +375,7 @@ export function DeckLibrary({
   const [showOptions, setShowOptions] = useState(false);
   const [editingDeck, setEditingDeck] = useState<OfflineDeckRow | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -403,6 +407,22 @@ export function DeckLibrary({
   const sorted = useMemo(
     () => sortDecks(decksWithCounts, sort),
     [decksWithCounts, sort],
+  );
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / DECKS_PER_PAGE));
+
+  // Reset to the first page whenever the result set or ordering changes.
+  useEffect(() => {
+    setPage(1);
+  }, [sort, workspaceScope, sorted.length]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
+
+  const pagedDecks = useMemo(
+    () => sorted.slice((page - 1) * DECKS_PER_PAGE, page * DECKS_PER_PAGE),
+    [sorted, page],
   );
 
   function changeView(next: OfflineDeckViewMode) {
@@ -543,7 +563,7 @@ export function DeckLibrary({
             </div>
           )}
           <div className={containerClass}>
-            {sorted.map((deck) => (
+            {pagedDecks.map((deck) => (
               <DeckTile
                 key={deck.local_id}
                 deck={deck}
@@ -556,6 +576,12 @@ export function DeckLibrary({
               />
             ))}
           </div>
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onPageChange={setPage}
+            label="Deck pages"
+          />
         </>
       )}
 

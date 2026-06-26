@@ -49,6 +49,16 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         ],
       },
       {
+        id: "appearance",
+        title: "Appearance & browsing your decks offline",
+        bullets: [
+          "The offline study view matches the light/dark mode and interface color you set on the online dashboard — your choice is saved on the device the last time you opened the dashboard in the app.",
+          "A faded Flipvise logo watermark sits behind the offline screens.",
+          "Long deck libraries and card lists are split into pages, with page controls at the bottom of the list.",
+          "Personal decks and their cards show Edit and Delete buttons offline; team decks stay read-only and are managed from the online dashboard.",
+        ],
+      },
+      {
         id: "sync",
         title: "Syncing across devices",
         paragraphs: [

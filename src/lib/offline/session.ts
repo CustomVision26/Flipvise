@@ -17,6 +17,51 @@ const PENDING_PULL_KEY = "flipvise.offline.pendingPull";
 const PENDING_PULL_USER_KEY = "flipvise.offline.pendingPullUserId";
 /** Set by the bundled offline shell so the live site can detect the native app. */
 const NATIVE_APP_FLAG_KEY = "flipvise.nativeApp";
+/** Theme (light/dark mode + interface colors) carried from the live dashboard. */
+const THEME_PREFS_KEY = "flipvise.offline.theme";
+
+/**
+ * Snapshot of the live dashboard's resolved theme so the bundled offline shell
+ * can match the user's light/dark mode and interface (accent/background) colors.
+ * Colors are stored as raw computed CSS values (e.g. `oklch(...)`).
+ */
+export type OfflineThemePrefs = {
+  mode: "light" | "dark";
+  background: string | null;
+  foreground: string | null;
+  card: string | null;
+  border: string | null;
+  mutedForeground: string | null;
+  primary: string | null;
+  primaryForeground: string | null;
+};
+
+export async function setOfflineThemePrefs(
+  prefs: OfflineThemePrefs,
+): Promise<void> {
+  await Preferences.set({ key: THEME_PREFS_KEY, value: JSON.stringify(prefs) });
+}
+
+export async function getOfflineThemePrefs(): Promise<OfflineThemePrefs | null> {
+  const { value } = await Preferences.get({ key: THEME_PREFS_KEY });
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<OfflineThemePrefs>;
+    if (parsed.mode !== "light" && parsed.mode !== "dark") return null;
+    return {
+      mode: parsed.mode,
+      background: parsed.background ?? null,
+      foreground: parsed.foreground ?? null,
+      card: parsed.card ?? null,
+      border: parsed.border ?? null,
+      mutedForeground: parsed.mutedForeground ?? null,
+      primary: parsed.primary ?? null,
+      primaryForeground: parsed.primaryForeground ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Marks this install as the Flipvise native app (survives navigation to the live site). */
 export async function setNativeAppFlag(): Promise<void> {

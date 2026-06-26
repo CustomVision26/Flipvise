@@ -28,6 +28,7 @@ import {
 } from "../../src/lib/offline/session";
 import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
+import { applyOfflineTheme } from "./apply-offline-theme";
 import { DeckLibrary } from "./deck-library";
 import { ImagePickerField } from "./image-picker-field";
 import { DeckDetail } from "./deck-detail";
@@ -105,6 +106,11 @@ export function App() {
   const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
   const [libraryReady, setLibraryReady] = useState(false);
   const [scopeLoading, setScopeLoading] = useState(false);
+
+  // Match the live dashboard's light/dark mode + interface colors (saved offline).
+  useEffect(() => {
+    void applyOfflineTheme();
+  }, []);
 
   const loadDecks = useCallback(
     async (uid: string, scope: SavedWorkspaceScope) => {

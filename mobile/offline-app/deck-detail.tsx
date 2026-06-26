@@ -20,6 +20,9 @@ import {
 import { LibraryTileActions, LibraryTileWatermark } from "./library-tile-chrome";
 import { OfflineImage } from "./offline-image";
 import { ImagePickerField } from "./image-picker-field";
+import { Pagination } from "./pagination";
+
+const CARDS_PER_PAGE = 12;
 
 function formatUpdated(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, {
@@ -415,6 +418,7 @@ export function DeckDetail({
   const [answerPreview, setAnswerPreview] = useState<OfflineCardRow | null>(null);
   const [editingCard, setEditingCard] = useState<OfflineCardRow | null>(null);
   const [cardsVersion, setCardsVersion] = useState(0);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -454,6 +458,23 @@ export function DeckDetail({
     if (!cards) return [];
     return sortCards(cards, sort);
   }, [cards, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / CARDS_PER_PAGE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [sort, deck.local_id, sorted.length]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount));
+  }, [pageCount]);
+
+  const pagedCards = useMemo(
+    () => sorted.slice((page - 1) * CARDS_PER_PAGE, page * CARDS_PER_PAGE),
+    [sorted, page],
+  );
+
+  const pageOffset = (page - 1) * CARDS_PER_PAGE;
 
   const containerClass =
     view === "thumbnail"
@@ -551,12 +572,12 @@ export function DeckDetail({
               </div>
             )}
             <div className={containerClass}>
-              {sorted.map((card, i) => (
+              {pagedCards.map((card, i) => (
                 <CardTile
                   key={card.local_id}
                   card={card}
                   view={view}
-                  index={i}
+                  index={pageOffset + i}
                   online={online}
                   canEdit={canEdit}
                   onOpenAnswer={setAnswerPreview}
@@ -565,6 +586,12 @@ export function DeckDetail({
                 />
               ))}
             </div>
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              onPageChange={setPage}
+              label="Card pages"
+            />
           </>
         )}
 

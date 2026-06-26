@@ -20,7 +20,29 @@ export function NativeAppBootstrap() {
     if (!likelyNative) return;
 
     void import("@/lib/offline/session")
-      .then((s) => s.setNativeAppFlag())
+      .then(async (s) => {
+        await s.setNativeAppFlag();
+        // Snapshot the dashboard's resolved theme (mode + interface colors) so the
+        // bundled offline shell can match it. `<html>` here carries both the
+        // light/dark class and `data-ui-theme`, so computed values are accurate.
+        try {
+          const root = document.documentElement;
+          const cs = getComputedStyle(root);
+          const read = (name: string) => cs.getPropertyValue(name).trim() || null;
+          await s.setOfflineThemePrefs({
+            mode: root.classList.contains("light") ? "light" : "dark",
+            background: read("--background"),
+            foreground: read("--foreground"),
+            card: read("--card"),
+            border: read("--border"),
+            mutedForeground: read("--muted-foreground"),
+            primary: read("--primary"),
+            primaryForeground: read("--primary-foreground"),
+          });
+        } catch {
+          // Non-fatal: offline shell falls back to its default dark theme.
+        }
+      })
       .catch(() => {});
   }, []);
 

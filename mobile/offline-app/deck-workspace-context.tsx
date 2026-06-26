@@ -34,6 +34,18 @@ export function resolveDeckWorkspaceInfo(
   }
 
   const team = input.workspaces.find((w) => w.teamId === deck.team_id);
+
+  // Subscriber-owned team workspaces are studied and managed from Personal Dash
+  // (see `app.tsx` workspace switcher), so their decks present as Personal Dash —
+  // not Team Dashboard — to match where the owner actually sees them.
+  if (team && (team.isSubscriberOwned ?? team.role === "owner")) {
+    return {
+      kind: "personal",
+      dashboardLabel: "Personal Dash",
+      detail: input.personalPlanLabel,
+    };
+  }
+
   if (!team) {
     return {
       kind: "team",
