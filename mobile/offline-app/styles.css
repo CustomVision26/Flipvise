@@ -82,6 +82,56 @@ html, body, #root {
   filter: grayscale(1);
 }
 
+/* ── Lock screen ─────────────────────────────────────────── */
+.lock-screen {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+.lock-screen__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 22rem;
+}
+.lock-screen__logo {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+}
+.lock-screen__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.lock-screen__hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.lock-screen__btn {
+  min-width: 12rem;
+  margin-top: 4px;
+}
+
+/* ── Settings ────────────────────────────────────────────── */
+.settings-toggle {
+  flex-shrink: 0;
+  min-width: 2.5rem;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.option-row:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ── Top bar ─────────────────────────────────────────────── */
 .topbar {
   display: flex;

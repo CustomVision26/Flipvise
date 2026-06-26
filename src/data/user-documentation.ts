@@ -210,6 +210,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Signing out inside the mobile app returns you to offline study (your downloaded decks) rather than the online sign-in page.",
           "The offline view matches the light/dark mode and interface color from your online dashboard (saved on the device), shows a faded Flipvise logo watermark, and pages through long deck and card lists.",
           "Personal decks and cards show Edit and Delete offline; team decks stay read-only and are managed on the online dashboard.",
+          "Optional app lock: in offline Settings (gear icon), turn on “Require unlock to open” to protect the app with your device's Face ID, fingerprint, or PIN/passcode on launch and after backgrounding.",
         ],
         requirements: [
           "Signed-in account; download your decks at least once while online.",

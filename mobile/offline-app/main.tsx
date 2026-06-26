@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
+import { LockGate } from "./lock-gate";
 import "./styles.css";
 
 const container = document.getElementById("root");
@@ -13,6 +14,8 @@ createRoot(container).render(
     <div className="app-watermark" aria-hidden>
       <img src={logoUrl} alt="" />
     </div>
-    <App />
+    <LockGate>
+      <App />
+    </LockGate>
   </React.StrictMode>,
 );

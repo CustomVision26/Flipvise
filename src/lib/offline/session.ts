@@ -19,6 +19,18 @@ const PENDING_PULL_USER_KEY = "flipvise.offline.pendingPullUserId";
 const NATIVE_APP_FLAG_KEY = "flipvise.nativeApp";
 /** Theme (light/dark mode + interface colors) carried from the live dashboard. */
 const THEME_PREFS_KEY = "flipvise.offline.theme";
+/** Whether the app requires the device security credential (biometric/PIN) to open. */
+const APP_LOCK_KEY = "flipvise.offline.appLock";
+
+/** Enables/disables the device-credential app lock for the offline shell. */
+export async function setAppLockEnabled(enabled: boolean): Promise<void> {
+  await Preferences.set({ key: APP_LOCK_KEY, value: enabled ? "1" : "0" });
+}
+
+export async function getAppLockEnabled(): Promise<boolean> {
+  const { value } = await Preferences.get({ key: APP_LOCK_KEY });
+  return value === "1";
+}
 
 /**
  * Snapshot of the live dashboard's resolved theme so the bundled offline shell

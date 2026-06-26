@@ -59,6 +59,21 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         ],
       },
       {
+        id: "app-lock",
+        title: "Locking the app with your device security",
+        paragraphs: [
+          "You can require your phone's own security credential — Face ID, Touch ID, fingerprint, or your device PIN/passcode — before the offline app will open your decks.",
+        ],
+        bullets: [
+          "Open Settings (the gear in the offline study top bar) and turn on “Require unlock to open”.",
+          "Turning the lock on or off asks for your device credential first, so it can't be changed by someone holding an unlocked phone.",
+          "Once enabled, Flipvise asks to unlock when you open it and again after it has been in the background.",
+          "Unlock uses biometrics when available and falls back to your device PIN/passcode.",
+          "The option only appears when your device has biometrics enrolled or a screen lock set; without one, there is nothing to unlock with.",
+          "This lock protects the on-device app and your downloaded decks. Your account itself is still protected by signing in online.",
+        ],
+      },
+      {
         id: "sync",
         title: "Syncing across devices",
         paragraphs: [

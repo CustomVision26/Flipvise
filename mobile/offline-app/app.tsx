@@ -29,6 +29,7 @@ import {
 import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { applyOfflineTheme } from "./apply-offline-theme";
+import { SettingsSheet } from "./settings-sheet";
 import { DeckLibrary } from "./deck-library";
 import { ImagePickerField } from "./image-picker-field";
 import { DeckDetail } from "./deck-detail";
@@ -106,6 +107,7 @@ export function App() {
   const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
   const [libraryReady, setLibraryReady] = useState(false);
   const [scopeLoading, setScopeLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Match the live dashboard's light/dark mode + interface colors (saved offline).
   useEffect(() => {
@@ -447,7 +449,13 @@ export function App() {
 
   return (
     <div className="app">
-      <Topbar online={online} onOpen={openLiveApp} onSync={handleSync} syncing={syncing} />
+      <Topbar
+        online={online}
+        onOpen={openLiveApp}
+        onSync={handleSync}
+        syncing={syncing}
+        onSettings={() => setShowSettings(true)}
+      />
       <div className="content content--library">
         <DeckLibrary
           decks={decks}
@@ -488,6 +496,7 @@ export function App() {
           }}
         />
       )}
+      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
@@ -497,11 +506,13 @@ function Topbar({
   onOpen,
   onSync,
   syncing,
+  onSettings,
 }: {
   online: boolean;
   onOpen: () => void;
   onSync: () => void;
   syncing: boolean;
+  onSettings: () => void;
 }) {
   return (
     <header className="topbar">
@@ -530,6 +541,15 @@ function Topbar({
         title={online ? "Open the live dashboard" : "Requires an internet connection"}
       >
         Online Dashboard
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        onClick={onSettings}
+        aria-label="Settings"
+        title="Settings"
+      >
+        ⚙
       </button>
     </header>
   );
