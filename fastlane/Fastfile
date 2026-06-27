@@ -7,22 +7,26 @@ XCODE_SCHEME = "App"
 platform :ios do
   # Builds the iOS app and uploads it to TestFlight.
   #
-  # Signing uses App Store Connect API key authentication combined with Xcode
-  # automatic provisioning (`-allowProvisioningUpdates`), so no certificates or
-  # provisioning profiles need to be committed or stored as separate secrets.
+  # Signing uses MANUAL signing driven by the App Store Connect API key:
+  #   - `cert`  creates/downloads an Apple Distribution certificate into a CI keychain
+  #   - `sigh`  creates an App Store provisioning profile (no devices required)
+  # Automatic signing is intentionally NOT used: `xcodebuild archive` with automatic
+  # signing tries to create a *Development* profile, which requires a registered
+  # device and therefore cannot work on a headless CI runner.
   #
   # Required environment variables (set as GitHub Actions secrets):
   #   ASC_KEY_ID       - App Store Connect API key ID
   #   ASC_ISSUER_ID    - App Store Connect API issuer ID
-  #   ASC_KEY_CONTENT  - base64-encoded contents of the .p8 key file
+  #   ASC_KEY_PATH     - path to the .p8 file (materialized by the workflow)
   #   APPLE_TEAM_ID    - 10-character Apple Developer Team ID
   desc "Build and upload a new build to TestFlight"
   lane :beta do
+    # Create/unlock a temporary keychain for the imported signing certificate.
+    setup_ci
+
     api_key = app_store_connect_api_key(
       key_id: ENV.fetch("ASC_KEY_ID"),
       issuer_id: ENV.fetch("ASC_ISSUER_ID"),
-      # The workflow materializes the .p8 to a file (handles base64 or raw PEM
-      # secrets) and exports its path — avoids fastlane's null-byte base64 bug.
       key_filepath: ENV.fetch("ASC_KEY_PATH"),
       in_house: false,
     )
@@ -30,8 +34,8 @@ platform :ios do
     team_id = ENV.fetch("APPLE_TEAM_ID")
 
     # Derive the next build number from TestFlight so uploads never collide.
-    # Injected directly at build time (CURRENT_PROJECT_VERSION) to avoid agvtool,
-    # since the project does not use apple-generic versioning.
+    # Injected at build time (CURRENT_PROJECT_VERSION) to avoid agvtool, since the
+    # project does not use apple-generic versioning.
     latest_build = latest_testflight_build_number(
       api_key: api_key,
       app_identifier: APP_IDENTIFIER,
@@ -39,27 +43,43 @@ platform :ios do
     )
     next_build = latest_build + 1
 
-    # Pass the App Store Connect API key directly to xcodebuild so that
-    # `-allowProvisioningUpdates` can register the App ID and create the signing
-    # certificate + provisioning profile automatically (cloud signing).
-    xcodebuild_args = [
-      "-allowProvisioningUpdates",
-      "-authenticationKeyPath", ENV.fetch("ASC_KEY_PATH"),
-      "-authenticationKeyID", ENV.fetch("ASC_KEY_ID"),
-      "-authenticationKeyIssuerID", ENV.fetch("ASC_ISSUER_ID"),
-      "DEVELOPMENT_TEAM=#{team_id}",
-      "CURRENT_PROJECT_VERSION=#{next_build}",
-    ].join(" ")
+    # Distribution certificate (Apple Distribution) into the CI keychain.
+    cert(
+      api_key: api_key,
+      team_id: team_id,
+    )
+
+    # App Store provisioning profile (distribution => no device requirement).
+    sigh(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      team_id: team_id,
+    )
+    profile_name = lane_context[SharedValues::SIGH_NAME]
+
+    # Switch the Release config to manual signing with the fetched profile.
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: XCODE_PROJECT,
+      team_id: team_id,
+      code_sign_identity: "Apple Distribution",
+      profile_name: profile_name,
+      targets: ["App"],
+      build_configurations: ["Release"],
+    )
 
     build_app(
       project: XCODE_PROJECT,
       scheme: XCODE_SCHEME,
       configuration: "Release",
       export_method: "app-store",
-      xcargs: xcodebuild_args,
+      xcargs: "CURRENT_PROJECT_VERSION=#{next_build}",
       export_options: {
-        signingStyle: "automatic",
+        signingStyle: "manual",
         teamID: team_id,
+        provisioningProfiles: {
+          APP_IDENTIFIER => profile_name,
+        },
       },
       output_directory: "build",
       output_name: "Flipvise.ipa",
