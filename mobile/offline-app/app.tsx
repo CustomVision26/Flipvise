@@ -28,6 +28,7 @@ import {
   getStoredSyncToken,
   getStoredUserId,
   setNativeAppFlag,
+  setStoredApiBaseUrl,
 } from "../../src/lib/offline/session";
 import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
@@ -51,6 +52,11 @@ import {
 const LIVE_URL =
   (import.meta.env.VITE_LIVE_URL as string | undefined) ??
   "https://flipvise-sjgw.onrender.com";
+
+/** Live origin from this native build — not a stale value from Preferences. */
+function bundledLiveUrl(): string {
+  return LIVE_URL.replace(/\/$/, "");
+}
 
 function maxCardsForDeck(
   deck: OfflineDeckRow,
@@ -166,6 +172,8 @@ export function App() {
 
   useEffect(() => {
     void setNativeAppFlag().catch(() => {});
+    // Keep Preferences in sync with the URL baked into this APK/IPA (dev vs prod).
+    void setStoredApiBaseUrl(bundledLiveUrl()).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -267,9 +275,8 @@ export function App() {
       if (!online) return false;
       setSyncing(true);
       try {
-        const [token, storedBase] = await Promise.all([
+        const [token] = await Promise.all([
           getStoredSyncToken(),
-          getStoredApiBaseUrl(),
         ]);
         if (!token) {
           if (options?.showSuccess !== false) {
@@ -281,7 +288,7 @@ export function App() {
         }
         const result = await runSync({
           userId,
-          apiBaseUrl: storedBase ?? LIVE_URL,
+          apiBaseUrl: bundledLiveUrl(),
           token,
           fullPull: true,
         });
@@ -384,7 +391,10 @@ export function App() {
     }
 
     const storedBase = await getStoredApiBaseUrl().catch(() => null);
-    const base = storedBase ?? LIVE_URL;
+    const base = bundledLiveUrl();
+    if (storedBase !== base) {
+      await setStoredApiBaseUrl(base).catch(() => {});
+    }
 
     // Navigate the in-app WebView to the live site (keeps the shared native
     // SQLite/Preferences bridge, so "Make available offline", theme carry-forward,
