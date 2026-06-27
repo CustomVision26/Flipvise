@@ -1,0 +1,88 @@
+name: Android Firebase
+
+# Builds the Capacitor Android app (debug APK) and distributes it to testers via
+# Firebase App Distribution. Trigger manually from the Actions tab or by pushing
+# a tag like `android-v1.0.0`.
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Firebase release notes (optional; defaults to the latest commit message)"
+        type: string
+        required: false
+        default: ""
+  push:
+    tags:
+      - "android-v*"
+
+concurrency:
+  group: android-firebase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & distribute via Firebase
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build mobile web assets
+        run: npm run mobile:build:prod
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Set up Ruby (fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Write Firebase service account
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          FILE="$RUNNER_TEMP/firebase-service-account.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$FILE"
+          if ! grep -q "private_key" "$FILE"; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is missing or not a valid service account JSON."
+            exit 1
+          fi
+          echo "FIREBASE_SERVICE_CREDENTIALS_FILE=$FILE" >> "$GITHUB_ENV"
+
+      - name: Build and distribute
+        env:
+          FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
+          FIREBASE_RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+        run: bundle exec fastlane android firebase
+
+      - name: Upload APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+          retention-days: 14

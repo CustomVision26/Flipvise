@@ -129,3 +129,45 @@ platform :ios do
     )
   end
 end
+
+platform :android do
+  # Builds a debug APK and distributes it to testers via Firebase App
+  # Distribution. A debug build is used so no release keystore secret is needed
+  # to get started; updates may require testers to reinstall because CI's debug
+  # signing key is not persisted between runs.
+  #
+  # Required environment variables (set as GitHub Actions secrets / by the workflow):
+  #   FIREBASE_ANDROID_APP_ID           - Firebase Android app id (1:NNNN:android:XXXX)
+  #   FIREBASE_SERVICE_CREDENTIALS_FILE - path to the service account JSON (written by the workflow)
+  #   FIREBASE_TESTER_GROUPS            - optional comma-separated Firebase tester group aliases
+  desc "Build a debug APK and distribute it via Firebase App Distribution"
+  lane :firebase do
+    gradle(
+      project_dir: "android",
+      task: "assemble",
+      build_type: "Debug",
+    )
+
+    # Release notes default to the latest commit message unless provided.
+    release_notes = ENV["FIREBASE_RELEASE_NOTES"].to_s.strip
+    if release_notes.empty?
+      release_notes = sh("git", "log", "-1", "--pretty=%B", log: false).strip
+    end
+
+    apk_path = lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH] ||
+               "android/app/build/outputs/apk/debug/app-debug.apk"
+
+    options = {
+      app: ENV.fetch("FIREBASE_ANDROID_APP_ID"),
+      service_credentials_file: ENV.fetch("FIREBASE_SERVICE_CREDENTIALS_FILE"),
+      android_artifact_type: "APK",
+      android_artifact_path: apk_path,
+      release_notes: release_notes,
+    }
+
+    groups = ENV["FIREBASE_TESTER_GROUPS"].to_s.strip
+    options[:groups] = groups unless groups.empty?
+
+    firebase_app_distribution(options)
+  end
+end
