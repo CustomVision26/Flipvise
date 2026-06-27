@@ -5,6 +5,14 @@ name: iOS TestFlight
 # or automatically on pushes to `main` that touch mobile/iOS-related files.
 on:
   workflow_dispatch:
+    inputs:
+      lane:
+        description: "fastlane lane to run"
+        type: choice
+        default: beta
+        options:
+          - beta
+          - nuke_certs
   push:
     tags:
       - "ios-v*"
@@ -94,7 +102,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-        run: bundle exec fastlane ios beta
+        run: bundle exec fastlane ios ${{ github.event.inputs.lane || 'beta' }}
 
       - name: Upload build artifacts
         if: always()
