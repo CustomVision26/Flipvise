@@ -923,6 +923,8 @@ export function TeamDeckAssignList({
           activeKey={expandedAssignmentKey}
           onActivate={onAssignmentTableRowActivate}
           layout="table"
+          tableGroupByMember
+          tablePageSize={10}
           deckFilterOptions={assignmentDeckFilterOptions}
           showDateSort
           getSearchHaystack={assignmentSearchHaystack}

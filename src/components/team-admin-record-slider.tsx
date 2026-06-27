@@ -90,12 +90,57 @@ export function sortTeamAdminRecords<T extends { memberLabel: string; deckName: 
   return copy;
 }
 
-export type TeamAdminRecordSliderProps<T extends { key: string; memberLabel: string; deckName: string }> = {
+type MemberGroup<T> = {
+  memberKey: string;
+  items: T[];
+};
+
+function groupItemsByMember<T extends { memberUserId?: string; memberLabel: string }>(
+  items: T[],
+): MemberGroup<T>[] {
+  const order: string[] = [];
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.memberUserId?.trim() || item.memberLabel;
+    if (!map.has(key)) {
+      map.set(key, []);
+      order.push(key);
+    }
+    map.get(key)!.push(item);
+  }
+  return order.map((memberKey) => ({ memberKey, items: map.get(memberKey)! }));
+}
+
+/** Paginate rows without splitting a member group across pages. */
+function paginateMemberGroups<T>(
+  groups: MemberGroup<T>[],
+  pageSize: number,
+): MemberGroup<T>[][] {
+  const pages: MemberGroup<T>[][] = [];
+  let current: MemberGroup<T>[] = [];
+  let rowCount = 0;
+  for (const group of groups) {
+    const groupSize = group.items.length;
+    if (rowCount > 0 && rowCount + groupSize > pageSize) {
+      pages.push(current);
+      current = [];
+      rowCount = 0;
+    }
+    current.push(group);
+    rowCount += groupSize;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
+
+export type TeamAdminRecordSliderProps<
+  T extends { key: string; memberLabel: string; deckName: string; memberUserId?: string },
+> = {
   items: T[];
   activeKey?: string | null;
   onActivate?: (item: T) => void;
   onDoubleClick?: (item: T) => void;
-  renderCard: (item: T, isActive: boolean) => React.ReactNode;
+  renderCard?: (item: T, isActive: boolean) => React.ReactNode;
   renderBelowActive?: (item: T) => React.ReactNode;
   deckFilterOptions?: string[];
   showDateSort?: boolean;
@@ -121,9 +166,15 @@ export type TeamAdminRecordSliderProps<T extends { key: string; memberLabel: str
     className?: string;
     cell: (item: T, isActive: boolean) => React.ReactNode;
   }>;
+  /** Merge rows under one member cell (rowspan) — requires `memberUserId` on items. */
+  tableGroupByMember?: boolean;
+  /** Assignment rows per page; member groups are never split across pages. */
+  tablePageSize?: number;
 };
 
-export function TeamAdminRecordSlider<T extends { key: string; memberLabel: string; deckName: string }>({
+export function TeamAdminRecordSlider<
+  T extends { key: string; memberLabel: string; deckName: string; memberUserId?: string },
+>({
   items,
   activeKey = null,
   onActivate,
@@ -145,12 +196,15 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
   filterPanelExtraActive = false,
   layout = "slider",
   tableColumns,
+  tableGroupByMember = false,
+  tablePageSize = 10,
 }: TeamAdminRecordSliderProps<T>) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState<TeamAdminRecordSort>("member_az");
   const [deckFilter, setDeckFilter] = React.useState(FILTER_ALL_DECKS);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slideIndex, setSlideIndex] = React.useState(0);
+  const [tablePage, setTablePage] = React.useState(1);
   const trackRef = React.useRef<HTMLDivElement>(null);
 
   const hasActiveFilters =
@@ -176,9 +230,35 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
     return sortTeamAdminRecords(next, sortBy, getSortDate);
   }, [items, deckFilter, searchQuery, sortBy, getSearchHaystack, getSortDate]);
 
+  const memberGroups = React.useMemo(() => {
+    if (!tableGroupByMember) return null;
+    return groupItemsByMember(filteredItems);
+  }, [filteredItems, tableGroupByMember]);
+
+  const tablePagination = React.useMemo(() => {
+    if (tableGroupByMember && memberGroups) {
+      const pages = paginateMemberGroups(memberGroups, tablePageSize);
+      const pageCount = Math.max(1, pages.length);
+      const groupsOnPage = pages[Math.min(tablePage, pageCount) - 1] ?? [];
+      const rowCount = groupsOnPage.reduce((n, g) => n + g.items.length, 0);
+      return { pageCount, groupsOnPage, flatRows: groupsOnPage.flatMap((g) => g.items), rowCount };
+    }
+    const pageCount = Math.max(1, Math.ceil(filteredItems.length / tablePageSize));
+    const start = (tablePage - 1) * tablePageSize;
+    const flatRows = filteredItems.slice(start, start + tablePageSize);
+    return { pageCount, groupsOnPage: null, flatRows, rowCount: flatRows.length };
+  }, [filteredItems, memberGroups, tableGroupByMember, tablePage, tablePageSize]);
+
   React.useEffect(() => {
     setSlideIndex(0);
+    setTablePage(1);
   }, [searchQuery, sortBy, deckFilter, items.length]);
+
+  React.useEffect(() => {
+    if (tablePage > tablePagination.pageCount) {
+      setTablePage(tablePagination.pageCount);
+    }
+  }, [tablePage, tablePagination.pageCount]);
 
   React.useEffect(() => {
     if (slideIndex >= filteredItems.length && filteredItems.length > 0) {
@@ -194,9 +274,19 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
     requestAnimationFrame(() => scrollToIndex(index));
   }, [activeKey, filteredItems]);
 
-  const activeItem = filteredItems[slideIndex] ?? null;
+  const activeItem =
+    (activeKey ? filteredItems.find((item) => item.key === activeKey) : null) ??
+    filteredItems[slideIndex] ??
+    null;
   const canPrev = slideIndex > 0;
   const canNext = slideIndex < filteredItems.length - 1;
+  const canTablePrev = tablePage > 1;
+  const canTableNext = tablePage < tablePagination.pageCount;
+  const memberColumn = tableColumns?.find((col) => col.id === "member");
+  const deckColumns =
+    tableGroupByMember && memberColumn
+      ? (tableColumns ?? []).filter((col) => col.id !== "member")
+      : (tableColumns ?? []);
 
   function scrollToIndex(index: number) {
     const track = trackRef.current;
@@ -362,29 +452,96 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => {
-                  const isActive = activeKey === item.key;
-                  return (
-                    <TableRow
-                      key={item.key}
-                      className={cn(
-                        "cursor-pointer",
-                        isActive && "bg-muted/40",
-                      )}
-                      onClick={() => onActivate?.(item)}
-                      aria-selected={isActive}
-                    >
-                      {tableColumns.map((col) => (
-                        <TableCell key={col.id} className={col.className}>
-                          {col.cell(item, isActive)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
+                {tableGroupByMember && tablePagination.groupsOnPage
+                  ? tablePagination.groupsOnPage.map((group) =>
+                      group.items.map((item, rowInGroup) => {
+                        const isActive = activeKey === item.key;
+                        return (
+                          <TableRow
+                            key={item.key}
+                            className={cn("cursor-pointer", isActive && "bg-muted/40")}
+                            onClick={() => onActivate?.(item)}
+                            aria-selected={isActive}
+                          >
+                            {rowInGroup === 0 && memberColumn ? (
+                              <TableCell
+                                rowSpan={group.items.length}
+                                className={cn(
+                                  memberColumn.className,
+                                  "align-top border-r border-border/50 bg-muted/10",
+                                )}
+                              >
+                                {memberColumn.cell(item, isActive)}
+                              </TableCell>
+                            ) : null}
+                            {deckColumns.map((col) => (
+                              <TableCell key={col.id} className={col.className}>
+                                {col.cell(item, isActive)}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        );
+                      }),
+                    )
+                  : tablePagination.flatRows.map((item) => {
+                      const isActive = activeKey === item.key;
+                      return (
+                        <TableRow
+                          key={item.key}
+                          className={cn("cursor-pointer", isActive && "bg-muted/40")}
+                          onClick={() => onActivate?.(item)}
+                          aria-selected={isActive}
+                        >
+                          {tableColumns.map((col) => (
+                            <TableCell key={col.id} className={col.className}>
+                              {col.cell(item, isActive)}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      );
+                    })}
               </TableBody>
             </Table>
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {filteredItems.length} assignment{filteredItems.length === 1 ? "" : "s"}
+              {tableGroupByMember && memberGroups
+                ? ` · ${memberGroups.length} member${memberGroups.length === 1 ? "" : "s"}`
+                : null}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="shrink-0"
+                disabled={!canTablePrev}
+                onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+              </Button>
+              <p className="min-w-[5.5rem] text-center text-xs font-medium tabular-nums text-muted-foreground">
+                {tablePage} of {tablePagination.pageCount}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="shrink-0"
+                disabled={!canTableNext}
+                onClick={() =>
+                  setTablePage((p) => Math.min(tablePagination.pageCount, p + 1))
+                }
+                aria-label="Next page"
+              >
+                <ChevronRight className="size-4" aria-hidden />
+              </Button>
+            </div>
+          </div>
+
           {activeItem && renderBelowActive ? (
             <div>{renderBelowActive(activeItem)}</div>
           ) : null}
@@ -450,7 +607,7 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
                       className={cn(cardClass, onDoubleClick && "cursor-pointer")}
                       onDoubleClick={() => onDoubleClick?.(item)}
                     >
-                      {renderCard(item, isActive)}
+                      {renderCard?.(item, isActive)}
                     </div>
                   ) : (
                     <button
@@ -458,7 +615,7 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
                       className={cn(cardClass, "text-left")}
                       onClick={() => onActivate?.(item)}
                     >
-                      {renderCard(item, isActive)}
+                      {renderCard?.(item, isActive)}
                     </button>
                   )}
                 </div>
