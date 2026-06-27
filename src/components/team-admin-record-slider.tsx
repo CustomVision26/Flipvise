@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
