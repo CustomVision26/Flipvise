@@ -171,6 +171,10 @@ export function DeckCardPopover({
   const triggerClassName =
     "block w-full min-h-0 text-left cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+  const deckTriggerRender = (
+    <div tabIndex={0} aria-label={`Quick actions for ${deck.name}`} />
+  );
+
   /**
    * Grid (detail) view: inline cover omitted — show cover on hover via CSS only.
    * Do not use Tooltip here: it portals into document.body while the card sits
@@ -476,8 +480,8 @@ export function DeckCardPopover({
         >
           <DialogTrigger
             nativeButton={false}
+            render={deckTriggerRender}
             className={triggerClassName}
-            aria-label={`Quick actions for ${deck.name}`}
           >
             {withGridCoverHover(deckCard)}
           </DialogTrigger>
@@ -525,8 +529,8 @@ export function DeckCardPopover({
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger
             nativeButton={false}
+            render={deckTriggerRender}
             className={triggerClassName}
-            aria-label={`Quick actions for ${deck.name}`}
           >
             {withGridCoverHover(deckCard)}
           </PopoverTrigger>

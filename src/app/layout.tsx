@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
-import Script from "next/script";
 import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
@@ -161,9 +160,13 @@ export default async function RootLayout({
       className={`${poppins.variable} h-full antialiased`}
       data-ui-theme={appliedTheme}
     >
-      <Script id="flipvise-native-shell-flag" strategy="beforeInteractive">
-        {`try{if(/FlipviseNative\\//.test(navigator.userAgent)||(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())){document.documentElement.dataset.flipviseNativeShell="1"}}catch(e){}`}
-      </Script>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(/FlipviseNative\\//.test(navigator.userAgent)||(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())){document.documentElement.dataset.flipviseNativeShell="1"}}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col relative">
         <AppProviders>
             {showHeaderChrome && (
