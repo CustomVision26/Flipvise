@@ -16,6 +16,11 @@
   .cl-drawerContent {
     z-index: 100 !important;
   }
+
+  /* Capacitor: keep the live-site header below the iOS status bar / notch. */
+  html[data-flipvise-native-shell] [data-app-header] {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 47px));
+  }
 }
 
 @theme inline {

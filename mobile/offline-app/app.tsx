@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   isOfflineDbAvailable,
   getLastOfflineDbError,
@@ -244,6 +244,14 @@ export function App() {
     },
     [userId, online, loadDecks, workspaceScope, refreshAccessContext],
   );
+
+  // Reconcile ghost decks (deleted on server) when the library opens online.
+  const didAutoSyncRef = useRef(false);
+  useEffect(() => {
+    if (!libraryReady || !userId || !online || didAutoSyncRef.current) return;
+    didAutoSyncRef.current = true;
+    void runSyncNow({ showSuccess: false });
+  }, [libraryReady, userId, online, runSyncNow]);
 
   const handleSync = useCallback(async () => {
     if (!userId) {

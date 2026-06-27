@@ -4,8 +4,8 @@ import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  FLIPVISE_OFFLINE_SHELL_URL,
   isFlipviseNativeShell,
+  navigateToOfflineShell,
 } from "@/lib/offline/is-flipvise-native-app";
 
 /** Returns to the bundled offline Study shell inside the Capacitor app. */
@@ -23,7 +23,7 @@ export function NativeAppBackButton() {
     <Button
       variant="outline"
       onClick={() => {
-        window.location.href = FLIPVISE_OFFLINE_SHELL_URL;
+        void navigateToOfflineShell();
       }}
     >
       <ArrowLeft className="size-4" />

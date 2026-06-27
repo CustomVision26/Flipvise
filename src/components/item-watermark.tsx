@@ -22,7 +22,7 @@ export function ItemWatermark({
           : view === "compact"
             ? "bottom-6 left-0 right-0 h-[38%] items-end justify-center"
             : "bottom-1 right-2 top-1 w-[40%] items-center justify-end",
-        "text-[length:clamp(0.7rem,min(14cqmin,4.5vw),2.75rem)] tracking-[0.16em]",
+        "text-[length:clamp(0.7rem,min(14cqi,4.5vw),2.75rem)] tracking-[0.16em]",
         "rotate-[-12deg] font-semibold uppercase",
         onGradient ? "text-white/18" : "text-muted-foreground/22",
       )}
@@ -33,7 +33,7 @@ export function ItemWatermark({
 }
 
 export const itemCardContainerClass =
-  "@container/item-card [container-type:size] relative overflow-hidden [&>*:not([data-item-watermark])]:relative [&>*:not([data-item-watermark])]:z-[1]";
+  "@container/item-card [container-type:inline-size] relative overflow-hidden [&>*:not([data-item-watermark])]:relative [&>*:not([data-item-watermark])]:z-[1]";
 
 export function itemPrimaryTextClass(onGradient = false) {
   return cn(

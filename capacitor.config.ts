@@ -32,6 +32,9 @@ const LIVE_HOST = parseLiveHost(
 
 /** Hostnames the in-app WebView may navigate to (live site + Clerk auth + optional dev). */
 const allowNavigation = new Set([
+  // Bundled offline shell (`server.hostname`); without this iOS opens Safari for
+  // "Offline study" / sign-out navigation to https://localhost/.
+  "localhost",
   LIVE_HOST,
   PROD_HOST,
   "*.onrender.com",
@@ -59,6 +62,8 @@ const config: CapacitorConfig = {
   },
   server: {
     androidScheme: "https",
+    // iOS cannot use https for the bundled origin — default is `capacitor://localhost`.
+    iosScheme: "capacitor",
     hostname: "localhost",
     // Custom page when a main-frame load fails (replaces the system "Webpage not available" screen).
     errorPath: "error.html",

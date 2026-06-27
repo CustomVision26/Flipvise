@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
+  AdminOverviewMetricsPanel,
   AdminOverviewMetricsProvider,
   AdminOverviewMetricsToggle,
 } from "@/components/admin-overview-stats-collapsible";
@@ -57,7 +58,9 @@ export default async function AdminDashboardPage({
         </div>
 
         <Suspense fallback={<AdminOverviewStatsSkeleton />}>
-          <AdminOverviewStats />
+          <AdminOverviewMetricsPanel>
+            <AdminOverviewStats />
+          </AdminOverviewMetricsPanel>
         </Suspense>
 
         <Suspense fallback={<AdminTabsPanelSkeleton />}>

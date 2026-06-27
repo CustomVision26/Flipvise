@@ -19,6 +19,19 @@ export function NativeAppBootstrap() {
 
     if (!likelyNative) return;
 
+    document.documentElement.dataset.flipviseNativeShell = "1";
+
+    // Live Render pages need viewport-fit=cover so env(safe-area-inset-*) clears the
+    // iOS status bar for the app header (workspace switcher, notifications, etc.).
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (viewportMeta) {
+      const content =
+        viewportMeta.getAttribute("content") ?? "width=device-width, initial-scale=1";
+      if (!content.includes("viewport-fit=cover")) {
+        viewportMeta.setAttribute("content", `${content}, viewport-fit=cover`);
+      }
+    }
+
     void import("@/lib/offline/session")
       .then(async (s) => {
         await s.setNativeAppFlag();

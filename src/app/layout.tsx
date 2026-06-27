@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
 import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
@@ -60,6 +60,13 @@ export const metadata: Metadata = {
       "Create AI-powered flashcard decks, study with flashcards or quizzes, and collaborate with your team.",
     type: "website",
   },
+};
+
+/** Lets `env(safe-area-inset-*)` apply under the iOS status bar / home indicator in Capacitor. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -157,10 +164,11 @@ export default async function RootLayout({
             {showHeaderChrome && (
               <AuthenticatedShellChrome>
                 <header
+                  data-app-header
                   className={
                     isTeamInviteRoute
-                      ? "flex items-center justify-start border-b border-border px-3 py-2 sm:px-6 sm:py-3 relative z-10"
-                      : "grid grid-cols-[1fr_auto_1fr] items-center border-b border-border px-3 py-2 sm:px-6 sm:py-3 relative z-10 gap-2"
+                      ? "flex items-center justify-start border-b border-border px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-6 sm:pb-3 relative z-10"
+                      : "grid grid-cols-[1fr_auto_1fr] items-center border-b border-border px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-6 sm:pb-3 relative z-10 gap-2"
                   }
                 >
                   <div className="flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start">

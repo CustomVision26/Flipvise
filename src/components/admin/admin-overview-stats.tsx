@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/card";
 import { Users, CreditCard, Layers, ShieldCheck } from "lucide-react";
 import { PaidSubscribersCard } from "@/components/paid-subscribers-card";
-import { AdminOverviewMetricsPanel } from "@/components/admin-overview-stats-collapsible";
 import {
   adminOverviewMetricsGridClass,
   adminOverviewStatCardClass,
@@ -54,8 +53,7 @@ export async function AdminOverviewStats() {
   ];
 
   return (
-    <AdminOverviewMetricsPanel>
-      <div className={adminOverviewMetricsGridClass}>
+    <div className={adminOverviewMetricsGridClass}>
         {statsCards.slice(0, 3).map(({ label, value, icon: Icon, description, accent, iconClass }, i) => (
           <Card
             key={label}
@@ -121,6 +119,5 @@ export async function AdminOverviewStats() {
           </Card>
         ))}
       </div>
-    </AdminOverviewMetricsPanel>
   );
 }

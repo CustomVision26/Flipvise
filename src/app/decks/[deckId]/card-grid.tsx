@@ -1,19 +1,22 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Image from "next/image";
 import {
   Sparkles,
-  CheckCircle2,
   ListChecks,
   Hash,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { setViewModeAction } from "@/actions/view-mode";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -42,6 +45,7 @@ import { DeleteCardDialog } from "./delete-card-dialog";
 import {
   ItemWatermark,
   itemCardContainerClass,
+  itemPrimaryTextClass,
 } from "@/components/item-watermark";
 
 type CardData = {
@@ -117,6 +121,137 @@ function sortCards(cards: CardData[], sort: SortOption): CardData[] {
   }
 }
 
+function cardTypeBadges(card: CardData, isMC: boolean) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {isMC ? (
+        <Badge
+          variant="outline"
+          className="gap-1 px-1.5 py-0 text-[10px] font-normal border-primary/40"
+        >
+          <ListChecks className="size-3 text-primary" />
+          MC
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+          Standard
+        </Badge>
+      )}
+      {card.aiGenerated && (
+        <Badge variant="outline" className="gap-1 px-1.5 py-0 text-[10px] font-normal">
+          <Sparkles className="size-3 text-primary" />
+          AI
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function CardFaceText({
+  front,
+  correctAnswer,
+  isMC,
+  frontImageUrl,
+  backImageUrl,
+  cardTextClass,
+  variant = "list",
+}: {
+  front: string | null;
+  correctAnswer: string;
+  isMC: boolean;
+  frontImageUrl: string | null;
+  backImageUrl: string | null;
+  cardTextClass: string;
+  variant?: "list" | "compact";
+}) {
+  const backText = correctAnswer || (backImageUrl ? "Image answer" : "No answer");
+  const frontText = front ?? "No question";
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
+      {variant === "compact" && frontImageUrl ? (
+        <CardFrontImage
+          src={frontImageUrl}
+          alt={front ?? (isMC ? "Question image" : "Front image")}
+          label={isMC ? "Question image" : "Front image"}
+          variant="tile"
+        />
+      ) : null}
+      <div className="flex items-start gap-2.5 min-w-0">
+        {frontImageUrl ? (
+          <CardFrontImage
+            src={frontImageUrl}
+            alt={front ?? (isMC ? "Question image" : "Front image")}
+            label={isMC ? "Question image" : "Front image"}
+            variant="thumb"
+            className={variant === "compact" ? "hidden" : "h-9 w-9 sm:h-10 sm:w-10"}
+          />
+        ) : null}
+        <p
+          className={cn(
+            "min-w-0 flex-1 font-semibold leading-snug text-card-foreground [overflow-wrap:anywhere]",
+            variant === "compact"
+              ? "line-clamp-2 text-[11px]"
+              : "line-clamp-2 text-xs sm:text-sm",
+            cardTextClass,
+            !front && "italic text-muted-foreground",
+          )}
+          title={front ?? undefined}
+        >
+          {frontText}
+        </p>
+      </div>
+      <p
+        className={cn(
+          "leading-snug text-muted-foreground line-clamp-2 [overflow-wrap:anywhere]",
+          variant === "compact" ? "text-[10px]" : "text-[11px] sm:text-xs",
+          cardTextClass,
+        )}
+        title={backText}
+      >
+        {backText}
+      </p>
+    </div>
+  );
+}
+
+function CardFrontTableCell({
+  front,
+  isMC,
+  frontImageUrl,
+  cardTextClass,
+}: {
+  front: string | null;
+  isMC: boolean;
+  frontImageUrl: string | null;
+  cardTextClass: string;
+}) {
+  const frontText = front ?? (frontImageUrl ? "Image card" : "—");
+
+  return (
+    <div className="flex min-w-[12rem] items-start gap-3 py-0.5">
+      {frontImageUrl ? (
+        <CardFrontImage
+          src={frontImageUrl}
+          alt={front ?? (isMC ? "Question image" : "Front image")}
+          label={isMC ? "Question image" : "Front image"}
+          variant="thumb"
+          className="h-11 w-11 shrink-0 sm:h-12 sm:w-12"
+        />
+      ) : null}
+      <p
+        className={cn(
+          "min-w-0 flex-1 whitespace-normal text-sm font-medium leading-relaxed text-foreground [overflow-wrap:anywhere] [word-break:normal] sm:text-[0.9375rem]",
+          cardTextClass,
+          !front && !frontImageUrl && "text-muted-foreground",
+        )}
+      >
+        {frontText}
+      </p>
+    </div>
+  );
+}
+
 interface CardGridProps {
   cards: CardData[];
   deckId: number;
@@ -134,24 +269,12 @@ export function CardGrid({
   const [pageSize, setPageSize] = useState<PageSize>(9);
   const [page, setPage] = useState(1);
   const [view, setView] = useState<ViewMode>(initialView);
-  const [hiddenActionRows, setHiddenActionRows] = useState<Set<number>>(
-    new Set(),
-  );
   const [, startTransition] = useTransition();
 
   function handleViewChange(next: ViewMode) {
     setView(next);
     startTransition(() => {
       setViewModeAction({ scope: "cards", view: next }).catch(() => {});
-    });
-  }
-
-  function toggleRowActions(id: number) {
-    setHiddenActionRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
     });
   }
 
@@ -212,24 +335,81 @@ export function CardGrid({
         </div>
       </div>
 
-      {/* Optional column header for detailed Grid view */}
-      {view === "grid" && paginated.length > 0 && (
-        <div className="hidden md:flex items-center gap-3 md:gap-4 px-4 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
-          <span className="flex-1">Question / Front</span>
-          <span className="flex-1">Answer / Back</span>
-          <span className="w-20 text-right">Type</span>
-          <span className="w-40 text-right">Updated</span>
-          <span className="w-28 text-right" aria-hidden />
-        </div>
-      )}
+      {view === "grid" && paginated.length > 0 ? (
+        <div
+          className={cn(
+            "overflow-hidden rounded-xl",
+            cardSurfaceClass,
+          )}
+        >
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="min-w-[14rem] whitespace-normal pl-4">
+                  Front
+                </TableHead>
+                <TableHead className="hidden w-28 sm:table-cell">Type</TableHead>
+                <TableHead className="hidden w-36 md:table-cell">Updated</TableHead>
+                <TableHead className="w-[1%] pr-4 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.map((card, i) => {
+                const isMC = card.cardType === "multiple_choice";
+                const updatedLabel = card.updatedAt.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+                const updatedShort = card.updatedAt.toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+                const cardTextClass = itemPrimaryTextClass(false);
 
+                return (
+                  <TableRow
+                    key={card.id}
+                    className="animate-in fade-in-0 duration-200 fill-mode-both"
+                    style={{ animationDelay: `${i * 20}ms` }}
+                  >
+                    <TableCell className="whitespace-normal pl-4 align-top">
+                      <CardFrontTableCell
+                        front={card.front}
+                        isMC={isMC}
+                        frontImageUrl={card.frontImageUrl}
+                        cardTextClass={cardTextClass}
+                      />
+                    </TableCell>
+                    <TableCell className="hidden align-top sm:table-cell">
+                      {cardTypeBadges(card, isMC)}
+                    </TableCell>
+                    <TableCell className="hidden align-top text-xs text-muted-foreground tabular-nums md:table-cell">
+                      <span className="hidden lg:inline">{updatedLabel}</span>
+                      <span className="lg:hidden">{updatedShort}</span>
+                    </TableCell>
+                    <TableCell className="pr-4 align-top">
+                      <div className="flex items-center justify-end gap-1">
+                        <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
+                        <DeleteCardDialog cardId={card.id} deckId={deckId} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
       <div
         className={
           view === "compact"
             ? "grid grid-cols-2 items-stretch gap-1.5 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-            : view === "list"
-              ? "flex flex-col gap-1"
-              : "flex flex-col gap-2"
+            : "flex flex-col gap-1"
         }
       >
         {paginated.map((card, i) => {
@@ -257,10 +437,8 @@ export function CardGrid({
             day: "numeric",
           });
 
-          // Card text sits on the solid card surface (not the deck gradient),
-          // so keep it above the "CARD" watermark but skip the gradient-oriented
-          // dark drop-shadow that otherwise muddies the text on a dark card.
-          const cardTextClass = "relative z-[2]";
+          // Card text sits on the solid card surface (not the deck gradient).
+          const cardTextClass = itemPrimaryTextClass(false);
 
           if (view === "list") {
             return (
@@ -269,83 +447,24 @@ export function CardGrid({
                 className={cn(
                   itemCardContainerClass,
                   cardSurfaceClass,
-                  "flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-3 px-3 sm:flex-row sm:items-center sm:gap-3",
+                  "flex flex-row items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-2.5 px-3 min-h-[3.25rem]",
                 )}
                 style={{ animationDelay: `${i * 20}ms` }}
               >
                 <ItemWatermark label="CARD" view="list" />
-                <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {isMC ? "Question" : "Front"}
-                      </span>
-                      {isMC && (
-                        <ListChecks
-                          className="size-3 text-primary"
-                          aria-label="Multiple choice"
-                        />
-                      )}
-                      {card.aiGenerated && (
-                        <Sparkles
-                          className="size-3 text-primary"
-                          aria-label="AI generated"
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-start gap-2">
-                      {card.frontImageUrl ? (
-                        <CardFrontImage
-                          src={card.frontImageUrl}
-                          alt={card.front ?? (isMC ? "Question image" : "Front image")}
-                          label={isMC ? "Question image" : "Front image"}
-                          variant="thumb"
-                          className="h-10 w-10 sm:h-12 sm:w-12"
-                        />
-                      ) : null}
-                      <p
-                        className={cn(
-                          "min-w-0 flex-1 text-sm font-semibold leading-snug text-card-foreground line-clamp-2 [overflow-wrap:anywhere]",
-                          cardTextClass,
-                        )}
-                      >
-                        {card.front ?? "(no front)"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1 border-t border-border/50 pt-2 sm:border-t-0 sm:border-l sm:pl-4 sm:pt-0">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {isMC ? "Answer" : "Back"}
-                    </span>
-                    <div className="flex items-start gap-1.5">
-                      {isMC && (
-                        <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-emerald-500" />
-                      )}
-                      {card.backImageUrl && !correctAnswer ? (
-                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-muted/30">
-                          <Image
-                            src={card.backImageUrl}
-                            alt=""
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      ) : null}
-                      <p
-                        className={cn(
-                          "min-w-0 flex-1 text-sm leading-snug text-card-foreground/90 line-clamp-2 [overflow-wrap:anywhere]",
-                          cardTextClass,
-                        )}
-                      >
-                        {correctAnswer || (card.backImageUrl ? "(image)" : "(no back)")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums sm:hidden">
+                <CardFaceText
+                  front={card.front}
+                  correctAnswer={correctAnswer}
+                  isMC={isMC}
+                  frontImageUrl={card.frontImageUrl}
+                  backImageUrl={card.backImageUrl}
+                  cardTextClass={cardTextClass}
+                  variant="list"
+                />
+                <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums lg:inline">
                   {updatedShort}
                 </span>
-                <div className="flex shrink-0 items-center gap-1 self-end sm:self-center">
+                <div className="flex shrink-0 items-center gap-1">
                   <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
                   <DeleteCardDialog cardId={card.id} deckId={deckId} />
                 </div>
@@ -354,85 +473,30 @@ export function CardGrid({
           }
 
           if (view === "compact") {
-            const frontImageAlt =
-              card.front ?? (isMC ? "Question image" : "Front image");
-            const frontImageLabel = isMC ? "Question image" : "Front image";
-
             return (
               <Card
                 key={card.id}
                 className={cn(
                   itemCardContainerClass,
                   cardSurfaceClass,
-                  "flex h-full min-h-[148px] flex-col gap-1.5 rounded-md py-2 px-2 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-xl",
+                  "flex h-full min-h-[120px] flex-col gap-1 rounded-md py-2 px-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-xl",
                 )}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
                 <ItemWatermark label="CARD" view="compact" />
-                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                <div className="flex min-h-0 flex-1 flex-col gap-1">
                   <div className="flex min-h-3 shrink-0 items-center gap-0.5">
-                    {isMC && (
-                      <Badge
-                        variant="outline"
-                        className="size-3.5 justify-center border-primary/35 p-0"
-                        aria-label="Multiple choice"
-                      >
-                        <ListChecks className="size-2 text-primary" />
-                      </Badge>
-                    )}
-                    {card.aiGenerated && (
-                      <Badge
-                        variant="outline"
-                        className="size-3.5 justify-center p-0"
-                        aria-label="AI generated"
-                      >
-                        <Sparkles className="size-2 text-primary" />
-                      </Badge>
-                    )}
+                    {cardTypeBadges(card, isMC)}
                   </div>
-                  <div className="min-h-0 flex-1">
-                    <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {isMC ? "Question" : "Front"}
-                    </span>
-                    {card.frontImageUrl ? (
-                      <CardFrontImage
-                        src={card.frontImageUrl}
-                        alt={frontImageAlt}
-                        label={frontImageLabel}
-                        variant="tile"
-                      />
-                    ) : null}
-                    <p
-                      className={cn(
-                        "text-[11px] font-semibold leading-snug [overflow-wrap:anywhere]",
-                        cardTextClass,
-                        card.frontImageUrl ? "mt-1 line-clamp-2" : "line-clamp-3",
-                        card.front
-                          ? "text-card-foreground"
-                          : "text-muted-foreground italic",
-                      )}
-                      title={card.front ?? undefined}
-                    >
-                      {card.front ?? "No front text"}
-                    </p>
-                  </div>
-                  <div className="border-t border-border/40 pt-1.5">
-                    <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {isMC ? "Answer" : "Back"}
-                    </span>
-                    <p
-                      className={cn(
-                        "text-[10px] leading-snug [overflow-wrap:anywhere] line-clamp-2",
-                        cardTextClass,
-                        correctAnswer
-                          ? "text-card-foreground/90"
-                          : "text-muted-foreground italic",
-                      )}
-                      title={correctAnswer || undefined}
-                    >
-                      {correctAnswer || (card.backImageUrl ? "Image answer" : "No back text")}
-                    </p>
-                  </div>
+                  <CardFaceText
+                    front={card.front}
+                    correctAnswer={correctAnswer}
+                    isMC={isMC}
+                    frontImageUrl={card.frontImageUrl}
+                    backImageUrl={card.backImageUrl}
+                    cardTextClass={cardTextClass}
+                    variant="compact"
+                  />
                 </div>
                 <div className="mt-auto flex shrink-0 items-center justify-between gap-0.5 border-t border-border/30 pt-1">
                   <span className="truncate text-[8px] text-muted-foreground tabular-nums">
@@ -447,147 +511,10 @@ export function CardGrid({
             );
           }
 
-          // Default: Grid = detailed table row — show front and back on the card face
-          return (
-            <Card
-              key={card.id}
-              className={cn(
-                itemCardContainerClass,
-                cardSurfaceClass,
-                "flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-3.5 px-4 sm:py-4 sm:px-5 md:min-h-[4rem] md:flex-row md:items-center md:gap-6",
-              )}
-              style={{ animationDelay: `${i * 30}ms` }}
-            >
-              <ItemWatermark label="CARD" view="grid" />
-              <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-start md:gap-4">
-                <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-background/40 px-3 py-2.5 md:border-0 md:bg-transparent md:p-0">
-                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {isMC ? "Question" : "Front"}
-                  </span>
-                  <div className="flex items-start gap-2.5">
-                    {card.frontImageUrl ? (
-                      <CardFrontImage
-                        src={card.frontImageUrl}
-                        alt={card.front ?? (isMC ? "Question image" : "Front image")}
-                        label={isMC ? "Question image" : "Front image"}
-                        variant="thumb"
-                      />
-                    ) : null}
-                    <p
-                      className={cn(
-                        "min-w-0 flex-1 text-sm font-semibold leading-relaxed text-card-foreground [overflow-wrap:anywhere] [word-break:normal] sm:text-[0.9375rem]",
-                        cardTextClass,
-                      )}
-                    >
-                      {card.front ?? "(no front)"}
-                    </p>
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-background/40 px-3 py-2.5 md:border-0 md:bg-transparent md:p-0">
-                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {isMC ? "Answer" : "Back"}
-                  </span>
-                  <div className="flex items-start gap-2 text-sm leading-relaxed text-card-foreground/90 sm:text-[0.9375rem]">
-                    {isMC && (
-                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-                    )}
-                    {card.backImageUrl && !correctAnswer ? (
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-muted/30 sm:h-12 sm:w-12">
-                        <Image
-                          src={card.backImageUrl}
-                          alt=""
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ) : null}
-                    <span
-                      className={cn(
-                        "min-w-0 flex-1 [overflow-wrap:anywhere] [word-break:normal]",
-                        cardTextClass,
-                      )}
-                    >
-                      {correctAnswer || (card.backImageUrl ? "(image)" : "(no back)")}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-row items-center justify-between gap-2 border-t border-border/40 pt-2 md:w-20 md:shrink-0 md:flex-col md:items-end md:justify-center md:border-0 md:pt-0">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground md:sr-only">
-                    Type
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {isMC ? (
-                      <Badge
-                        variant="outline"
-                        className="gap-1 px-1.5 py-0 text-[10px] font-normal border-primary/40"
-                      >
-                        <ListChecks className="size-3 text-primary" />
-                        MC
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="px-1.5 py-0 text-[10px] font-normal"
-                      >
-                        Standard
-                      </Badge>
-                    )}
-                    {card.aiGenerated && (
-                      <Badge
-                        variant="outline"
-                        className="gap-1 px-1.5 py-0 text-[10px] font-normal"
-                      >
-                        <Sparkles className="size-3 text-primary" />
-                        AI
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground tabular-nums md:hidden">
-                    {updatedShort}
-                  </span>
-                </div>
-                <div className="hidden items-center gap-1 md:flex md:w-40 md:shrink-0 md:justify-end md:self-center">
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {updatedLabel}
-                  </span>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center justify-end gap-1 md:w-28 md:self-center">
-                {!hiddenActionRows.has(card.id) && (
-                  <>
-                    <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
-                    <DeleteCardDialog cardId={card.id} deckId={deckId} />
-                  </>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  aria-expanded={!hiddenActionRows.has(card.id)}
-                  aria-label={
-                    hiddenActionRows.has(card.id)
-                      ? "Show edit and delete"
-                      : "Hide edit and delete"
-                  }
-                  title={
-                    hiddenActionRows.has(card.id)
-                      ? "Show actions"
-                      : "Hide actions"
-                  }
-                  onClick={() => toggleRowActions(card.id)}
-                >
-                  {hiddenActionRows.has(card.id) ? (
-                    <ChevronLeft className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </Card>
-          );
+          return null;
         })}
       </div>
+      )}
 
       {totalPages > 1 && (
         <Pagination className="pt-2">

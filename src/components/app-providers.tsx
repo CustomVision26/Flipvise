@@ -11,6 +11,7 @@ import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { NativeAppBootstrap } from "@/components/native-app-bootstrap";
 import { OfflineBanner } from "@/components/offline-banner";
 import { useClientMounted } from "@/lib/use-client-mounted";
 
@@ -57,6 +58,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     >
       <ThemeStorageNormalize>
         <ClerkWithTheme>
+          <NativeAppBootstrap />
           <OfflineBanner />
           {children}
           <Toaster richColors closeButton position="top-right" />
