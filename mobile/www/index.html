@@ -8,12 +8,85 @@
     />
     <meta name="theme-color" content="#0a0a0b" />
     <title>Flipvise</title>
-    <script type="module" crossorigin src="./assets/index-Bfmz7Y4A.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/dist-eVDQx8Yg.js">
-    <link rel="modulepreload" crossorigin href="./assets/preload-helper-DYl5dUZ5.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-D1Lkvsvx.css">
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #09090b;
+        color: #fafafa;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        padding: 24px;
+        padding-top: calc(24px + env(safe-area-inset-top));
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+      }
+      #boot-splash img {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+      }
+      #boot-splash p {
+        margin: 0;
+        font-size: 14px;
+        color: #a1a1aa;
+      }
+      #boot-error {
+        display: none;
+        max-width: 320px;
+        text-align: center;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #f87171;
+      }
+    </style>
+    <script type="module" src="./assets/index-CnwhrXlD.js"></script>
+    <link rel="modulepreload" href="./assets/dist-eVDQx8Yg.js">
+    <link rel="modulepreload" href="./assets/preload-helper-DYl5dUZ5.js">
+    <link rel="stylesheet" href="./assets/index-63AUAd82.css">
   </head>
   <body>
+    <div id="boot-splash" aria-live="polite">
+      <img src="./logo.png" alt="" />
+      <p>Loading Flipvise…</p>
+      <p id="boot-error"></p>
+    </div>
     <div id="root"></div>
+    <script>
+      (function () {
+        var splash = document.getElementById("boot-splash");
+        var errEl = document.getElementById("boot-error");
+        function showBootError(msg) {
+          if (!splash || !errEl) return;
+          errEl.textContent = msg;
+          errEl.style.display = "block";
+        }
+        window.addEventListener(
+          "error",
+          function (e) {
+            if (e.filename && /\.js($|\?)/.test(e.filename)) {
+              showBootError(
+                "The app could not start. Reinstall from TestFlight or tap below to retry.",
+              );
+            }
+          },
+          true,
+        );
+        window.__flipviseDismissBootSplash = function () {
+          splash && splash.remove();
+        };
+        window.setTimeout(function () {
+          if (splash && document.body.contains(splash)) {
+            showBootError(
+              "Still loading… If this persists, reinstall the app from TestFlight.",
+            );
+          }
+        }, 12000);
+      })();
+    </script>
   </body>
 </html>

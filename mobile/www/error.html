@@ -126,7 +126,28 @@
     </div>
     <script>
       (function () {
-        var OFFLINE_HOME = "https://localhost/";
+        function offlineHomeUrl() {
+          try {
+            if (
+              window.Capacitor &&
+              window.Capacitor.getPlatform &&
+              window.Capacitor.getPlatform() === "ios"
+            ) {
+              return "capacitor://localhost/index.html";
+            }
+          } catch (e) {}
+          var ua = navigator.userAgent || "";
+          if (
+            ua.indexOf("FlipviseNative") !== -1 &&
+            (/iPhone|iPad|iPod/.test(ua) ||
+              (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))
+          ) {
+            return "capacitor://localhost/";
+          }
+          return "https://localhost/";
+        }
+
+        var OFFLINE_HOME = offlineHomeUrl();
         var DEFAULT_RETRY =
           "https://flipvise-sjgw.onrender.com/dashboard?flipvise_native=1";
 
@@ -172,7 +193,7 @@
         });
 
         document.getElementById("offline-btn").addEventListener("click", function () {
-          window.location.href = OFFLINE_HOME;
+          window.location.replace(offlineHomeUrl());
         });
 
         window.addEventListener("online", setOnlineHint);

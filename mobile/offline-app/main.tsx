@@ -19,3 +19,11 @@ createRoot(container).render(
     </LockGate>
   </React.StrictMode>,
 );
+
+declare global {
+  interface Window {
+    __flipviseDismissBootSplash?: () => void;
+  }
+}
+
+window.__flipviseDismissBootSplash?.();

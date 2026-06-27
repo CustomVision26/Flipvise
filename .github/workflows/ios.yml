@@ -73,6 +73,9 @@ jobs:
       - name: Sync Capacitor iOS project
         run: npx cap sync ios
 
+      - name: Verify bundled web assets
+        run: npm run mobile:verify
+
       - name: Set up Ruby (fastlane)
         uses: ruby/setup-ruby@v1
         with:

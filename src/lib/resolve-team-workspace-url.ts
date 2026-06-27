@@ -18,8 +18,8 @@ export type ResolvedTeamWorkspaceUrl = {
    */
   isAssignedMemberPreview: boolean;
   /**
-   * Invited `team_admin` — `/dashboard?team=` lists workspace decks with full open/edit access.
-   * Management uses `/dashboard/team-admin` (URLs use `teamMemberId`; `0` = owner).
+   * Invited `team_admin` — `/dashboard?team=` shows only decks assigned to them for study.
+   * Deck linking and member assignment use `/dashboard/team-admin` (URLs use `teamMemberId`; `0` = owner).
    */
   isTeamAdminWorkspaceViewer: boolean;
   /** Canonical `plan=` for workspace URLs — matches DB team tier when applicable. */

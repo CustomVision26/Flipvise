@@ -5,6 +5,7 @@ import type {
   OfflineCardRow,
   OfflineDeckRow,
 } from "./schema";
+import type { OfflineWorkspaceRole } from "./access-context";
 
 function uuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -36,29 +37,61 @@ export class OfflineLimitError extends Error {
 // Decks
 // ---------------------------------------------------------------------------
 
-/** Personal dashboard — owned decks (excludes member-assigned study copies). */
-export async function listPersonalDecks(userId: string): Promise<OfflineDeckRow[]> {
-  const db = await getOfflineDb();
-  const res = await db.query(
-    `SELECT * FROM decks
-     WHERE user_id = ? AND deleted = 0
-       AND COALESCE(member_assigned, 0) = 0
-     ORDER BY updated_at_ms DESC;`,
-    [userId],
-  );
-  return (res.values ?? []) as OfflineDeckRow[];
-}
-
-/** Team workspace — decks in a workspace (owner/admin library or member assignments). */
-export async function listTeamWorkspaceDecks(
+/**
+ * Personal dashboard — decks the user authored on the server (`decks.userId`).
+ * Matches online `getPersonalDecksByUserWithCardCount` and excludes invited-workspace
+ * study copies (those use `owner_user_id` of the workspace subscriber).
+ */
+export async function listPersonalDecks(
   userId: string,
-  teamId: number,
+  options?: {
+    /** Workspaces the user was invited to (not subscriber-owned) — legacy rows only. */
+    invitedWorkspaceTeamIds?: ReadonlySet<number>;
+  },
 ): Promise<OfflineDeckRow[]> {
   const db = await getOfflineDb();
   const res = await db.query(
     `SELECT * FROM decks
-     WHERE user_id = ? AND deleted = 0 AND team_id = ?
+     WHERE deleted = 0
      ORDER BY updated_at_ms DESC;`,
+    [],
+  );
+  const invitedTeams = options?.invitedWorkspaceTeamIds;
+
+  return ((res.values ?? []) as OfflineDeckRow[]).filter((deck) => {
+    const ownerId = deck.owner_user_id?.trim();
+    if (ownerId) return ownerId === userId;
+
+    // Legacy rows (before `owner_user_id` backfill): session `user_id` is on every synced row.
+    if (deck.user_id !== userId) return false;
+    const onInvitedWorkspace =
+      deck.team_id != null && (invitedTeams?.has(deck.team_id) ?? false);
+    if (onInvitedWorkspace) return false;
+    // Personal decks may have been mis-tagged `member_assigned` during an earlier sync.
+    return true;
+  });
+}
+
+/**
+ * Team workspace — subscriber owner library, or assigned decks for invited members/admins.
+ */
+export async function listTeamWorkspaceDecks(
+  userId: string,
+  teamId: number,
+  role: OfflineWorkspaceRole,
+): Promise<OfflineDeckRow[]> {
+  const db = await getOfflineDb();
+  const assignedOnly = role === "team_member" || role === "team_admin";
+  const res = await db.query(
+    assignedOnly
+      ? `SELECT * FROM decks
+         WHERE user_id = ? AND deleted = 0 AND team_id = ?
+           AND COALESCE(member_assigned, 0) = 1
+         ORDER BY updated_at_ms DESC;`
+      : `SELECT * FROM decks
+         WHERE user_id = ? AND deleted = 0 AND team_id = ?
+           AND COALESCE(member_assigned, 0) = 0
+         ORDER BY updated_at_ms DESC;`,
     [userId, teamId],
   );
   return (res.values ?? []) as OfflineDeckRow[];
@@ -67,9 +100,19 @@ export async function listTeamWorkspaceDecks(
 export async function listDecksForScope(
   userId: string,
   scope: OfflineWorkspaceScope,
+  workspaceRole?: OfflineWorkspaceRole,
+  options?: {
+    invitedWorkspaceTeamIds?: ReadonlySet<number>;
+  },
 ): Promise<OfflineDeckRow[]> {
-  if (scope.kind === "personal") return listPersonalDecks(userId);
-  return listTeamWorkspaceDecks(userId, scope.teamId);
+  if (scope.kind === "personal") {
+    return listPersonalDecks(userId, options);
+  }
+  return listTeamWorkspaceDecks(
+    userId,
+    scope.teamId,
+    workspaceRole ?? "team_member",
+  );
 }
 
 /** @deprecated Use listDecksForScope — returns all non-assigned decks for the user. */
@@ -85,26 +128,29 @@ export async function getDeck(localId: string): Promise<OfflineDeckRow | null> {
   return ((res.values ?? [])[0] as OfflineDeckRow) ?? null;
 }
 
-export async function countOwnedDecks(userId: string): Promise<number> {
-  const db = await getOfflineDb();
-  const res = await db.query(
-    `SELECT COUNT(*) AS n FROM decks
-     WHERE user_id = ? AND deleted = 0 AND COALESCE(member_assigned, 0) = 0;`,
-    [userId],
-  );
-  const row = (res.values ?? [])[0] as { n: number } | undefined;
-  return Number(row?.n ?? 0);
+export async function countOwnedDecks(
+  userId: string,
+  options?: { invitedWorkspaceTeamIds?: ReadonlySet<number> },
+): Promise<number> {
+  const decks = await listPersonalDecks(userId, options);
+  return decks.length;
 }
 
 export async function countWorkspaceDecks(
   userId: string,
   teamId: number,
+  role: OfflineWorkspaceRole,
 ): Promise<number> {
   const db = await getOfflineDb();
+  const assignedOnly = role === "team_member" || role === "team_admin";
   const res = await db.query(
-    `SELECT COUNT(*) AS n FROM decks
-     WHERE user_id = ? AND deleted = 0 AND team_id = ?
-       AND COALESCE(member_assigned, 0) = 0;`,
+    assignedOnly
+      ? `SELECT COUNT(*) AS n FROM decks
+         WHERE user_id = ? AND deleted = 0 AND team_id = ?
+           AND COALESCE(member_assigned, 0) = 1;`
+      : `SELECT COUNT(*) AS n FROM decks
+         WHERE user_id = ? AND deleted = 0 AND team_id = ?
+           AND COALESCE(member_assigned, 0) = 0;`,
     [userId, teamId],
   );
   const row = (res.values ?? [])[0] as { n: number } | undefined;
@@ -145,11 +191,12 @@ export async function createDeck(input: {
   const ts = now();
   await db.run(
     `INSERT INTO decks
-       (local_id, server_id, user_id, name, description, gradient, cover_image_url,
+       (local_id, server_id, user_id, owner_user_id, name, description, gradient, cover_image_url,
         created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?);`,
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?);`,
     [
       localId,
+      input.userId,
       input.userId,
       input.name,
       input.description ?? null,
@@ -196,6 +243,17 @@ export async function purgeLocallyCreatedTeamDecks(userId: string): Promise<numb
   );
   await persistOfflineDb();
   return ids.length;
+}
+
+/** Clears mistaken `member_assigned` flags on rows the user authored (post-sync repair). */
+export async function repairPersonalDeckRows(userId: string): Promise<void> {
+  const db = await getOfflineDb();
+  await db.run(
+    `UPDATE decks SET member_assigned = 0
+     WHERE deleted = 0 AND owner_user_id = ? AND COALESCE(member_assigned, 0) != 0;`,
+    [userId],
+  );
+  await persistOfflineDb();
 }
 
 export async function updateDeck(

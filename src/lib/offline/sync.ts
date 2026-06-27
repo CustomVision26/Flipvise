@@ -47,6 +47,7 @@ interface SyncResponse {
   pull: {
     decks: {
       serverId: number;
+      ownerUserId: string;
       teamId: number | null;
       memberAssigned: boolean;
       name: string;
@@ -87,6 +88,8 @@ interface SyncResponse {
       isSubscriberOwned?: boolean;
     }[];
     personalPlanLabel?: string;
+    personalAccountPlanLabel?: string;
+    personalPlanAccessType?: string;
     viewerDisplayName?: string;
     viewerEmail?: string | null;
     updatedAtMs: number;
@@ -426,16 +429,18 @@ async function applyServerResponse(
   // 3. Merge pulled rows (last-write-wins; skip rows with newer local edits).
   //    `lower(hex(randomblob(16)))` mints a local id when the row is new locally.
   for (const d of data.pull.decks) {
-    const memberAssigned = d.memberAssigned ? 1 : 0;
+    const memberAssigned =
+      d.ownerUserId === userId ? 0 : d.memberAssigned ? 1 : 0;
     await db.run(
-      `INSERT INTO decks (local_id, server_id, user_id, name, description, gradient,
+      `INSERT INTO decks (local_id, server_id, user_id, owner_user_id, name, description, gradient,
          cover_image_url, created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
        VALUES (
          COALESCE((SELECT local_id FROM decks WHERE server_id = ?), lower(hex(randomblob(16)))),
-         ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
        ON CONFLICT(local_id) DO UPDATE SET
          server_id = excluded.server_id,
          user_id = excluded.user_id,
+         owner_user_id = excluded.owner_user_id,
          name = excluded.name,
          description = excluded.description,
          gradient = excluded.gradient,
@@ -448,6 +453,7 @@ async function applyServerResponse(
         d.serverId,
         d.serverId,
         userId,
+        d.ownerUserId,
         d.name,
         d.description,
         d.gradient,

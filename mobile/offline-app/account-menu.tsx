@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  listenForOfflineOverlayOpen,
+  notifyOfflineOverlayOpen,
+} from "./overlay-coordination";
 
 function initialsFrom(name?: string, email?: string | null): string {
   const source = (name && name.trim()) || (email && email.trim()) || "";
@@ -14,13 +18,19 @@ export function AccountMenu({
   displayName,
   email,
   planLabel,
+  planAccessType,
 }: {
   displayName?: string;
   email?: string | null;
   planLabel?: string;
+  planAccessType?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return listenForOfflineOverlayOpen("account", () => setOpen(false));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -46,7 +56,13 @@ export function AccountMenu({
       <button
         type="button"
         className="account-menu__avatar"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => {
+            const next = !v;
+            if (next) notifyOfflineOverlayOpen("account");
+            return next;
+          });
+        }}
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label="Account"
@@ -85,7 +101,9 @@ export function AccountMenu({
             </div>
             <div className="account-menu__row">
               <span className="account-menu__row-label">Plan type</span>
-              <span className="account-menu__badge">Offline</span>
+              <span className="account-menu__badge">
+                {planAccessType ?? "Free"}
+              </span>
             </div>
           </div>
         </div>

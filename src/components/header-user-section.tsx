@@ -165,70 +165,63 @@ export function HeaderUserSection({
     teamDashFallback != null ||
     isPro;
 
+  const showWorkspaceSwitcherUi =
+    showWorkspaceSwitcher &&
+    workspaceDropdownEligible &&
+    !hideWorkspaceSwitcherOnWorkspaceManagement &&
+    !hideWorkspaceSwitcherOnTeamRoute &&
+    !hideWorkspaceSwitcherOnPricingForTeamTier;
+
+  const toolIconClass = "h-8 w-8 shrink-0 rounded-full";
+
   return (
-    <div className="flex items-center gap-1 sm:gap-2">
-      {isAdmin && !hidePlatformAdminLink && (
-        <HeaderNavTooltip label="Platform Admin">
-          <Link
-            href="/admin/all-users"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
-            )}
-            aria-label="Platform Admin"
+    <div
+      data-header-user-section
+      className="contents lg:flex lg:min-w-0 lg:flex-1 lg:items-center lg:justify-end lg:gap-2"
+    >
+      <div
+        data-header-tools
+        className="col-start-2 row-start-1 flex shrink-0 items-center gap-0.5 justify-self-end sm:gap-1 lg:order-3"
+      >
+        {(isAdmin && !hidePlatformAdminLink) || showAffiliatePortal ? (
+          <div
+            data-header-promo-links
+            className="mr-0.5 hidden items-center gap-1 sm:mr-1 sm:flex"
           >
-            <Shield className="size-3.5 shrink-0" aria-hidden />
-            Platform Admin
-          </Link>
-        </HeaderNavTooltip>
-      )}
-      {showAffiliatePortal && (
-        <HeaderNavTooltip label="Affiliate portal">
-          <Link
-            href="/dashboard/affiliate"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+            {isAdmin && !hidePlatformAdminLink && (
+              <HeaderNavTooltip label="Platform Admin">
+                <Link
+                  href="/admin/all-users"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
+                  )}
+                  aria-label="Platform Admin"
+                >
+                  <Shield className="size-3.5 shrink-0" aria-hidden />
+                  <span className="hidden xl:inline">Platform Admin</span>
+                </Link>
+              </HeaderNavTooltip>
             )}
-            aria-label="Affiliate portal"
-          >
-            <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
-            Affiliate
-          </Link>
-        </HeaderNavTooltip>
-      )}
-      <div className="flex min-w-0 flex-row items-center gap-2">
-        <HeaderNavTooltip label={`${personalAccountPlanLabel} plan — view pricing`}>
-          <Link
-            href="/pricing"
-            className={cn(
-              "min-w-0 max-w-[9rem] shrink truncate text-sm font-medium text-muted-foreground hover:text-foreground transition-colors sm:max-w-[11rem] xl:max-w-[14rem]",
-              isPro && "text-foreground",
+            {showAffiliatePortal && (
+              <HeaderNavTooltip label="Affiliate portal">
+                <Link
+                  href="/dashboard/affiliate"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+                  )}
+                  aria-label="Affiliate portal"
+                >
+                  <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
+                  <span className="hidden xl:inline">Affiliate</span>
+                </Link>
+              </HeaderNavTooltip>
             )}
-            aria-label={`${personalAccountPlanLabel} plan — view pricing`}
-          >
-            {personalAccountPlanLabel}
-          </Link>
-        </HeaderNavTooltip>
+          </div>
+        ) : null}
         {portalsReady ? (
           <>
-            {showWorkspaceSwitcher &&
-              workspaceDropdownEligible &&
-              !hideWorkspaceSwitcherOnWorkspaceManagement &&
-              !hideWorkspaceSwitcherOnTeamRoute &&
-              !hideWorkspaceSwitcherOnPricingForTeamTier && (
-                <span className="inline-flex max-w-full min-w-0 shrink">
-                  <WorkspaceContextDropdown
-                    teams={workspaceTeams}
-                    totalEligibleTeamCount={workspaceTeamsTotalEligible}
-                    activeTeamId={activeWorkspaceTeamId}
-                    personalWorkspaceHref={personalWorkspaceHref}
-                    personalPlanLabel={personalPlanLabelForWorkspace}
-                    teamDashFallback={teamDashFallback}
-                  />
-                </span>
-              )}
-            {/* Avoid Tooltip wrapping UserButton (both use portals) — teardown race → removeChild on null parent. */}
             <span
               className="inline-flex shrink-0 items-center"
               title="Account — profile, appearance, and billing"
@@ -258,10 +251,52 @@ export function HeaderUserSection({
             <AccountDeleteDialog />
           </>
         ) : null}
+        {portalsReady ? (
+          <span className={toolIconClass}>
+            <DocsNavIconButton />
+          </span>
+        ) : null}
+        {portalsReady && showHelpCenter ? (
+          <span className={toolIconClass}>
+            <HelpCenterNavIconButton />
+          </span>
+        ) : null}
+        {portalsReady ? (
+          <span className={toolIconClass}>
+            <InboxNavIconButton unreadCount={inboxUnreadCount} />
+          </span>
+        ) : null}
       </div>
-      {portalsReady ? <DocsNavIconButton /> : null}
-      {portalsReady && showHelpCenter ? <HelpCenterNavIconButton /> : null}
-      {portalsReady ? <InboxNavIconButton unreadCount={inboxUnreadCount} /> : null}
+
+      {portalsReady && showWorkspaceSwitcherUi ? (
+        <div
+          data-header-workspace
+          className="col-span-2 row-start-2 flex w-full min-w-0 items-center gap-2 lg:order-2 lg:w-auto"
+        >
+          <HeaderNavTooltip label={`${personalAccountPlanLabel} plan — view pricing`}>
+            <Link
+              href="/pricing"
+              className={cn(
+                "hidden shrink-0 truncate text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline sm:max-w-[9rem] lg:max-w-[11rem] xl:max-w-[14rem]",
+                isPro && "text-foreground",
+              )}
+              aria-label={`${personalAccountPlanLabel} plan — view pricing`}
+            >
+              {personalAccountPlanLabel}
+            </Link>
+          </HeaderNavTooltip>
+          <span className="inline-flex min-w-0 flex-1 lg:flex-initial">
+            <WorkspaceContextDropdown
+              teams={workspaceTeams}
+              totalEligibleTeamCount={workspaceTeamsTotalEligible}
+              activeTeamId={activeWorkspaceTeamId}
+              personalWorkspaceHref={personalWorkspaceHref}
+              personalPlanLabel={personalPlanLabelForWorkspace}
+              teamDashFallback={teamDashFallback}
+            />
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

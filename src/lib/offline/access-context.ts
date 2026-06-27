@@ -6,6 +6,7 @@
  */
 
 import { Preferences } from "@capacitor/preferences";
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 
 const ACCESS_CONTEXT_KEY = "flipvise.offline.accessContext";
 
@@ -36,8 +37,12 @@ export type OfflineAccessContext = {
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineWorkspaceContext[];
-  /** Label beside “Personal Dash” in the workspace switcher (e.g. Team Basic, Pro). */
+  /** Label beside “Personal Dash” in the workspace switcher (e.g. Team Basic (Affiliate)). */
   personalPlanLabel?: string;
+  /** Billing tier for the account menu Plan row (e.g. Team Basic, Pro Plus). */
+  personalAccountPlanLabel?: string;
+  /** Plan source for the account menu Plan type row (Affiliate, Paid, Free, …). */
+  personalPlanAccessType?: AdminUserPlanAccessType;
   /** Signed-in user display name (for owned workspaces when owner label is missing). */
   viewerDisplayName?: string;
   viewerEmail?: string | null;
@@ -121,4 +126,32 @@ export function resolveOfflinePersonalPlanLabel(
   if (ctx.maxPersonalDecks >= 15) return "Pro Plus";
   if (ctx.maxPersonalDecks > 2) return "Pro";
   return stored || "Free";
+}
+
+/** Account menu: billing tier + plan source (separate from workspace switcher label). */
+export function resolveOfflineAccountPlanDisplay(ctx: OfflineAccessContext): {
+  plan: string;
+  planType: string;
+} {
+  const accountPlan = ctx.personalAccountPlanLabel?.trim();
+  const accessType = ctx.personalPlanAccessType;
+  if (accountPlan && accessType) {
+    return { plan: accountPlan, planType: accessType };
+  }
+
+  const stored = ctx.personalPlanLabel?.trim() || "Free";
+  const affiliateMatch = stored.match(/^(.+?)\s*\(Affiliate\)\s*$/i);
+  if (affiliateMatch) {
+    return { plan: affiliateMatch[1].trim(), planType: "Affiliate" };
+  }
+  if (stored === "Subscriber") {
+    return { plan: accountPlan || "Pro", planType: "Paid" };
+  }
+  if (stored === "Complimentary" || stored === "SuperAdmin" || stored === "Co-Admin") {
+    return {
+      plan: accountPlan || "Pro Plus",
+      planType: stored === "SuperAdmin" || stored === "Co-Admin" ? "Complimentary" : "Complimentary",
+    };
+  }
+  return { plan: accountPlan || stored, planType: accessType ?? "Free" };
 }

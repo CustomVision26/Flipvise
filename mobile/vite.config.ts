@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vite";
 
@@ -14,7 +15,25 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: path.resolve(__dirname, "offline-app"),
   base: "./",
-  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "..", "src"),
+    },
+  },
+  plugins: [
+    react(),
+    {
+      name: "flipvise-capacitor-html",
+      closeBundle() {
+        const indexPath = path.resolve(__dirname, "www", "index.html");
+        if (!fs.existsSync(indexPath)) return;
+        let html = fs.readFileSync(indexPath, "utf8");
+        // WKWebView + capacitor://localhost can reject module scripts with crossorigin.
+        html = html.replace(/\s+crossorigin/g, "");
+        fs.writeFileSync(indexPath, html);
+      },
+    },
+  ],
   build: {
     outDir: path.resolve(__dirname, "www"),
     emptyOutDir: true,

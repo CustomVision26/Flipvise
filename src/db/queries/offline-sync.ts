@@ -16,7 +16,12 @@ import {
   getClerkUserFieldDisplayById,
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
-import { getPersonalWorkspaceAccessLabel } from "@/lib/personal-workspace-plan-label";
+import {
+  getPersonalPlanAccessType,
+  getPersonalWorkspaceAccessLabel,
+  getPersonalWorkspaceAccountPlanLabel,
+} from "@/lib/personal-workspace-plan-label";
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import {
@@ -294,6 +299,8 @@ export async function pushOfflineChanges(
 
 export interface PullDeck {
   serverId: number;
+  /** Postgres `decks.userId` — used to separate personal vs invited-workspace study copies offline. */
+  ownerUserId: string;
   teamId: number | null;
   memberAssigned: boolean;
   name: string;
@@ -343,7 +350,12 @@ export type OfflineSyncContext = {
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineSyncWorkspaceContext[];
+  /** Workspace switcher label (e.g. Team Basic (Affiliate), Subscriber). */
   personalPlanLabel: string;
+  /** Billing tier for the account menu Plan row (e.g. Team Basic, Pro Plus). */
+  personalAccountPlanLabel: string;
+  /** Plan source for the account menu Plan type row (Affiliate, Paid, Free, …). */
+  personalPlanAccessType: AdminUserPlanAccessType;
   viewerDisplayName: string;
   viewerEmail: string | null;
   updatedAtMs: number;
@@ -379,7 +391,7 @@ async function collectAccessibleDeckMeta(
           ? "team_admin"
           : "team_member";
 
-    if (role === "team_member") {
+    if (role === "team_member" || role === "team_admin") {
       const assigned = await getAssignedDecksForMember(team.id, userId);
       for (const d of assigned) {
         map.set(d.id, { teamId: team.id, memberAssigned: true });
@@ -390,6 +402,11 @@ async function collectAccessibleDeckMeta(
     const teamDecks = await getDecksForTeam(team.id, team.ownerUserId);
     for (const d of teamDecks) {
       const existing = map.get(d.id);
+      const authoredByViewer = d.userId === userId;
+      if (!authoredByViewer) {
+        map.set(d.id, { teamId: team.id, memberAssigned: true });
+        continue;
+      }
       map.set(d.id, {
         teamId: team.id,
         memberAssigned: existing?.memberAssigned ?? false,
@@ -453,12 +470,14 @@ export async function buildOfflineSyncContext(
 ): Promise<OfflineSyncContext> {
   const personal = await personalLimitsForSyncUser(userId);
   const personalProUnlocked = personal.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT;
-  const [navPayload, workspaces, memberships, personalPlanLabel, viewerField] =
+  const [navPayload, workspaces, memberships, personalPlanLabel, personalAccountPlanLabel, personalPlanAccessType, viewerField] =
     await Promise.all([
       getWorkspaceNavTeamsForUser(userId, { personalProUnlocked }),
       getEligibleWorkspaceTeamsForUser(userId),
       getTeamMembershipsForUser(userId),
       getPersonalWorkspaceAccessLabel().catch(() => "Free"),
+      getPersonalWorkspaceAccountPlanLabel().catch(() => "Free"),
+      getPersonalPlanAccessType().catch(() => "Free" as const),
       getClerkUserFieldDisplayById(userId),
     ]);
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
@@ -507,6 +526,8 @@ export async function buildOfflineSyncContext(
     maxCardsPerDeck: personal.maxCardsPerDeck,
     workspaces: workspaceContexts,
     personalPlanLabel,
+    personalAccountPlanLabel,
+    personalPlanAccessType,
     viewerDisplayName: viewerField.primaryLine,
     viewerEmail: viewerField.primaryEmail,
     updatedAtMs: Date.now(),
@@ -584,7 +605,9 @@ export async function pullOfflineChanges(
       };
       return {
         serverId: d.id,
-        teamId: meta.teamId,
+        ownerUserId: d.userId,
+        // Prefer the decks-table FK; fall back to workspace context for link-table decks.
+        teamId: d.teamId ?? meta.teamId,
         memberAssigned: meta.memberAssigned,
         name: d.name,
         description: d.description,

@@ -9,6 +9,7 @@ import {
   listDecksForScope,
   OfflineLimitError,
   purgeLocallyCreatedTeamDecks,
+  repairPersonalDeckRows,
 } from "../../src/lib/offline/repository";
 import type {
   OfflineAccessContext,
@@ -17,6 +18,7 @@ import type {
 import {
   defaultOfflineAccessContext,
   getOfflineAccessContext,
+  resolveOfflineAccountPlanDisplay,
   resolveOfflinePersonalPlanLabel,
 } from "../../src/lib/offline/access-context";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
@@ -93,6 +95,15 @@ function useOnline(): boolean {
   return online;
 }
 
+function invitedWorkspaceTeamIds(ctx: OfflineAccessContext): Set<number> {
+  const ids = new Set<number>();
+  for (const w of ctx.workspaces) {
+    if (w.isSubscriberOwned ?? w.role === "owner") continue;
+    ids.add(w.teamId);
+  }
+  return ids;
+}
+
 export function App() {
   const online = useOnline();
   const [userId, setUserId] = useState<string | null>(null);
@@ -122,10 +133,22 @@ export function App() {
   }, []);
 
   const loadDecks = useCallback(
-    async (uid: string, scope: SavedWorkspaceScope) => {
+    async (
+      uid: string,
+      scope: SavedWorkspaceScope,
+      ctx: OfflineAccessContext = defaultOfflineAccessContext(),
+    ) => {
+      const workspaceRole =
+        scope === "personal"
+          ? undefined
+          : ctx.workspaces.find((w) => w.teamId === scope)?.role ?? "team_member";
       const rows = await listDecksForScope(
         uid,
         scope === "personal" ? { kind: "personal" } : { kind: "team", teamId: scope },
+        workspaceRole,
+        scope === "personal"
+          ? { invitedWorkspaceTeamIds: invitedWorkspaceTeamIds(ctx) }
+          : undefined,
       );
       setDecks(rows);
     },
@@ -146,8 +169,19 @@ export function App() {
     let cancelled = false;
     (async () => {
       try {
-        const available = await isOfflineDbAvailable();
+        const DB_BOOT_TIMEOUT_MS = 15_000;
+        const available = await Promise.race([
+          isOfflineDbAvailable(),
+          new Promise<boolean>((resolve) => {
+            window.setTimeout(() => resolve(false), DB_BOOT_TIMEOUT_MS);
+          }),
+        ]);
         if (cancelled) return;
+        if (!available && !getLastOfflineDbError()) {
+          setMessage(
+            "Offline storage is taking too long to start. Force-quit and reopen the app, or reinstall from TestFlight.",
+          );
+        }
         setDbReady(available);
         if (!available) return;
 
@@ -163,14 +197,16 @@ export function App() {
           );
         }
 
-        await refreshAccessContext();
+        const ctx = await refreshAccessContext();
         if (cancelled) return;
 
         const scope = loadWorkspaceScope();
         setWorkspaceScope(scope);
         if (uid) {
           await purgeLocallyCreatedTeamDecks(uid);
-          await loadDecks(uid, scope);
+          await repairPersonalDeckRows(uid).catch(() => {});
+          if (cancelled) return;
+          await loadDecks(uid, scope, ctx);
         }
       } catch (err) {
         if (!cancelled) setMessage(String(err));
@@ -181,7 +217,9 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [loadDecks, refreshAccessContext]);
+    // Mount-only bootstrap — must not re-run when access context / loadDecks identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const runSyncNow = useCallback(
     async (options?: { showSuccess?: boolean }): Promise<boolean> => {
@@ -207,8 +245,8 @@ export function App() {
           token,
           fullPull: true,
         });
-        await refreshAccessContext();
-        await loadDecks(userId, workspaceScope);
+        const ctx = await refreshAccessContext();
+        await loadDecks(userId, workspaceScope, ctx);
         if (options?.showSuccess !== false) {
           const downloadParts: string[] = [];
           if (result.deckCount > 0) {
@@ -273,12 +311,12 @@ export function App() {
       if (!userId) return;
       setScopeLoading(true);
       try {
-        await loadDecks(userId, scope);
+        await loadDecks(userId, scope, accessContext);
       } finally {
         setScopeLoading(false);
       }
     },
-    [userId, loadDecks],
+    [userId, loadDecks, accessContext],
   );
 
   const canCreateDeck = useMemo(
@@ -362,20 +400,26 @@ export function App() {
   );
 
   useEffect(() => {
+    if (!libraryReady) return;
     if (workspaceScope === "personal") return;
     const ws = accessContext.workspaces.find((w) => w.teamId === workspaceScope);
     if (!ws) {
-      handleWorkspaceChange("personal");
+      void handleWorkspaceChange("personal");
       return;
     }
     // Team-tier owners study and manage from Personal Dash — not subscriber-owned team rows.
     if (ws.isSubscriberOwned ?? ws.role === "owner") {
-      handleWorkspaceChange("personal");
+      void handleWorkspaceChange("personal");
     }
-  }, [accessContext.workspaces, workspaceScope, handleWorkspaceChange]);
+  }, [libraryReady, accessContext.workspaces, workspaceScope, handleWorkspaceChange]);
 
   const personalPlanLabel = useMemo(
     () => resolveOfflinePersonalPlanLabel(accessContext),
+    [accessContext],
+  );
+
+  const accountPlanDisplay = useMemo(
+    () => resolveOfflineAccountPlanDisplay(accessContext),
     [accessContext],
   );
 
@@ -427,7 +471,7 @@ export function App() {
         maxCardsPerDeck={maxCardsForDeck(addCardsDeck, accessContext)}
         onBack={() => setAddCardsDeck(null)}
         onSaved={async () => {
-          if (userId) await loadDecks(userId, workspaceScope);
+          if (userId) await loadDecks(userId, workspaceScope, accessContext);
           setAddCardsDeck(null);
           setActiveDeck(addCardsDeck);
           setDeckView("menu");
@@ -494,7 +538,8 @@ export function App() {
         onSettings={() => setShowSettings(true)}
         viewerDisplayName={accessContext.viewerDisplayName}
         viewerEmail={accessContext.viewerEmail}
-        personalPlanLabel={personalPlanLabel}
+        accountPlanLabel={accountPlanDisplay.plan}
+        accountPlanAccessType={accountPlanDisplay.planType}
       />
       <div className="content content--library">
         <DeckLibrary
@@ -517,7 +562,7 @@ export function App() {
             setDeckView("menu");
           }}
           onDecksChanged={async () => {
-            if (userId) await loadDecks(userId, workspaceScope);
+            if (userId) await loadDecks(userId, workspaceScope, accessContext);
           }}
         />
       </div>
@@ -530,7 +575,7 @@ export function App() {
           activeWorkspace={activeWorkspace}
           onClose={() => setShowNewDeck(false)}
           onCreated={async () => {
-            if (userId) await loadDecks(userId, workspaceScope);
+            if (userId) await loadDecks(userId, workspaceScope, accessContext);
             setShowNewDeck(false);
             setMessage("Deck saved on this device — add cards, then sync when online.");
           }}
@@ -549,7 +594,8 @@ function Topbar({
   onSettings,
   viewerDisplayName,
   viewerEmail,
-  personalPlanLabel,
+  accountPlanLabel,
+  accountPlanAccessType,
 }: {
   online: boolean;
   onOpen: () => void;
@@ -558,7 +604,8 @@ function Topbar({
   onSettings?: () => void;
   viewerDisplayName?: string;
   viewerEmail?: string | null;
-  personalPlanLabel?: string;
+  accountPlanLabel?: string;
+  accountPlanAccessType?: string;
 }) {
   return (
     <header className="topbar">
@@ -569,41 +616,43 @@ function Topbar({
           <span className="brand-tag">Offline study</span>
         </div>
       </div>
-      <div className="spacer" />
-      <ConnectionStatusPill online={online} />
-      <button
-        type="button"
-        className="btn secondary btn--sm"
-        onClick={onSync}
-        disabled={syncing}
-      >
-        {syncing ? "Syncing…" : "Sync"}
-      </button>
-      <button
-        type="button"
-        className="btn secondary btn--sm"
-        onClick={onOpen}
-        disabled={!online}
-        title={online ? "Open the live dashboard" : "Requires an internet connection"}
-      >
-        Online Dashboard
-      </button>
-      {onSettings ? (
+      <div className="topbar-actions">
+        <ConnectionStatusPill online={online} compact />
         <button
           type="button"
-          className="icon-btn"
-          onClick={onSettings}
-          aria-label="Settings"
-          title="Settings"
+          className="btn secondary btn--sm"
+          onClick={onSync}
+          disabled={syncing}
         >
-          ⚙
+          {syncing ? "Syncing…" : "Sync"}
         </button>
-      ) : null}
-      <AccountMenu
-        displayName={viewerDisplayName}
-        email={viewerEmail}
-        planLabel={personalPlanLabel}
-      />
+        <button
+          type="button"
+          className="btn secondary btn--sm topbar-actions__online-dash"
+          onClick={onOpen}
+          disabled={!online}
+          title={online ? "Open the live dashboard" : "Requires an internet connection"}
+        >
+          Online Dashboard
+        </button>
+        {onSettings ? (
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onSettings}
+            aria-label="Settings"
+            title="Settings"
+          >
+            ⚙
+          </button>
+        ) : null}
+        <AccountMenu
+          displayName={viewerDisplayName}
+          email={viewerEmail}
+          planLabel={accountPlanLabel}
+          planAccessType={accountPlanAccessType}
+        />
+      </div>
     </header>
   );
 }

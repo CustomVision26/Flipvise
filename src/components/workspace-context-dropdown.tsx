@@ -296,11 +296,11 @@ export function WorkspaceContextDropdown({
             variant="outline"
             size="sm"
             title="Switch workspace — personal dashboard or a team workspace"
-            className="h-9 min-w-[9.5rem] max-w-[12rem] justify-between gap-1.5 px-2.5 font-normal sm:min-w-[10.5rem] sm:max-w-[14rem]"
+            className="h-9 w-full min-w-0 max-w-none justify-between gap-1.5 px-2.5 font-normal sm:min-w-[10.5rem] sm:max-w-[14rem] lg:min-w-[10.5rem] lg:max-w-[14rem]"
             aria-label={`Workspace: ${triggerLabel}. Switch workspace.`}
           >
             <span
-              className="truncate text-left"
+              className="workspace-context-trigger-label truncate text-left"
               title={
                 selectedTeam
                   ? `${selectedTeam.name} · ${selectedTeam.planLabel} · ${selectedTeam.ownerDisplayName}`

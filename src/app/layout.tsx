@@ -24,6 +24,7 @@ import {
   resolveFreeUiThemeSelection,
 } from "@/lib/free-ui-theme";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
+import { cn } from "@/lib/utils";
 import {
   parseSearchParamsRecordFromSearchString,
   teamWorkspaceTeamIdFromUrlShapeIfValid,
@@ -168,10 +169,19 @@ export default async function RootLayout({
                   className={
                     isTeamInviteRoute
                       ? "flex items-center justify-start border-b border-border px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-6 sm:pb-3 relative z-10"
-                      : "grid grid-cols-[1fr_auto_1fr] items-center border-b border-border px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-6 sm:pb-3 relative z-10 gap-2"
+                      : cn(
+                          "relative z-10 border-b border-border px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6 sm:pb-3",
+                          "grid items-center gap-x-2 gap-y-2",
+                          "grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto]",
+                          "lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-rows-1",
+                          shell.teamAdminHeaderTeams.length > 0 && "has-team-admin",
+                        )
                   }
                 >
-                  <div className="flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start">
+                  <div
+                    data-header-brand
+                    className="col-start-1 row-start-1 flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start"
+                  >
                     <HeaderLogo dashboardHref={dashboardHrefWithUserQuery} />
                     {!isTeamInviteRoute && !userId && (
                       <AppTopNav homeHref={dashboardHrefWithUserQuery} />
@@ -180,7 +190,10 @@ export default async function RootLayout({
                   {!isTeamInviteRoute &&
                     userId &&
                     shell.teamAdminHeaderTeams.length > 0 && (
-                    <div className="flex min-w-0 justify-center justify-self-center px-1 sm:px-2">
+                    <div
+                      data-header-team-admin
+                      className="col-span-2 row-start-2 flex min-w-0 justify-center px-1 sm:px-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-center"
+                    >
                       <TeamAdminHeaderSwitcherClient
                         teams={shell.teamAdminHeaderTeams}
                         userId={userId}
@@ -188,7 +201,10 @@ export default async function RootLayout({
                     </div>
                   )}
                   {userId && !isTeamInviteRoute && (
-                    <div className="flex min-w-0 items-center justify-end justify-self-end gap-1 sm:gap-2">
+                    <div
+                      data-header-user
+                      className="contents lg:col-start-3 lg:flex lg:min-w-0 lg:max-w-full lg:items-center lg:justify-end lg:gap-2"
+                    >
                       <HeaderUserSection
                         currentProTheme={proUiThemeSelection}
                         currentFreeTheme={freeUiThemeSelection}

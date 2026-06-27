@@ -85,9 +85,16 @@ export function LockGate({ children }: { children: ReactNode }) {
     };
   }, [enabled]);
 
-  // Still resolving — render a neutral surface so neither decks nor the lock flash.
+  // Still resolving — show the same boot surface so launch never looks like a crash.
   if (enabled === null) {
-    return <div className="app" aria-hidden />;
+    return (
+      <div className="app lock-screen" aria-busy="true" aria-label="Loading">
+        <div className="lock-screen__inner">
+          <img className="lock-screen__logo" src={logoUrl} alt="" />
+          <p className="lock-screen__hint">Loading…</p>
+        </div>
+      </div>
+    );
   }
 
   if (locked) {

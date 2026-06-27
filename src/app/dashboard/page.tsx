@@ -220,11 +220,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   if (isTeamWorkspaceDeckViewer && teamWorkspaceUrl != null) {
     const tw = teamWorkspaceUrl;
+    const isSubscriberOwner = tw.canEditTeamDecks;
     const [workspaceHeadingRow, workspaceDecksRaw] = await Promise.all([
       tryTeamQuery(() => getTeamById(tw.teamId), null),
       tryTeamQuery(
         () =>
-          getDecksForTeamWithCardCount(tw.teamId, tw.ownerUserId),
+          isSubscriberOwner
+            ? getDecksForTeamWithCardCount(tw.teamId, tw.ownerUserId)
+            : getAssignedDecksForMemberWithCardCount(tw.teamId, userId),
         [],
       ),
     ]);
@@ -257,13 +260,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
             {teamWorkspaceTierExtras ? (
               <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                Team workspace — open decks to edit cards or study
+                {isSubscriberOwner
+                  ? "Team workspace — open decks to edit cards or study"
+                  : "Team workspace — preview and study assigned decks"}
               </p>
             ) : (
               <DashboardTeamWorkspaceSubline
                 teamName={workspaceHeadingGroupName}
                 ownerName={workspaceHeadingOwnerName}
-                tailText="Team workspace — open decks to edit cards or study"
+                tailText={
+                  isSubscriberOwner
+                    ? "Team workspace — open decks to edit cards or study"
+                    : "Team workspace — preview and study assigned decks"
+                }
               />
             )}
           </div>
@@ -274,9 +283,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <BookOpen className="h-6 w-6 text-muted-foreground" />
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-foreground text-sm">No decks in this workspace yet</p>
+              <p className="font-medium text-foreground text-sm">
+                {isSubscriberOwner ? "No decks in this workspace yet" : "No decks assigned yet"}
+              </p>
               <p className="text-muted-foreground text-xs max-w-xs">
-                Use Deck Manager in Team Admin to link subscriber decks or assign them to members.
+                {isSubscriberOwner
+                  ? "Use Deck Manager in Team Admin to link subscriber decks or assign them to members."
+                  : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
               </p>
             </div>
           </div>
@@ -285,6 +298,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             decks={workspaceDecks}
             initialView={initialView}
             workspaceQueryString={workspaceQueryString}
+            deckPopoverVariant={isSubscriberOwner ? undefined : "team-preview"}
             teamTierPreviewPromo={teamWorkspaceTierExtras}
             hasAiReading={hasAiReading}
           />

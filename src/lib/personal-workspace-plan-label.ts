@@ -204,6 +204,15 @@ export const getPersonalWorkspaceAccessLabel = cache(
   },
 );
 
+/** How the personal plan is sourced — Paid, Affiliate, Complimentary, Assigned, Free. */
+export const getPersonalPlanAccessType = cache(
+  async function getPersonalPlanAccessType(): Promise<AdminUserPlanAccessType> {
+    const loaded = await loadPersonalWorkspaceLabelContext();
+    if (!loaded) return "Free";
+    return loaded.planAccessType;
+  },
+);
+
 /** Cached plan source for the personal dashboard footer (`paid plan`, `assigned plan`, …). */
 export const getPersonalDashboardPlanAccessPhrase = cache(
   async function getPersonalDashboardPlanAccessPhrase(): Promise<{

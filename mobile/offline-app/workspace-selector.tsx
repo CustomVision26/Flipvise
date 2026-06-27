@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import type { SavedWorkspaceScope } from "./workspace-prefs";
+import {
+  listenForOfflineOverlayOpen,
+  notifyOfflineOverlayOpen,
+} from "./overlay-coordination";
 
 const PERSONAL_PRIMARY_LABEL = "Personal Dash";
 
@@ -82,6 +86,13 @@ export function WorkspaceSelector({
     subscriberOwnsTeamTierWorkspace &&
     invitedTeams.length > 0 &&
     (personalMatches || ownerWorkspace != null);
+
+  useEffect(() => {
+    return listenForOfflineOverlayOpen("workspace", () => {
+      setOpen(false);
+      setQuery("");
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -177,7 +188,13 @@ export function WorkspaceSelector({
       <button
         type="button"
         className="workspace-scope__trigger"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => {
+            const next = !v;
+            if (next) notifyOfflineOverlayOpen("workspace");
+            return next;
+          });
+        }}
         aria-expanded={open}
         aria-haspopup="listbox"
         title="Switch workspace — personal dashboard or a team workspace"
