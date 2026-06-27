@@ -1,12 +1,23 @@
 name: iOS TestFlight
 
 # Builds the Capacitor iOS app on a macOS runner and uploads it to TestFlight.
-# Trigger manually from the Actions tab, or by pushing a tag like `ios-v1.0.0`.
+# Trigger manually from the Actions tab, by pushing a tag like `ios-v1.0.0`,
+# or automatically on pushes to `main` that touch mobile/iOS-related files.
 on:
   workflow_dispatch:
   push:
     tags:
       - "ios-v*"
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ios.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.ts"
+      - "mobile/**"
+      - "ios/**"
+      - "fastlane/**"
 
 concurrency:
   group: ios-testflight-${{ github.ref }}
