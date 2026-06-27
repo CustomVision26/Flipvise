@@ -81,3 +81,10 @@ fastlane/README.md
 *.dSYM.zip
 vendor/bundle/
 .bundle/
+
+# App Store Connect API keys / signing secrets — NEVER commit these
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+AuthKey_*.p8
