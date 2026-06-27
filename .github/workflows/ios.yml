@@ -24,7 +24,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Node 24 matches the version the lockfile was generated with (npm 11)
+          # and satisfies Capacitor 8's CLI requirement of Node >= 22.
+          node-version: "24"
           cache: npm
 
       - name: Install JS dependencies
