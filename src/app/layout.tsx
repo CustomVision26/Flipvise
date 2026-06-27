@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
+import Script from "next/script";
 import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
@@ -160,6 +161,9 @@ export default async function RootLayout({
       className={`${poppins.variable} h-full antialiased`}
       data-ui-theme={appliedTheme}
     >
+      <Script id="flipvise-native-shell-flag" strategy="beforeInteractive">
+        {`try{if(/FlipviseNative\\//.test(navigator.userAgent)||(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())){document.documentElement.dataset.flipviseNativeShell="1"}}catch(e){}`}
+      </Script>
       <body className="min-h-full flex flex-col relative">
         <AppProviders>
             {showHeaderChrome && (
@@ -168,9 +172,9 @@ export default async function RootLayout({
                   data-app-header
                   className={
                     isTeamInviteRoute
-                      ? "flex items-center justify-start border-b border-border px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 sm:px-6 sm:pb-3 relative z-10"
+                      ? "flex items-center justify-start border-b border-border px-3 pb-2 sm:px-6 sm:pb-3 relative z-10"
                       : cn(
-                          "relative z-10 border-b border-border px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6 sm:pb-3",
+                          "relative z-10 border-b border-border px-3 pb-2 sm:px-6 sm:pb-3",
                           "grid items-center gap-x-2 gap-y-2",
                           "grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto]",
                           "lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-rows-1",

@@ -164,16 +164,12 @@ export function DeckCardPopover({
   const wrapperClass =
     view === "compact"
       ? "relative min-h-[140px] sm:min-h-[160px]"
-      : "relative";
+      : view === "list"
+        ? "relative"
+        : "relative min-h-[4.75rem]";
 
-  const deckSurfaceTrigger = (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label={`Quick actions for ${deck.name}`}
-      className="block w-full h-full text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-xl"
-    />
-  );
+  const triggerClassName =
+    "block w-full min-h-0 text-left cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   /**
    * Grid (detail) view: inline cover omitted — show cover on hover via CSS only.
@@ -184,7 +180,7 @@ export function DeckCardPopover({
     if (view !== "grid" || !deck.coverImageUrl) return card;
     const overlayOpen = popoverOpen || teamWorkspaceDialogOpen || previewOpen;
     return (
-      <div className="group/cover-preview relative block h-full w-full min-h-0 rounded-xl">
+      <div className="group/cover-preview relative block w-full min-h-0 rounded-xl">
         {card}
         {!overlayOpen ? (
           <div
@@ -434,7 +430,7 @@ export function DeckCardPopover({
           <div className="min-w-0 flex-1 flex flex-col gap-1">
             <p
               className={cn(
-                "text-base font-semibold leading-snug tracking-tight text-balance [overflow-wrap:anywhere] [word-break:normal] sm:text-lg",
+                "text-base font-semibold leading-snug tracking-tight text-balance text-foreground [overflow-wrap:anywhere] [word-break:normal] sm:text-lg",
                 deckTextClass,
                 hasGradient && "text-white",
               )}
@@ -443,7 +439,7 @@ export function DeckCardPopover({
             </p>
             <p
               className={cn(
-                "text-xs leading-relaxed line-clamp-2 sm:line-clamp-none sm:text-sm [overflow-wrap:anywhere] [word-break:normal]",
+                "text-xs leading-relaxed line-clamp-2 text-foreground sm:line-clamp-none sm:text-sm [overflow-wrap:anywhere] [word-break:normal]",
                 deckTextClass,
                 deckDescriptionClass,
               )}
@@ -478,7 +474,11 @@ export function DeckCardPopover({
           open={teamWorkspaceDialogOpen}
           onOpenChange={setTeamWorkspaceDialogOpen}
         >
-          <DialogTrigger nativeButton={false} render={deckSurfaceTrigger}>
+          <DialogTrigger
+            nativeButton={false}
+            className={triggerClassName}
+            aria-label={`Quick actions for ${deck.name}`}
+          >
             {withGridCoverHover(deckCard)}
           </DialogTrigger>
           <DialogContent
@@ -523,7 +523,11 @@ export function DeckCardPopover({
         </Dialog>
       ) : (
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger nativeButton={false} render={deckSurfaceTrigger}>
+          <PopoverTrigger
+            nativeButton={false}
+            className={triggerClassName}
+            aria-label={`Quick actions for ${deck.name}`}
+          >
             {withGridCoverHover(deckCard)}
           </PopoverTrigger>
 

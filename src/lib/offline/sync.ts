@@ -22,6 +22,7 @@ import {
   remoteUrlForPush,
   uploadPendingLocalImages,
 } from "./image-store";
+import { resetWorkspaceScopeToPersonal } from "./workspace-scope";
 import {
   clearPendingOfflinePull,
   getPendingOfflinePull,
@@ -184,6 +185,9 @@ export async function seedOfflineLibrary(options: SyncOptions): Promise<{
       }
     }
     const result = await runSync(options);
+    if (options.fullPull) {
+      await resetWorkspaceScopeToPersonal();
+    }
     return {
       deckCount: result.deckCount,
       cardCount: result.cardCount,
@@ -196,6 +200,7 @@ export async function seedOfflineLibrary(options: SyncOptions): Promise<{
   if (data.context) {
     await setOfflineAccessContext(data.context);
   }
+  await resetWorkspaceScopeToPersonal();
   return {
     deckCount: data.pull.decks.length,
     cardCount: data.pull.cards.length,
@@ -231,6 +236,7 @@ export async function consumePendingOfflinePull(): Promise<{
     await setOfflineAccessContext(data.context);
   }
   await clearPendingOfflinePull();
+  await resetWorkspaceScopeToPersonal();
 
   return {
     deckCount: data.pull.decks.length,

@@ -112,9 +112,7 @@ export function App() {
   const [accessContext, setAccessContext] = useState<OfflineAccessContext>(
     defaultOfflineAccessContext(),
   );
-  const [workspaceScope, setWorkspaceScope] = useState<SavedWorkspaceScope>(() =>
-    loadWorkspaceScope(),
-  );
+  const [workspaceScope, setWorkspaceScope] = useState<SavedWorkspaceScope>("personal");
   const [activeDeck, setActiveDeck] = useState<OfflineDeckRow | null>(null);
   const [deckView, setDeckView] = useState<
     "menu" | "study-hub" | "flash" | "quiz"
@@ -151,6 +149,7 @@ export function App() {
           : undefined,
       );
       setDecks(rows);
+      return rows;
     },
     [],
   );
@@ -200,13 +199,29 @@ export function App() {
         const ctx = await refreshAccessContext();
         if (cancelled) return;
 
-        const scope = loadWorkspaceScope();
+        let scope = await loadWorkspaceScope();
         setWorkspaceScope(scope);
         if (uid) {
           await purgeLocallyCreatedTeamDecks(uid);
           await repairPersonalDeckRows(uid).catch(() => {});
           if (cancelled) return;
-          await loadDecks(uid, scope, ctx);
+          let rows = await loadDecks(uid, scope, ctx);
+          if (
+            !cancelled &&
+            scope !== "personal" &&
+            rows.length === 0
+          ) {
+            const personalRows = await loadDecks(uid, "personal", ctx);
+            if (personalRows.length > 0) {
+              scope = "personal";
+              setWorkspaceScope("personal");
+              await saveWorkspaceScope("personal");
+              rows = personalRows;
+              setMessage(
+                "Switched to Personal Dash — your downloaded decks are here. Use the workspace menu for team workspaces.",
+              );
+            }
+          }
         }
       } catch (err) {
         if (!cancelled) setMessage(String(err));
@@ -220,6 +235,32 @@ export function App() {
     // Mount-only bootstrap — must not re-run when access context / loadDecks identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reload the library when returning from the live dashboard in the same WebView.
+  useEffect(() => {
+    if (!libraryReady || !userId) return;
+
+    const refreshFromStorage = async () => {
+      const ctx = await refreshAccessContext();
+      const scope = await loadWorkspaceScope();
+      setWorkspaceScope(scope);
+      await repairPersonalDeckRows(userId).catch(() => {});
+      let rows = await loadDecks(userId, scope, ctx);
+      if (scope !== "personal" && rows.length === 0) {
+        const personalRows = await loadDecks(userId, "personal", ctx);
+        if (personalRows.length > 0) {
+          setWorkspaceScope("personal");
+          await saveWorkspaceScope("personal");
+        }
+      }
+    };
+
+    const onPageShow = () => {
+      void refreshFromStorage();
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [libraryReady, userId, loadDecks, refreshAccessContext]);
 
   const runSyncNow = useCallback(
     async (options?: { showSuccess?: boolean }): Promise<boolean> => {
@@ -307,7 +348,7 @@ export function App() {
   const handleWorkspaceChange = useCallback(
     async (scope: SavedWorkspaceScope) => {
       setWorkspaceScope(scope);
-      saveWorkspaceScope(scope);
+      await saveWorkspaceScope(scope);
       if (!userId) return;
       setScopeLoading(true);
       try {

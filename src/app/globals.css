@@ -17,9 +17,34 @@
     z-index: 100 !important;
   }
 
-  /* Capacitor: keep the live-site header below the iOS status bar / notch. */
+  /*
+   * App header safe area — single source of truth (do not add Tailwind pt-* on
+   * [data-app-header]; utilities can override these rules in Tailwind v4).
+   */
+  [data-app-header] {
+    padding-top: max(
+      0.75rem,
+      env(safe-area-inset-top, 0px),
+      constant(safe-area-inset-top, 0px)
+    );
+  }
+
+  /* Capacitor WKWebView often reports safe-area-inset-top as 0 — enforce a notch floor. */
   html[data-flipvise-native-shell] [data-app-header] {
-    padding-top: max(0.75rem, env(safe-area-inset-top, 47px));
+    padding-top: max(
+      calc(env(safe-area-inset-top, 0px) + 0.75rem),
+      calc(constant(safe-area-inset-top, 0px) + 0.75rem)
+    );
+  }
+
+  @media (orientation: portrait) {
+    html[data-flipvise-native-shell] [data-app-header] {
+      padding-top: max(
+        3rem,
+        calc(env(safe-area-inset-top, 0px) + 0.75rem),
+        calc(constant(safe-area-inset-top, 0px) + 0.75rem)
+      );
+    }
   }
 
   /* When team-admin switcher shares the header, push workspace onto its own row. */

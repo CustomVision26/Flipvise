@@ -132,6 +132,12 @@ export function WorkspaceSelector({
 
   function teamRow(w: OfflineWorkspaceContext) {
     const isActive = scope === w.teamId;
+    const showToAdminDash =
+      online &&
+      w.canAccessTeamAdmin &&
+      onToAdminDash &&
+      !(w.isSubscriberOwned ?? w.role === "owner");
+
     return (
       <button
         key={w.teamId}
@@ -160,10 +166,7 @@ export function WorkspaceSelector({
             <span>{ownerLabel(w)}</span>
           </span>
         </span>
-        {online &&
-        w.canAccessTeamAdmin &&
-        onToAdminDash &&
-        !(w.isSubscriberOwned ?? w.role === "owner") ? (
+        {showToAdminDash ? (
           <button
             data-team-admin-dash-link
             type="button"

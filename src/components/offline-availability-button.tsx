@@ -88,8 +88,8 @@ export function OfflineAvailabilityButton() {
       } else {
         toast.success(
           parts.length > 0
-            ? `Saved for offline — ${parts.join(" and ")} downloaded.`
-            : "Saved for offline — your library is up to date (nothing new to download).",
+            ? `Saved for offline — ${parts.join(" and ")} downloaded. Tap Offline study to open your library.`
+            : "Saved for offline — your library is up to date. Tap Offline study to open it.",
         );
       }
     } catch (err) {

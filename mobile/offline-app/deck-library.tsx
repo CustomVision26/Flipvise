@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { deleteDeck, listCards, updateDeck } from "../../src/lib/offline/repository";
-import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
+import type {
+  OfflineWorkspaceContext,
+  OfflineWorkspaceRole,
+} from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
 import { offlineDeckGradientStyle } from "./deck-gradients";
@@ -23,6 +26,48 @@ import { ImagePickerField } from "./image-picker-field";
 import { Pagination } from "./pagination";
 
 const DECKS_PER_PAGE = 12;
+
+function teamWorkspaceEmptyCopy(role: OfflineWorkspaceRole | undefined): {
+  title: string;
+  body: ReactNode;
+} {
+  if (role === "team_member") {
+    return {
+      title: "No assigned decks on this device",
+      body: (
+        <>
+          Your workspace owner or admin hasn&apos;t assigned decks to you yet. Once assigned,
+          open the online dashboard and tap <strong>Make available offline</strong> to download
+          them here.
+        </>
+      ),
+    };
+  }
+
+  if (role === "team_admin") {
+    return {
+      title: "No workspace decks on this device",
+      body: (
+        <>
+          Your team owner adds decks on their Personal Dash and links them to this workspace in
+          Team Admin. Assign decks to members there, then open the online dashboard and tap{" "}
+          <strong>Make available offline</strong> to download them here.
+        </>
+      ),
+    };
+  }
+
+  return {
+    title: "No workspace decks on this device",
+    body: (
+      <>
+        Add decks on your Personal Dash, link them to this workspace in Team Admin, assign them
+        to team members, then open the online dashboard and tap{" "}
+        <strong>Make available offline</strong> to download them here.
+      </>
+    ),
+  };
+}
 
 export type DeckWithCount = OfflineDeckRow & { cardCount: number };
 
@@ -474,24 +519,10 @@ export function DeckLibrary({
       : "Team workspace on this device"
     : "Study on this device — sync when online";
 
-  const emptyTitle = isTeamScope
-    ? activeTeam?.role === "team_member"
-      ? "No assigned decks on this device"
-      : "No workspace decks on this device"
-    : "No decks on this device";
-
+  const teamEmpty = teamWorkspaceEmptyCopy(activeTeam?.role);
+  const emptyTitle = isTeamScope ? teamEmpty.title : "No decks on this device";
   const emptyBody = isTeamScope ? (
-    activeTeam?.role === "team_member" ? (
-      <>
-        Your admin hasn&apos;t assigned decks yet, or open the Dashboard while online
-        and tap <strong>Make available offline</strong> to download them.
-      </>
-    ) : (
-      <>
-        Create team decks on the online dashboard from your personal workspace, then tap{" "}
-        <strong>Make available offline</strong> to download them here.
-      </>
-    )
+    teamEmpty.body
   ) : (
     <>
       Create a deck with <strong>+ New deck</strong>, or open the Dashboard while online
