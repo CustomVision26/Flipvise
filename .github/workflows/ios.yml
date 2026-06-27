@@ -13,6 +13,11 @@ on:
         options:
           - beta
           - nuke_certs
+      changelog:
+        description: "TestFlight 'What to Test' notes (optional; defaults to the latest commit message)"
+        type: string
+        required: false
+        default: ""
   push:
     tags:
       - "ios-v*"
@@ -108,6 +113,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          TESTFLIGHT_CHANGELOG: ${{ github.event.inputs.changelog }}
         run: bundle exec fastlane ios ${{ github.event.inputs.lane || 'beta' }}
 
       - name: Upload build artifacts
