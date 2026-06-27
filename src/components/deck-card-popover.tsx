@@ -379,7 +379,7 @@ export function DeckCardPopover({
           <CardHeader className="px-3 py-3 gap-1">
             <CardTitle
               className={cn(
-                "line-clamp-2 text-sm sm:text-base leading-tight",
+                "line-clamp-2 text-sm font-semibold leading-snug tracking-tight text-balance sm:text-base",
                 deckTextClass,
                 hasGradient && "text-white",
               )}
@@ -413,7 +413,7 @@ export function DeckCardPopover({
           <div className="flex-1 min-w-0">
             <p
               className={cn(
-                "line-clamp-1 text-sm font-medium",
+                "line-clamp-1 text-sm font-semibold leading-snug tracking-tight",
                 deckTextClass,
                 hasGradient && "text-white",
               )}
@@ -430,11 +430,11 @@ export function DeckCardPopover({
           </span>
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-row items-center gap-3 sm:gap-4">
-          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <div className="flex min-h-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
+          <div className="min-w-0 flex-1 flex flex-col gap-1">
             <p
               className={cn(
-                "text-sm sm:text-base font-semibold break-words whitespace-pre-wrap",
+                "text-base font-semibold leading-snug tracking-tight text-balance [overflow-wrap:anywhere] [word-break:normal] sm:text-lg",
                 deckTextClass,
                 hasGradient && "text-white",
               )}
@@ -443,7 +443,7 @@ export function DeckCardPopover({
             </p>
             <p
               className={cn(
-                "text-xs break-words whitespace-pre-wrap",
+                "text-xs leading-relaxed line-clamp-2 sm:line-clamp-none sm:text-sm [overflow-wrap:anywhere] [word-break:normal]",
                 deckTextClass,
                 deckDescriptionClass,
               )}
@@ -451,12 +451,18 @@ export function DeckCardPopover({
               {deck.description ?? "No description provided."}
             </p>
           </div>
-          <div className={cn("flex flex-wrap shrink-0 items-center gap-x-6 gap-y-1 text-xs tabular-nums", deckMetaClass)}>
-            <span className="sm:w-16 sm:text-right">
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-between gap-3 border-t pt-2 text-xs tabular-nums sm:flex-col sm:items-end sm:justify-center sm:gap-1 sm:border-0 sm:pt-0",
+              hasGradient ? "border-white/15" : "border-border/50",
+              deckMetaClass,
+            )}
+          >
+            <span className="font-medium sm:w-16 sm:text-right">
               {deck.cardCount}{" "}
               {deck.cardCount === 1 ? "card" : "cards"}
             </span>
-            <span className="sm:w-44 sm:text-right">
+            <span className="text-right sm:w-44">
               Updated {updatedLabel}
             </span>
           </div>

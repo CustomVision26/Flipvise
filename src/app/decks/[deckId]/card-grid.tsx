@@ -36,7 +36,6 @@ import {
   type SortOption as DropdownSortOption,
 } from "@/components/view-mode-dropdown";
 import { cn } from "@/lib/utils";
-import { CardAnswerHover } from "./card-answer-hover";
 import { CardFrontImage } from "./card-front-image";
 import { EditCardDialog } from "./edit-card-dialog";
 import { DeleteCardDialog } from "./delete-card-dialog";
@@ -270,47 +269,83 @@ export function CardGrid({
                 className={cn(
                   itemCardContainerClass,
                   cardSurfaceClass,
-                  "flex flex-row items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-2 px-3",
+                  "flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-3 px-3 sm:flex-row sm:items-center sm:gap-3",
                 )}
                 style={{ animationDelay: `${i * 20}ms` }}
               >
                 <ItemWatermark label="CARD" view="list" />
-                <CardAnswerHover
-                  className="min-w-0 flex-1"
-                  front={card.front}
-                  answer={correctAnswer}
-                  isMC={isMC}
-                  backImageUrl={card.backImageUrl}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex shrink-0 items-center gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {isMC ? "Question" : "Front"}
+                      </span>
                       {isMC && (
                         <ListChecks
-                          className="size-3.5 text-primary"
+                          className="size-3 text-primary"
                           aria-label="Multiple choice"
                         />
                       )}
                       {card.aiGenerated && (
                         <Sparkles
-                          className="size-3.5 text-primary"
+                          className="size-3 text-primary"
                           aria-label="AI generated"
                         />
                       )}
                     </div>
-                    <p
-                      className={cn(
-                        "min-w-0 flex-1 text-sm font-medium text-card-foreground line-clamp-1",
-                        cardTextClass,
-                      )}
-                    >
-                      {card.front ?? "(no front)"}
-                    </p>
-                    <span className="hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:inline">
-                      {updatedShort}
-                    </span>
+                    <div className="flex items-start gap-2">
+                      {card.frontImageUrl ? (
+                        <CardFrontImage
+                          src={card.frontImageUrl}
+                          alt={card.front ?? (isMC ? "Question image" : "Front image")}
+                          label={isMC ? "Question image" : "Front image"}
+                          variant="thumb"
+                          className="h-10 w-10 sm:h-12 sm:w-12"
+                        />
+                      ) : null}
+                      <p
+                        className={cn(
+                          "min-w-0 flex-1 text-sm font-semibold leading-snug text-card-foreground line-clamp-2 [overflow-wrap:anywhere]",
+                          cardTextClass,
+                        )}
+                      >
+                        {card.front ?? "(no front)"}
+                      </p>
+                    </div>
                   </div>
-                </CardAnswerHover>
-                <div className="flex shrink-0 items-center gap-1 self-center">
+                  <div className="min-w-0 flex-1 border-t border-border/50 pt-2 sm:border-t-0 sm:border-l sm:pl-4 sm:pt-0">
+                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {isMC ? "Answer" : "Back"}
+                    </span>
+                    <div className="flex items-start gap-1.5">
+                      {isMC && (
+                        <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-emerald-500" />
+                      )}
+                      {card.backImageUrl && !correctAnswer ? (
+                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-muted/30">
+                          <Image
+                            src={card.backImageUrl}
+                            alt=""
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ) : null}
+                      <p
+                        className={cn(
+                          "min-w-0 flex-1 text-sm leading-snug text-card-foreground/90 line-clamp-2 [overflow-wrap:anywhere]",
+                          cardTextClass,
+                        )}
+                      >
+                        {correctAnswer || (card.backImageUrl ? "(image)" : "(no back)")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums sm:hidden">
+                  {updatedShort}
+                </span>
+                <div className="flex shrink-0 items-center gap-1 self-end sm:self-center">
                   <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
                   <DeleteCardDialog cardId={card.id} deckId={deckId} />
                 </div>
@@ -329,39 +364,36 @@ export function CardGrid({
                 className={cn(
                   itemCardContainerClass,
                   cardSurfaceClass,
-                  "flex h-full min-h-[120px] flex-col gap-1 rounded-md py-1.5 px-1.5 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-xl",
+                  "flex h-full min-h-[148px] flex-col gap-1.5 rounded-md py-2 px-2 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both transition-shadow hover:shadow-xl",
                 )}
                 style={{ animationDelay: `${i * 30}ms` }}
               >
                 <ItemWatermark label="CARD" view="compact" />
-                <CardAnswerHover
-                  className="flex min-h-0 flex-1 flex-col"
-                  front={card.front}
-                  answer={correctAnswer}
-                  isMC={isMC}
-                  backImageUrl={card.backImageUrl}
-                >
-                  <div className="flex min-h-0 flex-1 flex-col gap-1">
-                    <div className="flex min-h-3 shrink-0 items-center gap-0.5">
-                      {isMC && (
-                        <Badge
-                          variant="outline"
-                          className="size-3.5 justify-center border-primary/35 p-0"
-                          aria-label="Multiple choice"
-                        >
-                          <ListChecks className="size-2 text-primary" />
-                        </Badge>
-                      )}
-                      {card.aiGenerated && (
-                        <Badge
-                          variant="outline"
-                          className="size-3.5 justify-center p-0"
-                          aria-label="AI generated"
-                        >
-                          <Sparkles className="size-2 text-primary" />
-                        </Badge>
-                      )}
-                    </div>
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+                  <div className="flex min-h-3 shrink-0 items-center gap-0.5">
+                    {isMC && (
+                      <Badge
+                        variant="outline"
+                        className="size-3.5 justify-center border-primary/35 p-0"
+                        aria-label="Multiple choice"
+                      >
+                        <ListChecks className="size-2 text-primary" />
+                      </Badge>
+                    )}
+                    {card.aiGenerated && (
+                      <Badge
+                        variant="outline"
+                        className="size-3.5 justify-center p-0"
+                        aria-label="AI generated"
+                      >
+                        <Sparkles className="size-2 text-primary" />
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="min-h-0 flex-1">
+                    <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {isMC ? "Question" : "Front"}
+                    </span>
                     {card.frontImageUrl ? (
                       <CardFrontImage
                         src={card.frontImageUrl}
@@ -372,19 +404,36 @@ export function CardGrid({
                     ) : null}
                     <p
                       className={cn(
-                        "min-h-0 flex-1 text-[11px] font-medium leading-snug break-words",
+                        "text-[11px] font-semibold leading-snug [overflow-wrap:anywhere]",
                         cardTextClass,
-                        card.frontImageUrl ? "line-clamp-2" : "line-clamp-5",
+                        card.frontImageUrl ? "mt-1 line-clamp-2" : "line-clamp-3",
                         card.front
                           ? "text-card-foreground"
-                          : "text-transparent select-none",
+                          : "text-muted-foreground italic",
                       )}
                       title={card.front ?? undefined}
                     >
                       {card.front ?? "No front text"}
                     </p>
                   </div>
-                </CardAnswerHover>
+                  <div className="border-t border-border/40 pt-1.5">
+                    <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {isMC ? "Answer" : "Back"}
+                    </span>
+                    <p
+                      className={cn(
+                        "text-[10px] leading-snug [overflow-wrap:anywhere] line-clamp-2",
+                        cardTextClass,
+                        correctAnswer
+                          ? "text-card-foreground/90"
+                          : "text-muted-foreground italic",
+                      )}
+                      title={correctAnswer || undefined}
+                    >
+                      {correctAnswer || (card.backImageUrl ? "Image answer" : "No back text")}
+                    </p>
+                  </div>
+                </div>
                 <div className="mt-auto flex shrink-0 items-center justify-between gap-0.5 border-t border-border/30 pt-1">
                   <span className="truncate text-[8px] text-muted-foreground tabular-nums">
                     {updatedCompact}
@@ -398,117 +447,111 @@ export function CardGrid({
             );
           }
 
-          // Default: Grid = detailed table row — show every field fully, no truncation
+          // Default: Grid = detailed table row — show front and back on the card face
           return (
             <Card
               key={card.id}
               className={cn(
                 itemCardContainerClass,
                 cardSurfaceClass,
-                "flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-4 px-5 md:min-h-[4rem] md:flex-row md:items-center md:gap-6",
+                "flex flex-col items-stretch gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200 fill-mode-both hover:shadow-xl transition-[box-shadow] py-3.5 px-4 sm:py-4 sm:px-5 md:min-h-[4rem] md:flex-row md:items-center md:gap-6",
               )}
               style={{ animationDelay: `${i * 30}ms` }}
             >
               <ItemWatermark label="CARD" view="grid" />
-              <CardAnswerHover
-                className="min-w-0 flex-1"
-                front={card.front}
-                answer={correctAnswer}
-                isMC={isMC}
-                backImageUrl={card.backImageUrl}
-              >
-              <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:gap-4">
-              <div className="md:flex-1 min-w-0 flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground md:hidden">
-                  {isMC ? "Question" : "Front"}
-                </span>
-                <div className="flex items-start gap-2">
-                  {card.frontImageUrl ? (
-                    <CardFrontImage
-                      src={card.frontImageUrl}
-                      alt={card.front ?? (isMC ? "Question image" : "Front image")}
-                      label={isMC ? "Question image" : "Front image"}
-                      variant="thumb"
-                    />
-                  ) : null}
-                  <p
-                    className={cn(
-                      "text-[0.9375rem] leading-relaxed font-semibold text-card-foreground break-words whitespace-pre-wrap min-w-0",
-                      cardTextClass,
-                    )}
-                  >
-                    {card.front ?? "(no front)"}
-                  </p>
-                </div>
-              </div>
-              <div className="md:flex-1 min-w-0 flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground md:hidden">
-                  {isMC ? "Answer" : "Back"}
-                </span>
-                <div className="flex items-start gap-1.5 text-[0.9375rem] leading-relaxed text-card-foreground/90">
-                  {isMC && (
-                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-                  )}
-                  {card.backImageUrl && !correctAnswer && (
-                    <div className="relative h-10 w-10 shrink-0 rounded-md overflow-hidden border border-border bg-muted/30">
-                      <Image
-                        src={card.backImageUrl}
-                        alt=""
-                        fill
-                        className="object-cover"
+              <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-start md:gap-4">
+                <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-background/40 px-3 py-2.5 md:border-0 md:bg-transparent md:p-0">
+                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {isMC ? "Question" : "Front"}
+                  </span>
+                  <div className="flex items-start gap-2.5">
+                    {card.frontImageUrl ? (
+                      <CardFrontImage
+                        src={card.frontImageUrl}
+                        alt={card.front ?? (isMC ? "Question image" : "Front image")}
+                        label={isMC ? "Question image" : "Front image"}
+                        variant="thumb"
                       />
-                    </div>
-                  )}
-                  <span
-                    className={cn(
-                      "break-words whitespace-pre-wrap min-w-0",
-                      cardTextClass,
+                    ) : null}
+                    <p
+                      className={cn(
+                        "min-w-0 flex-1 text-sm font-semibold leading-relaxed text-card-foreground [overflow-wrap:anywhere] [word-break:normal] sm:text-[0.9375rem]",
+                        cardTextClass,
+                      )}
+                    >
+                      {card.front ?? "(no front)"}
+                    </p>
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-background/40 px-3 py-2.5 md:border-0 md:bg-transparent md:p-0">
+                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {isMC ? "Answer" : "Back"}
+                  </span>
+                  <div className="flex items-start gap-2 text-sm leading-relaxed text-card-foreground/90 sm:text-[0.9375rem]">
+                    {isMC && (
+                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
                     )}
-                  >
-                    {correctAnswer || (card.backImageUrl ? "(image)" : "(no back)")}
+                    {card.backImageUrl && !correctAnswer ? (
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-border bg-muted/30 sm:h-12 sm:w-12">
+                        <Image
+                          src={card.backImageUrl}
+                          alt=""
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : null}
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 [overflow-wrap:anywhere] [word-break:normal]",
+                        cardTextClass,
+                      )}
+                    >
+                      {correctAnswer || (card.backImageUrl ? "(image)" : "(no back)")}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-row items-center justify-between gap-2 border-t border-border/40 pt-2 md:w-20 md:shrink-0 md:flex-col md:items-end md:justify-center md:border-0 md:pt-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground md:sr-only">
+                    Type
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {isMC ? (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 px-1.5 py-0 text-[10px] font-normal border-primary/40"
+                      >
+                        <ListChecks className="size-3 text-primary" />
+                        MC
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="px-1.5 py-0 text-[10px] font-normal"
+                      >
+                        Standard
+                      </Badge>
+                    )}
+                    {card.aiGenerated && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 px-1.5 py-0 text-[10px] font-normal"
+                      >
+                        <Sparkles className="size-3 text-primary" />
+                        AI
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums md:hidden">
+                    {updatedShort}
+                  </span>
+                </div>
+                <div className="hidden items-center gap-1 md:flex md:w-40 md:shrink-0 md:justify-end md:self-center">
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {updatedLabel}
                   </span>
                 </div>
               </div>
-              <div className="flex flex-row md:flex-col md:w-20 shrink-0 items-start md:items-end gap-1 flex-wrap">
-                <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground md:hidden mr-1 self-center">
-                  Type
-                </span>
-                {isMC ? (
-                  <Badge
-                    variant="outline"
-                    className="gap-1 px-1.5 py-0 text-[10px] font-normal border-primary/40"
-                  >
-                    <ListChecks className="size-3 text-primary" />
-                    MC
-                  </Badge>
-                ) : (
-                  <Badge
-                    variant="outline"
-                    className="px-1.5 py-0 text-[10px] font-normal"
-                  >
-                    Standard
-                  </Badge>
-                )}
-                {card.aiGenerated && (
-                  <Badge
-                    variant="outline"
-                    className="gap-1 px-1.5 py-0 text-[10px] font-normal"
-                  >
-                    <Sparkles className="size-3 text-primary" />
-                    AI
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-1 md:w-40 shrink-0 md:justify-end md:self-center">
-                <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground md:hidden">
-                  Updated
-                </span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {updatedLabel}
-                </span>
-              </div>
-              </div>
-              </CardAnswerHover>
               <div className="flex shrink-0 items-center justify-end gap-1 md:w-28 md:self-center">
                 {!hiddenActionRows.has(card.id) && (
                   <>
