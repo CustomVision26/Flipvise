@@ -38,7 +38,8 @@ workflows:
         # Live host baked into the bundled offline app (matches NEXT_PUBLIC_APP_URL).
         CAP_LIVE_HOST: "https://flipvise-sjgw.onrender.com"
         VITE_LIVE_URL: "https://flipvise-sjgw.onrender.com"
-      node: 20
+      # Node 24 matches the committed lockfile (npm 11) and Capacitor 8's CLI (>= 22).
+      node: 24
       xcode: latest
     scripts:
       - name: Install JS dependencies
