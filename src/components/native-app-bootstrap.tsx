@@ -20,6 +20,19 @@ export function NativeAppBootstrap() {
     if (!likelyNative) return;
 
     document.documentElement.dataset.flipviseNativeShell = "1";
+    document.documentElement.dataset.nativeShell = "1";
+
+    try {
+      const getPlatform = (
+        cap as { getPlatform?: () => string } | undefined
+      )?.getPlatform;
+      const platform = getPlatform?.();
+      if (platform) {
+        document.documentElement.dataset.platform = platform;
+      }
+    } catch {
+      // ignore
+    }
 
     // Live Render pages need viewport-fit=cover so env(safe-area-inset-*) clears the
     // iOS status bar for the app header (workspace switcher, notifications, etc.).

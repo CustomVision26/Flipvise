@@ -13,7 +13,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
-import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export type TeamAdminRecordSort =
   | "member_az"
@@ -104,6 +111,15 @@ export type TeamAdminRecordSliderProps<T extends { key: string; memberLabel: str
   /** Optional controls rendered inside the Search & filters panel (e.g. workspace picker). */
   filterPanelExtra?: (context: { filtersOpen: boolean }) => React.ReactNode;
   filterPanelExtraActive?: boolean;
+  /** Card carousel (default) or scrollable table of all filtered rows. */
+  layout?: "slider" | "table";
+  /** Table headers — required when `layout="table"`. */
+  tableColumns?: Array<{
+    id: string;
+    header: string;
+    className?: string;
+    cell: (item: T, isActive: boolean) => React.ReactNode;
+  }>;
 };
 
 export function TeamAdminRecordSlider<T extends { key: string; memberLabel: string; deckName: string }>({
@@ -126,6 +142,8 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
   allowedSortOptions,
   filterPanelExtra,
   filterPanelExtraActive = false,
+  layout = "slider",
+  tableColumns,
 }: TeamAdminRecordSliderProps<T>) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState<TeamAdminRecordSort>("member_az");
@@ -329,6 +347,47 @@ export function TeamAdminRecordSlider<T extends { key: string; memberLabel: stri
         <p className="rounded-lg border border-dashed border-border/80 bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
           {noResultsMessage}
         </p>
+      ) : layout === "table" && tableColumns && tableColumns.length > 0 ? (
+        <>
+          <div className="overflow-x-auto -mx-1 px-1">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  {tableColumns.map((col) => (
+                    <TableHead key={col.id} className={col.className}>
+                      {col.header}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => {
+                  const isActive = activeKey === item.key;
+                  return (
+                    <TableRow
+                      key={item.key}
+                      className={cn(
+                        "cursor-pointer",
+                        isActive && "bg-muted/40",
+                      )}
+                      onClick={() => onActivate?.(item)}
+                      aria-selected={isActive}
+                    >
+                      {tableColumns.map((col) => (
+                        <TableCell key={col.id} className={col.className}>
+                          {col.cell(item, isActive)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          {activeItem && renderBelowActive ? (
+            <div>{renderBelowActive(activeItem)}</div>
+          ) : null}
+        </>
       ) : (
         <>
           <div className="flex items-center justify-between gap-2">

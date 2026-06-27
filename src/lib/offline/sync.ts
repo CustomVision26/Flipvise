@@ -17,6 +17,7 @@
 
 import { getOfflineDb, isOfflineDbAvailable, persistOfflineDb } from "./db";
 import { setOfflineAccessContext } from "./access-context";
+import { repairTeamWorkspaceDeckRows } from "./repository";
 import {
   cacheLibraryImages,
   remoteUrlForPush,
@@ -87,6 +88,7 @@ interface SyncResponse {
       canCreateDeck: boolean;
       ownerDisplayName?: string;
       isSubscriberOwned?: boolean;
+      workspaceDeckServerIds?: number[];
     }[];
     personalPlanLabel?: string;
     personalAccountPlanLabel?: string;
@@ -198,7 +200,7 @@ export async function seedOfflineLibrary(options: SyncOptions): Promise<{
   const data = await fetchFullOfflinePull(options);
   await setPendingOfflinePull(options.userId, JSON.stringify(data));
   if (data.context) {
-    await setOfflineAccessContext(data.context);
+    await persistOfflineAccessContext(options.userId, data.context);
   }
   await resetWorkspaceScopeToPersonal();
   return {
@@ -233,7 +235,7 @@ export async function consumePendingOfflinePull(): Promise<{
   // The stashed pull is always a full library download, so reconcile server deletions.
   await applyServerResponse(data, pending.userId, { reconcile: true });
   if (data.context) {
-    await setOfflineAccessContext(data.context);
+    await persistOfflineAccessContext(pending.userId, data.context);
   }
   await clearPendingOfflinePull();
   await resetWorkspaceScopeToPersonal();
@@ -242,6 +244,21 @@ export async function consumePendingOfflinePull(): Promise<{
     deckCount: data.pull.decks.length,
     cardCount: data.pull.cards.length,
   };
+}
+
+async function persistOfflineAccessContext(
+  userId: string,
+  context: NonNullable<SyncResponse["context"]>,
+): Promise<void> {
+  await setOfflineAccessContext(context);
+  await repairTeamWorkspaceDeckRows(
+    userId,
+    context.workspaces.map((w) => ({
+      teamId: w.teamId,
+      role: w.role,
+      workspaceDeckServerIds: w.workspaceDeckServerIds,
+    })),
+  ).catch(() => {});
 }
 
 async function collectDirty(): Promise<{
@@ -383,7 +400,7 @@ async function executeSyncRound(options: SyncOptions): Promise<{
   });
 
   if (data.context) {
-    await setOfflineAccessContext(data.context);
+    await persistOfflineAccessContext(options.userId, data.context);
   }
 
   const pushedCount = decks.length + cards.length + quizResults.length;
@@ -435,8 +452,6 @@ async function applyServerResponse(
   // 3. Merge pulled rows (last-write-wins; skip rows with newer local edits).
   //    `lower(hex(randomblob(16)))` mints a local id when the row is new locally.
   for (const d of data.pull.decks) {
-    const memberAssigned =
-      d.ownerUserId === userId ? 0 : d.memberAssigned ? 1 : 0;
     await db.run(
       `INSERT INTO decks (local_id, server_id, user_id, owner_user_id, name, description, gradient,
          cover_image_url, created_at_ms, updated_at_ms, dirty, deleted, team_id, member_assigned)
@@ -467,7 +482,7 @@ async function applyServerResponse(
         d.updatedAtMs,
         d.updatedAtMs,
         d.teamId,
-        memberAssigned,
+        d.memberAssigned ? 1 : 0,
       ],
     );
   }

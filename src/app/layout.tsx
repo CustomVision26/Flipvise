@@ -163,7 +163,7 @@ export default async function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(/FlipviseNative\\//.test(navigator.userAgent)||(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())){document.documentElement.dataset.flipviseNativeShell="1"}}catch(e){}`,
+            __html: `try{var c=window.Capacitor;var ua=navigator.userAgent;if(/FlipviseNative\\//.test(ua)||(c&&c.isNativePlatform&&c.isNativePlatform())){var r=document.documentElement;r.dataset.flipviseNativeShell="1";r.dataset.nativeShell="1";var p=c&&c.getPlatform?c.getPlatform():"";if(p)r.dataset.platform=p;else if(/Android/i.test(ua))r.dataset.platform="android";else if(/iPhone|iPad|iPod/i.test(ua))r.dataset.platform="ios"}}catch(e){}`,
           }}
         />
       </head>

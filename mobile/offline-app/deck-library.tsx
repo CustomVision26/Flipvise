@@ -510,9 +510,22 @@ export function DeckLibrary({
 
   const pageTitle = isTeamScope ? "Team Dashboard" : "Personal Dash";
 
+  const workspaceRoleLabel = (role: OfflineWorkspaceContext["role"] | undefined) => {
+    switch (role) {
+      case "owner":
+        return "Owner";
+      case "team_admin":
+        return "Team admin";
+      case "team_member":
+        return "Member";
+      default:
+        return "Member";
+    }
+  };
+
   const subtitle = isTeamScope
     ? activeTeam
-      ? `${activeTeam.name} · OWNER · ${formatOfflineWorkspaceOwnerLabel(activeTeam, {
+      ? `${activeTeam.name} · ${workspaceRoleLabel(activeTeam.role)} · ${formatOfflineWorkspaceOwnerLabel(activeTeam, {
           viewerDisplayName,
           viewerEmail,
         })}`

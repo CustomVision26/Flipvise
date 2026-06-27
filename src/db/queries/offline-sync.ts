@@ -344,6 +344,8 @@ export type OfflineSyncWorkspaceContext = {
   ownerDisplayName: string;
   ownerEmail: string | null;
   isSubscriberOwned: boolean;
+  /** Server deck ids visible in this workspace (matches online Team Dashboard). */
+  workspaceDeckServerIds: number[];
 };
 
 export type OfflineSyncContext = {
@@ -488,8 +490,8 @@ export async function buildOfflineSyncContext(
   const ownerIds = [...new Set(navPayload.teams.map((t) => t.ownerUserId))];
   const ownerFields = await getClerkUserFieldDisplaysByIds(ownerIds);
 
-  const workspaceContexts: OfflineSyncWorkspaceContext[] = navPayload.teams
-    .map((nav) => {
+  const workspaceContextRows = await Promise.all(
+    navPayload.teams.map(async (nav) => {
       const team = teamPlanById.get(nav.id);
       if (!team) return null;
       const membership = membershipByTeam.get(team.id);
@@ -503,6 +505,10 @@ export async function buildOfflineSyncContext(
       const ownerResolved =
         ownerFields[team.ownerUserId] ??
         (team.ownerUserId === userId ? viewerField : null);
+      const workspaceDeckServerIds =
+        role === "team_member" || role === "team_admin"
+          ? (await getAssignedDecksForMember(team.id, userId)).map((d) => d.id)
+          : (await getDecksForTeam(team.id, team.ownerUserId)).map((d) => d.id);
       return {
         teamId: team.id,
         name: team.name,
@@ -517,9 +523,13 @@ export async function buildOfflineSyncContext(
         ownerDisplayName: nav.ownerDisplayName,
         ownerEmail: ownerResolved?.primaryEmail ?? null,
         isSubscriberOwned: nav.isSubscriberOwned,
+        workspaceDeckServerIds,
       };
-    })
-    .filter((row) => row != null);
+    }),
+  );
+  const workspaceContexts: OfflineSyncWorkspaceContext[] = workspaceContextRows.filter(
+    (row) => row != null,
+  );
 
   return {
     maxPersonalDecks: personal.maxPersonalDecks,

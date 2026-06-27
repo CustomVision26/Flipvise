@@ -31,6 +31,8 @@ export type OfflineWorkspaceContext = {
   ownerEmail?: string | null;
   /** True when the signed-in user is the subscriber owner of this workspace. */
   isSubscriberOwned?: boolean;
+  /** Server deck ids for this workspace (from last sync — matches online Team Dashboard). */
+  workspaceDeckServerIds?: number[];
 };
 
 export type OfflineAccessContext = {
@@ -74,6 +76,9 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
         ownerDisplayName: w.ownerDisplayName ?? "Subscriber",
         ownerEmail: w.ownerEmail ?? null,
         isSubscriberOwned: w.isSubscriberOwned ?? w.role === "owner",
+        workspaceDeckServerIds: Array.isArray(w.workspaceDeckServerIds)
+          ? w.workspaceDeckServerIds.filter((id) => Number.isFinite(id))
+          : [],
       })),
     };
   } catch {

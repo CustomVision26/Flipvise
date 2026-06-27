@@ -29,16 +29,17 @@
     );
   }
 
-  /* Capacitor WKWebView often reports safe-area-inset-top as 0 — enforce a notch floor. */
+  /* Capacitor WebViews often report safe-area-inset-top as 0 — enforce status-bar floors. */
   html[data-flipvise-native-shell] [data-app-header] {
     padding-top: max(
+      1.75rem,
       calc(env(safe-area-inset-top, 0px) + 0.75rem),
       calc(constant(safe-area-inset-top, 0px) + 0.75rem)
     );
   }
 
   @media (orientation: portrait) {
-    html[data-flipvise-native-shell] [data-app-header] {
+    html[data-flipvise-native-shell][data-platform="ios"] [data-app-header] {
       padding-top: max(
         3rem,
         calc(env(safe-area-inset-top, 0px) + 0.75rem),

@@ -10,6 +10,7 @@ import {
   OfflineLimitError,
   purgeLocallyCreatedTeamDecks,
   repairPersonalDeckRows,
+  repairTeamWorkspaceDeckRows,
 } from "../../src/lib/offline/repository";
 import type {
   OfflineAccessContext,
@@ -136,17 +137,20 @@ export function App() {
       scope: SavedWorkspaceScope,
       ctx: OfflineAccessContext = defaultOfflineAccessContext(),
     ) => {
-      const workspaceRole =
+      const workspace =
         scope === "personal"
-          ? undefined
-          : ctx.workspaces.find((w) => w.teamId === scope)?.role ?? "team_member";
+          ? null
+          : ctx.workspaces.find((w) => w.teamId === scope) ?? null;
+      const workspaceRole = workspace?.role ?? "team_member";
       const rows = await listDecksForScope(
         uid,
         scope === "personal" ? { kind: "personal" } : { kind: "team", teamId: scope },
         workspaceRole,
         scope === "personal"
           ? { invitedWorkspaceTeamIds: invitedWorkspaceTeamIds(ctx) }
-          : undefined,
+          : {
+              workspaceDeckServerIds: workspace?.workspaceDeckServerIds,
+            },
       );
       setDecks(rows);
       return rows;
@@ -204,6 +208,7 @@ export function App() {
         if (uid) {
           await purgeLocallyCreatedTeamDecks(uid);
           await repairPersonalDeckRows(uid).catch(() => {});
+          await repairTeamWorkspaceDeckRows(uid, ctx.workspaces).catch(() => {});
           if (cancelled) return;
           let rows = await loadDecks(uid, scope, ctx);
           if (
@@ -245,14 +250,8 @@ export function App() {
       const scope = await loadWorkspaceScope();
       setWorkspaceScope(scope);
       await repairPersonalDeckRows(userId).catch(() => {});
-      let rows = await loadDecks(userId, scope, ctx);
-      if (scope !== "personal" && rows.length === 0) {
-        const personalRows = await loadDecks(userId, "personal", ctx);
-        if (personalRows.length > 0) {
-          setWorkspaceScope("personal");
-          await saveWorkspaceScope("personal");
-        }
-      }
+      await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
+      await loadDecks(userId, scope, ctx);
     };
 
     const onPageShow = () => {
@@ -287,6 +286,7 @@ export function App() {
           fullPull: true,
         });
         const ctx = await refreshAccessContext();
+        await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
         await loadDecks(userId, workspaceScope, ctx);
         if (options?.showSuccess !== false) {
           const downloadParts: string[] = [];

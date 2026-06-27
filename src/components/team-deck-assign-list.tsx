@@ -913,7 +913,7 @@ export function TeamDeckAssignList({
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-foreground">Assignments by member</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Tap or click a row to load it into the form above. Only the workspace owner can remove
+            Click a row to load it into the form above. Only the workspace owner can remove
             assignments.
           </p>
         </div>
@@ -922,21 +922,22 @@ export function TeamDeckAssignList({
           items={assignmentTableRows}
           activeKey={expandedAssignmentKey}
           onActivate={onAssignmentTableRowActivate}
+          layout="table"
           deckFilterOptions={assignmentDeckFilterOptions}
           showDateSort
           getSearchHaystack={assignmentSearchHaystack}
           getSortDate={(row) => toAssignmentDate(row.createdAt)?.getTime() ?? null}
           emptyMessage="No deck assignments yet."
           noResultsMessage="No assignments match your search or filters."
-          renderCard={(row, isActive) => {
-            const display = userFieldDisplayById[row.memberUserId];
-            return (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Member
-                    </p>
+          tableColumns={[
+            {
+              id: "member",
+              header: "Member",
+              className: "min-w-[10rem]",
+              cell: (row) => {
+                const display = userFieldDisplayById[row.memberUserId];
+                return (
+                  <div className="min-w-0">
                     <p className="font-medium text-foreground">{row.memberLabel}</p>
                     {display?.primaryEmail ? (
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -944,38 +945,51 @@ export function TeamDeckAssignList({
                       </p>
                     ) : null}
                   </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Deck
-                    </p>
-                    <p className="text-sm text-foreground">{row.deckName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Workspace
-                    </p>
-                    <p className="text-sm text-foreground">{row.workspaceName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Signed by
-                    </p>
-                    <p className="text-sm text-foreground">{row.signedByLabel}</p>
-                  </div>
-                </div>
-                {row.createdAt ? (
-                  <p className="text-xs text-muted-foreground">
-                    Assigned {formatAssignmentRecordedAt(row.createdAt)}
-                  </p>
-                ) : null}
-                <p className="text-xs text-muted-foreground">
-                  {isActive
-                    ? "Tap again to collapse access options"
-                    : "Tap to load in the form above and expand access options"}
-                </p>
-              </div>
-            );
-          }}
+                );
+              },
+            },
+            {
+              id: "deck",
+              header: "Deck",
+              className: "min-w-[8rem]",
+              cell: (row) => (
+                <span className="text-sm text-foreground">{row.deckName}</span>
+              ),
+            },
+            {
+              id: "workspace",
+              header: "Workspace",
+              className: "min-w-[8rem]",
+              cell: (row) => (
+                <span className="text-sm text-foreground">{row.workspaceName}</span>
+              ),
+            },
+            {
+              id: "signedBy",
+              header: "Signed by",
+              className: "min-w-[6rem]",
+              cell: (row) => (
+                <span
+                  className="text-sm text-foreground"
+                  title={row.signedByTitle}
+                >
+                  {row.signedByLabel}
+                </span>
+              ),
+            },
+            {
+              id: "assigned",
+              header: "Assigned",
+              className: "whitespace-nowrap",
+              cell: (row) => (
+                <span className="text-sm text-muted-foreground">
+                  {row.createdAt
+                    ? formatAssignmentRecordedAt(row.createdAt)
+                    : "—"}
+                </span>
+              ),
+            },
+          ]}
           renderBelowActive={(row) =>
             expandedAssignmentKey === row.key ? renderAssignmentAccessPanel(row) : null
           }

@@ -79,9 +79,27 @@ export async function listTeamWorkspaceDecks(
   userId: string,
   teamId: number,
   role: OfflineWorkspaceRole,
+  options?: { workspaceDeckServerIds?: number[] },
 ): Promise<OfflineDeckRow[]> {
   const db = await getOfflineDb();
   const assignedOnly = role === "team_member" || role === "team_admin";
+  const memberFlag = assignedOnly ? 1 : 0;
+  const serverIds = options?.workspaceDeckServerIds?.filter((id) => Number.isFinite(id));
+
+  // Prefer server-id manifest (linked personal decks often have `team_id` NULL on the server).
+  if (serverIds && serverIds.length > 0) {
+    const placeholders = serverIds.map(() => "?").join(", ");
+    const res = await db.query(
+      `SELECT * FROM decks
+       WHERE user_id = ? AND deleted = 0
+         AND COALESCE(member_assigned, 0) = ?
+         AND server_id IN (${placeholders})
+       ORDER BY updated_at_ms DESC;`,
+      [userId, memberFlag, ...serverIds],
+    );
+    return (res.values ?? []) as OfflineDeckRow[];
+  }
+
   const res = await db.query(
     assignedOnly
       ? `SELECT * FROM decks
@@ -103,6 +121,7 @@ export async function listDecksForScope(
   workspaceRole?: OfflineWorkspaceRole,
   options?: {
     invitedWorkspaceTeamIds?: ReadonlySet<number>;
+    workspaceDeckServerIds?: number[];
   },
 ): Promise<OfflineDeckRow[]> {
   if (scope.kind === "personal") {
@@ -112,6 +131,9 @@ export async function listDecksForScope(
     userId,
     scope.teamId,
     workspaceRole ?? "team_member",
+    options?.workspaceDeckServerIds != null
+      ? { workspaceDeckServerIds: options.workspaceDeckServerIds }
+      : undefined,
   );
 }
 
@@ -243,6 +265,33 @@ export async function purgeLocallyCreatedTeamDecks(userId: string): Promise<numb
   );
   await persistOfflineDb();
   return ids.length;
+}
+
+/** Backfill team_id / member_assigned from the sync manifest (linked decks may lack team_id). */
+export async function repairTeamWorkspaceDeckRows(
+  userId: string,
+  workspaces: ReadonlyArray<{
+    teamId: number;
+    role: OfflineWorkspaceRole;
+    workspaceDeckServerIds?: number[];
+  }>,
+): Promise<void> {
+  const db = await getOfflineDb();
+  for (const ws of workspaces) {
+    const ids = ws.workspaceDeckServerIds?.filter((id) => Number.isFinite(id));
+    if (!ids?.length) continue;
+    const memberAssigned =
+      ws.role === "team_member" || ws.role === "team_admin" ? 1 : 0;
+    for (const serverId of ids) {
+      await db.run(
+        `UPDATE decks
+         SET team_id = ?, member_assigned = ?
+         WHERE user_id = ? AND server_id = ? AND deleted = 0 AND dirty = 0;`,
+        [ws.teamId, memberAssigned, userId, serverId],
+      );
+    }
+  }
+  await persistOfflineDb();
 }
 
 /** Clears mistaken `member_assigned` flags on rows the user authored (post-sync repair). */

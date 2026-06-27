@@ -21,6 +21,18 @@
   --scrim: rgba(0, 0, 0, 0.72);
   --radius: 12px;
   --radius-lg: 16px;
+  --flipvise-safe-top: env(safe-area-inset-top, 0px);
+  --flipvise-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Capacitor WebViews often report env(safe-area-inset-*) as 0 — set floors in index.html. */
+html[data-native-shell] {
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+  --flipvise-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+html[data-native-shell][data-platform="ios"] {
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
 }
 
 /* Light mode carried from the live dashboard. Captured interface colors are
@@ -61,30 +73,7 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding-top: max(
-    env(safe-area-inset-top, 0px),
-    constant(safe-area-inset-top, 0px)
-  );
-  padding-bottom: max(
-    env(safe-area-inset-bottom, 0px),
-    constant(safe-area-inset-bottom, 0px)
-  );
-}
-
-/* iOS WKWebView fallback when env(safe-area-inset-*) is 0 */
-@supports (-webkit-touch-callout: none) {
-  .app {
-    padding-top: max(
-      47px,
-      env(safe-area-inset-top, 0px),
-      constant(safe-area-inset-top, 0px)
-    );
-    padding-bottom: max(
-      20px,
-      env(safe-area-inset-bottom, 0px),
-      constant(safe-area-inset-bottom, 0px)
-    );
-  }
+  padding-bottom: var(--flipvise-safe-bottom);
 }
 
 /* ── Logo watermark (behind all offline screens) ──────────── */
@@ -110,6 +99,8 @@ html, body, #root {
   justify-content: center;
   text-align: center;
   padding: 24px;
+  padding-top: calc(24px + var(--flipvise-safe-top));
+  padding-bottom: calc(24px + var(--flipvise-safe-bottom));
 }
 .lock-screen__inner {
   display: flex;
@@ -160,7 +151,7 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 14px;
+  padding: calc(12px + var(--flipvise-safe-top)) 14px 12px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-bar);
   backdrop-filter: blur(10px);
