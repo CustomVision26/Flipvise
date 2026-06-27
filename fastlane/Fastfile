@@ -7,18 +7,22 @@ XCODE_SCHEME = "App"
 platform :ios do
   # Builds the iOS app and uploads it to TestFlight.
   #
-  # Signing uses MANUAL signing driven by the App Store Connect API key:
-  #   - `cert`  creates/downloads an Apple Distribution certificate into a CI keychain
-  #   - `sigh`  creates an App Store provisioning profile (no devices required)
-  # Automatic signing is intentionally NOT used: `xcodebuild archive` with automatic
-  # signing tries to create a *Development* profile, which requires a registered
-  # device and therefore cannot work on a headless CI runner.
+  # Signing uses fastlane `match` (App Store / distribution). match stores the
+  # distribution certificate + private key + provisioning profile ENCRYPTED in a
+  # dedicated git branch, so every CI run reuses the same certificate instead of
+  # generating a new one (which would exhaust the account's certificate limit).
+  # Automatic signing is intentionally NOT used: `xcodebuild archive` with
+  # automatic signing tries to create a *Development* profile, which requires a
+  # registered device and therefore cannot work on a headless CI runner.
   #
-  # Required environment variables (set as GitHub Actions secrets):
-  #   ASC_KEY_ID       - App Store Connect API key ID
-  #   ASC_ISSUER_ID    - App Store Connect API issuer ID
-  #   ASC_KEY_PATH     - path to the .p8 file (materialized by the workflow)
-  #   APPLE_TEAM_ID    - 10-character Apple Developer Team ID
+  # Required environment variables (set as GitHub Actions secrets / by the workflow):
+  #   ASC_KEY_ID                     - App Store Connect API key ID
+  #   ASC_ISSUER_ID                  - App Store Connect API issuer ID
+  #   ASC_KEY_PATH                   - path to the .p8 file (materialized by the workflow)
+  #   APPLE_TEAM_ID                  - 10-character Apple Developer Team ID
+  #   MATCH_PASSWORD                 - passphrase used to encrypt the match storage
+  #   MATCH_GIT_URL                  - git URL of the repo holding the encrypted certs
+  #   MATCH_GIT_BASIC_AUTHORIZATION  - base64 "x-access-token:<token>" for git auth
   desc "Build and upload a new build to TestFlight"
   lane :beta do
     # Create/unlock a temporary keychain for the imported signing certificate.
@@ -43,19 +47,18 @@ platform :ios do
     )
     next_build = latest_build + 1
 
-    # Distribution certificate (Apple Distribution) into the CI keychain.
-    cert(
-      api_key: api_key,
-      team_id: team_id,
-    )
-
-    # App Store provisioning profile (distribution => no device requirement).
-    sigh(
-      api_key: api_key,
+    # Fetch (or create on first run) the App Store distribution certificate and
+    # provisioning profile, importing them into the CI keychain.
+    match(
+      type: "appstore",
       app_identifier: APP_IDENTIFIER,
+      api_key: api_key,
       team_id: team_id,
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      git_branch: ENV.fetch("MATCH_GIT_BRANCH", "match-certificates"),
+      readonly: false,
     )
-    profile_name = lane_context[SharedValues::SIGH_NAME]
+    profile_name = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING][APP_IDENTIFIER]
 
     # Switch the Release config to manual signing with the fetched profile.
     update_code_signing_settings(

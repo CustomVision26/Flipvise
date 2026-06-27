@@ -23,6 +23,11 @@ concurrency:
   group: ios-testflight-${{ github.ref }}
   cancel-in-progress: true
 
+# `contents: write` lets fastlane match push the encrypted signing assets to the
+# dedicated certificates branch using the built-in GITHUB_TOKEN.
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build & upload to TestFlight
@@ -74,11 +79,21 @@ jobs:
           fi
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      - name: Configure fastlane match git access
+        env:
+          GH_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "MATCH_GIT_URL=${{ github.server_url }}/${{ github.repository }}.git" >> "$GITHUB_ENV"
+          AUTH=$(printf '%s' "x-access-token:${GH_PAT}" | base64 | tr -d '\n')
+          echo "MATCH_GIT_BASIC_AUTHORIZATION=$AUTH" >> "$GITHUB_ENV"
+
       - name: Build and upload to TestFlight
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
         run: bundle exec fastlane ios beta
 
       - name: Upload build artifacts
