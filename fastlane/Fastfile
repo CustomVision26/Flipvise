@@ -39,12 +39,24 @@ platform :ios do
     )
     next_build = latest_build + 1
 
+    # Pass the App Store Connect API key directly to xcodebuild so that
+    # `-allowProvisioningUpdates` can register the App ID and create the signing
+    # certificate + provisioning profile automatically (cloud signing).
+    xcodebuild_args = [
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath", ENV.fetch("ASC_KEY_PATH"),
+      "-authenticationKeyID", ENV.fetch("ASC_KEY_ID"),
+      "-authenticationKeyIssuerID", ENV.fetch("ASC_ISSUER_ID"),
+      "DEVELOPMENT_TEAM=#{team_id}",
+      "CURRENT_PROJECT_VERSION=#{next_build}",
+    ].join(" ")
+
     build_app(
       project: XCODE_PROJECT,
       scheme: XCODE_SCHEME,
       configuration: "Release",
       export_method: "app-store",
-      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM=#{team_id} CURRENT_PROJECT_VERSION=#{next_build}",
+      xcargs: xcodebuild_args,
       export_options: {
         signingStyle: "automatic",
         teamID: team_id,
