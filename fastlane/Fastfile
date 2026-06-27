@@ -131,15 +131,6 @@ platform :ios do
 end
 
 platform :android do
-  # Builds a debug APK and distributes it to testers via Firebase App
-  # Distribution. A debug build is used so no release keystore secret is needed
-  # to get started; updates may require testers to reinstall because CI's debug
-  # signing key is not persisted between runs.
-  #
-  # Required environment variables (set as GitHub Actions secrets / by the workflow):
-  #   FIREBASE_ANDROID_APP_ID           - Firebase Android app id (1:NNNN:android:XXXX)
-  #   FIREBASE_SERVICE_CREDENTIALS_FILE - path to the service account JSON (written by the workflow)
-  #   FIREBASE_TESTER_GROUPS            - optional comma-separated Firebase tester group aliases
   # One-off helper: creates a Firebase App Distribution tester group with the
   # alias "testers". Add testers to it in the Firebase console (or via the
   # firebase_app_distribution_add_testers action) afterwards.
@@ -154,12 +145,25 @@ platform :android do
     )
   end
 
-  desc "Build a debug APK and distribute it via Firebase App Distribution"
+  # Builds a release-signed APK and distributes it to testers via Firebase App
+  # Distribution. The release keystore is provided by the workflow (decoded from
+  # a base64 secret), so the signing key is stable across runs and testers get
+  # seamless in-place updates. The same signed artifact is Play-Store ready.
+  #
+  # Required environment variables (set as GitHub Actions secrets / by the workflow):
+  #   FIREBASE_ANDROID_APP_ID           - Firebase Android app id (1:NNNN:android:XXXX)
+  #   FIREBASE_SERVICE_CREDENTIALS_FILE - path to the service account JSON (written by the workflow)
+  #   FIREBASE_TESTER_GROUPS            - optional comma-separated Firebase tester group aliases
+  #   ANDROID_KEYSTORE_PATH             - path to the decoded release keystore
+  #   ANDROID_KEYSTORE_PASSWORD         - keystore password
+  #   ANDROID_KEY_ALIAS                 - signing key alias
+  #   ANDROID_KEY_PASSWORD              - signing key password
+  desc "Build a release-signed APK and distribute it via Firebase App Distribution"
   lane :firebase do
     gradle(
       project_dir: "android",
       task: "assemble",
-      build_type: "Debug",
+      build_type: "Release",
     )
 
     # Release notes default to the latest commit message unless provided.
@@ -169,7 +173,7 @@ platform :android do
     end
 
     apk_path = lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH] ||
-               "android/app/build/outputs/apk/debug/app-debug.apk"
+               "android/app/build/outputs/apk/release/app-release.apk"
 
     options = {
       app: ENV.fetch("FIREBASE_ANDROID_APP_ID"),

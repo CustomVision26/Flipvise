@@ -88,3 +88,9 @@ vendor/bundle/
 *.mobileprovision
 *.cer
 AuthKey_*.p8
+
+# Android signing — NEVER commit keystores or signing properties
+*.jks
+*.keystore
+keystore.properties
+firebase-service-account.json
