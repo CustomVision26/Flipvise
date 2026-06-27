@@ -29,6 +29,7 @@ import {
 import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { applyOfflineTheme } from "./apply-offline-theme";
+import { AccountMenu } from "./account-menu";
 import { SettingsSheet } from "./settings-sheet";
 import { DeckLibrary } from "./deck-library";
 import { ImagePickerField } from "./image-picker-field";
@@ -483,6 +484,9 @@ export function App() {
         onSync={handleSync}
         syncing={syncing}
         onSettings={() => setShowSettings(true)}
+        viewerDisplayName={accessContext.viewerDisplayName}
+        viewerEmail={accessContext.viewerEmail}
+        personalPlanLabel={personalPlanLabel}
       />
       <div className="content content--library">
         <DeckLibrary
@@ -535,12 +539,18 @@ function Topbar({
   onSync,
   syncing,
   onSettings,
+  viewerDisplayName,
+  viewerEmail,
+  personalPlanLabel,
 }: {
   online: boolean;
   onOpen: () => void;
   onSync: () => void;
   syncing: boolean;
-  onSettings: () => void;
+  onSettings?: () => void;
+  viewerDisplayName?: string;
+  viewerEmail?: string | null;
+  personalPlanLabel?: string;
 }) {
   return (
     <header className="topbar">
@@ -570,15 +580,22 @@ function Topbar({
       >
         Online Dashboard
       </button>
-      <button
-        type="button"
-        className="icon-btn"
-        onClick={onSettings}
-        aria-label="Settings"
-        title="Settings"
-      >
-        ⚙
-      </button>
+      {onSettings ? (
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onSettings}
+          aria-label="Settings"
+          title="Settings"
+        >
+          ⚙
+        </button>
+      ) : null}
+      <AccountMenu
+        displayName={viewerDisplayName}
+        email={viewerEmail}
+        planLabel={personalPlanLabel}
+      />
     </header>
   );
 }

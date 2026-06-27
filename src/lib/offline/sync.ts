@@ -222,7 +222,8 @@ export async function consumePendingOfflinePull(): Promise<{
   } catch {
     // non-fatal
   }
-  await applyServerResponse(data, pending.userId);
+  // The stashed pull is always a full library download, so reconcile server deletions.
+  await applyServerResponse(data, pending.userId, { reconcile: true });
   if (data.context) {
     await setOfflineAccessContext(data.context);
   }
@@ -364,7 +365,13 @@ async function executeSyncRound(options: SyncOptions): Promise<{
 
   const data = await postSyncRequest(options, payload);
 
-  await applyServerResponse(data, options.userId);
+  // A full pull returns the complete authoritative library, so we can safely remove
+  // local rows the server no longer has (decks/cards deleted on another device or the
+  // online dashboard). Incremental pulls only return changed rows, so absence there
+  // does NOT imply deletion — never reconcile in that case.
+  await applyServerResponse(data, options.userId, {
+    reconcile: options.fullPull === true,
+  });
 
   if (data.context) {
     await setOfflineAccessContext(data.context);
@@ -383,6 +390,7 @@ async function executeSyncRound(options: SyncOptions): Promise<{
 async function applyServerResponse(
   data: SyncResponse,
   userId: string,
+  options: { reconcile?: boolean } = {},
 ): Promise<void> {
   const db = await getOfflineDb();
 
@@ -479,6 +487,43 @@ async function applyServerResponse(
         c.choices ? JSON.stringify(c.choices) : null, c.correctChoiceIndex,
         c.updatedAtMs, c.updatedAtMs,
       ],
+    );
+  }
+
+  // 3b. Reconcile server-side deletions (full pull only — see caller).
+  //     The pulled set is the complete authoritative library, so any confirmed-synced
+  //     local row (server_id set, not dirty) that the server didn't return has been
+  //     deleted elsewhere and must be removed. Locally-created/edited rows (dirty = 1)
+  //     and not-yet-pushed rows (server_id NULL) are preserved.
+  if (options.reconcile) {
+    // Server ids are integers, so inlining them sidesteps SQLite's bound-parameter
+    // limit on large libraries while staying injection-safe.
+    const pulledDeckIds = data.pull.decks
+      .map((d) => Number(d.serverId))
+      .filter((id) => Number.isFinite(id));
+    const pulledCardIds = data.pull.cards
+      .map((c) => Number(c.serverId))
+      .filter((id) => Number.isFinite(id));
+
+    if (pulledDeckIds.length > 0) {
+      await db.run(
+        `DELETE FROM decks WHERE server_id IS NOT NULL AND dirty = 0 AND server_id NOT IN (${pulledDeckIds.join(",")});`,
+      );
+    } else {
+      await db.run(`DELETE FROM decks WHERE server_id IS NOT NULL AND dirty = 0;`);
+    }
+
+    if (pulledCardIds.length > 0) {
+      await db.run(
+        `DELETE FROM cards WHERE server_id IS NOT NULL AND dirty = 0 AND server_id NOT IN (${pulledCardIds.join(",")});`,
+      );
+    } else {
+      await db.run(`DELETE FROM cards WHERE server_id IS NOT NULL AND dirty = 0;`);
+    }
+
+    // Drop cards orphaned by a removed deck (safety net; keep dirty rows to push later).
+    await db.run(
+      `DELETE FROM cards WHERE dirty = 0 AND (deck_local_id IS NULL OR deck_local_id NOT IN (SELECT local_id FROM decks));`,
     );
   }
 
