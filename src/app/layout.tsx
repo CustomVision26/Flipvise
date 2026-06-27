@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
+import Script from "next/script";
 import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
@@ -69,6 +70,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
 };
+
+const NATIVE_SHELL_EARLY_SCRIPT = `try{var c=window.Capacitor;var ua=navigator.userAgent;if(/FlipviseNative\\//.test(ua)||(c&&c.isNativePlatform&&c.isNativePlatform())){var r=document.documentElement;r.dataset.flipviseNativeShell="1";r.dataset.nativeShell="1";var p=c&&c.getPlatform?c.getPlatform():"";if(p)r.dataset.platform=p;else if(/Android/i.test(ua))r.dataset.platform="android";else if(/iPhone|iPad|iPod/i.test(ua))r.dataset.platform="ios"}}catch(e){}`;
 
 export default async function RootLayout({
   children,
@@ -160,14 +163,10 @@ export default async function RootLayout({
       className={`${poppins.variable} h-full antialiased`}
       data-ui-theme={appliedTheme}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var c=window.Capacitor;var ua=navigator.userAgent;if(/FlipviseNative\\//.test(ua)||(c&&c.isNativePlatform&&c.isNativePlatform())){var r=document.documentElement;r.dataset.flipviseNativeShell="1";r.dataset.nativeShell="1";var p=c&&c.getPlatform?c.getPlatform():"";if(p)r.dataset.platform=p;else if(/Android/i.test(ua))r.dataset.platform="android";else if(/iPhone|iPad|iPod/i.test(ua))r.dataset.platform="ios"}}catch(e){}`,
-          }}
-        />
-      </head>
       <body className="min-h-full flex flex-col relative">
+        <Script id="flipvise-native-shell-early" strategy="beforeInteractive">
+          {NATIVE_SHELL_EARLY_SCRIPT}
+        </Script>
         <AppProviders>
             {showHeaderChrome && (
               <AuthenticatedShellChrome>
@@ -263,6 +262,7 @@ export default async function RootLayout({
             <div
               className="relative flex-1 flex flex-col"
               data-shell={isTeamAdminRoute ? "team-admin" : undefined}
+              suppressHydrationWarning
             >
               <TooltipProvider>{children}</TooltipProvider>
             </div>
