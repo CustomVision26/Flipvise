@@ -1,5 +1,4 @@
 import path from "node:path";
-import fs from "node:fs";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vite";
 
@@ -15,6 +14,12 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: path.resolve(__dirname, "offline-app"),
   base: "./",
+  define: {
+    "import.meta.env.BASE_URL": JSON.stringify("./"),
+    "import.meta.env.VITE_LIVE_URL": JSON.stringify(
+      process.env.VITE_LIVE_URL ?? "https://flipvise-sjgw.onrender.com",
+    ),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "..", "src"),
@@ -24,13 +29,20 @@ export default defineConfig({
     react(),
     {
       name: "flipvise-capacitor-html",
-      closeBundle() {
-        const indexPath = path.resolve(__dirname, "www", "index.html");
-        if (!fs.existsSync(indexPath)) return;
-        let html = fs.readFileSync(indexPath, "utf8");
-        // WKWebView + capacitor://localhost can reject module scripts with crossorigin.
-        html = html.replace(/\s+crossorigin/g, "");
-        fs.writeFileSync(indexPath, html);
+      apply: "build",
+      transformIndexHtml: {
+        order: "post",
+        handler(html) {
+          let out = html.replace(/\s+crossorigin/g, "");
+          out = out.replace(/\s+type="module"/g, "");
+          out = out.replace(/<link rel="modulepreload"[^>]*>\s*/g, "");
+          const appScript = out.match(/<script src="\.\/assets\/app\.js"><\/script>/);
+          if (appScript) {
+            out = out.replace(appScript[0], "");
+            out = out.replace("</body>", `    ${appScript[0]}\n  </body>`);
+          }
+          return out;
+        },
       },
     },
   ],
@@ -38,5 +50,17 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "www"),
     emptyOutDir: true,
     target: "es2020",
+    // One JS file — iOS WKWebView often fails to load secondary Vite chunks (MIME/CORS).
+    modulePreload: false,
+    cssCodeSplit: false,
+    rollupOptions: {
+      output: {
+        format: "iife",
+        inlineDynamicImports: true,
+        entryFileNames: "assets/app.js",
+        extend: true,
+        name: "FlipviseOffline",
+      },
+    },
   },
 });

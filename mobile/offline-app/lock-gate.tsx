@@ -24,19 +24,36 @@ export function LockGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setEnabled(false);
+        setLocked(false);
+      }
+    }, 4000);
+
     (async () => {
-      const [on, availability] = await Promise.all([
-        getAppLockEnabled().catch(() => false),
-        getLockAvailability().catch(() => ({ canLock: false, label: "" })),
-      ]);
-      if (cancelled) return;
-      const active = on && availability.canLock;
-      if (availability.label) setLabel(availability.label);
-      setEnabled(active);
-      setLocked(active);
+      try {
+        const [on, availability] = await Promise.all([
+          getAppLockEnabled().catch(() => false),
+          getLockAvailability().catch(() => ({ canLock: false, label: "" })),
+        ]);
+        if (cancelled) return;
+        const active = on && availability.canLock;
+        if (availability.label) setLabel(availability.label);
+        setEnabled(active);
+        setLocked(active);
+      } catch {
+        if (!cancelled) {
+          setEnabled(false);
+          setLocked(false);
+        }
+      } finally {
+        window.clearTimeout(timeout);
+      }
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
   }, []);
 

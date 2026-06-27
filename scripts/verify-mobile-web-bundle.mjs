@@ -21,6 +21,11 @@ function verifyWebDir(label, webDir) {
     ...html.matchAll(/(?:src|href)=["'](\.\/[^"']+)["']/g),
   ].map((m) => m[1]);
 
+  const appJs = path.join(webDir, "assets", "app.js");
+  if (fs.existsSync(appJs) && !refs.some((r) => r.endsWith("app.js"))) {
+    refs.push("./assets/app.js");
+  }
+
   if (refs.length === 0) {
     throw new Error(`[${label}] No ./ asset references found in index.html`);
   }

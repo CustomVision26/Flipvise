@@ -47,6 +47,9 @@
   </head>
   <body>
     <div id="boot-splash" aria-live="polite">
+      <p style="margin:0;font-size:28px;font-weight:700;letter-spacing:-0.03em;color:#fafafa">
+        FLIPVISE
+      </p>
       <img src="./logo.png" alt="" />
       <p>Loading Flipvise…</p>
       <p id="boot-error"></p>
@@ -64,21 +67,26 @@
         window.addEventListener(
           "error",
           function (e) {
-            if (e.filename && /\.js($|\?)/.test(e.filename)) {
+            var src = e.filename || (e.target && e.target.src) || "";
+            if (/\.js($|\?)/.test(src)) {
               showBootError(
-                "The app could not start. Reinstall from TestFlight or tap below to retry.",
+                "The app could not start (" + (e.message || "script error") + "). Pull to refresh in TestFlight or reinstall.",
               );
             }
           },
           true,
         );
+        window.addEventListener("unhandledrejection", function (e) {
+          var reason = e.reason && (e.reason.message || String(e.reason));
+          if (reason) showBootError("Startup failed: " + reason);
+        });
         window.__flipviseDismissBootSplash = function () {
           splash && splash.remove();
         };
         window.setTimeout(function () {
           if (splash && document.body.contains(splash)) {
             showBootError(
-              "Still loading… If this persists, reinstall the app from TestFlight.",
+              "Still loading… Force-quit and reopen. If this continues, wait for the next TestFlight build.",
             );
           }
         }, 12000);
