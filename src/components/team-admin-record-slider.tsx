@@ -166,7 +166,7 @@ export type TeamAdminRecordSliderProps<
     className?: string;
     cell: (item: T, isActive: boolean) => React.ReactNode;
   }>;
-  /** Merge rows under one member cell (rowspan) — requires `memberUserId` on items. */
+  /** Visually group rows by member (one member cell per row; first row shows the label). */
   tableGroupByMember?: boolean;
   /** Assignment rows per page; member groups are never split across pages. */
   tablePageSize?: number;
@@ -462,6 +462,7 @@ export function TeamAdminRecordSlider<
                   ? tablePagination.groupsOnPage.map((group) =>
                       group.items.map((item, rowInGroup) => {
                         const isActive = activeKey === item.key;
+                        const isFirstInGroup = rowInGroup === 0;
                         return (
                           <TableRow
                             key={item.key}
@@ -469,15 +470,17 @@ export function TeamAdminRecordSlider<
                             onClick={() => onActivate?.(item)}
                             aria-selected={isActive}
                           >
-                            {rowInGroup === 0 && memberColumn ? (
+                            {memberColumn ? (
                               <TableCell
-                                rowSpan={group.items.length}
                                 className={cn(
                                   memberColumn.className,
-                                  "align-top border-r border-border/50 bg-muted/10",
+                                  "align-top border-r border-border/50",
+                                  isFirstInGroup ? "bg-muted/10" : "bg-muted/5",
                                 )}
                               >
-                                {memberColumn.cell(item, isActive)}
+                                {isFirstInGroup
+                                  ? memberColumn.cell(item, isActive)
+                                  : null}
                               </TableCell>
                             ) : null}
                             {deckColumns.map((col) => (
