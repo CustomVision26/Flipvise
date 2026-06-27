@@ -10,7 +10,7 @@
 # 2. Apple integration: Team settings → Integrations → Developer Portal → connect an
 #    App Store Connect API key (Issuer ID + Key ID + .p8). Name it exactly:  FlipviseASC
 #    (or change `app_store_connect:` below to match the name you choose).
-# 3. In App Store Connect, create the app record with bundle id  com.flipvise.app
+# 3. In App Store Connect, create the app record with bundle id  com.flipvise.ios
 #    and copy its numeric Apple ID into the APP_STORE_APP_ID var below.
 # 4. (Recommended) Register the bundle id under Certificates, Identifiers & Profiles.
 # Automatic signing then provisions certificates/profiles from the API key on each build.
@@ -27,10 +27,11 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.flipvise.app
+        bundle_identifier: com.flipvise.ios
       vars:
-        BUNDLE_ID: "com.flipvise.app"
-        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        BUNDLE_ID: "com.flipvise.ios"
+        # Capacitor 8 uses Swift Package Manager — there is NO .xcworkspace, only the project.
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
         # Numeric Apple ID of the app in App Store Connect (App Information → General).
         APP_STORE_APP_ID: 0000000000
@@ -39,7 +40,6 @@ workflows:
         VITE_LIVE_URL: "https://flipvise-sjgw.onrender.com"
       node: 20
       xcode: latest
-      cocoapods: default
     scripts:
       - name: Install JS dependencies
         script: npm ci
@@ -54,17 +54,19 @@ workflows:
           npx cap sync ios
       - name: Set up code signing (automatic via API key)
         script: xcode-project use-profiles
-      - name: Bump build number from latest TestFlight build
+      - name: Compute next build number from latest TestFlight build
         script: |
           set -e
-          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo "0")
-          cd ios/App
-          agvtool new-version -all $((LATEST + 1))
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null || echo "0")
+          echo "BUILD_NUMBER=$((LATEST + 1))" >> "$CM_ENV"
       - name: Build signed .ipa
         script: |
+          set -e
+          # Inject the build number via xcargs (project is not set up for agvtool).
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

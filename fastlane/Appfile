@@ -1,4 +1,4 @@
-app_identifier("com.flipvise.app")
+app_identifier("com.flipvise.ios")
 
 # Authentication is handled by the App Store Connect API key (see Fastfile),
 # so no apple_id / itc_team_id is required here.

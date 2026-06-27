@@ -1,6 +1,6 @@
 default_platform(:ios)
 
-APP_IDENTIFIER = "com.flipvise.app"
+APP_IDENTIFIER = "com.flipvise.ios"
 XCODE_PROJECT = "ios/App/App.xcodeproj"
 XCODE_SCHEME = "App"
 
