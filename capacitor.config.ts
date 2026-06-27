@@ -35,6 +35,8 @@ const allowNavigation = new Set([
   // Bundled offline shell (`server.hostname`); without this iOS opens Safari for
   // "Offline study" / sign-out navigation to https://localhost/.
   "localhost",
+  // Android emulator → host machine (`npm run mobile:sync:dev`).
+  "10.0.2.2",
   LIVE_HOST,
   PROD_HOST,
   "*.onrender.com",
