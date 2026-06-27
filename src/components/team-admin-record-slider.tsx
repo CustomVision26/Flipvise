@@ -311,6 +311,9 @@ export function TeamAdminRecordSlider<
 
   const resolvedSortLabels = { ...SORT_LABELS, ...sortLabelMap };
 
+  const effectiveLayout: "slider" | "table" =
+    tableColumns && tableColumns.length > 0 ? "table" : layout;
+
   const sortOptions =
     allowedSortOptions ??
     (Object.keys(SORT_LABELS) as TeamAdminRecordSort[]).filter(
@@ -438,9 +441,12 @@ export function TeamAdminRecordSlider<
         <p className="rounded-lg border border-dashed border-border/80 bg-muted/10 px-4 py-8 text-center text-sm text-muted-foreground">
           {noResultsMessage}
         </p>
-      ) : layout === "table" && tableColumns && tableColumns.length > 0 ? (
+      ) : effectiveLayout === "table" && tableColumns && tableColumns.length > 0 ? (
         <>
-          <div className="overflow-x-auto -mx-1 px-1">
+          <div
+            className="overflow-x-auto -mx-1 px-1"
+            data-team-assign-table=""
+          >
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">

@@ -48,6 +48,21 @@
     }
   }
 
+  /* Team Admin — assignments table in Capacitor WebView (match web grouped table). */
+  html[data-flipvise-native-shell] [data-team-assign-table] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html[data-flipvise-native-shell] [data-team-assign-table] table {
+    min-width: 36rem;
+  }
+
+  html[data-flipvise-native-shell] [data-team-assign-table] th,
+  html[data-flipvise-native-shell] [data-team-assign-table] td {
+    font-size: 0.8125rem;
+    vertical-align: top;
+  }
+
   /* When team-admin switcher shares the header, push workspace onto its own row. */
   [data-app-header].has-team-admin [data-header-workspace] {
     grid-row: 3;
