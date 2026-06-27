@@ -74,7 +74,8 @@ jobs:
       - name: Build and distribute
         env:
           FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
+          # FIREBASE_TESTER_GROUPS temporarily disabled to isolate a distribution error.
+          # FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
           FIREBASE_RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
         run: bundle exec fastlane android firebase
 
