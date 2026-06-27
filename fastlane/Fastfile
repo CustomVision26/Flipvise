@@ -140,6 +140,20 @@ platform :android do
   #   FIREBASE_ANDROID_APP_ID           - Firebase Android app id (1:NNNN:android:XXXX)
   #   FIREBASE_SERVICE_CREDENTIALS_FILE - path to the service account JSON (written by the workflow)
   #   FIREBASE_TESTER_GROUPS            - optional comma-separated Firebase tester group aliases
+  # One-off helper: creates a Firebase App Distribution tester group with the
+  # alias "testers". Add testers to it in the Firebase console (or via the
+  # firebase_app_distribution_add_testers action) afterwards.
+  desc "Create a Firebase App Distribution tester group (alias: testers)"
+  lane :create_group do
+    project_number = ENV.fetch("FIREBASE_ANDROID_APP_ID").split(":")[1]
+    firebase_app_distribution_create_group(
+      project_number: project_number,
+      alias: "testers",
+      display_name: "Testers",
+      service_credentials_file: ENV.fetch("FIREBASE_SERVICE_CREDENTIALS_FILE"),
+    )
+  end
+
   desc "Build a debug APK and distribute it via Firebase App Distribution"
   lane :firebase do
     gradle(

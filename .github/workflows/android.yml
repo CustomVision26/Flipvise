@@ -6,6 +6,13 @@ name: Android Firebase
 on:
   workflow_dispatch:
     inputs:
+      lane:
+        description: "fastlane lane to run"
+        type: choice
+        default: firebase
+        options:
+          - firebase
+          - create_group
       release_notes:
         description: "Firebase release notes (optional; defaults to the latest commit message)"
         type: string
@@ -76,7 +83,7 @@ jobs:
           FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
           FIREBASE_RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
-        run: bundle exec fastlane android firebase
+        run: bundle exec fastlane android ${{ github.event.inputs.lane || 'firebase' }}
 
       - name: Upload APK artifact
         if: always()
