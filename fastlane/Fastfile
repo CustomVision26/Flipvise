@@ -21,8 +21,9 @@ platform :ios do
     api_key = app_store_connect_api_key(
       key_id: ENV.fetch("ASC_KEY_ID"),
       issuer_id: ENV.fetch("ASC_ISSUER_ID"),
-      key_content: ENV.fetch("ASC_KEY_CONTENT"),
-      is_key_content_base64: true,
+      # The workflow materializes the .p8 to a file (handles base64 or raw PEM
+      # secrets) and exports its path — avoids fastlane's null-byte base64 bug.
+      key_filepath: ENV.fetch("ASC_KEY_PATH"),
       in_house: false,
     )
 
