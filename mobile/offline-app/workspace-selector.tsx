@@ -13,6 +13,7 @@ export function WorkspaceSelector({
   scope,
   workspaces,
   personalPlanLabel = "Free",
+  personalHasTeamTierPlan = false,
   viewerDisplayName,
   viewerEmail,
   online = false,
@@ -23,6 +24,7 @@ export function WorkspaceSelector({
   scope: SavedWorkspaceScope;
   workspaces: OfflineWorkspaceContext[];
   personalPlanLabel?: string;
+  personalHasTeamTierPlan?: boolean;
   viewerDisplayName?: string;
   viewerEmail?: string | null;
   online?: boolean;
@@ -34,11 +36,12 @@ export function WorkspaceSelector({
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const subscriberOwnsTeamTierWorkspace = workspaces.some(
-    (w) => w.isSubscriberOwned ?? w.role === "owner",
-  );
-  const ownerWorkspace =
-    workspaces.find((w) => w.isSubscriberOwned ?? w.role === "owner") ?? null;
+  const subscriberOwnsTeamTierWorkspace =
+    personalHasTeamTierPlan &&
+    workspaces.some((w) => w.isSubscriberOwned ?? w.role === "owner");
+  const ownerWorkspace = personalHasTeamTierPlan
+    ? workspaces.find((w) => w.isSubscriberOwned ?? w.role === "owner") ?? null
+    : null;
 
   const selectedTeam =
     scope !== "personal"
@@ -255,7 +258,7 @@ export function WorkspaceSelector({
               </button>
             )}
 
-            {online && ownerWorkspace && onTeamAdminDash && (
+            {online && personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash && (
               <div className="workspace-scope__admin-row">
                 <button
                   type="button"

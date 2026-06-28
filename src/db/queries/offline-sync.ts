@@ -21,6 +21,7 @@ import {
   getPersonalWorkspaceAccessLabel,
   getPersonalWorkspaceAccountPlanLabel,
 } from "@/lib/personal-workspace-plan-label";
+import { getAccessContext } from "@/lib/access";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
@@ -352,12 +353,14 @@ export type OfflineSyncContext = {
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineSyncWorkspaceContext[];
-  /** Workspace switcher label (e.g. Team Basic (Affiliate), Subscriber). */
+  /** Workspace switcher label (e.g. Subscriber, Complimentary). */
   personalPlanLabel: string;
   /** Billing tier for the account menu Plan row (e.g. Team Basic, Pro Plus). */
   personalAccountPlanLabel: string;
   /** Plan source for the account menu Plan type row (Affiliate, Paid, Free, …). */
   personalPlanAccessType: AdminUserPlanAccessType;
+  /** True when the signed-in user has an active team-tier personal subscription. */
+  personalHasTeamTierPlan: boolean;
   viewerDisplayName: string;
   viewerEmail: string | null;
   updatedAtMs: number;
@@ -531,13 +534,21 @@ export async function buildOfflineSyncContext(
     (row) => row != null,
   );
 
+  const { activeTeamPlan } = await getAccessContext();
+  const personalHasTeamTierPlan =
+    activeTeamPlan != null && isTeamPlanId(activeTeamPlan);
+  const workspacesForOffline = personalHasTeamTierPlan
+    ? workspaceContexts
+    : workspaceContexts.filter((w) => !w.isSubscriberOwned);
+
   return {
     maxPersonalDecks: personal.maxPersonalDecks,
     maxCardsPerDeck: personal.maxCardsPerDeck,
-    workspaces: workspaceContexts,
+    workspaces: workspacesForOffline,
     personalPlanLabel,
     personalAccountPlanLabel,
     personalPlanAccessType,
+    personalHasTeamTierPlan,
     viewerDisplayName: viewerField.primaryLine,
     viewerEmail: viewerField.primaryEmail,
     updatedAtMs: Date.now(),

@@ -378,11 +378,15 @@ export function App() {
   }, [workspaceScope, accessContext.workspaces]);
 
   const ownerWorkspace = useMemo(
-    () => accessContext.workspaces.find((w) => w.role === "owner") ?? null,
-    [accessContext.workspaces],
+    () =>
+      accessContext.personalHasTeamTierPlan
+        ? accessContext.workspaces.find((w) => w.role === "owner") ?? null
+        : null,
+    [accessContext.personalHasTeamTierPlan, accessContext.workspaces],
   );
 
-  const showTeamAdminDash = ownerWorkspace != null;
+  const showTeamAdminDash =
+    Boolean(accessContext.personalHasTeamTierPlan) && ownerWorkspace != null;
 
   const openLivePath = useCallback(async (path: string) => {
     if (!navigator.onLine) {
@@ -601,6 +605,7 @@ export function App() {
           workspaceScope={workspaceScope}
           workspaces={accessContext.workspaces}
           personalPlanLabel={personalPlanLabel}
+          personalHasTeamTierPlan={accessContext.personalHasTeamTierPlan ?? false}
           viewerDisplayName={accessContext.viewerDisplayName}
           viewerEmail={accessContext.viewerEmail}
           canCreateDeck={canCreateDeck}

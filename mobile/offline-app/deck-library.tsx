@@ -393,6 +393,7 @@ export function DeckLibrary({
   workspaceScope,
   workspaces,
   personalPlanLabel,
+  personalHasTeamTierPlan = false,
   viewerDisplayName,
   viewerEmail,
   canCreateDeck,
@@ -410,6 +411,7 @@ export function DeckLibrary({
   workspaceScope: SavedWorkspaceScope;
   workspaces: OfflineWorkspaceContext[];
   personalPlanLabel?: string;
+  personalHasTeamTierPlan?: boolean;
   viewerDisplayName?: string;
   viewerEmail?: string | null;
   canCreateDeck: boolean;
@@ -555,6 +557,7 @@ export function DeckLibrary({
             scope={workspaceScope}
             workspaces={workspaces}
             personalPlanLabel={personalPlanLabel}
+            personalHasTeamTierPlan={personalHasTeamTierPlan}
             viewerDisplayName={viewerDisplayName}
             viewerEmail={viewerEmail}
             online={online}

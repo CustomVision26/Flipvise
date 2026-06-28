@@ -39,12 +39,14 @@ export type OfflineAccessContext = {
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineWorkspaceContext[];
-  /** Label beside “Personal Dash” in the workspace switcher (e.g. Team Basic (Affiliate)). */
+  /** Label beside “Personal Dash” in the workspace switcher (e.g. Subscriber). */
   personalPlanLabel?: string;
-  /** Billing tier for the account menu Plan row (e.g. Team Basic, Pro Plus). */
+  /** Billing tier for the account menu Plan row (e.g. Pro Plus). */
   personalAccountPlanLabel?: string;
   /** Plan source for the account menu Plan type row (Affiliate, Paid, Free, …). */
   personalPlanAccessType?: AdminUserPlanAccessType;
+  /** Active team-tier personal subscription — gates Team Admin Dash and owned workspaces. */
+  personalHasTeamTierPlan?: boolean;
   /** Signed-in user display name (for owned workspaces when owner label is missing). */
   viewerDisplayName?: string;
   viewerEmail?: string | null;
@@ -65,10 +67,13 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as OfflineAccessContext;
-    return {
-      ...parsed,
-      personalPlanLabel: parsed.personalPlanLabel ?? "Free",
-      workspaces: (parsed.workspaces ?? []).map((w) => ({
+    const personalHasTeamTierPlan = parsed.personalHasTeamTierPlan ?? false;
+    const workspaces = (parsed.workspaces ?? [])
+      .filter((w) => {
+        const owned = w.isSubscriberOwned ?? w.role === "owner";
+        return personalHasTeamTierPlan || !owned;
+      })
+      .map((w) => ({
         ...w,
         teamMemberId: w.teamMemberId ?? 0,
         canAccessTeamAdmin:
@@ -79,7 +84,12 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
         workspaceDeckServerIds: Array.isArray(w.workspaceDeckServerIds)
           ? w.workspaceDeckServerIds.filter((id) => Number.isFinite(id))
           : [],
-      })),
+      }));
+    return {
+      ...parsed,
+      personalPlanLabel: parsed.personalPlanLabel ?? "Free",
+      personalHasTeamTierPlan,
+      workspaces,
     };
   } catch {
     return null;
@@ -120,17 +130,35 @@ export function defaultOfflineAccessContext(): OfflineAccessContext {
 export function resolveOfflinePersonalPlanLabel(
   ctx: OfflineAccessContext,
 ): string {
+  const hasTeamTier = ctx.personalHasTeamTierPlan ?? false;
+  const account = ctx.personalAccountPlanLabel?.trim();
+  const accessType = ctx.personalPlanAccessType;
   const stored = ctx.personalPlanLabel?.trim();
-  if (stored && stored !== "Free") return stored;
 
-  const ownedTeam = ctx.workspaces.find((w) => w.role === "owner");
-  if (ownedTeam) {
-    return `${ownedTeam.planLabel} (Affiliate)`;
+  if (!hasTeamTier && stored) {
+    const looksLikeTeamTierLabel =
+      /team basic|team gold|platinum|enterprise/i.test(stored) ||
+      stored.includes("(Affiliate)");
+    if (looksLikeTeamTierLabel) {
+      if (accessType === "Affiliate" && account) return `${account} (Affiliate)`;
+      if (accessType === "Paid") return "Subscriber";
+      if (accessType === "Complimentary") return "Complimentary";
+      if (account) return account;
+    }
   }
 
-  if (ctx.maxPersonalDecks >= 15) return "Pro Plus";
-  if (ctx.maxPersonalDecks > 2) return "Pro";
-  return stored || "Free";
+  if (stored && stored !== "Free") return stored;
+
+  if (account && account !== "Free") {
+    if (accessType === "Affiliate") return `${account} (Affiliate)`;
+    if (accessType === "Paid") return "Subscriber";
+    if (accessType === "Complimentary") return "Complimentary";
+    return account;
+  }
+
+  if (ctx.maxPersonalDecks >= 15) return "Subscriber";
+  if (ctx.maxPersonalDecks > 2) return "Subscriber";
+  return "Free";
 }
 
 /** Account menu: billing tier + plan source (separate from workspace switcher label). */
@@ -142,6 +170,13 @@ export function resolveOfflineAccountPlanDisplay(ctx: OfflineAccessContext): {
   const accessType = ctx.personalPlanAccessType;
   if (accountPlan && accessType) {
     return { plan: accountPlan, planType: accessType };
+  }
+
+  if (ctx.maxPersonalDecks >= 15) {
+    return { plan: "Pro Plus", planType: accessType ?? "Paid" };
+  }
+  if (ctx.maxPersonalDecks > 2) {
+    return { plan: "Pro", planType: accessType ?? "Paid" };
   }
 
   const stored = ctx.personalPlanLabel?.trim() || "Free";

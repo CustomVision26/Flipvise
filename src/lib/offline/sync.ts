@@ -93,6 +93,7 @@ interface SyncResponse {
     personalPlanLabel?: string;
     personalAccountPlanLabel?: string;
     personalPlanAccessType?: string;
+    personalHasTeamTierPlan?: boolean;
     viewerDisplayName?: string;
     viewerEmail?: string | null;
     updatedAtMs: number;
