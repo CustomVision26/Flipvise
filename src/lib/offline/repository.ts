@@ -83,33 +83,43 @@ export async function listTeamWorkspaceDecks(
 ): Promise<OfflineDeckRow[]> {
   const db = await getOfflineDb();
   const assignedOnly = role === "team_member" || role === "team_admin";
-  const memberFlag = assignedOnly ? 1 : 0;
-  const serverIds = options?.workspaceDeckServerIds?.filter((id) => Number.isFinite(id));
+  const manifest =
+    options?.workspaceDeckServerIds?.filter((id) => Number.isFinite(id)) ?? [];
 
-  // Prefer server-id manifest (linked personal decks often have `team_id` NULL on the server).
-  if (serverIds && serverIds.length > 0) {
-    const placeholders = serverIds.map(() => "?").join(", ");
+  // Invited members/co-admins: manifest is the assignment list (matches online dashboard).
+  // Linked personal decks often have `team_id` NULL — never fall back to `team_id` here
+  // or unassigned workspace decks (e.g. French to English) can appear.
+  if (assignedOnly) {
+    if (manifest.length === 0) return [];
+    const placeholders = manifest.map(() => "?").join(", ");
     const res = await db.query(
       `SELECT * FROM decks
        WHERE user_id = ? AND deleted = 0
-         AND COALESCE(member_assigned, 0) = ?
          AND server_id IN (${placeholders})
        ORDER BY updated_at_ms DESC;`,
-      [userId, memberFlag, ...serverIds],
+      [userId, ...manifest],
+    );
+    return (res.values ?? []) as OfflineDeckRow[];
+  }
+
+  // Subscriber owner — prefer manifest (linked decks may lack `team_id`).
+  if (manifest.length > 0) {
+    const placeholders = manifest.map(() => "?").join(", ");
+    const res = await db.query(
+      `SELECT * FROM decks
+       WHERE user_id = ? AND deleted = 0
+         AND server_id IN (${placeholders})
+       ORDER BY updated_at_ms DESC;`,
+      [userId, ...manifest],
     );
     return (res.values ?? []) as OfflineDeckRow[];
   }
 
   const res = await db.query(
-    assignedOnly
-      ? `SELECT * FROM decks
-         WHERE user_id = ? AND deleted = 0 AND team_id = ?
-           AND COALESCE(member_assigned, 0) = 1
-         ORDER BY updated_at_ms DESC;`
-      : `SELECT * FROM decks
-         WHERE user_id = ? AND deleted = 0 AND team_id = ?
-           AND COALESCE(member_assigned, 0) = 0
-         ORDER BY updated_at_ms DESC;`,
+    `SELECT * FROM decks
+     WHERE user_id = ? AND deleted = 0 AND team_id = ?
+       AND COALESCE(member_assigned, 0) = 0
+     ORDER BY updated_at_ms DESC;`,
     [userId, teamId],
   );
   return (res.values ?? []) as OfflineDeckRow[];
@@ -131,9 +141,7 @@ export async function listDecksForScope(
     userId,
     scope.teamId,
     workspaceRole ?? "team_member",
-    options?.workspaceDeckServerIds != null
-      ? { workspaceDeckServerIds: options.workspaceDeckServerIds }
-      : undefined,
+    { workspaceDeckServerIds: options?.workspaceDeckServerIds ?? [] },
   );
 }
 
@@ -278,10 +286,34 @@ export async function repairTeamWorkspaceDeckRows(
 ): Promise<void> {
   const db = await getOfflineDb();
   for (const ws of workspaces) {
-    const ids = ws.workspaceDeckServerIds?.filter((id) => Number.isFinite(id));
-    if (!ids?.length) continue;
-    const memberAssigned =
-      ws.role === "team_member" || ws.role === "team_admin" ? 1 : 0;
+    const ids = ws.workspaceDeckServerIds?.filter((id) => Number.isFinite(id)) ?? [];
+    const invitedRole = ws.role === "team_member" || ws.role === "team_admin";
+
+    if (invitedRole) {
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => "?").join(", ");
+        await db.run(
+          `UPDATE decks
+           SET team_id = NULL, member_assigned = 0
+           WHERE user_id = ? AND deleted = 0 AND dirty = 0
+             AND team_id = ?
+             AND server_id IS NOT NULL
+             AND server_id NOT IN (${placeholders});`,
+          [userId, ws.teamId, ...ids],
+        );
+      } else {
+        await db.run(
+          `UPDATE decks
+           SET team_id = NULL, member_assigned = 0
+           WHERE user_id = ? AND deleted = 0 AND dirty = 0 AND team_id = ?;`,
+          [userId, ws.teamId],
+        );
+      }
+    }
+
+    if (ids.length === 0) continue;
+
+    const memberAssigned = invitedRole ? 1 : 0;
     for (const serverId of ids) {
       await db.run(
         `UPDATE decks
@@ -291,6 +323,113 @@ export async function repairTeamWorkspaceDeckRows(
       );
     }
   }
+  await persistOfflineDb();
+}
+
+/**
+ * Removes invited-workspace study copies that are not in the assignment manifest
+ * (e.g. French to English for a co-admin who only has English Vocabulary + Jamaican History).
+ * Native SQLite persists across bundle updates — run after sync and on offline shell boot.
+ */
+export async function purgeStaleInvitedWorkspaceStudyDecks(
+  userId: string,
+  workspaces: ReadonlyArray<{
+    teamId: number;
+    role: OfflineWorkspaceRole;
+    workspaceDeckServerIds?: number[];
+  }>,
+): Promise<void> {
+  const db = await getOfflineDb();
+  for (const ws of workspaces) {
+    if (ws.role === "owner") continue;
+
+    const allowed = (ws.workspaceDeckServerIds ?? []).filter((id) =>
+      Number.isFinite(id),
+    );
+
+    if (allowed.length === 0) {
+      await db.run(
+        `DELETE FROM cards
+         WHERE deck_local_id IN (
+           SELECT local_id FROM decks
+           WHERE user_id = ? AND deleted = 0 AND dirty = 0 AND team_id = ?
+         );`,
+        [userId, ws.teamId],
+      );
+      await db.run(
+        `DELETE FROM decks
+         WHERE user_id = ? AND deleted = 0 AND dirty = 0 AND team_id = ?;`,
+        [userId, ws.teamId],
+      );
+      continue;
+    }
+
+    const placeholders = allowed.map(() => "?").join(", ");
+    await db.run(
+      `DELETE FROM cards
+       WHERE deck_local_id IN (
+         SELECT local_id FROM decks
+         WHERE user_id = ? AND deleted = 0 AND dirty = 0
+           AND server_id IS NOT NULL
+           AND server_id NOT IN (${placeholders})
+           AND (
+             team_id = ?
+             OR (
+               COALESCE(member_assigned, 0) = 1
+               AND owner_user_id IS NOT NULL
+               AND trim(owner_user_id) != ''
+               AND owner_user_id != ?
+             )
+           )
+       );`,
+      [userId, ...allowed, ws.teamId, userId],
+    );
+    await db.run(
+      `DELETE FROM decks
+       WHERE user_id = ? AND deleted = 0 AND dirty = 0
+         AND server_id IS NOT NULL
+         AND server_id NOT IN (${placeholders})
+         AND (
+           team_id = ?
+           OR (
+             COALESCE(member_assigned, 0) = 1
+             AND owner_user_id IS NOT NULL
+             AND trim(owner_user_id) != ''
+             AND owner_user_id != ?
+           )
+         );`,
+      [userId, ...allowed, ws.teamId, userId],
+    );
+  }
+  await persistOfflineDb();
+}
+
+/** One-time wipe of all subscriber study copies after a library revision migration. */
+export async function purgeAllInvitedWorkspaceStudyCopies(
+  userId: string,
+): Promise<void> {
+  const db = await getOfflineDb();
+  await db.run(
+    `DELETE FROM cards
+     WHERE deck_local_id IN (
+       SELECT local_id FROM decks
+       WHERE user_id = ? AND deleted = 0 AND dirty = 0
+         AND COALESCE(member_assigned, 0) = 1
+         AND owner_user_id IS NOT NULL
+         AND trim(owner_user_id) != ''
+         AND owner_user_id != ?
+     );`,
+    [userId, userId],
+  );
+  await db.run(
+    `DELETE FROM decks
+     WHERE user_id = ? AND deleted = 0 AND dirty = 0
+       AND COALESCE(member_assigned, 0) = 1
+       AND owner_user_id IS NOT NULL
+       AND trim(owner_user_id) != ''
+       AND owner_user_id != ?;`,
+    [userId, userId],
+  );
   await persistOfflineDb();
 }
 

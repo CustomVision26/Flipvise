@@ -8,7 +8,9 @@ import {
   createDeck,
   listDecksForScope,
   OfflineLimitError,
+  purgeAllInvitedWorkspaceStudyCopies,
   purgeLocallyCreatedTeamDecks,
+  purgeStaleInvitedWorkspaceStudyDecks,
   repairPersonalDeckRows,
   repairTeamWorkspaceDeckRows,
 } from "../../src/lib/offline/repository";
@@ -17,6 +19,7 @@ import type {
   OfflineWorkspaceContext,
 } from "../../src/lib/offline/access-context";
 import {
+  consumeOfflineLibraryMigrationPendingSync,
   defaultOfflineAccessContext,
   getOfflineAccessContext,
   resolveOfflineAccountPlanDisplay,
@@ -30,7 +33,7 @@ import {
   setNativeAppFlag,
   setStoredApiBaseUrl,
 } from "../../src/lib/offline/session";
-import { runSync, consumePendingOfflinePull } from "../../src/lib/offline/sync";
+import { runSync, consumePendingOfflinePull, resetSyncPullCursor } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { applyOfflineTheme } from "./apply-offline-theme";
 import { AccountMenu } from "./account-menu";
@@ -155,7 +158,7 @@ export function App() {
         scope === "personal"
           ? { invitedWorkspaceTeamIds: invitedWorkspaceTeamIds(ctx) }
           : {
-              workspaceDeckServerIds: workspace?.workspaceDeckServerIds,
+              workspaceDeckServerIds: workspace?.workspaceDeckServerIds ?? [],
             },
       );
       setDecks(rows);
@@ -211,11 +214,17 @@ export function App() {
         const ctx = await refreshAccessContext();
         if (cancelled) return;
 
+        if (uid && (await consumeOfflineLibraryMigrationPendingSync())) {
+          await resetSyncPullCursor().catch(() => {});
+          await purgeAllInvitedWorkspaceStudyCopies(uid).catch(() => {});
+        }
+
         let scope = await loadWorkspaceScope();
         setWorkspaceScope(scope);
         if (uid) {
           await purgeLocallyCreatedTeamDecks(uid);
           await repairPersonalDeckRows(uid).catch(() => {});
+          await purgeStaleInvitedWorkspaceStudyDecks(uid, ctx.workspaces).catch(() => {});
           await repairTeamWorkspaceDeckRows(uid, ctx.workspaces).catch(() => {});
           if (cancelled) return;
           let rows = await loadDecks(uid, scope, ctx);
@@ -258,6 +267,7 @@ export function App() {
       const scope = await loadWorkspaceScope();
       setWorkspaceScope(scope);
       await repairPersonalDeckRows(userId).catch(() => {});
+      await purgeStaleInvitedWorkspaceStudyDecks(userId, ctx.workspaces).catch(() => {});
       await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
       await loadDecks(userId, scope, ctx);
     };
@@ -293,6 +303,7 @@ export function App() {
           fullPull: true,
         });
         const ctx = await refreshAccessContext();
+        await purgeStaleInvitedWorkspaceStudyDecks(userId, ctx.workspaces).catch(() => {});
         await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
         await loadDecks(userId, workspaceScope, ctx);
         if (options?.showSuccess !== false) {
@@ -359,12 +370,13 @@ export function App() {
       if (!userId) return;
       setScopeLoading(true);
       try {
-        await loadDecks(userId, scope, accessContext);
+        const ctx = await refreshAccessContext();
+        await loadDecks(userId, scope, ctx);
       } finally {
         setScopeLoading(false);
       }
     },
-    [userId, loadDecks, accessContext],
+    [userId, loadDecks, refreshAccessContext],
   );
 
   const canCreateDeck = useMemo(

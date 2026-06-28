@@ -9,6 +9,10 @@ import { Preferences } from "@capacitor/preferences";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 
 const ACCESS_CONTEXT_KEY = "flipvise.offline.accessContext";
+/** Bump when offline deck visibility rules change — triggers manifest reset + full re-sync on native. */
+export const OFFLINE_LIBRARY_REVISION = 2;
+const LIBRARY_MIGRATION_PENDING_SYNC_KEY =
+  "flipvise.offline.libraryMigrationPendingSync";
 
 export type OfflineWorkspaceRole = "owner" | "team_admin" | "team_member";
 
@@ -36,6 +40,8 @@ export type OfflineWorkspaceContext = {
 };
 
 export type OfflineAccessContext = {
+  /** Schema for assignment manifests / deck visibility (see {@link OFFLINE_LIBRARY_REVISION}). */
+  libraryRevision?: number;
   maxPersonalDecks: number;
   maxCardsPerDeck: number;
   workspaces: OfflineWorkspaceContext[];
@@ -58,8 +64,19 @@ export async function setOfflineAccessContext(
 ): Promise<void> {
   await Preferences.set({
     key: ACCESS_CONTEXT_KEY,
-    value: JSON.stringify(context),
+    value: JSON.stringify({
+      ...context,
+      libraryRevision: OFFLINE_LIBRARY_REVISION,
+    }),
   });
+}
+
+/** True after a library revision migration until the offline shell completes a full sync. */
+export async function consumeOfflineLibraryMigrationPendingSync(): Promise<boolean> {
+  const { value } = await Preferences.get({ key: LIBRARY_MIGRATION_PENDING_SYNC_KEY });
+  if (value !== "1") return false;
+  await Preferences.remove({ key: LIBRARY_MIGRATION_PENDING_SYNC_KEY });
+  return true;
 }
 
 export async function getOfflineAccessContext(): Promise<OfflineAccessContext | null> {
@@ -68,7 +85,10 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
   try {
     const parsed = JSON.parse(value) as OfflineAccessContext;
     const personalHasTeamTierPlan = parsed.personalHasTeamTierPlan ?? false;
-    const workspaces = (parsed.workspaces ?? [])
+    const storedRevision = parsed.libraryRevision ?? 0;
+    const libraryMigrated = storedRevision < OFFLINE_LIBRARY_REVISION;
+
+    let workspaces = (parsed.workspaces ?? [])
       .filter((w) => {
         const owned = w.isSubscriberOwned ?? w.role === "owner";
         return personalHasTeamTierPlan || !owned;
@@ -85,12 +105,34 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
           ? w.workspaceDeckServerIds.filter((id) => Number.isFinite(id))
           : [],
       }));
-    return {
+
+    // Stale native caches may list every workspace deck for co-admins — clear invited
+    // manifests so a full sync re-seeds assignments from the server.
+    if (libraryMigrated) {
+      workspaces = workspaces.map((w) =>
+        w.role === "owner"
+          ? w
+          : { ...w, workspaceDeckServerIds: [] as number[] },
+      );
+    }
+
+    const context: OfflineAccessContext = {
       ...parsed,
+      libraryRevision: OFFLINE_LIBRARY_REVISION,
       personalPlanLabel: parsed.personalPlanLabel ?? "Free",
       personalHasTeamTierPlan,
       workspaces,
     };
+
+    if (libraryMigrated) {
+      await Preferences.set({
+        key: ACCESS_CONTEXT_KEY,
+        value: JSON.stringify(context),
+      });
+      await Preferences.set({ key: LIBRARY_MIGRATION_PENDING_SYNC_KEY, value: "1" });
+    }
+
+    return context;
   } catch {
     return null;
   }

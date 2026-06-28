@@ -17,7 +17,7 @@
 
 import { getOfflineDb, isOfflineDbAvailable, persistOfflineDb } from "./db";
 import { setOfflineAccessContext } from "./access-context";
-import { repairTeamWorkspaceDeckRows } from "./repository";
+import { repairTeamWorkspaceDeckRows, purgeStaleInvitedWorkspaceStudyDecks } from "./repository";
 import {
   cacheLibraryImages,
   remoteUrlForPush,
@@ -252,14 +252,13 @@ async function persistOfflineAccessContext(
   context: NonNullable<SyncResponse["context"]>,
 ): Promise<void> {
   await setOfflineAccessContext(context);
-  await repairTeamWorkspaceDeckRows(
-    userId,
-    context.workspaces.map((w) => ({
-      teamId: w.teamId,
-      role: w.role,
-      workspaceDeckServerIds: w.workspaceDeckServerIds,
-    })),
-  ).catch(() => {});
+  const workspaceRows = context.workspaces.map((w) => ({
+    teamId: w.teamId,
+    role: w.role,
+    workspaceDeckServerIds: w.workspaceDeckServerIds,
+  }));
+  await purgeStaleInvitedWorkspaceStudyDecks(userId, workspaceRows).catch(() => {});
+  await repairTeamWorkspaceDeckRows(userId, workspaceRows).catch(() => {});
 }
 
 async function collectDirty(): Promise<{

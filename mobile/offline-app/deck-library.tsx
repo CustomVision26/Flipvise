@@ -31,26 +31,14 @@ function teamWorkspaceEmptyCopy(role: OfflineWorkspaceRole | undefined): {
   title: string;
   body: ReactNode;
 } {
-  if (role === "team_member") {
+  if (role === "team_member" || role === "team_admin") {
     return {
       title: "No assigned decks on this device",
       body: (
         <>
-          Your workspace owner or admin hasn&apos;t assigned decks to you yet. Once assigned,
-          open the online dashboard and tap <strong>Make available offline</strong> to download
-          them here.
-        </>
-      ),
-    };
-  }
-
-  if (role === "team_admin") {
-    return {
-      title: "No workspace decks on this device",
-      body: (
-        <>
-          Your team owner adds decks on their Personal Dash and links them to this workspace in
-          Team Admin. Assign decks to members there, then open the online dashboard and tap{" "}
+          {role === "team_admin"
+            ? "Your workspace owner assigns decks in Team Admin. Once assigned to you, open the online dashboard and tap "
+            : "Your workspace owner or admin hasn't assigned decks to you yet. Once assigned, open the online dashboard and tap "}
           <strong>Make available offline</strong> to download them here.
         </>
       ),
@@ -527,10 +515,15 @@ export function DeckLibrary({
 
   const subtitle = isTeamScope
     ? activeTeam
-      ? `${activeTeam.name} · ${workspaceRoleLabel(activeTeam.role)} · ${formatOfflineWorkspaceOwnerLabel(activeTeam, {
-          viewerDisplayName,
-          viewerEmail,
-        })}`
+      ? activeTeam.role === "owner"
+        ? `${activeTeam.name} · ${workspaceRoleLabel(activeTeam.role)} · ${formatOfflineWorkspaceOwnerLabel(activeTeam, {
+            viewerDisplayName,
+            viewerEmail,
+          })}`
+        : `${activeTeam.name} · ${workspaceRoleLabel(activeTeam.role)} · ${formatOfflineWorkspaceOwnerLabel(activeTeam, {
+            viewerDisplayName,
+            viewerEmail,
+          })} — preview and study assigned decks`
       : "Team workspace on this device"
     : "Study on this device — sync when online";
 
