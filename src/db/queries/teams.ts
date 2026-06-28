@@ -35,6 +35,10 @@ import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
 import {
+  resolveSubscriberActiveTeamPlan,
+  subscriberHasActiveTeamTierPlan,
+} from "@/lib/subscriber-team-plan-access";
+import {
   defaultTeamMemberStudyPrivilege,
   type TeamMemberStudyPrivilege,
 } from "@/lib/team-study-privilege";
@@ -844,8 +848,25 @@ async function viewerHasActiveTeamMembershipAccess(
 ): Promise<boolean> {
   const team = await getTeamById(teamId);
   if (!team || !isTeamPlanId(team.planSlug)) return false;
+  if (team.ownerUserId === viewerUserId) return false;
+  return teamWorkspaceAllowsViewerAccess(teamId, viewerUserId);
+}
+
+/**
+ * Team workspace is live when the subscriber still holds a team-tier plan and the
+ * workspace is within that plan's limits. Downgraded subscribers retain DB rows but
+ * workspaces are hidden and inaccessible until they upgrade again.
+ */
+export async function teamWorkspaceAllowsViewerAccess(
+  teamId: number,
+  viewerUserId: string,
+): Promise<boolean> {
+  const team = await getTeamById(teamId);
+  if (!team || !isTeamPlanId(team.planSlug)) return false;
+  if (!(await subscriberHasActiveTeamTierPlan(team.ownerUserId))) return false;
   const owned = await getTeamsByOwner(team.ownerUserId);
   if (!isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug)) return false;
+  if (team.ownerUserId === viewerUserId) return true;
   const members = await listTeamMembers(teamId);
   return isMemberWithinMemberLimit(viewerUserId, members, team.planSlug);
 }
@@ -1020,12 +1041,15 @@ export async function resolveDeckViewerAccess(
 
 /** Teams the user owns or manages as `team_admin` (for `/dashboard/team-admin`). */
 export async function getTeamsForTeamDashboard(userId: string) {
+  const ownerActiveTeamPlan = await resolveSubscriberActiveTeamPlan(userId);
   const owned = await getTeamsByOwner(userId);
-  const ownedPlanTeam = owned.find((t) => isTeamPlanId(t.planSlug));
   const ownedAccessible =
-    ownedPlanTeam != null
-      ? selectNewestTeamsWithinWorkspaceLimit(owned, ownedPlanTeam.planSlug)
-      : owned;
+    ownerActiveTeamPlan != null
+      ? selectNewestTeamsWithinWorkspaceLimit(
+          owned.filter((t) => isTeamPlanId(t.planSlug)),
+          ownerActiveTeamPlan,
+        )
+      : [];
 
   const adminRows = await db
     .select({ teamId: teamMembers.teamId })
@@ -1037,6 +1061,7 @@ export async function getTeamsForTeamDashboard(userId: string) {
   const extraAccessible: InferSelectModel<typeof teams>[] = [];
   for (const t of extra) {
     if (!isTeamPlanId(t.planSlug)) continue;
+    if (!(await subscriberHasActiveTeamTierPlan(t.ownerUserId))) continue;
     const subscriberOwned = await getTeamsByOwner(t.ownerUserId);
     if (!isTeamWithinWorkspaceLimit(t.id, subscriberOwned, t.planSlug)) continue;
     const members = await listTeamMembers(t.id);
@@ -1053,10 +1078,9 @@ export async function getTeamsForTeamDashboard(userId: string) {
 
 /**
  * Team-tier workspaces shown in the header switcher — aligned with `/dashboard/team-admin`:
- * - **Subscriber owners** see every team workspace they own, plus any `team_member` workspaces (study).
- * - **Invited co-admins** who co-manage a workspace omit other `team_member`-only workspaces from the
- *   same subscriber (stale member invites).
- * - **Pure team members** (no ownership, no `team_admin`) see each `team_member` workspace for study.
+ * - **Subscriber owners** with an active team-tier plan see owned workspaces (within limits).
+ * - **Invited co-admins / members** only see workspaces whose subscriber still has team-tier billing.
+ * - Downgraded subscribers retain workspace rows in the DB but they are omitted until re-upgrade.
  */
 export async function getEligibleWorkspaceTeamsForUser(
   userId: string,
@@ -1250,19 +1274,8 @@ export async function getRootLayoutTeamNavPayload(
 }
 
 export async function userHasTeamAdminDashboardAccess(userId: string): Promise<boolean> {
-  const owned = await db
-    .select({ id: teams.id })
-    .from(teams)
-    .where(eq(teams.ownerUserId, userId))
-    .limit(1);
-  if (owned.length > 0) return true;
-
-  const adminRow = await db
-    .select({ id: teamMembers.id })
-    .from(teamMembers)
-    .where(and(eq(teamMembers.userId, userId), eq(teamMembers.role, "team_admin")))
-    .limit(1);
-  return adminRow.length > 0;
+  const manageTeams = await getTeamsForTeamDashboard(userId);
+  return manageTeams.some((t) => isTeamPlanId(t.planSlug));
 }
 
 export async function getInvitationByToken(token: string) {

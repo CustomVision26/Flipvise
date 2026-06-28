@@ -56,30 +56,29 @@ export type RootLayoutShellData = {
 function resolveTeamDashFallback(
   userId: string | null,
   activeTeamPlan: AccessContext["activeTeamPlan"],
-  teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[],
+  workspaceTeams: TeamWorkspaceNavTeam[],
 ): RootLayoutTeamDashFallback {
-  if (userId == null || teamAdminHeaderTeams.length === 0) {
+  if (
+    userId == null ||
+    activeTeamPlan == null ||
+    !isTeamPlanId(activeTeamPlan)
+  ) {
     return null;
   }
-  // Team Admin Dash: workspace owner with a team-tier plan (paid, affiliate, complimentary, admin-assigned, etc.).
-  const ownedTeamTierTeams = teamAdminHeaderTeams.filter(
-    (t) =>
-      t.ownerUserId === userId &&
-      t.workspacePlanQuery != null &&
-      isTeamPlanId(t.workspacePlanQuery),
+  // Personal "Team Admin Dash": subscriber with an active team-tier personal plan who owns team workspaces.
+  const ownedTeamTierTeams = workspaceTeams.filter(
+    (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
   );
   if (ownedTeamTierTeams.length === 0) {
     return null;
   }
-  const match =
-    activeTeamPlan != null && isTeamPlanId(activeTeamPlan)
-      ? ownedTeamTierTeams.find((t) => t.workspacePlanQuery === activeTeamPlan)
-      : undefined;
+  const match = ownedTeamTierTeams.find(
+    (t) => t.planUrlValue === activeTeamPlan,
+  );
   const pick = match ?? ownedTeamTierTeams[0]!;
-  const planSlug = pick.workspacePlanQuery!;
   return {
     teamId: pick.id,
-    planSlug,
+    planSlug: pick.planUrlValue,
     teamMemberUrlParam: pick.teamMemberUrlParam,
   };
 }
@@ -228,7 +227,7 @@ export async function loadRootLayoutShellData(input: {
     teamDashFallback: resolveTeamDashFallback(
       userId,
       activeTeamPlan,
-      teamAdminHeaderTeams,
+      workspaceTeams,
     ),
   };
 }

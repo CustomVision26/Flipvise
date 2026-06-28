@@ -14,8 +14,12 @@ import {
   sortByNewestFirst,
 } from "@/lib/team-plan-limit-selection";
 import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
+import { subscriberHasActiveTeamTierPlan } from "@/lib/subscriber-team-plan-access";
 
 export async function getOwnedTeamsWithinSubscriptionLimit(ownerUserId: string) {
+  if (!(await subscriberHasActiveTeamTierPlan(ownerUserId))) {
+    return [];
+  }
   const owned = await getTeamsByOwner(ownerUserId);
   const planTeam = owned.find((t) => isTeamPlanId(t.planSlug));
   if (!planTeam) return owned;
@@ -27,6 +31,7 @@ export async function isTeamAccessibleUnderSubscriptionPlan(
 ): Promise<boolean> {
   const team = await getTeamById(teamId);
   if (!team || !isTeamPlanId(team.planSlug)) return false;
+  if (!(await subscriberHasActiveTeamTierPlan(team.ownerUserId))) return false;
   const owned = await getTeamsByOwner(team.ownerUserId);
   return isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug);
 }

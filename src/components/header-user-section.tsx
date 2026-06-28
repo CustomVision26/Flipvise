@@ -292,7 +292,10 @@ export function HeaderUserSection({
               activeTeamId={activeWorkspaceTeamId}
               personalWorkspaceHref={personalWorkspaceHref}
               personalPlanLabel={personalPlanLabelForWorkspace}
-              teamDashFallback={teamDashFallback}
+              personalHasTeamTierPlan={
+                resolvedActiveTeamPlan != null &&
+                isTeamPlanId(resolvedActiveTeamPlan)
+              }
             />
           </span>
         </div>

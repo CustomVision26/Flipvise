@@ -35,6 +35,7 @@ import {
   getDecksForTeamWithCardCount,
   getTeamById,
   getTeamMembershipsForUser,
+  teamWorkspaceAllowsViewerAccess,
 } from "@/db/queries/teams";
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
@@ -45,7 +46,7 @@ import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
-import { syncTeamContextCookieForUser } from "@/lib/team-context-cookie-server";
+import { syncTeamContextCookieForUser, clearTeamContextCookie } from "@/lib/team-context-cookie-server";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { isTeamPlanId } from "@/lib/team-plans";
 import {
@@ -396,6 +397,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     invitedTeamWorkspaceMemberships.some((m) => m.teamId === teamCtxId);
 
   if (isTeamMemberWorkspace) {
+    const cookieWorkspaceLive = await tryTeamQuery(
+      () => teamWorkspaceAllowsViewerAccess(teamCtxId, userId),
+      false,
+    );
+    if (!cookieWorkspaceLive) {
+      await clearTeamContextCookie();
+    } else {
     const cookieMembership = invitedTeamWorkspaceMemberships.find(
       (m) => m.teamId === teamCtxId,
     );
@@ -511,6 +519,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         )}
       </div>
     );
+    }
   }
 
   const [decksRaw, teamCount, dashboardSessionUser] = await Promise.all([

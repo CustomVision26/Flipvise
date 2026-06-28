@@ -1,4 +1,4 @@
-import { getMemberRecord, getTeamById } from "@/db/queries/teams";
+import { getMemberRecord, getTeamById, teamWorkspaceAllowsViewerAccess } from "@/db/queries/teams";
 import {
   canonicalTeamPlanId,
   isTeamPlanId,
@@ -78,6 +78,10 @@ export async function resolveTeamWorkspaceFromSearchParams(
   }
 
   const workspacePlanQuery = team.planSlug;
+
+  if (!(await teamWorkspaceAllowsViewerAccess(teamId, userId))) {
+    return null;
+  }
 
   if (team.ownerUserId === userId) {
     return {

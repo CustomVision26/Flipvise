@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getMemberRecord, getTeamById } from "@/db/queries/teams";
+import { getMemberRecord, getTeamById, teamWorkspaceAllowsViewerAccess } from "@/db/queries/teams";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 
 const COOKIE_OPTIONS = {
@@ -17,6 +17,11 @@ export async function clearTeamContextCookie() {
 
 /** Align the team workspace cookie with URL-based team context (no client round-trip). */
 export async function syncTeamContextCookieForUser(teamId: number, userId: string) {
+  if (!(await teamWorkspaceAllowsViewerAccess(teamId, userId))) {
+    await clearTeamContextCookie();
+    return;
+  }
+
   const team = await getTeamById(teamId);
   if (!team) return;
   const isOwner = team.ownerUserId === userId;

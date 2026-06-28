@@ -39,12 +39,12 @@ interface WorkspaceContextDropdownProps {
   personalWorkspaceHref?: string;
   /** Plan label next to "Personal" (e.g. Team Gold, Pro, Free). */
   personalPlanLabel?: string;
-  /** When owned team-tier rows are omitted from `teams`, layout may still supply a subscriber-owned team admin target. */
-  teamDashFallback?: {
-    teamId: number;
-    planSlug: string;
-    teamMemberUrlParam: number;
-  } | null;
+  /**
+   * True when the signed-in user’s personal account has an active team-tier plan
+   * (paid, affiliate, complimentary, admin-assigned, etc.). Pro / Pro Plus-only
+   * subscribers who only co-admin invited teams must not see personal Team Admin Dash.
+   */
+  personalHasTeamTierPlan?: boolean;
 }
 
 export function WorkspaceContextDropdown({
@@ -53,7 +53,7 @@ export function WorkspaceContextDropdown({
   activeTeamId,
   personalWorkspaceHref = "/dashboard",
   personalPlanLabel = "Free",
-  teamDashFallback = null,
+  personalHasTeamTierPlan = false,
 }: WorkspaceContextDropdownProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -91,13 +91,11 @@ export function WorkspaceContextDropdown({
    * plan access type — paid, affiliate, complimentary, admin-assigned, etc.).
    */
   const subscriberOwnsTeamTierWorkspace = React.useMemo(() => {
-    if (teamDashFallback != null && isTeamPlanId(teamDashFallback.planSlug)) {
-      return true;
-    }
+    if (!personalHasTeamTierPlan) return false;
     return teams.some(
       (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
     );
-  }, [teams, teamDashFallback]);
+  }, [teams, personalHasTeamTierPlan]);
 
   const subscriberOwnedTeamTierWorkspaces = React.useMemo(() => {
     return teams.filter(
@@ -106,26 +104,14 @@ export function WorkspaceContextDropdown({
   }, [teams]);
 
   const teamDashTarget = React.useMemo(() => {
-    if (subscriberOwnedTeamTierWorkspaces.length > 0) {
-      const activeOwned = activeTeamId
-        ? subscriberOwnedTeamTierWorkspaces.find((t) => t.id === activeTeamId)
-        : undefined;
-      return activeOwned ?? subscriberOwnedTeamTierWorkspaces[0] ?? null;
+    if (!personalHasTeamTierPlan || subscriberOwnedTeamTierWorkspaces.length === 0) {
+      return null;
     }
-
-    if (
-      teamDashFallback != null &&
-      isTeamPlanId(teamDashFallback.planSlug)
-    ) {
-      return {
-        id: teamDashFallback.teamId,
-        planUrlValue: teamDashFallback.planSlug,
-        teamMemberUrlParam: teamDashFallback.teamMemberUrlParam,
-      };
-    }
-
-    return null;
-  }, [subscriberOwnedTeamTierWorkspaces, activeTeamId, teamDashFallback]);
+    const activeOwned = activeTeamId
+      ? subscriberOwnedTeamTierWorkspaces.find((t) => t.id === activeTeamId)
+      : undefined;
+    return activeOwned ?? subscriberOwnedTeamTierWorkspaces[0] ?? null;
+  }, [subscriberOwnedTeamTierWorkspaces, activeTeamId, personalHasTeamTierPlan]);
 
   /** Other subscribers’ workspaces, grouped by `ownerUserId` (dividers between owners). */
   const otherSubscriberWorkspaceGroups = React.useMemo(() => {
