@@ -60,7 +60,9 @@ export async function acceptAdminPlanInviteAction(data: z.infer<typeof acceptDec
   const targetMeta = target.publicMetadata as Record<string, unknown>;
   const previousSlug = previousPlanSlugFromMeta(targetMeta);
 
-  const planResult = await applyPlanUpgrade(userId, assignment);
+  const planResult = await applyPlanUpgrade(userId, assignment, {
+    recordAdminAssignment: true,
+  });
 
   await logAdminPlanAssignment({
     targetUserId: userId,

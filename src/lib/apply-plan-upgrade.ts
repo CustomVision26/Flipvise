@@ -40,6 +40,7 @@ import {
 import {
   ADMIN_PLAN_UPDATED_AT_KEY,
   PLAN_SOURCE_UPDATED_AT_KEY,
+  parsePlanSourceUpdatedAtMs,
   resolveEffectivePlan,
 } from "@/lib/plan-metadata-billing-resolution";
 import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
@@ -122,6 +123,49 @@ async function applyPlanToClerkMetadata(
   }
 }
 
+/**
+ * Records an admin plan assignment in Clerk after a Stripe proration swap.
+ * Stripe billing metadata alone makes All Users show Plan type = Paid; stamping
+ * `adminPlan` (with a timestamp after billing) marks the tier as Assigned.
+ */
+export async function stampAdminPlanAssignmentMetadata(
+  userId: string,
+  plan: AdminPlanAssignment,
+): Promise<void> {
+  if (plan === "free") return;
+
+  const target = await clerkClient.users.getUser(userId);
+  const existing = target.publicMetadata as Record<string, unknown>;
+  const patch = publicMetadataPatchForAdminPlanAssignment(plan);
+  const billingMs =
+    parsePlanSourceUpdatedAtMs(existing.billingPlanUpdatedAt) ?? 0;
+  const adminAt = new Date(Math.max(Date.now(), billingMs + 1)).toISOString();
+
+  const merged: Record<string, unknown> = {
+    ...existing,
+    ...patch,
+    [ADMIN_PLAN_UPDATED_AT_KEY]: adminAt,
+    [PLAN_SOURCE_UPDATED_AT_KEY]: adminAt,
+  };
+
+  const resolvedPlan = resolveEffectivePlan(merged);
+  const isTeam = resolvedPlan !== null && isTeamPlanId(resolvedPlan);
+
+  await clerkClient.users.updateUserMetadata(userId, {
+    publicMetadata: {
+      ...merged,
+      plan: resolvedPlan,
+      teamPlanId: isTeam ? resolvedPlan : null,
+    } as Record<string, unknown>,
+  });
+
+  const canonicalTeam =
+    resolvedPlan !== null ? canonicalTeamPlanId(resolvedPlan) : null;
+  if (canonicalTeam) {
+    await updateOwnedTeamsPlanSlug(userId, canonicalTeam);
+  }
+}
+
 export type ApplyPlanUpgradeResult =
   | { path: "stripe_proration"; newPriceId: string }
   | { path: "clerk_metadata_only" };
@@ -129,6 +173,8 @@ export type ApplyPlanUpgradeResult =
 export type ApplyPlanUpgradeOptions = {
   /** Checkout billing toggle; defaults to the existing subscription’s interval. */
   period?: "monthly" | "yearly";
+  /** When true (admin plan invite accept), stamp `adminPlan` even on Stripe proration. */
+  recordAdminAssignment?: boolean;
 };
 
 /** Stripe statuses that allow `subscriptions.update` (price swap / proration). */
@@ -458,6 +504,9 @@ export async function applyPlanUpgrade(
         stripeSubscriptionItemId: live.itemId,
         stripeCustomerId: live.customerId,
       });
+      if (options?.recordAdminAssignment && isAdminPlanAssignment(planSlug)) {
+        await stampAdminPlanAssignmentMetadata(userId, adminPlan);
+      }
       return { path: "stripe_proration", newPriceId };
     }
   }

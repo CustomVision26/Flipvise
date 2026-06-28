@@ -7,7 +7,7 @@ import type {
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import { normalizeAdminInvoicePromoKind } from "@/lib/admin-invoice-promo-display";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
+import { resolveEffectivePlan, parsePlanSourceUpdatedAtMs } from "@/lib/plan-metadata-billing-resolution";
 import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 
 export type AdminBillingUserMeta = {
@@ -87,16 +87,21 @@ export function clerkUsersToBillingMeta(
     const effectivePlanSlug = normalizePlanSlug(resolveEffectivePlan(meta));
     const isBillingActive =
       billingStatus === "active" || billingStatus === "trialing";
+    const adminAssignedMs = parsePlanSourceUpdatedAtMs(meta.adminPlanUpdatedAt) ?? 0;
+    const billingMs = parsePlanSourceUpdatedAtMs(meta.billingPlanUpdatedAt) ?? 0;
     const accessFromAdminGrant =
       !!adminPlanSlug &&
       !!effectivePlanSlug &&
       planSlugsMatch(adminPlanSlug, effectivePlanSlug);
+    const adminAssignmentAuthoritative =
+      !!adminPlanSlug &&
+      (accessFromAdminGrant || adminAssignedMs > billingMs);
     const stripeAuthoritative =
       isBillingActive &&
       !!billingPlanSlug &&
       !!effectivePlanSlug &&
       planSlugsMatch(billingPlanSlug, effectivePlanSlug) &&
-      !accessFromAdminGrant &&
+      !adminAssignmentAuthoritative &&
       isPaidStripePlanSlug(billingPlanSlug);
 
     const primaryEmail =

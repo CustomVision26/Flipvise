@@ -1,6 +1,7 @@
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import {
   resolveEffectivePlan,
+  parsePlanSourceUpdatedAtMs,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
@@ -88,24 +89,29 @@ export function resolveAdminUserPlanAccessType(input: {
   const effectivePlanSlug = normalizePlanSlug(
     resolveEffectivePlan(meta as Record<string, unknown>),
   );
+  const adminAssignedMs = parsePlanSourceUpdatedAtMs(meta.adminPlanUpdatedAt) ?? 0;
+  const billingMs = parsePlanSourceUpdatedAtMs(meta.billingPlanUpdatedAt) ?? 0;
   const isBillingActive =
     billingStatus === "active" || billingStatus === "trialing";
   const accessFromAdminGrant =
     !!adminPlanSlug &&
     !!effectivePlanSlug &&
     planSlugsMatch(adminPlanSlug, effectivePlanSlug);
+  const adminAssignmentAuthoritative =
+    !!adminPlanSlug &&
+    (accessFromAdminGrant || adminAssignedMs > billingMs);
   const stripeAuthoritative =
     isBillingActive &&
     !!billingPlanSlug &&
     !!effectivePlanSlug &&
     planSlugsMatch(billingPlanSlug, effectivePlanSlug) &&
-    !accessFromAdminGrant &&
+    !adminAssignmentAuthoritative &&
     isPaidStripePlanSlug(billingPlanSlug);
 
   if (stripeAuthoritative) {
     return "Paid";
   }
-  if (meta.adminGranted === true || accessFromAdminGrant) {
+  if (meta.adminGranted === true || adminAssignmentAuthoritative) {
     return "Assigned";
   }
   if (effectivePlanSlug != null && effectivePlanSlug !== "free") {
