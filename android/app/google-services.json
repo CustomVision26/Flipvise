@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "477214638368",
+    "project_id": "flipvise-84e02",
+    "storage_bucket": "flipvise-84e02.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:477214638368:android:43a7ff10b1c9abf303d745",
+        "android_client_info": {
+          "package_name": "com.flipvise.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAT00jxzVy-LAa9Wk-qUKjzHpPOiWj0lrs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

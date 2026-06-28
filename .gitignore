@@ -93,4 +93,5 @@ AuthKey_*.p8
 *.jks
 *.keystore
 keystore.properties
+*.jks.b64.txt
 firebase-service-account.json
