@@ -30,21 +30,22 @@
   }
 
   /* Capacitor WebViews often report safe-area-inset-top as 0 — enforce status-bar floors. */
+  html[data-flipvise-native-shell] {
+    --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+    --flipvise-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  }
+
+  html[data-flipvise-native-shell][data-platform="ios"] {
+    --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
+  }
+
   html[data-flipvise-native-shell] [data-app-header] {
-    padding-top: max(
-      1.75rem,
-      calc(env(safe-area-inset-top, 0px) + 0.75rem),
-      calc(constant(safe-area-inset-top, 0px) + 0.75rem)
-    );
+    padding-top: calc(0.75rem + var(--flipvise-safe-top, 28px));
   }
 
   @media (orientation: portrait) {
     html[data-flipvise-native-shell][data-platform="ios"] [data-app-header] {
-      padding-top: max(
-        3rem,
-        calc(env(safe-area-inset-top, 0px) + 0.75rem),
-        calc(constant(safe-area-inset-top, 0px) + 0.75rem)
-      );
+      padding-top: calc(0.75rem + var(--flipvise-safe-top, 47px));
     }
   }
 
@@ -1740,4 +1741,21 @@
   .flipvise-loader-flipper {
     animation: flipvise-loader-pulse 2s ease-in-out infinite;
   }
+}
+
+/*
+ * Native Capacitor WebView — unlayered so Tailwind v4 utilities cannot zero out
+ * status-bar clearance on [data-app-header] (safe-area env() is often 0 in WKWebView).
+ */
+html[data-flipvise-native-shell] {
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+  --flipvise-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+html[data-flipvise-native-shell][data-platform="ios"] {
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
+}
+
+html[data-flipvise-native-shell] [data-app-header] {
+  padding-top: calc(0.75rem + var(--flipvise-safe-top, 28px)) !important;
 }

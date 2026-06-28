@@ -29,6 +29,13 @@ export function NativeAppBootstrap() {
       const platform = getPlatform?.();
       if (platform) {
         document.documentElement.dataset.platform = platform;
+      } else if (/Android/i.test(navigator.userAgent)) {
+        document.documentElement.dataset.platform = "android";
+      } else if (
+        /\b(iPhone|iPad|iPod)\b/i.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+      ) {
+        document.documentElement.dataset.platform = "ios";
       }
     } catch {
       // ignore

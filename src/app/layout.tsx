@@ -30,6 +30,7 @@ import {
   parseSearchParamsRecordFromSearchString,
   teamWorkspaceTeamIdFromUrlShapeIfValid,
 } from "@/lib/resolve-team-workspace-url";
+import { detectNativeShellFromUserAgent } from "@/lib/native-shell-from-request";
 import "./globals.css";
 
 /** Defer heavy optional UI — keep AppProviders static so Clerk hydrates without mismatch. */
@@ -103,6 +104,8 @@ export default async function RootLayout({
   const freeCookieValue = cookieStore.get(FREE_UI_THEME_COOKIE)?.value;
   const pathnameHeader = headerStore.get("x-pathname") ?? "";
   const xSearch = headerStore.get("x-search") ?? "";
+  const userAgent = headerStore.get("user-agent") ?? "";
+  const nativeShell = detectNativeShellFromUserAgent(userAgent);
 
   const shell = await loadRootLayoutShellData({
     pathname: pathnameHeader,
@@ -162,6 +165,9 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${poppins.variable} h-full antialiased`}
       data-ui-theme={appliedTheme}
+      data-flipvise-native-shell={nativeShell.isNativeShell ? "1" : undefined}
+      data-native-shell={nativeShell.isNativeShell ? "1" : undefined}
+      data-platform={nativeShell.platform}
     >
       <body className="min-h-full flex flex-col relative">
         <Script id="flipvise-native-shell-early" strategy="beforeInteractive">
