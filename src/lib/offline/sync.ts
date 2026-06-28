@@ -15,6 +15,7 @@
  * (minted from the authenticated session via "Make available offline").
  */
 
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { getOfflineDb, isOfflineDbAvailable, persistOfflineDb } from "./db";
 import { setOfflineAccessContext } from "./access-context";
 import { repairTeamWorkspaceDeckRows, purgeStaleInvitedWorkspaceStudyDecks } from "./repository";
@@ -92,7 +93,7 @@ interface SyncResponse {
     }[];
     personalPlanLabel?: string;
     personalAccountPlanLabel?: string;
-    personalPlanAccessType?: string;
+    personalPlanAccessType?: AdminUserPlanAccessType;
     personalHasTeamTierPlan?: boolean;
     viewerDisplayName?: string;
     viewerEmail?: string | null;
