@@ -39,7 +39,7 @@ interface WorkspaceContextDropdownProps {
   personalWorkspaceHref?: string;
   /** Plan label next to "Personal" (e.g. Team Gold, Pro, Free). */
   personalPlanLabel?: string;
-  /** When the workspace list has no subscriber-owned team-tier row, use this for Team Dash (from layout / team-admin scope). */
+  /** When owned team-tier rows are omitted from `teams`, layout may still supply a subscriber-owned team admin target. */
   teamDashFallback?: {
     teamId: number;
     planSlug: string;
@@ -87,13 +87,11 @@ export function WorkspaceContextDropdown({
   }, [teams, q]);
 
   /**
-   * True when the signed-in user owns at least one team-tier workspace.
-   * Uses the server-computed `isSubscriberOwned` flag rather than comparing
-   * `ownerUserId` against the client-side `useAuth()` userId, which can be
-   * null during SSR hydration and cause a structural mismatch (removeChild crash).
+   * True when the signed-in user owns at least one team-tier workspace (any personal
+   * plan access type — paid, affiliate, complimentary, admin-assigned, etc.).
    */
   const subscriberOwnsTeamTierWorkspace = React.useMemo(() => {
-    if (teamDashFallback != null) {
+    if (teamDashFallback != null && isTeamPlanId(teamDashFallback.planSlug)) {
       return true;
     }
     return teams.some(
@@ -115,7 +113,10 @@ export function WorkspaceContextDropdown({
       return activeOwned ?? subscriberOwnedTeamTierWorkspaces[0] ?? null;
     }
 
-    if (teamDashFallback != null) {
+    if (
+      teamDashFallback != null &&
+      isTeamPlanId(teamDashFallback.planSlug)
+    ) {
       return {
         id: teamDashFallback.teamId,
         planUrlValue: teamDashFallback.planSlug,

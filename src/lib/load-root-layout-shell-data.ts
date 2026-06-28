@@ -58,24 +58,25 @@ function resolveTeamDashFallback(
   activeTeamPlan: AccessContext["activeTeamPlan"],
   teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[],
 ): RootLayoutTeamDashFallback {
-  if (
-    userId == null ||
-    activeTeamPlan == null ||
-    !isTeamPlanId(activeTeamPlan) ||
-    teamAdminHeaderTeams.length === 0
-  ) {
+  if (userId == null || teamAdminHeaderTeams.length === 0) {
     return null;
   }
-  // "Team Admin Dash" is for the subscriber owner only — not invited co-admin workspaces.
-  const ownedTeams = teamAdminHeaderTeams.filter(
-    (t) => t.ownerUserId === userId,
+  // Team Admin Dash: workspace owner with a team-tier plan (paid, affiliate, complimentary, admin-assigned, etc.).
+  const ownedTeamTierTeams = teamAdminHeaderTeams.filter(
+    (t) =>
+      t.ownerUserId === userId &&
+      t.workspacePlanQuery != null &&
+      isTeamPlanId(t.workspacePlanQuery),
   );
-  if (ownedTeams.length === 0) {
+  if (ownedTeamTierTeams.length === 0) {
     return null;
   }
-  const match = ownedTeams.find((t) => t.workspacePlanQuery === activeTeamPlan);
-  const pick = match ?? ownedTeams[0]!;
-  const planSlug = pick.workspacePlanQuery ?? activeTeamPlan;
+  const match =
+    activeTeamPlan != null && isTeamPlanId(activeTeamPlan)
+      ? ownedTeamTierTeams.find((t) => t.workspacePlanQuery === activeTeamPlan)
+      : undefined;
+  const pick = match ?? ownedTeamTierTeams[0]!;
+  const planSlug = pick.workspacePlanQuery!;
   return {
     teamId: pick.id,
     planSlug,
