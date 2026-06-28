@@ -95,6 +95,8 @@ interface SyncResponse {
     personalAccountPlanLabel?: string;
     personalPlanAccessType?: AdminUserPlanAccessType;
     personalHasTeamTierPlan?: boolean;
+    viewerIsSuperadmin?: boolean;
+    viewerIsPlatformAdmin?: boolean;
     viewerDisplayName?: string;
     viewerEmail?: string | null;
     updatedAtMs: number;

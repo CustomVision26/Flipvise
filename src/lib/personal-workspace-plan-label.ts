@@ -9,7 +9,12 @@ import {
   type BillingTabPlanDisplay,
 } from "@/lib/billing-tab-plan-display";
 import type { AccessContext } from "@/lib/access";
-import { TEAM_PLAN_LABELS, type TeamPlanId } from "@/lib/team-plans";
+import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
+import {
+  resolvePersonalPlanMetadataVsBilling,
+  type PlanPublicMetadata,
+} from "@/lib/plan-metadata-billing-resolution";
+import { TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
 import {
   formatPersonalDashboardPlanAccessPhrase,
   resolveAdminUserPlanAccessType,
@@ -105,48 +110,190 @@ export function personalWorkspaceAccessLabelFromPlanDisplay(
 }
 
 type PersonalWorkspaceLabelContext = {
-  ctx: Awaited<ReturnType<typeof getAccessContext>>;
+  ctx: Pick<
+    AccessContext,
+    | "isSuperadmin"
+    | "isAdmin"
+    | "activeTeamPlan"
+    | "isPro"
+    | "hasProPlusInterfacePalette"
+  >;
   planDisplay: BillingTabPlanDisplay;
   planAccessType: AdminUserPlanAccessType;
 };
 
+function primaryEmailFromClerkUser(user: {
+  primaryEmailAddressId?: string | null;
+  emailAddresses?: { id: string; emailAddress: string }[] | null;
+}): string | null {
+  const list = user.emailAddresses ?? [];
+  const pid = user.primaryEmailAddressId;
+  const primary =
+    pid != null && pid !== "" ? list.find((e) => e.id === pid) : undefined;
+  return (primary ?? list[0])?.emailAddress ?? null;
+}
+
+async function loadPlanLabelContextForUser(
+  userId: string,
+  ctx: PersonalWorkspaceLabelContext["ctx"],
+  meta: Record<string, unknown>,
+  primaryEmail: string | null,
+): Promise<PersonalWorkspaceLabelContext> {
+  const [affiliates, stripeSub] = await Promise.all([
+    listAffiliatesForPlanHistory(userId, primaryEmail?.toLowerCase() ?? null),
+    getActiveStripeSubscription(userId),
+  ]);
+
+  const activeAffiliateGrant = resolveActiveAffiliateGrant(affiliates);
+  const billingStatus =
+    typeof meta.billingStatus === "string" ? meta.billingStatus : null;
+
+  const planDisplay = resolveBillingTabPlanDisplay({
+    meta,
+    stripePlanSlug: stripeSub?.planSlug?.trim() ?? null,
+    billingStatus,
+    activeAffiliateGrant,
+    platformAdminUnlocked: ctx.isAdmin,
+  });
+
+  const planAccessType = resolveAdminUserPlanAccessType({
+    meta: meta as AdminPlanAccessMeta,
+    isSuperadmin: ctx.isSuperadmin,
+    isCoAdmin: ctx.isAdmin && !ctx.isSuperadmin,
+    isActiveAffiliate: activeAffiliateGrant != null,
+  });
+
+  return { ctx, planDisplay, planAccessType };
+}
+
+function accessContextPickForPlanLabels(input: {
+  isSuperadmin: boolean;
+  isAdmin: boolean;
+  activeTeamPlan: TeamPlanId | null;
+  effectivePersonalPro: boolean;
+  stripeSlug: string | null | undefined;
+}): PersonalWorkspaceLabelContext["ctx"] {
+  const personalSlug =
+    input.stripeSlug === "pro" || input.stripeSlug === "pro_plus"
+      ? input.stripeSlug
+      : null;
+  return {
+    isSuperadmin: input.isSuperadmin,
+    isAdmin: input.isAdmin,
+    activeTeamPlan: input.activeTeamPlan,
+    isPro:
+      input.isAdmin ||
+      input.effectivePersonalPro ||
+      input.activeTeamPlan !== null ||
+      personalSlug !== null,
+    hasProPlusInterfacePalette:
+      input.isAdmin ||
+      input.activeTeamPlan !== null ||
+      personalSlug === "pro_plus",
+  };
+}
+
+/**
+ * Session-independent plan labels for `/api/sync` (device sync token has no Clerk session).
+ * Matches online header switcher + account menu for the resolved `userId`.
+ */
+export async function resolvePersonalWorkspaceLabelsForUserId(userId: string): Promise<{
+  personalPlanLabel: string;
+  personalAccountPlanLabel: string;
+  personalPlanAccessType: AdminUserPlanAccessType;
+  personalHasTeamTierPlan: boolean;
+  viewerIsSuperadmin: boolean;
+  viewerIsPlatformAdmin: boolean;
+}> {
+  const loaded = await loadPersonalWorkspaceLabelContextForUserId(userId);
+  if (!loaded) {
+    return {
+      personalPlanLabel: "Free",
+      personalAccountPlanLabel: "Free",
+      personalPlanAccessType: "Free",
+      personalHasTeamTierPlan: false,
+      viewerIsSuperadmin: false,
+      viewerIsPlatformAdmin: false,
+    };
+  }
+  return {
+    personalPlanLabel: personalWorkspaceAccessLabel(loaded),
+    personalAccountPlanLabel: personalWorkspaceAccountPlanLabel(loaded),
+    personalPlanAccessType: loaded.planAccessType,
+    personalHasTeamTierPlan:
+      loaded.ctx.activeTeamPlan != null && isTeamPlanId(loaded.ctx.activeTeamPlan),
+    viewerIsSuperadmin: loaded.ctx.isSuperadmin,
+    viewerIsPlatformAdmin: loaded.ctx.isAdmin,
+  };
+}
+
+async function loadPersonalWorkspaceLabelContextForUserId(
+  userId: string,
+): Promise<PersonalWorkspaceLabelContext | null> {
+  const superadminAllowListed = isPlatformSuperadminAllowListed(userId);
+
+  let meta: Record<string, unknown> = {};
+  let primaryEmail: string | null = null;
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    meta = (user.publicMetadata ?? {}) as Record<string, unknown>;
+    primaryEmail = primaryEmailFromClerkUser(user);
+  } catch {
+    if (!superadminAllowListed) return null;
+  }
+
+  const planResolution = await resolvePersonalPlanMetadataVsBilling({
+    clerkClient,
+    userId,
+    has: () => false,
+    publicMetadata: meta as PlanPublicMetadata,
+  });
+
+  const liveRole = typeof meta.role === "string" ? meta.role : undefined;
+  const isSuperadminUser = liveRole === "superadmin";
+  const isSuperadmin = superadminAllowListed || isSuperadminUser;
+  const isAdmin = liveRole === "admin" || isSuperadmin;
+  const activeTeamPlan = planResolution.activeTeamPlan;
+  const effectivePersonalPro =
+    planResolution.personalPro && activeTeamPlan === null;
+  const stripeSlug =
+    activeTeamPlan !== null ? null : planResolution.effectiveStripeSlug;
+
+  const ctx = accessContextPickForPlanLabels({
+    isSuperadmin,
+    isAdmin,
+    activeTeamPlan,
+    effectivePersonalPro,
+    stripeSlug,
+  });
+
+  return loadPlanLabelContextForUser(userId, ctx, meta, primaryEmail);
+}
+
 const loadPersonalWorkspaceLabelContext = cache(
   async function loadPersonalWorkspaceLabelContext(): Promise<PersonalWorkspaceLabelContext | null> {
-    const ctx = await getAccessContext();
-    if (!ctx.userId) return null;
+    const fullCtx = await getAccessContext();
+    if (!fullCtx.userId) return null;
 
-    const [affiliates, stripeSub, meta] = await Promise.all([
-      listAffiliatesForPlanHistory(
-        ctx.userId,
-        ctx.primaryEmail?.toLowerCase() ?? null,
-      ),
-      getActiveStripeSubscription(ctx.userId),
-      clerkClient.users
-        .getUser(ctx.userId)
-        .then((u) => u.publicMetadata as Record<string, unknown>)
-        .catch(() => ({} as Record<string, unknown>)),
-    ]);
+    const meta = await clerkClient.users
+      .getUser(fullCtx.userId)
+      .then((u) => u.publicMetadata as Record<string, unknown>)
+      .catch(() => ({} as Record<string, unknown>));
 
-    const activeAffiliateGrant = resolveActiveAffiliateGrant(affiliates);
-    const billingStatus =
-      typeof meta.billingStatus === "string" ? meta.billingStatus : null;
+    const ctx: PersonalWorkspaceLabelContext["ctx"] = {
+      isSuperadmin: fullCtx.isSuperadmin,
+      isAdmin: fullCtx.isAdmin,
+      activeTeamPlan: fullCtx.activeTeamPlan,
+      isPro: fullCtx.isPro,
+      hasProPlusInterfacePalette: fullCtx.hasProPlusInterfacePalette,
+    };
 
-    const planDisplay = resolveBillingTabPlanDisplay({
+    return loadPlanLabelContextForUser(
+      fullCtx.userId,
+      ctx,
       meta,
-      stripePlanSlug: stripeSub?.planSlug?.trim() ?? null,
-      billingStatus,
-      activeAffiliateGrant,
-      platformAdminUnlocked: ctx.isAdmin,
-    });
-
-    const planAccessType = resolveAdminUserPlanAccessType({
-      meta: meta as AdminPlanAccessMeta,
-      isSuperadmin: ctx.isSuperadmin,
-      isCoAdmin: ctx.isAdmin && !ctx.isSuperadmin,
-      isActiveAffiliate: activeAffiliateGrant != null,
-    });
-
-    return { ctx, planDisplay, planAccessType };
+      fullCtx.primaryEmail,
+    );
   },
 );
 

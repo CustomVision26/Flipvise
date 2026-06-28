@@ -7,10 +7,14 @@
 
 import { Preferences } from "@capacitor/preferences";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
+import {
+  FREE_PERSONAL_DECK_LIMIT,
+  PRO_PLUS_PERSONAL_DECK_LIMIT,
+} from "@/lib/personal-plan-limits";
 
 const ACCESS_CONTEXT_KEY = "flipvise.offline.accessContext";
 /** Bump when offline deck visibility rules change — triggers manifest reset + full re-sync on native. */
-export const OFFLINE_LIBRARY_REVISION = 2;
+export const OFFLINE_LIBRARY_REVISION = 3;
 const LIBRARY_MIGRATION_PENDING_SYNC_KEY =
   "flipvise.offline.libraryMigrationPendingSync";
 
@@ -56,6 +60,10 @@ export type OfflineAccessContext = {
   /** Signed-in user display name (for owned workspaces when owner label is missing). */
   viewerDisplayName?: string;
   viewerEmail?: string | null;
+  /** True when the signed-in user is a platform superadmin (owner). */
+  viewerIsSuperadmin?: boolean;
+  /** True when the signed-in user is a platform admin or superadmin. */
+  viewerIsPlatformAdmin?: boolean;
   updatedAtMs: number;
 };
 
@@ -168,16 +176,33 @@ export function defaultOfflineAccessContext(): OfflineAccessContext {
   };
 }
 
+/** True when a pre-fix sync cached placeholder Free labels despite Pro+ limits. */
+function isStaleOfflineFreePlanCache(ctx: OfflineAccessContext): boolean {
+  if (ctx.viewerIsSuperadmin || ctx.viewerIsPlatformAdmin) return false;
+  const account = ctx.personalAccountPlanLabel?.trim();
+  const accessType = ctx.personalPlanAccessType;
+  const stored = ctx.personalPlanLabel?.trim();
+  if (account !== "Free" || accessType !== "Free") return false;
+  if (stored === "SuperAdmin" || stored === "Co-Admin" || stored === "Complimentary") {
+    return false;
+  }
+  return ctx.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT;
+}
+
 /** Personal plan label for the workspace switcher — uses sync payload with sensible fallbacks. */
 export function resolveOfflinePersonalPlanLabel(
   ctx: OfflineAccessContext,
 ): string {
+  if (ctx.viewerIsSuperadmin) return "SuperAdmin";
+  if (ctx.viewerIsPlatformAdmin) return "Co-Admin";
+
   const hasTeamTier = ctx.personalHasTeamTierPlan ?? false;
   const account = ctx.personalAccountPlanLabel?.trim();
   const accessType = ctx.personalPlanAccessType;
   const stored = ctx.personalPlanLabel?.trim();
+  const staleFree = isStaleOfflineFreePlanCache(ctx);
 
-  if (!hasTeamTier && stored) {
+  if (!hasTeamTier && stored && !staleFree) {
     const looksLikeTeamTierLabel =
       /team basic|team gold|platinum|enterprise/i.test(stored) ||
       stored.includes("(Affiliate)");
@@ -189,17 +214,20 @@ export function resolveOfflinePersonalPlanLabel(
     }
   }
 
-  if (stored && stored !== "Free") return stored;
+  if (stored && stored !== "Free" && !staleFree) return stored;
 
-  if (account && account !== "Free") {
+  if (account && account !== "Free" && !staleFree) {
     if (accessType === "Affiliate") return `${account} (Affiliate)`;
     if (accessType === "Paid") return "Subscriber";
     if (accessType === "Complimentary") return "Complimentary";
     return account;
   }
 
-  if (ctx.maxPersonalDecks >= 15) return "Subscriber";
-  if (ctx.maxPersonalDecks > 2) return "Subscriber";
+  if (ctx.maxPersonalDecks >= PRO_PLUS_PERSONAL_DECK_LIMIT) {
+    if (accessType === "Complimentary") return "SuperAdmin";
+    return "Subscriber";
+  }
+  if (ctx.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT) return "Subscriber";
   return "Free";
 }
 
@@ -208,17 +236,33 @@ export function resolveOfflineAccountPlanDisplay(ctx: OfflineAccessContext): {
   plan: string;
   planType: string;
 } {
+  if (ctx.viewerIsPlatformAdmin) {
+    return { plan: "Pro Plus", planType: "Complimentary" };
+  }
+
   const accountPlan = ctx.personalAccountPlanLabel?.trim();
   const accessType = ctx.personalPlanAccessType;
-  if (accountPlan && accessType) {
+  const staleFree = isStaleOfflineFreePlanCache(ctx);
+
+  if (accountPlan && accessType && !staleFree) {
     return { plan: accountPlan, planType: accessType };
   }
 
-  if (ctx.maxPersonalDecks >= 15) {
-    return { plan: "Pro Plus", planType: accessType ?? "Paid" };
+  if (ctx.maxPersonalDecks >= PRO_PLUS_PERSONAL_DECK_LIMIT) {
+    const plan =
+      accessType === "Complimentary" || staleFree ? "Pro Plus" : accountPlan || "Pro Plus";
+    const planType =
+      accessType === "Complimentary"
+        ? "Complimentary"
+        : accessType && accessType !== "Free"
+          ? accessType
+          : staleFree
+            ? "Complimentary"
+            : "Paid";
+    return { plan, planType };
   }
-  if (ctx.maxPersonalDecks > 2) {
-    return { plan: "Pro", planType: accessType ?? "Paid" };
+  if (ctx.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT) {
+    return { plan: accountPlan || "Pro", planType: accessType ?? "Paid" };
   }
 
   const stored = ctx.personalPlanLabel?.trim() || "Free";

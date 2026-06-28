@@ -17,11 +17,8 @@ import {
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
 import {
-  getPersonalPlanAccessType,
-  getPersonalWorkspaceAccessLabel,
-  getPersonalWorkspaceAccountPlanLabel,
+  resolvePersonalWorkspaceLabelsForUserId,
 } from "@/lib/personal-workspace-plan-label";
-import { getAccessContext } from "@/lib/access";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
@@ -361,6 +358,8 @@ export type OfflineSyncContext = {
   personalPlanAccessType: AdminUserPlanAccessType;
   /** True when the signed-in user has an active team-tier personal subscription. */
   personalHasTeamTierPlan: boolean;
+  viewerIsSuperadmin: boolean;
+  viewerIsPlatformAdmin: boolean;
   viewerDisplayName: string;
   viewerEmail: string | null;
   updatedAtMs: number;
@@ -475,14 +474,12 @@ export async function buildOfflineSyncContext(
 ): Promise<OfflineSyncContext> {
   const personal = await personalLimitsForSyncUser(userId);
   const personalProUnlocked = personal.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT;
-  const [navPayload, workspaces, memberships, personalPlanLabel, personalAccountPlanLabel, personalPlanAccessType, viewerField] =
+  const [navPayload, workspaces, memberships, personalLabels, viewerField] =
     await Promise.all([
       getWorkspaceNavTeamsForUser(userId, { personalProUnlocked }),
       getEligibleWorkspaceTeamsForUser(userId),
       getTeamMembershipsForUser(userId),
-      getPersonalWorkspaceAccessLabel().catch(() => "Free"),
-      getPersonalWorkspaceAccountPlanLabel().catch(() => "Free"),
-      getPersonalPlanAccessType().catch(() => "Free" as const),
+      resolvePersonalWorkspaceLabelsForUserId(userId),
       getClerkUserFieldDisplayById(userId),
     ]);
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
@@ -534,9 +531,7 @@ export async function buildOfflineSyncContext(
     (row) => row != null,
   );
 
-  const { activeTeamPlan } = await getAccessContext();
-  const personalHasTeamTierPlan =
-    activeTeamPlan != null && isTeamPlanId(activeTeamPlan);
+  const personalHasTeamTierPlan = personalLabels.personalHasTeamTierPlan;
   const workspacesForOffline = personalHasTeamTierPlan
     ? workspaceContexts
     : workspaceContexts.filter((w) => !w.isSubscriberOwned);
@@ -545,10 +540,12 @@ export async function buildOfflineSyncContext(
     maxPersonalDecks: personal.maxPersonalDecks,
     maxCardsPerDeck: personal.maxCardsPerDeck,
     workspaces: workspacesForOffline,
-    personalPlanLabel,
-    personalAccountPlanLabel,
-    personalPlanAccessType,
+    personalPlanLabel: personalLabels.personalPlanLabel,
+    personalAccountPlanLabel: personalLabels.personalAccountPlanLabel,
+    personalPlanAccessType: personalLabels.personalPlanAccessType,
     personalHasTeamTierPlan,
+    viewerIsSuperadmin: personalLabels.viewerIsSuperadmin,
+    viewerIsPlatformAdmin: personalLabels.viewerIsPlatformAdmin,
     viewerDisplayName: viewerField.primaryLine,
     viewerEmail: viewerField.primaryEmail,
     updatedAtMs: Date.now(),
