@@ -25,6 +25,8 @@ import {
 const CLERK_LOAD_TIMEOUT_MS = 15_000;
 const REDIRECT_STALL_TIMEOUT_MS = 12_000;
 const TICKET_FLOW_TIMEOUT_MS = 25_000;
+/** When Clerk JS is stuck refreshing, fall back to server session probe. */
+const CLERK_SERVER_SESSION_FALLBACK_MS = 2_500;
 
 function describeClerkError(err: unknown): string {
   if (!err) return "";
@@ -82,6 +84,10 @@ export function NativeSignInClient() {
   const continueRef = useRef(false);
 
   const clerkLoadTimedOut = useTimeoutFlag(!isLoaded, CLERK_LOAD_TIMEOUT_MS);
+  const clerkServerFallbackDue = useTimeoutFlag(
+    !isLoaded && !manualOnly && !continuing,
+    CLERK_SERVER_SESSION_FALLBACK_MS,
+  );
   const redirectStalled = useTimeoutFlag(
     Boolean(continuing),
     REDIRECT_STALL_TIMEOUT_MS,
@@ -111,6 +117,18 @@ export function NativeSignInClient() {
     window.location.replace(postAuthTarget);
   }, [postAuthTarget, signOut]);
 
+  // Clerk JS can spin on session refresh in the WebView while SSR cookies are valid.
+  useEffect(() => {
+    if (!clerkServerFallbackDue || continueRef.current || manualOnly) return;
+    void (async () => {
+      const serverReady = await waitForServerSession(4_000);
+      if (!serverReady || continueRef.current) return;
+      continueRef.current = true;
+      setContinuing(true);
+      window.location.replace(postAuthTarget);
+    })();
+  }, [clerkServerFallbackDue, manualOnly, postAuthTarget]);
+
   // Server rejected a prior session — clear client state and show the form.
   useEffect(() => {
     if (!sessionRetry || !isLoaded) return;
@@ -127,10 +145,11 @@ export function NativeSignInClient() {
   }, [sessionRetry, isLoaded, signOut]);
 
   // Returning visit: Clerk JS says signed-in — verify server cookies before redirect.
+  // Do not block on `ticket`: handoff URLs can arrive while a stale client session exists.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || manualOnly || ticket || continuing) return;
+    if (!isLoaded || !isSignedIn || manualOnly || continuing) return;
     void finishSignIn();
-  }, [isLoaded, isSignedIn, manualOnly, ticket, continuing, finishSignIn]);
+  }, [isLoaded, isSignedIn, manualOnly, continuing, finishSignIn]);
 
   // Ticket handoff from offline device sync token.
   useEffect(() => {
@@ -218,7 +237,9 @@ export function NativeSignInClient() {
   if (continuing || !isLoaded || isSignedIn) {
     return (
       <CenteredSpinner
-        label={continuing ? "Opening dashboard…" : undefined}
+        label={
+          continuing || isSignedIn ? "Opening dashboard…" : undefined
+        }
       />
     );
   }
@@ -308,7 +329,13 @@ function SignInRecovery({
             <Button
               type="button"
               className="w-full"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                if (isNative) {
+                  window.location.href = "/api/auth/clear-stale-session";
+                  return;
+                }
+                window.location.reload();
+              }}
             >
               Try again
             </Button>

@@ -5,6 +5,7 @@ import {
   clearClerkCookiesOnResponse,
   isStaleOrMissingSessionError,
 } from "@/lib/clerk-stale-session";
+import { detectNativeShellFromUserAgent } from "@/lib/native-shell-from-request";
 
 const clerk = clerkMiddleware();
 
@@ -23,9 +24,15 @@ export default async function proxy(
     );
   } catch (error) {
     if (isStaleOrMissingSessionError(error)) {
+      const ua = request.headers.get("user-agent") ?? "";
       const url = request.nextUrl.clone();
-      url.pathname = "/";
-      url.search = "";
+      if (detectNativeShellFromUserAgent(ua).isNativeShell) {
+        url.pathname = "/api/auth/clear-stale-session";
+        url.search = "";
+      } else {
+        url.pathname = "/";
+        url.search = "";
+      }
       const res = NextResponse.redirect(url);
       clearClerkCookiesOnResponse(request, res);
       return res;
