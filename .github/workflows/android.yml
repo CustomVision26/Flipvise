@@ -94,6 +94,45 @@ jobs:
           fi
           echo "ANDROID_KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
 
+      - name: Validate release keystore credentials
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KS="${ANDROID_KEYSTORE_PATH}"
+
+          for name in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::GitHub secret $name is not set."
+              exit 1
+            fi
+          done
+
+          if ! keytool -list -keystore "$KS" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD is wrong, or ANDROID_KEYSTORE_BASE64 is corrupted (re-encode the .jks as raw base64 with no PEM headers/newlines)."
+            exit 1
+          fi
+
+          if ! keytool -list -keystore "$KS" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::ANDROID_KEY_ALIAS '$ANDROID_KEY_ALIAS' was not found in the keystore."
+            echo "Available aliases:"
+            keytool -list -keystore "$KS" -storepass "$ANDROID_KEYSTORE_PASSWORD" | sed -n '1,40p'
+            exit 1
+          fi
+
+          VERIFY="$RUNNER_TEMP/keystore-verify.p12"
+          if ! keytool -importkeystore -noprompt \
+            -srckeystore "$KS" -srcstorepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -srcalias "$ANDROID_KEY_ALIAS" -srckeypass "$ANDROID_KEY_PASSWORD" \
+            -destkeystore "$VERIFY" -deststoretype PKCS12 -deststorepass verify \
+            -destkeypass verify >/dev/null 2>&1; then
+            echo "::error::ANDROID_KEY_PASSWORD does not unlock alias '$ANDROID_KEY_ALIAS'. If both passwords are the same on your machine, set ANDROID_KEY_PASSWORD equal to ANDROID_KEYSTORE_PASSWORD."
+            exit 1
+          fi
+          echo "Release keystore credentials validated."
+
       - name: Build and distribute
         env:
           FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
