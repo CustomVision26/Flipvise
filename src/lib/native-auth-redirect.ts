@@ -1,5 +1,4 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { FLIPVISE_NATIVE_QUERY_PARAM } from "@/lib/flipvise-native-constants";
 import { detectNativeShellFromUserAgent } from "@/lib/native-shell-from-request";
 import { safeRedirectPath } from "@/lib/safe-redirect-path";
@@ -20,14 +19,4 @@ export function nativeSignInPath(
 export async function isNativeShellRequest(): Promise<boolean> {
   const ua = (await headers()).get("user-agent") ?? "";
   return detectNativeShellFromUserAgent(ua).isNativeShell;
-}
-
-/** Redirect unauthenticated native WebView users to in-app sign-in instead of marketing `/`. */
-export async function redirectUnauthenticatedNativeOrHome(
-  redirectPath: string,
-): Promise<never> {
-  if (await isNativeShellRequest()) {
-    redirect(nativeSignInPath(redirectPath));
-  }
-  redirect("/");
 }

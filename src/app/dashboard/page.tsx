@@ -54,7 +54,10 @@ import {
   FREE_PERSONAL_DECK_LIMIT,
 } from "@/lib/personal-plan-limits";
 import { getPersonalDashboardPlanAccessPhrase } from "@/lib/personal-workspace-plan-label";
-import { redirectUnauthenticatedNativeOrHome } from "@/lib/native-auth-redirect";
+import {
+  isNativeShellRequest,
+  nativeSignInPath,
+} from "@/lib/native-auth-redirect";
 /** Team-tier deck extras (speech, images): own Clerk team plan or a subscriber’s team-tier workspace. */
 function teamWorkspaceHasTierExtras(
   hasOwnTeamPlan: boolean,
@@ -183,7 +186,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     isAdmin,
     hasAiReading,
   } = await getAccessContext();
-  if (!userId) await redirectUnauthenticatedNativeOrHome("/dashboard");
+  if (!userId) {
+    if (await isNativeShellRequest()) {
+      redirect(nativeSignInPath("/dashboard"));
+    }
+    redirect("/");
+  }
 
   const sp = await searchParams;
   if (shouldRedirectUnauthorizedDashboardUseridParam(userId, sp)) {
