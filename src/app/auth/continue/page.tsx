@@ -1,11 +1,10 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAccessContext } from "@/lib/access";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
-import { FLIPVISE_NATIVE_QUERY_PARAM } from "@/lib/flipvise-native-constants";
 import {
-  isFlipviseNativeUserAgent,
-} from "@/lib/native-live-navigation";
+  nativeSignInPath,
+  isNativeShellRequest,
+} from "@/lib/native-auth-redirect";
 import {
   DEFAULT_AUTH_REDIRECT,
   safeRedirectPath,
@@ -28,11 +27,7 @@ async function resolveAccessContextWithRetry(
 }
 
 /**
- * Post–Clerk-auth hop: Clerk buttons redirect here first so we resolve session
- * (`getAccessContext`) before landing on `/dashboard?userid=…&plan=…`.
- *
- * Retries exist because Clerk's JWT can arrive slightly after the browser
- * lands on this page, especially inside the Android WebView.
+ * Post–Clerk-auth hop: waits for Clerk JWT cookies, then lands on the dashboard.
  */
 export default async function AuthContinuePage({
   searchParams,
@@ -46,19 +41,12 @@ export default async function AuthContinuePage({
         : undefined;
   const requestedPath = safeRedirectPath(redirectRaw);
 
-  const headerStore = await headers();
-  const userAgent = headerStore.get("user-agent");
-  const isNativeRequest = isFlipviseNativeUserAgent(userAgent);
-  const retryAttempts = isNativeRequest ? 6 : 2;
-  const retryDelayMs = isNativeRequest ? 500 : 800;
-
-  const ctx = await resolveAccessContextWithRetry(retryAttempts, retryDelayMs);
+  const isNative = await isNativeShellRequest();
+  const ctx = await resolveAccessContextWithRetry(isNative ? 12 : 3, 500);
 
   if (!ctx.userId) {
-    if (isNativeRequest) {
-      redirect(
-        `/native-signin?${FLIPVISE_NATIVE_QUERY_PARAM}=1&session_retry=1&redirect=${encodeURIComponent(requestedPath)}`,
-      );
+    if (isNative) {
+      redirect(nativeSignInPath(requestedPath, { session_retry: "1" }));
     }
     redirect("/");
   }

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { AUTH_CONTINUE_ATTEMPTS_KEY } from "@/lib/flipvise-native-constants";
 import { unwrapNativeSignInRetryUrl } from "@/lib/native-live-navigation";
 import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
 
@@ -13,6 +12,7 @@ import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
  */
 export function NativeAppBootstrap() {
   const pathname = usePathname();
+  const syncTokenEnsuredRef = React.useRef(false);
 
   React.useEffect(() => {
     const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
@@ -46,8 +46,6 @@ export function NativeAppBootstrap() {
       // ignore
     }
 
-    // Live Render pages need viewport-fit=cover so env(safe-area-inset-*) clears the
-    // iOS status bar for the app header (workspace switcher, notifications, etc.).
     const viewportMeta = document.querySelector('meta[name="viewport"]');
     if (viewportMeta) {
       const content =
@@ -67,9 +65,6 @@ export function NativeAppBootstrap() {
         } catch {
           // Non-fatal — error.html falls back to dashboard handoff.
         }
-        // Snapshot the dashboard's resolved theme (mode + interface colors) so the
-        // bundled offline shell can match it. `<html>` here carries both the
-        // light/dark class and `data-ui-theme`, so computed values are accurate.
         try {
           const root = document.documentElement;
           const cs = getComputedStyle(root);
@@ -93,7 +88,6 @@ export function NativeAppBootstrap() {
       .catch(() => {});
   }, []);
 
-  // Keep the native error page retry URL in sync during in-app client navigations.
   React.useEffect(() => {
     const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
       .Capacitor;
@@ -109,13 +103,28 @@ export function NativeAppBootstrap() {
       )
       .catch(() => {});
 
-    if (pathname?.startsWith("/dashboard")) {
-      try {
-        sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
-      } catch {
-        // ignore
-      }
+    if (!pathname?.startsWith("/dashboard") || syncTokenEnsuredRef.current) {
+      return;
     }
+    syncTokenEnsuredRef.current = true;
+
+    void import("@/lib/offline/session").then(async (session) => {
+      const existing = await session.getStoredSyncToken().catch(() => null);
+      if (existing) return;
+      try {
+        const res = await fetch("/api/native/ensure-sync-token", {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { token?: string };
+        if (!data.token) return;
+        await session.setStoredSyncToken(data.token);
+        await session.setStoredApiBaseUrl(window.location.origin);
+      } catch {
+        // Non-fatal — user can still sign in manually or use Make available offline.
+      }
+    });
   }, [pathname]);
 
   return null;

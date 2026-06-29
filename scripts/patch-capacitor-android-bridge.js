@@ -50,6 +50,33 @@ const newBlock = `        if (WebViewFeature.isFeatureSupported(WebViewFeature.D
                     try {
                         Uri originUri = Uri.parse(rule).buildUpon().path(null).fragment(null).clearQuery().build();
                         injectionOrigins.add(originUri.toString());
+                        if ("https".equals(originUri.getScheme())) {
+                            injectionOrigins.add(
+                                originUri.buildUpon().scheme("http").build().toString()
+                            );
+                        }
+                    } catch (Exception ignored) {
+                        // skip invalid rule
+                    }
+                }
+            }
+            try {
+                WebViewCompat.addDocumentStartJavaScript(webView, injector.getScriptString(), injectionOrigins);
+                injector = null;
+            } catch (IllegalArgumentException ex) {
+                Logger.warn("Invalid url, using fallback");
+            }
+        }`;
+
+const previousBlock = `        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            Set<String> injectionOrigins = new HashSet<>();
+            String allowedOrigin = Uri.parse(appUrl).buildUpon().path(null).fragment(null).clearQuery().build().toString();
+            injectionOrigins.add(allowedOrigin);
+            for (String rule : allowedOriginRules) {
+                if (rule.startsWith("http")) {
+                    try {
+                        Uri originUri = Uri.parse(rule).buildUpon().path(null).fragment(null).clearQuery().build();
+                        injectionOrigins.add(originUri.toString());
                     } catch (Exception ignored) {
                         // skip invalid rule
                     }
@@ -64,6 +91,14 @@ const newBlock = `        if (WebViewFeature.isFeatureSupported(WebViewFeature.D
         }`;
 
 if (content.includes(newBlock)) {
+  process.exit(0);
+}
+
+if (content.includes(previousBlock)) {
+  fs.writeFileSync(bridgePath, content.replace(previousBlock, newBlock));
+  console.log(
+    "[patch-capacitor-android-bridge] Upgraded patch with http injection mirrors.",
+  );
   process.exit(0);
 }
 

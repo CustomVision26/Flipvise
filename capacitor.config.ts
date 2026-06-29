@@ -46,7 +46,15 @@ const allowNavigation = new Set([
   "*.clerk.com",
 ]);
 if (process.env.CAP_ANDROID_DEV_HOST) {
-  allowNavigation.add(parseLiveHost(process.env.CAP_ANDROID_DEV_HOST));
+  const devHostRaw = process.env.CAP_ANDROID_DEV_HOST.replace(/\/$/, "");
+  allowNavigation.add(parseLiveHost(devHostRaw));
+  // Capacitor bridge JS injection matches full http(s) origins — dev uses cleartext.
+  if (devHostRaw.startsWith("http://") || devHostRaw.startsWith("https://")) {
+    allowNavigation.add(devHostRaw);
+  } else {
+    allowNavigation.add(`http://${parseLiveHost(devHostRaw)}`);
+    allowNavigation.add(`https://${parseLiveHost(devHostRaw)}`);
+  }
 }
 
 const config: CapacitorConfig = {

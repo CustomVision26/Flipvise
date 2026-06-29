@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
 import { Loader2, ShieldAlert } from "lucide-react";
@@ -16,20 +16,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
-import {
-  AUTH_CONTINUE_ATTEMPTS_KEY,
-  MAX_AUTH_CONTINUE_ATTEMPTS,
-} from "@/lib/flipvise-native-constants";
+import { waitForServerSession } from "@/lib/native-session-probe";
 import {
   isFlipviseNativeShell,
   navigateToOfflineShell,
 } from "@/lib/offline/is-flipvise-native-app";
 
-const CLERK_LOAD_TIMEOUT_MS = 12_000;
-const REDIRECT_STALL_TIMEOUT_MS = 6_000;
-const TICKET_FLOW_TIMEOUT_MS = 20_000;
+const CLERK_LOAD_TIMEOUT_MS = 15_000;
+const REDIRECT_STALL_TIMEOUT_MS = 12_000;
+const TICKET_FLOW_TIMEOUT_MS = 25_000;
 
-/** Pull a human-readable message out of a Clerk error object or thrown error. */
 function describeClerkError(err: unknown): string {
   if (!err) return "";
   if (typeof err === "string") return err;
@@ -67,11 +63,8 @@ function useTimeoutFlag(active: boolean, ms: number): boolean {
 }
 
 /**
- * In-app sign-in for the native (Capacitor) WebView. Avoids Clerk's heavy modal
- * (which crashed the WebView renderer) by signing in programmatically:
- *  - already signed in → redirect to `redirect`
- *  - `ticket` present (returning device) → exchange the sign-in token for a session
- *  - otherwise → a lightweight email/password (or email-code) form
+ * In-app sign-in for the Capacitor WebView — no Clerk modal (OOM risk).
+ * Always verifies the server session before leaving this page.
  */
 export function NativeSignInClient() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -84,11 +77,13 @@ export function NativeSignInClient() {
   const postAuthTarget = authContinueUrl(redirectTo);
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [manualOnly, setManualOnly] = useState(sessionRetry);
+  const [continuing, setContinuing] = useState(false);
   const startedRef = useRef(false);
+  const continueRef = useRef(false);
 
   const clerkLoadTimedOut = useTimeoutFlag(!isLoaded, CLERK_LOAD_TIMEOUT_MS);
   const redirectStalled = useTimeoutFlag(
-    Boolean(isLoaded && isSignedIn && !manualOnly),
+    Boolean(continuing),
     REDIRECT_STALL_TIMEOUT_MS,
   );
   const ticketTimedOut = useTimeoutFlag(
@@ -96,7 +91,27 @@ export function NativeSignInClient() {
     TICKET_FLOW_TIMEOUT_MS,
   );
 
-  // Server could not verify a stale client session — clear it and show the form.
+  const finishSignIn = useCallback(async () => {
+    if (continueRef.current) return;
+    continueRef.current = true;
+    setContinuing(true);
+
+    const serverReady = await waitForServerSession(12_000);
+    if (!serverReady) {
+      continueRef.current = false;
+      setContinuing(false);
+      await signOut().catch(() => {});
+      setManualOnly(true);
+      setTicketError(
+        "Your sign-in did not fully sync inside the app. Please sign in again below.",
+      );
+      return;
+    }
+
+    window.location.replace(postAuthTarget);
+  }, [postAuthTarget, signOut]);
+
+  // Server rejected a prior session — clear client state and show the form.
   useEffect(() => {
     if (!sessionRetry || !isLoaded) return;
     void signOut().then(() => {
@@ -111,49 +126,13 @@ export function NativeSignInClient() {
     });
   }, [sessionRetry, isLoaded, signOut]);
 
-  // Already authenticated — hop through auth/continue (with a hard attempt cap).
+  // Returning visit: Clerk JS says signed-in — verify server cookies before redirect.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || manualOnly) return;
+    if (!isLoaded || !isSignedIn || manualOnly || ticket || continuing) return;
+    void finishSignIn();
+  }, [isLoaded, isSignedIn, manualOnly, ticket, continuing, finishSignIn]);
 
-    try {
-      const attempts = Number(
-        sessionStorage.getItem(AUTH_CONTINUE_ATTEMPTS_KEY) ?? "0",
-      );
-      if (attempts >= MAX_AUTH_CONTINUE_ATTEMPTS) {
-        sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
-        void signOut().then(() => setManualOnly(true));
-        return;
-      }
-      sessionStorage.setItem(AUTH_CONTINUE_ATTEMPTS_KEY, String(attempts + 1));
-    } catch {
-      // ignore
-    }
-
-    window.location.replace(postAuthTarget);
-  }, [isLoaded, isSignedIn, manualOnly, postAuthTarget, signOut]);
-
-  if (manualOnly && isLoaded) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
-        <SignInForm
-          redirectTo={postAuthTarget}
-          notice={
-            ticketError ??
-            "Please sign in again to open the online dashboard."
-          }
-          onSignedIn={() => {
-            try {
-              sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
-            } catch {
-              // ignore
-            }
-          }}
-        />
-      </main>
-    );
-  }
-
-  // Ticket handoff: exchange the backend sign-in token for a session.
+  // Ticket handoff from offline device sync token.
   useEffect(() => {
     if (
       !isLoaded ||
@@ -167,8 +146,7 @@ export function NativeSignInClient() {
     }
     startedRef.current = true;
 
-    const expired =
-      "This sign-in link has expired. Please sign in below.";
+    const expired = "This sign-in link has expired. Please sign in below.";
     (async () => {
       try {
         const { error: ticketErr } = await signIn.ticket({ ticket });
@@ -181,12 +159,27 @@ export function NativeSignInClient() {
           setTicketError(expired);
           return;
         }
-        window.location.replace(postAuthTarget);
+        await finishSignIn();
       } catch {
         setTicketError(expired);
       }
     })();
-  }, [isLoaded, isSignedIn, ticket, signIn, postAuthTarget, manualOnly]);
+  }, [isLoaded, isSignedIn, ticket, signIn, manualOnly, finishSignIn]);
+
+  if (manualOnly && isLoaded) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+        <SignInForm
+          redirectTo={postAuthTarget}
+          notice={
+            ticketError ??
+            "Please sign in to open the online dashboard."
+          }
+          onFinishSignIn={finishSignIn}
+        />
+      </main>
+    );
+  }
 
   if (clerkLoadTimedOut && !isLoaded) {
     return (
@@ -198,11 +191,11 @@ export function NativeSignInClient() {
     );
   }
 
-  if (redirectStalled && isSignedIn) {
+  if (redirectStalled && continuing) {
     return (
       <SignInRecovery
         title="Could not open the dashboard"
-        description="You appear signed in, but the dashboard did not load. Try again or sign out and sign in manually."
+        description="Sign-in synced slowly. Try again or sign in manually."
         showSignOut
       />
     );
@@ -214,18 +207,22 @@ export function NativeSignInClient() {
         title="Automatic sign-in timed out"
         description="Your saved device sign-in did not finish in time. Try again or sign in manually below."
         showSignOut={false}
-        onContinue={() => setTicketError("Automatic sign-in timed out. Sign in below.")}
+        onContinue={() =>
+          setTicketError("Automatic sign-in timed out. Sign in below.")
+        }
         continueLabel="Sign in manually"
       />
     );
   }
 
-  // While Clerk loads, or while we redirect an already-signed-in session.
-  if (!isLoaded || isSignedIn) {
-    return <CenteredSpinner />;
+  if (continuing || !isLoaded || isSignedIn) {
+    return (
+      <CenteredSpinner
+        label={continuing ? "Opening dashboard…" : undefined}
+      />
+    );
   }
 
-  // Ticket flow in progress (and not yet failed).
   if (ticket && !ticketError) {
     return <CenteredSpinner label="Signing you in…" />;
   }
@@ -235,13 +232,7 @@ export function NativeSignInClient() {
       <SignInForm
         redirectTo={postAuthTarget}
         notice={ticketError}
-        onSignedIn={() => {
-          try {
-            sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
-          } catch {
-            // ignore
-          }
-        }}
+        onFinishSignIn={finishSignIn}
       />
     </main>
   );
@@ -357,11 +348,11 @@ type Step = "identify" | "code";
 function SignInForm({
   redirectTo,
   notice,
-  onSignedIn,
+  onFinishSignIn,
 }: {
   redirectTo: string;
   notice: string | null;
-  onSignedIn?: () => void;
+  onFinishSignIn: () => Promise<void>;
 }) {
   const { signIn } = useSignIn();
   const [mode, setMode] = useState<"password" | "code">("password");
@@ -377,6 +368,10 @@ function SignInForm({
     setIsNative(isFlipviseNativeShell());
   }, []);
 
+  useEffect(() => {
+    setError(notice);
+  }, [notice]);
+
   const fail = (label: string, raw: unknown) => {
     const detail = describeClerkError(raw);
     console.error(`[native-signin] ${label}:`, raw);
@@ -389,8 +384,7 @@ function SignInForm({
       fail("Couldn't finish sign-in", finalizeErr);
       return false;
     }
-    onSignedIn?.();
-    window.location.replace(redirectTo);
+    await onFinishSignIn();
     return true;
   }
 

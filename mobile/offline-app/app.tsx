@@ -418,7 +418,7 @@ export function App() {
 
     if (!navigator.onLine) {
       try {
-        sessionStorage.setItem("flipvise.lastNavigationUrl", target);
+        sessionStorage.setItem("flipvise.lastNavigationUrl", retryDestination);
       } catch {
         // ignore
       }
@@ -449,10 +449,16 @@ export function App() {
           if (data.ticket) {
             target = `${base}/native-signin?${nativeQuery}&ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
           }
+        } else if (import.meta.env.DEV) {
+          console.warn(
+            `[openLivePath] clerk-handoff failed (${res.status}) — manual sign-in`,
+          );
         }
       }
-    } catch {
-      // Fall back to the form-based /native-signin (manual sign-in).
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn("[openLivePath] clerk-handoff error — manual sign-in", err);
+      }
     }
 
     try {
