@@ -688,6 +688,8 @@ export function App() {
   );
 }
 
+const offlineLogoUrl = `${import.meta.env.BASE_URL}logo.png`;
+
 function Topbar({
   online,
   onOpen,
@@ -712,7 +714,7 @@ function Topbar({
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="mark" aria-hidden>F</span>
+        <img className="brand-logo" src={offlineLogoUrl} alt="" aria-hidden />
         <div className="brand-text">
           <span className="brand-name">Flipvise</span>
           <span className="brand-tag">Offline study</span>
