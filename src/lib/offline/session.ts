@@ -12,6 +12,8 @@ import { Preferences } from "@capacitor/preferences";
 const USER_ID_KEY = "flipvise.offline.userId";
 const SYNC_TOKEN_KEY = "flipvise.offline.syncToken";
 const API_BASE_URL_KEY = "flipvise.offline.apiBaseUrl";
+/** Last in-app WebView navigation target (live site handoff) for error.html retry. */
+const LAST_NAVIGATION_URL_KEY = "flipvise.offline.lastNavigationUrl";
 /** Stashed `/api/sync` pull payload when SQLite is unavailable on the live dashboard page. */
 const PENDING_PULL_KEY = "flipvise.offline.pendingPull";
 const PENDING_PULL_USER_KEY = "flipvise.offline.pendingPullUserId";
@@ -118,6 +120,15 @@ export async function setStoredApiBaseUrl(url: string): Promise<void> {
 
 export async function getStoredApiBaseUrl(): Promise<string | null> {
   const { value } = await Preferences.get({ key: API_BASE_URL_KEY });
+  return value ?? null;
+}
+
+export async function setLastNavigationUrl(url: string): Promise<void> {
+  await Preferences.set({ key: LAST_NAVIGATION_URL_KEY, value: url });
+}
+
+export async function getLastNavigationUrl(): Promise<string | null> {
+  const { value } = await Preferences.get({ key: LAST_NAVIGATION_URL_KEY });
   return value ?? null;
 }
 

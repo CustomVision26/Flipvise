@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { App as CapacitorApp, type PluginListenerHandle } from "@capacitor/app";
 import { getAppLockEnabled } from "../../src/lib/offline/session";
+import { markBootSplashReady } from "./boot-splash";
 import {
   authenticateDeviceCredential,
   getLockAvailability,
@@ -28,6 +29,7 @@ export function LockGate({ children }: { children: ReactNode }) {
       if (!cancelled) {
         setEnabled(false);
         setLocked(false);
+        markBootSplashReady();
       }
     }, 4000);
 
@@ -42,10 +44,12 @@ export function LockGate({ children }: { children: ReactNode }) {
         if (availability.label) setLabel(availability.label);
         setEnabled(active);
         setLocked(active);
+        markBootSplashReady();
       } catch {
         if (!cancelled) {
           setEnabled(false);
           setLocked(false);
+          markBootSplashReady();
         }
       } finally {
         window.clearTimeout(timeout);
@@ -102,23 +106,17 @@ export function LockGate({ children }: { children: ReactNode }) {
     };
   }, [enabled]);
 
-  // Still resolving — show the same boot surface so launch never looks like a crash.
+  // Boot splash (#boot-splash in index.html) covers this phase — avoid a duplicate loader.
   if (enabled === null) {
-    return (
-      <div className="app lock-screen" aria-busy="true" aria-label="Loading">
-        <div className="lock-screen__inner">
-          <img className="lock-screen__logo" src={logoUrl} alt="" />
-          <p className="lock-screen__hint">Loading…</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (locked) {
     return (
       <div className="app lock-screen">
         <div className="lock-screen__inner">
-          <img className="lock-screen__logo" src={logoUrl} alt="" />
+          <img className="lock-screen__logo" src={logoUrl} alt="Flipvise" />
+          <p className="lock-screen__caption">By Flipvise Studio</p>
           <h1 className="lock-screen__title">Flipvise is locked</h1>
           <p className="lock-screen__hint">
             Unlock with your {label} to study your decks.

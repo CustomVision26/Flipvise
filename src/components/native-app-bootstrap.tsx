@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
 
 /**
@@ -9,6 +10,8 @@ import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
  * the bundled offline shell.
  */
 export function NativeAppBootstrap() {
+  const pathname = usePathname();
+
   React.useEffect(() => {
     const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
       .Capacitor;
@@ -55,6 +58,11 @@ export function NativeAppBootstrap() {
     void import("@/lib/offline/session")
       .then(async (s) => {
         await s.setNativeAppFlag();
+        try {
+          await s.setLastNavigationUrl(window.location.href);
+        } catch {
+          // Non-fatal — error.html falls back to native-signin handoff.
+        }
         // Snapshot the dashboard's resolved theme (mode + interface colors) so the
         // bundled offline shell can match it. `<html>` here carries both the
         // light/dark class and `data-ui-theme`, so computed values are accurate.
@@ -80,6 +88,21 @@ export function NativeAppBootstrap() {
       })
       .catch(() => {});
   }, []);
+
+  // Keep the native error page retry URL in sync during in-app client navigations.
+  React.useEffect(() => {
+    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor;
+    const likelyNative =
+      isFlipviseNativeApp() ||
+      Boolean(cap?.isNativePlatform?.()) ||
+      Boolean(cap);
+    if (!likelyNative) return;
+
+    void import("@/lib/offline/session")
+      .then((s) => s.setLastNavigationUrl(window.location.href))
+      .catch(() => {});
+  }, [pathname]);
 
   return null;
 }

@@ -5,7 +5,11 @@ import android.content.pm.PackageInfo;
 import android.os.Bundle;
 import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -38,6 +42,36 @@ public class MainActivity extends BridgeActivity {
             cookieManager.setAcceptThirdPartyCookies(webView, true);
 
             webView.setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                @Override
+                public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                    if (request != null && request.isForMainFrame() && error != null) {
+                        int code = error.getErrorCode();
+                        CharSequence desc = error.getDescription();
+                        String descText = desc != null ? desc.toString().toLowerCase() : "";
+                        // Ignore cancelled navigations during Clerk/Next redirects.
+                        if (code == WebViewClient.ERROR_UNKNOWN || descText.contains("cancel")) {
+                            return;
+                        }
+                    }
+                    super.onReceivedError(view, request, error);
+                }
+
+                @Override
+                public void onReceivedHttpError(
+                    WebView view,
+                    WebResourceRequest request,
+                    WebResourceResponse errorResponse
+                ) {
+                    if (request != null && request.isForMainFrame() && errorResponse != null) {
+                        int status = errorResponse.getStatusCode();
+                        // Render cold starts often return 502/503 briefly — don't trap users on error.html.
+                        if (status >= 500 && status < 600) {
+                            return;
+                        }
+                    }
+                    super.onReceivedHttpError(view, request, errorResponse);
+                }
+
                 @Override
                 public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                     if (view != null) {

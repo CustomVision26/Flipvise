@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import { LockGate } from "./lock-gate";
+import { markBootSplashReady, startBootSplashTimer } from "./boot-splash";
 import "./styles.css";
 
 declare global {
@@ -33,6 +34,8 @@ try {
 
   const logoUrl = `${import.meta.env.BASE_URL}logo.png`;
 
+  startBootSplashTimer();
+
   createRoot(container).render(
     <LockGate>
       <div className="app-watermark" aria-hidden>
@@ -41,9 +44,8 @@ try {
       <App />
     </LockGate>,
   );
-
-  window.__flipviseDismissBootSplash?.();
 } catch (err) {
+  markBootSplashReady();
   const detail = err instanceof Error ? err.message : String(err);
   showFatalStartupError(detail);
 }

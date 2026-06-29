@@ -113,6 +113,15 @@ html, body, #root {
   width: 84px;
   height: 84px;
   object-fit: contain;
+  border-radius: 18px;
+}
+.lock-screen__caption {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
 }
 .lock-screen__title {
   margin: 0;

@@ -30,6 +30,7 @@ import {
   getStoredApiBaseUrl,
   getStoredSyncToken,
   getStoredUserId,
+  setLastNavigationUrl,
   setNativeAppFlag,
   setStoredApiBaseUrl,
 } from "../../src/lib/offline/session";
@@ -403,15 +404,24 @@ export function App() {
     Boolean(accessContext.personalHasTeamTierPlan) && ownerWorkspace != null;
 
   const openLivePath = useCallback(async (path: string) => {
-    if (!navigator.onLine) {
-      window.location.href = "./error.html?offline=1";
-      return;
-    }
-
     const storedBase = await getStoredApiBaseUrl().catch(() => null);
     const base = bundledLiveUrl();
     if (storedBase !== base) {
       await setStoredApiBaseUrl(base).catch(() => {});
+    }
+
+    const enc = (s: string) => encodeURIComponent(s);
+    let target = `${base}/native-signin?redirect=${enc(path)}`;
+
+    if (!navigator.onLine) {
+      try {
+        sessionStorage.setItem("flipvise.lastNavigationUrl", target);
+      } catch {
+        // ignore
+      }
+      await setLastNavigationUrl(target).catch(() => {});
+      window.location.href = `./error.html?offline=1&url=${enc(target)}`;
+      return;
     }
 
     // Navigate the in-app WebView to the live site (keeps the shared native
@@ -424,8 +434,6 @@ export function App() {
     //   • first-time users → a lightweight in-app email/password (or email code)
     //     form, then redirect to `path`.
     //   • already-signed-in WebView sessions → redirect straight to `path`.
-    const enc = (s: string) => encodeURIComponent(s);
-    let target = `${base}/native-signin?redirect=${enc(path)}`;
     try {
       const syncToken = await getStoredSyncToken().catch(() => null);
       if (syncToken) {
@@ -444,6 +452,12 @@ export function App() {
       // Fall back to the form-based /native-signin (manual sign-in).
     }
 
+    try {
+      sessionStorage.setItem("flipvise.lastNavigationUrl", target);
+    } catch {
+      // ignore
+    }
+    await setLastNavigationUrl(target).catch(() => {});
     window.location.replace(target);
   }, []);
 
