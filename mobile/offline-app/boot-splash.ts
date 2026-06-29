@@ -1,5 +1,5 @@
 /** Minimum branded splash time so launch feels intentional (not a flash). */
-const MIN_SPLASH_MS = 3000;
+const MIN_SPLASH_MS = 5000;
 
 let appReady = false;
 let minElapsed = false;

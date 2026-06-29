@@ -2,6 +2,7 @@ package com.flipvise.app;
 
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
@@ -9,7 +10,6 @@ import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -45,11 +45,19 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                     if (request != null && request.isForMainFrame() && error != null) {
-                        int code = error.getErrorCode();
                         CharSequence desc = error.getDescription();
                         String descText = desc != null ? desc.toString().toLowerCase() : "";
-                        // Ignore cancelled navigations during Clerk/Next redirects.
-                        if (code == WebViewClient.ERROR_UNKNOWN || descText.contains("cancel")) {
+                        // Ignore aborted/cancelled navigations during Clerk/Next redirects only.
+                        // Do NOT treat ERROR_UNKNOWN as cancelled — cleartext and other real failures
+                        // use that code and must reach error.html (Refresh / Offline study).
+                        if (
+                            descText.contains("err_aborted") ||
+                            descText.contains("cancelled") ||
+                            descText.contains("canceled")
+                        ) {
+                            return;
+                        }
+                        if (loadConnectionErrorPage(view, request.getUrl(), descText)) {
                             return;
                         }
                     }
@@ -84,6 +92,26 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+    }
+
+    /**
+     * Replace Android's system "Webpage not available" screen with the bundled error.html
+     * (Refresh + Offline study). Returns true when the recovery page was loaded.
+     */
+    private boolean loadConnectionErrorPage(WebView view, Uri failedUri, String descText) {
+        String errorPage = getBridge().getErrorUrl();
+        if (errorPage == null || errorPage.trim().isEmpty()) {
+            return false;
+        }
+        Uri.Builder target = Uri.parse(errorPage).buildUpon();
+        if (failedUri != null) {
+            target.appendQueryParameter("url", failedUri.toString());
+        }
+        if (descText.contains("cleartext")) {
+            target.appendQueryParameter("reason", "cleartext");
+        }
+        view.loadUrl(target.build().toString());
+        return true;
     }
 
     /** Drop cached live-site assets after each store/app upgrade so Team Admin UI updates ship. */

@@ -115,7 +115,10 @@ export function LockGate({ children }: { children: ReactNode }) {
     return (
       <div className="app lock-screen">
         <div className="lock-screen__inner">
-          <img className="lock-screen__logo" src={logoUrl} alt="Flipvise" />
+          <div className="lock-screen__logo-wrap">
+            <img className="lock-screen__logo" src={logoUrl} alt="" />
+          </div>
+          <p className="lock-screen__brand">Flipvise</p>
           <p className="lock-screen__caption">By Flipvise Studio</p>
           <h1 className="lock-screen__title">Flipvise is locked</h1>
           <p className="lock-screen__hint">

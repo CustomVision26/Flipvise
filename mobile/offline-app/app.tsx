@@ -36,6 +36,7 @@ import {
 } from "../../src/lib/offline/session";
 import { runSync, consumePendingOfflinePull, resetSyncPullCursor } from "../../src/lib/offline/sync";
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
+import { liveDestinationUrl } from "../../src/lib/native-live-navigation";
 import { applyOfflineTheme } from "./apply-offline-theme";
 import { AccountMenu } from "./account-menu";
 import { SettingsMenu } from "./settings-menu";
@@ -411,7 +412,9 @@ export function App() {
     }
 
     const enc = (s: string) => encodeURIComponent(s);
-    let target = `${base}/native-signin?redirect=${enc(path)}`;
+    const nativeQuery = "flipvise_native=1";
+    const retryDestination = liveDestinationUrl(base, path);
+    let target = `${base}/native-signin?${nativeQuery}&redirect=${enc(path)}`;
 
     if (!navigator.onLine) {
       try {
@@ -419,8 +422,8 @@ export function App() {
       } catch {
         // ignore
       }
-      await setLastNavigationUrl(target).catch(() => {});
-      window.location.href = `./error.html?offline=1&url=${enc(target)}`;
+      await setLastNavigationUrl(retryDestination).catch(() => {});
+      window.location.href = `./error.html?offline=1&url=${enc(retryDestination)}`;
       return;
     }
 
@@ -444,7 +447,7 @@ export function App() {
         if (res.ok) {
           const data = (await res.json()) as { ticket?: string };
           if (data.ticket) {
-            target = `${base}/native-signin?ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
+            target = `${base}/native-signin?${nativeQuery}&ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
           }
         }
       }
@@ -453,11 +456,12 @@ export function App() {
     }
 
     try {
-      sessionStorage.setItem("flipvise.lastNavigationUrl", target);
+      sessionStorage.setItem("flipvise.native", "1");
+      sessionStorage.setItem("flipvise.lastNavigationUrl", retryDestination);
     } catch {
       // ignore
     }
-    await setLastNavigationUrl(target).catch(() => {});
+    await setLastNavigationUrl(retryDestination).catch(() => {});
     window.location.replace(target);
   }, []);
 

@@ -32,8 +32,24 @@ const NATIVE_ORIGINS = new Set([
   "https://localhost",
 ]);
 
+function isNativeWebViewOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (NATIVE_ORIGINS.has(origin)) return true;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== "http:" && protocol !== "https:") return false;
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "10.0.2.2"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function corsHeaders(origin: string | null): Record<string, string> {
-  if (origin && NATIVE_ORIGINS.has(origin)) {
+  if (isNativeWebViewOrigin(origin)) {
     return {
       "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",

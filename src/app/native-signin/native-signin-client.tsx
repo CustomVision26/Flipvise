@@ -2,28 +2,32 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAuth, useSignIn } from "@clerk/nextjs";
+import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
+import {
+  AUTH_CONTINUE_ATTEMPTS_KEY,
+  MAX_AUTH_CONTINUE_ATTEMPTS,
+} from "@/lib/flipvise-native-constants";
+import {
+  isFlipviseNativeShell,
+  navigateToOfflineShell,
+} from "@/lib/offline/is-flipvise-native-app";
 
-/** Default landing if the handoff URL doesn't specify a redirect. */
-const DEFAULT_REDIRECT = "/dashboard";
-
-/** Only allow same-origin relative paths as redirect targets. */
-function safeRedirect(raw: string | null): string {
-  if (!raw) return DEFAULT_REDIRECT;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return DEFAULT_REDIRECT;
-  return raw;
-}
+const CLERK_LOAD_TIMEOUT_MS = 12_000;
+const REDIRECT_STALL_TIMEOUT_MS = 6_000;
+const TICKET_FLOW_TIMEOUT_MS = 20_000;
 
 /** Pull a human-readable message out of a Clerk error object or thrown error. */
 function describeClerkError(err: unknown): string {
@@ -47,6 +51,21 @@ function describeClerkError(err: unknown): string {
   );
 }
 
+function useTimeoutFlag(active: boolean, ms: number): boolean {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      setTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setTimedOut(true), ms);
+    return () => window.clearTimeout(timer);
+  }, [active, ms]);
+
+  return timedOut;
+}
+
 /**
  * In-app sign-in for the native (Capacitor) WebView. Avoids Clerk's heavy modal
  * (which crashed the WebView renderer) by signing in programmatically:
@@ -57,20 +76,93 @@ function describeClerkError(err: unknown): string {
 export function NativeSignInClient() {
   const { isLoaded, isSignedIn } = useAuth();
   const { signIn } = useSignIn();
+  const { signOut } = useClerk();
   const searchParams = useSearchParams();
   const ticket = searchParams.get("ticket");
-  const redirectTo = safeRedirect(searchParams.get("redirect"));
+  const sessionRetry = searchParams.get("session_retry") === "1";
+  const redirectTo = safeRedirectPath(searchParams.get("redirect"));
+  const postAuthTarget = authContinueUrl(redirectTo);
   const [ticketError, setTicketError] = useState<string | null>(null);
+  const [manualOnly, setManualOnly] = useState(sessionRetry);
   const startedRef = useRef(false);
 
-  // Already authenticated in this WebView session — go straight through.
+  const clerkLoadTimedOut = useTimeoutFlag(!isLoaded, CLERK_LOAD_TIMEOUT_MS);
+  const redirectStalled = useTimeoutFlag(
+    Boolean(isLoaded && isSignedIn && !manualOnly),
+    REDIRECT_STALL_TIMEOUT_MS,
+  );
+  const ticketTimedOut = useTimeoutFlag(
+    Boolean(isLoaded && ticket && !ticketError && !isSignedIn && !manualOnly),
+    TICKET_FLOW_TIMEOUT_MS,
+  );
+
+  // Server could not verify a stale client session — clear it and show the form.
   useEffect(() => {
-    if (isLoaded && isSignedIn) window.location.replace(redirectTo);
-  }, [isLoaded, isSignedIn, redirectTo]);
+    if (!sessionRetry || !isLoaded) return;
+    void signOut().then(() => {
+      setManualOnly(true);
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("session_retry");
+        window.history.replaceState(null, "", url.toString());
+      } catch {
+        // ignore
+      }
+    });
+  }, [sessionRetry, isLoaded, signOut]);
+
+  // Already authenticated — hop through auth/continue (with a hard attempt cap).
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || manualOnly) return;
+
+    try {
+      const attempts = Number(
+        sessionStorage.getItem(AUTH_CONTINUE_ATTEMPTS_KEY) ?? "0",
+      );
+      if (attempts >= MAX_AUTH_CONTINUE_ATTEMPTS) {
+        sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
+        void signOut().then(() => setManualOnly(true));
+        return;
+      }
+      sessionStorage.setItem(AUTH_CONTINUE_ATTEMPTS_KEY, String(attempts + 1));
+    } catch {
+      // ignore
+    }
+
+    window.location.replace(postAuthTarget);
+  }, [isLoaded, isSignedIn, manualOnly, postAuthTarget, signOut]);
+
+  if (manualOnly && isLoaded) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+        <SignInForm
+          redirectTo={postAuthTarget}
+          notice={
+            ticketError ??
+            "Please sign in again to open the online dashboard."
+          }
+          onSignedIn={() => {
+            try {
+              sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
+            } catch {
+              // ignore
+            }
+          }}
+        />
+      </main>
+    );
+  }
 
   // Ticket handoff: exchange the backend sign-in token for a session.
   useEffect(() => {
-    if (!isLoaded || isSignedIn || !ticket || !signIn || startedRef.current) {
+    if (
+      !isLoaded ||
+      isSignedIn ||
+      !ticket ||
+      !signIn ||
+      startedRef.current ||
+      manualOnly
+    ) {
       return;
     }
     startedRef.current = true;
@@ -89,12 +181,44 @@ export function NativeSignInClient() {
           setTicketError(expired);
           return;
         }
-        window.location.replace(redirectTo);
+        window.location.replace(postAuthTarget);
       } catch {
         setTicketError(expired);
       }
     })();
-  }, [isLoaded, isSignedIn, ticket, signIn, redirectTo]);
+  }, [isLoaded, isSignedIn, ticket, signIn, postAuthTarget, manualOnly]);
+
+  if (clerkLoadTimedOut && !isLoaded) {
+    return (
+      <SignInRecovery
+        title="Sign-in is taking too long"
+        description="Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
+        showSignOut={false}
+      />
+    );
+  }
+
+  if (redirectStalled && isSignedIn) {
+    return (
+      <SignInRecovery
+        title="Could not open the dashboard"
+        description="You appear signed in, but the dashboard did not load. Try again or sign out and sign in manually."
+        showSignOut
+      />
+    );
+  }
+
+  if (ticketTimedOut && ticket && !ticketError) {
+    return (
+      <SignInRecovery
+        title="Automatic sign-in timed out"
+        description="Your saved device sign-in did not finish in time. Try again or sign in manually below."
+        showSignOut={false}
+        onContinue={() => setTicketError("Automatic sign-in timed out. Sign in below.")}
+        continueLabel="Sign in manually"
+      />
+    );
+  }
 
   // While Clerk loads, or while we redirect an already-signed-in session.
   if (!isLoaded || isSignedIn) {
@@ -108,20 +232,121 @@ export function NativeSignInClient() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6">
-      <SignInForm redirectTo={redirectTo} notice={ticketError} />
+      <SignInForm
+        redirectTo={postAuthTarget}
+        notice={ticketError}
+        onSignedIn={() => {
+          try {
+            sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
+          } catch {
+            // ignore
+          }
+        }}
+      />
     </main>
   );
 }
 
 function CenteredSpinner({ label }: { label?: string }) {
+  const [isNative, setIsNative] = useState(false);
+
+  useEffect(() => {
+    setIsNative(isFlipviseNativeShell());
+  }, []);
+
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
           <CardTitle>{label ?? "Loading…"}</CardTitle>
           <CardDescription>This only takes a moment.</CardDescription>
         </CardHeader>
+        {isNative ? (
+          <CardFooter className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                void navigateToOfflineShell();
+              }}
+            >
+              Back to offline study
+            </Button>
+          </CardFooter>
+        ) : null}
+      </Card>
+    </main>
+  );
+}
+
+function SignInRecovery({
+  title,
+  description,
+  showSignOut,
+  onContinue,
+  continueLabel,
+}: {
+  title: string;
+  description: string;
+  showSignOut: boolean;
+  onContinue?: () => void;
+  continueLabel?: string;
+}) {
+  const { signOut } = useClerk();
+  const [isNative, setIsNative] = useState(false);
+
+  useEffect(() => {
+    setIsNative(isFlipviseNativeShell());
+  }, []);
+
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardFooter className="flex flex-col gap-2">
+          {onContinue ? (
+            <Button type="button" className="w-full" onClick={onContinue}>
+              {continueLabel ?? "Continue"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </Button>
+          )}
+          {showSignOut ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={() => {
+                void signOut().then(() => window.location.reload());
+              }}
+            >
+              Sign out and try again
+            </Button>
+          ) : null}
+          {isNative ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                void navigateToOfflineShell();
+              }}
+            >
+              Back to offline study
+            </Button>
+          ) : null}
+        </CardFooter>
       </Card>
     </main>
   );
@@ -132,9 +357,11 @@ type Step = "identify" | "code";
 function SignInForm({
   redirectTo,
   notice,
+  onSignedIn,
 }: {
   redirectTo: string;
   notice: string | null;
+  onSignedIn?: () => void;
 }) {
   const { signIn } = useSignIn();
   const [mode, setMode] = useState<"password" | "code">("password");
@@ -144,6 +371,11 @@ function SignInForm({
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
+  const [isNative, setIsNative] = useState(false);
+
+  useEffect(() => {
+    setIsNative(isFlipviseNativeShell());
+  }, []);
 
   const fail = (label: string, raw: unknown) => {
     const detail = describeClerkError(raw);
@@ -157,6 +389,7 @@ function SignInForm({
       fail("Couldn't finish sign-in", finalizeErr);
       return false;
     }
+    onSignedIn?.();
     window.location.replace(redirectTo);
     return true;
   }
@@ -352,6 +585,20 @@ function SignInForm({
           </form>
         )}
       </CardContent>
+      {isNative ? (
+        <CardFooter>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              void navigateToOfflineShell();
+            }}
+          >
+            Back to offline study
+          </Button>
+        </CardFooter>
+      ) : null}
     </Card>
   );
 }

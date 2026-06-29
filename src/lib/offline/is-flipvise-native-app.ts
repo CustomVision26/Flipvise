@@ -1,12 +1,12 @@
 "use client";
 
 import { Capacitor } from "@capacitor/core";
+import {
+  FLIPVISE_NATIVE_QUERY_PARAM,
+  FLIPVISE_NATIVE_UA_MARKER,
+} from "@/lib/flipvise-native-constants";
 
-/** Appended to the WebView user agent via `capacitor.config.ts` (`android.appendUserAgent`). */
-export const FLIPVISE_NATIVE_UA_MARKER = "FlipviseNative";
-
-/** Query param set when navigating from the bundled offline shell to the live site. */
-export const FLIPVISE_NATIVE_QUERY_PARAM = "flipvise_native";
+export { FLIPVISE_NATIVE_QUERY_PARAM, FLIPVISE_NATIVE_UA_MARKER };
 
 /** Android bundled shell (`server.androidScheme: https`). */
 export const FLIPVISE_OFFLINE_SHELL_ANDROID_URL = "https://localhost/";

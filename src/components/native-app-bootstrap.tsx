@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import { AUTH_CONTINUE_ATTEMPTS_KEY } from "@/lib/flipvise-native-constants";
+import { unwrapNativeSignInRetryUrl } from "@/lib/native-live-navigation";
 import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
 
 /**
@@ -59,9 +61,11 @@ export function NativeAppBootstrap() {
       .then(async (s) => {
         await s.setNativeAppFlag();
         try {
-          await s.setLastNavigationUrl(window.location.href);
+          await s.setLastNavigationUrl(
+            unwrapNativeSignInRetryUrl(window.location.href),
+          );
         } catch {
-          // Non-fatal — error.html falls back to native-signin handoff.
+          // Non-fatal — error.html falls back to dashboard handoff.
         }
         // Snapshot the dashboard's resolved theme (mode + interface colors) so the
         // bundled offline shell can match it. `<html>` here carries both the
@@ -100,8 +104,18 @@ export function NativeAppBootstrap() {
     if (!likelyNative) return;
 
     void import("@/lib/offline/session")
-      .then((s) => s.setLastNavigationUrl(window.location.href))
+      .then((s) =>
+        s.setLastNavigationUrl(unwrapNativeSignInRetryUrl(window.location.href)),
+      )
       .catch(() => {});
+
+    if (pathname?.startsWith("/dashboard")) {
+      try {
+        sessionStorage.removeItem(AUTH_CONTINUE_ATTEMPTS_KEY);
+      } catch {
+        // ignore
+      }
+    }
   }, [pathname]);
 
   return null;

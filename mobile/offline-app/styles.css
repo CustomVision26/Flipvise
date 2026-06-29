@@ -106,20 +106,37 @@ html, body, #root {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   max-width: 22rem;
 }
+.lock-screen__logo-wrap {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
 .lock-screen__logo {
-  width: 84px;
-  height: 84px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
-  border-radius: 18px;
+  border-radius: 14px;
+}
+.lock-screen__brand {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--fg);
 }
 .lock-screen__caption {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.6875rem;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted-2);
 }
