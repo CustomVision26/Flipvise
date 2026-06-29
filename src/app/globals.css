@@ -1759,3 +1759,20 @@ html[data-flipvise-native-shell][data-platform="ios"] {
 html[data-flipvise-native-shell] [data-app-header] {
   padding-top: calc(0.75rem + var(--flipvise-safe-top, 28px)) !important;
 }
+
+/*
+ * Sonner toasts — inline --offset-* loses to Capacitor status bar without safe-area
+ * clearance (Sonner sets offsets inline; !important beats those custom properties).
+ */
+html[data-flipvise-native-shell] [data-sonner-toaster],
+html[data-native-shell] [data-sonner-toaster] {
+  --offset-top: calc(var(--flipvise-safe-top, 28px) + 12px) !important;
+  --mobile-offset-top: calc(var(--flipvise-safe-top, 28px) + 12px) !important;
+  --offset-bottom: calc(var(--flipvise-safe-bottom, 16px) + 12px) !important;
+  --mobile-offset-bottom: calc(var(--flipvise-safe-bottom, 16px) + 12px) !important;
+}
+
+html[data-flipvise-native-shell] [data-offline-banner],
+html[data-native-shell] [data-offline-banner] {
+  padding-top: var(--flipvise-safe-top, 28px);
+}

@@ -22,7 +22,7 @@ import {
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
 import { EditDeckDialog } from "./edit-deck-dialog";
-import { DeleteAllCardsDialog } from "./delete-all-cards-dialog";
+import { DeleteAllCardsDialogLoader } from "./delete-all-cards-dialog-loader";
 import { StudyLink } from "./study-link";
 import { GenerateCardsButtonLoader } from "./generate-cards-button-loader";
 import { CardGrid } from "./card-grid";
@@ -215,7 +215,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             >
               <EditDeckDialog deck={deck} allowCoverUpload={teamTierPro} />
               {cards.length > 0 ? (
-                <DeleteAllCardsDialog deckId={id} cardCount={cards.length} />
+                <DeleteAllCardsDialogLoader deckId={id} cardCount={cards.length} />
               ) : null}
               {cards.length > 0 ? (
                 <StudyLink
