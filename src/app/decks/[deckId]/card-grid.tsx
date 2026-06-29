@@ -40,6 +40,7 @@ import {
 } from "@/components/view-mode-dropdown";
 import { cn } from "@/lib/utils";
 import { CardFrontImage } from "./card-front-image";
+import { CardAnswerHover } from "./card-answer-hover";
 import { EditCardDialog } from "./edit-card-dialog";
 import { DeleteCardDialog } from "./delete-card-dialog";
 import {
@@ -167,7 +168,7 @@ function CardFaceText({
   const backText = correctAnswer || (backImageUrl ? "Image answer" : "No answer");
   const frontText = front ?? "No question";
 
-  return (
+  const faceContent = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
       {variant === "compact" && frontImageUrl ? (
         <CardFrontImage
@@ -191,27 +192,39 @@ function CardFaceText({
           className={cn(
             "min-w-0 flex-1 font-semibold leading-snug text-card-foreground [overflow-wrap:anywhere]",
             variant === "compact"
-              ? "line-clamp-2 text-[11px]"
+              ? "line-clamp-4 text-[11px]"
               : "line-clamp-2 text-xs sm:text-sm",
             cardTextClass,
             !front && "italic text-muted-foreground",
           )}
-          title={front ?? undefined}
         >
           {frontText}
         </p>
       </div>
-      <p
-        className={cn(
-          "leading-snug text-muted-foreground line-clamp-2 [overflow-wrap:anywhere]",
-          variant === "compact" ? "text-[10px]" : "text-[11px] sm:text-xs",
-          cardTextClass,
-        )}
-        title={backText}
-      >
-        {backText}
-      </p>
+      {variant !== "compact" ? (
+        <p
+          className={cn(
+            "leading-snug text-muted-foreground line-clamp-2 [overflow-wrap:anywhere]",
+            "text-[11px] sm:text-xs",
+            cardTextClass,
+          )}
+        >
+          {backText}
+        </p>
+      ) : null}
     </div>
+  );
+
+  return (
+    <CardAnswerHover
+      front={front}
+      answer={correctAnswer}
+      isMC={isMC}
+      backImageUrl={backImageUrl}
+      className="min-h-0 min-w-0 flex-1"
+    >
+      {faceContent}
+    </CardAnswerHover>
   );
 }
 

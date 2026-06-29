@@ -39,6 +39,8 @@ export async function getAppLockEnabled(): Promise<boolean> {
  */
 export type OfflineThemePrefs = {
   mode: "light" | "dark";
+  /** Pro/free interface preset id (`neutral` = default shell palette). */
+  interfaceId?: string | null;
   background: string | null;
   foreground: string | null;
   card: string | null;
@@ -62,6 +64,7 @@ export async function getOfflineThemePrefs(): Promise<OfflineThemePrefs | null> 
     if (parsed.mode !== "light" && parsed.mode !== "dark") return null;
     return {
       mode: parsed.mode,
+      interfaceId: parsed.interfaceId ?? null,
       background: parsed.background ?? null,
       foreground: parsed.foreground ?? null,
       card: parsed.card ?? null,

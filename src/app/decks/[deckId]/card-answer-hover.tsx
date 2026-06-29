@@ -58,7 +58,8 @@ export function CardAnswerHover({
   const [imageOpen, setImageOpen] = useState(false);
   const coarsePointer = useCoarsePointer();
   const answerText = answer.trim();
-  const hasPreview = Boolean(answerText || backImageUrl);
+  const frontText = front?.trim() ?? "";
+  const hasPreview = Boolean(answerText || backImageUrl || frontText);
   if (!hasPreview) return <>{children}</>;
 
   const imageAlt = answerText || front || "Answer image";
@@ -71,20 +72,18 @@ export function CardAnswerHover({
   };
 
   const triggerClassName = cn(
-    "block w-full rounded-xl text-left outline-none",
+    "block w-full rounded-xl text-left outline-none transition-colors",
     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
     coarsePointer && "cursor-pointer",
     className,
   );
   const contentClassName = cn(
-    "gap-0 overflow-hidden border-2 border-primary bg-card p-0 text-card-foreground shadow-lg shadow-primary/30 ring-0",
+    "gap-0 overflow-hidden rounded-xl border border-border/70 bg-card p-0 text-card-foreground shadow-2xl shadow-black/40 ring-1 ring-foreground/10",
     isStructuredAnswer
-      ? "w-[min(32rem,calc(100vw-1.25rem))]"
-      : "w-[min(26rem,calc(100vw-1.25rem))]",
+      ? "w-[min(34rem,calc(100vw-1.5rem))]"
+      : "w-[min(28rem,calc(100vw-1.5rem))]",
   );
 
-  // Render as a div (not the default button/anchor) so cards that embed their own
-  // image button don't produce invalid nested interactive DOM.
   const triggerInner = (
     <CardHoverPreviewProvider closeHover={closeHover}>
       {children}
@@ -93,83 +92,81 @@ export function CardAnswerHover({
 
   const previewBody = (
     <>
-      <div className="border-b border-primary/40 bg-primary px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <div
-                className="h-4 w-1 shrink-0 rounded-full bg-primary-foreground/90"
-                aria-hidden
-              />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-foreground">
-                {isMC ? "Correct answer" : "Answer preview"}
-              </p>
-            </div>
-          </div>
-          <div
-            className={cn(
-              "max-h-[min(70vh,28rem)] overflow-y-auto bg-card",
-              isStructuredAnswer ? "px-4 py-4" : "px-4 py-3",
-            )}
-          >
+      <div className="border-b border-primary/25 bg-primary/10 px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          {isMC ? (
+            <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500" aria-hidden />
+          ) : (
             <div
+              className="h-3.5 w-0.5 shrink-0 rounded-full bg-primary"
+              aria-hidden
+            />
+          )}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+            {isMC ? "Correct answer" : "Answer"}
+          </p>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          "max-h-[min(70vh,28rem)] overflow-y-auto bg-card/95 px-4 py-3.5",
+          isStructuredAnswer && "py-4",
+        )}
+      >
+        <div
+          className={cn(
+            "flex min-w-0",
+            isStructuredAnswer || !backImageUrl
+              ? "flex-col gap-2.5"
+              : "items-start gap-3",
+          )}
+        >
+          {backImageUrl ? (
+            <button
+              type="button"
               className={cn(
-                "flex min-w-0",
-                isStructuredAnswer || !backImageUrl
-                  ? "flex-col gap-2"
-                  : "items-start gap-2.5",
+                "relative shrink-0 overflow-hidden rounded-lg border border-border/80 bg-muted/50 cursor-zoom-in transition-[box-shadow,transform] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                isStructuredAnswer ? "h-32 w-full" : "h-16 w-16",
               )}
+              title="Double-click to enlarge"
+              aria-label="Double-click to enlarge answer image"
+              onClick={(event) => {
+                if (coarsePointer) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openBackImage();
+                }
+              }}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openBackImage();
+              }}
             >
-              {isMC && !isStructuredAnswer ? (
-                <CheckCircle2
-                  className="mt-0.5 size-3.5 shrink-0 text-emerald-500"
-                  aria-hidden
-                />
-              ) : null}
-              {backImageUrl ? (
-                <button
-                  type="button"
-                  className={cn(
-                    "relative shrink-0 overflow-hidden rounded-md border border-border bg-muted cursor-zoom-in transition-[box-shadow,transform] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isStructuredAnswer ? "h-32 w-full" : "h-16 w-16",
-                  )}
-                  title="Double-click to enlarge"
-                  aria-label="Double-click to enlarge answer image"
-                  onClick={(event) => {
-                    // On touch there is no double-click, so a tap enlarges.
-                    if (coarsePointer) {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      openBackImage();
-                    }
-                  }}
-                  onDoubleClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    openBackImage();
-                  }}
-                >
-                  <Image
-                    src={backImageUrl}
-                    alt=""
-                    fill
-                    className="object-contain pointer-events-none p-1.5"
-                    sizes={isStructuredAnswer ? "480px" : "64px"}
-                    draggable={false}
-                  />
-                </button>
-              ) : null}
-              {answerText ? (
-                <FormattedCardAnswer
-                  text={answerText}
-                  variant="hover"
-                  className="min-w-0 flex-1 text-base leading-relaxed"
-                />
-              ) : backImageUrl ? (
-                <p className="text-base font-medium text-foreground">Image answer</p>
-              ) : (
-                <p className="text-base font-medium text-muted-foreground">—</p>
-              )}
-            </div>
-          </div>
+              <Image
+                src={backImageUrl}
+                alt=""
+                fill
+                className="object-contain pointer-events-none p-1.5"
+                sizes={isStructuredAnswer ? "480px" : "64px"}
+                draggable={false}
+              />
+            </button>
+          ) : null}
+          {answerText ? (
+            <FormattedCardAnswer
+              text={answerText}
+              variant="hover"
+              className="min-w-0 flex-1 text-sm leading-relaxed text-foreground/95"
+            />
+          ) : backImageUrl ? (
+            <p className="text-sm font-medium text-foreground">Image answer</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No answer text</p>
+          )}
+        </div>
+      </div>
     </>
   );
 
@@ -192,8 +189,6 @@ export function CardAnswerHover({
     />
   ) : null;
 
-  // Touch / pen (no hover): tap to open, tap-outside / Esc to dismiss. The trigger
-  // renders as a div, so Base UI's Popover.Trigger needs nativeButton={false}.
   if (coarsePointer) {
     return (
       <>

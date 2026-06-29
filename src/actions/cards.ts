@@ -27,6 +27,11 @@ import {
   resolveDeckCardCap,
 } from "@/lib/deck-limits";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
+import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
+import {
+  importedCardPreviewSchema,
+  type GenerateCardsFromSourceResult,
+} from "@/lib/source-import-types";
 
 async function requireDeckEditor(userId: string, deckId: number) {
   const bundle = await getDeckWithViewerAccess(deckId, userId);
@@ -1089,4 +1094,250 @@ Generate the correct answer and 3 plausible wrong answers that match the deck's 
     correctAnswer: finalCorrect,
     distractors: [d1, d2, d3],
   };
+}
+
+const commitImportedCardsSchema = z.object({
+  deckId: z.number().int().positive(),
+  cards: z
+    .array(
+      z.object({
+        front: z.string().min(1),
+        back: z.string().min(1),
+      }),
+    )
+    .min(1),
+});
+
+type CommitImportedCardsInput = z.infer<typeof commitImportedCardsSchema>;
+
+const validateSourceRelevanceSchema = z.object({
+  isRelevant: z.boolean(),
+  warning: z.string().nullable(),
+});
+
+const FLASHCARD_GENERATION_SYSTEM_PROMPT = `You are a flashcard generation assistant. Infer the subject matter and purpose of the deck from its name, description, AND the existing cards already in the deck. Use the existing cards as the authoritative reference for the deck's style, format, depth, and scope — your generated cards must feel like they belong in the same deck.
+
+For **problem-solving, mathematical, or computational topics** (e.g. algebra, calculus, geometry, trigonometry, statistics, physics, chemistry, programming algorithms, logic puzzles, financial calculations):
+- Put a clear problem or question on the front
+- On the back, show the complete step-by-step working out using EXACTLY this uniform format (use plain newlines between each element, no markdown, no bullet points):
+
+Step 1: [Brief label describing the action]
+[The computation or reasoning for this step]
+Step 2: [Brief label describing the action]
+[The computation or reasoning for this step]
+(continue for as many steps as needed)
+Answer: [The final result]
+
+For **non-problem-solving topics** (vocabulary, definitions, historical facts, concepts, language learning):
+- A term or concept on the front with a concise definition or explanation on the back
+- Keep both sides brief and direct
+
+For EVERY card, also produce exactly 3 "distractors" — plausible but definitively incorrect alternative answers to the card's back. Distractors must:
+- Be clearly wrong to someone who knows the subject
+- Be plausible enough to make a student hesitate (similar length, tone, and category to the correct back)
+- Be distinct from each other and from the correct back
+- Match the style, depth, and tone of the existing cards in the deck
+- Follow the same "no markdown" rules as the rest of the card
+
+For a step-by-step/problem-solving back, each distractor should be a short plausible final-answer-style string (NOT a full multi-line solution) — roughly matching what a student might mistakenly compute.
+
+Rules:
+- NEVER use markdown formatting (no **, no *, no #, no backticks) in any card or distractor
+- NEVER use bullet points or dashes in step-by-step cards
+- Use the step-by-step format ONLY when the topic genuinely requires working through a process
+- When existing cards are provided, treat them as the source of truth for tone, length, and format — match them
+- NEVER duplicate or trivially rephrase any of the existing cards
+- Stay strictly within the subject matter and scope established by the deck
+- Always return exactly 3 distractors per card — no more, no less`;
+
+async function assertSourceImportLimits(
+  deckId: number,
+  count: number,
+  maxCardsPerDeck: number,
+  teamTierPro: boolean,
+) {
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
+  const existingCards = await getCardsByDeckUnscoped(deckId);
+  const aiGeneratedSoFar = existingCards.filter((c) => c.aiGenerated).length;
+  const remainingAiSlots = AI_GENERATION_CAP_PER_DECK - aiGeneratedSoFar;
+  if (count > remainingAiSlots) {
+    throw new Error(
+      `This deck can receive at most ${AI_GENERATION_CAP_PER_DECK} AI-generated cards (${remainingAiSlots} slot${remainingAiSlots !== 1 ? "s" : ""} left).`,
+    );
+  }
+  const remainingDeckSlots = deckCardLimit - existingCards.length;
+  if (count > remainingDeckSlots) {
+    throw new Error(
+      paidCardTier
+        ? `Not enough room in this deck (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left; max ${deckCardLimit} per deck).`
+        : `Not enough room in this deck on the Free plan (${remainingDeckSlots} card slot${remainingDeckSlots !== 1 ? "s" : ""} left).`,
+    );
+  }
+  return { existingCards, deckCardLimit, paidCardTier };
+}
+
+/**
+ * Extract text from a URL or uploaded file (ephemeral — nothing is stored) and
+ * generate flashcards for user review. Pro: URL + TXT. Pro Plus: + enabled document types.
+ */
+export async function generateCardsFromSourceAction(
+  formData: FormData,
+): Promise<GenerateCardsFromSourceResult> {
+  const { userId, hasAI, hasAiReading, maxCardsPerDeck } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const deckId = Number(formData.get("deckId"));
+  const count = Number(formData.get("count"));
+  const urlRaw = String(formData.get("url") ?? "").trim();
+  const file = formData.get("file");
+  const skipRelevanceCheck = formData.get("skipRelevanceCheck") === "true";
+
+  if (!Number.isInteger(deckId) || deckId <= 0) throw new Error("Invalid deck.");
+  if (!Number.isInteger(count) || count < 1 || count > AI_GENERATION_CAP_PER_DECK) {
+    throw new Error(`Enter a card count between 1 and ${AI_GENERATION_CAP_PER_DECK}.`);
+  }
+
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effectiveAI = hasAI || teamTierPro;
+  if (!effectiveAI) {
+    throw new Error("Import and AI generation from sources requires a Pro plan.");
+  }
+
+  const advancedImport = canUseAdvancedSourceImport({
+    hasAiReading,
+    teamTierProWorkspace: teamTierPro,
+  });
+
+  const hasFile = file instanceof File && file.size > 0;
+  const hasUrl = urlRaw.length > 0;
+  if (hasFile === hasUrl) {
+    throw new Error("Provide either a website URL or one file — not both.");
+  }
+
+  const {
+    assertFormatAllowedForPlan,
+    extractTextFromFile,
+    extractTextFromUrl,
+    resolveFileSourceFormat,
+  } = await import("@/lib/document-extract");
+
+  let extracted;
+  if (hasUrl) {
+    extracted = await extractTextFromUrl(urlRaw);
+  } else {
+    const uploadFile = file as File;
+    const format = resolveFileSourceFormat(uploadFile);
+    assertFormatAllowedForPlan(format, advancedImport);
+    extracted = await extractTextFromFile(uploadFile);
+  }
+
+  const { existingCards } = await assertSourceImportLimits(
+    deckId,
+    count,
+    maxCardsPerDeck,
+    teamTierPro,
+  );
+
+  const deckContext = buildDeckContext(deck, existingCards, {
+    includeForDuplicateCheck: true,
+  });
+
+  const { output: relevance } = await generateText({
+    model: openai("gpt-4o"),
+    output: Output.object({ schema: validateSourceRelevanceSchema }),
+    system: `You validate whether uploaded or linked study material fits a flashcard deck's topic.
+
+Use the deck name, description, and existing cards to understand the deck scope. Compare the source excerpt to that scope.
+
+Return isRelevant=false only when the material is clearly unrelated (wrong subject, wrong language course, etc.). Return a short, helpful warning when false.`,
+    prompt: `${deckContext}
+
+Source material excerpt (first portion):
+${extracted.text.slice(0, 4000)}
+
+Is this source material appropriate for generating flashcards in this deck?`,
+  });
+
+  if (!relevance?.isRelevant && !skipRelevanceCheck) {
+    return {
+      status: "relevance_warning",
+      warning:
+        relevance?.warning ??
+        "This source does not appear to match your deck topic. Try a different file or URL, or generate anyway if you are sure.",
+    };
+  }
+
+  const { output } = await generateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: z.object({
+        cards: z.array(importedCardPreviewSchema),
+      }),
+    }),
+    system: `${FLASHCARD_GENERATION_SYSTEM_PROMPT}
+
+You will also receive an excerpt of source material (notes, article, document, etc.). Ground every card in facts from that source while matching the deck's established style and scope. Prefer the most important concepts from the source.`,
+    prompt: `${deckContext}
+
+Source material:
+${extracted.text}
+
+Generate exactly ${count} new flashcards from the source material above. They must be genuinely new (no duplicates of existing cards), match the deck style, and stay within the deck topic. For each card return front, back, and 3 distractors.`,
+  });
+
+  const trimmed = (output?.cards ?? []).slice(0, count).map((c) => ({
+    front: cleanAiText(c.front),
+    back: cleanAiText(c.back),
+    distractors: [
+      cleanAiText(c.distractors[0]),
+      cleanAiText(c.distractors[1]),
+      cleanAiText(c.distractors[2]),
+    ],
+  }));
+
+  if (trimmed.length === 0) {
+    throw new Error("The model did not return any cards. Please try again.");
+  }
+
+  return { status: "ok", cards: trimmed };
+}
+
+/** Persist user-approved cards from the source-import review step. */
+export async function commitImportedCardsAction(
+  data: CommitImportedCardsInput,
+): Promise<{ added: number }> {
+  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = commitImportedCardsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { deckId, cards } = parsed.data;
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effectiveAI = hasAI || teamTierPro;
+  if (!effectiveAI) {
+    throw new Error("Import and AI generation from sources requires a Pro plan.");
+  }
+
+  await assertSourceImportLimits(deckId, cards.length, maxCardsPerDeck, teamTierPro);
+
+  const existingCards = await getCardsByDeckUnscoped(deckId);
+  const payload: { front: string; back: string; distractors: string[] }[] = [];
+
+  for (const card of cards) {
+    const front = card.front.trim();
+    const back = card.back.trim();
+    const [d1, d2, d3] = await generateStandardDistractors(deck, existingCards, front, back);
+    payload.push({ front, back, distractors: [d1, d2, d3] });
+  }
+
+  await bulkCreateCards(deckId, payload, true);
+  revalidatePath(`/decks/${deckId}`);
+  return { added: payload.length };
 }

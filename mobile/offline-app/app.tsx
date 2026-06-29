@@ -37,7 +37,10 @@ import { runSync, consumePendingOfflinePull, resetSyncPullCursor } from "../../s
 import { buildTeamAdminMembersPath } from "../../src/lib/team-admin-url";
 import { applyOfflineTheme } from "./apply-offline-theme";
 import { AccountMenu } from "./account-menu";
-import { SettingsSheet } from "./settings-sheet";
+import { SettingsMenu } from "./settings-menu";
+import {
+  resolveOfflineAppearanceAccess,
+} from "../../src/lib/offline/offline-appearance-palettes";
 import { DeckLibrary } from "./deck-library";
 import { ImagePickerField } from "./image-picker-field";
 import { DeckDetail } from "./deck-detail";
@@ -133,7 +136,6 @@ export function App() {
   const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
   const [libraryReady, setLibraryReady] = useState(false);
   const [scopeLoading, setScopeLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
 
   // Match the live dashboard's light/dark mode + interface colors (saved offline).
   useEffect(() => {
@@ -490,6 +492,15 @@ export function App() {
     [accessContext],
   );
 
+  const appearanceAccess = useMemo(
+    () =>
+      resolveOfflineAppearanceAccess(
+        accessContext.personalAccountPlanLabel ?? accessContext.personalPlanLabel,
+        accessContext.personalHasTeamTierPlan,
+      ),
+    [accessContext],
+  );
+
   const deckWorkspaceInput = useMemo(
     (): DeckWorkspaceContextInput => ({
       workspaces: accessContext.workspaces,
@@ -602,7 +613,7 @@ export function App() {
         onOpen={openLiveApp}
         onSync={handleSync}
         syncing={syncing}
-        onSettings={() => setShowSettings(true)}
+        appearanceAccess={appearanceAccess}
         viewerDisplayName={accessContext.viewerDisplayName}
         viewerEmail={accessContext.viewerEmail}
         accountPlanLabel={accountPlanDisplay.plan}
@@ -649,7 +660,6 @@ export function App() {
           }}
         />
       )}
-      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
@@ -659,7 +669,7 @@ function Topbar({
   onOpen,
   onSync,
   syncing,
-  onSettings,
+  appearanceAccess,
   viewerDisplayName,
   viewerEmail,
   accountPlanLabel,
@@ -669,7 +679,7 @@ function Topbar({
   onOpen: () => void;
   onSync: () => void;
   syncing: boolean;
-  onSettings?: () => void;
+  appearanceAccess?: { isPro: boolean; hasProPlusInterfacePalette: boolean };
   viewerDisplayName?: string;
   viewerEmail?: string | null;
   accountPlanLabel?: string;
@@ -703,17 +713,10 @@ function Topbar({
         >
           Online Dashboard
         </button>
-        {onSettings ? (
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={onSettings}
-            aria-label="Settings"
-            title="Settings"
-          >
-            ⚙
-          </button>
-        ) : null}
+        <SettingsMenu
+          isPro={appearanceAccess?.isPro}
+          hasProPlusInterfacePalette={appearanceAccess?.hasProPlusInterfacePalette}
+        />
         <AccountMenu
           displayName={viewerDisplayName}
           email={viewerEmail}

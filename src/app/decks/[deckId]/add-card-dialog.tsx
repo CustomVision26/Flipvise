@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useTransition, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -41,6 +42,12 @@ import {
   generateMultipleChoiceAction,
   uploadCardImageAction,
 } from "@/actions/cards";
+import { AI_GENERATION_CAP_PER_DECK } from "@/lib/deck-limits";
+
+const FromSourceCardForm = dynamic(
+  () => import("./from-source-card-form").then((m) => m.FromSourceCardForm),
+  { ssr: false },
+);
 import {
   CheckCircle2,
   ChevronDown,
@@ -61,6 +68,11 @@ interface AddCardDialogProps {
   trigger?: React.ReactElement;
   isAtLimit?: boolean;
   hasAI?: boolean;
+  /** Pro Plus or team-tier workspace — PDF and future document types. */
+  hasAdvancedSourceImport?: boolean;
+  aiGeneratedCount?: number;
+  totalCardCount?: number;
+  deckCardLimit?: number;
   /** Paid tiers — Free users only get the standard card format in this dialog. */
   allowsMultipleChoiceFormat?: boolean;
 }
@@ -1313,19 +1325,27 @@ export function AddCardDialog({
   trigger,
   isAtLimit = false,
   hasAI = false,
+  hasAdvancedSourceImport = false,
+  aiGeneratedCount = 0,
+  totalCardCount = 0,
+  deckCardLimit = 0,
   allowsMultipleChoiceFormat = true,
 }: AddCardDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"standard" | "multiple_choice">("standard");
+  const [tab, setTab] = useState<"standard" | "multiple_choice" | "from_source">("standard");
 
-  const effectiveTab = allowsMultipleChoiceFormat ? tab : "standard";
+  const effectiveTab = allowsMultipleChoiceFormat ? tab : tab === "multiple_choice" ? "standard" : tab;
+  const remainingAiSlots = Math.max(0, AI_GENERATION_CAP_PER_DECK - aiGeneratedCount);
+  const remainingDeckSlots = Math.max(0, deckCardLimit - totalCardCount);
+  const tabColumnCount =
+    hasAI && allowsMultipleChoiceFormat ? 3 : hasAI ? 2 : allowsMultipleChoiceFormat ? 2 : 1;
 
   useEffect(() => {
-    if (open && !allowsMultipleChoiceFormat) {
+    if (open && !allowsMultipleChoiceFormat && tab === "multiple_choice") {
       setTab("standard");
     }
-  }, [open, allowsMultipleChoiceFormat]);
+  }, [open, allowsMultipleChoiceFormat, tab]);
 
   if (isAtLimit) {
     return (
@@ -1376,7 +1396,7 @@ export function AddCardDialog({
           + Add Card
         </DialogTrigger>
       )}
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Add a new card</DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -1387,7 +1407,9 @@ export function AddCardDialog({
           </p>
           <DialogDescription className="text-xs sm:text-sm">
             {allowsMultipleChoiceFormat
-              ? "Choose a card format: a classic question-and-answer card, or a multiple-choice card."
+              ? hasAI
+                ? "Choose a card format, or import study material with AI."
+                : "Choose a card format: a classic question-and-answer card, or a multiple-choice card."
               : "On the Free plan, new cards use the standard question-and-answer format. Upgrade to Pro to add multiple-choice cards."}
           </DialogDescription>
         </DialogHeader>
@@ -1404,12 +1426,19 @@ export function AddCardDialog({
         <Tabs
           value={effectiveTab}
           onValueChange={(v) => {
-            if (!allowsMultipleChoiceFormat) return;
-            setTab(v as "standard" | "multiple_choice");
+            if (v === "multiple_choice" && !allowsMultipleChoiceFormat) return;
+            setTab(v as "standard" | "multiple_choice" | "from_source");
           }}
           className="gap-3"
         >
-          <TabsList className="w-full grid grid-cols-2 h-9">
+          <TabsList
+            className={cn(
+              "w-full grid h-9",
+              tabColumnCount === 3 && "grid-cols-3",
+              tabColumnCount === 2 && "grid-cols-2",
+              tabColumnCount === 1 && "grid-cols-1",
+            )}
+          >
             <TabsTrigger value="standard">Standard</TabsTrigger>
             {allowsMultipleChoiceFormat ? (
               <TabsTrigger value="multiple_choice">Multiple Choice</TabsTrigger>
@@ -1448,6 +1477,7 @@ export function AddCardDialog({
                 </TooltipContent>
               </Tooltip>
             )}
+            {hasAI ? <TabsTrigger value="from_source">From source</TabsTrigger> : null}
           </TabsList>
 
           <TabsContent value="standard" keepMounted>
@@ -1467,6 +1497,19 @@ export function AddCardDialog({
               onCancel={handleCancel}
             />
           </TabsContent>
+
+          {hasAI ? (
+            <TabsContent value="from_source" keepMounted>
+              <FromSourceCardForm
+                deckId={deckId}
+                hasAdvancedSourceImport={hasAdvancedSourceImport}
+                remainingAiSlots={remainingAiSlots}
+                remainingDeckSlots={remainingDeckSlots}
+                onSuccess={handleSuccess}
+                onCancel={handleCancel}
+              />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </DialogContent>
     </Dialog>

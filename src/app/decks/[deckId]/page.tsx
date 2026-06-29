@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getAccessContext } from "@/lib/access";
+import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import Link from "next/link";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ interface DeckPageProps {
 }
 
 export default async function DeckPage({ params, searchParams }: DeckPageProps) {
-  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
+  const { userId, hasAI, hasAiReading, maxCardsPerDeck } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -96,6 +97,10 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
   });
   const paidDeckCards = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
   const effectiveAI = hasAI || teamTierPro;
+  const effectiveAdvancedSourceImport = canUseAdvancedSourceImport({
+    hasAiReading,
+    teamTierProWorkspace: teamTierPro,
+  });
   const isFreePlan = !paidDeckCards;
   const isAtCardLimit = cards.length >= deckCardLimit;
 
@@ -278,6 +283,10 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             deckName={deck.name}
             isAtLimit={isAtCardLimit}
             hasAI={effectiveAI}
+            hasAdvancedSourceImport={effectiveAdvancedSourceImport}
+            aiGeneratedCount={aiGeneratedCount}
+            totalCardCount={cards.length}
+            deckCardLimit={deckCardLimit}
             allowsMultipleChoiceFormat={paidDeckCards}
           />
         </div>
@@ -304,6 +313,10 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               deckName={deck.name}
               isAtLimit={isAtCardLimit}
               hasAI={effectiveAI}
+              hasAdvancedSourceImport={effectiveAdvancedSourceImport}
+              aiGeneratedCount={aiGeneratedCount}
+              totalCardCount={cards.length}
+              deckCardLimit={deckCardLimit}
               allowsMultipleChoiceFormat={paidDeckCards}
               trigger={<Button>Add your first card</Button>}
             />

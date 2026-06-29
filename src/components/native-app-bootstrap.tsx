@@ -62,8 +62,10 @@ export function NativeAppBootstrap() {
           const root = document.documentElement;
           const cs = getComputedStyle(root);
           const read = (name: string) => cs.getPropertyValue(name).trim() || null;
+          const uiTheme = root.dataset.uiTheme?.trim();
           await s.setOfflineThemePrefs({
             mode: root.classList.contains("light") ? "light" : "dark",
+            interfaceId: uiTheme && uiTheme !== "neutral" ? uiTheme : null,
             background: read("--background"),
             foreground: read("--foreground"),
             card: read("--card"),

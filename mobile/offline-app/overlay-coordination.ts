@@ -1,7 +1,7 @@
 /** Keeps the account menu and workspace selector from staying open together. */
 export const OFFLINE_OVERLAY_OPEN = "flipvise:offline-overlay-open";
 
-export type OfflineOverlaySource = "account" | "workspace";
+export type OfflineOverlaySource = "account" | "workspace" | "settings";
 
 export function notifyOfflineOverlayOpen(source: OfflineOverlaySource): void {
   window.dispatchEvent(
