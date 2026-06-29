@@ -134,13 +134,30 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
   try {
-    const result = await parser.getText();
-    return result.text ?? "";
-  } finally {
-    await parser.destroy();
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return result.text ?? "";
+    } finally {
+      await parser.destroy();
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/password|encrypted/i.test(msg)) {
+      throw new Error(
+        "This PDF is password-protected. Remove the password, then upload again.",
+      );
+    }
+    if (/Invalid PDF/i.test(msg)) {
+      throw new Error(
+        "Could not read this PDF. Use a file with selectable text (not a scanned image-only PDF).",
+      );
+    }
+    throw new Error(
+      "Could not extract text from this PDF. Try a smaller file or export the document as plain text.",
+    );
   }
 }
 

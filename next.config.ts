@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // pdf-parse / pdfjs must run natively on the server (not bundled for edge).
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+
   // Tree-shake large icon / UI libraries at build time — reduces JS sent to the browser
   experimental: {
     optimizePackageImports: [

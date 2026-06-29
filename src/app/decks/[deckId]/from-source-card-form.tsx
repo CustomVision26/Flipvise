@@ -17,6 +17,11 @@ import {
   commitImportedCardsAction,
   generateCardsFromSourceAction,
 } from "@/actions/cards";
+import {
+  generateCardsFromUploadFile,
+  mapSourceImportNetworkError,
+  type SourceImportProgress,
+} from "@/lib/source-import-client";
 import type { ImportedCardPreview } from "@/lib/source-import-types";
 import { AI_GENERATION_CAP_PER_DECK } from "@/lib/deck-limits";
 import {
@@ -104,6 +109,7 @@ export function FromSourceCardForm({
   const [reviewRows, setReviewRows] = useState<ReviewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [relevanceWarning, setRelevanceWarning] = useState<string | null>(null);
+  const [generateStep, setGenerateStep] = useState<SourceImportProgress | null>(null);
   const [isGenerating, startGenerate] = useTransition();
   const [isCommitting, startCommit] = useTransition();
 
@@ -162,6 +168,7 @@ export function FromSourceCardForm({
     if (!forceDespiteWarning) setRelevanceWarning(null);
     startGenerate(async () => {
       try {
+        setGenerateStep(null);
         const formData = new FormData();
         formData.set("deckId", String(deckId));
         formData.set("count", String(cardCount));
@@ -175,7 +182,20 @@ export function FromSourceCardForm({
         } else {
           throw new Error("Choose a source type and provide a URL or file.");
         }
-        const result = await generateCardsFromSourceAction(formData);
+
+        const result =
+          file != null
+            ? await generateCardsFromUploadFile({
+                deckId,
+                count: cardCount,
+                file,
+                skipRelevanceCheck: forceDespiteWarning,
+                onProgress: setGenerateStep,
+              })
+            : await generateCardsFromSourceAction(formData);
+
+        setGenerateStep(null);
+
         if (result.status === "relevance_warning") {
           setRelevanceWarning(result.warning);
           return;
@@ -191,8 +211,9 @@ export function FromSourceCardForm({
           })),
         );
       } catch (err) {
+        setGenerateStep(null);
         setReviewRows(null);
-        setError(err instanceof Error ? err.message : "Generation failed. Please try again.");
+        setError(mapSourceImportNetworkError(err));
       }
     });
   }
@@ -540,7 +561,13 @@ export function FromSourceCardForm({
             className="w-full sm:w-auto gap-2"
           >
             <Sparkles className="h-4 w-4" />
-            {isGenerating ? "Generating…" : "Generate for review"}
+            {isGenerating
+              ? generateStep === "reading"
+                ? "Reading file…"
+                : generateStep === "generating"
+                  ? "Generating cards…"
+                  : "Generating…"
+              : "Generate for review"}
           </Button>
         </div>
 

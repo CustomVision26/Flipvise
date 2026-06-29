@@ -32,6 +32,7 @@ import {
   importedCardPreviewSchema,
   type GenerateCardsFromSourceResult,
 } from "@/lib/source-import-types";
+import type { ExtractedSource } from "@/lib/document-extract";
 
 async function requireDeckEditor(userId: string, deckId: number) {
   const bundle = await getDeckWithViewerAccess(deckId, userId);
@@ -1184,21 +1185,20 @@ async function assertSourceImportLimits(
   return { existingCards, deckCardLimit, paidCardTier };
 }
 
-/**
- * Extract text from a URL or uploaded file (ephemeral — nothing is stored) and
- * generate flashcards for user review. Pro: URL + TXT. Pro Plus: + enabled document types.
- */
-export async function generateCardsFromSourceAction(
-  formData: FormData,
+/** Generate flashcards from already-extracted source text (used by API routes and the form action). */
+export async function generateCardsFromExtractedSource(
+  userId: string,
+  input: {
+    deckId: number;
+    count: number;
+    extracted: ExtractedSource;
+    skipRelevanceCheck: boolean;
+  },
 ): Promise<GenerateCardsFromSourceResult> {
-  const { userId, hasAI, hasAiReading, maxCardsPerDeck } = await getAccessContext();
+  const { hasAI, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
-  const deckId = Number(formData.get("deckId"));
-  const count = Number(formData.get("count"));
-  const urlRaw = String(formData.get("url") ?? "").trim();
-  const file = formData.get("file");
-  const skipRelevanceCheck = formData.get("skipRelevanceCheck") === "true";
+  const { deckId, count, extracted, skipRelevanceCheck } = input;
 
   if (!Number.isInteger(deckId) || deckId <= 0) throw new Error("Invalid deck.");
   if (!Number.isInteger(count) || count < 1 || count > AI_GENERATION_CAP_PER_DECK) {
@@ -1210,34 +1210,6 @@ export async function generateCardsFromSourceAction(
   const effectiveAI = hasAI || teamTierPro;
   if (!effectiveAI) {
     throw new Error("Import and AI generation from sources requires a Pro plan.");
-  }
-
-  const advancedImport = canUseAdvancedSourceImport({
-    hasAiReading,
-    teamTierProWorkspace: teamTierPro,
-  });
-
-  const hasFile = file instanceof File && file.size > 0;
-  const hasUrl = urlRaw.length > 0;
-  if (hasFile === hasUrl) {
-    throw new Error("Provide either a website URL or one file — not both.");
-  }
-
-  const {
-    assertFormatAllowedForPlan,
-    extractTextFromFile,
-    extractTextFromUrl,
-    resolveFileSourceFormat,
-  } = await import("@/lib/document-extract");
-
-  let extracted;
-  if (hasUrl) {
-    extracted = await extractTextFromUrl(urlRaw);
-  } else {
-    const uploadFile = file as File;
-    const format = resolveFileSourceFormat(uploadFile);
-    assertFormatAllowedForPlan(format, advancedImport);
-    extracted = await extractTextFromFile(uploadFile);
   }
 
   const { existingCards } = await assertSourceImportLimits(
@@ -1309,6 +1281,70 @@ Generate exactly ${count} new flashcards from the source material above. They mu
   }
 
   return { status: "ok", cards: trimmed };
+}
+
+/**
+ * Extract text from a URL or uploaded file (ephemeral — nothing is stored) and
+ * generate flashcards for user review. Pro: URL + TXT. Pro Plus: + enabled document types.
+ */
+export async function generateCardsFromSourceAction(
+  formData: FormData,
+): Promise<GenerateCardsFromSourceResult> {
+  const { userId, hasAI, hasAiReading } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const deckId = Number(formData.get("deckId"));
+  const count = Number(formData.get("count"));
+  const urlRaw = String(formData.get("url") ?? "").trim();
+  const file = formData.get("file");
+  const skipRelevanceCheck = formData.get("skipRelevanceCheck") === "true";
+
+  if (!Number.isInteger(deckId) || deckId <= 0) throw new Error("Invalid deck.");
+  if (!Number.isInteger(count) || count < 1 || count > AI_GENERATION_CAP_PER_DECK) {
+    throw new Error(`Enter a card count between 1 and ${AI_GENERATION_CAP_PER_DECK}.`);
+  }
+
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const effectiveAI = hasAI || teamTierPro;
+  if (!effectiveAI) {
+    throw new Error("Import and AI generation from sources requires a Pro plan.");
+  }
+
+  const advancedImport = canUseAdvancedSourceImport({
+    hasAiReading,
+    teamTierProWorkspace: teamTierPro,
+  });
+
+  const hasFile = file instanceof File && file.size > 0;
+  const hasUrl = urlRaw.length > 0;
+  if (hasFile === hasUrl) {
+    throw new Error("Provide either a website URL or one file — not both.");
+  }
+
+  const {
+    assertFormatAllowedForPlan,
+    extractTextFromFile,
+    extractTextFromUrl,
+    resolveFileSourceFormat,
+  } = await import("@/lib/document-extract");
+
+  let extracted: ExtractedSource;
+  if (hasUrl) {
+    extracted = await extractTextFromUrl(urlRaw);
+  } else {
+    const uploadFile = file as File;
+    const format = resolveFileSourceFormat(uploadFile);
+    assertFormatAllowedForPlan(format, advancedImport);
+    extracted = await extractTextFromFile(uploadFile);
+  }
+
+  return generateCardsFromExtractedSource(userId, {
+    deckId,
+    count,
+    extracted,
+    skipRelevanceCheck,
+  });
 }
 
 /** Persist user-approved cards from the source-import review step. */
