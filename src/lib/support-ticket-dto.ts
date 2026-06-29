@@ -8,6 +8,7 @@ export type SerializedTicketMessage = {
   authorName: string;
   authorRole: "admin" | "user";
   message: string;
+  imageUrl: string | null;
   createdAt: string;
 };
 
@@ -21,6 +22,7 @@ export function serializeSupportTicketMessageRow(
     authorName: row.authorName,
     authorRole: row.authorRole,
     message: row.message,
+    imageUrl: row.imageUrl ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }

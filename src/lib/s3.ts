@@ -112,6 +112,27 @@ export async function uploadSupportAttachmentToS3(options: UploadSupportAttachme
   return uploadImageFileToS3({ key, file });
 }
 
+export interface UploadSupportTicketChatImageOptions {
+  ticketId: number;
+  file: File;
+}
+
+export async function uploadSupportTicketChatImageToS3(
+  options: UploadSupportTicketChatImageOptions,
+): Promise<string> {
+  const { ticketId, file } = options;
+
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const extension = file.name.includes(".")
+    ? file.name.substring(file.name.lastIndexOf("."))
+    : "";
+  const fileName = `image-${timestamp}-${randomString}${extension}`;
+  const key = `support-ticket-chat/${ticketId}/${fileName}`;
+
+  return uploadImageFileToS3({ key, file });
+}
+
 export interface UploadContactUsChatImageOptions {
   messageId: number;
   file: File;

@@ -59,10 +59,15 @@ const updateStatusSchema = z.object({
   status: z.enum(["open", "in_progress", "resolved", "closed"]),
 });
 
-const replySchema = z.object({
-  ticketId: z.number().int().positive(),
-  message: z.string().min(1, "Reply cannot be empty").max(5000),
-});
+const replySchema = z
+  .object({
+    ticketId: z.number().int().positive(),
+    message: z.string().trim().max(5000).optional().default(""),
+    imageUrl: z.string().url().max(2000).nullable().optional(),
+  })
+  .refine((data) => data.message.trim().length > 0 || Boolean(data.imageUrl), {
+    message: "Add a message or attach an image",
+  });
 
 const ticketIdSchema = z.object({
   ticketId: z.number().int().positive(),
@@ -168,6 +173,7 @@ export async function adminReplyToTicketAction(
     authorName: name,
     authorRole: "admin",
     message: parsed.data.message.trim(),
+    imageUrl: parsed.data.imageUrl ?? null,
   });
   if (!ticket || !reply) throw new Error("Ticket not found");
 
@@ -181,7 +187,7 @@ export async function adminReplyToTicketAction(
     ticketId: next.id,
     recipientUserId: next.userId,
     subject: next.subject,
-    message: parsed.data.message,
+    message: parsed.data.message.trim() || "[Image attachment]",
     adminName: name,
   });
 

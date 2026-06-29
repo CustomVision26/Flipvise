@@ -34,6 +34,7 @@
     "db:ensure-subscription-checkout-inbox": "tsx scripts/ensure-subscription-checkout-inbox-table.ts",
     "db:ensure-support-ticket-messaging": "tsx scripts/ensure-support-ticket-messaging.ts",
     "db:ensure-contact-us-reply-images": "tsx scripts/ensure-contact-us-reply-images.ts",
+    "db:ensure-support-ticket-reply-images": "tsx scripts/ensure-support-ticket-reply-images.ts",
     "db:ensure-contact-us-guest-chat-presence": "tsx scripts/ensure-contact-us-guest-chat-presence.ts",
     "db:ensure-affiliate-referral-quota-columns": "tsx scripts/ensure-affiliate-referral-quota-columns.ts",
     "db:ensure-device-sync-tokens": "tsx scripts/ensure-device-sync-tokens.ts",

@@ -1,6 +1,50 @@
 import { db } from "@/db";
 import { supportTickets, supportTicketReplies } from "@/db/schema";
 import { eq, desc, count, sql, and } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
+import {
+  isMissingSupportTicketReplyImageUrlColumnError,
+  warnMissingSupportTicketReplyImageUrlColumnOnce,
+} from "@/lib/support-ticket-db-fallback";
+
+type SupportTicketReplyRow = InferSelectModel<typeof supportTicketReplies>;
+
+const supportTicketReplyRowSelectLegacy = {
+  id: supportTicketReplies.id,
+  ticketId: supportTicketReplies.ticketId,
+  authorUserId: supportTicketReplies.authorUserId,
+  authorName: supportTicketReplies.authorName,
+  authorRole: supportTicketReplies.authorRole,
+  adminId: supportTicketReplies.adminId,
+  adminName: supportTicketReplies.adminName,
+  message: supportTicketReplies.message,
+  createdAt: supportTicketReplies.createdAt,
+} as const;
+
+function withDefaultReplyImageUrl(
+  row: Omit<SupportTicketReplyRow, "imageUrl">,
+): SupportTicketReplyRow {
+  return { ...row, imageUrl: null };
+}
+
+async function listRepliesForTicket(ticketId: number): Promise<SupportTicketReplyRow[]> {
+  try {
+    return await db
+      .select()
+      .from(supportTicketReplies)
+      .where(eq(supportTicketReplies.ticketId, ticketId))
+      .orderBy(supportTicketReplies.createdAt);
+  } catch (error) {
+    if (!isMissingSupportTicketReplyImageUrlColumnError(error)) throw error;
+    warnMissingSupportTicketReplyImageUrlColumnOnce();
+    const rows = await db
+      .select(supportTicketReplyRowSelectLegacy)
+      .from(supportTicketReplies)
+      .where(eq(supportTicketReplies.ticketId, ticketId))
+      .orderBy(supportTicketReplies.createdAt);
+    return rows.map(withDefaultReplyImageUrl);
+  }
+}
 
 function isMissingSupportTicketsTableError(error: unknown): boolean {
   let current: unknown = error;
@@ -147,11 +191,7 @@ export async function getTicketWithReplies(ticketId: number) {
 
   if (!ticket) return null;
 
-  const replies = await db
-    .select()
-    .from(supportTicketReplies)
-    .where(eq(supportTicketReplies.ticketId, ticketId))
-    .orderBy(supportTicketReplies.createdAt);
+  const replies = await listRepliesForTicket(ticketId);
 
   return { ticket, replies };
 }
@@ -162,20 +202,46 @@ export async function addTicketReply(params: {
   authorName: string;
   authorRole: "admin" | "user";
   message: string;
+  imageUrl?: string | null;
 }) {
   // neon-http driver does not support transactions — insert reply then touch ticket row.
-  const [reply] = await db
-    .insert(supportTicketReplies)
-    .values({
-      ticketId: params.ticketId,
-      authorUserId: params.authorUserId,
-      authorName: params.authorName,
-      authorRole: params.authorRole,
-      adminId: params.authorRole === "admin" ? params.authorUserId : null,
-      adminName: params.authorRole === "admin" ? params.authorName : null,
-      message: params.message,
-    })
-    .returning();
+  let reply: SupportTicketReplyRow | undefined;
+  try {
+    [reply] = await db
+      .insert(supportTicketReplies)
+      .values({
+        ticketId: params.ticketId,
+        authorUserId: params.authorUserId,
+        authorName: params.authorName,
+        authorRole: params.authorRole,
+        adminId: params.authorRole === "admin" ? params.authorUserId : null,
+        adminName: params.authorRole === "admin" ? params.authorName : null,
+        message: params.message,
+        imageUrl: params.imageUrl ?? null,
+      })
+      .returning();
+  } catch (error) {
+    if (!isMissingSupportTicketReplyImageUrlColumnError(error)) throw error;
+    if (params.imageUrl) {
+      throw new Error(
+        "Image attachments need a database update. Run: npm run db:ensure-support-ticket-reply-images",
+      );
+    }
+    warnMissingSupportTicketReplyImageUrlColumnOnce();
+    [reply] = await db
+      .insert(supportTicketReplies)
+      .values({
+        ticketId: params.ticketId,
+        authorUserId: params.authorUserId,
+        authorName: params.authorName,
+        authorRole: params.authorRole,
+        adminId: params.authorRole === "admin" ? params.authorUserId : null,
+        adminName: params.authorRole === "admin" ? params.authorName : null,
+        message: params.message,
+      })
+      .returning();
+    reply = withDefaultReplyImageUrl(reply!);
+  }
   const [ticket] = await db
     .update(supportTickets)
     .set({ updatedAt: new Date() })

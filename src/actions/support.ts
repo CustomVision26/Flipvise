@@ -107,10 +107,15 @@ const ticketIdSchema = z.object({
   ticketId: z.number().int().positive(),
 });
 
-const userReplySchema = z.object({
-  ticketId: z.number().int().positive(),
-  message: z.string().min(1, "Message cannot be empty").max(5000),
-});
+const userReplySchema = z
+  .object({
+    ticketId: z.number().int().positive(),
+    message: z.string().trim().max(5000).optional().default(""),
+    imageUrl: z.string().url().max(2000).nullable().optional(),
+  })
+  .refine((data) => data.message.trim().length > 0 || Boolean(data.imageUrl), {
+    message: "Add a message or attach an image",
+  });
 
 export async function uploadSupportAttachmentAction(formData: FormData): Promise<string> {
   const { userId } = await auth();
@@ -278,12 +283,15 @@ export async function replyToMySupportTicketAction(data: z.infer<typeof userRepl
   if (ticket.status === "closed") throw new Error("This ticket is closed.");
 
   const displayName = userName ?? "You";
+  const messageText = parsed.data.message.trim();
+  const imageUrl = parsed.data.imageUrl ?? null;
   const { ticket: updated, reply } = await addTicketReply({
     ticketId: ticket.id,
     authorUserId: userId,
     authorName: displayName,
     authorRole: "user",
-    message: parsed.data.message.trim(),
+    message: messageText,
+    imageUrl,
   });
   if (!updated || !reply) throw new Error("Failed to send reply");
 
@@ -294,7 +302,7 @@ export async function replyToMySupportTicketAction(data: z.infer<typeof userRepl
   await notifyAdminsOfUserTicketReply({
     ticketId: ticket.id,
     subject: ticket.subject,
-    message: parsed.data.message,
+    message: messageText || "[Image attachment]",
     userName: displayName,
   });
 

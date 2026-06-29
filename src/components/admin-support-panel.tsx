@@ -250,10 +250,11 @@ function TicketDetailSheet({
     loadThread();
   }, [open, loadThread]);
 
-  async function handleSendReply(message: string) {
+  async function handleSendReply(payload: { message: string; imageUrl?: string | null }) {
     const { ticket: next, message: reply } = await adminReplyToTicketAction({
       ticketId: ticket.id,
-      message,
+      message: payload.message,
+      imageUrl: payload.imageUrl,
     });
     onTicketUpdated(next);
     setThreadTicket((prev) =>

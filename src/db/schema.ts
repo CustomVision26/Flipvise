@@ -365,6 +365,8 @@ export const supportTicketReplies = pgTable('support_ticket_replies', {
   adminId: varchar({ length: 255 }),
   adminName: varchar({ length: 255 }),
   message: text().notNull(),
+  /** Optional image attached to this reply (S3 URL). */
+  imageUrl: text(),
   createdAt: timestamp().notNull().defaultNow(),
 });
 

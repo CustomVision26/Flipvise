@@ -164,10 +164,11 @@ export function HelpCenterMyTickets() {
                 ticket={threadTicket}
                 messages={messages}
                 viewerRole="user"
-                onSendReply={async (message) => {
+                onSendReply={async (payload) => {
                   const res = await replyToMySupportTicketAction({
                     ticketId: threadTicket.id,
-                    message,
+                    message: payload.message,
+                    imageUrl: payload.imageUrl,
                   });
                   setThreadTicket(res.ticket);
                   setMessages((prev) => [...prev, res.message]);
