@@ -1,8 +1,9 @@
 name: Android Firebase
 
-# Builds the Capacitor Android app (debug APK) and distributes it to testers via
-# Firebase App Distribution. Trigger manually from the Actions tab or by pushing
-# a tag like `android-v1.0.0`.
+# Builds the Capacitor Android app (release APK) and distributes it to testers via
+# Firebase App Distribution. Trigger manually from the Actions tab, by pushing
+# a tag like `android-v1.0.0`, or automatically on pushes to `main` that touch
+# mobile/Android-related files (same pattern as iOS TestFlight).
 on:
   workflow_dispatch:
     inputs:
@@ -21,6 +22,18 @@ on:
   push:
     tags:
       - "android-v*"
+    branches:
+      - main
+    paths:
+      - ".github/workflows/android.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.ts"
+      - "mobile/**"
+      - "android/**"
+      - "fastlane/**"
+      - "Gemfile"
+      - "Gemfile.lock"
 
 concurrency:
   group: android-firebase-${{ github.ref }}
