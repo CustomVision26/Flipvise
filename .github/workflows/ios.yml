@@ -82,6 +82,9 @@ jobs:
           ruby-version: "3.3"
           bundler-cache: true
 
+      - name: Install fastlane plugins
+        run: bundle exec fastlane install_plugins
+
       - name: Materialize App Store Connect API key
         env:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
