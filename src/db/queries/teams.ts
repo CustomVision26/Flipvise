@@ -179,12 +179,14 @@ export function isMissingTeamInvitationInviteeDisplayNameColumnError(
 
 let warnedMissingInviteeDisplayNameColumn = false;
 
-function warnMissingInviteeDisplayNameColumnOnce() {
-  if (process.env.NODE_ENV !== "development") return;
+function warnMissingInviteeDisplayNameColumnOnce(droppedDisplayName = false) {
   if (warnedMissingInviteeDisplayNameColumn) return;
   warnedMissingInviteeDisplayNameColumn = true;
+  const suffix = droppedDisplayName
+    ? " Invitee display names will not be stored until the migration runs."
+    : "";
   console.warn(
-    "[db] team_invitations is missing inviteeDisplayName. Run: npm run db:migrate:local (or db:push:local) or apply drizzle/0017_team_invitation_invitee_display_name.sql",
+    `[db] team_invitations is missing inviteeDisplayName. Run: npm run db:migrate:local (or db:push:local) or apply drizzle/0017_team_invitation_invitee_display_name.sql.${suffix}`,
   );
 }
 
@@ -1423,13 +1425,10 @@ export async function insertTeamInvitation(
       status: "pending",
     });
   } catch (e) {
-    if (
-      !isMissingTeamInvitationInviteeDisplayNameColumnError(e) ||
-      (label && label.length > 0)
-    ) {
+    if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) {
       throw e;
     }
-    warnMissingInviteeDisplayNameColumnOnce();
+    warnMissingInviteeDisplayNameColumnOnce(Boolean(label && label.length > 0));
     await db.insert(teamInvitations).values({
       teamId,
       invitedByUserId,

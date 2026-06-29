@@ -32,6 +32,7 @@ import { useOnlineStatus } from "@/lib/use-online-status";
 import { getUnsupportedImportUrlReason } from "@/lib/source-import-url-validation";
 import { cn } from "@/lib/utils";
 import {
+  ArrowUpDown,
   Camera,
   FileText,
   FileType,
@@ -42,7 +43,14 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-type ReviewRow = ImportedCardPreview & { id: string; selected: boolean };
+type ReviewRow = ImportedCardPreview & {
+  id: string;
+  selected: boolean;
+  /** AI-generated question — kept for quiz distractor generation after a front/back swap. */
+  originalFront: string;
+  /** AI-generated answer — paired with originalFront for quiz distractor generation. */
+  originalBack: string;
+};
 
 interface FromSourceCardFormProps {
   deckId: number;
@@ -178,6 +186,8 @@ export function FromSourceCardForm({
             ...c,
             id: `row-${i}-${Date.now()}`,
             selected: true,
+            originalFront: c.front,
+            originalBack: c.back,
           })),
         );
       } catch (err) {
@@ -202,6 +212,8 @@ export function FromSourceCardForm({
           cards: selected.map((r) => ({
             front: r.front.trim(),
             back: r.back.trim(),
+            distractorQuestion: r.originalFront.trim(),
+            distractorAnswer: r.originalBack.trim(),
           })),
         });
         onSuccess();
@@ -214,6 +226,13 @@ export function FromSourceCardForm({
   function updateRow(id: string, patch: Partial<Pick<ReviewRow, "front" | "back" | "selected">>) {
     setReviewRows((rows) =>
       rows?.map((r) => (r.id === id ? { ...r, ...patch } : r)) ?? null,
+    );
+  }
+
+  function swapRowFrontBack(id: string) {
+    setReviewRows(
+      (rows) =>
+        rows?.map((r) => (r.id === id ? { ...r, front: r.back, back: r.front } : r)) ?? null,
     );
   }
 
@@ -264,8 +283,10 @@ export function FromSourceCardForm({
     return (
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Review AI-generated cards. Uncheck any you do not want, edit front or back, then add the
-          selected cards to your deck. Three quiz wrong answers are generated for each saved card.
+          Review AI-generated cards. Uncheck any you do not want, edit front or back, or use{" "}
+          <span className="font-medium text-foreground">Swap</span> to flip question and answer on
+          the card. Three quiz wrong answers are still generated from the original question when
+          you save.
         </p>
 
         <div className="space-y-3 max-h-[min(50vh,22rem)] overflow-y-auto pr-1">
@@ -297,6 +318,19 @@ export function FromSourceCardForm({
                   rows={2}
                   className="text-sm min-h-[2.5rem] resize-y"
                 />
+              </div>
+              <div className="flex justify-center py-0.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => swapRowFrontBack(row.id)}
+                  aria-label={`Swap front and back for card ${index + 1}`}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  Swap
+                </Button>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">

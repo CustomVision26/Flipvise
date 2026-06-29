@@ -171,7 +171,12 @@ export function TeamInviteForm({
       setEmail("");
       setInviteeDisplayName("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const raw = err instanceof Error ? err.message : "Something went wrong";
+      setError(
+        raw.includes("Server Components render")
+          ? "Could not send the invitation. Please try again, or contact support if the problem continues."
+          : raw,
+      );
     } finally {
       setPending(false);
     }

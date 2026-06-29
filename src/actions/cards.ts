@@ -1103,6 +1103,10 @@ const commitImportedCardsSchema = z.object({
       z.object({
         front: z.string().min(1),
         back: z.string().min(1),
+        /** Original AI question — used for quiz distractor generation when front/back are swapped. */
+        distractorQuestion: z.string().min(1).optional(),
+        /** Original AI answer — paired with distractorQuestion for quiz distractor generation. */
+        distractorAnswer: z.string().min(1).optional(),
       }),
     )
     .min(1),
@@ -1333,7 +1337,14 @@ export async function commitImportedCardsAction(
   for (const card of cards) {
     const front = card.front.trim();
     const back = card.back.trim();
-    const [d1, d2, d3] = await generateStandardDistractors(deck, existingCards, front, back);
+    const distractorQuestion = card.distractorQuestion?.trim() ?? front;
+    const distractorAnswer = card.distractorAnswer?.trim() ?? back;
+    const [d1, d2, d3] = await generateStandardDistractors(
+      deck,
+      existingCards,
+      distractorQuestion,
+      distractorAnswer,
+    );
     payload.push({ front, back, distractors: [d1, d2, d3] });
   }
 
