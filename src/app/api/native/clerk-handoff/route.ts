@@ -49,16 +49,16 @@ function isNativeWebViewOrigin(origin: string | null): boolean {
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
-  if (isNativeWebViewOrigin(origin)) {
-    return {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Authorization, Content-Type",
-      "Access-Control-Max-Age": "86400",
-      Vary: "Origin",
-    };
+  if (!origin || !isNativeWebViewOrigin(origin)) {
+    return {};
   }
-  return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
 }
 
 export function OPTIONS(request: Request) {
