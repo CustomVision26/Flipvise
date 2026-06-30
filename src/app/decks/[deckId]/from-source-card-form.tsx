@@ -82,6 +82,22 @@ function maxGeneratableCount(remainingAiSlots: number, remainingDeckSlots: numbe
   return Math.max(0, Math.min(remainingAiSlots, remainingDeckSlots, AI_GENERATION_CAP_PER_DECK));
 }
 
+const DEFAULT_SOURCE_CARD_COUNT = 5;
+
+function parseCardCountInput(input: string, maxCount: number): number | null {
+  const trimmed = input.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n < 1) return null;
+  if (maxCount <= 0) return null;
+  return Math.min(maxCount, n);
+}
+
+function defaultCardCountInput(maxCount: number): string {
+  if (maxCount <= 0) return "1";
+  return String(Math.min(DEFAULT_SOURCE_CARD_COUNT, maxCount));
+}
+
 function isFileSourceAvailable(
   id: FileSourcePickerId,
   hasAdvancedSourceImport: boolean,
@@ -105,7 +121,9 @@ export function FromSourceCardForm({
   const [sourceMode, setSourceMode] = useState<SourcePickerId | null>(null);
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [cardCount, setCardCount] = useState(5);
+  const [cardCountInput, setCardCountInput] = useState(() =>
+    defaultCardCountInput(maxGeneratableCount(remainingAiSlots, remainingDeckSlots)),
+  );
   const [reviewRows, setReviewRows] = useState<ReviewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [relevanceWarning, setRelevanceWarning] = useState<string | null>(null);
@@ -115,12 +133,20 @@ export function FromSourceCardForm({
 
   const maxCount = maxGeneratableCount(remainingAiSlots, remainingDeckSlots);
   const atQuota = maxCount === 0;
+  const cardCount = parseCardCountInput(cardCountInput, maxCount);
 
   useEffect(() => {
-    if (maxCount > 0 && cardCount > maxCount) {
-      setCardCount(maxCount);
+    if (maxCount <= 0) return;
+    const parsed = parseCardCountInput(cardCountInput, maxCount);
+    if (parsed != null && parsed > maxCount) {
+      setCardCountInput(String(maxCount));
     }
-  }, [maxCount, cardCount]);
+  }, [maxCount, cardCountInput]);
+
+  function commitCardCountInput() {
+    const parsed = parseCardCountInput(cardCountInput, maxCount);
+    setCardCountInput(parsed != null ? String(parsed) : defaultCardCountInput(maxCount));
+  }
 
   const unsupportedUrlReason = useMemo(
     () => (sourceMode === "url" && url.trim() ? getUnsupportedImportUrlReason(url) : null),
@@ -131,7 +157,13 @@ export function FromSourceCardForm({
   const hasSource =
     sourceMode === "url" ? Boolean(url.trim()) : sourceMode !== null && Boolean(file);
   const canGenerate =
-    hasSource && !unsupportedUrlReason && !atQuota && online && !isBusy && sourceMode !== null;
+    hasSource &&
+    !unsupportedUrlReason &&
+    !atQuota &&
+    online &&
+    !isBusy &&
+    sourceMode !== null &&
+    cardCount != null;
 
   const selectedCount = reviewRows?.filter((r) => r.selected).length ?? 0;
 
@@ -171,6 +203,9 @@ export function FromSourceCardForm({
         setGenerateStep(null);
         const formData = new FormData();
         formData.set("deckId", String(deckId));
+        if (cardCount == null) {
+          throw new Error("Enter a valid number of cards to generate.");
+        }
         formData.set("count", String(cardCount));
         if (forceDespiteWarning) {
           formData.set("skipRelevanceCheck", "true");
@@ -487,16 +522,21 @@ export function FromSourceCardForm({
             </Label>
             <Input
               id="source-count"
-              type="number"
-              min={1}
-              max={maxCount || 1}
-              value={cardCount}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="off"
+              value={cardCountInput}
               onChange={(e) => {
-                const n = Number(e.target.value);
-                if (Number.isFinite(n)) setCardCount(Math.min(maxCount || 1, Math.max(1, n)));
+                const raw = e.target.value;
+                if (raw === "" || /^\d+$/.test(raw)) {
+                  setCardCountInput(raw);
+                }
               }}
+              onBlur={commitCardCountInput}
               disabled={isBusy || atQuota}
               className="text-sm w-full sm:w-28"
+              aria-invalid={cardCountInput.trim() !== "" && cardCount == null}
             />
             <p className="text-[11px] text-muted-foreground tabular-nums">
               {remainingAiSlots} AI slot{remainingAiSlots !== 1 ? "s" : ""} · {remainingDeckSlots}{" "}

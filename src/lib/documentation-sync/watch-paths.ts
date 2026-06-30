@@ -14,6 +14,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/decks/[deckId]/card-grid.tsx",
     "src/app/decks/[deckId]/edit-deck-dialog.tsx",
     "src/app/decks/[deckId]/generate-cards-button.tsx",
+    "src/app/decks/[deckId]/add-card-dialog.tsx",
+    "src/app/decks/[deckId]/from-source-card-form.tsx",
+    "src/actions/cards.ts",
   ],
   "personal-dashboard": ["src/components/offline-availability-button.tsx"],
   "offline-mobile": [

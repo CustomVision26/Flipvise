@@ -131,6 +131,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Add, edit, reorder, and delete cards.",
           "Generate cards with AI on eligible plans.",
+          "AI reads your deck name, description, and existing cards to match topic, tone, and format — add a few representative cards first for the most consistent results.",
+          "Empty decks have only the name and description to guide AI, so the first generated batch may be less predictable until you refine cards or add manual examples.",
+          "Batch generate, From source import, and Generate answer all use the same deck context and avoid duplicating cards already in the deck.",
           "Upload a deck cover image when your plan allows.",
           "Open Study to start flashcard review or quiz mode.",
           "AI generation needs an internet connection — the Generate button is disabled while offline.",

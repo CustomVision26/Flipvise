@@ -27,6 +27,21 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         ],
       },
       {
+        id: "ai-generation-quality",
+        title: "Getting reliable AI-generated cards",
+        paragraphs: [
+          "Whenever you use batch Generate, Add card → From source, or Generate answer, Flipvise builds context from your deck name, description, and a sample of cards already in that deck. The model treats those existing cards as the reference for subject scope, question style, answer length, and difficulty — so new cards feel like they belong in the same deck.",
+        ],
+        bullets: [
+          "Use a specific deck name and a short description that states the topic clearly (for example, \"AP Biology — cell division\" rather than a vague title like \"Bio\").",
+          "Add several representative cards by hand before your first large AI batch — even three to five well-written examples usually produces much more consistent output.",
+          "Keep your manual cards consistent in format (all definitions, all worked problems, and so on) so the AI can mirror that pattern.",
+          "AI generates new material within the deck topic and does not copy or trivially rephrase cards you already have.",
+          "If the deck is still empty, AI has only the name and description to work from, so the first batch may vary more until you edit results or add sample cards.",
+          "Math and problem-solving decks receive step-by-step worked answers; vocabulary and fact decks receive concise term-and-definition pairs.",
+        ],
+      },
+      {
         id: "access",
         title: "Access control",
         bullets: [
