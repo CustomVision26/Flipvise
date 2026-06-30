@@ -1097,6 +1097,12 @@ Generate the correct answer and 3 plausible wrong answers that match the deck's 
   };
 }
 
+const previewImportDistractorsSchema = z.object({
+  deckId: z.number().int().positive(),
+  distractorQuestion: z.string().min(1),
+  distractorAnswer: z.string().min(1),
+});
+
 const commitImportedCardsSchema = z.object({
   deckId: z.number().int().positive(),
   cards: z
@@ -1108,6 +1114,8 @@ const commitImportedCardsSchema = z.object({
         distractorQuestion: z.string().min(1).optional(),
         /** Original AI answer — paired with distractorQuestion for quiz distractor generation. */
         distractorAnswer: z.string().min(1).optional(),
+        /** User-reviewed quiz wrong answers from the import review step. */
+        distractors: z.array(z.string().min(1)).length(3).optional(),
       }),
     )
     .min(1),
@@ -1347,6 +1355,33 @@ export async function generateCardsFromSourceAction(
   });
 }
 
+/** Preview or regenerate quiz wrong answers during source-import review. */
+export async function previewImportDistractorsAction(
+  data: z.infer<typeof previewImportDistractorsSchema>,
+): Promise<{ distractors: [string, string, string] }> {
+  const { userId, hasAI } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = previewImportDistractorsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { deckId, distractorQuestion, distractorAnswer } = parsed.data;
+  const deck = await requireDeckEditor(userId, deckId);
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  if (!(hasAI || teamTierPro)) {
+    throw new Error("Import and AI generation from sources requires a Pro plan.");
+  }
+
+  const existingCards = await getCardsByDeckUnscoped(deckId);
+  const distractors = await generateStandardDistractors(
+    deck,
+    existingCards,
+    distractorQuestion.trim(),
+    distractorAnswer.trim(),
+  );
+  return { distractors };
+}
+
 /** Persist user-approved cards from the source-import review step. */
 export async function commitImportedCardsAction(
   data: CommitImportedCardsInput,
@@ -1373,15 +1408,24 @@ export async function commitImportedCardsAction(
   for (const card of cards) {
     const front = card.front.trim();
     const back = card.back.trim();
-    const distractorQuestion = card.distractorQuestion?.trim() ?? front;
-    const distractorAnswer = card.distractorAnswer?.trim() ?? back;
-    const [d1, d2, d3] = await generateStandardDistractors(
-      deck,
-      existingCards,
-      distractorQuestion,
-      distractorAnswer,
-    );
-    payload.push({ front, back, distractors: [d1, d2, d3] });
+    let distractors: [string, string, string];
+    if (card.distractors?.length === 3) {
+      distractors = [
+        cleanAiText(card.distractors[0]),
+        cleanAiText(card.distractors[1]),
+        cleanAiText(card.distractors[2]),
+      ];
+    } else {
+      const distractorQuestion = card.distractorQuestion?.trim() ?? front;
+      const distractorAnswer = card.distractorAnswer?.trim() ?? back;
+      distractors = await generateStandardDistractors(
+        deck,
+        existingCards,
+        distractorQuestion,
+        distractorAnswer,
+      );
+    }
+    payload.push({ front, back, distractors: [...distractors] });
   }
 
   await bulkCreateCards(deckId, payload, true);

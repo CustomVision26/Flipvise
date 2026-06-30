@@ -16,6 +16,7 @@ import {
 import {
   commitImportedCardsAction,
   generateCardsFromSourceAction,
+  previewImportDistractorsAction,
 } from "@/actions/cards";
 import {
   generateCardsFromUploadFile,
@@ -42,7 +43,9 @@ import {
   FileText,
   FileType,
   Link2,
+  Loader2,
   Presentation,
+  RefreshCw,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
@@ -55,7 +58,29 @@ type ReviewRow = ImportedCardPreview & {
   originalFront: string;
   /** AI-generated answer — paired with originalFront for quiz distractor generation. */
   originalBack: string;
+  /**
+   * When false (default), quiz distractors match the original back (answer) style.
+   * When true, roles flip — distractors match the original front (question / term) style.
+   * Useful after Swap when the saved back holds the short question or term.
+   */
+  distractorsFromOriginalFront: boolean;
+  /** True while AI is regenerating quiz wrong answers for preview. */
+  distractorsLoading: boolean;
 };
+
+function distractorContextForRow(
+  row: Pick<ReviewRow, "distractorsFromOriginalFront" | "originalFront" | "originalBack">,
+) {
+  return row.distractorsFromOriginalFront
+    ? {
+        distractorQuestion: row.originalBack.trim(),
+        distractorAnswer: row.originalFront.trim(),
+      }
+    : {
+        distractorQuestion: row.originalFront.trim(),
+        distractorAnswer: row.originalBack.trim(),
+      };
+}
 
 interface FromSourceCardFormProps {
   deckId: number;
@@ -166,6 +191,39 @@ export function FromSourceCardForm({
     cardCount != null;
 
   const selectedCount = reviewRows?.filter((r) => r.selected).length ?? 0;
+  const anyDistractorsLoading = reviewRows?.some((r) => r.selected && r.distractorsLoading) ?? false;
+
+  async function fetchDistractorsForRow(row: ReviewRow) {
+    const ctx = distractorContextForRow(row);
+    try {
+      const { distractors } = await previewImportDistractorsAction({
+        deckId,
+        ...ctx,
+      });
+      setReviewRows(
+        (rows) =>
+          rows?.map((r) =>
+            r.id === row.id
+              ? { ...r, distractors, distractorsLoading: false }
+              : r,
+          ) ?? null,
+      );
+    } catch (err) {
+      setReviewRows(
+        (rows) =>
+          rows?.map((r) => (r.id === row.id ? { ...r, distractorsLoading: false } : r)) ?? null,
+      );
+      setError(
+        err instanceof Error ? err.message : "Could not generate quiz wrong answers. Try again.",
+      );
+    }
+  }
+
+  function queueDistractorRegeneration(row: ReviewRow) {
+    queueMicrotask(() => {
+      void fetchDistractorsForRow(row);
+    });
+  }
 
   function clearSourceInput() {
     setUrl("");
@@ -243,6 +301,8 @@ export function FromSourceCardForm({
             selected: true,
             originalFront: c.front,
             originalBack: c.back,
+            distractorsFromOriginalFront: false,
+            distractorsLoading: false,
           })),
         );
       } catch (err) {
@@ -260,6 +320,13 @@ export function FromSourceCardForm({
       setError("Select at least one card with front and back text.");
       return;
     }
+    const missingDistractors = selected.some(
+      (r) => r.distractorsLoading || r.distractors.some((d) => !d.trim()),
+    );
+    if (missingDistractors) {
+      setError("Fill in all three quiz wrong answers for each selected card before saving.");
+      return;
+    }
     setError(null);
     startCommit(async () => {
       try {
@@ -268,8 +335,7 @@ export function FromSourceCardForm({
           cards: selected.map((r) => ({
             front: r.front.trim(),
             back: r.back.trim(),
-            distractorQuestion: r.originalFront.trim(),
-            distractorAnswer: r.originalBack.trim(),
+            distractors: r.distractors.map((d) => d.trim()) as [string, string, string],
           })),
         });
         onSuccess();
@@ -279,17 +345,74 @@ export function FromSourceCardForm({
     });
   }
 
-  function updateRow(id: string, patch: Partial<Pick<ReviewRow, "front" | "back" | "selected">>) {
+  function updateRow(
+    id: string,
+    patch: Partial<
+      Pick<
+        ReviewRow,
+        "front" | "back" | "selected" | "distractorsFromOriginalFront" | "distractorsLoading"
+      >
+    >,
+  ) {
     setReviewRows((rows) =>
       rows?.map((r) => (r.id === id ? { ...r, ...patch } : r)) ?? null,
     );
   }
 
-  function swapRowFrontBack(id: string) {
+  function updateDistractor(rowId: string, index: 0 | 1 | 2, value: string) {
     setReviewRows(
       (rows) =>
-        rows?.map((r) => (r.id === id ? { ...r, front: r.back, back: r.front } : r)) ?? null,
+        rows?.map((r) => {
+          if (r.id !== rowId) return r;
+          const next: [string, string, string] = [...r.distractors] as [string, string, string];
+          next[index] = value;
+          return { ...r, distractors: next };
+        }) ?? null,
     );
+  }
+
+  function handleDistractorSourceChange(rowId: string, fromOriginalFront: boolean) {
+    setReviewRows((rows) => {
+      if (!rows) return null;
+      const target = rows.find((r) => r.id === rowId);
+      if (!target) return rows;
+      const updated: ReviewRow = {
+        ...target,
+        distractorsFromOriginalFront: fromOriginalFront,
+        distractorsLoading: true,
+      };
+      queueDistractorRegeneration(updated);
+      return rows.map((r) => (r.id === rowId ? updated : r));
+    });
+  }
+
+  function regenerateRowDistractors(rowId: string) {
+    setReviewRows((rows) => {
+      if (!rows) return null;
+      const target = rows.find((r) => r.id === rowId);
+      if (!target) return rows;
+      const updated: ReviewRow = { ...target, distractorsLoading: true };
+      queueDistractorRegeneration(updated);
+      return rows.map((r) => (r.id === rowId ? updated : r));
+    });
+  }
+
+  function swapRowFrontBack(id: string) {
+    setReviewRows((rows) => {
+      if (!rows) return null;
+      const target = rows.find((r) => r.id === id);
+      if (!target) return rows;
+      const flipped = target.front !== target.originalFront || target.back !== target.originalBack;
+      const updated: ReviewRow = {
+        ...target,
+        front: target.back,
+        back: target.front,
+        distractorsFromOriginalFront: !flipped,
+        distractorsLoading: true,
+      };
+      queueDistractorRegeneration(updated);
+      return rows.map((r) => (r.id === id ? updated : r));
+    });
   }
 
   function renderSourceButton(
@@ -339,13 +462,14 @@ export function FromSourceCardForm({
     return (
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Review AI-generated cards. Uncheck any you do not want, edit front or back, or use{" "}
-          <span className="font-medium text-foreground">Swap</span> to flip question and answer on
-          the card. Three quiz wrong answers are still generated from the original question when
-          you save.
+          Review AI-generated cards. Edit front, back, and the three quiz wrong answers below
+          before saving. Use <span className="font-medium text-foreground">Swap</span> to flip
+          question and answer; wrong answers refresh automatically and you can edit or regenerate
+          them. Toggle <span className="font-medium text-foreground">Wrong answers from original front</span>{" "}
+          after swap when distractors should match the term or question side.
         </p>
 
-        <div className="space-y-3 max-h-[min(50vh,22rem)] overflow-y-auto pr-1">
+        <div className="space-y-3 max-h-[min(65vh,32rem)] overflow-y-auto pr-1">
           {reviewRows.map((row, index) => (
             <div
               key={row.id}
@@ -399,6 +523,76 @@ export function FromSourceCardForm({
                   className="text-sm min-h-[3rem] resize-y"
                 />
               </div>
+              <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/10 px-2.5 py-2">
+                <Checkbox
+                  id={`distractor-source-${row.id}`}
+                  checked={row.distractorsFromOriginalFront}
+                  disabled={row.distractorsLoading}
+                  onCheckedChange={(checked) =>
+                    handleDistractorSourceChange(row.id, checked === true)
+                  }
+                  aria-label={`Use original front style for quiz wrong answers on card ${index + 1}`}
+                />
+                <Label
+                  htmlFor={`distractor-source-${row.id}`}
+                  className="cursor-pointer text-[11px] leading-relaxed text-muted-foreground font-normal"
+                >
+                  <span className="font-medium text-foreground">
+                    Wrong answers from original front
+                  </span>
+                  <span className="block mt-0.5">
+                    Off (default): wrong answers match the original back — e.g. other definitions,
+                    numbers, or answer lists. On: match the original front — e.g. other terms,
+                    parallel questions like &quot;what is 5+5?&quot;, or short prompts.
+                  </span>
+                </Label>
+              </div>
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/5 px-2.5 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Quiz wrong answers (preview)
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-[11px]"
+                    disabled={row.distractorsLoading || isBusy}
+                    onClick={() => regenerateRowDistractors(row.id)}
+                  >
+                    {row.distractorsLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" aria-hidden />
+                    )}
+                    Regenerate
+                  </Button>
+                </div>
+                {row.distractorsLoading ? (
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin shrink-0" aria-hidden />
+                    Generating wrong answers…
+                  </p>
+                ) : null}
+                {([0, 1, 2] as const).map((distractorIndex) => (
+                  <div key={distractorIndex} className="space-y-1">
+                    <Label
+                      htmlFor={`distractor-${row.id}-${distractorIndex}`}
+                      className="text-[10px] text-muted-foreground"
+                    >
+                      Wrong answer {distractorIndex + 1}
+                    </Label>
+                    <Textarea
+                      id={`distractor-${row.id}-${distractorIndex}`}
+                      value={row.distractors[distractorIndex]}
+                      onChange={(e) => updateDistractor(row.id, distractorIndex, e.target.value)}
+                      disabled={row.distractorsLoading || isBusy}
+                      rows={distractorIndex === 0 ? 2 : 1}
+                      className="text-sm min-h-[2rem] resize-y"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -421,10 +615,10 @@ export function FromSourceCardForm({
           <Button
             type="button"
             onClick={handleCommit}
-            disabled={isBusy || selectedCount === 0}
+            disabled={isBusy || selectedCount === 0 || anyDistractorsLoading}
             className="w-full sm:w-auto"
           >
-            {isCommitting ? "Saving & generating quiz options…" : `Add ${selectedCount} selected`}
+            {isCommitting ? "Saving…" : `Add ${selectedCount} selected`}
           </Button>
         </div>
       </div>

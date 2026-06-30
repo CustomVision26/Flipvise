@@ -42,6 +42,18 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         ],
       },
       {
+        id: "source-import-review",
+        title: "From source — review, swap, and quiz distractors",
+        bullets: [
+          "After AI drafts cards from a URL or file, review each card before adding it to the deck.",
+          "Swap flips the front and back you save — e.g. move a definition to the front and the term to the back.",
+          "Three quiz wrong answers are generated when you save; by default they match the original back (answer) style, such as other definitions, numbers, or fact lists.",
+          "Wrong answers from original front — enable per card after Swap when the saved back holds the short term or question; distractors then match that side (other terms, parallel questions like \"what is 5+5?\", etc.).",
+          "Swap toggles that option automatically; you can change it per card before clicking Add.",
+          "Three editable quiz wrong answers are shown on each card before save; use Regenerate to refresh them from AI or edit the fields directly.",
+        ],
+      },
+      {
         id: "access",
         title: "Access control",
         bullets: [

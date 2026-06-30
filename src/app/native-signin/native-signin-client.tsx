@@ -49,6 +49,31 @@ function describeClerkError(err: unknown): string {
   );
 }
 
+function clerkErrorCode(err: unknown): string | undefined {
+  if (!err || typeof err === "string") return undefined;
+  const e = err as { code?: string; errors?: Array<{ code?: string }> };
+  return e.errors?.[0]?.code ?? e.code;
+}
+
+function isUnsupportedPasswordStrategy(err: unknown): boolean {
+  const code = clerkErrorCode(err)?.toLowerCase() ?? "";
+  const msg = describeClerkError(err).toLowerCase();
+  return (
+    msg.includes("verification strategy") ||
+    code === "strategy_for_user_invalid" ||
+    code === "form_password_not_supported"
+  );
+}
+
+type SignInResource = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
+
+function signInSupportsStrategy(
+  signIn: SignInResource,
+  strategy: "password" | "email_code",
+): boolean {
+  return signIn.supportedFirstFactors?.some((f) => f.strategy === strategy) ?? false;
+}
+
 function useTimeoutFlag(active: boolean, ms: number): boolean {
   const [timedOut, setTimedOut] = useState(false);
 
@@ -382,7 +407,7 @@ function SignInForm({
   onFinishSignIn: () => Promise<void>;
 }) {
   const { signIn } = useSignIn();
-  const [mode, setMode] = useState<"password" | "code">("password");
+  const [mode, setMode] = useState<"password" | "code">("code");
   const [step, setStep] = useState<Step>("identify");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -392,7 +417,11 @@ function SignInForm({
   const [isNative, setIsNative] = useState(false);
 
   useEffect(() => {
-    setIsNative(isFlipviseNativeShell());
+    const native = isFlipviseNativeShell();
+    setIsNative(native);
+    if (native) {
+      setMode("code");
+    }
   }, []);
 
   useEffect(() => {
@@ -406,6 +435,7 @@ function SignInForm({
   };
 
   async function complete(): Promise<boolean> {
+    if (!signIn) return false;
     const { error: finalizeErr } = await signIn.finalize();
     if (finalizeErr) {
       fail("Couldn't finish sign-in", finalizeErr);
@@ -415,17 +445,68 @@ function SignInForm({
     return true;
   }
 
+  async function beginEmailCodeFlow(
+    noticeMessage?: string,
+    skipCreate = false,
+  ): Promise<boolean> {
+    if (!signIn || !email.trim()) return false;
+    if (!skipCreate) {
+      const { error: createErr } = await signIn.create({
+        identifier: email.trim(),
+      });
+      if (createErr) {
+        fail("Couldn't start sign-in", createErr);
+        return false;
+      }
+    }
+    if (!signInSupportsStrategy(signIn, "email_code")) {
+      setError(
+        "This account does not support email codes (for example Google-only sign-in). Open Flipvise in your mobile browser or on desktop to sign in with your provider, then return to the app.",
+      );
+      return false;
+    }
+    const { error: sendErr } = await signIn.emailCode.sendCode();
+    if (sendErr) {
+      fail("Couldn't send code", sendErr);
+      return false;
+    }
+    setMode("code");
+    setStep("code");
+    setError(noticeMessage ?? null);
+    return true;
+  }
+
   async function onPasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password || busy) return;
+    if (!email || !password || busy || !signIn) return;
     setBusy(true);
     setError(null);
     try {
-      const { error: pwErr } = await signIn.password({
+      const { error: createErr } = await signIn.create({
         identifier: email.trim(),
-        password,
       });
+      if (createErr) {
+        fail("Sign-in failed", createErr);
+        return;
+      }
+
+      if (!signInSupportsStrategy(signIn, "password")) {
+        await beginEmailCodeFlow(
+          "This account does not use a password. Enter the code we sent to your email.",
+          true,
+        );
+        return;
+      }
+
+      const { error: pwErr } = await signIn.password({ password });
       if (pwErr) {
+        if (isUnsupportedPasswordStrategy(pwErr) && signInSupportsStrategy(signIn, "email_code")) {
+          await beginEmailCodeFlow(
+            "This account does not use a password. Enter the code we sent to your email.",
+            true,
+          );
+          return;
+        }
         fail("Sign-in failed", pwErr);
         return;
       }
@@ -439,23 +520,12 @@ function SignInForm({
 
   async function onSendCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || busy) return;
+    if (!email || busy || !signIn) return;
     setBusy(true);
     setError(null);
     try {
-      const { error: createErr } = await signIn.create({
-        identifier: email.trim(),
-      });
-      if (createErr) {
-        fail("Couldn't start sign-in", createErr);
-        return;
-      }
-      const { error: sendErr } = await signIn.emailCode.sendCode();
-      if (sendErr) {
-        fail("Couldn't send code", sendErr);
-        return;
-      }
-      setStep("code");
+      const ok = await beginEmailCodeFlow();
+      if (!ok) return;
     } catch (err) {
       fail("Couldn't send code", err);
     } finally {
@@ -465,7 +535,7 @@ function SignInForm({
 
   async function onVerifyCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!code || busy) return;
+    if (!code || busy || !signIn) return;
     setBusy(true);
     setError(null);
     try {
@@ -491,7 +561,9 @@ function SignInForm({
         <CardDescription>
           {mode === "code" && step === "code"
             ? `Enter the code we emailed to ${email}.`
-            : "Use your email to continue to the dashboard."}
+            : isNative
+              ? "Most accounts use an email sign-in code. Password sign-in works only if you created one on the web."
+              : "Use your email to continue to the dashboard."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

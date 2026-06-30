@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-30T03:51:26.130Z",
+  "updatedAt": "2026-06-30T17:42:55.773Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "00c084a6f2569d89bce7ff204e0368efde39d2586b5c325a9f81dac8d14f50c1",
@@ -23,8 +23,8 @@
       "docFingerprint": "5762adf04cfa75fd56b92d59e627ffa30740319851141c9250a5dbc7d8011445"
     },
     "deck-editor": {
-      "watchFingerprint": "a8153ada45d6e1610d2f8f0f2afc8f63f4096bc47ca878693dc9276aa53b1d18",
-      "docFingerprint": "ffd2aa131d994e69cb9f5ed0a9901232439467cdd0a505a92f28bc8277cdfca6"
+      "watchFingerprint": "46d825198b375e580ff397801a34a288aae06c7c06cef6ef046122d1584da21c",
+      "docFingerprint": "4954d25395cbfab671b57cc7ce77389b73c881863688ed35b5654cdeb1bed9e8"
     },
     "study-session": {
       "watchFingerprint": "82d74b8e580f2f3ebb656fa59facac43dd62e60db0f537c24d344cce93caa17d",
