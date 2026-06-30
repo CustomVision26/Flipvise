@@ -23,6 +23,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -36,10 +37,15 @@ import { useClientMounted } from "@/lib/use-client-mounted";
 import { useDocumentationMobileNav, documentationContentPanelClass, documentationTocAsideClass } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
 import {
+  useDocumentationContentOptional,
+  useDocumentationEditOptional,
+} from "@/components/documentation-content-context";
+import {
   AlertCircle,
   BookOpen,
   CheckCircle2,
   ChevronLeft,
+  Pencil,
   XCircle,
 } from "lucide-react";
 
@@ -54,31 +60,38 @@ function hashFromLocation() {
   return window.location.hash.replace(/^#/, "");
 }
 
-function resolveDocPageById(pageId: string): { section: DocSection; page: DocPage } | null {
-  for (const section of ADMIN_DOCUMENTATION_SECTIONS) {
+function resolveDocPageById(
+  sections: DocSection[],
+  pageId: string,
+): { section: DocSection; page: DocPage } | null {
+  for (const section of sections) {
     const page = section.pages.find((p) => p.id === pageId);
     if (page) return { section, page };
   }
   return null;
 }
 
-function resolveDocTarget(id: string): DocTarget | null {
+function resolveDocTarget(
+  sections: DocSection[],
+  getArticle: (pageId: string) => DocArticle | null,
+  id: string,
+): DocTarget | null {
   if (!id) return null;
 
   const articlePageId = parseDocArticleHash(id);
   if (articlePageId) {
-    const resolved = resolveDocPageById(articlePageId);
-    const article = getAdminDocumentationArticle(articlePageId);
+    const resolved = resolveDocPageById(sections, articlePageId);
+    const article = getArticle(articlePageId);
     if (resolved && article) {
       return { type: "article", ...resolved, article };
     }
     return null;
   }
 
-  const resolved = resolveDocPageById(id);
+  const resolved = resolveDocPageById(sections, id);
   if (resolved) return { type: "page", ...resolved };
 
-  const section = ADMIN_DOCUMENTATION_SECTIONS.find((s) => s.id === id);
+  const section = sections.find((s) => s.id === id);
   if (!section) return null;
   if (section.pages.length === 1) {
     return { type: "page", section, page: section.pages[0] };
@@ -102,14 +115,24 @@ function PageLocationMeta({ page }: { page: DocPage }) {
 function DocPagePanel({
   page,
   onOpenArticle,
+  hasArticle,
+  onEditPage,
 }: {
   page: DocPage;
   onOpenArticle?: (pageId: string) => void;
+  hasArticle: (pageId: string) => boolean;
+  onEditPage?: (page: DocPage) => void;
 }) {
-  const showArticleLink = hasAdminDocumentationArticle(page.id);
+  const showArticleLink = hasArticle(page.id);
 
   return (
     <div className="space-y-5 text-sm leading-relaxed">
+      {onEditPage ? (
+        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => onEditPage(page)}>
+          <Pencil className="size-3.5" aria-hidden />
+          Edit quick reference
+        </Button>
+      ) : null}
       <PageLocationMeta page={page} />
       {showArticleLink && onOpenArticle ? (
         <button
@@ -232,16 +255,30 @@ function DocArticlePanel({
   page,
   article,
   onSelect,
+  onEditArticle,
 }: {
   section: DocSection;
   page: DocPage;
   article: DocArticle;
   onSelect: (id: string) => void;
+  onEditArticle?: (args: { page: DocPage; article: DocArticle }) => void;
 }) {
   const showSectionBack = section.pages.length > 1;
   return (
     <Card className="border-primary/20 bg-card/50 shadow-none ring-1 ring-primary/15">
       <CardHeader className="gap-2 border-b border-border/50 pb-4">
+        {onEditArticle ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit gap-2"
+            onClick={() => onEditArticle({ page, article })}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit in-depth guide
+          </Button>
+        ) : null}
         <button
           type="button"
           onClick={() => onSelect(page.id)}
@@ -271,9 +308,13 @@ function DocArticlePanel({
 }
 
 function AdminDocToc({
+  sections,
+  hasArticle,
   activeId,
   onSelect,
 }: {
+  sections: DocSection[];
+  hasArticle: (pageId: string) => boolean;
   activeId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -294,7 +335,7 @@ function AdminDocToc({
       >
         Overview
       </button>
-      {ADMIN_DOCUMENTATION_SECTIONS.map((section) => {
+      {sections.map((section) => {
         const sectionActive =
           activeId === section.id ||
           section.pages.some((page) => isDocPageActive(page.id, activeId));
@@ -332,7 +373,7 @@ function AdminDocToc({
                     >
                       {page.title}
                     </button>
-                    {hasAdminDocumentationArticle(page.id) ? (
+                    {hasArticle(page.id) ? (
                       <button
                         type="button"
                         onClick={() => openArticle(page.id)}
@@ -359,11 +400,19 @@ function AdminDocToc({
 }
 
 function AdminDocContentPanel({
+  sections,
+  hasArticle,
   target,
   onSelect,
+  onEditPage,
+  onEditArticle,
 }: {
+  sections: DocSection[];
+  hasArticle: (pageId: string) => boolean;
   target: DocTarget;
   onSelect: (id: string) => void;
+  onEditPage?: (page: DocPage) => void;
+  onEditArticle?: (args: { page: DocPage; article: DocArticle }) => void;
 }) {
   const openArticle = (pageId: string) => onSelect(docArticleHash(pageId));
 
@@ -396,6 +445,7 @@ function AdminDocContentPanel({
         page={target.page}
         article={target.article}
         onSelect={onSelect}
+        onEditArticle={onEditArticle}
       />
     );
   }
@@ -419,7 +469,12 @@ function AdminDocContentPanel({
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-2 pb-4">
-                  <DocPagePanel page={page} onOpenArticle={openArticle} />
+                  <DocPagePanel
+                    page={page}
+                    onOpenArticle={openArticle}
+                    hasArticle={hasArticle}
+                    onEditPage={onEditPage}
+                  />
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -452,13 +507,33 @@ function AdminDocContentPanel({
         <PageLocationMeta page={page} />
       </CardHeader>
       <CardContent className="pt-5">
-        <DocPagePanel page={page} onOpenArticle={openArticle} />
+        <DocPagePanel
+          page={page}
+          onOpenArticle={openArticle}
+          hasArticle={hasArticle}
+          onEditPage={onEditPage}
+        />
       </CardContent>
     </Card>
   );
 }
 
-export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode }) {
+export function AdminDocumentationView({
+  headerSlot,
+  embedded = false,
+}: {
+  headerSlot?: ReactNode;
+  embedded?: boolean;
+}) {
+  const contentCtx = useDocumentationContentOptional();
+  const editCtx = useDocumentationEditOptional();
+  const sections = contentCtx?.sections ?? ADMIN_DOCUMENTATION_SECTIONS;
+  const getArticle = contentCtx?.getArticle ?? getAdminDocumentationArticle;
+  const hasArticle = contentCtx?.hasArticle ?? hasAdminDocumentationArticle;
+  const articleCount = contentCtx?.articleCount ?? ADMIN_DOCUMENTATION_ARTICLE_COUNT;
+  const onEditPage = editCtx?.enabled ? editCtx.onEditPage : undefined;
+  const onEditArticle = editCtx?.enabled ? editCtx.onEditArticle : undefined;
+
   const mounted = useClientMounted();
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -487,21 +562,21 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
 
   const target = useMemo((): DocTarget => {
     if (!activeId) return { type: "overview" };
-    return resolveDocTarget(activeId) ?? { type: "overview" };
-  }, [activeId]);
+    return resolveDocTarget(sections, getArticle, activeId) ?? { type: "overview" };
+  }, [activeId, getArticle, sections]);
 
   const topicCount = useMemo(
-    () => ADMIN_DOCUMENTATION_SECTIONS.reduce((n, s) => n + s.pages.length, 0),
-    [],
+    () => sections.reduce((n, s) => n + s.pages.length, 0),
+    [sections],
   );
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", !embedded && "space-y-4")}>
       {headerSlot}
       {mounted ? (
         <DocumentationSearchPanel
-          sections={ADMIN_DOCUMENTATION_SECTIONS}
-          getArticle={getAdminDocumentationArticle}
+          sections={sections}
+          getArticle={getArticle}
           onNavigate={selectTarget}
           placeholder="Search admin screens, tools, and guides…"
         />
@@ -515,7 +590,12 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
         >
           <div className="max-h-[calc(100vh-8rem)] overflow-y-auto rounded-xl border border-border/70 bg-card/40 p-4 ring-1 ring-border/30">
             {mounted ? (
-              <AdminDocToc activeId={activeId} onSelect={selectTarget} />
+              <AdminDocToc
+                sections={sections}
+                hasArticle={hasArticle}
+                activeId={activeId}
+                onSelect={selectTarget}
+              />
             ) : (
               <Skeleton className="h-40 w-full bg-muted/30" />
             )}
@@ -526,13 +606,20 @@ export function AdminDocumentationView({ headerSlot }: { headerSlot?: ReactNode 
             <DocumentationMobileBack onClick={closeMobileContent} />
           ) : null}
           {mounted ? (
-            <AdminDocContentPanel target={target} onSelect={selectTarget} />
+            <AdminDocContentPanel
+              sections={sections}
+              hasArticle={hasArticle}
+              target={target}
+              onSelect={selectTarget}
+              onEditPage={onEditPage}
+              onEditArticle={onEditArticle}
+            />
           ) : (
             <Skeleton className="h-64 w-full bg-muted/30" />
           )}
           {mounted && target.type !== "overview" ? (
             <p className="text-center text-xs text-muted-foreground">
-              {topicCount} quick references · {ADMIN_DOCUMENTATION_ARTICLE_COUNT} in-depth guides
+              {topicCount} quick references · {articleCount} in-depth guides
             </p>
           ) : null}
         </div>

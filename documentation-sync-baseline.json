@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-30T17:42:55.773Z",
+  "updatedAt": "2026-06-30T18:07:54.695Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "00c084a6f2569d89bce7ff204e0368efde39d2586b5c325a9f81dac8d14f50c1",
@@ -24,7 +24,7 @@
     },
     "deck-editor": {
       "watchFingerprint": "46d825198b375e580ff397801a34a288aae06c7c06cef6ef046122d1584da21c",
-      "docFingerprint": "4954d25395cbfab671b57cc7ce77389b73c881863688ed35b5654cdeb1bed9e8"
+      "docFingerprint": "1c8002fd955937da1007ca4737090a73225760dc7082acd29994e31bc6ad96b7"
     },
     "study-session": {
       "watchFingerprint": "82d74b8e580f2f3ebb656fa59facac43dd62e60db0f537c24d344cce93caa17d",
@@ -35,8 +35,8 @@
       "docFingerprint": "3ea0c3de962ce007b376358c0449dd99744c08f3bb56fc992c7f347688552868"
     },
     "offline-mobile": {
-      "watchFingerprint": "b5882e0d9295321b0c51d45edd8909a012f2c762d7e7beae27746f221a7a4b8f",
-      "docFingerprint": "3c045cae4d64e92817c3285b314854bfce0bcfdcb038b3beb4544eb63d64a097"
+      "watchFingerprint": "47ce9342fd6e741046d9e682035f4e27a6ded99d457cd1ab1d497bca43b95f4d",
+      "docFingerprint": "dbda96c37d48f352f715913eb62980642038647f58ff32dd4675f1a74156cd25"
     },
     "inbox": {
       "watchFingerprint": "1ffb8e15c3baca0433b2f2b5141d327444f7d464832f377d52fc395973041402",

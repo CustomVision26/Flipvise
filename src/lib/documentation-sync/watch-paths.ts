@@ -29,6 +29,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/offline/session.ts",
     "src/app/api/sync/route.ts",
     "src/actions/offline-sync.ts",
+    "src/app/native-signin/native-signin-client.tsx",
+    "src/app/native-signin/page.tsx",
+    "src/app/api/native/clerk-handoff/route.ts",
   ],
   "study-session": [
     "src/app/decks/[deckId]/study/page.tsx",

@@ -61,7 +61,7 @@ import {
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
-import { AdminDocumentationView } from "@/components/admin-documentation-view";
+import { PlatformDocumentationManager } from "@/components/platform-documentation-manager";
 import { AdminSupportNotificationsMenu } from "@/components/admin-support-notifications-menu";
 import type { SerializedSupportNotification } from "@/lib/support-ticket-dto";
 import type {
@@ -1966,18 +1966,18 @@ export function AdminTabs({
       ) : null}
 
       {activeSection === "documentation" ? (
-        <AdminDocumentationView
+        <PlatformDocumentationManager
           headerSlot={
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Platform admin
               </p>
               <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                Admin documentation
+                Documentation
               </h2>
               <p className="max-w-2xl text-sm text-muted-foreground">
-                Quick reference and in-depth guides for every Admin Menu section. Visible only to
-                platform administrators.
+                Use the AI agent to add, update, or remove topics from admin and user docs. Attach UI
+                screenshots for step-by-step updates. Edit mode still supports manual per-page edits.
               </p>
             </div>
           }

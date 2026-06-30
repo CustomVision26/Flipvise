@@ -812,6 +812,39 @@ export const quizResultInboxMessages = pgTable('quiz_result_inbox_messages', {
   createdAt: timestamp().notNull().defaultNow(),
 });
 
+export const documentationAudienceEnum = pgEnum('documentation_audience', ['user', 'admin']);
+
+export const documentationContentKindEnum = pgEnum('documentation_content_kind', [
+  'quick_reference_page',
+  'in_depth_article',
+  'page_addition',
+  'page_removal',
+  'section_addition',
+  'section_metadata',
+]);
+
+/** Platform-admin edits to static user/admin documentation (merged at read time). */
+export const documentationOverrides = pgTable(
+  'documentation_overrides',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    audience: documentationAudienceEnum().notNull(),
+    contentKind: documentationContentKindEnum().notNull(),
+    pageId: varchar({ length: 128 }).notNull(),
+    payload: json().notNull(),
+    updatedByUserId: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('documentation_overrides_audience_kind_page_idx').on(
+      table.audience,
+      table.contentKind,
+      table.pageId,
+    ),
+  ],
+);
+
 export const cards = pgTable('cards', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   deckId: integer()

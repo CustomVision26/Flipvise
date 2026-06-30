@@ -28,6 +28,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -41,12 +42,18 @@ import { useClientMounted } from "@/lib/use-client-mounted";
 import { useDocumentationMobileNav, documentationContentPanelClass, documentationTocAsideClass } from "@/lib/use-documentation-mobile-nav";
 import { cn } from "@/lib/utils";
 import {
+  useDocumentationContentOptional,
+  useDocumentationEditOptional,
+} from "@/components/documentation-content-context";
+import {
   AlertCircle,
   BookOpen,
   CheckCircle2,
   ChevronLeft,
+  Pencil,
   XCircle,
 } from "lucide-react";
+import type { EffectiveDocumentationContent } from "@/lib/documentation-effective-content";
 
 type DocTarget =
   | { type: "overview" }
@@ -59,21 +66,28 @@ function hashFromLocation() {
   return window.location.hash.replace(/^#/, "");
 }
 
-function resolveDocPageById(pageId: string): { section: DocSection; page: DocPage } | null {
-  for (const section of USER_DOCUMENTATION_SECTIONS) {
+function resolveDocPageById(
+  sections: DocSection[],
+  pageId: string,
+): { section: DocSection; page: DocPage } | null {
+  for (const section of sections) {
     const page = section.pages.find((p) => p.id === pageId);
     if (page) return { section, page };
   }
   return null;
 }
 
-function resolveDocTarget(id: string): DocTarget | null {
+function resolveDocTarget(
+  sections: DocSection[],
+  getArticle: (pageId: string) => DocArticle | null,
+  id: string,
+): DocTarget | null {
   if (!id) return null;
 
   const articlePageId = parseDocArticleHash(id);
   if (articlePageId) {
-    const resolved = resolveDocPageById(articlePageId);
-    const article = getUserDocumentationArticle(articlePageId);
+    const resolved = resolveDocPageById(sections, articlePageId);
+    const article = getArticle(articlePageId);
     if (resolved && article) {
       return {
         type: "article",
@@ -85,10 +99,10 @@ function resolveDocTarget(id: string): DocTarget | null {
     return null;
   }
 
-  const resolved = resolveDocPageById(id);
+  const resolved = resolveDocPageById(sections, id);
   if (resolved) return { type: "page", ...resolved };
 
-  const section = USER_DOCUMENTATION_SECTIONS.find((s) => s.id === id);
+  const section = sections.find((s) => s.id === id);
   if (!section) return null;
 
   if (section.pages.length === 1) {
@@ -101,19 +115,29 @@ function resolveDocTarget(id: string): DocTarget | null {
 function DocPagePanel({
   page,
   onOpenArticle,
+  hasArticle,
+  onEditPage,
 }: {
   page: DocPage;
   onOpenArticle?: (pageId: string) => void;
+  hasArticle: (pageId: string) => boolean;
+  onEditPage?: (page: DocPage) => void;
 }) {
   const locationLabel = page.route
     ? page.route
     : page.clerkTab
       ? `Account menu → ${page.clerkTab}`
       : null;
-  const showArticleLink = hasUserDocumentationArticle(page.id);
+  const showArticleLink = hasArticle(page.id);
 
   return (
     <div className="space-y-5 text-sm leading-relaxed">
+      {onEditPage ? (
+        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => onEditPage(page)}>
+          <Pencil className="size-3.5" aria-hidden />
+          Edit quick reference
+        </Button>
+      ) : null}
       {locationLabel ? (
         <p className="inline-flex rounded-md border border-border/60 bg-muted/30 px-2.5 py-1 font-mono text-xs text-muted-foreground">
           {locationLabel}
@@ -253,17 +277,31 @@ function DocArticlePanel({
   page,
   article,
   onSelect,
+  onEditArticle,
 }: {
   section: DocSection;
   page: DocPage;
   article: DocArticle;
   onSelect: (id: string) => void;
+  onEditArticle?: (args: { page: DocPage; article: DocArticle }) => void;
 }) {
   const showSectionBack = section.pages.length > 1;
 
   return (
     <Card className="border-primary/20 bg-card/50 shadow-none ring-1 ring-primary/15">
       <CardHeader className="gap-2 border-b border-border/50 pb-4">
+        {onEditArticle ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit gap-2"
+            onClick={() => onEditArticle({ page, article })}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit in-depth guide
+          </Button>
+        ) : null}
         <button
           type="button"
           onClick={() => onSelect(page.id)}
@@ -409,7 +447,15 @@ function isDocPageActive(pageId: string, activeId: string | null): boolean {
   return parseDocArticleHash(activeId) === pageId;
 }
 
-function DocumentationToc({ activeId, onSelect }: DocumentationTocProps) {
+function DocumentationToc({
+  sections,
+  hasArticle,
+  activeId,
+  onSelect,
+}: DocumentationTocProps & {
+  sections: DocSection[];
+  hasArticle: (pageId: string) => boolean;
+}) {
   const openArticle = (pageId: string) => onSelect(docArticleHash(pageId));
 
   return (
@@ -429,7 +475,7 @@ function DocumentationToc({ activeId, onSelect }: DocumentationTocProps) {
           Overview
         </button>
 
-        {USER_DOCUMENTATION_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const sectionActive =
             activeId === section.id ||
             section.pages.some((page) => isDocPageActive(page.id, activeId));
@@ -468,7 +514,7 @@ function DocumentationToc({ activeId, onSelect }: DocumentationTocProps) {
                       >
                         {page.title}
                       </button>
-                      {hasUserDocumentationArticle(page.id) ? (
+                      {hasArticle(page.id) ? (
                         <button
                           type="button"
                           onClick={() => openArticle(page.id)}
@@ -500,7 +546,17 @@ type DocContentPanelProps = {
   onSelect: (id: string) => void;
 };
 
-function DocContentPanel({ target, onSelect }: DocContentPanelProps) {
+function DocContentPanel({
+  hasArticle,
+  target,
+  onSelect,
+  onEditPage,
+  onEditArticle,
+}: DocContentPanelProps & {
+  hasArticle: (pageId: string) => boolean;
+  onEditPage?: (page: DocPage) => void;
+  onEditArticle?: (args: { page: DocPage; article: DocArticle }) => void;
+}) {
   const openArticle = (pageId: string) => onSelect(docArticleHash(pageId));
 
   if (target.type === "overview") {
@@ -529,6 +585,7 @@ function DocContentPanel({ target, onSelect }: DocContentPanelProps) {
         page={target.page}
         article={target.article}
         onSelect={onSelect}
+        onEditArticle={onEditArticle}
       />
     );
   }
@@ -556,7 +613,12 @@ function DocContentPanel({ target, onSelect }: DocContentPanelProps) {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-2 pb-4">
-                  <DocPagePanel page={page} onOpenArticle={openArticle} />
+                  <DocPagePanel
+                    page={page}
+                    onOpenArticle={openArticle}
+                    hasArticle={hasArticle}
+                    onEditPage={onEditPage}
+                  />
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -590,13 +652,50 @@ function DocContentPanel({ target, onSelect }: DocContentPanelProps) {
         <PageLocationMeta page={page} />
       </CardHeader>
       <CardContent className="pt-5">
-        <DocPagePanel page={page} onOpenArticle={openArticle} />
+        <DocPagePanel
+          page={page}
+          onOpenArticle={openArticle}
+          hasArticle={hasArticle}
+          onEditPage={onEditPage}
+        />
       </CardContent>
     </Card>
   );
 }
 
-export function UserDocumentationView() {
+export type UserDocumentationViewProps = {
+  embedded?: boolean;
+  initialContent?: EffectiveDocumentationContent;
+};
+
+export function UserDocumentationView({
+  embedded = false,
+  initialContent,
+}: UserDocumentationViewProps = {}) {
+  const contentCtx = useDocumentationContentOptional();
+  const editCtx = useDocumentationEditOptional();
+
+  const sections =
+    contentCtx?.sections ?? initialContent?.sections ?? USER_DOCUMENTATION_SECTIONS;
+  const getArticle = useMemo(() => {
+    if (contentCtx) return contentCtx.getArticle;
+    if (initialContent) {
+      return (pageId: string) => initialContent.articlesByPageId[pageId] ?? null;
+    }
+    return getUserDocumentationArticle;
+  }, [contentCtx, initialContent]);
+  const hasArticle = useMemo(() => {
+    if (contentCtx) return contentCtx.hasArticle;
+    if (initialContent) {
+      return (pageId: string) => pageId in initialContent.articlesByPageId;
+    }
+    return hasUserDocumentationArticle;
+  }, [contentCtx, initialContent]);
+  const articleCount =
+    contentCtx?.articleCount ?? initialContent?.articleCount ?? USER_DOCUMENTATION_ARTICLE_COUNT;
+  const onEditPage = editCtx?.enabled ? editCtx.onEditPage : undefined;
+  const onEditArticle = editCtx?.enabled ? editCtx.onEditArticle : undefined;
+
   const mounted = useClientMounted();
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -630,27 +729,28 @@ export function UserDocumentationView() {
 
   const target = useMemo((): DocTarget => {
     if (!activeId) return { type: "overview" };
-    return resolveDocTarget(activeId) ?? { type: "overview" };
-  }, [activeId]);
+    return resolveDocTarget(sections, getArticle, activeId) ?? { type: "overview" };
+  }, [activeId, getArticle, sections]);
 
   const topicCount = useMemo(
-    () =>
-      USER_DOCUMENTATION_SECTIONS.reduce((count, section) => count + section.pages.length, 0),
-    [],
+    () => sections.reduce((count, section) => count + section.pages.length, 0),
+    [sections],
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-10">
-      <PublicPageIntro
-        badge="User guide"
-        title="Flipvise Documentation"
-        description="Quick reference and in-depth guides for every customer-facing screen — purpose, workflows, plan requirements, and restrictions."
-      />
+    <div className={cn("mx-auto w-full max-w-6xl", embedded ? "space-y-4" : "space-y-10")}>
+      {!embedded ? (
+        <PublicPageIntro
+          badge="User guide"
+          title="Flipvise Documentation"
+          description="Quick reference and in-depth guides for every customer-facing screen — purpose, workflows, plan requirements, and restrictions."
+        />
+      ) : null}
 
       {mounted ? (
         <DocumentationSearchPanel
-          sections={USER_DOCUMENTATION_SECTIONS}
-          getArticle={getUserDocumentationArticle}
+          sections={sections}
+          getArticle={getArticle}
           onNavigate={selectTarget}
         />
       ) : (
@@ -671,7 +771,12 @@ export function UserDocumentationView() {
             )}
           >
             {mounted ? (
-              <DocumentationToc activeId={activeId} onSelect={selectTarget} />
+              <DocumentationToc
+                sections={sections}
+                hasArticle={hasArticle}
+                activeId={activeId}
+                onSelect={selectTarget}
+              />
             ) : (
               <div className="space-y-3">
                 <Skeleton className="h-4 w-24 bg-muted/40" />
@@ -688,14 +793,20 @@ export function UserDocumentationView() {
             <DocumentationMobileBack onClick={closeMobileContent} />
           ) : null}
           {mounted ? (
-            <DocContentPanel target={target} onSelect={selectTarget} />
+            <DocContentPanel
+              hasArticle={hasArticle}
+              target={target}
+              onSelect={selectTarget}
+              onEditPage={onEditPage}
+              onEditArticle={onEditArticle}
+            />
           ) : (
             <DocContentSkeleton />
           )}
 
           {mounted && target.type !== "overview" ? (
             <p className="pb-4 text-center text-xs text-muted-foreground">
-              {topicCount} quick references · {USER_DOCUMENTATION_ARTICLE_COUNT} in-depth guides ·
+              {topicCount} quick references · {articleCount} in-depth guides ·
               Updated for the current Flipvise UI
             </p>
           ) : null}

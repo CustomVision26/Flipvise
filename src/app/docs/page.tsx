@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { UserDocumentationView } from "@/components/user-documentation-view";
 import { PublicMarketingPageChrome } from "@/components/public-marketing-page-chrome";
 import { resolvePublicPageHomeContext } from "@/lib/public-page-home-context";
+import { getEffectiveUserDocumentationContent } from "@/lib/documentation-effective-content";
 
 export const metadata: Metadata = {
   title: "Documentation",
@@ -10,11 +11,14 @@ export const metadata: Metadata = {
 };
 
 export default async function DocsPage() {
-  const { homeHref, isSignedIn } = await resolvePublicPageHomeContext();
+  const [{ homeHref, isSignedIn }, initialContent] = await Promise.all([
+    resolvePublicPageHomeContext(),
+    getEffectiveUserDocumentationContent(),
+  ]);
 
   return (
     <PublicMarketingPageChrome homeHref={homeHref} isSignedIn={isSignedIn}>
-      <UserDocumentationView />
+      <UserDocumentationView initialContent={initialContent} />
     </PublicMarketingPageChrome>
   );
 }

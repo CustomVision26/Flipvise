@@ -154,6 +154,27 @@ export async function uploadContactUsChatImageToS3(
   return uploadImageFileToS3({ key, file });
 }
 
+export interface UploadDocumentationAgentImageOptions {
+  userId: string;
+  file: File;
+}
+
+export async function uploadDocumentationAgentImageToS3(
+  options: UploadDocumentationAgentImageOptions,
+): Promise<string> {
+  const { userId, file } = options;
+
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const extension = file.name.includes(".")
+    ? file.name.substring(file.name.lastIndexOf("."))
+    : "";
+  const fileName = `ui-${timestamp}-${randomString}${extension}`;
+  const key = `documentation-agent/${userId}/${fileName}`;
+
+  return uploadImageFileToS3({ key, file });
+}
+
 async function uploadImageFileToS3(options: { key: string; file: File }): Promise<string> {
   const { key, file } = options;
 

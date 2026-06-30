@@ -38,6 +38,8 @@
     "db:ensure-contact-us-guest-chat-presence": "tsx scripts/ensure-contact-us-guest-chat-presence.ts",
     "db:ensure-affiliate-referral-quota-columns": "tsx scripts/ensure-affiliate-referral-quota-columns.ts",
     "db:ensure-device-sync-tokens": "tsx scripts/ensure-device-sync-tokens.ts",
+    "db:ensure-documentation-overrides": "tsx scripts/ensure-documentation-overrides-table.ts",
+    "db:ensure-documentation-agent-kinds": "tsx scripts/ensure-documentation-agent-kinds.ts",
     "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.mjs",
     "db:generate:local": "drizzle-kit generate --config=drizzle.config.local.ts",
     "db:generate:prod": "drizzle-kit generate --config=drizzle.config.local.ts",

@@ -51,6 +51,20 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         ],
       },
       {
+        id: "native-sign-in",
+        title: "Signing in inside the mobile app",
+        paragraphs: [
+          "The native iOS/Android app opens the live Flipvise site in an in-app browser view. Sign-in uses a lightweight screen built for the app — not the Clerk modal on the public homepage.",
+        ],
+        bullets: [
+          "Returning users: if you already used “Make available offline”, the app can often sign you in automatically when you open the online dashboard.",
+          "First-time or manual sign-in: enter your email and request a sign-in code (this is the default in the app).",
+          "Password sign-in works only if you created a password on the website (Clerk profile → Security). Many accounts use Google or email code only — password will fail with a strategy error; switch to “Email me a code”.",
+          "If your account is Google-only and email code is unavailable, sign in once in Safari or Chrome on your phone, then open the online dashboard again inside the app.",
+          "You need a connection for any sign-in attempt — use “Back to offline study” to return to downloaded decks without signing in.",
+        ],
+      },
+      {
         id: "appearance",
         title: "Appearance & browsing your decks offline",
         bullets: [
