@@ -101,13 +101,28 @@ export function HeaderUserSection({
 
   useEffect(() => {
     if (!isSigningOut) return;
-    // Native app: land back in the bundled offline shell (works without a
-    // connection) instead of the live homepage's sign-in screen.
-    if (isFlipviseNativeApp()) {
-      void navigateToOfflineShell();
-    } else {
-      window.location.replace("/");
-    }
+
+    void (async () => {
+      if (isFlipviseNativeApp()) {
+        try {
+          const session = await import("@/lib/offline/session");
+          await session.setRequireManualSignIn(true);
+          const token = await session.getStoredSyncToken().catch(() => null);
+          if (token) {
+            await fetch(`${window.location.origin}/api/native/revoke-sync-token`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {});
+          }
+          await session.clearStoredSyncCredentials();
+        } catch {
+          // Non-fatal — offline shell still opens; user may need to sign in manually.
+        }
+        await navigateToOfflineShell();
+      } else {
+        window.location.replace("/");
+      }
+    })();
   }, [isSigningOut]);
   const meta = user?.publicMetadata as
     | { adminGranted?: boolean; role?: string }

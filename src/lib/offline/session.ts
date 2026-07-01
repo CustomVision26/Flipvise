@@ -23,6 +23,11 @@ const NATIVE_APP_FLAG_KEY = "flipvise.nativeApp";
 const THEME_PREFS_KEY = "flipvise.offline.theme";
 /** Whether the app requires the device security credential (biometric/PIN) to open. */
 const APP_LOCK_KEY = "flipvise.offline.appLock";
+/**
+ * When set, the offline shell must not auto hand off to the live dashboard via the
+ * device sync token (user signed out explicitly).
+ */
+const REQUIRE_MANUAL_SIGNIN_KEY = "flipvise.offline.requireManualSignIn";
 
 /** Enables/disables the device-credential app lock for the offline shell. */
 export async function setAppLockEnabled(enabled: boolean): Promise<void> {
@@ -163,4 +168,18 @@ export async function clearStoredSyncCredentials(): Promise<void> {
   await Preferences.remove({ key: SYNC_TOKEN_KEY });
   await Preferences.remove({ key: USER_ID_KEY });
   await clearPendingOfflinePull();
+}
+
+/** Blocks clerk-handoff until the user signs in manually again. */
+export async function setRequireManualSignIn(required: boolean): Promise<void> {
+  if (required) {
+    await Preferences.set({ key: REQUIRE_MANUAL_SIGNIN_KEY, value: "1" });
+  } else {
+    await Preferences.remove({ key: REQUIRE_MANUAL_SIGNIN_KEY });
+  }
+}
+
+export async function getRequireManualSignIn(): Promise<boolean> {
+  const { value } = await Preferences.get({ key: REQUIRE_MANUAL_SIGNIN_KEY });
+  return value === "1";
 }

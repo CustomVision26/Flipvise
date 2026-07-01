@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { unwrapNativeSignInRetryUrl } from "@/lib/native-live-navigation";
 import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
@@ -12,6 +13,7 @@ import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
  */
 export function NativeAppBootstrap() {
   const pathname = usePathname();
+  const { userId, isSignedIn } = useAuth();
   const syncTokenEnsuredRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -88,6 +90,24 @@ export function NativeAppBootstrap() {
       .catch(() => {});
   }, []);
 
+  // Persist Clerk user id for the offline shell on any authenticated native page.
+  React.useEffect(() => {
+    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
+      .Capacitor;
+    const likelyNative =
+      isFlipviseNativeApp() ||
+      Boolean(cap?.isNativePlatform?.()) ||
+      Boolean(cap);
+    if (!likelyNative || !isSignedIn || !userId) return;
+
+    void import("@/lib/offline/session")
+      .then(async (s) => {
+        await s.setStoredUserId(userId);
+        await s.setStoredApiBaseUrl(window.location.origin);
+      })
+      .catch(() => {});
+  }, [isSignedIn, userId]);
+
   React.useEffect(() => {
     const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
       .Capacitor;
@@ -103,12 +123,21 @@ export function NativeAppBootstrap() {
       )
       .catch(() => {});
 
-    if (!pathname?.startsWith("/dashboard") || syncTokenEnsuredRef.current) {
+    if (!pathname?.startsWith("/dashboard")) {
       return;
     }
-    syncTokenEnsuredRef.current = true;
 
     void import("@/lib/offline/session").then(async (session) => {
+      // Keep the offline shell's user id in sync whenever the live dashboard loads
+      // (not only after "Make available offline") so a cold start can load SQLite rows.
+      if (isSignedIn && userId) {
+        await session.setStoredUserId(userId).catch(() => {});
+        await session.setStoredApiBaseUrl(window.location.origin).catch(() => {});
+      }
+
+      if (syncTokenEnsuredRef.current) return;
+      syncTokenEnsuredRef.current = true;
+
       const existing = await session.getStoredSyncToken().catch(() => null);
       if (existing) return;
       try {
@@ -121,11 +150,12 @@ export function NativeAppBootstrap() {
         if (!data.token) return;
         await session.setStoredSyncToken(data.token);
         await session.setStoredApiBaseUrl(window.location.origin);
+        await session.setRequireManualSignIn(false);
       } catch {
         // Non-fatal — user can still sign in manually or use Make available offline.
       }
     });
-  }, [pathname]);
+  }, [pathname, isSignedIn, userId]);
 
   return null;
 }

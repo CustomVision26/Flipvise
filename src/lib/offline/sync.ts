@@ -535,20 +535,45 @@ async function applyServerResponse(
       .map((c) => Number(c.serverId))
       .filter((id) => Number.isFinite(id));
 
+    const localSyncedDeckCount = Number(
+      (
+        (await db.query(
+          `SELECT COUNT(*) AS n FROM decks WHERE deleted = 0 AND server_id IS NOT NULL AND dirty = 0;`,
+        )).values?.[0] as { n: number } | undefined
+      )?.n ?? 0,
+    );
+    const localSyncedCardCount = Number(
+      (
+        (await db.query(
+          `SELECT COUNT(*) AS n FROM cards WHERE deleted = 0 AND server_id IS NOT NULL AND dirty = 0;`,
+        )).values?.[0] as { n: number } | undefined
+      )?.n ?? 0,
+    );
+
+    // An empty authoritative pull must not wipe a populated local library — that
+    // happens on auth/env glitches and left users with "No decks on this device".
     if (pulledDeckIds.length > 0) {
       await db.run(
         `DELETE FROM decks WHERE server_id IS NOT NULL AND dirty = 0 AND server_id NOT IN (${pulledDeckIds.join(",")});`,
       );
-    } else {
+    } else if (localSyncedDeckCount === 0) {
       await db.run(`DELETE FROM decks WHERE server_id IS NOT NULL AND dirty = 0;`);
+    } else {
+      console.warn(
+        `[sync] Skipping deck reconcile — full pull returned 0 decks but ${localSyncedDeckCount} synced deck(s) remain locally.`,
+      );
     }
 
     if (pulledCardIds.length > 0) {
       await db.run(
         `DELETE FROM cards WHERE server_id IS NOT NULL AND dirty = 0 AND server_id NOT IN (${pulledCardIds.join(",")});`,
       );
-    } else {
+    } else if (localSyncedCardCount === 0) {
       await db.run(`DELETE FROM cards WHERE server_id IS NOT NULL AND dirty = 0;`);
+    } else {
+      console.warn(
+        `[sync] Skipping card reconcile — full pull returned 0 cards but ${localSyncedCardCount} synced card(s) remain locally.`,
+      );
     }
 
     // Drop cards orphaned by a removed deck (safety net; keep dirty rows to push later).

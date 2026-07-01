@@ -66,6 +66,8 @@ export function OfflineAvailabilityButton() {
         // Non-fatal — offline reading still works even if token minting fails.
       }
 
+      await session.setRequireManualSignIn(false).catch(() => {});
+
       // Full pull seeds every accessible deck on the device (not just rows changed since last sync).
       const result = await seedOfflineLibrary({
         userId,

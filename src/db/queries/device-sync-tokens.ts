@@ -59,3 +59,20 @@ export async function resolveUserIdByDeviceToken(
 export async function deleteDeviceSyncTokensForUser(userId: string): Promise<void> {
   await db.delete(deviceSyncTokens).where(eq(deviceSyncTokens.userId, userId));
 }
+
+/** Revokes a single presented raw token (sign-out / device unlink). */
+export async function revokeDeviceSyncToken(rawToken: string): Promise<boolean> {
+  if (!rawToken.trim()) return false;
+  const tokenHash = hashToken(rawToken);
+  const rows = await db
+    .update(deviceSyncTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(deviceSyncTokens.tokenHash, tokenHash),
+        isNull(deviceSyncTokens.revokedAt),
+      ),
+    )
+    .returning({ id: deviceSyncTokens.id });
+  return rows.length > 0;
+}

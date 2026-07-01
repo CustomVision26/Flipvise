@@ -35,6 +35,10 @@ html[data-native-shell][data-platform="ios"] {
   --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
 }
 
+html[data-native-shell][data-platform="android"] {
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 36px);
+}
+
 /* Light mode carried from the live dashboard. Captured interface colors are
    layered on top of these as inline CSS variables (see apply-offline-theme.ts). */
 :root[data-theme="light"] {
@@ -174,7 +178,7 @@ html, body, #root {
 /* ── Top bar ─────────────────────────────────────────────── */
 .topbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   padding: calc(12px + var(--flipvise-safe-top)) 14px 12px;
@@ -194,6 +198,7 @@ html, body, #root {
   min-width: 0;
   flex: 0 1 auto;
   max-width: 42%;
+  padding-top: 2px;
 }
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .brand-name {
@@ -215,12 +220,21 @@ html, body, #root {
 
 .topbar-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-end;
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.topbar-actions__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .topbar-actions .status-pill {
@@ -234,12 +248,68 @@ html, body, #root {
   white-space: nowrap;
 }
 
+/* Portrait phones: brand + account row, then a full-width action strip (no clipping). */
+@media (max-width: 520px) and (orientation: portrait) {
+  .topbar--shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
+    gap: 10px 8px;
+    align-items: center;
+  }
+
+  .topbar--shell .brand {
+    grid-column: 1;
+    grid-row: 1;
+    max-width: none;
+    padding-top: 0;
+  }
+
+  .topbar--shell .topbar-actions {
+    display: contents;
+  }
+
+  .topbar--shell .settings-menu {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .topbar--shell .account-menu {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .topbar--shell .topbar-actions__toolbar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    min-width: 0;
+    width: 100%;
+    padding-bottom: 2px;
+  }
+
+  .topbar--shell .topbar-actions__toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar--shell .topbar-actions__online-dash {
+    max-width: none;
+    flex-shrink: 0;
+  }
+}
+
 @media (max-width: 380px) {
   .brand-tag {
     display: none;
   }
   .topbar-actions__online-dash {
-    max-width: 5.5rem;
     font-size: 11px;
     padding-inline: 8px;
   }

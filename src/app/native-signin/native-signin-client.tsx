@@ -139,6 +139,13 @@ export function NativeSignInClient() {
       return;
     }
 
+    try {
+      const session = await import("@/lib/offline/session");
+      await session.setRequireManualSignIn(false);
+    } catch {
+      // Non-fatal
+    }
+
     window.location.replace(postAuthTarget);
   }, [postAuthTarget, signOut]);
 
@@ -171,10 +178,11 @@ export function NativeSignInClient() {
 
   // Returning visit: Clerk JS says signed-in — verify server cookies before redirect.
   // Do not block on `ticket`: handoff URLs can arrive while a stale client session exists.
+  // Skip when `session_retry` / manual-only — user signed out and must re-authenticate.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || manualOnly || continuing) return;
+    if (!isLoaded || !isSignedIn || manualOnly || continuing || sessionRetry) return;
     void finishSignIn();
-  }, [isLoaded, isSignedIn, manualOnly, continuing, finishSignIn]);
+  }, [isLoaded, isSignedIn, manualOnly, continuing, sessionRetry, finishSignIn]);
 
   // Ticket handoff from offline device sync token.
   useEffect(() => {

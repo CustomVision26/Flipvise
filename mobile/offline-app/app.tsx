@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
+import type { PluginListenerHandle } from "@capacitor/core";
 import {
   isOfflineDbAvailable,
   getLastOfflineDbError,
@@ -30,6 +32,7 @@ import {
   getStoredApiBaseUrl,
   getStoredSyncToken,
   getStoredUserId,
+  getRequireManualSignIn,
   setLastNavigationUrl,
   setNativeAppFlag,
   setStoredApiBaseUrl,
@@ -203,7 +206,14 @@ export function App() {
         setDbReady(available);
         if (!available) return;
 
-        const uid = await getStoredUserId();
+        const uid =
+          (await getStoredUserId()) ??
+          (await import("../../src/lib/offline/session").then(async (s) => {
+            const pending = await s.getPendingOfflinePull().catch(() => null);
+            if (!pending?.userId) return null;
+            await s.setStoredUserId(pending.userId).catch(() => {});
+            return pending.userId;
+          }));
         if (cancelled) return;
         setUserId(uid);
 
@@ -262,7 +272,7 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reload the library when returning from the live dashboard in the same WebView.
+  // Reload the library when returning from the live dashboard or resuming the app.
   useEffect(() => {
     if (!libraryReady || !userId) return;
 
@@ -276,15 +286,37 @@ export function App() {
       await loadDecks(userId, scope, ctx);
     };
 
-    const onPageShow = () => {
+    const onResume = () => {
       void refreshFromStorage();
     };
+
+    const onPageShow = () => {
+      onResume();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onResume();
+    };
+
     window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    let appStateListener: PluginListenerHandle | undefined;
+    void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) onResume();
+    }).then((handle) => {
+      appStateListener = handle;
+    });
+
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibility);
+      void appStateListener?.remove();
+    };
   }, [libraryReady, userId, loadDecks, refreshAccessContext]);
 
   const runSyncNow = useCallback(
-    async (options?: { showSuccess?: boolean }): Promise<boolean> => {
+    async (options?: { showSuccess?: boolean; fullPull?: boolean }): Promise<boolean> => {
       if (!userId) return false;
       if (!online) return false;
       setSyncing(true);
@@ -304,7 +336,7 @@ export function App() {
           userId,
           apiBaseUrl: bundledLiveUrl(),
           token,
-          fullPull: true,
+          fullPull: options?.fullPull === true,
         });
         const ctx = await refreshAccessContext();
         await purgeStaleInvitedWorkspaceStudyDecks(userId, ctx.workspaces).catch(() => {});
@@ -346,12 +378,12 @@ export function App() {
     [userId, online, loadDecks, workspaceScope, refreshAccessContext],
   );
 
-  // Reconcile ghost decks (deleted on server) when the library opens online.
+  // Push/pull incremental changes when the library opens online (no full reconcile).
   const didAutoSyncRef = useRef(false);
   useEffect(() => {
     if (!libraryReady || !userId || !online || didAutoSyncRef.current) return;
     didAutoSyncRef.current = true;
-    void runSyncNow({ showSuccess: false });
+    void runSyncNow({ showSuccess: false, fullPull: false });
   }, [libraryReady, userId, online, runSyncNow]);
 
   const handleSync = useCallback(async () => {
@@ -364,7 +396,7 @@ export function App() {
       return;
     }
     setMessage(null);
-    await runSyncNow({ showSuccess: true });
+    await runSyncNow({ showSuccess: true, fullPull: true });
   }, [userId, online, runSyncNow]);
 
   const handleWorkspaceChange = useCallback(
@@ -414,7 +446,11 @@ export function App() {
     const enc = (s: string) => encodeURIComponent(s);
     const nativeQuery = "flipvise_native=1";
     const retryDestination = liveDestinationUrl(base, path);
+    const requireManualSignIn = await getRequireManualSignIn().catch(() => false);
     let target = `${base}/native-signin?${nativeQuery}&redirect=${enc(path)}`;
+    if (requireManualSignIn) {
+      target += "&session_retry=1";
+    }
 
     if (!navigator.onLine) {
       try {
@@ -437,27 +473,29 @@ export function App() {
     //   • first-time users → a lightweight in-app email/password (or email code)
     //     form, then redirect to `path`.
     //   • already-signed-in WebView sessions → redirect straight to `path`.
-    try {
-      const syncToken = await getStoredSyncToken().catch(() => null);
-      if (syncToken) {
-        const res = await fetch(`${base}/api/native/clerk-handoff`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${syncToken}` },
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { ticket?: string };
-          if (data.ticket) {
-            target = `${base}/native-signin?${nativeQuery}&ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
+    if (!requireManualSignIn) {
+      try {
+        const syncToken = await getStoredSyncToken().catch(() => null);
+        if (syncToken) {
+          const res = await fetch(`${base}/api/native/clerk-handoff`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${syncToken}` },
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { ticket?: string };
+            if (data.ticket) {
+              target = `${base}/native-signin?${nativeQuery}&ticket=${enc(data.ticket)}&redirect=${enc(path)}`;
+            }
+          } else if (import.meta.env.DEV) {
+            console.warn(
+              `[openLivePath] clerk-handoff failed (${res.status}) — manual sign-in`,
+            );
           }
-        } else if (import.meta.env.DEV) {
-          console.warn(
-            `[openLivePath] clerk-handoff failed (${res.status}) — manual sign-in`,
-          );
         }
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.warn("[openLivePath] clerk-handoff error — manual sign-in", err);
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn("[openLivePath] clerk-handoff error — manual sign-in", err);
+        }
       }
     }
 
@@ -712,7 +750,7 @@ function Topbar({
   accountPlanAccessType?: string;
 }) {
   return (
-    <header className="topbar">
+    <header className="topbar topbar--shell">
       <div className="brand">
         <img className="brand-logo" src={offlineLogoUrl} alt="" aria-hidden />
         <div className="brand-text">
@@ -721,24 +759,26 @@ function Topbar({
         </div>
       </div>
       <div className="topbar-actions">
-        <ConnectionStatusPill online={online} compact />
-        <button
-          type="button"
-          className="btn secondary btn--sm"
-          onClick={onSync}
-          disabled={syncing}
-        >
-          {syncing ? "Syncing…" : "Sync"}
-        </button>
-        <button
-          type="button"
-          className="btn secondary btn--sm topbar-actions__online-dash"
-          onClick={onOpen}
-          disabled={!online}
-          title={online ? "Open the live dashboard" : "Requires an internet connection"}
-        >
-          Online Dashboard
-        </button>
+        <div className="topbar-actions__toolbar">
+          <ConnectionStatusPill online={online} compact />
+          <button
+            type="button"
+            className="btn secondary btn--sm topbar-actions__sync"
+            onClick={onSync}
+            disabled={syncing}
+          >
+            {syncing ? "Syncing…" : "Sync"}
+          </button>
+          <button
+            type="button"
+            className="btn secondary btn--sm topbar-actions__online-dash"
+            onClick={onOpen}
+            disabled={!online}
+            title={online ? "Open the live dashboard" : "Requires an internet connection"}
+          >
+            Online Dashboard
+          </button>
+        </div>
         <SettingsMenu
           isPro={appearanceAccess?.isPro}
           hasProPlusInterfacePalette={appearanceAccess?.hasProPlusInterfacePalette}
