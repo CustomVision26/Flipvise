@@ -278,6 +278,37 @@ function slugImpliesPersonalProOrTeam(slug: string | undefined): boolean {
   return isTeamPlanId(slug);
 }
 
+/** Active Stripe subscription slug from Clerk `publicMetadata` (not Clerk Billing API). */
+export function activeStripeBillingSlugFromMeta(
+  meta: PlanPublicMetadata | undefined,
+): string | undefined {
+  if (!meta) return undefined;
+  const status =
+    typeof meta.billingStatus === "string" ? meta.billingStatus : null;
+  if (status !== "active" && status !== "trialing") return undefined;
+  const plan =
+    typeof meta.billingPlan === "string" ? meta.billingPlan.trim() : "";
+  return plan || undefined;
+}
+
+export function stripeBillingReferenceTimestampMs(
+  meta: PlanPublicMetadata | undefined,
+): number {
+  return parsePlanSourceUpdatedAtMs(meta?.billingPlanUpdatedAt) ?? 0;
+}
+
+function coalescePaidPlanSlug(
+  ...candidates: (string | undefined | null)[]
+): string | undefined {
+  for (const raw of candidates) {
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === "free") continue;
+    if (slugImpliesPersonalProOrTeam(trimmed)) return trimmed;
+  }
+  return undefined;
+}
+
 /**
  * When `planSourceUpdatedAt` is missing, treat metadata plan flags as the source of
  * entitlements only if Clerk Billing (JWT) does not already show a paid personal or team plan.
@@ -317,9 +348,16 @@ export async function resolvePersonalPlanMetadataVsBilling(input: {
   userId: string;
   has: HasFn;
   publicMetadata: PlanPublicMetadata | undefined;
+  /** Optional Stripe DB row when Clerk metadata is stale (webhook lag). */
+  stripeDbPlanSlug?: string | null;
 }): Promise<PersonalPlanResolution> {
-  const { clerkClient, userId, has, publicMetadata } = input;
+  const { clerkClient, userId, has, publicMetadata, stripeDbPlanSlug } = input;
   const metaSlug = metadataPlanSlugFromPublicMeta(publicMetadata);
+  const effectiveSlug = resolveEffectivePlan(
+    (publicMetadata ?? {}) as Record<string, unknown>,
+  );
+  const stripeMetaSlug = activeStripeBillingSlugFromMeta(publicMetadata);
+  const stripeMetaMs = stripeBillingReferenceTimestampMs(publicMetadata);
   const metaMs = parsePlanSourceUpdatedAtMs(
     publicMetadata?.planSourceUpdatedAt,
   );
@@ -331,44 +369,77 @@ export async function resolvePersonalPlanMetadataVsBilling(input: {
   let legacyMetadataOverride = false;
 
   if (metaMs != null) {
-    const sub = await fetchUserBillingSubscriptionSafe(clerkClient, userId);
-    if (sub) {
-      comparedMetadataToBilling = true;
-      const billingMs = billingReferenceTimestampMs(sub);
-      const billingSlug = billingActivePlanSlug(sub);
-      if (metaMs > billingMs) {
-        winner = "metadata";
-        chosenSlug = metaSlug;
-      } else {
-        winner = "billing";
-        chosenSlug = billingSlug;
-      }
-    } else {
-      if (jwt.teamPlan !== null) {
-        chosenSlug = jwt.teamPlan;
-      } else if (jwt.personalPro) {
-        chosenSlug = jwt.personalPaidSlug ?? "pro";
-      } else if (legacyMetadataOverridesJwt(metaSlug, has)) {
-        winner = "metadata";
-        chosenSlug = metaSlug;
-        legacyMetadataOverride = true;
-      } else {
-        chosenSlug = undefined;
+    let billingMs = stripeMetaMs;
+    let billingSlug = stripeMetaSlug;
+
+    // Legacy Clerk Billing API — only when it reports an active paid item.
+    if (!billingSlug) {
+      const sub = await fetchUserBillingSubscriptionSafe(clerkClient, userId);
+      const clerkSlug = billingActivePlanSlug(sub);
+      if (clerkSlug) {
+        billingSlug = clerkSlug;
+        billingMs = Math.max(billingMs, billingReferenceTimestampMs(sub));
       }
     }
+
+    if (billingMs > 0 || billingSlug) {
+      comparedMetadataToBilling = true;
+      if (metaMs > billingMs) {
+        winner = "metadata";
+        chosenSlug = coalescePaidPlanSlug(metaSlug, effectiveSlug);
+      } else {
+        winner = "billing";
+        chosenSlug = coalescePaidPlanSlug(
+          billingSlug,
+          stripeMetaSlug,
+          metaSlug,
+          effectiveSlug,
+        );
+      }
+    } else if (jwt.teamPlan !== null) {
+      chosenSlug = jwt.teamPlan;
+    } else if (jwt.personalPro) {
+      chosenSlug = jwt.personalPaidSlug ?? "pro";
+    } else if (legacyMetadataOverridesJwt(metaSlug, has)) {
+      winner = "metadata";
+      chosenSlug = metaSlug;
+      legacyMetadataOverride = true;
+    } else {
+      chosenSlug = coalescePaidPlanSlug(
+        stripeMetaSlug,
+        effectiveSlug,
+        metaSlug,
+      );
+    }
+  } else if (stripeMetaSlug) {
+    winner = "billing";
+    chosenSlug = stripeMetaSlug;
+  } else if (effectiveSlug && slugImpliesPersonalProOrTeam(effectiveSlug)) {
+    const adminPlan =
+      typeof publicMetadata?.adminPlan === "string"
+        ? publicMetadata.adminPlan.trim()
+        : "";
+    winner = adminPlan && effectiveSlug === adminPlan ? "metadata" : "billing";
+    chosenSlug = effectiveSlug;
   } else if (legacyMetadataOverridesJwt(metaSlug, has)) {
     winner = "metadata";
     chosenSlug = metaSlug;
     legacyMetadataOverride = true;
+  } else if (jwt.teamPlan !== null) {
+    chosenSlug = jwt.teamPlan;
+  } else if (jwt.personalPro) {
+    chosenSlug = jwt.personalPaidSlug ?? "pro";
   } else {
-    if (jwt.teamPlan !== null) {
-      chosenSlug = jwt.teamPlan;
-    } else if (jwt.personalPro) {
-      chosenSlug = jwt.personalPaidSlug ?? "pro";
-    } else {
-      chosenSlug = undefined;
-    }
+    chosenSlug = coalescePaidPlanSlug(metaSlug, effectiveSlug);
   }
+
+  chosenSlug = coalescePaidPlanSlug(
+    chosenSlug,
+    stripeMetaSlug,
+    effectiveSlug,
+    metaSlug,
+    stripeDbPlanSlug,
+  );
 
   const fromSlug = resolutionFromSlug(chosenSlug);
   return {

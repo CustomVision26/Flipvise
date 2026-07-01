@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClerkClient } from "@clerk/backend";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
+import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
 import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
@@ -62,6 +63,8 @@ export const resolveSubscriberActiveTeamPlan = cache(
       userId: subscriberUserId,
       has: noopHas,
       publicMetadata: meta,
+      stripeDbPlanSlug:
+        (await getActiveStripeSubscription(subscriberUserId))?.planSlug ?? null,
     });
 
     if (planResolution.activeTeamPlan !== null) {

@@ -94,6 +94,18 @@ export function personalWorkspaceAccessLabelFromPlanDisplay(
     hasProPlusInterfacePalette: boolean;
   },
 ): string {
+  if (fallbackInput.activeTeamPlan != null) {
+    if (planDisplay.accessSubtitle === "Affiliate grant") {
+      return `${TEAM_PLAN_LABELS[fallbackInput.activeTeamPlan]} (Affiliate)`;
+    }
+    if (planDisplay.showPaidStripeControls) {
+      return "Subscriber";
+    }
+    if (planDisplay.isComplimentary) {
+      return "Complimentary";
+    }
+    return personalWorkspacePlanDisplayLabel(fallbackInput);
+  }
   if (planDisplay.accessSubtitle === "Affiliate grant") {
     return `${planDisplay.planLabel} (Affiliate)`;
   }
@@ -247,6 +259,7 @@ async function loadPersonalWorkspaceLabelContextForUserId(
     userId,
     has: () => false,
     publicMetadata: meta as PlanPublicMetadata,
+    stripeDbPlanSlug: (await getActiveStripeSubscription(userId))?.planSlug ?? null,
   });
 
   const liveRole = typeof meta.role === "string" ? meta.role : undefined;

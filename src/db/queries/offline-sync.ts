@@ -29,6 +29,7 @@ import {
   proPlusPersonalLimits,
 } from "@/lib/personal-plan-limits";
 import { resolvePersonalPlanMetadataVsBilling } from "@/lib/plan-metadata-billing-resolution";
+import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import {
   isTeamPlanId,
   labelForTeamPlanSlug,
@@ -450,6 +451,7 @@ async function personalLimitsForSyncUser(userId: string): Promise<{
     userId,
     has: () => false,
     publicMetadata: meta,
+    stripeDbPlanSlug: (await getActiveStripeSubscription(userId))?.planSlug ?? null,
   });
 
   if (planResolution.activeTeamPlan !== null) {

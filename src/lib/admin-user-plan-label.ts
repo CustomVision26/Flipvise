@@ -2,6 +2,7 @@ import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import {
   resolveEffectivePlan,
   parsePlanSourceUpdatedAtMs,
+  metadataPlanSlugFromPublicMeta,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
@@ -63,6 +64,77 @@ function isPaidStripePlanSlug(slug: string | null): boolean {
   );
 }
 
+/** Shared Stripe vs admin metadata resolution for admin tables and account billing UI. */
+export type AdminUserPlanBillingContext = {
+  metadataSlug: string | null;
+  resolvedSlug: string | null;
+  /** Plan slug for display (`resolveEffectivePlan` ?? metadata slug). */
+  effectivePlanSlug: string | null;
+  billingPlanSlug: string | null;
+  adminPlanSlug: string | null;
+  billingStatus: string | null;
+  isBillingActive: boolean;
+  accessFromAdminGrant: boolean;
+  adminAssignmentAuthoritative: boolean;
+  legacyAdminAssignment: boolean;
+  stripeAuthoritative: boolean;
+};
+
+export function resolveAdminUserPlanBillingContext(
+  meta: AdminPlanAccessMeta,
+): AdminUserPlanBillingContext {
+  const billingStatus =
+    typeof meta.billingStatus === "string" ? meta.billingStatus : null;
+  const billingPlanSlug = normalizePlanSlug(
+    typeof meta.billingPlan === "string" ? meta.billingPlan : null,
+  );
+  const adminPlanSlug = normalizePlanSlug(
+    typeof meta.adminPlan === "string" ? meta.adminPlan : null,
+  );
+  const metadataSlug = normalizePlanSlug(metadataPlanSlugFromPublicMeta(meta));
+  const resolvedSlug = normalizePlanSlug(
+    resolveEffectivePlan(meta as Record<string, unknown>),
+  );
+  const effectivePlanSlug = resolvedSlug ?? metadataSlug;
+  const adminAssignedMs = parsePlanSourceUpdatedAtMs(meta.adminPlanUpdatedAt) ?? 0;
+  const legacyAdminAssignedMs =
+    parsePlanSourceUpdatedAtMs(meta.planSourceUpdatedAt) ?? 0;
+  const billingMs = parsePlanSourceUpdatedAtMs(meta.billingPlanUpdatedAt) ?? 0;
+  const isBillingActive =
+    billingStatus === "active" || billingStatus === "trialing";
+  const accessFromAdminGrant =
+    !!adminPlanSlug &&
+    !!effectivePlanSlug &&
+    planSlugsMatch(adminPlanSlug, effectivePlanSlug);
+  const adminAssignmentAuthoritative =
+    !!adminPlanSlug &&
+    (accessFromAdminGrant || adminAssignedMs > billingMs);
+  const stripeAuthoritative =
+    isBillingActive &&
+    !!billingPlanSlug &&
+    isPaidStripePlanSlug(billingPlanSlug) &&
+    !adminAssignmentAuthoritative;
+  const legacyAdminAssignment =
+    legacyAdminAssignedMs > 0 &&
+    !!metadataSlug &&
+    isPaidStripePlanSlug(metadataSlug) &&
+    !stripeAuthoritative;
+
+  return {
+    metadataSlug,
+    resolvedSlug,
+    effectivePlanSlug,
+    billingPlanSlug,
+    adminPlanSlug,
+    billingStatus,
+    isBillingActive,
+    accessFromAdminGrant,
+    adminAssignmentAuthoritative,
+    legacyAdminAssignment,
+    stripeAuthoritative,
+  };
+}
+
 /** How the user’s personal plan is sourced — for the admin All Users table. */
 export function resolveAdminUserPlanAccessType(input: {
   meta: AdminPlanAccessMeta;
@@ -77,41 +149,22 @@ export function resolveAdminUserPlanAccessType(input: {
     return "Affiliate";
   }
 
+  const {
+    effectivePlanSlug,
+    stripeAuthoritative,
+    adminAssignmentAuthoritative,
+    legacyAdminAssignment,
+  } = resolveAdminUserPlanBillingContext(input.meta);
   const meta = input.meta;
-  const billingStatus =
-    typeof meta.billingStatus === "string" ? meta.billingStatus : null;
-  const billingPlanSlug = normalizePlanSlug(
-    typeof meta.billingPlan === "string" ? meta.billingPlan : null,
-  );
-  const adminPlanSlug = normalizePlanSlug(
-    typeof meta.adminPlan === "string" ? meta.adminPlan : null,
-  );
-  const effectivePlanSlug = normalizePlanSlug(
-    resolveEffectivePlan(meta as Record<string, unknown>),
-  );
-  const adminAssignedMs = parsePlanSourceUpdatedAtMs(meta.adminPlanUpdatedAt) ?? 0;
-  const billingMs = parsePlanSourceUpdatedAtMs(meta.billingPlanUpdatedAt) ?? 0;
-  const isBillingActive =
-    billingStatus === "active" || billingStatus === "trialing";
-  const accessFromAdminGrant =
-    !!adminPlanSlug &&
-    !!effectivePlanSlug &&
-    planSlugsMatch(adminPlanSlug, effectivePlanSlug);
-  const adminAssignmentAuthoritative =
-    !!adminPlanSlug &&
-    (accessFromAdminGrant || adminAssignedMs > billingMs);
-  const stripeAuthoritative =
-    isBillingActive &&
-    !!billingPlanSlug &&
-    !!effectivePlanSlug &&
-    planSlugsMatch(billingPlanSlug, effectivePlanSlug) &&
-    !adminAssignmentAuthoritative &&
-    isPaidStripePlanSlug(billingPlanSlug);
 
   if (stripeAuthoritative) {
     return "Paid";
   }
-  if (meta.adminGranted === true || adminAssignmentAuthoritative) {
+  if (
+    meta.adminGranted === true ||
+    adminAssignmentAuthoritative ||
+    legacyAdminAssignment
+  ) {
     return "Assigned";
   }
   if (effectivePlanSlug != null && effectivePlanSlug !== "free") {

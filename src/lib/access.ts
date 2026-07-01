@@ -32,6 +32,7 @@ import {
 } from "@/lib/plan-metadata-billing-resolution";
 import { resolvePrioritySupportAccess } from "@/lib/priority-support-eligibility";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
+import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
 
 const clerkClient = createClerkClient({
@@ -304,6 +305,8 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
 
   const superadminAllowListed = isPlatformSuperadminAllowListed(userId);
 
+  const stripeSubPromise = getActiveStripeSubscription(userId).catch(() => null);
+
   let primaryEmail: string | null = null;
   let meta: PublicMeta;
   try {
@@ -325,11 +328,13 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     }
     meta = {} as PublicMeta;
   }
+  const stripeSub = await stripeSubPromise;
   const planResolution = await resolvePersonalPlanMetadataVsBilling({
     clerkClient,
     userId,
     has,
     publicMetadata: meta,
+    stripeDbPlanSlug: stripeSub?.planSlug ?? null,
   });
 
   const metadataForcedPersonalFree =

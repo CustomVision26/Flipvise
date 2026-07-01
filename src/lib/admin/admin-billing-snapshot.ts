@@ -7,7 +7,10 @@ import type {
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import { normalizeAdminInvoicePromoKind } from "@/lib/admin-invoice-promo-display";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import { resolveEffectivePlan, parsePlanSourceUpdatedAtMs } from "@/lib/plan-metadata-billing-resolution";
+import {
+  resolveAdminUserPlanBillingContext,
+  type AdminPlanAccessMeta,
+} from "@/lib/admin-user-plan-label";
 import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 
 export type AdminBillingUserMeta = {
@@ -43,15 +46,6 @@ function normalizePlanSlug(slug: string | null | undefined): string | null {
   return canonicalTeamPlanId(slug.trim()) ?? slug.trim();
 }
 
-function planSlugsMatch(
-  a: string | null | undefined,
-  b: string | null | undefined,
-): boolean {
-  const left = normalizePlanSlug(a);
-  const right = normalizePlanSlug(b);
-  return left != null && right != null && left === right;
-}
-
 function isPaidStripePlanSlug(slug: string | null): boolean {
   if (!slug) return false;
   return (
@@ -60,6 +54,11 @@ function isPaidStripePlanSlug(slug: string | null): boolean {
     isTeamPlanId(slug) ||
     isStripePaidPlanId(slug)
   );
+}
+
+function displayPlanNameFromSlug(slug: string | null): string {
+  if (!slug || slug === "free") return "Free";
+  return displayNameForBillingPlanSlug(slug);
 }
 
 /** Clerk users with Stripe vs admin/affiliate grant resolution for admin billing tables. */
@@ -75,34 +74,8 @@ export function clerkUsersToBillingMeta(
   }[],
 ): AdminBillingUserMeta[] {
   return clerkUsers.map((u) => {
-    const meta = (u.publicMetadata ?? {}) as Record<string, unknown>;
-    const billingStatus =
-      typeof meta.billingStatus === "string" ? meta.billingStatus : null;
-    const billingPlanSlug = normalizePlanSlug(
-      typeof meta.billingPlan === "string" ? meta.billingPlan : null,
-    );
-    const adminPlanSlug = normalizePlanSlug(
-      typeof meta.adminPlan === "string" ? meta.adminPlan : null,
-    );
-    const effectivePlanSlug = normalizePlanSlug(resolveEffectivePlan(meta));
-    const isBillingActive =
-      billingStatus === "active" || billingStatus === "trialing";
-    const adminAssignedMs = parsePlanSourceUpdatedAtMs(meta.adminPlanUpdatedAt) ?? 0;
-    const billingMs = parsePlanSourceUpdatedAtMs(meta.billingPlanUpdatedAt) ?? 0;
-    const accessFromAdminGrant =
-      !!adminPlanSlug &&
-      !!effectivePlanSlug &&
-      planSlugsMatch(adminPlanSlug, effectivePlanSlug);
-    const adminAssignmentAuthoritative =
-      !!adminPlanSlug &&
-      (accessFromAdminGrant || adminAssignedMs > billingMs);
-    const stripeAuthoritative =
-      isBillingActive &&
-      !!billingPlanSlug &&
-      !!effectivePlanSlug &&
-      planSlugsMatch(billingPlanSlug, effectivePlanSlug) &&
-      !adminAssignmentAuthoritative &&
-      isPaidStripePlanSlug(billingPlanSlug);
+    const meta = (u.publicMetadata ?? {}) as AdminPlanAccessMeta;
+    const planCtx = resolveAdminUserPlanBillingContext(meta);
 
     const primaryEmail =
       u.emailAddresses.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ??
@@ -114,17 +87,17 @@ export function clerkUsersToBillingMeta(
       id: u.id,
       fullName,
       email: primaryEmail,
-      isPaidPro: stripeAuthoritative,
-      planDisplayName: effectivePlanSlug ?? "Free",
-      billingStatus,
+      isPaidPro: planCtx.stripeAuthoritative,
+      planDisplayName: displayPlanNameFromSlug(planCtx.effectivePlanSlug),
+      billingStatus: planCtx.billingStatus,
       billingPlanUpdatedAt:
         typeof meta.billingPlanUpdatedAt === "string"
           ? meta.billingPlanUpdatedAt
           : null,
-      billingPlanSlug,
-      effectivePlanSlug,
-      accessFromAdminGrant,
-      stripeAuthoritative,
+      billingPlanSlug: planCtx.billingPlanSlug,
+      effectivePlanSlug: planCtx.effectivePlanSlug,
+      accessFromAdminGrant: planCtx.accessFromAdminGrant,
+      stripeAuthoritative: planCtx.stripeAuthoritative,
     };
   });
 }
@@ -249,11 +222,7 @@ export function buildAdminBillingSnapshot(input: {
     }
 
     const stripePlan = normalizePlanSlug(stripeRow.planSlug);
-    if (!stripePlan || !isPaidStripePlanSlug(stripePlan)) return false;
-
-    return (
-      !!user.effectivePlanSlug && planSlugsMatch(stripePlan, user.effectivePlanSlug)
-    );
+    return stripePlan != null && isPaidStripePlanSlug(stripePlan);
   }
 
   const paidUserIds = new Set<string>();

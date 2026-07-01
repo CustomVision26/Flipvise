@@ -179,6 +179,9 @@ export function defaultOfflineAccessContext(): OfflineAccessContext {
 /** True when a pre-fix sync cached placeholder Free labels despite Pro+ limits. */
 function isStaleOfflineFreePlanCache(ctx: OfflineAccessContext): boolean {
   if (ctx.viewerIsSuperadmin || ctx.viewerIsPlatformAdmin) return false;
+  if (ctx.personalHasTeamTierPlan && ctx.personalPlanLabel?.trim() === "Free") {
+    return true;
+  }
   const account = ctx.personalAccountPlanLabel?.trim();
   const accessType = ctx.personalPlanAccessType;
   const stored = ctx.personalPlanLabel?.trim();
@@ -201,6 +204,14 @@ export function resolveOfflinePersonalPlanLabel(
   const accessType = ctx.personalPlanAccessType;
   const stored = ctx.personalPlanLabel?.trim();
   const staleFree = isStaleOfflineFreePlanCache(ctx);
+
+  if (hasTeamTier) {
+    if (accessType === "Affiliate" && account) return `${account} (Affiliate)`;
+    if (accessType === "Paid") return "Subscriber";
+    if (accessType === "Complimentary") return "Complimentary";
+    if (account && account !== "Free" && !staleFree) return account;
+    return "Subscriber";
+  }
 
   if (!hasTeamTier && stored && !staleFree) {
     const looksLikeTeamTierLabel =

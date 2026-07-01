@@ -1,10 +1,12 @@
-import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import {
   isClerkPlatformAdminRole,
   isClerkSuperadminRole,
 } from "@/lib/clerk-platform-admin-role";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
+import {
+  resolveAdminUserPlanBillingContext,
+  type AdminPlanAccessMeta,
+} from "@/lib/admin-user-plan-label";
 import { canonicalTeamPlanId } from "@/lib/team-plans";
 
 export type BillingTabPlanDisplay = {
@@ -32,15 +34,6 @@ type AffiliateGrantRow = {
 function normalizePlanSlug(slug: string | null | undefined): string | null {
   if (!slug?.trim()) return null;
   return canonicalTeamPlanId(slug.trim()) ?? slug.trim();
-}
-
-function planSlugsMatch(
-  a: string | null | undefined,
-  b: string | null | undefined,
-): boolean {
-  const left = normalizePlanSlug(a);
-  const right = normalizePlanSlug(b);
-  return left != null && right != null && left === right;
 }
 
 /** Active marketing-affiliate row linked to this user (not revoked, not past end date). */
@@ -83,8 +76,6 @@ export function resolveBillingTabPlanDisplay(input: {
 }): BillingTabPlanDisplay {
   const role = typeof input.meta.role === "string" ? input.meta.role : null;
   const adminGranted = input.meta.adminGranted === true;
-  const adminPlan =
-    typeof input.meta.adminPlan === "string" ? input.meta.adminPlan.trim() : null;
 
   const isSuperadmin = isClerkSuperadminRole(role);
   const isPlatformAdmin =
@@ -96,9 +87,14 @@ export function resolveBillingTabPlanDisplay(input: {
       : null;
 
   const stripeSlug = normalizePlanSlug(input.stripePlanSlug);
-  const effectiveSlug = normalizePlanSlug(resolveEffectivePlan(input.meta));
+  const planCtx = resolveAdminUserPlanBillingContext(
+    input.meta as AdminPlanAccessMeta,
+  );
+  const effectiveSlug = planCtx.effectivePlanSlug;
   const accessFromAdminGrant =
-    !!adminPlan && planSlugsMatch(adminPlan, effectiveSlug);
+    planCtx.accessFromAdminGrant ||
+    planCtx.adminAssignmentAuthoritative ||
+    planCtx.legacyAdminAssignment;
   const activeAffiliateGrant = input.activeAffiliateGrant ?? null;
 
   let planSlug = effectiveSlug ?? stripeSlug;
@@ -150,10 +146,7 @@ export function resolveBillingTabPlanDisplay(input: {
     accessSubtitle = "Paid subscription";
   }
 
-  const stripeIsAuthoritative =
-    stripeSlug != null &&
-    effectiveSlug === stripeSlug &&
-    isStripePaidPlanId(stripeSlug);
+  const stripeIsAuthoritative = planCtx.stripeAuthoritative;
 
   const showPaidStripeControls =
     stripeIsAuthoritative && !isComplimentary && !accessFromAffiliateGrant;

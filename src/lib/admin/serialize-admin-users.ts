@@ -3,12 +3,12 @@ import type { SerializedUser } from "@/lib/admin-dashboard-types";
 import {
   getAdminUserPlanColumnLabel,
   resolveAdminUserPlanAccessType,
+  resolveAdminUserPlanBillingContext,
 } from "@/lib/admin-user-plan-label";
 import {
   augmentAdminPlanLabelWithWinner,
   metadataPlanSlugFromPublicMeta,
   parsePlanSourceUpdatedAtMs,
-  resolveEffectivePlan,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
@@ -68,11 +68,9 @@ function billingReferenceMsFromMetadata(meta: ClerkUserMeta): number {
 }
 
 function planResolutionFromMetadata(meta: ClerkUserMeta) {
-  const stripeResolved = resolveEffectivePlan(meta as Record<string, unknown>);
-  const metaSlug = metadataPlanSlugFromPublicMeta(meta);
-  const effectiveSlug = stripeResolved ?? metaSlug;
+  const planCtx = resolveAdminUserPlanBillingContext(meta);
   return {
-    effectiveSlug: effectiveSlug ?? undefined,
+    effectiveSlug: planCtx.effectivePlanSlug ?? undefined,
     comparedMetadataToBilling: false,
     winner: null as "billing" | "metadata" | null,
     legacyMetadataOverride: false,
@@ -80,13 +78,17 @@ function planResolutionFromMetadata(meta: ClerkUserMeta) {
 }
 
 function stripeActivePlanSlug(meta: ClerkUserMeta): string | undefined {
-  const active =
-    meta.billingStatus === "active" || meta.billingStatus === "trialing";
-  if (!active) return undefined;
-  const fromStripe = resolveEffectivePlan(meta as Record<string, unknown>);
-  if (fromStripe) return fromStripe;
+  const planCtx = resolveAdminUserPlanBillingContext(meta);
+  if (planCtx.stripeAuthoritative && planCtx.billingPlanSlug) {
+    return planCtx.billingPlanSlug;
+  }
+  if (planCtx.isBillingActive && planCtx.resolvedSlug) {
+    return planCtx.resolvedSlug;
+  }
   if (typeof meta.billingPlan === "string" && meta.billingPlan.trim()) {
-    return meta.billingPlan.trim();
+    const active =
+      meta.billingStatus === "active" || meta.billingStatus === "trialing";
+    if (active) return meta.billingPlan.trim();
   }
   return undefined;
 }
@@ -316,21 +318,14 @@ export function countAdminGrantedProPlus(clerkUsers: User[]): number {
   let adminRoleProCount = 0;
 
   for (const u of clerkUsers) {
-    const meta = u.publicMetadata as {
-      role?: string;
-      adminGranted?: boolean;
-      billingPlan?: string;
-      billingStatus?: string;
-    };
-    const stripeActive =
-      meta?.billingStatus === "active" || meta?.billingStatus === "trialing";
-    const effectiveSlug = stripeActive
-      ? (resolveEffectivePlan(meta as Record<string, unknown>) ?? meta?.billingPlan ?? null)
-      : null;
+    const meta = u.publicMetadata as ClerkUserMeta;
+    const planCtx = resolveAdminUserPlanBillingContext(meta);
     const isPaidPro =
-      effectiveSlug === "pro" ||
-      effectiveSlug === "pro_plus" ||
-      isTeamPlanId(effectiveSlug ?? "");
+      planCtx.stripeAuthoritative ||
+      (planCtx.effectivePlanSlug != null &&
+        (planCtx.effectivePlanSlug === "pro" ||
+          planCtx.effectivePlanSlug === "pro_plus" ||
+          isTeamPlanId(planCtx.effectivePlanSlug)));
     const isAdminGranted = meta?.adminGranted === true;
     const isAdminRole = meta?.role === "admin" || meta?.role === "superadmin";
 
