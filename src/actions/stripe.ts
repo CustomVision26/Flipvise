@@ -19,6 +19,7 @@ import {
 } from "@/lib/stripe-plan-price-env";
 import {
   ensureGeneralPlanStripeCoupon,
+  noPromoCheckoutDiscount,
   resolveCheckoutDiscount,
   resolveStripeCheckoutDiscountPayload,
   resolveUnderlyingStripeCouponId,
@@ -39,6 +40,8 @@ import {
   resolvePlanPromoWindow,
 } from "@/lib/plan-promo-window";
 import { resolveCatalogAlignedStripePriceId } from "@/lib/stripe-catalog-price";
+import { hasUserConsumedPlanTrial } from "@/db/queries/user-plan-trials";
+import { resolveCheckoutTrialDays } from "@/lib/plan-trial";
 
 const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
 type PaidPlanId = StripePaidPlanId;
@@ -49,6 +52,7 @@ const createCheckoutSessionSchema = z.object({
   plan: z.enum(PAID_PLAN_IDS).default("pro"),
   period: z.enum(BILLING_PERIODS).default("monthly"),
   promotionCode: z.string().max(128).optional(),
+  startTrial: z.boolean().optional(),
 });
 type CreateCheckoutSessionInput = z.infer<typeof createCheckoutSessionSchema>;
 
@@ -245,7 +249,7 @@ async function createStripeCheckoutSessionActionInner(
 
   const parsed = createCheckoutSessionSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
-  const { plan, period, promotionCode } = parsed.data;
+  const { plan, period, promotionCode, startTrial } = parsed.data;
 
   const appUrl = resolveAppUrl();
   const successReturnPath = personalDashboardHrefAfterCheckoutSuccess({
@@ -266,6 +270,27 @@ async function createStripeCheckoutSessionActionInner(
   }
 
   const planRow = plansConfig.find((p) => p.id === plan);
+  const hasUsedTrial = await hasUserConsumedPlanTrial(userId);
+  const hasActiveSub = (await getManageableStripeSubscription(userId)) != null;
+  const trialDays =
+    planRow != null
+      ? resolveCheckoutTrialDays({
+          plan: planRow,
+          planId: plan,
+          startTrial: Boolean(startTrial),
+          hasUsedTrial,
+          period,
+        })
+      : null;
+
+  if (startTrial && trialDays == null) {
+    throw new Error(
+      hasUsedTrial
+        ? "You have already used your free trial."
+        : "This plan does not offer a free trial.",
+    );
+  }
+
   const priceId = planRow
     ? await resolveCatalogAlignedStripePriceId({
         plan,
@@ -277,14 +302,18 @@ async function createStripeCheckoutSessionActionInner(
 
   const description = subscriptionDescriptionFromPlansConfig(plan, period, plansConfig);
 
-  const discountResolution = await resolveCheckoutDiscount({
-    planId: plan,
-    promotionCodeInput: promotionCode,
-    plansConfig,
-    userId,
-  });
+  const discountResolution =
+    trialDays != null
+      ? noPromoCheckoutDiscount()
+      : await resolveCheckoutDiscount({
+          planId: plan,
+          promotionCodeInput: promotionCode,
+          plansConfig,
+          userId,
+        });
 
   if (
+    trialDays == null &&
     discountResolution.couponId != null &&
     discountResolution.affiliateId == null
   ) {
@@ -305,11 +334,12 @@ async function createStripeCheckoutSessionActionInner(
   }
 
   const checkoutDiscount =
-    discountResolution.couponId != null
+    trialDays == null && discountResolution.couponId != null
       ? await resolveStripeCheckoutDiscountPayload(discountResolution.couponId)
       : null;
 
   if (
+    trialDays == null &&
     discountResolution.couponId != null &&
     discountResolution.customerPromoCode != null &&
     discountResolution.promoKind != null &&
@@ -340,6 +370,9 @@ async function createStripeCheckoutSessionActionInner(
     subscriptionMetadata.promoCode = discountResolution.customerPromoCode;
     subscriptionMetadata.promoKind = discountResolution.promoKind;
   }
+  if (trialDays != null) {
+    subscriptionMetadata.isTrial = "true";
+  }
 
   const checkoutCustomer = await resolveCheckoutCustomerParams(userId);
 
@@ -362,6 +395,7 @@ async function createStripeCheckoutSessionActionInner(
       subscription_data: {
         description,
         metadata: subscriptionMetadata,
+        ...(trialDays != null ? { trial_period_days: trialDays } : {}),
       },
       automatic_tax: { enabled: true },
       billing_address_collection: "required",

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
-import Script from "next/script";
 import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
@@ -13,6 +12,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { loadRootLayoutShellData } from "@/lib/load-root-layout-shell-data";
+import { getManageableStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import { resolveBillingReminderState } from "@/lib/billing-reminder-state";
+import { BillingReminderBanner } from "@/components/billing-reminder-banner";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
   PRO_UI_THEME_COOKIE,
@@ -113,6 +115,26 @@ export default async function RootLayout({
     teamContextCookie: teamContext,
   });
 
+  let billingReminder = null;
+  if (userId && !pathnameHeader.startsWith("/pricing")) {
+    try {
+      const stripeRow = await getManageableStripeSubscription(userId);
+      billingReminder = resolveBillingReminderState({
+        stripeRow: stripeRow
+          ? {
+              status: stripeRow.status,
+              planSlug: stripeRow.planSlug,
+              trialEnd: stripeRow.trialEnd,
+              currentPeriodEnd: stripeRow.currentPeriodEnd,
+              paymentFailedAt: stripeRow.paymentFailedAt,
+            }
+          : null,
+      });
+    } catch {
+      // Best-effort banner
+    }
+  }
+
   const dashboardHrefWithUserQuery =
     userId != null
       ? personalDashboardHrefWithUserPlanQuery({
@@ -169,10 +191,13 @@ export default async function RootLayout({
       data-native-shell={nativeShell.isNativeShell ? "1" : undefined}
       data-platform={nativeShell.platform}
     >
+      <head>
+        <script
+          id="flipvise-native-shell-early"
+          dangerouslySetInnerHTML={{ __html: NATIVE_SHELL_EARLY_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full flex flex-col relative">
-        <Script id="flipvise-native-shell-early" strategy="beforeInteractive">
-          {NATIVE_SHELL_EARLY_SCRIPT}
-        </Script>
         <AppProviders>
             {showHeaderChrome && (
               <AuthenticatedShellChrome>
@@ -270,6 +295,9 @@ export default async function RootLayout({
               data-shell={isTeamAdminRoute ? "team-admin" : undefined}
               suppressHydrationWarning
             >
+              {billingReminder && userId && !isTeamInviteRoute ? (
+                <BillingReminderBanner reminder={billingReminder} />
+              ) : null}
               <TooltipProvider>{children}</TooltipProvider>
             </div>
         </AppProviders>

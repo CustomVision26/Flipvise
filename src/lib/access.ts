@@ -32,6 +32,7 @@ import {
 } from "@/lib/plan-metadata-billing-resolution";
 import { resolvePrioritySupportAccess } from "@/lib/priority-support-eligibility";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
+import { enforceExpiredPaymentGraceIfNeeded } from "@/lib/billing-grace-enforcement";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
 
@@ -302,6 +303,10 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   if (!userId) {
     return guestAccessContext();
   }
+
+  await enforceExpiredPaymentGraceIfNeeded(userId).catch(() => {
+    // Best-effort — access still resolves from Clerk metadata.
+  });
 
   const superadminAllowListed = isPlatformSuperadminAllowListed(userId);
 

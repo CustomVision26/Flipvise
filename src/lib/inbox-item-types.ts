@@ -10,6 +10,7 @@ export type InboxItemType =
   | "affiliate"
   | "affiliate_broadcast"
   | "affiliate_notice"
+  | "billing_notice"
   | "admin_plan_log"
   | "admin_plan_invite"
   | "quiz_security_notice"
@@ -82,6 +83,16 @@ export type AffiliateNoticePayload = {
   affiliateName: string;
   planAssigned: string;
   /** Revoked at, invite period end, or scheduled grant end (ISO). */
+  eventAtIso: string;
+};
+
+export type BillingNoticePayload = {
+  kind:
+    | "trial_ending"
+    | "trial_expired"
+    | "payment_grace"
+    | "payment_grace_expired";
+  planSlug: string;
   eventAtIso: string;
 };
 
@@ -180,6 +191,16 @@ export type UnifiedInboxItem =
       payload: AffiliateNoticePayload;
     }
   | {
+      type: "billing_notice";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: boolean;
+      payload: BillingNoticePayload;
+    }
+  | {
       type: "admin_plan_log";
       key: string;
       title: string;
@@ -238,6 +259,7 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   affiliate: "Affiliate Invite",
   affiliate_broadcast: "Affiliate message",
   affiliate_notice: "Affiliate notice",
+  billing_notice: "Billing notice",
   admin_plan_log: "Plan update",
   admin_plan_invite: "Plan request",
   quiz_security_notice: "Quiz security",

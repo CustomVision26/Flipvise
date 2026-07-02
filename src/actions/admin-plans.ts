@@ -13,6 +13,7 @@ import {
   deactivateExpiredPlanPromos,
   validatePlanPromoForSave,
 } from "@/lib/plan-promo-window";
+import { normalizePlanTrialConfig } from "@/lib/plan-trial";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -45,6 +46,16 @@ const PlanConfigSchema = z.object({
   discontinueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   promoStartsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable().optional(),
   promoEndsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable().optional(),
+});
+
+const PlanTrialSchema = z.object({
+  days: z.number().int().min(0).max(90),
+  published: z.boolean(),
+});
+
+const UpdatePlanTrialInput = z.object({
+  planId: z.string().min(1),
+  trial: PlanTrialSchema,
 });
 
 const UpdatePlanInput = z.object({
@@ -119,4 +130,30 @@ export async function reorderPlanFeatureAction(input: {
   await writePlansConfig(plans);
   revalidatePath("/pricing");
   revalidatePath("/admin/plans");
+}
+
+export async function updatePlanTrialAction(
+  input: z.infer<typeof UpdatePlanTrialInput>,
+) {
+  await requireAdmin();
+
+  const parsed = UpdatePlanTrialInput.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(`Invalid trial data: ${parsed.error.issues[0]?.message ?? "unknown"}`);
+  }
+
+  const { planId, trial } = parsed.data;
+  const normalizedTrial = normalizePlanTrialConfig(trial);
+
+  const plans = await readPlansConfig();
+  const idx = plans.findIndex((p) => p.id === planId);
+  if (idx === -1) throw new Error(`Plan "${planId}" not found`);
+  if (planId === "free") throw new Error("Free plan cannot have a trial");
+
+  plans[idx] = { ...plans[idx], trial: normalizedTrial };
+  await writePlansConfig(plans);
+
+  revalidatePath("/pricing");
+  revalidatePath("/admin/plans");
+  revalidatePath("/admin/plan-trials");
 }

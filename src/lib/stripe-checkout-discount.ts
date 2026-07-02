@@ -32,6 +32,18 @@ export type ResolvedCheckoutDiscount = {
   percentOff: number | null;
 };
 
+/** Trial checkouts never apply coupons, affiliate codes, or promotion-code entry. */
+export function noPromoCheckoutDiscount(): ResolvedCheckoutDiscount {
+  return {
+    couponId: null,
+    allowPromotionCodes: false,
+    affiliateId: null,
+    customerPromoCode: null,
+    promoKind: null,
+    percentOff: null,
+  };
+}
+
 /** Sets Stripe coupon `name` so hosted invoices/receipts show the promo code used. */
 export async function stampStripeCouponInvoiceLabel(opts: {
   couponId: string;

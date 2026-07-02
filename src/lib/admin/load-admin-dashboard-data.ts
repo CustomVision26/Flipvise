@@ -16,6 +16,9 @@ import { countClerkUsersWithPaidPlanAccess } from "@/lib/admin-user-plan-label";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { evaluateAllActiveAffiliateQuotas } from "@/lib/affiliate-quota-renewal";
 import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
+import { listUserPlanTrialsForAdmin } from "@/db/queries/user-plan-trials";
+import { buildAdminBillingMonitorRows } from "@/lib/admin/billing-monitor-snapshot";
+import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
 import {
   getContactUsStats,
@@ -173,6 +176,7 @@ export type AdminTabsData = {
   contactUsStats: ContactUsMessageStats;
   plansConfig: PlanConfig[];
   affiliates: SerializedAffiliate[];
+  billingMonitorRows: AdminBillingMonitorRow[];
 };
 
 const EMPTY_CONTACT_SETTINGS: SerializedContactSettings = {
@@ -213,6 +217,7 @@ export async function loadAdminTabsData(
     contactUsStats: EMPTY_CONTACT_US_STATS,
     plansConfig: [],
     affiliates: [],
+    billingMonitorRows: [],
   };
 
   switch (section) {
@@ -367,12 +372,13 @@ export async function loadAdminTabsData(
     case "invoices": {
       const { data: clerkUsers } = await getAdminClerkUserList();
       const invoiceLimit = section === "invoices" ? INVOICES_TAB_LIMIT : OVERVIEW_INVOICE_LIMIT;
-      const [persistedBillingInvoices, rawAffiliates, stripeSubscriptions] =
+      const [persistedBillingInvoices, rawAffiliates, stripeSubscriptions, trialRows] =
         await runDbTasksWithConcurrencyLimit(
           [
             () => listBillingInvoicesForAdmin(invoiceLimit),
             () => listAffiliates(),
             () => listStripeSubscriptionsForAdmin(),
+            () => listUserPlanTrialsForAdmin(),
           ] as const,
           ADMIN_DASHBOARD_DB_CONCURRENCY,
         );
@@ -423,7 +429,19 @@ export async function loadAdminTabsData(
           includeWorkspaceDetails: false,
         });
 
-        return { ...empty, users, subscriptions, invoices };
+        const usersById = new Map(
+          users.map((u) => [
+            u.id,
+            { fullName: u.fullName, email: u.email },
+          ]),
+        );
+        const billingMonitorRows = buildAdminBillingMonitorRows({
+          stripeRows: stripeSubscriptions,
+          trialRows,
+          usersById,
+        });
+
+        return { ...empty, users, subscriptions, invoices, billingMonitorRows };
       }
 
       return { ...empty, subscriptions, invoices };

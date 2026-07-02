@@ -17,6 +17,8 @@ import {
   quizSecurityInboxMessages,
   quizSecuritySessions,
   stripeSubscriptions,
+  userPlanTrials,
+  billingNoticeInboxMessages,
   supportTickets,
   teamDeckAssignments,
   teamMembers,
@@ -157,6 +159,10 @@ export async function purgeAllUserData(
     .delete(billingProrationLines)
     .where(eq(billingProrationLines.userId, userId));
   await db.delete(stripeSubscriptions).where(eq(stripeSubscriptions.userId, userId));
+  await db.delete(userPlanTrials).where(eq(userPlanTrials.userId, userId));
+  await db
+    .delete(billingNoticeInboxMessages)
+    .where(eq(billingNoticeInboxMessages.recipientUserId, userId));
   await db.delete(quizResults).where(eq(quizResults.userId, userId));
   await db.delete(quizSecuritySessions).where(eq(quizSecuritySessions.userId, userId));
   await db

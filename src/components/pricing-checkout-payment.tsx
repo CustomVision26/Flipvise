@@ -39,6 +39,10 @@ export type PricingCheckoutSummary = {
   customerEmail: string | null;
   campaignLabel: string | null;
   promo: CheckoutPromoDisplay | null;
+  isTrial: boolean;
+  trialDays: number | null;
+  /** List monthly rate after trial (major units). */
+  monthlyRateAfterTrial: number | null;
   /** Stripe Checkout Session amounts — same source as the slide button total. */
   stripeAmounts: CheckoutSessionAmountsMajor | null;
 };
@@ -110,87 +114,138 @@ function OrderSummary({
   liveTotalMajor: number | null;
 }) {
   const isYearly = summary.period === "yearly";
-  const periodLabel = isYearly ? "Annual billing" : "Monthly billing";
+  const periodLabel = summary.isTrial
+    ? "Monthly billing after trial"
+    : isYearly
+      ? "Annual billing"
+      : "Monthly billing";
   const amounts = summary.stripeAmounts;
 
   const subtotal = amounts?.subtotalMajor ?? null;
-  const discount = amounts?.discountMajor ?? null;
-  const totalDue =
-    liveTotalMajor ?? amounts?.totalDueMajor ?? null;
+  const discount = summary.isTrial ? null : amounts?.discountMajor ?? null;
+  const totalDue = summary.isTrial
+    ? 0
+    : liveTotalMajor ?? amounts?.totalDueMajor ?? null;
 
   const impliedTax =
-    totalDue != null && subtotal != null
+    !summary.isTrial && totalDue != null && subtotal != null
       ? roundMoney(Math.max(0, totalDue - subtotal + (discount ?? 0)))
-      : (amounts?.taxMajor ?? null);
+      : summary.isTrial
+        ? null
+        : (amounts?.taxMajor ?? null);
 
   const monthlyEquivalent =
-    isYearly && totalDue != null ? roundMoney(totalDue / 12) : null;
+    !summary.isTrial && isYearly && totalDue != null
+      ? roundMoney(totalDue / 12)
+      : null;
+
+  const monthlyAfterTrial =
+    summary.monthlyRateAfterTrial ??
+    (!summary.isTrial && isYearly && subtotal != null ? roundMoney(subtotal / 12) : subtotal);
 
   return (
     <section className="space-y-4">
-      <SectionLabel>Order summary</SectionLabel>
+      <SectionLabel>{summary.isTrial ? "Free trial" : "Order summary"}</SectionLabel>
       <div className="space-y-1">
         <h1
           className="font-serif text-xl font-normal tracking-tight text-[#1a2332] sm:text-[1.35rem]"
           style={{ fontFamily: 'Georgia, "Noto Serif", serif' }}
         >
-          Subscribe to {summary.planLabel}
+          {summary.isTrial
+            ? `Start your ${summary.planLabel} free trial`
+            : `Subscribe to ${summary.planLabel}`}
         </h1>
         <p className="text-sm text-[#6b7280]">{periodLabel}</p>
       </div>
 
-      {summary.campaignLabel ? (
+      {summary.isTrial && summary.trialDays != null && summary.trialDays > 0 ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm leading-relaxed text-[#3d4f46]">
+          You are about to start the{" "}
+          <span className="font-medium text-[#1a2332]">{summary.planLabel}</span> free trial.
+          Add your payment method below — you will not be charged until your{" "}
+          {summary.trialDays}-day trial ends.
+        </div>
+      ) : null}
+
+      {!summary.isTrial && summary.campaignLabel ? (
         <Badge className="border-amber-300/50 bg-amber-50 font-normal text-amber-950 hover:bg-amber-50">
           {summary.campaignLabel}
         </Badge>
       ) : null}
 
       <div className="space-y-2 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-4 py-3.5 text-sm">
-        <div className="flex items-baseline justify-between gap-4">
-          <span className="text-[#6b7280]">
-            {summary.planLabel} · {isYearly ? "Yearly" : "Monthly"}
-          </span>
-          {subtotal != null ? (
-            <span
-              className={cn(
-                "tabular-nums text-[#30313d]",
-                discount != null && discount > 0 && "text-[#6b7280] line-through",
-              )}
-            >
-              ${formatPlanMoney(subtotal)}
-            </span>
-          ) : null}
-        </div>
-        {discount != null && discount > 0 ? (
-          <div className="flex items-baseline justify-between gap-4 text-emerald-800">
-            <span>
-              {summary.promo?.kind === "affiliate"
-                ? "Affiliate discount"
-                : "General discount"}
-            </span>
-            <span className="tabular-nums">−${formatPlanMoney(discount)}</span>
-          </div>
-        ) : null}
-        {impliedTax != null && impliedTax > 0 ? (
-          <div className="flex items-baseline justify-between gap-4 text-[#30313d]">
-            <span>Tax</span>
-            <span className="tabular-nums">${formatPlanMoney(impliedTax)}</span>
-          </div>
-        ) : null}
-        <Separator className="bg-[#e0e4e8]" />
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <span className="font-medium text-[#1a2332]">Total due today</span>
-          {totalDue != null ? (
-            <div className="text-right">
-              <span className="font-serif text-2xl font-semibold tabular-nums text-[#1a2332]">
-                ${formatPlanMoney(totalDue)}
+        {summary.isTrial && summary.trialDays != null && summary.trialDays > 0 ? (
+          <>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="text-[#6b7280]">
+                {summary.planLabel} · {summary.trialDays}-day trial
               </span>
-              <span className="ml-1.5 text-sm text-[#6b7280]">
-                {isYearly ? "per year" : "per month"}
+              <span className="font-serif text-2xl font-semibold tabular-nums text-[#1a2332]">
+                $0
               </span>
             </div>
-          ) : null}
-        </div>
+            {monthlyAfterTrial != null ? (
+              <p className="text-[#6b7280]">
+                Then ${formatPlanMoney(monthlyAfterTrial)} / month after trial
+              </p>
+            ) : null}
+            <Separator className="bg-[#e0e4e8]" />
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="font-medium text-[#1a2332]">Total due today</span>
+              <span className="font-serif text-2xl font-semibold tabular-nums text-[#1a2332]">
+                $0
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-[#6b7280]">
+                {summary.planLabel} · {isYearly ? "Yearly" : "Monthly"}
+              </span>
+              {subtotal != null ? (
+                <span
+                  className={cn(
+                    "tabular-nums text-[#30313d]",
+                    discount != null && discount > 0 && "text-[#6b7280] line-through",
+                  )}
+                >
+                  ${formatPlanMoney(subtotal)}
+                </span>
+              ) : null}
+            </div>
+            {discount != null && discount > 0 ? (
+              <div className="flex items-baseline justify-between gap-4 text-emerald-800">
+                <span>
+                  {summary.promo?.kind === "affiliate"
+                    ? "Affiliate discount"
+                    : "General discount"}
+                </span>
+                <span className="tabular-nums">−${formatPlanMoney(discount)}</span>
+              </div>
+            ) : null}
+            {impliedTax != null && impliedTax > 0 ? (
+              <div className="flex items-baseline justify-between gap-4 text-[#30313d]">
+                <span>Tax</span>
+                <span className="tabular-nums">${formatPlanMoney(impliedTax)}</span>
+              </div>
+            ) : null}
+            <Separator className="bg-[#e0e4e8]" />
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="font-medium text-[#1a2332]">Total due today</span>
+              {totalDue != null ? (
+                <div className="text-right">
+                  <span className="font-serif text-2xl font-semibold tabular-nums text-[#1a2332]">
+                    ${formatPlanMoney(totalDue)}
+                  </span>
+                  <span className="ml-1.5 text-sm text-[#6b7280]">
+                    {isYearly ? "per year" : "per month"}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
 
       {monthlyEquivalent != null ? (
@@ -199,7 +254,7 @@ function OrderSummary({
         </p>
       ) : null}
 
-      {summary.promo ? <PromoPanel promo={summary.promo} /> : null}
+      {!summary.isTrial && summary.promo ? <PromoPanel promo={summary.promo} /> : null}
     </section>
   );
 }
@@ -222,6 +277,9 @@ function CheckoutPayBody({
       <CheckoutPaymentFields
         customerEmail={summary.customerEmail}
         checkoutState={checkoutState}
+        isTrial={summary.isTrial}
+        planLabel={summary.planLabel}
+        trialDays={summary.trialDays}
       />
     </>
   );
@@ -230,9 +288,15 @@ function CheckoutPayBody({
 function CheckoutPaymentFields({
   customerEmail,
   checkoutState,
+  isTrial,
+  planLabel,
+  trialDays,
 }: {
   customerEmail: string | null;
   checkoutState: ReturnType<typeof useCheckoutElements>;
+  isTrial: boolean;
+  planLabel: string;
+  trialDays: number | null;
 }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -253,9 +317,13 @@ function CheckoutPaymentFields({
 
   const { checkout } = checkoutState;
   const stripeTotal = stripeCheckoutElementsTotalFormatted(checkout.total);
-  const slideLabel = stripeTotal
-    ? `Slide to subscribe — ${stripeTotal}`
-    : "Slide to subscribe";
+  const slideLabel = isTrial
+    ? trialDays != null && trialDays > 0
+      ? `Slide to start ${trialDays}-day trial`
+      : `Slide to start free trial`
+    : stripeTotal
+      ? `Slide to subscribe — ${stripeTotal}`
+      : "Slide to subscribe";
 
   async function handleSubscribe() {
     setIsSubmitting(true);
@@ -274,7 +342,7 @@ function CheckoutPaymentFields({
       {customerEmail ? (
         <div className="space-y-2">
           <Label htmlFor="checkout-email" className="text-sm font-medium text-[#30313d]">
-            Email
+            Account email
           </Label>
           <Input
             id="checkout-email"
@@ -282,11 +350,19 @@ function CheckoutPaymentFields({
             value={customerEmail}
             className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
           />
+          <p className="text-xs leading-relaxed text-[#6b7280]">
+            Your signed-in Flipvise account. Receipts and billing notices are sent here.
+          </p>
         </div>
       ) : null}
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-[#30313d]">Payment method</p>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-[#30313d]">Payment method</p>
+          <p className="text-xs leading-relaxed text-[#6b7280]">
+            Card details for the person or business paying for this subscription.
+          </p>
+        </div>
         <div className="flex items-center gap-2 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2 text-sm text-[#30313d]">
           <CreditCard className="size-4 text-[#6b7280]" aria-hidden />
           <span>Card</span>
@@ -294,7 +370,17 @@ function CheckoutPaymentFields({
         <PaymentElement />
       </div>
 
-      <BillingAddressElement />
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-[#30313d]">Billing address</p>
+          <p className="text-xs leading-relaxed text-[#6b7280]">
+            Enter the name and address on the card or bank account you are using above —
+            not your Flipvise account details. These are used to verify your payment method
+            and calculate tax where applicable.
+          </p>
+        </div>
+        <BillingAddressElement />
+      </div>
 
       {errorMessage ? (
         <p
@@ -307,7 +393,7 @@ function CheckoutPaymentFields({
 
       <div className="space-y-3 pt-1">
         <p className="text-center text-xs font-medium uppercase tracking-[0.12em] text-[#6b7280]">
-          Complete subscription
+          {isTrial ? "Start free trial" : "Complete subscription"}
         </p>
         <SlideToSubmitButton
           label={slideLabel}
@@ -317,8 +403,17 @@ function CheckoutPaymentFields({
           variant="checkout"
         />
         <p className="text-center text-xs leading-relaxed text-[#6b7280]">
-          By subscribing, you authorize Flipvise to charge you according to the terms until
-          you cancel.
+          {isTrial ? (
+            <>
+              By starting your {planLabel} trial, you authorize Flipvise to charge you after
+              the trial ends unless you cancel before then.
+            </>
+          ) : (
+            <>
+              By subscribing, you authorize Flipvise to charge you according to the terms until
+              you cancel.
+            </>
+          )}
         </p>
       </div>
     </section>

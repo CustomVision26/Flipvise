@@ -10,6 +10,10 @@ import {
   type BillingStatusValue,
 } from "@/lib/plan-metadata-billing-resolution";
 import {
+  resolveClerkBillingStatusFromStripe,
+  stripeSubscriptionTrialEnd,
+} from "@/lib/billing-stripe-status";
+import {
   STRIPE_PAID_PLAN_IDS,
   type StripePaidPlanId,
 } from "@/lib/billing-plan-ids";
@@ -76,6 +80,9 @@ export async function upsertStripeSubscriptionFromStripeSub(
   userId: string,
   sub: Stripe.Subscription,
   planSlug: StripePaidPlanId | null,
+  options?: {
+    paymentFailedAt?: Date | null;
+  },
 ) {
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
@@ -95,16 +102,21 @@ export async function upsertStripeSubscriptionFromStripeSub(
       typeof firstItemAny?.current_period_end === "number"
         ? new Date(firstItemAny.current_period_end * 1000)
         : null,
+    trialEnd: stripeSubscriptionTrialEnd(sub),
+    ...(options?.paymentFailedAt !== undefined
+      ? { paymentFailedAt: options.paymentFailedAt }
+      : {}),
   });
 }
 
 function billingStatusFromStripeSubscription(
   status: Stripe.Subscription.Status,
+  paymentFailedAt?: Date | null,
 ): BillingStatusValue {
-  if (status === "active") return "active";
-  if (status === "trialing") return "trialing";
-  if (status === "canceled") return "canceled";
-  return "expired";
+  return resolveClerkBillingStatusFromStripe({
+    stripeStatus: status,
+    paymentFailedAt,
+  });
 }
 
 function stripeSearchLiteral(value: string): string {

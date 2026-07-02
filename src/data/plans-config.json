@@ -80,7 +80,11 @@
     },
     "discontinueAt": "2026-05-18",
     "promoStartsAt": "2026-05-01T00:00",
-    "promoEndsAt": "2026-05-18T23:59"
+    "promoEndsAt": "2026-05-18T23:59",
+    "trial": {
+      "days": 7,
+      "published": true
+    }
   },
   {
     "id": "pro_plus_team_basic",

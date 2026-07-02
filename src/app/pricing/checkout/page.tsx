@@ -23,6 +23,7 @@ interface PricingCheckoutPageProps {
     period?: string;
     promo?: string;
     checkout?: string;
+    trial?: string;
   }>;
 }
 
@@ -39,7 +40,7 @@ async function loadPlansForPricingUi(): Promise<PlanConfig[]> {
 export default async function PricingCheckoutPage({
   searchParams,
 }: PricingCheckoutPageProps) {
-  const { plan: planParam, period, promo, checkout } = await searchParams;
+  const { plan: planParam, period, promo, checkout, trial } = await searchParams;
 
   let access = guestAccessContext();
   try {
@@ -86,9 +87,10 @@ export default async function PricingCheckoutPage({
         planId={planId}
         plan={toClientJson(plan)}
         initialPeriod={initialPeriod}
-        initialPromotionCode={promo?.trim() ?? ""}
+        initialPromotionCode={trial === "1" ? "" : (promo?.trim() ?? "")}
         checkoutCanceled={checkout === "canceled"}
         planChangeContext={planChangeContext ? toClientJson(planChangeContext) : null}
+        startTrial={trial === "1"}
       />
     </div>
   );

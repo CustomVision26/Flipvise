@@ -52,13 +52,18 @@ import {
   Loader2,
   Mail,
   BookOpen,
+  Timer,
+  Activity,
 } from "lucide-react";
+import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
 import {
   AdminSupportPanel,
   type SerializedTicket,
   type SupportStats,
 } from "@/components/admin-support-panel";
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
+import { AdminPlanTrialSettings } from "@/components/admin-plan-trial-settings";
+import { AdminSubscriptionMonitor } from "@/components/admin-subscription-monitor";
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
 import { PlatformDocumentationManager } from "@/components/platform-documentation-manager";
@@ -147,6 +152,7 @@ export interface AdminTabsProps {
   affiliates: SerializedAffiliate[];
   /** Server default (env) — used as the initial value for “accept link” days in the invite form. */
   affiliateInviteDefaultExpiresInDays: number;
+  billingMonitorRows: AdminBillingMonitorRow[];
 }
 
 function formatDate(dateStr: string | null | undefined) {
@@ -255,6 +261,7 @@ export function AdminTabs({
   plansConfig,
   affiliates,
   affiliateInviteDefaultExpiresInDays,
+  billingMonitorRows,
 }: AdminTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -291,7 +298,8 @@ export function AdminTabs({
     | "documentation" =
     pathname === "/admin/team-workspaces"
       ? "workspace-admin"
-      : pathname === "/admin/subscription"
+      : pathname === "/admin/subscription" ||
+          pathname === "/admin/subscription-monitor"
         ? "subscription"
         : pathname === "/admin/invoices"
           ? "invoices"
@@ -302,7 +310,8 @@ export function AdminTabs({
           ? "support-center"
             : pathname === "/admin/plans" ||
                 pathname === "/admin/plan-history" ||
-                pathname === "/admin/affiliate-messaging"
+                pathname === "/admin/affiliate-messaging" ||
+                pathname === "/admin/plan-trials"
               ? "plans"
               : pathname === "/admin/marketing-affiliates"
                 ? "marketing-affiliates"
@@ -315,7 +324,12 @@ export function AdminTabs({
       ? "plan-history"
       : pathname === "/admin/affiliate-messaging"
         ? "affiliate-messaging"
-        : "pricing-plans";
+        : pathname === "/admin/plan-trials"
+          ? "trial-settings"
+          : "pricing-plans";
+
+  const subscriptionSubTab =
+    pathname === "/admin/subscription-monitor" ? "billing-monitor" : "subscriptions";
 
   const supportSubTab =
     pathname === "/admin/support-center/contact-us" ? "contact-us" : "tickets";
@@ -1208,150 +1222,195 @@ export function AdminTabs({
       {activeSection === "subscription" ? (
         <Card className={adminSectionCardClass}>
           <CardHeader>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle>Subscription Management</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Track billing status, active plan, and renewal windows for each user.
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  downloadCsv(
-                    "admin-subscriptions.csv",
-                    [
-                      "User",
-                      "Email",
-                      "Plan",
-                      "Status",
-                      "Current Period Start",
-                      "Current Period End",
-                      "Next Payment",
-                      "Auto Renew",
-                      "Last Billing Sync",
-                    ],
-                    subscriptionRows.map((row) => [
-                      row.userName,
-                      row.email,
-                      row.planLabel,
-                      row.status,
-                      row.currentPeriodStart,
-                      row.currentPeriodEnd,
-                      row.nextPaymentDate,
-                      row.cancelAtPeriodEnd ? "No (cancels at period end)" : "Yes",
-                      row.sourceUpdatedAt,
-                    ]),
-                  )
-                }
-              >
-                <Download className="mr-1.5 h-4 w-4" />
-                Export CSV
-              </Button>
-            </div>
+            <CardTitle>Subscription</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Manage subscriptions, monitor trials, payment failures, and upcoming expirations.
+            </p>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <div className="flex flex-col gap-2 border-b p-4 sm:flex-row sm:items-center">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  placeholder="Search user, email, or plan…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-              <Select
-                value={subscriptionStatusFilter}
-                onValueChange={(v) =>
-                  setSubscriptionStatusFilter(v as BillingSubscriptionStatusFilter)
-                }
+          <CardContent>
+            <Tabs
+              value={subscriptionSubTab}
+              onValueChange={(v) =>
+                router.push(
+                  v === "billing-monitor"
+                    ? "/admin/subscription-monitor"
+                    : "/admin/subscription",
+                )
+              }
+              className="w-full gap-4"
+            >
+              <TabsList variant="line" className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit">
+                <TabsTrigger value="subscriptions" className="gap-1.5">
+                  <WalletCards className="h-4 w-4 shrink-0" />
+                  All subscriptions
+                </TabsTrigger>
+                <TabsTrigger value="billing-monitor" className="gap-1.5">
+                  <Activity className="h-4 w-4 shrink-0" />
+                  Billing monitor
+                  {billingMonitorRows.length > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
+                      {billingMonitorRows.length}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent
+                value="subscriptions"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
               >
-                <SelectTrigger className="w-full sm:w-[190px]">
-                  <SelectValue placeholder="Subscription status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="trialing">Trialing</SelectItem>
-                  <SelectItem value="past_due">Past Due</SelectItem>
-                  <SelectItem value="canceled">Canceled</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={paidOnlyFilter}
-                onValueChange={(v) => setPaidOnlyFilter(v as PaidOnlyFilter)}
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Track billing status, active plan, and renewal windows for each user.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        downloadCsv(
+                          "admin-subscriptions.csv",
+                          [
+                            "User",
+                            "Email",
+                            "Plan",
+                            "Status",
+                            "Current Period Start",
+                            "Current Period End",
+                            "Next Payment",
+                            "Auto Renew",
+                            "Last Billing Sync",
+                          ],
+                          subscriptionRows.map((row) => [
+                            row.userName,
+                            row.email,
+                            row.planLabel,
+                            row.status,
+                            row.currentPeriodStart,
+                            row.currentPeriodEnd,
+                            row.nextPaymentDate,
+                            row.cancelAtPeriodEnd ? "No (cancels at period end)" : "Yes",
+                            row.sourceUpdatedAt,
+                          ]),
+                        )
+                      }
+                    >
+                      <Download className="mr-1.5 h-4 w-4" />
+                      Export CSV
+                    </Button>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-border/80">
+                    <div className="flex flex-col gap-2 border-b p-4 sm:flex-row sm:items-center">
+                      <div className="relative w-full sm:max-w-xs">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          placeholder="Search user, email, or plan…"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          className="pl-8"
+                        />
+                      </div>
+                      <Select
+                        value={subscriptionStatusFilter}
+                        onValueChange={(v) =>
+                          setSubscriptionStatusFilter(v as BillingSubscriptionStatusFilter)
+                        }
+                      >
+                        <SelectTrigger className="w-full sm:w-[190px]">
+                          <SelectValue placeholder="Subscription status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="trialing">Trialing</SelectItem>
+                          <SelectItem value="past_due">Past Due</SelectItem>
+                          <SelectItem value="canceled">Canceled</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={paidOnlyFilter}
+                        onValueChange={(v) => setPaidOnlyFilter(v as PaidOnlyFilter)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[170px]">
+                          <SelectValue placeholder="Paid users" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Users</SelectItem>
+                          <SelectItem value="paid-only">Paid Users Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Current Period</TableHead>
+                          <TableHead>Next Payment</TableHead>
+                          <TableHead>Auto-Renew</TableHead>
+                          <TableHead>Last Billing Sync</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {subscriptionRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                              No subscription records available.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          subscriptionRows.map((row) => (
+                            <TableRow key={row.userId}>
+                              <TableCell className="font-medium whitespace-nowrap">
+                                {row.userName}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                {row.email ?? "—"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={row.planSlug === "free" ? "secondary" : "default"}>
+                                  {row.planLabel}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                {row.status}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                {row.currentPeriodStart
+                                  ? `${formatDate(row.currentPeriodStart)} - ${formatDate(row.currentPeriodEnd)}`
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                {formatDate(row.nextPaymentDate)}
+                              </TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                <Badge variant={row.cancelAtPeriodEnd ? "outline" : "secondary"}>
+                                  {row.cancelAtPeriodEnd ? "Cancels at period end" : "Renews"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                {row.sourceUpdatedAt ? formatDateTime(row.sourceUpdatedAt) : "—"}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="billing-monitor"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
               >
-                <SelectTrigger className="w-full sm:w-[170px]">
-                  <SelectValue placeholder="Paid users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  <SelectItem value="paid-only">Paid Users Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Current Period</TableHead>
-                  <TableHead>Next Payment</TableHead>
-                  <TableHead>Auto-Renew</TableHead>
-                  <TableHead>Last Billing Sync</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {subscriptionRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                      No subscription records available.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  subscriptionRows.map((row) => (
-                    <TableRow key={row.userId}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {row.userName}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {row.email ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={row.planSlug === "free" ? "secondary" : "default"}>
-                          {row.planLabel}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {row.status}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {row.currentPeriodStart
-                          ? `${formatDate(row.currentPeriodStart)} - ${formatDate(row.currentPeriodEnd)}`
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatDate(row.nextPaymentDate)}
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">
-                        <Badge variant={row.cancelAtPeriodEnd ? "outline" : "secondary"}>
-                          {row.cancelAtPeriodEnd ? "Cancels at period end" : "Renews"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {row.sourceUpdatedAt ? formatDateTime(row.sourceUpdatedAt) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                <AdminSubscriptionMonitor rows={billingMonitorRows} />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       ) : null}
@@ -1804,7 +1863,9 @@ export function AdminTabs({
                     ? "/admin/plan-history"
                     : v === "affiliate-messaging"
                       ? "/admin/affiliate-messaging"
-                      : "/admin/plans",
+                      : v === "trial-settings"
+                        ? "/admin/plan-trials"
+                        : "/admin/plans",
                 )
               }
               className="w-full gap-4"
@@ -1831,6 +1892,10 @@ export function AdminTabs({
                       {activeAffiliateCount}
                     </Badge>
                   ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="trial-settings" className="gap-1.5">
+                  <Timer className="h-4 w-4 shrink-0" />
+                  Trial settings
                 </TabsTrigger>
               </TabsList>
 
@@ -1860,6 +1925,16 @@ export function AdminTabs({
                     broadcast inbox table in the database.
                   </p>
                   <AdminAffiliatePromoBroadcast affiliates={affiliates} plans={plansConfig} />
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="trial-settings"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
+                <div className={adminPlansSubTabPanelClass}>
+                  <p className={adminSupportSectionLabelClass}>Plan trials</p>
+                  <AdminPlanTrialSettings initialPlans={plansConfig} />
                 </div>
               </TabsContent>
 

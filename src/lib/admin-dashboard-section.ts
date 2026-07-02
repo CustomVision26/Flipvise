@@ -19,7 +19,7 @@ export function adminDashboardSectionFromPath(pathname: string): AdminDashboardS
   if (pathname === "/admin/support-center" || pathname.startsWith("/admin/support-center/")) {
     return "support-center";
   }
-  if (pathname === "/admin/plans" || pathname === "/admin/plan-history" || pathname === "/admin/affiliate-messaging") return "plans";
+  if (pathname === "/admin/plans" || pathname === "/admin/plan-history" || pathname === "/admin/affiliate-messaging" || pathname === "/admin/plan-trials") return "plans";
   if (pathname === "/admin/marketing-affiliates") return "marketing-affiliates";
   if (pathname === "/admin/documentation") return "documentation";
   return DEFAULT_ADMIN_DASHBOARD_SECTION;

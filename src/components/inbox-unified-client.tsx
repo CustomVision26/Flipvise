@@ -91,6 +91,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   affiliate: <Megaphone className="size-4 text-amber-400" aria-hidden />,
   affiliate_broadcast: <Mail className="size-4 text-amber-400" aria-hidden />,
   affiliate_notice: <CircleAlert className="size-4 text-orange-400" aria-hidden />,
+  billing_notice: <CircleAlert className="size-4 text-amber-400" aria-hidden />,
   admin_plan_invite: <Shield className="size-4 text-violet-400" aria-hidden />,
   admin_plan_log: <Shield className="size-4 text-sky-400" aria-hidden />,
   quiz_security_notice: <ShieldAlert className="size-4 text-rose-400" aria-hidden />,
@@ -112,10 +113,11 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         affiliate: 5,
         affiliate_broadcast: 6,
         affiliate_notice: 7,
-        admin_plan_log: 8,
-        quiz_security_notice: 9,
-        support_ticket: 10,
-        contact_us_message: 11,
+        billing_notice: 8,
+        admin_plan_log: 9,
+        quiz_security_notice: 10,
+        support_ticket: 11,
+        contact_us_message: 12,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -524,6 +526,14 @@ function InboxItemRow({
                     : "Invite withdrawn"}
               </Badge>
             )}
+            {item.type === "billing_notice" && item.requiresAction && (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-xs border-amber-500/40 text-amber-400"
+              >
+                Action needed
+              </Badge>
+            )}
             {item.type === "admin_plan_invite" && item.payload.status === "pending" && (
               <Badge variant="secondary" className="shrink-0 text-xs">
                 Action needed
@@ -657,6 +667,15 @@ function InboxItemRow({
               </a>
             )}
           </div>
+        )}
+
+        {item.type === "billing_notice" && item.requiresAction && (
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+          >
+            View plans
+          </Link>
         )}
 
         {item.type === "admin_plan_invite" && (

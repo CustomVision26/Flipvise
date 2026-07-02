@@ -28,6 +28,8 @@ import { getAccessContext } from "@/lib/access";
 import { contactUsNotificationsToInboxItems } from "@/lib/contact-us-inbox";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
+import { billingNoticeRowsToInboxItems } from "@/lib/billing-inbox-notices";
+import { listBillingNoticeInboxMessagesForUser } from "@/db/queries/billing-notice-inbox";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
@@ -74,6 +76,7 @@ export default async function DashboardInboxPage() {
     supportNotificationRows,
     contactUsNotificationRows,
     readSet,
+    billingNoticeRows,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
     tryTeamQuery(() => listTeamInvitationsForInviteeEmail(inboxEmail), []),
@@ -89,6 +92,7 @@ export default async function DashboardInboxPage() {
       ? listContactUsNotificationsForRecipient(userId, 50).catch(() => [])
       : listContactUsNotificationsForRecipient(userId, 50).catch(() => []),
     getInboxReadsForUser(userId),
+    listBillingNoticeInboxMessagesForUser(userId),
   ]);
 
   // ── Resolve team context for quiz results ─────────────────────────────────
@@ -454,6 +458,7 @@ export default async function DashboardInboxPage() {
   }
 
   items.push(...buildAffiliateNoticeInboxItems(affiliateRows, readSet));
+  items.push(...billingNoticeRowsToInboxItems(billingNoticeRows, readSet));
 
   for (const row of adminPlanInviteRows) {
     if (row.status === "accepted") continue;

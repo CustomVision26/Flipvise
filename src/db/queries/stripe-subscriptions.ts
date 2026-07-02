@@ -24,6 +24,25 @@ function isMissingStripeSubscriptionsTableError(error: unknown): boolean {
   );
 }
 
+/** Drizzle/neon HTTP driver when code selects columns not yet migrated. */
+function isStripeSubscriptionsPendingMigrationError(error: unknown): boolean {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    if (typeof obj.message === "string") parts.push(obj.message);
+    current = obj.cause;
+  }
+  parts.push(String(error));
+  const flat = parts.join(" ");
+  if (!/stripe_subscriptions/i.test(flat)) return false;
+  return (
+    /Failed query/i.test(flat) ||
+    /(trialEnd|paymentFailedAt|trial_end|payment_failed_at)/i.test(flat) ||
+    /column .* does not exist/i.test(flat)
+  );
+}
+
 /** Older DBs or mismatched schema (e.g. wrong column names). */
 function isStripeSubscriptionsSchemaMismatch(error: unknown): boolean {
   let current: unknown = error;
@@ -42,6 +61,7 @@ function isStripeSubscriptionsSchemaMismatch(error: unknown): boolean {
 function isRecoverableStripeSubscriptionsReadError(error: unknown): boolean {
   if (isMissingStripeSubscriptionsTableError(error)) return true;
   if (isStripeSubscriptionsSchemaMismatch(error)) return true;
+  if (isStripeSubscriptionsPendingMigrationError(error)) return true;
   return isRecoverableNeonReadError(error);
 }
 
@@ -53,6 +73,8 @@ export type UpsertStripeSubscriptionInput = {
   planSlug?: string | null;
   status: string;
   currentPeriodEnd?: Date | null;
+  trialEnd?: Date | null;
+  paymentFailedAt?: Date | null;
 };
 
 /**
@@ -73,6 +95,8 @@ export async function upsertStripeSubscription(
       planSlug: input.planSlug ?? null,
       status: input.status,
       currentPeriodEnd: input.currentPeriodEnd ?? null,
+      trialEnd: input.trialEnd ?? null,
+      paymentFailedAt: input.paymentFailedAt ?? null,
       updatedAt: now,
     })
     .onConflictDoUpdate({
@@ -84,6 +108,10 @@ export async function upsertStripeSubscription(
         planSlug: input.planSlug ?? null,
         status: input.status,
         currentPeriodEnd: input.currentPeriodEnd ?? null,
+        trialEnd: input.trialEnd ?? null,
+        ...(input.paymentFailedAt !== undefined
+          ? { paymentFailedAt: input.paymentFailedAt }
+          : {}),
         updatedAt: now,
       },
     });
@@ -175,4 +203,22 @@ export async function markStripeSubscriptionStatus(
     .where(
       eq(stripeSubscriptions.stripeSubscriptionId, stripeSubscriptionId),
     );
+}
+
+export async function setStripeSubscriptionPaymentFailedAt(
+  stripeSubscriptionId: string,
+  paymentFailedAt: Date | null,
+) {
+  await db
+    .update(stripeSubscriptions)
+    .set({ paymentFailedAt, updatedAt: new Date() })
+    .where(
+      eq(stripeSubscriptions.stripeSubscriptionId, stripeSubscriptionId),
+    );
+}
+
+export async function clearStripeSubscriptionPaymentFailedAt(
+  stripeSubscriptionId: string,
+) {
+  await setStripeSubscriptionPaymentFailedAt(stripeSubscriptionId, null);
 }

@@ -13,6 +13,12 @@ export type PlanAffiliateDiscount = {
   label?: string;
 };
 
+/** Admin-configurable free trial surfaced on `/pricing` when `published` is true. */
+export type PlanTrialConfig = {
+  days: number;
+  published: boolean;
+};
+
 export type PlanConfig = {
   id: string;
   name: string;
@@ -26,4 +32,5 @@ export type PlanConfig = {
   discontinueAt?: string | null;
   promoStartsAt?: string | null;
   promoEndsAt?: string | null;
+  trial?: PlanTrialConfig;
 };

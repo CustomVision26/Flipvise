@@ -18,6 +18,7 @@ import {
 } from "@/lib/stripe-pricing-display";
 import { stripe } from "@/lib/stripe";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
+import { publishedTrialDaysForPlan } from "@/lib/plan-trial";
 import { toClientJson } from "@/lib/to-client-json";
 
 export const dynamic = "force-dynamic";
@@ -73,12 +74,17 @@ export default async function PricingCheckoutPayPage({
 
   const planId = session.metadata?.plan?.trim() ?? "";
   const period = parsePricingBillingPeriod(session.metadata?.period);
-  const promoQuery = session.metadata?.promoCode?.trim();
+  const isTrial = session.metadata?.isTrial === "true";
+  const promoQuery = isTrial ? "" : session.metadata?.promoCode?.trim();
 
   const backParams = new URLSearchParams();
   if (isStripePaidPlanId(planId)) backParams.set("plan", planId);
   if (period) backParams.set("period", period);
-  if (promoQuery) backParams.set("promo", promoQuery);
+  if (isTrial) {
+    backParams.set("trial", "1");
+  } else if (promoQuery) {
+    backParams.set("promo", promoQuery);
+  }
   const backHref = backParams.size
     ? `/pricing/checkout?${backParams.toString()}`
     : "/pricing/checkout";
@@ -96,12 +102,16 @@ export default async function PricingCheckoutPayPage({
   const planRow = isStripePaidPlanId(planId)
     ? plans.find((p) => p.id === planId)
     : undefined;
-  const promoDisplay = resolveCheckoutPromoDisplay({
-    sessionPromoCode: session.metadata?.promoCode,
-    sessionPromoKind: session.metadata?.promoKind,
-    plan: planRow,
-  });
+  const promoDisplay = isTrial
+    ? null
+    : resolveCheckoutPromoDisplay({
+        sessionPromoCode: session.metadata?.promoCode,
+        sessionPromoKind: session.metadata?.promoKind,
+        plan: planRow,
+      });
   const stripeAmounts = checkoutSessionAmountsMajor(session);
+  const trialDays =
+    isTrial && planRow ? publishedTrialDaysForPlan(planRow) : null;
 
   const summary: PricingCheckoutSummary = {
     planLabel: planRow?.name ?? displayNameForBillingPlanSlug(
@@ -109,8 +119,12 @@ export default async function PricingCheckoutPayPage({
     ),
     period,
     customerEmail,
-    campaignLabel: planRow?.discount?.label?.trim() || null,
+    campaignLabel: isTrial ? null : planRow?.discount?.label?.trim() || null,
     promo: promoDisplay,
+    isTrial,
+    trialDays: trialDays && trialDays > 0 ? trialDays : null,
+    monthlyRateAfterTrial:
+      planRow?.monthlyPrice ?? stripeAmounts?.subtotalMajor ?? null,
     stripeAmounts,
   };
 

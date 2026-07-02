@@ -32,6 +32,7 @@
     "db:ensure-affiliate-pending-arrangement-columns": "tsx scripts/ensure-affiliate-pending-arrangement-columns.ts",
     "db:ensure-affiliate-broadcast-inbox": "tsx scripts/ensure-affiliate-broadcast-inbox-table.ts",
     "db:ensure-subscription-checkout-inbox": "tsx scripts/ensure-subscription-checkout-inbox-table.ts",
+    "db:ensure-billing-trial-schema": "tsx scripts/ensure-billing-trial-schema.ts",
     "db:ensure-support-ticket-messaging": "tsx scripts/ensure-support-ticket-messaging.ts",
     "db:ensure-contact-us-reply-images": "tsx scripts/ensure-contact-us-reply-images.ts",
     "db:ensure-support-ticket-reply-images": "tsx scripts/ensure-support-ticket-reply-images.ts",

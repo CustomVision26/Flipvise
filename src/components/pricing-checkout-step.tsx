@@ -14,8 +14,10 @@ import { SlideToSubmitButton } from "@/components/slide-to-submit-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { publishedTrialDaysForPlan } from "@/lib/plan-trial";
 import { PricingBillingPeriodToggle } from "@/components/pricing-billing-period-toggle";
 import { type PlanConfig } from "@/lib/plan-config-types";
 import {
@@ -40,6 +42,7 @@ export function PricingCheckoutStep({
   initialPromotionCode,
   checkoutCanceled,
   planChangeContext,
+  startTrial = false,
 }: {
   planId: StripePaidPlanId;
   plan: PlanConfig;
@@ -47,6 +50,7 @@ export function PricingCheckoutStep({
   initialPromotionCode: string;
   checkoutCanceled: boolean;
   planChangeContext: PlanChangeCheckoutContextResult | null;
+  startTrial?: boolean;
 }) {
   const isPlanChange = planChangeContext != null;
   const [period, setPeriod] = useState<PricingBillingPeriod>(initialPeriod);
@@ -55,10 +59,18 @@ export function PricingCheckoutStep({
     planChangeContext?.initialPreview ?? null,
   );
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [trialAcknowledged, setTrialAcknowledged] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   const pricing = computePlanPeriodPricing(plan, period);
+  const trialDays = startTrial ? publishedTrialDaysForPlan(plan) : 0;
+
+  useEffect(() => {
+    if (startTrial && period !== "monthly") {
+      setPeriod("monthly");
+    }
+  }, [startTrial, period]);
 
   useEffect(() => {
     if (!isPlanChange) return;
@@ -109,9 +121,10 @@ export function PricingCheckoutStep({
         const result = await createStripeCheckoutSessionAction({
           plan: planId,
           period,
-          ...(promotionCode.trim()
+          ...(!startTrial && promotionCode.trim()
             ? { promotionCode: promotionCode.trim() }
             : {}),
+          ...(startTrial ? { startTrial: true } : {}),
         });
         navigateAfterCheckoutSessionCreated(result, router.push);
       } catch (e) {
@@ -122,7 +135,9 @@ export function PricingCheckoutStep({
 
   const slideLabel = isPlanChange
     ? `Slide to confirm — ${period === "yearly" ? "Yearly" : "Monthly"}`
-    : `Slide to continue — ${period === "yearly" ? "Yearly" : "Monthly"}`;
+    : startTrial
+      ? `Slide to start free trial — Monthly`
+      : `Slide to continue — ${period === "yearly" ? "Yearly" : "Monthly"}`;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
@@ -198,23 +213,37 @@ export function PricingCheckoutStep({
             </div>
           ) : null}
 
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground">Billing period</Label>
-            <PricingBillingPeriodToggle
-              period={period}
-              onPeriodChange={setPeriod}
-              className="w-full sm:w-auto"
-            />
-          </div>
+          {!startTrial ? (
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Billing period</Label>
+              <PricingBillingPeriodToggle
+                period={period}
+                onPeriodChange={setPeriod}
+                className="w-full sm:w-auto"
+              />
+            </div>
+          ) : null}
 
           {!isPlanChange && pricing ? (
             <div className="rounded-lg border border-border/70 bg-background/40 px-4 py-3">
-              {pricing.hasActiveDiscount && plan.discount?.label ? (
+              {startTrial && trialDays > 0 ? (
+                <>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-3xl font-bold tabular-nums">$0</span>
+                    <span className="text-sm text-muted-foreground">
+                      for {trialDays} days
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Then ${formatPlanMoney(pricing.basePeriodicRate)} / month
+                  </p>
+                </>
+              ) : pricing.hasActiveDiscount && plan.discount?.label ? (
                 <Badge className="mb-2 text-xs bg-amber-500/15 text-amber-400 border-amber-500/20">
                   {plan.discount.label}
                 </Badge>
               ) : null}
-              {period === "yearly" && pricing.discountedAnnualTotal != null ? (
+              {!startTrial && period === "yearly" && pricing.discountedAnnualTotal != null ? (
                 <>
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     {pricing.hasActiveDiscount && pricing.baseAnnualTotal != null ? (
@@ -232,7 +261,7 @@ export function PricingCheckoutStep({
                     annually
                   </p>
                 </>
-              ) : (
+              ) : !startTrial ? (
                 <>
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     {pricing.hasActiveDiscount ? (
@@ -247,7 +276,7 @@ export function PricingCheckoutStep({
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">Billed monthly</p>
                 </>
-              )}
+              ) : null}
             </div>
           ) : null}
 
@@ -280,7 +309,25 @@ export function PricingCheckoutStep({
               campaign discount on your current subscription, it cannot be applied again on
               upgrade or downgrade.
             </div>
-          ) : (
+          ) : startTrial && trialDays > 0 && pricing ? (
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm leading-relaxed">
+              <p className="font-medium text-foreground">
+                Full {plan.name} access for {trialDays} days — no charge today
+              </p>
+              <p className="mt-2 text-muted-foreground">
+                {plan.description
+                  ? `${plan.description.charAt(0).toUpperCase()}${plan.description.slice(1)}`
+                  : `Everything included in ${plan.name} is unlocked during your trial.`}
+                {" "}You will add a payment method on the next screen; you will not be charged
+                until the trial ends.
+              </p>
+              <p className="mt-2 text-muted-foreground">
+                When your {trialDays}-day trial ends, your subscription continues at $
+                {formatPlanMoney(pricing.basePeriodicRate)}/month. Cancel anytime before
+                then from your account to avoid being charged.
+              </p>
+            </div>
+          ) : !startTrial ? (
             <div className="space-y-2">
               <Label htmlFor="checkout-step-promo">Promotion code</Label>
               <Input
@@ -298,11 +345,34 @@ export function PricingCheckoutStep({
                 without an additional promo.
               </p>
             </div>
-          )}
+          ) : null}
+
+          {startTrial && trialDays > 0 && pricing ? (
+            <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-background/40 px-3 py-3">
+              <Checkbox
+                id="checkout-trial-ack"
+                checked={trialAcknowledged}
+                onCheckedChange={(checked) => setTrialAcknowledged(checked === true)}
+                className="mt-0.5"
+              />
+              <Label
+                htmlFor="checkout-trial-ack"
+                className="cursor-pointer text-sm font-normal leading-relaxed text-muted-foreground"
+              >
+                I understand that after my {trialDays}-day free trial, I will be charged $
+                {formatPlanMoney(pricing.basePeriodicRate)}/month unless I cancel before
+                the trial ends.
+              </Label>
+            </div>
+          ) : null}
 
           <SlideToSubmitButton
             label={slideLabel}
-            disabled={isPending || (isPlanChange && previewLoading)}
+            disabled={
+              isPending ||
+              (isPlanChange && previewLoading) ||
+              (startTrial && !trialAcknowledged)
+            }
             pending={isPending}
             onSubmit={continueToStripe}
           />

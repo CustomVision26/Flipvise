@@ -169,7 +169,7 @@ function PlanChangePaymentForm({
               htmlFor="plan-change-email"
               className="text-sm font-medium text-[#30313d]"
             >
-              Email
+              Account email
             </Label>
             <Input
               id="plan-change-email"
@@ -177,11 +177,19 @@ function PlanChangePaymentForm({
               value={summary.customerEmail}
               className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
             />
+            <p className="text-xs leading-relaxed text-[#6b7280]">
+              Your signed-in Flipvise account. Receipts and billing notices are sent here.
+            </p>
           </div>
         ) : null}
 
         <div className="space-y-3">
-          <p className="text-sm font-medium text-[#30313d]">Payment method</p>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-[#30313d]">Payment method</p>
+            <p className="text-xs leading-relaxed text-[#6b7280]">
+              Card details for the person or business paying for this subscription.
+            </p>
+          </div>
           <div className="flex items-center gap-2 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2 text-sm text-[#30313d]">
             <CreditCard className="size-4 text-[#6b7280]" aria-hidden />
             <span>Card</span>

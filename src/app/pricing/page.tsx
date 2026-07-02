@@ -8,7 +8,8 @@ import { PricingContent } from "@/components/pricing-content";
 import { ManageBillingButton } from "@/components/manage-billing-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
-import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import { getActiveStripeSubscription, getManageableStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import { hasUserConsumedPlanTrial } from "@/db/queries/user-plan-trials";
 import { resolvePricingPageHighlightId } from "@/lib/pricing-page-current-plan";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
@@ -82,11 +83,20 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
   }
 
   let stripeSubRow: Awaited<ReturnType<typeof getActiveStripeSubscription>> = null;
+  let hasUsedTrial = false;
+  let hasActiveSubscription = false;
   if (userId != null) {
     try {
-      stripeSubRow = await getActiveStripeSubscription(userId);
+      const [activeSub, manageableSub, usedTrial] = await Promise.all([
+        getActiveStripeSubscription(userId),
+        getManageableStripeSubscription(userId),
+        hasUserConsumedPlanTrial(userId),
+      ]);
+      stripeSubRow = activeSub;
+      hasUsedTrial = usedTrial;
+      hasActiveSubscription = manageableSub != null;
     } catch (error) {
-      console.error("[PricingPage] getActiveStripeSubscription:", error);
+      console.error("[PricingPage] subscription/trial lookup:", error);
     }
   }
 
@@ -156,6 +166,8 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           currentPlanHighlightId={currentPlanHighlightId}
           plans={plansForUi}
           initialPromotionCode={promoFromUrl?.trim() ?? ""}
+          hasUsedTrial={hasUsedTrial}
+          hasActiveSubscription={hasActiveSubscription}
         />
       </div>
     </div>

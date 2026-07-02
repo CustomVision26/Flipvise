@@ -1,23 +1,24 @@
-import { createClerkClient } from "@clerk/backend";
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 import { markStripeSubscriptionStatus } from "@/db/queries/stripe-subscriptions";
 import { incrementAffiliatePaidReferral } from "@/db/queries/affiliates";
-import type { BillingStatusValue } from "@/lib/plan-metadata-billing-resolution";
 import { stripe } from "@/lib/stripe";
 import { persistStripeInvoiceForUser, syncCheckoutSessionInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import { recordSubscriptionCheckoutInboxForSession } from "@/lib/record-subscription-checkout-inbox";
 import { cancelOtherActiveSubscriptionsForCustomer } from "@/lib/apply-plan-upgrade";
-import {
-  asPaidPlanId,
-  setStripeBillingState,
-  upsertStripeSubscriptionFromStripeSub,
-} from "@/lib/stripe-billing-sync";
+import { asPaidPlanId } from "@/lib/stripe-billing-sync";
 import {
   STRIPE_PAID_PLAN_IDS,
   type StripePaidPlanId,
 } from "@/lib/billing-plan-ids";
 import { loopsSendEvent, loopsUpdateContact } from "@/lib/loops";
+import {
+  clearPaymentFailedOnInvoiceSuccess,
+  handleInvoicePaymentFailed,
+  syncCheckoutCompletedSubscription,
+  syncSubscriptionLifecycleEvent,
+} from "@/lib/stripe-subscription-lifecycle";
+import { createClerkClient } from "@clerk/backend";
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -117,15 +118,14 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
 
         if (session.metadata?.checkoutKind === "plan_change") {
-          // Subscription swap runs in finalizePlanChangePaymentAction after SetupIntent redirect.
           break;
         }
 
         const userId = stringOrNull(session.metadata?.clerkUserId);
         const selectedPlan = asPaidPlanId(session.metadata?.plan) ?? "pro";
-        if (userId) {
-          await setStripeBillingState(userId, selectedPlan, "active");
+        const isTrialCheckout = session.metadata?.isTrial === "true";
 
+        if (userId) {
           const customerId =
             typeof session.customer === "string" ? session.customer : session.customer?.id;
           const subscriptionId =
@@ -139,41 +139,43 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          // Persist the subscription so we can apply proration later.
           if (customerId && subscriptionId) {
             try {
-              const sub = await stripe.subscriptions.retrieve(subscriptionId, {
-                expand: ["items.data"],
-              });
-              await upsertStripeSubscriptionFromStripeSub(
+              await syncCheckoutCompletedSubscription({
                 userId,
-                sub,
                 selectedPlan,
-              );
+                subscriptionId,
+                customerId,
+                isTrialCheckout,
+              });
               await cancelOtherActiveSubscriptionsForCustomer(
                 customerId,
                 subscriptionId,
               );
             } catch {
-              // Best-effort — billing state already written above.
+              // Best-effort
             }
           }
 
-          // Loops: update contact group + fire plan_upgraded event
           void (async () => {
             const email = await getClerkUserEmail(userId);
             if (!email) return;
             await loopsUpdateContact(email, { userId, userGroup: selectedPlan });
-            await loopsSendEvent(email, "plan_upgraded", { userId, userGroup: selectedPlan });
+            if (!isTrialCheckout) {
+              await loopsSendEvent(email, "plan_upgraded", {
+                userId,
+                userGroup: selectedPlan,
+              });
+            }
           })();
         }
 
         const affiliateIdRaw = stringOrNull(session.metadata?.affiliateId);
-          if (affiliateIdRaw && /^\d+$/.test(affiliateIdRaw)) {
+        if (affiliateIdRaw && /^\d+$/.test(affiliateIdRaw)) {
           try {
             await incrementAffiliatePaidReferral(Number(affiliateIdRaw));
           } catch {
-            // best-effort; attribution is non-blocking for billing writes
+            // best-effort
           }
         }
 
@@ -193,79 +195,20 @@ export async function POST(req: NextRequest) {
       }
       case "customer.subscription.created":
       case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
+      case "customer.subscription.deleted":
+      case "customer.subscription.trial_will_end": {
         const sub = event.data.object as Stripe.Subscription;
         const resolution = await resolveUserAndPlanFromSubscription(sub);
         if (resolution) {
-          const stripeStatus = sub.status;
-          let billingStatus: BillingStatusValue;
-          if (stripeStatus === "active") billingStatus = "active";
-          else if (stripeStatus === "trialing") billingStatus = "trialing";
-          else if (stripeStatus === "canceled") billingStatus = "canceled";
-          else billingStatus = "expired";
-
-          const activePlan =
-            stripeStatus === "active" || stripeStatus === "trialing"
-              ? (resolution.plan ?? "pro")
-              : null;
-
-          await setStripeBillingState(resolution.userId, activePlan, billingStatus);
-
-          const customerId =
-            typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
-          if (
-            customerId &&
-            activePlan &&
-            (billingStatus === "active" || billingStatus === "trialing")
-          ) {
-            try {
-              await stripe.customers.update(customerId, {
-                metadata: {
-                  clerkUserId: resolution.userId,
-                  plan: activePlan,
-                },
-              });
-            } catch {
-              // Best-effort — billing state already written above.
-            }
-          }
-
-          // Loops: sync userGroup and fire lifecycle events
-          void (async () => {
-            const email = await getClerkUserEmail(resolution.userId);
-            if (!email) return;
-            if (billingStatus === "active" || billingStatus === "trialing") {
-              await loopsUpdateContact(email, {
-                userId: resolution.userId,
-                userGroup: activePlan ?? "pro",
-              });
-            } else {
-              // canceled / expired — downgrade contact back to free
-              await loopsUpdateContact(email, { userId: resolution.userId, userGroup: "free" });
-              await loopsSendEvent(email, "plan_cancelled", {
-                userId: resolution.userId,
-                userGroup: "free",
-              });
-            }
-          })();
-
-          // Keep the stripe_subscriptions row in sync with the latest status,
-          // plan slug, and item ID (price swaps update the item list).
-          try {
-            if (customerId) {
-              if (stripeStatus === "canceled" || stripeStatus === "incomplete_expired") {
-                await markStripeSubscriptionStatus(sub.id, stripeStatus);
-              } else {
-                await upsertStripeSubscriptionFromStripeSub(
-                  resolution.userId,
-                  sub,
-                  activePlan,
-                );
-              }
-            }
-          } catch {
-            // Best-effort — billing state already written above.
-          }
+          await syncSubscriptionLifecycleEvent(sub, resolution, event.type);
+        }
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const userId = await resolveClerkUserIdFromInvoice(invoice);
+        if (userId) {
+          await handleInvoicePaymentFailed(invoice, userId);
         }
         break;
       }
@@ -287,12 +230,14 @@ export async function POST(req: NextRequest) {
           user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress?.toLowerCase() ??
           null;
 
-        // Loops: fire payment_succeeded once per successful charge
-        if (userEmail && event.type === "invoice.payment_succeeded") {
-          void loopsSendEvent(userEmail, "payment_succeeded", {
-            userId,
-            userGroup: invoicePlan,
-          });
+        if (event.type === "invoice.payment_succeeded") {
+          await clearPaymentFailedOnInvoiceSuccess(invoice);
+          if (userEmail) {
+            void loopsSendEvent(userEmail, "payment_succeeded", {
+              userId,
+              userGroup: invoicePlan,
+            });
+          }
         }
 
         try {

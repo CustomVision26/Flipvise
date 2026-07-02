@@ -20,6 +20,11 @@ import {
 import { cn } from "@/lib/utils";
 import { isGeneralDiscountEffectivelyActive } from "@/lib/plan-promo-window";
 import {
+  canUserStartPlanTrial,
+  isPublishedPlanTrial,
+  publishedTrialDaysForPlan,
+} from "@/lib/plan-trial";
+import {
   computePlanPeriodPricing,
   formatPlanMoney,
 } from "@/lib/pricing-period-display";
@@ -48,19 +53,36 @@ function PlanCard({
   isCurrent,
   userId,
   error,
+  hasUsedTrial,
+  hasActiveSubscription,
   onCheckout,
+  onTrialCheckout,
 }: {
   plan: PlanConfig;
   period: BillingPeriod;
   isCurrent: boolean;
   userId: string | null;
   error: string | null;
+  hasUsedTrial: boolean;
+  hasActiveSubscription: boolean;
   onCheckout: (planId: PaidPlanId) => void;
+  onTrialCheckout: (planId: PaidPlanId) => void;
 }) {
   const periodPricing = computePlanPeriodPricing(plan, period);
   const discount = plan.discount;
   const hasActiveDiscount = periodPricing?.hasActiveDiscount ?? false;
   const isFree = plan.id === "free";
+
+  const trialEligible =
+    userId != null &&
+    !isFree &&
+    canUserStartPlanTrial({
+      plan,
+      hasUsedTrial,
+      hasActiveSubscription,
+    }) &&
+    period === "monthly";
+  const trialDays = publishedTrialDaysForPlan(plan);
 
   const cta = (() => {
     if (!userId) {
@@ -88,15 +110,29 @@ function PlanCard({
       );
     }
     return (
-      <Button
-        size="lg"
-        className="w-full"
-        onClick={() => onCheckout(plan.id as PaidPlanId)}
-      >
-        {userId && !isCurrent && !isFree
-          ? `Change to ${plan.name}`
-          : `Choose ${plan.name}`}
-      </Button>
+      <div className="flex flex-col gap-2 w-full">
+        {trialEligible ? (
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => onTrialCheckout(plan.id as PaidPlanId)}
+          >
+            Start {trialDays}-day free trial
+          </Button>
+        ) : null}
+        <Button
+          size="lg"
+          className="w-full"
+          variant={trialEligible ? "outline" : "default"}
+          onClick={() => onCheckout(plan.id as PaidPlanId)}
+        >
+          {trialEligible
+            ? `Subscribe to ${plan.name} now`
+            : userId && !isCurrent && !isFree
+              ? `Change to ${plan.name}`
+              : `Choose ${plan.name}`}
+        </Button>
+      </div>
     );
   })();
 
@@ -121,6 +157,11 @@ function PlanCard({
             {plan.highlighted && !isCurrent && (
               <Badge className="text-xs">Most popular</Badge>
             )}
+            {isPublishedPlanTrial(plan) && trialEligible ? (
+              <Badge variant="secondary" className="text-xs">
+                {trialDays}-day trial
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -244,6 +285,8 @@ export function PricingContent({
   currentPlanHighlightId,
   plans = PLANS,
   initialPromotionCode = "",
+  hasUsedTrial = false,
+  hasActiveSubscription = false,
 }: {
   userId: string | null;
   /**
@@ -255,6 +298,8 @@ export function PricingContent({
   plans?: PlanConfig[];
   /** Prefill from `/pricing?promo=…` (affiliate or campaign links). */
   initialPromotionCode?: string;
+  hasUsedTrial?: boolean;
+  hasActiveSubscription?: boolean;
 }) {
   const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -271,16 +316,18 @@ export function PricingContent({
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
 
-  function handleCheckout(planId: PaidPlanId) {
+  function handleCheckout(planId: PaidPlanId, startTrial = false) {
     setErrors({});
     const params = new URLSearchParams({
       plan: planId,
       period,
     });
-    const hasPaidPlan =
-      currentPlanHighlightId != null && currentPlanHighlightId !== "free";
-    const promo = promotionCode.trim();
-    if (promo && !hasPaidPlan) params.set("promo", promo);
+    if (!startTrial && promotionCode.trim()) {
+      params.set("promo", promotionCode.trim());
+    }
+    if (startTrial) {
+      params.set("trial", "1");
+    }
     router.push(`/pricing/checkout?${params.toString()}`);
   }
 
@@ -424,7 +471,10 @@ export function PricingContent({
             isCurrent={isCurrentPlan(plan.id)}
             userId={userId}
             error={errors[plan.id] ?? null}
-            onCheckout={handleCheckout}
+            hasUsedTrial={hasUsedTrial}
+            hasActiveSubscription={hasActiveSubscription}
+            onCheckout={(planId) => handleCheckout(planId, false)}
+            onTrialCheckout={(planId) => handleCheckout(planId, true)}
           />
         ))}
       </div>

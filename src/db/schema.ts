@@ -655,9 +655,55 @@ export const stripeSubscriptions = pgTable('stripe_subscriptions', {
   status: varchar({ length: 64 }).notNull().default('active'),
   /** When the current billing period ends (Unix-epoch seconds stored as timestamp). */
   currentPeriodEnd: timestamp(),
+  /** Stripe trial end (when status is `trialing`). */
+  trialEnd: timestamp(),
+  /** Set when Stripe reports `past_due` — starts the 12-hour payment grace window. */
+  paymentFailedAt: timestamp(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });
+
+/**
+ * Records each user's one-time plan trial (enforced at checkout).
+ * A user may only start a published trial once across all plans.
+ */
+export const userPlanTrials = pgTable('user_plan_trials', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar({ length: 255 }).notNull().unique(),
+  planSlug: varchar({ length: 64 }).notNull(),
+  stripeSubscriptionId: varchar({ length: 255 }),
+  startedAt: timestamp().notNull().defaultNow(),
+  trialEndsAt: timestamp().notNull(),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
+/**
+ * Billing lifecycle notices (trial ending, trial expired, payment grace) delivered
+ * in the user dashboard inbox — one row per recipient / notice kind / subscription.
+ */
+export const billingNoticeInboxMessages = pgTable(
+  'billing_notice_inbox_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    noticeKind: varchar({ length: 32 }).notNull(),
+    stripeSubscriptionId: varchar({ length: 255 }).notNull(),
+    planSlug: varchar({ length: 64 }).notNull(),
+    title: varchar({ length: 200 }).notNull(),
+    description: text().notNull(),
+    eventAt: timestamp().notNull(),
+    requiresAction: boolean().notNull().default(true),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('billing_notice_inbox_recipient_idx').on(t.recipientUserId),
+    uniqueIndex('billing_notice_inbox_dedupe_uidx').on(
+      t.recipientUserId,
+      t.noticeKind,
+      t.stripeSubscriptionId,
+    ),
+  ],
+);
 
 /**
  * Long-lived per-device tokens that let the bundled offline mobile app authenticate to
