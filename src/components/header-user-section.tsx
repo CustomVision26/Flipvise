@@ -292,7 +292,7 @@ export function HeaderUserSection({
             <Link
               href="/pricing"
               className={cn(
-                "hidden shrink-0 truncate text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline sm:max-w-[9rem] lg:max-w-[11rem] xl:max-w-[14rem]",
+                "inline-block shrink-0 truncate text-sm font-medium text-muted-foreground transition-colors hover:text-foreground max-w-[6rem] min-[380px]:max-w-[8rem] sm:max-w-[9rem] lg:max-w-[11rem] xl:max-w-[14rem]",
                 isPro && "text-foreground",
               )}
               aria-label={`${personalAccountPlanLabel} plan — view pricing`}
