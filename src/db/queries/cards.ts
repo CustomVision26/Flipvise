@@ -54,6 +54,14 @@ function withNullChoiceImages<T extends Omit<CardRow, "choiceImageUrls">>(row: T
   return { ...row, choiceImageUrls: null };
 }
 
+/** Postgres text arrays cannot store null elements — preserve choice index with empty strings. */
+function normalizeChoiceImageUrlsForDb(
+  urls: (string | null)[] | null | undefined,
+): string[] | null {
+  if (urls == null) return null;
+  return urls.map((url) => url ?? "");
+}
+
 async function selectCardsByDeck(deckId: number, scopedUserId?: string) {
   const order = desc(cards.updatedAt);
   try {
@@ -277,7 +285,7 @@ export async function createMultipleChoiceCard(
     backImageUrl: null,
     cardType: 'multiple_choice' as const,
     choices,
-    choiceImageUrls: choiceImageUrls ?? null,
+    choiceImageUrls: normalizeChoiceImageUrlsForDb(choiceImageUrls),
     correctChoiceIndex,
     aiGenerated,
   };
@@ -305,7 +313,7 @@ export async function updateMultipleChoiceCard(
     back: choices[correctChoiceIndex] ?? null,
     backImageUrl: null,
     choices,
-    choiceImageUrls: choiceImageUrls ?? null,
+    choiceImageUrls: normalizeChoiceImageUrlsForDb(choiceImageUrls),
     correctChoiceIndex,
     updatedAt: new Date(),
   };

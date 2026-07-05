@@ -44,6 +44,7 @@ export function questionsFromSessionState(state: QuizSecuritySessionState): Quiz
       question: q.question,
       questionImageUrl: q.questionImageUrl,
       options: q.options,
+      optionImageUrls: q.optionImageUrls ?? q.options.map(() => null),
       correctIndex: q.correctIndex,
     };
   });
@@ -87,6 +88,7 @@ export function buildQuizSessionState(
         question: q.question,
         questionImageUrl: q.questionImageUrl,
         options: q.options,
+        optionImageUrls: q.optionImageUrls,
         correctIndex: q.correctIndex,
       };
     }),

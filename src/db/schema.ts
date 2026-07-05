@@ -847,6 +847,7 @@ export type QuizSecuritySessionState = {
     question: string | null;
     questionImageUrl: string | null;
     options: string[];
+    optionImageUrls?: (string | null)[];
     correctIndex: number;
     statement?: string;
     correctAnswer?: boolean;

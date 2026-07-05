@@ -339,10 +339,10 @@ export function gradeQuizAnswer(
   const selected = payload.selectedText ?? "";
   const wasCorrect =
     isAnswered &&
-    ((correctText.trim() &&
+    ((correctText.trim().length > 0 &&
       normalizeQuizText(selected) === normalizeQuizText(correctText)) ||
-      (!correctText.trim() &&
-        correctImage &&
+      (correctText.trim().length === 0 &&
+        Boolean(correctImage) &&
         selected === correctImage));
   return { correctText: correctText || correctImage || "", wasCorrect, isAnswered };
 }

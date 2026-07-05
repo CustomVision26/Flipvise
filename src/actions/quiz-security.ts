@@ -39,6 +39,7 @@ const sessionStateSchema = z.object({
         question: z.string().nullable(),
         questionImageUrl: z.string().nullable(),
         options: z.array(z.string()),
+        optionImageUrls: z.array(z.string().nullable()).optional(),
         correctIndex: z.number().int().min(0),
         statement: z.string().optional(),
         correctAnswer: z.boolean().optional(),
