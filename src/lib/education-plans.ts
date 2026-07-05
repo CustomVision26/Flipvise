@@ -1,5 +1,5 @@
 import { PRO_PLUS_PERSONAL_DECK_LIMIT } from "@/lib/personal-plan-limits";
-import { isTeamPlanId } from "@/lib/team-plans";
+import { isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
 
 /** Education subscription plan slugs — separate from consumer team tiers. */
 export const EDUCATION_PLAN_IDS = [
@@ -17,6 +17,9 @@ export const EDUCATION_TEAM_PLAN_IDS = [
 ] as const;
 
 export type EducationTeamPlanId = (typeof EDUCATION_TEAM_PLAN_IDS)[number];
+
+/** Team or education team tier used when creating a new workspace. */
+export type WorkspaceCreatePlanId = TeamPlanId | EducationTeamPlanId;
 
 export const EDUCATION_PLAN_LABELS: Record<EducationPlanId, string> = {
   education_plus: "Education Plus",
@@ -138,7 +141,9 @@ export function limitsForEducationTeamPlan(planSlug: string) {
 }
 
 /** True for consumer team tiers and education team tiers (workspace subscription plans). */
-export function isWorkspaceSubscriptionPlanSlug(slug: string): boolean {
+export function isWorkspaceSubscriptionPlanSlug(
+  slug: string,
+): slug is WorkspaceCreatePlanId {
   return isTeamPlanId(slug) || isEducationTeamPlanId(slug);
 }
 
