@@ -30,9 +30,6 @@ import {
   uploadCardImageAction,
 } from "@/actions/cards";
 import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   ImagePlus,
   Mic,
   MicOff,
@@ -40,6 +37,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface EditCardDialogProps {
   card: {
@@ -50,6 +48,7 @@ interface EditCardDialogProps {
     backImageUrl?: string | null;
     cardType: "standard" | "multiple_choice";
     choices: string[] | null;
+    choiceImageUrls?: (string | null)[] | null;
     correctChoiceIndex: number | null;
   };
   deckId: number;
@@ -58,6 +57,14 @@ interface EditCardDialogProps {
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function initialCorrectAnswerImage(
+  choiceImageUrls: (string | null)[] | null | undefined,
+  correctIdx: number,
+): string | null {
+  const urls = choiceImageUrls ?? [];
+  return urls[correctIdx] ?? null;
+}
 
 function validateImageFile(file: File): string | null {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -69,6 +76,97 @@ function validateImageFile(file: File): string | null {
   return null;
 }
 
+function EditCardSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border bg-muted/15 p-3 sm:p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function EditCardTextField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  rows = 3,
+  actions,
+}: {
+  id: string;
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  rows?: number;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={id} className="text-xs sm:text-sm">
+          {label ?? "Text"}
+        </Label>
+        {actions}
+      </div>
+      <Textarea
+        id={id}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        disabled={disabled}
+        className="text-sm bg-background"
+      />
+    </div>
+  );
+}
+
+function EditCardDialogFooter({
+  onCancel,
+  onSave,
+  isBusy,
+  saveDisabled,
+  saveLabel,
+}: {
+  onCancel: () => void;
+  onSave: () => void;
+  isBusy: boolean;
+  saveDisabled: boolean;
+  saveLabel: string;
+}) {
+  return (
+    <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0 pt-1">
+      <Button
+        variant="outline"
+        onClick={onCancel}
+        disabled={isBusy}
+        className="w-full sm:w-auto"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={onSave}
+        disabled={isBusy || saveDisabled}
+        className="w-full sm:w-auto"
+      >
+        {saveLabel}
+      </Button>
+    </DialogFooter>
+  );
+}
+
 function ImageUploadSection({
   label,
   imagePreview,
@@ -78,6 +176,7 @@ function ImageUploadSection({
   onFileChange,
   onRemove,
   altText,
+  compact = false,
 }: {
   label: string;
   imagePreview: string | null;
@@ -87,12 +186,18 @@ function ImageUploadSection({
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
   altText: string;
+  compact?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
       <Label className="text-muted-foreground text-xs">{label}</Label>
       {imagePreview ? (
-        <div className="relative w-full h-32 sm:h-48 rounded-lg overflow-hidden border border-border bg-muted/30">
+        <div
+          className={cn(
+            "relative w-full rounded-lg overflow-hidden border border-border bg-muted/30",
+            compact ? "h-24 sm:h-28" : "h-32 sm:h-48",
+          )}
+        >
           <Image
             src={imagePreview}
             alt={altText}
@@ -141,6 +246,87 @@ function ImageUploadSection({
   );
 }
 
+function extractDistractorsFromChoices(
+  choices: string[] | null | undefined,
+  correctIdx: number,
+): [string, string, string] {
+  if (!choices || choices.length < 4) return ["", "", ""];
+  const wrong = choices.filter((_, i) => i !== correctIdx).slice(0, 3);
+  while (wrong.length < 3) wrong.push("");
+  return [wrong[0] ?? "", wrong[1] ?? "", wrong[2] ?? ""];
+}
+
+function WrongAnswersSection({
+  cardId,
+  distractors,
+  onDistractorChange,
+  disabled,
+  hasAI,
+  onRegenerate,
+  isRegenerating,
+  canRegenerate,
+}: {
+  cardId: number;
+  distractors: string[];
+  onDistractorChange: (index: number, value: string) => void;
+  disabled: boolean;
+  hasAI: boolean;
+  onRegenerate: () => void;
+  isRegenerating: boolean;
+  canRegenerate: boolean;
+}) {
+  return (
+    <EditCardSection title="Wrong answers">
+      <div className="flex flex-col gap-2">
+        {hasAI && (
+          <div className="flex justify-end">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger render={<span />}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={onRegenerate}
+                    disabled={!canRegenerate || disabled}
+                    aria-label="Regenerate wrong answers with AI"
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${isRegenerating ? "animate-spin" : ""}`}
+                    />
+                    Regenerate
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-64 text-center">
+                  {!canRegenerate
+                    ? "Enter front and back text first"
+                    : "Regenerate 3 new wrong answers with AI"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
+        {distractors.map((d, i) => (
+          <div key={i} className="flex flex-col gap-1.5">
+            <Label htmlFor={`wrong-answer-${cardId}-${i}`} className="text-xs sm:text-sm">
+              Wrong answer {i + 1}
+            </Label>
+            <Input
+              id={`wrong-answer-${cardId}-${i}`}
+              value={d}
+              onChange={(e) => onDistractorChange(i, e.target.value)}
+              disabled={disabled}
+              placeholder={`Wrong answer ${i + 1}`}
+              className="text-sm bg-background"
+            />
+          </div>
+        ))}
+      </div>
+    </EditCardSection>
+  );
+}
+
 function StandardEditForm({
   card,
   deckId,
@@ -167,8 +353,17 @@ function StandardEditForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
-  const [aiDistractors, setAiDistractors] = useState<[string, string, string] | null>(null);
-  const [aiDistractorsFor, setAiDistractorsFor] = useState<string | null>(null);
+  const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
+  const correctIdx = card.correctChoiceIndex ?? 0;
+  const initialDistractors = extractDistractorsFromChoices(card.choices, correctIdx);
+  const hasQuizChoices = (card.choices?.length ?? 0) >= 4;
+  const [distractors, setDistractors] = useState<string[]>([...initialDistractors]);
+  const [aiDistractors, setAiDistractors] = useState<[string, string, string] | null>(
+    hasQuizChoices ? initialDistractors : null,
+  );
+  const [aiDistractorsFor, setAiDistractorsFor] = useState<string | null>(
+    hasQuizChoices ? (card.back ?? "") : null,
+  );
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -177,9 +372,48 @@ function StandardEditForm({
   const speechError = frontSpeech.error ?? backSpeech.error;
 
   const isUploading = isUploadingFront || isUploadingBack;
-  const isBusy = isPending || isUploading || isGeneratingAnswer;
+  const isBusy = isPending || isUploading || isGeneratingAnswer || isRegeneratingDistractors;
   const frontHasContent = front.trim().length > 0 || !!frontImageUrl;
   const backHasContent = back.trim().length > 0 || !!backImageUrl;
+  const allDistractorsFilled = distractors.every((d) => d.trim().length > 0);
+  const showWrongAnswers = hasQuizChoices;
+
+  function setDistractorAt(i: number, value: string) {
+    setDistractors((prev) => {
+      const next = [...prev];
+      next[i] = value;
+      return next;
+    });
+  }
+
+  async function handleRegenerateDistractors() {
+    if (!front.trim()) {
+      setError("Please enter a question or term on the front first.");
+      return;
+    }
+    if (!back.trim()) {
+      setError("Please enter an answer on the back first.");
+      return;
+    }
+    setError(null);
+    setIsRegeneratingDistractors(true);
+    try {
+      const result = await generateMultipleChoiceAction({
+        deckId,
+        question: front.trim(),
+        correctAnswer: back.trim(),
+      });
+      setDistractors([...result.distractors]);
+      setAiDistractors([result.distractors[0], result.distractors[1], result.distractors[2]]);
+      setAiDistractorsFor(back.trim());
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to regenerate wrong answers.",
+      );
+    } finally {
+      setIsRegeneratingDistractors(false);
+    }
+  }
 
   async function handleImageChange(
     e: React.ChangeEvent<HTMLInputElement>,
@@ -234,6 +468,7 @@ function StandardEditForm({
       if (hasValidDistractors) {
         setAiDistractors([distractors[0], distractors[1], distractors[2]]);
         setAiDistractorsFor(answer.trim());
+        setDistractors([distractors[0], distractors[1], distractors[2]]);
       } else {
         setAiDistractors(null);
         setAiDistractorsFor(null);
@@ -249,8 +484,9 @@ function StandardEditForm({
     setError(null);
     frontSpeech.stop();
     backSpeech.stop();
-    const distractorsToSend =
-      aiDistractors && aiDistractorsFor !== null && aiDistractorsFor === back.trim()
+    const distractorsToSend = showWrongAnswers
+      ? (distractors as [string, string, string])
+      : aiDistractors && aiDistractorsFor !== null && aiDistractorsFor === back.trim()
         ? aiDistractors
         : null;
     startTransition(async () => {
@@ -274,18 +510,16 @@ function StandardEditForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 py-2">
-      {/* Front */}
-      <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border p-3 sm:p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Front
-        </p>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor={`front-${card.id}`} className="text-xs sm:text-sm">
-              Text <span className="text-muted-foreground font-normal">(question, term, etc.)</span>
-            </Label>
-            {frontSpeech.supported && (
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <EditCardSection title="Front">
+        <EditCardTextField
+          id={`front-${card.id}`}
+          value={front}
+          onChange={setFront}
+          placeholder="Question or term… (optional if image added)"
+          disabled={isBusy}
+          actions={
+            frontSpeech.supported ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={<span />}>
@@ -318,18 +552,9 @@ function StandardEditForm({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
-          </div>
-          <Textarea
-            id={`front-${card.id}`}
-            placeholder="Question or term… (optional if image added)"
-            value={front}
-            onChange={(e) => setFront(e.target.value)}
-            rows={3}
-            disabled={isBusy}
-            className="text-sm"
-          />
-        </div>
+            ) : null
+          }
+        />
         <ImageUploadSection
           label="Image (optional)"
           imagePreview={frontImagePreview}
@@ -353,21 +578,16 @@ function StandardEditForm({
           }}
           altText="Front image preview"
         />
-      </div>
+      </EditCardSection>
 
-      {/* Back */}
-      <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border p-3 sm:p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Back
-        </p>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor={`back-${card.id}`} className="text-xs sm:text-sm">
-              Text{" "}
-              <span className="text-muted-foreground font-normal">
-                (answer, definition, etc.)
-              </span>
-            </Label>
+      <EditCardSection title="Back">
+        <EditCardTextField
+          id={`back-${card.id}`}
+          value={back}
+          onChange={setBack}
+          placeholder="Answer or definition… (optional if image added)"
+          disabled={isBusy}
+          actions={
             <div className="flex items-center gap-1.5 shrink-0">
               {hasAI && (
                 <TooltipProvider>
@@ -430,17 +650,8 @@ function StandardEditForm({
                 </TooltipProvider>
               )}
             </div>
-          </div>
-          <Textarea
-            id={`back-${card.id}`}
-            placeholder="Answer or definition… (optional if image added)"
-            value={back}
-            onChange={(e) => setBack(e.target.value)}
-            rows={3}
-            disabled={isBusy}
-            className="text-sm"
-          />
-        </div>
+          }
+        />
         <ImageUploadSection
           label="Image (optional)"
           imagePreview={backImagePreview}
@@ -464,7 +675,20 @@ function StandardEditForm({
           }}
           altText="Back image preview"
         />
-      </div>
+      </EditCardSection>
+
+      {showWrongAnswers && (
+        <WrongAnswersSection
+          cardId={card.id}
+          distractors={distractors}
+          onDistractorChange={setDistractorAt}
+          disabled={isBusy}
+          hasAI={hasAI}
+          onRegenerate={handleRegenerateDistractors}
+          isRegenerating={isRegeneratingDistractors}
+          canRegenerate={!!front.trim() && !!back.trim()}
+        />
+      )}
 
       {!frontSpeech.supported && !backSpeech.supported && (
         <p className="text-muted-foreground text-[11px] sm:text-xs">
@@ -480,35 +704,31 @@ function StandardEditForm({
 
       {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
 
-      <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-        <Button
-          variant="outline"
-          onClick={() => {
-            frontSpeech.stop();
-            backSpeech.stop();
-            frontSpeech.clearError();
-            backSpeech.clearError();
-            onClose();
-          }}
-          disabled={isBusy}
-          className="w-full sm:w-auto"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={isBusy || !frontHasContent || !backHasContent}
-          className="w-full sm:w-auto"
-        >
-          {isPending
+      <EditCardDialogFooter
+        onCancel={() => {
+          frontSpeech.stop();
+          backSpeech.stop();
+          frontSpeech.clearError();
+          backSpeech.clearError();
+          onClose();
+        }}
+        onSave={handleSubmit}
+        isBusy={isBusy}
+        saveDisabled={
+          !frontHasContent ||
+          !backHasContent ||
+          (showWrongAnswers && !allDistractorsFilled)
+        }
+        saveLabel={
+          isPending
             ? "Saving…"
             : isUploading
               ? "Uploading…"
-              : isGeneratingAnswer
+              : isGeneratingAnswer || isRegeneratingDistractors
                 ? "Generating…"
-                : "Save changes"}
-        </Button>
-      </DialogFooter>
+                : "Save changes"
+        }
+      />
     </div>
   );
 }
@@ -532,6 +752,8 @@ function MultipleChoiceEditForm({
     .slice(0, 3);
   while (initialDistractors.length < 3) initialDistractors.push("");
 
+  const initialCorrectImage = initialCorrectAnswerImage(card.choiceImageUrls, correctIdx);
+
   const [question, setQuestion] = useState(card.front ?? "");
   const [questionImageUrl, setQuestionImageUrl] = useState<string | null>(
     card.frontImageUrl ?? null,
@@ -542,7 +764,14 @@ function MultipleChoiceEditForm({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState(initialCorrect);
   const [distractors, setDistractors] = useState<string[]>(initialDistractors);
-  const [showDistractors, setShowDistractors] = useState(true);
+  const [correctAnswerImageUrl, setCorrectAnswerImageUrl] = useState<string | null>(
+    initialCorrectImage,
+  );
+  const [correctAnswerImagePreview, setCorrectAnswerImagePreview] = useState<string | null>(
+    initialCorrectImage,
+  );
+  const [isUploadingCorrectImage, setIsUploadingCorrectImage] = useState(false);
+  const correctAnswerImageInputRef = useRef<HTMLInputElement>(null);
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -552,10 +781,37 @@ function MultipleChoiceEditForm({
   const correctSpeech = useSpeechRecognition((t) => setCorrectAnswer((prev) => prev + t));
   const mcSpeechError = questionSpeech.error ?? correctSpeech.error;
 
-  const isBusy = isPending || isUploadingImage || isRegeneratingDistractors;
+  const isBusy =
+    isPending || isUploadingImage || isRegeneratingDistractors || isUploadingCorrectImage;
   const questionHasContent = question.trim().length > 0 || !!questionImageUrl;
-  const correctFilled = correctAnswer.trim().length > 0;
+  const correctFilled = correctAnswer.trim().length > 0 || !!correctAnswerImageUrl;
   const allDistractorsFilled = distractors.every((d) => d.trim().length > 0);
+
+  async function handleCorrectAnswerImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
+      if (correctAnswerImageInputRef.current) correctAnswerImageInputRef.current.value = "";
+      return;
+    }
+    setError(null);
+    setIsUploadingCorrectImage(true);
+    setCorrectAnswerImagePreview(URL.createObjectURL(file));
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const url = await uploadCardImageAction({ deckId }, formData);
+      setCorrectAnswerImageUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+      setCorrectAnswerImagePreview(correctAnswerImageUrl);
+    } finally {
+      setIsUploadingCorrectImage(false);
+      if (correctAnswerImageInputRef.current) correctAnswerImageInputRef.current.value = "";
+    }
+  }
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -609,7 +865,6 @@ function MultipleChoiceEditForm({
         correctAnswer: correctAnswer.trim(),
       });
       setDistractors([...result.distractors]);
-      setShowDistractors(true);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to regenerate wrong answers.",
@@ -633,6 +888,8 @@ function MultipleChoiceEditForm({
           oldQuestionImageUrl: card.frontImageUrl ?? null,
           correctAnswer,
           distractors,
+          choiceImageUrls: [correctAnswerImageUrl, null, null, null],
+          oldChoiceImageUrls: [initialCorrectImage, null, null, null],
         });
         onClose();
       } catch (err) {
@@ -642,18 +899,16 @@ function MultipleChoiceEditForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 py-2">
-      {/* Question */}
-      <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border p-3 sm:p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Question
-        </p>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor={`mc-question-${card.id}`} className="text-xs sm:text-sm">
-              Text
-            </Label>
-            {questionSpeech.supported && (
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <EditCardSection title="Front">
+        <EditCardTextField
+          id={`mc-question-${card.id}`}
+          value={question}
+          onChange={setQuestion}
+          placeholder="Question or term… (optional if image added)"
+          disabled={isBusy}
+          actions={
+            questionSpeech.supported ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={<span />}>
@@ -664,8 +919,8 @@ function MultipleChoiceEditForm({
                       className="h-7 w-7 shrink-0"
                       aria-label={
                         questionSpeech.isRecording
-                          ? "Stop recording question"
-                          : "Dictate question with microphone"
+                          ? "Stop recording front text"
+                          : "Dictate front text with microphone"
                       }
                       onClick={() =>
                         questionSpeech.isRecording ? questionSpeech.stop() : questionSpeech.start()
@@ -686,17 +941,9 @@ function MultipleChoiceEditForm({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
-          </div>
-          <Textarea
-            id={`mc-question-${card.id}`}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={3}
-            disabled={isBusy}
-            className="text-sm"
-          />
-        </div>
+            ) : null
+          }
+        />
         <ImageUploadSection
           label="Image (optional)"
           imagePreview={questionImagePreview}
@@ -709,26 +956,19 @@ function MultipleChoiceEditForm({
             setQuestionImagePreview(null);
             if (imageFileInputRef.current) imageFileInputRef.current.value = "";
           }}
-          altText="Question image preview"
+          altText="Front image preview"
         />
-      </div>
+      </EditCardSection>
 
-      {/* Answers */}
-      <div className="flex flex-col gap-2 sm:gap-3 rounded-lg border border-border p-3 sm:p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Answers
-        </p>
-
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label
-              htmlFor={`mc-correct-${card.id}`}
-              className="text-xs sm:text-sm flex items-center gap-1.5 min-w-0"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              <span className="leading-snug">Correct answer</span>
-            </Label>
-            {correctSpeech.supported && (
+      <EditCardSection title="Back">
+        <EditCardTextField
+          id={`mc-correct-${card.id}`}
+          value={correctAnswer}
+          onChange={setCorrectAnswer}
+          placeholder="Correct answer… (optional if image added)"
+          disabled={isBusy}
+          actions={
+            correctSpeech.supported ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={<span />}>
@@ -739,8 +979,8 @@ function MultipleChoiceEditForm({
                       className="h-7 w-7 shrink-0"
                       aria-label={
                         correctSpeech.isRecording
-                          ? "Stop recording correct answer"
-                          : "Dictate correct answer with microphone"
+                          ? "Stop recording back text"
+                          : "Dictate back text with microphone"
                       }
                       onClick={() =>
                         correctSpeech.isRecording ? correctSpeech.stop() : correctSpeech.start()
@@ -761,81 +1001,37 @@ function MultipleChoiceEditForm({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
-          </div>
-          <Input
-            id={`mc-correct-${card.id}`}
-            value={correctAnswer}
-            onChange={(e) => setCorrectAnswer(e.target.value)}
-            disabled={isBusy}
-            className="text-sm border-emerald-500/40 focus-visible:ring-emerald-500/30"
-          />
-        </div>
+            ) : null
+          }
+        />
+        <ImageUploadSection
+          label="Image (optional)"
+          imagePreview={correctAnswerImagePreview}
+          isUploading={isUploadingCorrectImage}
+          isBusy={isBusy}
+          fileInputRef={correctAnswerImageInputRef}
+          onFileChange={handleCorrectAnswerImageChange}
+          onRemove={() => {
+            setCorrectAnswerImageUrl(null);
+            setCorrectAnswerImagePreview(null);
+            if (correctAnswerImageInputRef.current) {
+              correctAnswerImageInputRef.current.value = "";
+            }
+          }}
+          altText="Back image preview"
+        />
+      </EditCardSection>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 -ml-2 px-2 gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => setShowDistractors((v) => !v)}
-              aria-expanded={showDistractors}
-              aria-controls={`mc-distractors-${card.id}`}
-            >
-              {showDistractors ? (
-                <ChevronUp className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
-              Wrong answers (3 required)
-            </Button>
-            {hasAI && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger render={<span />}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={handleRegenerateDistractors}
-                      disabled={!question.trim() || !correctFilled || isBusy}
-                    >
-                      <RefreshCw
-                        className={`h-3.5 w-3.5 ${
-                          isRegeneratingDistractors ? "animate-spin" : ""
-                        }`}
-                      />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-64 text-center">
-                    {!question.trim()
-                      ? "Enter a question first"
-                      : !correctFilled
-                        ? "Enter a correct answer first"
-                        : "Regenerate 3 new wrong answers with AI"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-          {showDistractors && (
-            <div id={`mc-distractors-${card.id}`} className="flex flex-col gap-2">
-              {distractors.map((d, i) => (
-                <Input
-                  key={i}
-                  value={d}
-                  onChange={(e) => setDistractorAt(i, e.target.value)}
-                  disabled={isBusy}
-                  placeholder={`Wrong answer ${i + 1}`}
-                  className="text-sm"
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <WrongAnswersSection
+        cardId={card.id}
+        distractors={distractors}
+        onDistractorChange={setDistractorAt}
+        disabled={isBusy}
+        hasAI={hasAI}
+        onRegenerate={handleRegenerateDistractors}
+        isRegenerating={isRegeneratingDistractors}
+        canRegenerate={!!question.trim() && correctFilled}
+      />
 
       {!questionSpeech.supported && !correctSpeech.supported && (
         <p className="text-muted-foreground text-[11px] sm:text-xs">
@@ -851,35 +1047,27 @@ function MultipleChoiceEditForm({
 
       {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
 
-      <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-        <Button
-          variant="outline"
-          onClick={() => {
-            questionSpeech.stop();
-            correctSpeech.stop();
-            questionSpeech.clearError();
-            correctSpeech.clearError();
-            onClose();
-          }}
-          disabled={isBusy}
-          className="w-full sm:w-auto"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={isBusy || !questionHasContent || !correctFilled || !allDistractorsFilled}
-          className="w-full sm:w-auto"
-        >
-          {isPending
+      <EditCardDialogFooter
+        onCancel={() => {
+          questionSpeech.stop();
+          correctSpeech.stop();
+          questionSpeech.clearError();
+          correctSpeech.clearError();
+          onClose();
+        }}
+        onSave={handleSubmit}
+        isBusy={isBusy}
+        saveDisabled={!questionHasContent || !correctFilled || !allDistractorsFilled}
+        saveLabel={
+          isPending
             ? "Saving…"
-            : isUploadingImage
+            : isUploadingImage || isUploadingCorrectImage
               ? "Uploading…"
               : isRegeneratingDistractors
                 ? "Generating…"
-                : "Save changes"}
-        </Button>
-      </DialogFooter>
+                : "Save changes"
+        }
+      />
     </div>
   );
 }
@@ -901,15 +1089,13 @@ export function EditCardDialog({ card, deckId, hasAI = false }: EditCardDialogPr
       >
         Edit
       </DialogTrigger>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto bg-background">
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">
-            {isMC ? "Edit multiple-choice card" : "Edit card"}
-          </DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Edit Card</DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
             {isMC
-              ? "Update the question, the correct answer, and the 3 wrong answers."
-              : "Each side can have text, an image, or both — at least one is required per side."}
+              ? "Update the front, back, and 3 wrong answers. Each side can have text, an image, or both."
+              : "Update the front and back. Each side can have text, an image, or both."}
           </DialogDescription>
         </DialogHeader>
 

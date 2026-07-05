@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { decks, cards, type DeckRow } from "@/db/schema";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 export type { DeckRow };
 
 /** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` columns). */
@@ -17,6 +17,10 @@ export const deckRowSelectWithoutCover = {
   quizFormatTrueFalse: decks.quizFormatTrueFalse,
   quizFormatFillInBlank: decks.quizFormatFillInBlank,
   quizFormatAssignments: decks.quizFormatAssignments,
+  gradeLevel: decks.gradeLevel,
+  difficultyLevel: decks.difficultyLevel,
+  createdByUserId: decks.createdByUserId,
+  inactiveAt: decks.inactiveAt,
   createdAt: decks.createdAt,
   updatedAt: decks.updatedAt,
 } as const;
@@ -55,6 +59,7 @@ export function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradien
     ...row,
     coverImageUrl: null,
     gradient: null,
+    inactiveAt: "inactiveAt" in row ? (row.inactiveAt ?? null) : null,
     quizSecurityEnabled:
       "quizSecurityEnabled" in row ? (row.quizSecurityEnabled ?? null) : null,
   };
@@ -71,6 +76,14 @@ export async function getDecksByUser(userId: string): Promise<DeckRow[]> {
       .where(eq(decks.userId, userId));
     return rows.map(withNullCover);
   }
+}
+
+/** Personal decks owned by the user (excludes team workspace decks). */
+export async function getPersonalDecksByUser(userId: string): Promise<DeckRow[]> {
+  const rows = await getDecksByUser(userId);
+  return rows
+    .filter((deck) => deck.teamId == null)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function countPersonalDecksForUser(userId: string) {
@@ -108,29 +121,42 @@ export async function getDecksByUserWithCardCount(userId: string) {
 }
 
 /** Personal dashboard — entire deck library for the Clerk user (`decks.userId`). */
-export async function getPersonalDecksByUserWithCardCount(userId: string) {
+export async function getPersonalDecksByUserWithCardCount(
+  userId: string,
+  options?: { includeInactive?: boolean },
+) {
+  const base = eq(decks.userId, userId);
+  const where = options?.includeInactive
+    ? base
+    : (and(base, isNull(decks.inactiveAt)) ?? base);
   return db
     .select({
       id: decks.id,
       userId: decks.userId,
+      teamId: decks.teamId,
       name: decks.name,
       description: decks.description,
       gradient: decks.gradient,
+      createdByUserId: decks.createdByUserId,
       createdAt: decks.createdAt,
       updatedAt: decks.updatedAt,
+      inactiveAt: decks.inactiveAt,
       cardCount: count(cards.id),
     })
     .from(decks)
     .leftJoin(cards, eq(cards.deckId, decks.id))
-    .where(eq(decks.userId, userId))
+    .where(where)
     .groupBy(
       decks.id,
       decks.userId,
+      decks.teamId,
       decks.name,
       decks.description,
       decks.gradient,
+      decks.createdByUserId,
       decks.createdAt,
       decks.updatedAt,
+      decks.inactiveAt,
     );
 }
 
@@ -179,10 +205,22 @@ export async function createDeck(
   description?: string,
   teamId?: number | null,
   gradient?: string | null,
+  gradeLevel?: string | null,
+  difficultyLevel?: string | null,
+  createdByUserId?: string | null,
 ): Promise<number> {
   const [row] = await db
     .insert(decks)
-    .values({ userId, name, description, teamId: teamId ?? null, gradient: gradient ?? null })
+    .values({
+      userId,
+      name,
+      description,
+      teamId: teamId ?? null,
+      gradient: gradient ?? null,
+      gradeLevel: gradeLevel?.trim() || null,
+      difficultyLevel: difficultyLevel?.trim() || null,
+      createdByUserId: createdByUserId ?? userId,
+    })
     .returning({ id: decks.id });
   if (!row) throw new Error("Failed to create deck");
   return row.id;
@@ -194,10 +232,19 @@ export async function updateDeck(
   name: string,
   description?: string,
   gradient?: string | null,
+  gradeLevel?: string | null,
+  difficultyLevel?: string | null,
 ) {
   return db
     .update(decks)
-    .set({ name, description, gradient: gradient ?? null, updatedAt: new Date() })
+    .set({
+      name,
+      description,
+      gradient: gradient ?? null,
+      gradeLevel: gradeLevel?.trim() || null,
+      difficultyLevel: difficultyLevel?.trim() || null,
+      updatedAt: new Date(),
+    })
     .where(and(eq(decks.id, deckId), eq(decks.userId, userId)));
 }
 

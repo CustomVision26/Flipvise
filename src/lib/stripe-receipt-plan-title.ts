@@ -3,6 +3,9 @@ import { canonicalTeamPlanId } from "@/lib/team-plans";
 
 /** Stripe PDF / line-item product names (longest match first). */
 const LINE_DESCRIPTION_PLAN_TITLES: { pattern: RegExp; title: string }[] = [
+  { pattern: /\bEducation Enterprise\b/i, title: "Education Enterprise" },
+  { pattern: /\bEducation Gold\b/i, title: "Education Gold" },
+  { pattern: /\bEducation Plus\b/i, title: "Education Plus" },
   { pattern: /\bPro Plus Team Basic\b/i, title: "Pro Plus Team Basic" },
   { pattern: /\bPro Plus Team Gold\b/i, title: "Pro Plus Team Gold" },
   { pattern: /\bPro Plus Platinum\b/i, title: "Pro Plus Platinum" },
@@ -27,9 +30,15 @@ const RECEIPT_TITLE_BY_SLUG: Record<string, string> = {
   pro_team_gold: "Pro Team Gold",
   pro_platinum_plan: "Pro Platinum",
   pro_enterprise: "Pro Enterprise",
+  education_plus: "Education Plus",
+  education_gold: "Education Gold",
+  education_enterprise: "Education Enterprise",
 };
 
 const LINE_DESCRIPTION_TO_SLUG: { pattern: RegExp; slug: StripePaidPlanId }[] = [
+  { pattern: /\bEducation Enterprise\b/i, slug: "education_enterprise" },
+  { pattern: /\bEducation Gold\b/i, slug: "education_gold" },
+  { pattern: /\bEducation Plus\b/i, slug: "education_plus" },
   { pattern: /\bPro Plus Team Basic\b/i, slug: "pro_plus_team_basic" },
   { pattern: /\bPro Plus Team Gold\b/i, slug: "pro_plus_team_gold" },
   { pattern: /\bPro Plus Platinum\b/i, slug: "pro_plus_platinum_plan" },

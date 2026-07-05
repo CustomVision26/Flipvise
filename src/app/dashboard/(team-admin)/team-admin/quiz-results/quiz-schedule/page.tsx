@@ -24,8 +24,14 @@ import {
   buildTeamAdminQuizTimerPath,
 } from "@/lib/team-admin-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
-import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
-import { TeamAdminPanelScroll } from "@/components/team-admin-panel-scroll";
+import { hasEducationPlan } from "@/lib/education-plans";
+import {
+  TeamAdminPanelScroll,
+  TeamAdminQuickNavPanel,
+  TeamAdminWorkspaceStatsPanel,
+  TeamQuizResultsSubTabs,
+  TeamQuizScheduleSettings,
+} from "@/lib/team-admin-dynamic-components";
 import {
   TEAM_ADMIN_PANEL_IDS,
   teamAdminActivePanelClass,
@@ -33,11 +39,8 @@ import {
   teamAdminPanelScrollClass,
 } from "@/components/team-admin-panel-styles";
 import { cn } from "@/lib/utils";
-import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
 import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
-import { TeamQuizResultsSubTabs } from "@/components/team-quiz-results-sub-tabs";
-import { TeamQuizScheduleSettings } from "@/components/team-quiz-schedule-settings";
 import { toClientJson } from "@/lib/to-client-json";
 
 interface PageProps {
@@ -167,8 +170,10 @@ export default async function TeamAdminQuizSchedulePage({ searchParams }: PagePr
           mainDashboardHref={mainDashboardHref}
           workspaceDashboardHref={workspaceDashboardHref}
           workspaceTeamId={selected.id}
+          workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
           isOwner={isOwner}
           workspacePlanSlug={selected.planSlug}
+          showTeacherDashboard={hasEducationPlan(selected.planSlug)}
         />
       </div>
 

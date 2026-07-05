@@ -13,6 +13,25 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { CardQuizVariants, FillInBlankSegment } from '@/lib/card-quiz-variants';
 import type { QuizQuestionType } from '@/lib/quiz-questions';
+import type { LessonPlanInput, LessonPlanResult } from '@/lib/teacher-generators';
+import type {
+  HomeworkResult,
+  HomeworkSourceType,
+  TeacherHomeworkActionInput,
+} from '@/lib/teacher-homework-ai-schema';
+import type { PlanReconciliationSnapshot } from '@/lib/plan-reconciliation-types';
+
+export type SavedHomeworkGenerationInput = Pick<
+  TeacherHomeworkActionInput,
+  | 'sourceType'
+  | 'savedLessonPlanId'
+  | 'deckId'
+  | 'subject'
+  | 'gradeLevel'
+  | 'topic'
+  | 'numberOfQuestions'
+  | 'difficultyLevel'
+>;
 
 export const supportCategoryEnum = pgEnum('support_category', [
   'general_support',
@@ -91,6 +110,11 @@ export const teamWorkspaceEventActionEnum = pgEnum('team_workspace_event_action'
   'deleted',
 ]);
 
+export const teamMemberHistoryActionEnum = pgEnum('team_member_history_action', [
+  'added',
+  'removed',
+]);
+
 export const quizSecuritySessionStatusEnum = pgEnum('quiz_security_session_status', [
   'active',
   'locked',
@@ -124,6 +148,8 @@ export const teams = pgTable('teams', {
   /** When true, quizzes may include AI-generated fill-in-the-blank sentences. */
   quizFormatFillInBlank: boolean().notNull().default(false),
   createdAt: timestamp().notNull().defaultNow(),
+  /** Set when owner marks workspace inactive during plan reconciliation (restorable on upgrade). */
+  inactiveAt: timestamp(),
 });
 
 /** Subscriber default timed-quiz length — applies to all owned workspaces without an override. */
@@ -145,6 +171,10 @@ export const decks = pgTable('decks', {
   teamId: integer().references(() => teams.id, { onDelete: 'set null' }),
   name: varchar({ length: 255 }).notNull(),
   description: text(),
+  /** Optional grade level label (e.g. Grade 6, Year 1). */
+  gradeLevel: varchar({ length: 64 }),
+  /** Optional difficulty tier for AI generation and teacher tools. */
+  difficultyLevel: varchar({ length: 32 }),
   /** Optional hero/cover image for team workspace decks (S3 URL). */
   coverImageUrl: text(),
   /** Gradient slug (e.g. "ocean", "sunset") applied to deck tile and study flashcard. */
@@ -164,6 +194,10 @@ export const decks = pgTable('decks', {
   quizFormatFillInBlank: boolean(),
   /** Admin-reshuffled per-card quiz format assignments (see DeckQuizFormatAssignments). */
   quizFormatAssignments: json().$type<import("@/lib/quiz-format-assignments").DeckQuizFormatAssignments>(),
+  /** Clerk user id of who created the deck row (co-admin on education workspaces; owner on personal/owner-created). */
+  createdByUserId: varchar({ length: 255 }),
+  /** Set when owner marks deck inactive during plan reconciliation. */
+  inactiveAt: timestamp(),
   createdAt: timestamp().notNull().defaultNow(),
   updatedAt: timestamp().notNull().defaultNow(),
 });
@@ -184,9 +218,26 @@ export const teamMembers = pgTable(
     addedByUserId: varchar({ length: 255 }),
     /** True if the adder is the workspace subscriber; false if a co-admin sent the invite. */
     addedByAsOwner: boolean(),
+    /** Set when owner marks member inactive during plan reconciliation. */
+    inactiveAt: timestamp(),
   },
   (t) => [uniqueIndex('team_members_team_user_uidx').on(t.teamId, t.userId)],
 );
+
+/** Audit trail for workspace membership (member added / removed). */
+export const teamMemberHistory = pgTable('team_member_history', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  teamId: integer()
+    .notNull()
+    .references(() => teams.id, { onDelete: 'cascade' }),
+  ownerUserId: varchar({ length: 255 }).notNull(),
+  action: teamMemberHistoryActionEnum().notNull(),
+  memberUserId: varchar({ length: 255 }).notNull(),
+  memberRole: teamMemberRoleEnum().notNull(),
+  /** Clerk user id of who added or removed the member. */
+  actorUserId: varchar({ length: 255 }),
+  createdAt: timestamp().notNull().defaultNow(),
+});
 
 /** Audit trail for subscriber-owned workspaces (create / rename / delete). */
 export const teamWorkspaceEvents = pgTable('team_workspace_events', {
@@ -906,6 +957,8 @@ export const cards = pgTable('cards', {
   cardType: cardTypeEnum().notNull().default('standard'),
   /** For multiple-choice cards: 4 options. First element is the correct answer. Null for standard cards. */
   choices: text().array(),
+  /** Optional image URL for the correct MC answer (`choices[correctChoiceIndex]`). */
+  choiceImageUrls: text().array(),
   /** Index into `choices` pointing to the correct answer (0..3). Null for standard cards. */
   correctChoiceIndex: integer(),
   /** AI-generated true/false and fill-in-the-blank quiz content for this card. */
@@ -914,8 +967,84 @@ export const cards = pgTable('cards', {
   updatedAt: timestamp().notNull().defaultNow(),
 });
 
+/** Teacher-saved AI lesson plans (personal library per Clerk user). */
+export const savedLessonPlans = pgTable(
+  'saved_lesson_plans',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    lessonTitle: varchar({ length: 512 }).notNull(),
+    subject: varchar({ length: 255 }).notNull(),
+    gradeLevel: varchar({ length: 64 }).notNull(),
+    topic: varchar({ length: 255 }).notNull(),
+    difficultyLevel: varchar({ length: 32 }).notNull(),
+    input: json().$type<LessonPlanInput>().notNull(),
+    result: json().$type<LessonPlanResult>().notNull(),
+    pdfUrl: text(),
+    pdfFileName: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [index('saved_lesson_plans_user_id_idx').on(table.userId)],
+);
+
+/** Teacher-saved AI homework assignments (personal library per Clerk user). */
+export const savedHomeworkAssignments = pgTable(
+  'saved_homework_assignments',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    label: varchar({ length: 255 }).notNull(),
+    assignmentTitle: varchar({ length: 512 }).notNull(),
+    subject: varchar({ length: 255 }).notNull(),
+    gradeLevel: varchar({ length: 64 }).notNull(),
+    topic: varchar({ length: 255 }).notNull(),
+    difficultyLevel: varchar({ length: 32 }).notNull(),
+    sourceType: varchar({ length: 32 }).$type<HomeworkSourceType>().notNull(),
+    savedLessonPlanId: integer(),
+    sourceLessonPlanTitle: varchar({ length: 512 }),
+    deckId: integer(),
+    sourceDeckName: varchar({ length: 255 }),
+    input: json().$type<SavedHomeworkGenerationInput>().notNull(),
+    result: json().$type<HomeworkResult>().notNull(),
+    pdfUrl: text(),
+    pdfFileName: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [index('saved_homework_assignments_user_id_idx').on(table.userId)],
+);
+
+export const planReconciliationStatusEnum = pgEnum('plan_reconciliation_status', [
+  'pending',
+  'completed',
+]);
+
+export const planReconciliationTriggerEnum = pgEnum('plan_reconciliation_trigger', [
+  'upgrade',
+  'downgrade',
+  'lateral',
+]);
+
+export const planReconciliationSessions = pgTable(
+  'plan_reconciliation_sessions',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    targetPlanSlug: varchar({ length: 64 }).notNull(),
+    previousPlanSlug: varchar({ length: 64 }),
+    triggerKind: planReconciliationTriggerEnum().notNull().default('lateral'),
+    status: planReconciliationStatusEnum().notNull().default('pending'),
+    snapshot: json().$type<PlanReconciliationSnapshot>().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+    completedAt: timestamp(),
+  },
+  (t) => [index('plan_reconciliation_sessions_user_status_idx').on(t.userId, t.status)],
+);
+
 /** Row shapes for client `import type` — avoids bundling table refs into client runtime chunks. */
 export type TeamInvitationRow = InferSelectModel<typeof teamInvitations>;
 export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
 export type DeckRow = InferSelectModel<typeof decks>;
 export type TeamDeckAssignmentRow = InferSelectModel<typeof teamDeckAssignments>;
+export type PlanReconciliationSession = InferSelectModel<typeof planReconciliationSessions>;

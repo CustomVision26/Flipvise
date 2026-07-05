@@ -73,8 +73,12 @@
     max-width: 100%;
   }
 
-  [data-app-header] [data-header-tools] {
-    max-width: min(100%, 12.5rem);
+  [data-app-header] [data-header-icon-tools] {
+    max-width: min(100%, 10rem);
+  }
+
+  [data-app-header] [data-header-promo-links] {
+    min-width: 0;
   }
 
   [data-app-header] [data-header-workspace] .workspace-context-trigger-label {
@@ -89,7 +93,7 @@
       grid-row: auto;
     }
 
-    [data-app-header] [data-header-tools] {
+    [data-app-header] [data-header-icon-tools] {
       max-width: none;
     }
   }

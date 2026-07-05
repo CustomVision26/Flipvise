@@ -1,4 +1,3 @@
-import dynamic from "next/dynamic";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
@@ -20,10 +19,9 @@ import {
   teamMemberInviteCapacity,
 } from "@/db/queries/team-plan-limits";
 import { selectNewestMembersWithinMemberLimit } from "@/lib/team-plan-limit-selection";
+import { hasEducationPlan, isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
+import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
-  canonicalTeamPlanId,
-  isTeamPlanId,
-  labelForTeamPlanSlug,
   limitsForPlan,
   personalDashboardPlanQueryValue,
 } from "@/lib/team-plans";
@@ -33,6 +31,7 @@ import {
   buildTeamAdminInvitePendingPath,
   buildTeamAdminInviteSendPath,
   buildTeamAdminMembersPath,
+  buildTeamAdminMembersHistoryPath,
   buildTeamAdminQuizResultsPath,
   buildTeamAdminQuizSchedulePath,
   buildTeamAdminQuizSecurityPath,
@@ -41,22 +40,20 @@ import {
 } from "@/lib/team-admin-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
+import { listTeamMemberHistoryForTeam } from "@/db/queries/team-member-history";
 import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
-import { TeamAdminManageTabs } from "@/components/team-admin-manage-tabs";
-import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
-import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
 import {
   getClerkPrimaryEmailsByUserIds,
   getClerkUserDisplayNameById,
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
-
-/** Turbopack: avoid static SSR import of this client chunk from a Server Component. */
-const AddTeamDialog = dynamic(
-  () => import("@/components/add-team-dialog").then((mod) => mod.AddTeamDialog),
-  { loading: () => null },
-);
+import {
+  AddTeamDialog,
+  TeamAdminManageTabs,
+  TeamAdminQuickNavPanel,
+  TeamAdminWorkspaceStatsPanel,
+} from "@/lib/team-admin-dynamic-components";
 import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
 
 interface TeamAdminDashboardViewProps {
@@ -108,9 +105,7 @@ export default async function TeamAdminDashboardView({
   const { selected, teamsForSubscriber, subscriberTeamIds, viewerTeamMemberUrlParam } =
     resolution;
 
-  const limits = isTeamPlanId(selected.planSlug)
-    ? limitsForPlan(selected.planSlug)
-    : { maxTeams: 0, maxMembersPerTeam: 0, maxDecksPerWorkspace: 0 };
+  const limits = limitsForPlan(selected.planSlug);
 
   const [
     [
@@ -119,6 +114,7 @@ export default async function TeamAdminDashboardView({
       invitations,
       invitationHistory,
       workspaceHistory,
+      memberHistory,
       teamDecksWithCardCounts,
       ownerDisplayName,
       workspaceQuizSnapshots,
@@ -131,6 +127,7 @@ export default async function TeamAdminDashboardView({
       listPendingInvitations(selected.id),
       listTeamInvitationHistoryForTeam(selected.id),
       listTeamWorkspaceEventsForTeam(selected.ownerUserId, selected.id),
+      listTeamMemberHistoryForTeam(selected.ownerUserId, selected.id),
       getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
       getClerkUserDisplayNameById(selected.ownerUserId),
       Promise.all(
@@ -193,6 +190,10 @@ export default async function TeamAdminDashboardView({
     ...invitations.map((i) => i.invitedByUserId),
     ...invitationHistory.map((i) => i.invitedByUserId),
   ].filter((id): id is string => Boolean(id));
+  const memberHistoryUserIds = [
+    ...memberHistory.map((h) => h.memberUserId),
+    ...memberHistory.map((h) => h.actorUserId).filter((id): id is string => Boolean(id)),
+  ];
   const [userFieldDisplayById, access, inviteWorkspaceOptions, invitationStoredDisplayNames] =
     await Promise.all([
       getClerkUserFieldDisplaysByIds(
@@ -203,6 +204,7 @@ export default async function TeamAdminDashboardView({
             ...assignmentSignerUserIds,
             ...workspaceOwnerUserIds,
             ...invitationInviterUserIds,
+            ...memberHistoryUserIds,
           ]),
         ],
       ),
@@ -293,7 +295,7 @@ export default async function TeamAdminDashboardView({
     a.localeCompare(b, undefined, { sensitivity: "base" }),
   );
 
-  if (isOwner && isTeamPlanId(selected.planSlug)) {
+  if (isOwner && isWorkspaceSubscriptionPlanSlug(selected.planSlug)) {
     await enforceSubscriptionPlanLimitsForOwner(selected.ownerUserId, selected.planSlug);
   }
 
@@ -308,7 +310,7 @@ export default async function TeamAdminDashboardView({
         )
       : undefined;
 
-  const planLabel = labelForTeamPlanSlug(selected.planSlug) ?? selected.planSlug;
+  const planLabel = displayNameForBillingPlanSlug(selected.planSlug);
 
   return (
     <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
@@ -339,10 +341,10 @@ export default async function TeamAdminDashboardView({
               Manage teams, members, and deck access for your subscription.
             </p>
           </div>
-          {isOwner && isTeamPlanId(selected.planSlug) ? (
+          {isOwner && isWorkspaceSubscriptionPlanSlug(selected.planSlug) ? (
             <div className="flex shrink-0 sm:justify-end">
               <AddTeamDialog
-                planSlug={canonicalTeamPlanId(selected.planSlug)!}
+                planSlug={selected.planSlug}
                 isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
               />
             </div>
@@ -359,8 +361,10 @@ export default async function TeamAdminDashboardView({
           mainDashboardHref={mainDashboardHref}
           workspaceDashboardHref={workspaceDashboardHref}
           workspaceTeamId={selected.id}
+          workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
           isOwner={isOwner}
           workspacePlanSlug={selected.planSlug}
+          showTeacherDashboard={hasEducationPlan(selected.planSlug)}
         />
       </div>
 
@@ -381,6 +385,10 @@ export default async function TeamAdminDashboardView({
           viewerTeamMemberUrlParam,
         )}
         membersHref={buildTeamAdminMembersPath(selected.id, viewerTeamMemberUrlParam)}
+        membersHistoryHref={buildTeamAdminMembersHistoryPath(
+          selected.id,
+          viewerTeamMemberUrlParam,
+        )}
         workspaceHistoryHref={buildTeamAdminWsHistoryPath(
           selected.id,
           viewerTeamMemberUrlParam,
@@ -424,6 +432,7 @@ export default async function TeamAdminDashboardView({
         userFieldDisplayById={userFieldDisplayById}
         pendingInvitations={invitations}
         invitationHistory={invitationHistory}
+        memberHistory={memberHistory}
         workspaceHistory={workspaceHistory}
         inviteDisplayHintsByEmail={inviteDisplayHintsByEmail}
         subscriberOwnerPrimaryEmail={subscriberOwnerPrimaryEmail}

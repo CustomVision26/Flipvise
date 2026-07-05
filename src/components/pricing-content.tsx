@@ -30,6 +30,11 @@ import {
 } from "@/lib/pricing-period-display";
 import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
+import {
+  EDUCATION_PLAN_BADGES,
+  EDUCATION_PLAN_LABELS,
+  isEducationPlanId,
+} from "@/lib/education-plans";
 import type {
   PlanAffiliateDiscount,
   PlanConfig,
@@ -72,6 +77,10 @@ function PlanCard({
   const discount = plan.discount;
   const hasActiveDiscount = periodPricing?.hasActiveDiscount ?? false;
   const isFree = plan.id === "free";
+  const isEducation = isEducationPlanId(plan.id);
+  const educationBadge = isEducation
+    ? EDUCATION_PLAN_BADGES[plan.id as keyof typeof EDUCATION_PLAN_BADGES]
+    : null;
 
   const trialEligible =
     userId != null &&
@@ -83,6 +92,15 @@ function PlanCard({
     }) &&
     period === "monthly";
   const trialDays = publishedTrialDaysForPlan(plan);
+
+  const checkoutButtonLabel = (() => {
+    if (isEducation) {
+      return `Change to ${EDUCATION_PLAN_LABELS[plan.id as keyof typeof EDUCATION_PLAN_LABELS]}`;
+    }
+    if (trialEligible) return `Subscribe to ${plan.name} now`;
+    if (userId && !isCurrent && !isFree) return `Change to ${plan.name}`;
+    return `Choose ${plan.name}`;
+  })();
 
   const cta = (() => {
     if (!userId) {
@@ -126,11 +144,7 @@ function PlanCard({
           variant={trialEligible ? "outline" : "default"}
           onClick={() => onCheckout(plan.id as PaidPlanId)}
         >
-          {trialEligible
-            ? `Subscribe to ${plan.name} now`
-            : userId && !isCurrent && !isFree
-              ? `Change to ${plan.name}`
-              : `Choose ${plan.name}`}
+          {checkoutButtonLabel}
         </Button>
       </div>
     );
@@ -157,6 +171,11 @@ function PlanCard({
             {plan.highlighted && !isCurrent && (
               <Badge className="text-xs">Most popular</Badge>
             )}
+            {educationBadge && !isCurrent ? (
+              <Badge variant="secondary" className="text-xs">
+                {educationBadge}
+              </Badge>
+            ) : null}
             {isPublishedPlanTrial(plan) && trialEligible ? (
               <Badge variant="secondary" className="text-xs">
                 {trialDays}-day trial

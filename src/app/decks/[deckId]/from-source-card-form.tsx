@@ -149,6 +149,8 @@ export function FromSourceCardForm({
   const [cardCountInput, setCardCountInput] = useState(() =>
     defaultCardCountInput(maxGeneratableCount(remainingAiSlots, remainingDeckSlots)),
   );
+  const [readingPassageMultipleChoice, setReadingPassageMultipleChoice] = useState(false);
+  const [reviewReadingPassageMode, setReviewReadingPassageMode] = useState(false);
   const [reviewRows, setReviewRows] = useState<ReviewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [relevanceWarning, setRelevanceWarning] = useState<string | null>(null);
@@ -268,6 +270,9 @@ export function FromSourceCardForm({
         if (forceDespiteWarning) {
           formData.set("skipRelevanceCheck", "true");
         }
+        if (readingPassageMultipleChoice) {
+          formData.set("readingPassageMultipleChoice", "true");
+        }
         if (sourceMode === "url" && url.trim()) {
           formData.set("url", url.trim());
         } else if (file) {
@@ -283,11 +288,13 @@ export function FromSourceCardForm({
                 count: cardCount,
                 file,
                 skipRelevanceCheck: forceDespiteWarning,
+                readingPassageMultipleChoice,
                 onProgress: setGenerateStep,
               })
             : await generateCardsFromSourceAction(formData);
 
         setGenerateStep(null);
+        setReviewReadingPassageMode(readingPassageMultipleChoice);
 
         if (result.status === "relevance_warning") {
           setRelevanceWarning(result.warning);
@@ -407,7 +414,7 @@ export function FromSourceCardForm({
         ...target,
         front: target.back,
         back: target.front,
-        distractorsFromOriginalFront: !flipped,
+        distractorsFromOriginalFront: reviewReadingPassageMode ? false : !flipped,
         distractorsLoading: true,
       };
       queueDistractorRegeneration(updated);
@@ -463,10 +470,19 @@ export function FromSourceCardForm({
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground leading-relaxed">
           Review AI-generated cards. Edit front, back, and the three quiz wrong answers below
-          before saving. Use <span className="font-medium text-foreground">Swap</span> to flip
-          question and answer; wrong answers refresh automatically and you can edit or regenerate
-          them. Toggle <span className="font-medium text-foreground">Wrong answers from original front</span>{" "}
-          after swap when distractors should match the term or question side.
+          before saving.
+          {reviewReadingPassageMode
+            ? " Each front should include only a Passage and Question; back holds the correct answer and wrong answers are listed below for quiz mode."
+            : null}{" "}
+          {!reviewReadingPassageMode ? (
+            <>
+              Use <span className="font-medium text-foreground">Swap</span> to flip
+              question and answer; wrong answers refresh automatically and you can edit or regenerate
+              them. Toggle{" "}
+              <span className="font-medium text-foreground">Wrong answers from original front</span>{" "}
+              after swap when distractors should match the term or question side.
+            </>
+          ) : null}
         </p>
 
         <div className="space-y-3 max-h-[min(65vh,32rem)] overflow-y-auto pr-1">
@@ -495,23 +511,25 @@ export function FromSourceCardForm({
                 <Textarea
                   value={row.front}
                   onChange={(e) => updateRow(row.id, { front: e.target.value })}
-                  rows={2}
+                  rows={reviewReadingPassageMode ? 10 : 2}
                   className="text-sm min-h-[2.5rem] resize-y"
                 />
               </div>
-              <div className="flex justify-center py-0.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs"
-                  onClick={() => swapRowFrontBack(row.id)}
-                  aria-label={`Swap front and back for card ${index + 1}`}
-                >
-                  <ArrowUpDown className="h-3.5 w-3.5" />
-                  Swap
-                </Button>
-              </div>
+              {!reviewReadingPassageMode ? (
+                <div className="flex justify-center py-0.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => swapRowFrontBack(row.id)}
+                    aria-label={`Swap front and back for card ${index + 1}`}
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Swap
+                  </Button>
+                </div>
+              ) : null}
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   Back
@@ -523,30 +541,32 @@ export function FromSourceCardForm({
                   className="text-sm min-h-[3rem] resize-y"
                 />
               </div>
-              <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/10 px-2.5 py-2">
-                <Checkbox
-                  id={`distractor-source-${row.id}`}
-                  checked={row.distractorsFromOriginalFront}
-                  disabled={row.distractorsLoading}
-                  onCheckedChange={(checked) =>
-                    handleDistractorSourceChange(row.id, checked === true)
-                  }
-                  aria-label={`Use original front style for quiz wrong answers on card ${index + 1}`}
-                />
-                <Label
-                  htmlFor={`distractor-source-${row.id}`}
-                  className="cursor-pointer text-[11px] leading-relaxed text-muted-foreground font-normal"
-                >
-                  <span className="font-medium text-foreground">
-                    Wrong answers from original front
-                  </span>
-                  <span className="block mt-0.5">
-                    Off (default): wrong answers match the original back — e.g. other definitions,
-                    numbers, or answer lists. On: match the original front — e.g. other terms,
-                    parallel questions like &quot;what is 5+5?&quot;, or short prompts.
-                  </span>
-                </Label>
-              </div>
+              {!reviewReadingPassageMode ? (
+                <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/10 px-2.5 py-2">
+                  <Checkbox
+                    id={`distractor-source-${row.id}`}
+                    checked={row.distractorsFromOriginalFront}
+                    disabled={row.distractorsLoading}
+                    onCheckedChange={(checked) =>
+                      handleDistractorSourceChange(row.id, checked === true)
+                    }
+                    aria-label={`Use original front style for quiz wrong answers on card ${index + 1}`}
+                  />
+                  <Label
+                    htmlFor={`distractor-source-${row.id}`}
+                    className="cursor-pointer text-[11px] leading-relaxed text-muted-foreground font-normal"
+                  >
+                    <span className="font-medium text-foreground">
+                      Wrong answers from original front
+                    </span>
+                    <span className="block mt-0.5">
+                      Off (default): wrong answers match the original back — e.g. other definitions,
+                      numbers, or answer lists. On: match the original front — e.g. other terms,
+                      parallel questions like &quot;what is 5+5?&quot;, or short prompts.
+                    </span>
+                  </Label>
+                </div>
+              ) : null}
               <div className="space-y-2 rounded-md border border-border/60 bg-muted/5 px-2.5 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -606,6 +626,7 @@ export function FromSourceCardForm({
             disabled={isBusy}
             onClick={() => {
               setReviewRows(null);
+              setReviewReadingPassageMode(false);
               setError(null);
             }}
             className="w-full sm:w-auto"
@@ -742,6 +763,33 @@ export function FromSourceCardForm({
             Select a source type above to continue.
           </p>
         )}
+
+        {sourceMode !== null ? (
+          <div className="flex items-start gap-2 rounded-md border border-border/60 bg-muted/10 px-3 py-2.5">
+            <Checkbox
+              id="reading-passage-mc"
+              checked={readingPassageMultipleChoice}
+              disabled={isBusy}
+              onCheckedChange={(checked) =>
+                setReadingPassageMultipleChoice(checked === true)
+              }
+              aria-label="Include reading passage with multiple choice questions"
+            />
+            <Label
+              htmlFor="reading-passage-mc"
+              className="cursor-pointer text-[11px] leading-relaxed text-muted-foreground font-normal"
+            >
+              <span className="font-medium text-foreground">
+                Reading passage + multiple choice
+              </span>
+              <span className="block mt-0.5">
+                Each card includes a short passage and comprehension question on the front. The
+                correct answer goes on the back; three wrong answers are saved for quiz mode (not
+                shown on the front).
+              </span>
+            </Label>
+          </div>
+        ) : null}
 
         {relevanceWarning ? (
           <div

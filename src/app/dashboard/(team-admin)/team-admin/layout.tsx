@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
 import { userHasTeamAdminDashboardAccess } from "@/db/queries/teams";
+import { redirectIfPlanReconciliationPending } from "@/lib/plan-reconciliation-gate";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 
 export const metadata: Metadata = {
@@ -15,6 +16,8 @@ export default async function TeamAdminRouteGroupLayout({
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/");
+
+  await redirectIfPlanReconciliationPending(userId);
 
   const allowed = await tryTeamQuery(
     () => userHasTeamAdminDashboardAccess(userId),

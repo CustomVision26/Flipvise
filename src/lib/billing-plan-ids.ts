@@ -1,3 +1,4 @@
+import { EDUCATION_PLAN_IDS } from "@/lib/education-plans";
 import { TEAM_PLAN_IDS, type TeamPlanId } from "@/lib/team-plans";
 
 /** Individual paid plans billed through Stripe (personal workspace). */
@@ -8,6 +9,7 @@ export type PersonalStripePlanId = (typeof PERSONAL_STRIPE_PLAN_IDS)[number];
 export const STRIPE_PAID_PLAN_IDS = [
   ...PERSONAL_STRIPE_PLAN_IDS,
   ...TEAM_PLAN_IDS,
+  ...EDUCATION_PLAN_IDS,
 ] as const;
 export type StripePaidPlanId = (typeof STRIPE_PAID_PLAN_IDS)[number];
 

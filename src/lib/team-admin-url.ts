@@ -17,6 +17,10 @@ const TEAM_ADMIN_TEAM_MEMBER_PARAM = "teamMemberId";
 /** Primary dashboard — members tab content (`?team=`). */
 export const TEAM_ADMIN_MEMBERS_PATH = "/dashboard/team-admin/members";
 
+/** Members — membership add/remove history (`?team=`). */
+export const TEAM_ADMIN_MEMBERS_HISTORY_PATH =
+  "/dashboard/team-admin/members/membership-history";
+
 /** Workspace rename/create/remove history (`?team=`). */
 export const TEAM_ADMIN_WS_HISTORY_PATH = "/dashboard/team-admin/ws-history";
 
@@ -80,6 +84,14 @@ export function isTeamAdminStudyPrivilegesPath(pathname: string): boolean {
 /** True when `pathname` is the members team-admin dashboard. */
 export function isTeamAdminMembersPath(pathname: string): boolean {
   return pathname === TEAM_ADMIN_MEMBERS_PATH || pathname.startsWith(`${TEAM_ADMIN_MEMBERS_PATH}/`);
+}
+
+/** True when `pathname` is the membership history sub-route under Members. */
+export function isTeamAdminMembersHistoryPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_MEMBERS_HISTORY_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_MEMBERS_HISTORY_PATH}/`)
+  );
 }
 
 /** True when `pathname` is the team-admin workspace history route. */
@@ -186,6 +198,16 @@ export function buildTeamAdminMembersPath(
 ): string {
   const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_MEMBERS_PATH}?${qs}` : TEAM_ADMIN_MEMBERS_PATH;
+}
+
+export function buildTeamAdminMembersHistoryPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs
+    ? `${TEAM_ADMIN_MEMBERS_HISTORY_PATH}?${qs}`
+    : TEAM_ADMIN_MEMBERS_HISTORY_PATH;
 }
 
 export function buildTeamAdminWsHistoryPath(

@@ -16,7 +16,6 @@ import {
 } from "@/components/team-admin-workspace-deck-card-totals";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import {
-  isTeamPlanId,
   limitsForPlan,
   workspaceCardsCapacityForPlan,
 } from "@/lib/team-plans";
@@ -55,7 +54,7 @@ export function TeamAdminWorkspaceStatsPanel({
 }: TeamAdminWorkspaceStatsPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
 
-  const limits = isTeamPlanId(planSlug) ? limitsForPlan(planSlug) : { maxDecksPerWorkspace: 0 };
+  const limits = limitsForPlan(planSlug);
   const deckCount = teamDecksWithCardCounts.length;
   const cardCount = teamDecksWithCardCounts.reduce((sum, d) => sum + toNumber(d.cardCount), 0);
   const cardsCapacity = workspaceCardsCapacityForPlan(planSlug);

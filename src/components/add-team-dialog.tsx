@@ -24,10 +24,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTeamAction } from "@/actions/teams";
-import type { TeamPlanId } from "@/lib/team-plans";
 
 interface AddTeamDialogProps {
-  planSlug: TeamPlanId;
+  planSlug: string;
   isAtLimit?: boolean;
   triggerLabel?: string;
   /** Shown on hover. Omit to use the default help text. Pass `""` to disable. */

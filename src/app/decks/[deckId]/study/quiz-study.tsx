@@ -472,7 +472,11 @@ export function QuizStudy({
           cardId: q.cardId,
           questionType: "multiple_choice" as const,
           selectedText:
-            sel !== null && sel !== undefined ? q.options[sel] ?? null : null,
+            sel !== null && sel !== undefined
+              ? q.options[sel]?.trim()
+                ? q.options[sel]
+                : q.optionImageUrls[sel] ?? null
+              : null,
           typedAnswer: null,
         };
       });
@@ -1153,6 +1157,8 @@ export function QuizStudy({
         : "Select the best answer";
   const choiceOptions =
     current.type === "true_false" ? trueFalseOptions() : current.type === "multiple_choice" ? current.options : [];
+  const choiceOptionImages =
+    current.type === "multiple_choice" ? current.optionImageUrls : [];
   const timerWarning = remainingSeconds <= 60;
   const timerCritical = remainingSeconds <= 30;
 
@@ -1387,6 +1393,9 @@ export function QuizStudy({
         {choiceOptions.map((text, i) => {
           const isSelected = selectedForCurrent === i;
           const displayText = formatQuizOptionForDisplay(text);
+          const optionImageUrl =
+            current.type === "multiple_choice" ? choiceOptionImages[i] ?? null : null;
+          const hasOptionText = displayText.trim().length > 0;
           return (
             <div key={`${current.cardId}-${i}`} className="flex items-center gap-1.5">
               <Button
@@ -1415,10 +1424,27 @@ export function QuizStudy({
                   >
                     {String.fromCharCode(65 + i)}
                   </span>
-                  <span className="break-words">{displayText}</span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-2">
+                    {optionImageUrl ? (
+                      <span className="relative block h-24 w-full max-w-xs overflow-hidden rounded-md border border-border/60 bg-muted/20">
+                        <Image
+                          src={optionImageUrl}
+                          alt=""
+                          fill
+                          className="object-contain"
+                          sizes="240px"
+                        />
+                      </span>
+                    ) : null}
+                    {hasOptionText ? (
+                      <span className="break-words">{displayText}</span>
+                    ) : optionImageUrl ? (
+                      <span className="text-xs text-muted-foreground">(Image answer)</span>
+                    ) : null}
+                  </span>
                 </span>
               </Button>
-              {hasAiReading ? (
+              {hasAiReading && hasOptionText ? (
                 <SpeakButton text={displayText} voice={voice} stopKey={currentIndex} />
               ) : null}
             </div>

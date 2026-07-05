@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  isTeamPlanId,
   limitsForPlan,
   workspaceCardsCapacityForPlan,
 } from "@/lib/team-plans";
@@ -34,9 +33,7 @@ export function TeamAdminWorkspaceDeckCardTotals({
   teamDecksWithCardCounts: ReadonlyArray<TeamAdminWorkspaceDeckCardTotalsRow>;
   planSlug: string;
 }) {
-  const limits = isTeamPlanId(planSlug)
-    ? limitsForPlan(planSlug)
-    : { maxDecksPerWorkspace: 0 };
+  const limits = limitsForPlan(planSlug);
 
   const workspaceCardRecordCount = teamDecksWithCardCounts.reduce(
     (sum, d) => sum + toNumber(d.cardCount),

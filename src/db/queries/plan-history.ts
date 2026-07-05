@@ -129,6 +129,77 @@ export function buildAdminComplimentarySegments(
   return segments;
 }
 
+type ActiveStripeSubRow = NonNullable<
+  Awaited<ReturnType<typeof getActiveStripeSubscription>>
+>;
+
+function activePaidSubscriptionStart(
+  activeSub: ActiveStripeSubRow,
+  invoices: StoredBillingInvoice[],
+): Date {
+  const planSlug = activeSub.planSlug?.trim();
+  if (planSlug) {
+    const inv = latestPaidInvoiceForPlan(invoices, planSlug);
+    const fromInvoice = inv?.periodStart ?? inv?.paidAt;
+    if (fromInvoice) {
+      return fromInvoice instanceof Date ? fromInvoice : new Date(fromInvoice);
+    }
+  }
+  const fallback = activeSub.updatedAt ?? activeSub.createdAt;
+  return fallback instanceof Date ? fallback : new Date(fallback);
+}
+
+/** Close open admin-assigned complimentary intervals when a paid Stripe sub is active. */
+function closeAdminSegmentsSupersededByPaidSubscription(
+  segments: Array<{ planName: string; start: Date; end: Date | null }>,
+  activeSub: ActiveStripeSubRow | null,
+  invoices: StoredBillingInvoice[],
+): void {
+  if (!activeSub) return;
+  if (activeSub.status !== "active" && activeSub.status !== "trialing") return;
+
+  const supersedeAt = activePaidSubscriptionStart(activeSub, invoices);
+  for (const seg of segments) {
+    if (seg.end != null) continue;
+    if (supersedeAt.getTime() <= seg.start.getTime()) continue;
+    seg.end = supersedeAt;
+  }
+}
+
+/** Mark the current paid subscription period as Active in history (not just Paid). */
+function reconcileActivePaidPlanStatusInHistory(
+  rows: PlanHistoryRow[],
+  activeSub: ActiveStripeSubRow | null,
+): void {
+  if (!activeSub) return;
+  if (activeSub.status !== "active" && activeSub.status !== "trialing") return;
+
+  const planSlug = activeSub.planSlug?.trim();
+  if (!planSlug) return;
+
+  const now = Date.now();
+  const matching = rows
+    .filter(
+      (row) =>
+        row.planType === "Paid subscription" &&
+        planNamesMatch(row.planName, planSlug),
+    )
+    .sort(
+      (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+    );
+
+  const current = matching.find((row) => {
+    if (!row.endAt) return true;
+    const endMs = new Date(row.endAt).getTime();
+    return !Number.isNaN(endMs) && endMs > now;
+  });
+
+  if (!current) return;
+
+  current.statusLabel =
+    activeSub.status === "trialing" ? "Trialing" : "Active";
+}
+
 export async function listPlanAssignmentLogsForUser(targetUserId: string) {
   try {
     return await db
@@ -300,11 +371,7 @@ async function appendActiveStripeSubscriptionRow(
         ? new Date(activeSub.updatedAt)
         : null;
 
-  const latestPaidInvoice =
-    latestPaidInvoiceForPlan(invoices, planSlug) ??
-    invoices
-      .filter((inv) => inv.status?.toLowerCase() === "paid")
-      .sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a))[0];
+  const latestPaidInvoice = latestPaidInvoiceForPlan(invoices, planSlug);
 
   let paidInvoice = latestPaidInvoice;
   if (!paidInvoice || !receiptUrlFromStoredInvoice(paidInvoice)) {
@@ -513,6 +580,12 @@ async function buildMergedPlanHistoryForUser(
   const segments = buildAdminComplimentarySegments(
     assignmentLogs as AssignmentLogRow[],
   );
+  const activeSubForHistory = await getActiveStripeSubscription(userId);
+  closeAdminSegmentsSupersededByPaidSubscription(
+    segments,
+    activeSubForHistory,
+    invoices,
+  );
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!;
     const startIso = toIsoString(seg.start);
@@ -572,6 +645,8 @@ async function buildMergedPlanHistoryForUser(
 
   await appendActiveStripeSubscriptionRow(userId, rows, invoices);
 
+  reconcileActivePaidPlanStatusInHistory(rows, activeSubForHistory);
+
   await enrichPlanHistoryPromoFromReceipts(userId, emailLower, rows, invoices);
 
   rows.sort(
@@ -605,6 +680,14 @@ export async function appendComplimentaryAccessHistoryRows(
   const isPlatformAdmin = isClerkPlatformAdminRole(role);
 
   if (!isPlatformAdmin && !adminGranted) return;
+
+  const activeSub = await getActiveStripeSubscription(userId);
+  if (
+    activeSub &&
+    (activeSub.status === "active" || activeSub.status === "trialing")
+  ) {
+    return;
+  }
 
   const planName = "Pro Plus";
   if (hasOpenComplimentaryPlanRow(rows, planName)) return;

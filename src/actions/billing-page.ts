@@ -84,6 +84,12 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
     const email = await resolveUserEmail(userId);
 
     try {
+      await syncActiveSubscriptionFromStripeForUser(userId);
+    } catch (error) {
+      console.error("[loadBillingTabDataAction] subscription sync:", error);
+    }
+
+    try {
       await syncBillingInvoicesForUser(userId);
     } catch (error) {
       console.error("[loadBillingTabDataAction] invoice sync:", error);
@@ -103,6 +109,10 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
       billingStatus = typeof raw === "string" ? raw : null;
     } catch {
       // omit
+    }
+
+    if (!billingStatus && activeSub?.status) {
+      billingStatus = activeSub.status;
     }
 
     const [planHistory, affiliateRows] = await Promise.all([

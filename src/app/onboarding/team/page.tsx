@@ -13,12 +13,14 @@ const clerkClient = createClerkClient({
 });
 
 export default async function TeamOnboardingPage() {
-  const { userId, activeTeamPlan, isAdmin } = await getAccessContext();
+  const { userId, activeTeamPlan, activeEducationTeamPlan, isAdmin } =
+    await getAccessContext();
   if (!userId) redirect("/");
   if (isAdmin) {
     redirect("/dashboard");
   }
-  if (!activeTeamPlan) {
+  const workspacePlan = activeTeamPlan ?? activeEducationTeamPlan;
+  if (!workspacePlan) {
     redirect("/pricing");
   }
 
@@ -47,7 +49,7 @@ export default async function TeamOnboardingPage() {
             </p>
           </div>
         </div>
-        <TeamOnboardingWizard planSlug={activeTeamPlan} />
+        <TeamOnboardingWizard planSlug={workspacePlan} />
       </div>
     </div>
   );

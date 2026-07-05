@@ -18,7 +18,9 @@ import {
 } from "@/lib/personal-workspace-plan-label";
 import { shouldHideHelpCenter } from "@/lib/team-help";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
+import { showTeacherDashboardFromShell } from "@/lib/show-teacher-dashboard";
 import { isTeamPlanId } from "@/lib/team-plans";
+import { isEducationTeamPlanId, isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
 import {
   resolveRootLayoutShellProfile,
   rootLayoutShellNeedsAffiliatePortal,
@@ -52,41 +54,69 @@ export type RootLayoutShellData = {
   personalAccountPlanLabel: string;
   showWorkspaceSwitcher: boolean;
   teamDashFallback: RootLayoutTeamDashFallback;
+  showTeacherDashboard: boolean;
 };
 
 function resolveTeamDashFallback(
   userId: string | null,
   activeTeamPlan: AccessContext["activeTeamPlan"],
+  activeEducationTeamPlan: AccessContext["activeEducationTeamPlan"],
   workspaceTeams: TeamWorkspaceNavTeam[],
+  teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[],
 ): RootLayoutTeamDashFallback {
+  const workspacePlan =
+    activeTeamPlan ??
+    (activeEducationTeamPlan != null ? activeEducationTeamPlan : null);
   if (
     userId == null ||
-    activeTeamPlan == null ||
-    !isTeamPlanId(activeTeamPlan)
+    workspacePlan == null ||
+    !isWorkspaceSubscriptionPlanSlug(workspacePlan)
   ) {
     return null;
   }
-  // Personal "Team Admin Dash": subscriber with an active team-tier personal plan who owns team workspaces.
-  const ownedTeamTierTeams = workspaceTeams.filter(
-    (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
+
+  const pickFromWorkspaceNav = (): RootLayoutTeamDashFallback => {
+    const ownedTeamTierTeams = workspaceTeams.filter(
+      (t) =>
+        t.isSubscriberOwned && isWorkspaceSubscriptionPlanSlug(t.planUrlValue),
+    );
+    if (ownedTeamTierTeams.length === 0) return null;
+    const match = ownedTeamTierTeams.find(
+      (t) => t.planUrlValue === workspacePlan,
+    );
+    const pick = match ?? ownedTeamTierTeams[0]!;
+    return {
+      teamId: pick.id,
+      planSlug: pick.planUrlValue,
+      teamMemberUrlParam: pick.teamMemberUrlParam,
+    };
+  };
+
+  const fromNav = pickFromWorkspaceNav();
+  if (fromNav != null) return fromNav;
+
+  const ownedHeaderTeams = teamAdminHeaderTeams.filter(
+    (t) =>
+      t.ownerUserId === userId &&
+      t.workspacePlanQuery != null &&
+      isWorkspaceSubscriptionPlanSlug(t.workspacePlanQuery),
   );
-  if (ownedTeamTierTeams.length === 0) {
-    return null;
-  }
-  const match = ownedTeamTierTeams.find(
-    (t) => t.planUrlValue === activeTeamPlan,
+  if (ownedHeaderTeams.length === 0) return null;
+  const headerMatch = ownedHeaderTeams.find(
+    (t) => t.workspacePlanQuery === workspacePlan,
   );
-  const pick = match ?? ownedTeamTierTeams[0]!;
+  const headerPick = headerMatch ?? ownedHeaderTeams[0]!;
   return {
-    teamId: pick.id,
-    planSlug: pick.planUrlValue,
-    teamMemberUrlParam: pick.teamMemberUrlParam,
+    teamId: headerPick.id,
+    planSlug: headerPick.workspacePlanQuery!,
+    teamMemberUrlParam: headerPick.teamMemberUrlParam,
   };
 }
 
 function resolveShowWorkspaceSwitcher(
   workspaceTeamsTotalEligible: number,
   activeTeamPlan: AccessContext["activeTeamPlan"],
+  activeEducationTeamPlan: AccessContext["activeEducationTeamPlan"],
   isPro: boolean,
   hasTeamMembership: boolean,
 ): boolean {
@@ -94,6 +124,7 @@ function resolveShowWorkspaceSwitcher(
     workspaceTeamsTotalEligible > 0 ||
     hasTeamMembership ||
     (activeTeamPlan != null && isTeamPlanId(activeTeamPlan)) ||
+    activeEducationTeamPlan != null ||
     isPro
   );
 }
@@ -105,7 +136,7 @@ export async function loadRootLayoutShellData(input: {
 }): Promise<RootLayoutShellData> {
   const { pathname, access, teamContextCookie } = input;
   const profile = resolveRootLayoutShellProfile(pathname, access.userId);
-  const { userId, isAdmin, adminGranted, activeTeamPlan, isPro, primaryEmail } =
+  const { userId, isAdmin, adminGranted, activeTeamPlan, activeEducationTeamPlan, isPro, primaryEmail, effectivePlanSlug } =
     access;
 
   const emptyGuest: RootLayoutShellData = {
@@ -120,6 +151,7 @@ export async function loadRootLayoutShellData(input: {
     personalAccountPlanLabel: "Free",
     showWorkspaceSwitcher: false,
     teamDashFallback: null,
+    showTeacherDashboard: false,
   };
 
   if (profile === "guest" || userId == null) {
@@ -224,13 +256,20 @@ export async function loadRootLayoutShellData(input: {
     showWorkspaceSwitcher: resolveShowWorkspaceSwitcher(
       workspaceTeamsTotalEligible,
       activeTeamPlan,
+      activeEducationTeamPlan,
       isPro,
       hasTeamMembership,
     ),
     teamDashFallback: resolveTeamDashFallback(
       userId,
       activeTeamPlan,
+      activeEducationTeamPlan,
       workspaceTeams,
+      teamAdminHeaderTeams,
     ),
+    showTeacherDashboard: showTeacherDashboardFromShell({
+      access,
+      teamAdminHeaderTeams,
+    }),
   };
 }

@@ -21,6 +21,9 @@ const PRICE_ENV_MONTHLY: Record<StripePaidPlanId, EnvPair> = {
     primary: "STRIPE_PRO_PLUS_ENTERPRISE_PRICE_ID",
     fallback: "STRIPE_PRO_ENTERPRISE_PRICE_ID",
   },
+  education_plus: { primary: "STRIPE_EDUCATION_PLUS_PRICE_ID" },
+  education_gold: { primary: "STRIPE_EDUCATION_GOLD_PRICE_ID" },
+  education_enterprise: { primary: "STRIPE_EDUCATION_ENTERPRISE_PRICE_ID" },
 };
 
 const PRICE_ENV_YEARLY: Record<StripePaidPlanId, EnvPair> = {
@@ -41,6 +44,11 @@ const PRICE_ENV_YEARLY: Record<StripePaidPlanId, EnvPair> = {
   pro_plus_enterprise: {
     primary: "STRIPE_PRO_PLUS_ENTERPRISE_YEARLY_PRICE_ID",
     fallback: "STRIPE_PRO_ENTERPRISE_YEARLY_PRICE_ID",
+  },
+  education_plus: { primary: "STRIPE_EDUCATION_YEARLY_PLUS_PRICE_ID" },
+  education_gold: { primary: "STRIPE_EDUCATION_YEARLY_GOLD_PRICE_ID" },
+  education_enterprise: {
+    primary: "STRIPE_EDUCATION_YEARLY_ENTERPRISE_PRICE_ID",
   },
 };
 
@@ -66,4 +74,28 @@ export function resolveStripePriceIdForPlan(
   period: "monthly" | "yearly",
 ): string | null {
   return readStripePriceIdFromEnv(stripePriceEnvPairForPlan(plan, period));
+}
+
+let priceIdToPlanCache: Map<string, StripePaidPlanId> | null = null;
+
+function buildPriceIdToPlanCache(): Map<string, StripePaidPlanId> {
+  const map = new Map<string, StripePaidPlanId>();
+  const plans = Object.keys(PRICE_ENV_MONTHLY) as StripePaidPlanId[];
+  for (const plan of plans) {
+    for (const period of ["monthly", "yearly"] as const) {
+      const priceId = resolveStripePriceIdForPlan(plan, period);
+      if (priceId) map.set(priceId, plan);
+    }
+  }
+  return map;
+}
+
+/** Reverse lookup: Stripe price id → billing plan slug (from env vars). */
+export function planSlugFromStripePriceId(
+  priceId: string | null | undefined,
+): StripePaidPlanId | null {
+  const id = priceId?.trim();
+  if (!id?.startsWith("price_")) return null;
+  priceIdToPlanCache ??= buildPriceIdToPlanCache();
+  return priceIdToPlanCache.get(id) ?? null;
 }

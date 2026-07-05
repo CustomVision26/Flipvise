@@ -1,4 +1,8 @@
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
+import {
+  isEducationTeamPlanId,
+  limitsForEducationTeamPlan,
+} from "@/lib/education-plans";
 import { PRO_PLUS_PERSONAL_DECK_LIMIT } from "@/lib/personal-plan-limits";
 
 /** Clerk Billing plan ids for team tiers — configure matching plans + features in Clerk Dashboard. */
@@ -83,8 +87,10 @@ export function personalDashboardPlanQueryValue(
   activeTeamPlan: TeamPlanId | null,
   isPro: boolean,
   personalStripeSlug?: "pro" | "pro_plus" | null,
+  activeEducationTeamPlan?: import("@/lib/education-plans").EducationTeamPlanId | null,
 ): string {
   if (activeTeamPlan !== null) return activeTeamPlan;
+  if (activeEducationTeamPlan != null) return activeEducationTeamPlan;
   if (personalStripeSlug === "pro_plus") return "pro_plus";
   if (isPro && personalStripeSlug === "pro") return "pro";
   if (isPro) return "pro";
@@ -97,12 +103,20 @@ export function personalDashboardPlanQueryValue(
  */
 export function isWorkspaceSubscriberPlanQueryParam(plan: string): boolean {
   const p = plan.trim().toLowerCase();
-  return p === "pro" || p === "pro_plus" || isTeamPlanId(p);
+  return (
+    p === "pro" ||
+    p === "pro_plus" ||
+    p === "education_plus" ||
+    isTeamPlanId(p) ||
+    isEducationTeamPlanId(p)
+  );
 }
 
 export function limitsForPlan(planSlug: string) {
   const canonical = canonicalTeamPlanId(planSlug);
   if (canonical) return TEAM_PLAN_LIMITS[canonical];
+  const education = limitsForEducationTeamPlan(planSlug);
+  if (education.maxTeams > 0) return education;
   return { maxTeams: 0, maxMembersPerTeam: 0, maxDecksPerWorkspace: 0 };
 }
 

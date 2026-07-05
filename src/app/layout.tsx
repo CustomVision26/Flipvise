@@ -76,6 +76,9 @@ export const viewport: Viewport = {
 
 const NATIVE_SHELL_EARLY_SCRIPT = `try{var c=window.Capacitor;var ua=navigator.userAgent;if(/FlipviseNative\\//.test(ua)||(c&&c.isNativePlatform&&c.isNativePlatform())){var r=document.documentElement;r.dataset.flipviseNativeShell="1";r.dataset.nativeShell="1";var p=c&&c.getPlatform?c.getPlatform():"";if(p)r.dataset.platform=p;else if(/Android/i.test(ua))r.dataset.platform="android";else if(/iPhone|iPad|iPod/i.test(ua))r.dataset.platform="ios"}}catch(e){}`;
 
+/** Unregister PWA SW + flipvise caches on localhost before React/Turbopack load (avoids stale chunk SSR errors). */
+const DEV_SW_CLEANUP_EARLY_SCRIPT = `try{var h=location.hostname;var isLocal=h==="localhost"||h==="127.0.0.1"||h==="::1";if(isLocal&&"serviceWorker"in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister()})}).catch(function(){});if("caches"in window){caches.keys().then(function(ks){ks.filter(function(k){return k.indexOf("flipvise")===0}).forEach(function(k){caches.delete(k)})}).catch(function(){})}}}catch(e){}`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -99,6 +102,8 @@ export default async function RootLayout({
     hasPrioritySupport,
     hasClerkPersonalPro,
     hasClerkPersonalProPlus,
+    canAccessTeacherTools,
+    activeEducationTeamPlan,
   } = access;
 
   const teamContext = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
@@ -140,6 +145,7 @@ export default async function RootLayout({
       ? personalDashboardHrefWithUserPlanQuery({
           userId,
           activeTeamPlan,
+          activeEducationTeamPlan,
           isPro,
           hasClerkPersonalPro,
           hasClerkPersonalProPlus,
@@ -192,6 +198,12 @@ export default async function RootLayout({
       data-platform={nativeShell.platform}
     >
       <head>
+        {process.env.NODE_ENV === "development" ? (
+          <script
+            id="flipvise-dev-sw-cleanup-early"
+            dangerouslySetInnerHTML={{ __html: DEV_SW_CLEANUP_EARLY_SCRIPT }}
+          />
+        ) : null}
         <script
           id="flipvise-native-shell-early"
           dangerouslySetInnerHTML={{ __html: NATIVE_SHELL_EARLY_SCRIPT }}
@@ -262,11 +274,13 @@ export default async function RootLayout({
                         teamDashFallback={shell.teamDashFallback}
                         resolvedIsPro={isPro}
                         resolvedActiveTeamPlan={activeTeamPlan}
+                        resolvedActiveEducationTeamPlan={activeEducationTeamPlan}
                         resolvedHasProPlusInterfacePalette={
                           hasProPlusInterfacePalette
                         }
                         inboxUnreadCount={shell.inboxUnreadCount}
                         showHelpCenter={!shell.hideHelpCenter}
+                        showTeacherDashboard={shell.showTeacherDashboard}
                       />
                     </div>
                   )}

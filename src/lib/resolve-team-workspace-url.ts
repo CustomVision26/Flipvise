@@ -1,5 +1,10 @@
 import { getMemberRecord, getTeamById, teamWorkspaceAllowsViewerAccess } from "@/db/queries/teams";
 import {
+  canonicalEducationPlanId,
+  isEducationTeamPlanId,
+  isWorkspaceSubscriptionPlanSlug,
+} from "@/lib/education-plans";
+import {
   canonicalTeamPlanId,
   isTeamPlanId,
   isWorkspaceSubscriberPlanQueryParam,
@@ -54,7 +59,7 @@ export async function resolveTeamWorkspaceFromSearchParams(
   if (!Number.isFinite(teamId) || teamId <= 0) return null;
 
   const team = await getTeamById(teamId);
-  if (!team || !isTeamPlanId(team.planSlug)) return null;
+  if (!team || !isWorkspaceSubscriptionPlanSlug(team.planSlug)) return null;
 
   const ownerParam = firstString(sp, ["userid", "userId"]);
   const plan = firstString(sp, ["plan", "Plan"]);
@@ -71,6 +76,16 @@ export async function resolveTeamWorkspaceFromSearchParams(
         urlTeamPlan == null ||
         dbTeamPlan == null ||
         urlTeamPlan !== dbTeamPlan
+      ) {
+        return null;
+      }
+    } else if (isEducationTeamPlanId(planNorm)) {
+      const urlEducationPlan = canonicalEducationPlanId(planNorm);
+      const dbEducationPlan = canonicalEducationPlanId(team.planSlug);
+      if (
+        urlEducationPlan == null ||
+        dbEducationPlan == null ||
+        urlEducationPlan !== dbEducationPlan
       ) {
         return null;
       }

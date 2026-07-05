@@ -20,8 +20,10 @@ type TeamAdminQuickNavPanelProps = {
   mainDashboardHref: string;
   workspaceDashboardHref: string;
   workspaceTeamId: number;
+  workspaceTeamMemberUrlParam?: number;
   isOwner: boolean;
   workspacePlanSlug: string;
+  showTeacherDashboard?: boolean;
   className?: string;
   /** Start collapsed to save vertical space. */
   defaultOpen?: boolean;
@@ -33,8 +35,9 @@ export function TeamAdminQuickNavPanel({
   mainDashboardHref,
   workspaceDashboardHref,
   workspaceTeamId,
+  workspaceTeamMemberUrlParam = 0,
   isOwner,
-  workspacePlanSlug,
+  showTeacherDashboard = false,
   className,
   defaultOpen = false,
 }: TeamAdminQuickNavPanelProps) {
@@ -64,6 +67,7 @@ export function TeamAdminQuickNavPanel({
               <p className="text-xs text-muted-foreground">
                 Personal dashboard
                 {!isOwner ? " · Workspace dashboard" : ""}
+                {showTeacherDashboard ? " · Teacher dashboard" : ""}
               </p>
             ) : null}
           </div>
@@ -82,8 +86,9 @@ export function TeamAdminQuickNavPanel({
             mainDashboardHref={mainDashboardHref}
             workspaceDashboardHref={workspaceDashboardHref}
             workspaceTeamId={workspaceTeamId}
+            workspaceTeamMemberUrlParam={workspaceTeamMemberUrlParam}
             isOwner={isOwner}
-            workspacePlanSlug={workspacePlanSlug}
+            showTeacherDashboard={showTeacherDashboard}
           />
         </CardContent>
       ) : null}

@@ -24,10 +24,16 @@ import {
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
 import { shouldHidePlatformAdminNav } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
-import { isTeamPlanId } from "@/lib/team-plans";
+import { isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
 
 export type WorkspaceTeamOption = TeamWorkspaceNavTeam;
+
+export type TeamDashFallbackTarget = {
+  teamId: number;
+  planSlug: string;
+  teamMemberUrlParam: number;
+};
 
 interface WorkspaceContextDropdownProps {
   teams: WorkspaceTeamOption[];
@@ -45,6 +51,10 @@ interface WorkspaceContextDropdownProps {
    * subscribers who only co-admin invited teams must not see personal Team Admin Dash.
    */
   personalHasTeamTierPlan?: boolean;
+  /**
+   * When workspace nav omits owned team-tier rows, server still supplies a Team Admin Dash target.
+   */
+  teamDashFallback?: TeamDashFallbackTarget | null;
 }
 
 export function WorkspaceContextDropdown({
@@ -54,6 +64,7 @@ export function WorkspaceContextDropdown({
   personalWorkspaceHref = "/dashboard",
   personalPlanLabel = "Free",
   personalHasTeamTierPlan = false,
+  teamDashFallback = null,
 }: WorkspaceContextDropdownProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -92,26 +103,61 @@ export function WorkspaceContextDropdown({
    */
   const subscriberOwnsTeamTierWorkspace = React.useMemo(() => {
     if (!personalHasTeamTierPlan) return false;
+    if (teamDashFallback != null) return true;
     return teams.some(
-      (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
+      (t) => t.isSubscriberOwned && isWorkspaceSubscriptionPlanSlug(t.planUrlValue),
     );
-  }, [teams, personalHasTeamTierPlan]);
+  }, [teams, personalHasTeamTierPlan, teamDashFallback]);
 
   const subscriberOwnedTeamTierWorkspaces = React.useMemo(() => {
     return teams.filter(
-      (t) => t.isSubscriberOwned && isTeamPlanId(t.planUrlValue),
+      (t) => t.isSubscriberOwned && isWorkspaceSubscriptionPlanSlug(t.planUrlValue),
     );
   }, [teams]);
 
+  const subscriberOwnedAdminWorkspaces = React.useMemo(() => {
+    return teams.filter((t) => t.isSubscriberOwned && t.canAccessTeamAdmin);
+  }, [teams]);
+
   const teamDashTarget = React.useMemo(() => {
-    if (!personalHasTeamTierPlan || subscriberOwnedTeamTierWorkspaces.length === 0) {
-      return null;
+    if (!personalHasTeamTierPlan) return null;
+
+    if (subscriberOwnedTeamTierWorkspaces.length > 0) {
+      const activeOwned = activeTeamId
+        ? subscriberOwnedTeamTierWorkspaces.find((t) => t.id === activeTeamId)
+        : undefined;
+      return activeOwned ?? subscriberOwnedTeamTierWorkspaces[0] ?? null;
     }
-    const activeOwned = activeTeamId
-      ? subscriberOwnedTeamTierWorkspaces.find((t) => t.id === activeTeamId)
-      : undefined;
-    return activeOwned ?? subscriberOwnedTeamTierWorkspaces[0] ?? null;
-  }, [subscriberOwnedTeamTierWorkspaces, activeTeamId, personalHasTeamTierPlan]);
+
+    if (subscriberOwnedAdminWorkspaces.length > 0) {
+      const activeOwned = activeTeamId
+        ? subscriberOwnedAdminWorkspaces.find((t) => t.id === activeTeamId)
+        : undefined;
+      return activeOwned ?? subscriberOwnedAdminWorkspaces[0] ?? null;
+    }
+
+    if (teamDashFallback != null) {
+      return {
+        id: teamDashFallback.teamId,
+        teamMemberUrlParam: teamDashFallback.teamMemberUrlParam,
+        name: "Team workspace",
+        ownerUserId: "",
+        planLabel: "",
+        planUrlValue: teamDashFallback.planSlug,
+        ownerDisplayName: "",
+        canAccessTeamAdmin: true,
+        isSubscriberOwned: true,
+      } satisfies TeamWorkspaceNavTeam;
+    }
+
+    return null;
+  }, [
+    subscriberOwnedTeamTierWorkspaces,
+    subscriberOwnedAdminWorkspaces,
+    activeTeamId,
+    personalHasTeamTierPlan,
+    teamDashFallback,
+  ]);
 
   /** Other subscribers’ workspaces, grouped by `ownerUserId` (dividers between owners). */
   const otherSubscriberWorkspaceGroups = React.useMemo(() => {

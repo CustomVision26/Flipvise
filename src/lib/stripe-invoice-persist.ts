@@ -22,6 +22,7 @@ import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { asPaidPlanId, upsertStripeSubscriptionFromStripeSub } from "@/lib/stripe-billing-sync";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { planSlugFromStripeLineDescription } from "@/lib/stripe-receipt-plan-title";
+import { planSlugFromStripePriceId } from "@/lib/stripe-plan-price-env";
 import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
 import {
   resolveCheckoutSessionChargeReceiptUrl,
@@ -180,14 +181,52 @@ function resolvePlanSlugFromInvoiceLines(
   return null;
 }
 
+async function resolvePlanSlugFromInvoiceSubscription(
+  invoice: Stripe.Invoice,
+): Promise<StripePaidPlanId | null> {
+  const raw = invoice as unknown as Record<string, unknown>;
+  const subscriptionRef = raw.subscription;
+  const subId =
+    typeof subscriptionRef === "string"
+      ? subscriptionRef
+      : typeof subscriptionRef === "object" &&
+          subscriptionRef !== null &&
+          typeof (subscriptionRef as { id?: string }).id === "string"
+        ? (subscriptionRef as { id: string }).id
+        : null;
+  if (!subId) return null;
+
+  try {
+    const sub =
+      typeof subscriptionRef === "object" &&
+      subscriptionRef !== null &&
+      "metadata" in subscriptionRef
+        ? (subscriptionRef as Stripe.Subscription)
+        : await stripe.subscriptions.retrieve(subId);
+    const fromMeta = asPaidPlanId(sub.metadata?.plan);
+    if (fromMeta) return fromMeta;
+
+    const priceId =
+      typeof sub.items?.data?.[0]?.price === "string"
+        ? sub.items.data[0].price
+        : sub.items?.data?.[0]?.price?.id;
+    return planSlugFromStripePriceId(priceId);
+  } catch {
+    return null;
+  }
+}
+
 async function resolvePlanSlugForInvoice(
   invoice: Stripe.Invoice,
-): Promise<StripePaidPlanId> {
+): Promise<StripePaidPlanId | null> {
   const fromLines = resolvePlanSlugFromInvoiceLines(invoice);
   if (fromLines) return fromLines;
 
   const fromMeta = asPaidPlanId(invoice.metadata?.plan);
   if (fromMeta) return fromMeta;
+
+  const fromSubscription = await resolvePlanSlugFromInvoiceSubscription(invoice);
+  if (fromSubscription) return fromSubscription;
 
   const customerId =
     typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
@@ -196,7 +235,7 @@ async function resolvePlanSlugForInvoice(
     if (fromCustomer) return fromCustomer;
   }
 
-  return "pro";
+  return null;
 }
 
 async function resolvePromoPercentFromPlanConfig(input: {
@@ -409,7 +448,20 @@ export async function persistStripeInvoiceForUser(
   userEmail: string | null,
   invoice: Stripe.Invoice,
 ): Promise<void> {
-  const invoicePlan = await resolvePlanSlugForInvoice(invoice);
+  let invoicePlan = await resolvePlanSlugForInvoice(invoice);
+  if (!invoicePlan) {
+    const activeSub =
+      (await getActiveStripeSubscription(userId)) ??
+      (await getManageableStripeSubscription(userId));
+    invoicePlan = asPaidPlanId(activeSub?.planSlug);
+  }
+  if (!invoicePlan) {
+    console.error(
+      "[persistStripeInvoiceForUser] could not resolve plan slug",
+      invoice.id,
+    );
+    return;
+  }
 
   const raw = invoice as unknown as Record<string, unknown>;
   const firstLine = invoice.lines?.data?.[0];
@@ -625,13 +677,14 @@ export async function refreshLatestPaidInvoiceForUser(
     const forPlan = paid.find((inv) => inv.planSlug?.trim().toLowerCase() === slug);
     if (forPlan) return forPlan;
   }
-  return paid[0] ?? null;
+  return null;
 }
 
 async function promoDisplayFromStripeInvoice(
   invoice: Stripe.Invoice,
 ): Promise<string | null> {
   const invoicePlan = await resolvePlanSlugForInvoice(invoice);
+  if (!invoicePlan) return null;
   const rawDiscountLabel = invoiceDiscountLabel(invoice);
   const { promoCode, promoKind, percentOff } = await resolveInvoicePromoFromStripe(
     invoice,

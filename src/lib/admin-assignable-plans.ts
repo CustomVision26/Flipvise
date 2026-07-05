@@ -4,6 +4,13 @@ import {
   canonicalTeamPlanId,
   isTeamPlanId,
 } from "@/lib/team-plans";
+import {
+  EDUCATION_PLAN_IDS,
+  EDUCATION_PLAN_LABELS,
+  canonicalEducationPlanId,
+  isEducationPlanId,
+  isEducationTeamPlanId,
+} from "@/lib/education-plans";
 import { ADMIN_PLAN_KEY } from "@/lib/plan-metadata-billing-resolution";
 
 const BASE = [
@@ -15,11 +22,16 @@ const BASE = [
 export const ADMIN_PLAN_DROPDOWN_OPTIONS = {
   base: BASE,
   team: TEAM_PLAN_IDS.map((id) => ({ id, label: TEAM_PLAN_LABELS[id] })),
+  education: EDUCATION_PLAN_IDS.map((id) => ({
+    id,
+    label: EDUCATION_PLAN_LABELS[id],
+  })),
 } as const;
 
 export type AdminPlanAssignment =
   | (typeof BASE)[number]["id"]
-  | (typeof TEAM_PLAN_IDS)[number];
+  | (typeof TEAM_PLAN_IDS)[number]
+  | (typeof EDUCATION_PLAN_IDS)[number];
 
 export type AffiliatePlanValue = Exclude<AdminPlanAssignment, "free">;
 
@@ -27,6 +39,7 @@ export function isAdminPlanAssignment(value: string): value is AdminPlanAssignme
   if (value === "free" || value === "pro" || value === "pro_plus") {
     return true;
   }
+  if (isEducationPlanId(value)) return true;
   return isTeamPlanId(value);
 }
 
@@ -61,6 +74,23 @@ export function publicMetadataPatchForAdminPlanAssignment(
         adminGranted: null,
       };
     default:
+      if (isEducationPlanId(assignment)) {
+        const canon = canonicalEducationPlanId(assignment)!;
+        if (isEducationTeamPlanId(canon)) {
+          return {
+            [ADMIN_PLAN_KEY]: canon,
+            teamPlanId: canon,
+            teamRole: "team_admin",
+            adminGranted: null,
+          };
+        }
+        return {
+          [ADMIN_PLAN_KEY]: canon,
+          teamPlanId: null,
+          teamRole: null,
+          adminGranted: null,
+        };
+      }
       if (isTeamPlanId(assignment)) {
         const canon = canonicalTeamPlanId(assignment)!;
         return {
@@ -83,6 +113,10 @@ export function labelForAdminPlanAssignment(
   if (isTeamPlanId(a)) {
     const canon = canonicalTeamPlanId(a)!;
     return TEAM_PLAN_LABELS[canon];
+  }
+  if (isEducationPlanId(a)) {
+    const canon = canonicalEducationPlanId(a)!;
+    return EDUCATION_PLAN_LABELS[canon];
   }
   return a;
 }

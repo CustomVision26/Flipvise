@@ -3,6 +3,7 @@ export type RootLayoutShellProfile =
   | "guest"
   | "admin"
   | "team-admin"
+  | "teacher"
   | "dashboard"
   | "full";
 
@@ -13,6 +14,7 @@ export function resolveRootLayoutShellProfile(
   if (!userId) return "guest";
   if (pathname.startsWith("/admin")) return "admin";
   if (pathname.startsWith("/dashboard/team-admin")) return "team-admin";
+  if (pathname === "/teacher" || pathname.startsWith("/teacher/")) return "teacher";
   if (pathname.startsWith("/dashboard")) return "dashboard";
   return "full";
 }
@@ -22,6 +24,7 @@ export function rootLayoutShellNeedsTeamNav(
 ): boolean {
   return (
     profile === "team-admin" ||
+    profile === "teacher" ||
     profile === "dashboard" ||
     profile === "full"
   );
@@ -47,6 +50,7 @@ export function rootLayoutShellNeedsFullPlanLabels(
 ): boolean {
   return (
     profile === "team-admin" ||
+    profile === "teacher" ||
     profile === "dashboard" ||
     profile === "full"
   );

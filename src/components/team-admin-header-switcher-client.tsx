@@ -18,6 +18,10 @@ import {
   TEAM_ADMIN_QUIZ_RESULTS_PATH,
   TEAM_ADMIN_WS_HISTORY_PATH,
 } from "@/lib/team-admin-url";
+import {
+  buildTeacherTeamChangePath,
+  isTeacherDashboardPath,
+} from "@/lib/teacher-url";
 
 export type TeamAdminHeaderSwitcherTeam = {
   id: number;
@@ -83,8 +87,28 @@ function TeamAdminHeaderSwitcherInner({
       : displayedTeams[0]!.id;
   }, [searchParams, displayedTeams]);
 
-  if (!pathname.startsWith("/dashboard/team-admin")) return null;
+  const isTeacherRoute = isTeacherDashboardPath(pathname);
+  const isTeamAdminRoute = pathname.startsWith("/dashboard/team-admin");
+
+  if (!isTeamAdminRoute && !isTeacherRoute) return null;
   if (displayedTeams.length === 0) return null;
+
+  const buildTeamChangeHref = isTeacherRoute
+    ? (teamId: number, teamMemberUrlParam: number) =>
+        buildTeacherTeamChangePath(teamId, teamMemberUrlParam, pathname)
+    : pathname.startsWith(TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH)
+      ? buildTeamAdminAssignDecksToMembersPath
+      : pathname.startsWith(TEAM_ADMIN_WS_HISTORY_PATH)
+        ? buildTeamAdminWsHistoryPath
+        : pathname.startsWith(TEAM_ADMIN_QUIZ_RESULTS_PATH)
+          ? buildTeamAdminQuizResultsPath
+          : pathname.startsWith(TEAM_ADMIN_INVITE_PENDING_PATH)
+            ? buildTeamAdminInvitePendingPath
+            : isTeamAdminInviteHistoryPath(pathname)
+              ? buildTeamAdminInviteHistoryPath
+              : pathname.startsWith(TEAM_ADMIN_INVITE_SEND_PATH)
+                ? buildTeamAdminInviteSendPath
+                : buildTeamAdminPath;
 
   return (
     <>
@@ -103,21 +127,7 @@ function TeamAdminHeaderSwitcherInner({
         selectedId={selectedId}
         ariaDescribedBy="team-admin-header-team-switcher-hint"
         showManageWorkspaces={displayedTeams.some((t) => t.ownerUserId === userId)}
-        buildTeamChangeHref={
-          pathname.startsWith(TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH)
-            ? buildTeamAdminAssignDecksToMembersPath
-            : pathname.startsWith(TEAM_ADMIN_WS_HISTORY_PATH)
-                ? buildTeamAdminWsHistoryPath
-                : pathname.startsWith(TEAM_ADMIN_QUIZ_RESULTS_PATH)
-                  ? buildTeamAdminQuizResultsPath
-                  : pathname.startsWith(TEAM_ADMIN_INVITE_PENDING_PATH)
-                  ? buildTeamAdminInvitePendingPath
-                  : isTeamAdminInviteHistoryPath(pathname)
-                    ? buildTeamAdminInviteHistoryPath
-                    : pathname.startsWith(TEAM_ADMIN_INVITE_SEND_PATH)
-                      ? buildTeamAdminInviteSendPath
-                      : buildTeamAdminPath
-        }
+        buildTeamChangeHref={buildTeamChangeHref}
       />
     </>
   );

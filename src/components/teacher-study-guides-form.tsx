@@ -1,0 +1,447 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  LessonPlanReferenceMaterialFields,
+  type LessonPlanReferenceMaterial,
+  type LessonPlanReferenceMaterialFieldsHandle,
+} from "@/components/lesson-plan-reference-material-fields";
+import { TeacherFieldLabel } from "@/components/teacher-field-label";
+import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
+import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
+import type { SavedHomeworkPickerItem } from "@/db/queries/saved-homework";
+import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
+import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
+import { generateStudyGuideAction } from "@/actions/teacher-study-guide";
+import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
+import type { StudyGuideResult } from "@/lib/teacher-generators";
+
+const SAVED_PLAN_NONE = "__none__";
+const HOMEWORK_NONE = "__none__";
+
+type StudyGuideFormState = {
+  subject: string;
+  gradeLevel: string;
+  topic: string;
+  savedLessonPlanId?: number;
+  savedHomeworkId?: number;
+};
+
+const EMPTY_FORM: StudyGuideFormState = {
+  subject: "",
+  gradeLevel: "",
+  topic: "",
+};
+
+export function TeacherStudyGuidesForm({
+  savedLessonPlans = [],
+  savedHomework = [],
+  hasAdvancedSourceImport = false,
+  initialLessonPlanId,
+  backHref = "/teacher",
+  teacherWorkspace,
+}: {
+  savedLessonPlans?: SavedLessonPlanPickerItem[];
+  savedHomework?: SavedHomeworkPickerItem[];
+  hasAdvancedSourceImport?: boolean;
+  initialLessonPlanId?: number;
+  backHref?: string;
+  teacherWorkspace?: TeacherWorkspaceContext;
+}) {
+  const referenceFieldsRef = useRef<LessonPlanReferenceMaterialFieldsHandle>(null);
+  const [referenceMaterials, setReferenceMaterials] = useState<
+    LessonPlanReferenceMaterial[]
+  >([]);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [form, setForm] = useState<StudyGuideFormState>(EMPTY_FORM);
+  const [selectedPlanKey, setSelectedPlanKey] = useState<string>(SAVED_PLAN_NONE);
+  const [selectedHomeworkKey, setSelectedHomeworkKey] = useState<string>(HOMEWORK_NONE);
+  const [result, setResult] = useState<StudyGuideResult | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [regenerationSeed, setRegenerationSeed] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const selectedPlan =
+    form.savedLessonPlanId != null
+      ? savedLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
+      : null;
+
+  const homeworkForPlan = useMemo(
+    () =>
+      form.savedLessonPlanId != null
+        ? savedHomework.filter(
+            (item) => item.savedLessonPlanId === form.savedLessonPlanId,
+          )
+        : [],
+    [form.savedLessonPlanId, savedHomework],
+  );
+
+  const selectedHomework =
+    form.savedHomeworkId != null
+      ? homeworkForPlan.find((item) => item.id === form.savedHomeworkId) ?? null
+      : null;
+
+  const lessonBuilderHref = teacherWorkspace
+    ? buildTeacherSubPath(
+        "/lesson-builder",
+        teacherWorkspace.teamId,
+        teacherWorkspace.teamMemberId,
+      )
+    : "/teacher/lesson-builder";
+
+  const homeworkHref = teacherWorkspace
+    ? buildTeacherSubPath(
+        "/homework",
+        teacherWorkspace.teamId,
+        teacherWorkspace.teamMemberId,
+      )
+    : "/teacher/homework";
+
+  function handleSavedPlanChange(value: string | null) {
+    if (!value || value === SAVED_PLAN_NONE) {
+      setSelectedPlanKey(SAVED_PLAN_NONE);
+      setSelectedHomeworkKey(HOMEWORK_NONE);
+      setForm(EMPTY_FORM);
+      return;
+    }
+
+    const planId = Number(value);
+    const plan = savedLessonPlans.find((item) => item.id === planId);
+    if (!plan) return;
+
+    const defaults = lessonPlanInputToQuizDefaults(plan.input);
+    setSelectedPlanKey(value);
+    setSelectedHomeworkKey(HOMEWORK_NONE);
+    setForm({
+      savedLessonPlanId: plan.id,
+      subject: defaults.subject,
+      gradeLevel: defaults.gradeLevel,
+      topic: defaults.topic,
+    });
+  }
+
+  function handleHomeworkChange(value: string | null) {
+    if (!value || value === HOMEWORK_NONE) {
+      setSelectedHomeworkKey(HOMEWORK_NONE);
+      setForm((current) => ({
+        ...current,
+        savedHomeworkId: undefined,
+      }));
+      return;
+    }
+
+    const homeworkId = Number(value);
+    const homework = homeworkForPlan.find((item) => item.id === homeworkId);
+    if (!homework) return;
+
+    setSelectedHomeworkKey(value);
+    setForm((current) => ({
+      ...current,
+      savedHomeworkId: homework.id,
+    }));
+  }
+
+  useEffect(() => {
+    if (!initialLessonPlanId) return;
+    const exists = savedLessonPlans.some((plan) => plan.id === initialLessonPlanId);
+    if (exists) {
+      handleSavedPlanChange(String(initialLessonPlanId));
+    }
+  }, [initialLessonPlanId, savedLessonPlans]);
+
+  async function runGeneration(isRegenerate = false) {
+    setIsGenerating(true);
+    setErrorMessage(null);
+    setReferenceError(null);
+
+    const seed = isRegenerate ? regenerationSeed + 1 : 0;
+    if (isRegenerate) {
+      setRegenerationSeed(seed);
+    } else {
+      setRegenerationSeed(0);
+    }
+
+    try {
+      const resolvedReferences = isRegenerate
+        ? referenceMaterials
+        : ((await referenceFieldsRef.current?.resolveReferences()) ?? referenceMaterials);
+
+      if (!isRegenerate && resolvedReferences.length > 0) {
+        setReferenceMaterials(resolvedReferences);
+      }
+
+      const studyGuide = await generateStudyGuideAction({
+        subject: form.subject,
+        gradeLevel: form.gradeLevel,
+        topic: form.topic,
+        savedLessonPlanId: form.savedLessonPlanId,
+        savedHomeworkId: form.savedHomeworkId,
+        referenceMaterials:
+          resolvedReferences.length > 0 ? resolvedReferences : undefined,
+        regenerationSeed: seed,
+      });
+
+      setResult(studyGuide);
+      setShowResult(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Study guide generation failed. Please try again.";
+      setErrorMessage(message);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function handleGenerate() {
+    await runGeneration(false);
+  }
+
+  function handleRegenerate() {
+    void runGeneration(true);
+  }
+
+  const selectedPlanLabel = selectedPlan
+    ? `${selectedPlan.lessonTitle} (${selectedPlan.subject} · ${selectedPlan.gradeLevel})`
+    : null;
+
+  const selectedHomeworkLabel = selectedHomework?.label ?? null;
+
+  return (
+    <TeacherToolPageShell
+      title="Study Guide Generator"
+      description="Build study guides with summaries, vocabulary, and practice questions."
+      backHref={backHref}
+      showResult={showResult}
+      onGenerate={handleGenerate}
+      isGenerating={isGenerating}
+      generateWithAiIcon
+      generateLabel="Generate"
+      submittingLabel="Generating…"
+      errorMessage={errorMessage ?? referenceError}
+      previewActions={
+        result ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={isGenerating}
+            onClick={handleRegenerate}
+          >
+            {isGenerating ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="size-4" aria-hidden />
+            )}
+            Regenerate AI
+          </Button>
+        ) : null
+      }
+      result={
+        result ? (
+          <div className="space-y-4 text-foreground">
+            <p>{result.summary}</p>
+            <div>
+              <p className="font-medium text-foreground">Key Vocabulary</p>
+              <ul className="list-disc pl-5">
+                {(result.keyVocabulary ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Important Points</p>
+              <ul className="list-disc pl-5">
+                {(result.importantPoints ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Worked Examples</p>
+              <ul className="list-disc pl-5">
+                {(result.workedExamples ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Sample Problems</p>
+              <ul className="list-disc pl-5">
+                {(result.sampleProblems ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Practice Questions</p>
+              <ul className="list-disc pl-5">
+                {(result.practiceQuestions ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Study Tips</p>
+              <ul className="list-disc pl-5">
+                {(result.studyTips ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : null
+      }
+    >
+      <TooltipProvider>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <TeacherFieldLabel
+              htmlFor="studyGuideLessonPlan"
+              label="Saved lesson plan (optional)"
+              help={
+                <>
+                  <p className="mb-1 font-semibold">Example:</p>
+                  <p>
+                    Select a plan saved from the AI Lesson Builder. Subject, grade,
+                    and topic will auto-fill for your study guide.
+                  </p>
+                </>
+              }
+            />
+            <Select value={selectedPlanKey} onValueChange={handleSavedPlanChange}>
+              <SelectTrigger id="studyGuideLessonPlan" className="h-10 w-full bg-background">
+                <SelectValue placeholder="Select a saved lesson plan">
+                  {selectedPlanLabel ?? "No saved lesson plan"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SAVED_PLAN_NONE}>No saved lesson plan</SelectItem>
+                {savedLessonPlans.map((plan) => (
+                  <SelectItem key={plan.id} value={String(plan.id)}>
+                    {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {savedLessonPlans.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No saved lesson plans yet. Save one in the{" "}
+                <Link href={lessonBuilderHref} className="underline underline-offset-2">
+                  AI Lesson Builder
+                </Link>{" "}
+                first.
+              </p>
+            ) : null}
+            {selectedPlan?.pdfUrl ? (
+              <p className="text-xs text-muted-foreground">
+                Lesson plan PDF:{" "}
+                <a
+                  href={selectedPlan.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 underline underline-offset-2"
+                >
+                  View saved PDF
+                  <ExternalLink className="size-3" aria-hidden />
+                </a>
+              </p>
+            ) : null}
+          </div>
+
+          {form.savedLessonPlanId != null ? (
+            <div className="space-y-2 sm:col-span-2">
+              <TeacherFieldLabel
+                htmlFor="studyGuideHomework"
+                label="Homework assignment (optional)"
+                help="If you generated homework from this lesson plan, select it to align the study guide with those questions."
+              />
+              {homeworkForPlan.length > 0 ? (
+                <Select value={selectedHomeworkKey} onValueChange={handleHomeworkChange}>
+                  <SelectTrigger id="studyGuideHomework" className="h-10 w-full bg-background">
+                    <SelectValue placeholder="Select homework">
+                      {selectedHomeworkLabel ?? "No homework selected"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={HOMEWORK_NONE}>No homework selected</SelectItem>
+                    {homeworkForPlan.map((homework) => (
+                      <SelectItem key={homework.id} value={String(homework.id)}>
+                        {homework.label} ({homework.assignmentTitle})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No saved homework for this lesson plan. Generate homework in the{" "}
+                  <Link href={homeworkHref} className="underline underline-offset-2">
+                    Homework Generator
+                  </Link>{" "}
+                  using this lesson plan as the source.
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="subject">Subject</Label>
+            <Input
+              id="subject"
+              value={form.subject}
+              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="gradeLevel">Grade Level</Label>
+            <Input
+              id="gradeLevel"
+              value={form.gradeLevel}
+              onChange={(e) => setForm((f) => ({ ...f, gradeLevel: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <TeacherFieldLabel
+              htmlFor="topic"
+              label="Topic"
+              help={<TeacherTopicFieldHelpContent />}
+            />
+            <Input
+              id="topic"
+              value={form.topic}
+              onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
+              required
+            />
+          </div>
+
+          <LessonPlanReferenceMaterialFields
+            ref={referenceFieldsRef}
+            hasAdvancedSourceImport={hasAdvancedSourceImport}
+            disabled={isGenerating}
+            value={referenceMaterials}
+            onChange={setReferenceMaterials}
+            onError={setReferenceError}
+          />
+        </div>
+      </TooltipProvider>
+    </TeacherToolPageShell>
+  );
+}

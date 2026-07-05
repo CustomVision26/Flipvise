@@ -16,6 +16,8 @@ import {
   quizResults,
   quizSecurityInboxMessages,
   quizSecuritySessions,
+  savedHomeworkAssignments,
+  savedLessonPlans,
   stripeSubscriptions,
   userPlanTrials,
   billingNoticeInboxMessages,
@@ -93,6 +95,22 @@ async function collectUserMediaUrls(userId: string): Promise<string[]> {
     collectUrl(t.attachmentUrl, urls);
   }
 
+  const lessonPlanPdfs = await db
+    .select({ pdfUrl: savedLessonPlans.pdfUrl })
+    .from(savedLessonPlans)
+    .where(eq(savedLessonPlans.userId, userId));
+  for (const row of lessonPlanPdfs) {
+    collectUrl(row.pdfUrl, urls);
+  }
+
+  const homeworkPdfs = await db
+    .select({ pdfUrl: savedHomeworkAssignments.pdfUrl })
+    .from(savedHomeworkAssignments)
+    .where(eq(savedHomeworkAssignments.userId, userId));
+  for (const row of homeworkPdfs) {
+    collectUrl(row.pdfUrl, urls);
+  }
+
   return [...urls];
 }
 
@@ -152,6 +170,9 @@ export async function purgeAllUserData(
     .where(eq(teamWorkspaceEvents.ownerUserId, userId));
 
   await db.delete(decks).where(eq(decks.userId, userId));
+
+  await db.delete(savedHomeworkAssignments).where(eq(savedHomeworkAssignments.userId, userId));
+  await db.delete(savedLessonPlans).where(eq(savedLessonPlans.userId, userId));
 
   await db.delete(supportTickets).where(eq(supportTickets.userId, userId));
   await db.delete(billingInvoices).where(eq(billingInvoices.userId, userId));

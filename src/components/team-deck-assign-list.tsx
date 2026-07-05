@@ -79,6 +79,8 @@ export interface TeamDeckAssignListProps {
   workspaces: TeamAssignWorkspaceSnapshot[];
   defaultWorkspaceId: number;
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
+  /** True when the signed-in user owns the selected workspace (subscriber). */
+  viewerIsSubscriberOwner?: boolean;
   /** Subscriber-only — every Personal deck (matches Personal Dashboard); `alreadyLinked` is informational only. Omit for co-admins. */
   subscriberPersonalUnlinkedDecks?: Array<{
     id: number;
@@ -205,6 +207,7 @@ export function TeamDeckAssignList({
   workspaces,
   defaultWorkspaceId,
   userFieldDisplayById,
+  viewerIsSubscriberOwner = false,
   subscriberPersonalUnlinkedDecks,
 }: TeamDeckAssignListProps) {
   const { userId: clerkUserId } = useAuth();
@@ -278,10 +281,19 @@ export function TeamDeckAssignList({
       : undefined;
   const selectedMemberIsRegular = selectedMember?.role === "team_member";
 
+  const assignmentTableWorkspaces = React.useMemo(() => {
+    if (viewerIsSubscriberOwner) return workspaces;
+    return workspaces.filter((w) => w.id === defaultWorkspaceId);
+  }, [workspaces, defaultWorkspaceId, viewerIsSubscriberOwner]);
+
   const assignmentTableRows = React.useMemo((): AssignmentTableDisplayRow[] => {
     const out: AssignmentTableDisplayRow[] = [];
-    for (const w of workspaces) {
+    for (const w of assignmentTableWorkspaces) {
+      const workspaceMemberIds = new Set(w.allMembers.map((m) => m.userId));
       for (const a of w.assignments) {
+        if (!viewerIsSubscriberOwner && !workspaceMemberIds.has(a.memberUserId)) {
+          continue;
+        }
         const deck = w.decks.find((d) => d.id === a.deckId);
         const memberRecord = w.allMembers.find((m) => m.userId === a.memberUserId);
         const byId = a.assignedByUserId;
@@ -324,7 +336,72 @@ export function TeamDeckAssignList({
       return a.deckName.localeCompare(b.deckName);
     });
     return out;
-  }, [workspaces, userFieldDisplayById]);
+  }, [assignmentTableWorkspaces, userFieldDisplayById, viewerIsSubscriberOwner]);
+
+  const assignmentTableColumns = React.useMemo(
+    () =>
+      [
+        {
+          id: "member",
+          header: "Member",
+          className: "min-w-[10rem]",
+          cell: (row: AssignmentTableDisplayRow) => {
+            const display = userFieldDisplayById[row.memberUserId];
+            return (
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{row.memberLabel}</p>
+                {display?.primaryEmail ? (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {display.primaryEmail}
+                  </p>
+                ) : null}
+              </div>
+            );
+          },
+        },
+        {
+          id: "deck",
+          header: "Deck",
+          className: "min-w-[8rem]",
+          cell: (row: AssignmentTableDisplayRow) => (
+            <span className="text-sm text-foreground">{row.deckName}</span>
+          ),
+        },
+        ...(viewerIsSubscriberOwner
+          ? [
+              {
+                id: "workspace",
+                header: "Workspace",
+                className: "min-w-[8rem]",
+                cell: (row: AssignmentTableDisplayRow) => (
+                  <span className="text-sm text-foreground">{row.workspaceName}</span>
+                ),
+              },
+            ]
+          : []),
+        {
+          id: "signedBy",
+          header: "Signed by",
+          className: "min-w-[6rem]",
+          cell: (row: AssignmentTableDisplayRow) => (
+            <span className="text-sm text-foreground" title={row.signedByTitle}>
+              {row.signedByLabel}
+            </span>
+          ),
+        },
+        {
+          id: "assigned",
+          header: "Assigned",
+          className: "whitespace-nowrap",
+          cell: (row: AssignmentTableDisplayRow) => (
+            <span className="text-sm text-muted-foreground">
+              {row.createdAt ? formatAssignmentRecordedAt(row.createdAt) : "—"}
+            </span>
+          ),
+        },
+      ] as const,
+    [userFieldDisplayById, viewerIsSubscriberOwner],
+  );
 
   const assignmentDeckFilterOptions = React.useMemo(
     () => [...new Set(assignmentTableRows.map((r) => r.deckName))].sort((a, b) => a.localeCompare(b)),
@@ -913,8 +990,9 @@ export function TeamDeckAssignList({
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-foreground">Assignments by member</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Click a row to load it into the form above. Only the workspace owner can remove
-            assignments.
+            {viewerIsSubscriberOwner
+              ? "All members and deck assignments across your workspaces. Click a row to load it into the form above. Only you can remove assignments."
+              : "Members and deck assignments for this workspace only. Click a row to load it into the form above. Only the workspace owner can remove assignments."}
           </p>
         </div>
 
@@ -929,69 +1007,13 @@ export function TeamDeckAssignList({
           showDateSort
           getSearchHaystack={assignmentSearchHaystack}
           getSortDate={(row) => toAssignmentDate(row.createdAt)?.getTime() ?? null}
-          emptyMessage="No deck assignments yet."
+          emptyMessage={
+            viewerIsSubscriberOwner
+              ? "No deck assignments yet."
+              : "No deck assignments for this workspace yet."
+          }
           noResultsMessage="No assignments match your search or filters."
-          tableColumns={[
-            {
-              id: "member",
-              header: "Member",
-              className: "min-w-[10rem]",
-              cell: (row) => {
-                const display = userFieldDisplayById[row.memberUserId];
-                return (
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground">{row.memberLabel}</p>
-                    {display?.primaryEmail ? (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {display.primaryEmail}
-                      </p>
-                    ) : null}
-                  </div>
-                );
-              },
-            },
-            {
-              id: "deck",
-              header: "Deck",
-              className: "min-w-[8rem]",
-              cell: (row) => (
-                <span className="text-sm text-foreground">{row.deckName}</span>
-              ),
-            },
-            {
-              id: "workspace",
-              header: "Workspace",
-              className: "min-w-[8rem]",
-              cell: (row) => (
-                <span className="text-sm text-foreground">{row.workspaceName}</span>
-              ),
-            },
-            {
-              id: "signedBy",
-              header: "Signed by",
-              className: "min-w-[6rem]",
-              cell: (row) => (
-                <span
-                  className="text-sm text-foreground"
-                  title={row.signedByTitle}
-                >
-                  {row.signedByLabel}
-                </span>
-              ),
-            },
-            {
-              id: "assigned",
-              header: "Assigned",
-              className: "whitespace-nowrap",
-              cell: (row) => (
-                <span className="text-sm text-muted-foreground">
-                  {row.createdAt
-                    ? formatAssignmentRecordedAt(row.createdAt)
-                    : "—"}
-                </span>
-              ),
-            },
-          ]}
+          tableColumns={[...assignmentTableColumns]}
           renderBelowActive={(row) =>
             expandedAssignmentKey === row.key ? renderAssignmentAccessPanel(row) : null
           }

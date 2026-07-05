@@ -1,3 +1,4 @@
+import { EDUCATION_PLAN_LABELS, isEducationPlanId } from "@/lib/education-plans";
 import { labelForTeamPlanSlug } from "@/lib/team-plans";
 
 /** Human-readable plan name for billing slugs (Stripe, Clerk metadata, invoice history). */
@@ -8,6 +9,7 @@ export function displayNameForBillingPlanSlug(
   const s = slug.trim();
   if (s === "pro") return "Pro";
   if (s === "pro_plus") return "Pro Plus";
+  if (isEducationPlanId(s)) return EDUCATION_PLAN_LABELS[s];
   const team = labelForTeamPlanSlug(s);
   if (team) return team;
   return s

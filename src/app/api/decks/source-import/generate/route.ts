@@ -13,6 +13,7 @@ const bodySchema = z.object({
   sourceText: z.string().min(1),
   sourceFormat: z.string().min(1),
   skipRelevanceCheck: z.boolean().optional(),
+  readingPassageMultipleChoice: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
         format: parsed.data.sourceFormat as SourceFormat,
       },
       skipRelevanceCheck: parsed.data.skipRelevanceCheck ?? false,
+      readingPassageMultipleChoice: parsed.data.readingPassageMultipleChoice ?? false,
     });
 
     return NextResponse.json(result);

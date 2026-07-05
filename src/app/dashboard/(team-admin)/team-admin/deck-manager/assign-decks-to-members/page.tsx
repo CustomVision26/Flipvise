@@ -25,12 +25,13 @@ import {
   buildTeamAdminPath,
   buildTeamAdminStudyPrivilegesPath,
 } from "@/lib/team-admin-url";
-import { TeamDeckManagerSubTabs } from "@/components/team-deck-manager-sub-tabs";
-import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
-import { TeamDeckAssignListLoader } from "@/components/team-deck-assign-list-loader";
-import { toClientJson } from "@/lib/to-client-json";
-import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
-import { TeamAdminPanelScroll } from "@/components/team-admin-panel-scroll";
+import {
+  TeamAdminPanelScroll,
+  TeamAdminQuickNavPanel,
+  TeamAdminWorkspaceStatsPanel,
+  TeamDeckAssignListLoader,
+  TeamDeckManagerSubTabs,
+} from "@/lib/team-admin-dynamic-components";
 import {
   TEAM_ADMIN_PANEL_IDS,
   teamAdminActivePanelClass,
@@ -38,7 +39,9 @@ import {
   teamAdminPanelScrollClass,
 } from "@/components/team-admin-panel-styles";
 import { cn } from "@/lib/utils";
-import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
+import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
+import { hasEducationPlan } from "@/lib/education-plans";
+import { toClientJson } from "@/lib/to-client-json";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
@@ -202,8 +205,10 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
           mainDashboardHref={mainDashboardHref}
           workspaceDashboardHref={workspaceDashboardHref}
           workspaceTeamId={selected.id}
+          workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
           isOwner={isOwner}
           workspacePlanSlug={selected.planSlug}
+          showTeacherDashboard={hasEducationPlan(selected.planSlug)}
         />
       </div>
 
@@ -241,6 +246,7 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
             workspaces={toClientJson(assignWorkspaceSnapshots)}
             defaultWorkspaceId={selected.id}
             userFieldDisplayById={toClientJson(userFieldDisplayById)}
+            viewerIsSubscriberOwner={isOwner}
             subscriberPersonalUnlinkedDecks={
               subscriberPersonalUnlinkedDecks
                 ? toClientJson(subscriberPersonalUnlinkedDecks)

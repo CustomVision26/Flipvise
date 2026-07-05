@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveLogoImageUrl } from "@/lib/branding";
 import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
+import { ClerkChunkLoadRecovery } from "@/components/clerk-chunk-load-recovery";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
@@ -40,6 +41,7 @@ function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
 function ClerkWithTheme({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider appearance={clerkAppearance}>
+      <ClerkChunkLoadRecovery />
       <ClerkAuthHandoffMarker />
       <ClerkPostSignInHardNavigation />
       <ClerkSessionRouterSync />

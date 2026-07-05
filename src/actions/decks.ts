@@ -61,7 +61,7 @@ export async function createDeckAction(
         `Deck limit reached — up to ${maxPersonalDecks} personal deck(s) on your plan. See Pricing to upgrade.`,
       );
     }
-    return createDeck(sessionUserId, name, description, null, gradient);
+    return createDeck(sessionUserId, name, description, null, gradient, null, null, sessionUserId);
   }
 
   async function insertTeamDeckForTeamId(tid: number): Promise<number> {
@@ -77,7 +77,16 @@ export async function createDeckAction(
         );
       }
     }
-    return createDeck(team.ownerUserId, name, description, tid, gradient);
+    return createDeck(
+      team.ownerUserId,
+      name,
+      description,
+      tid,
+      gradient,
+      null,
+      null,
+      sessionUserId,
+    );
   }
 
   let deckId: number;
@@ -103,6 +112,8 @@ const updateDeckSchema = z.object({
   deckId: z.number().int().positive(),
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  gradeLevel: z.string().optional(),
+  difficultyLevel: z.string().optional(),
   gradient: z.string().optional(),
 });
 
@@ -126,6 +137,8 @@ export async function updateDeckAction(data: UpdateDeckInput) {
     parsed.data.name,
     parsed.data.description,
     parsed.data.gradient,
+    parsed.data.gradeLevel,
+    parsed.data.difficultyLevel,
   );
 
   revalidatePath(`/decks/${parsed.data.deckId}`);

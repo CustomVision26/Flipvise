@@ -16,7 +16,9 @@ import {
   TeamInvitationHistoryTable,
 } from "@/components/team-admin-invitation-tables";
 import { TeamMemberTable } from "@/components/team-member-table";
+import { TeamMemberHistoryTable } from "@/components/team-member-history-table";
 import { TeamWorkspaceHistoryTable } from "@/components/team-workspace-history-table";
+import type { TeamMemberHistoryRow } from "@/lib/team-member-history-types";
 import type { TeamWorkspaceEventRow } from "@/db/queries/team-workspace-events";
 import type { TeamInvitationRow, TeamMemberRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
@@ -30,6 +32,7 @@ import {
   isTeamAdminInviteMembersSubPath,
   isTeamAdminInvitePendingPath,
   isTeamAdminInviteSendPath,
+  isTeamAdminMembersHistoryPath,
   isTeamAdminQuizResultsPath,
   isTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
@@ -105,6 +108,7 @@ export type TeamAdminManageTabsProps = {
   teamId: number;
   deckManagerHref: string;
   membersHref: string;
+  membersHistoryHref: string;
   workspaceHistoryHref: string;
   inviteSendHref: string;
   invitePendingHref: string;
@@ -129,6 +133,7 @@ export type TeamAdminManageTabsProps = {
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
   pendingInvitations: InvitationRow[];
   invitationHistory: InvitationRow[];
+  memberHistory?: TeamMemberHistoryRow[] | null;
   workspaceHistory?: TeamWorkspaceEventRow[] | null;
   inviteDisplayHintsByEmail: Record<string, string>;
   subscriberOwnerPrimaryEmail: string | null;
@@ -139,23 +144,30 @@ function TeamAdminPanelCard({
   panelId,
   title,
   description,
+  headerAside,
   children,
 }: {
   panelId: string;
   title: string;
   description: string;
+  headerAside?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Card className={teamAdminActivePanelClass}>
       <CardHeader className="space-y-2 pb-4">
-        <CardTitle
-          id={panelId}
-          className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}
-        >
-          {title}
-        </CardTitle>
-        <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <CardTitle
+              id={panelId}
+              className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}
+            >
+              {title}
+            </CardTitle>
+            <CardDescription className="text-sm leading-relaxed">{description}</CardDescription>
+          </div>
+          {headerAside ? <div className="shrink-0 self-start">{headerAside}</div> : null}
+        </div>
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
@@ -166,6 +178,7 @@ export function TeamAdminManageTabs({
   teamId,
   deckManagerHref,
   membersHref,
+  membersHistoryHref,
   workspaceHistoryHref,
   inviteSendHref,
   invitePendingHref,
@@ -188,6 +201,7 @@ export function TeamAdminManageTabs({
   userFieldDisplayById,
   pendingInvitations,
   invitationHistory,
+  memberHistory = [],
   workspaceHistory = [],
   inviteDisplayHintsByEmail,
   subscriberOwnerPrimaryEmail,
@@ -254,20 +268,55 @@ export function TeamAdminManageTabs({
         <TeamAdminPanelCard
           panelId={TEAM_ADMIN_PANEL_IDS.members}
           title="Members"
-          description="Change roles or remove members. Double-click a row to view member details."
+          description={
+            isTeamAdminMembersHistoryPath(pathname)
+              ? "When members joined or were removed from this workspace, including who performed each action."
+              : "Change roles or remove members. Double-click a row to view member details."
+          }
+          headerAside={
+            <div
+              role="tablist"
+              aria-orientation="horizontal"
+              className="inline-flex rounded-lg border border-border/80 bg-muted/20 p-1"
+            >
+              <Link
+                href={membersHref}
+                className={teamAdminSubTabClass(!isTeamAdminMembersHistoryPath(pathname))}
+                role="tab"
+              >
+                Roster
+              </Link>
+              <Link
+                href={membersHistoryHref}
+                className={teamAdminSubTabClass(isTeamAdminMembersHistoryPath(pathname))}
+                role="tab"
+              >
+                Membership history
+              </Link>
+            </div>
+          }
         >
-          <TeamMemberTable
-            teamId={teamId}
-            teamName={teamName}
-            deckNamesByMemberUserId={deckNamesByMemberUserId}
-            workspaceDeckNames={workspaceDeckNames}
-            ownerUserId={ownerUserId}
-            teamCreatedAt={teamCreatedAt}
-            members={members}
-            currentUserId={currentUserId}
-            isOwner={isOwner}
-            userFieldDisplayById={userFieldDisplayById}
-          />
+          {isTeamAdminMembersHistoryPath(pathname) ? (
+            <div className={teamAdminSubTabPanelClass}>
+              <TeamMemberHistoryTable
+                rows={memberHistory}
+                userFieldDisplayById={userFieldDisplayById}
+              />
+            </div>
+          ) : (
+            <TeamMemberTable
+              teamId={teamId}
+              teamName={teamName}
+              deckNamesByMemberUserId={deckNamesByMemberUserId}
+              workspaceDeckNames={workspaceDeckNames}
+              ownerUserId={ownerUserId}
+              teamCreatedAt={teamCreatedAt}
+              members={members}
+              currentUserId={currentUserId}
+              isOwner={isOwner}
+              userFieldDisplayById={userFieldDisplayById}
+            />
+          )}
         </TeamAdminPanelCard>
       ) : null}
 

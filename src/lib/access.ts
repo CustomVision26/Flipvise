@@ -31,6 +31,17 @@ import {
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 import { resolvePrioritySupportAccess } from "@/lib/priority-support-eligibility";
+import {
+  educationAccessFieldsFromSources,
+  educationAccessFieldsFromPlanSlug,
+  type EducationAccessFields,
+} from "@/lib/education-access";
+import {
+  canonicalEducationPlanId,
+  isEducationPlanId,
+  isEducationTeamPlanId,
+  type EducationTeamPlanId,
+} from "@/lib/education-plans";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
 import { enforceExpiredPaymentGraceIfNeeded } from "@/lib/billing-grace-enforcement";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
@@ -79,7 +90,64 @@ export type AccessContext = {
   hasClerkPersonalProPlus: boolean;
   /** Primary email from Clerk Backend `getUser` (same fetch as metadata). Used by layout for team-invite inbox count alongside broadcast unread queries. */
   primaryEmail: string | null;
+  /** Resolved effective plan slug from billing/admin metadata. */
+  effectivePlanSlug: string | null;
+  /** Teacher dashboard and education tools (education_plus, education_gold, education_enterprise). */
+  canAccessTeacherTools: boolean;
+  /** education_gold or education_enterprise — parallel to activeTeamPlan for education team tiers. */
+  activeEducationTeamPlan: EducationTeamPlanId | null;
 };
+
+function withEducationFields(
+  ctx: Omit<
+    AccessContext,
+    | "effectivePlanSlug"
+    | "canAccessTeacherTools"
+    | "activeEducationTeamPlan"
+  >,
+  education: EducationAccessFields,
+): AccessContext {
+  return { ...ctx, ...education };
+}
+
+function educationTeamTierAccessContext(input: {
+  userId: string;
+  activeEducationTeamPlan: EducationTeamPlanId;
+  education: EducationAccessFields;
+  paidProFromHas: boolean;
+  paidProPlusFromHas: boolean;
+  primaryEmail: string | null;
+}): AccessContext {
+  const lim = personalWorkspaceLimits({
+    unlocked: false,
+    activeTeamPlan: null,
+    activeEducationTeamPlan: input.activeEducationTeamPlan,
+    stripeSlug: undefined,
+  });
+  return withEducationFields(
+    {
+      userId: input.userId,
+      isPro: true,
+      maxPersonalDecks: lim.maxPersonalDecks,
+      maxCardsPerDeck: lim.maxCardsPerDeck,
+      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+      hasAI: true,
+      hasAiReading: true,
+      hasPrioritySupport: true,
+      hasCustomColors: true,
+      hasProPlusInterfacePalette: true,
+      adminGranted: false,
+      isAdmin: false,
+      isSuperadmin: false,
+      activeTeamPlan: null,
+      hasClerkPersonalPro: input.paidProFromHas,
+      hasClerkPersonalProPlus: input.paidProPlusFromHas,
+      primaryEmail: input.primaryEmail,
+    },
+    input.education,
+  );
+}
 
 function personalPaidSlugFromStripeSlug(
   slug: string | undefined | null,
@@ -91,7 +159,7 @@ function personalPaidSlugFromStripeSlug(
 function prioritySupportForAccess(input: {
   isPlatformAdmin: boolean;
   activeTeamPlan: TeamPlanId | null;
-  personalPlanSlug: "pro" | "pro_plus" | null | undefined;
+  personalPlanSlug: string | null | undefined;
   hasClerkProPlusPlan: boolean;
 }): boolean {
   return resolvePrioritySupportAccess({
@@ -105,13 +173,19 @@ function prioritySupportForAccess(input: {
 function personalWorkspaceLimits(input: {
   unlocked: boolean;
   activeTeamPlan: TeamPlanId | null;
+  activeEducationTeamPlan?: EducationTeamPlanId | null;
   stripeSlug: string | undefined | null;
 }): { maxPersonalDecks: number; maxCardsPerDeck: number } {
-  if (input.unlocked || input.activeTeamPlan !== null) {
+  if (
+    input.unlocked ||
+    input.activeTeamPlan !== null ||
+    input.activeEducationTeamPlan != null
+  ) {
     return proPlusPersonalLimits();
   }
   const personal = personalPaidSlugFromStripeSlug(input.stripeSlug);
   if (personal === "pro_plus") return limitsForPersonalIndividualTier("pro_plus");
+  if (input.stripeSlug === "education_plus") return limitsForPersonalIndividualTier("pro_plus");
   if (personal === "pro") return limitsForPersonalIndividualTier("pro");
   return {
     maxPersonalDecks: FREE_PERSONAL_DECK_LIMIT,
@@ -194,26 +268,29 @@ async function accessContextFromActiveAffiliateGrant(input: {
       activeTeamPlan: teamPlan,
       stripeSlug: undefined,
     });
-    return {
-      userId: input.userId,
-      isPro: true,
-      maxPersonalDecks: lim.maxPersonalDecks,
-      maxCardsPerDeck: lim.maxCardsPerDeck,
-      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-      hasAI: true,
-      hasAiReading: true,
-      hasPrioritySupport: true,
-      hasCustomColors: true,
-      hasProPlusInterfacePalette: true,
-      adminGranted: false,
-      isAdmin: false,
-      isSuperadmin: false,
-      activeTeamPlan: teamPlan,
-      hasClerkPersonalPro: input.paidProFromHas,
-      hasClerkPersonalProPlus: input.paidProPlusFromHas,
-      primaryEmail: input.primaryEmail,
-    };
+    return withEducationFields(
+      {
+        userId: input.userId,
+        isPro: true,
+        maxPersonalDecks: lim.maxPersonalDecks,
+        maxCardsPerDeck: lim.maxCardsPerDeck,
+        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+        hasAI: true,
+        hasAiReading: true,
+        hasPrioritySupport: true,
+        hasCustomColors: true,
+        hasProPlusInterfacePalette: true,
+        adminGranted: false,
+        isAdmin: false,
+        isSuperadmin: false,
+        activeTeamPlan: teamPlan,
+        hasClerkPersonalPro: input.paidProFromHas,
+        hasClerkPersonalProPlus: input.paidProPlusFromHas,
+        primaryEmail: input.primaryEmail,
+      },
+      educationAccessFieldsFromPlanSlug(planSlug),
+    );
   }
 
   if (planSlug === "pro" || planSlug === "pro_plus") {
@@ -222,31 +299,34 @@ async function accessContextFromActiveAffiliateGrant(input: {
       activeTeamPlan: null,
       stripeSlug: planSlug,
     });
-    return {
-      userId: input.userId,
-      isPro: true,
-      maxPersonalDecks: lim.maxPersonalDecks,
-      maxCardsPerDeck: lim.maxCardsPerDeck,
-      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-      hasAI: true,
-      hasAiReading: input.aiReadingForTier(planSlug),
-      hasPrioritySupport: prioritySupportForAccess({
-        isPlatformAdmin: false,
+    return withEducationFields(
+      {
+        userId: input.userId,
+        isPro: true,
+        maxPersonalDecks: lim.maxPersonalDecks,
+        maxCardsPerDeck: lim.maxCardsPerDeck,
+        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+        hasAI: true,
+        hasAiReading: input.aiReadingForTier(planSlug),
+        hasPrioritySupport: prioritySupportForAccess({
+          isPlatformAdmin: false,
+          activeTeamPlan: null,
+          personalPlanSlug: planSlug,
+          hasClerkProPlusPlan: input.paidProPlusFromHas,
+        }),
+        hasCustomColors: true,
+        hasProPlusInterfacePalette: planSlug === "pro_plus" || input.paidCustomColors,
+        adminGranted: false,
+        isAdmin: false,
+        isSuperadmin: false,
         activeTeamPlan: null,
-        personalPlanSlug: planSlug,
-        hasClerkProPlusPlan: input.paidProPlusFromHas,
-      }),
-      hasCustomColors: true,
-      hasProPlusInterfacePalette: planSlug === "pro_plus" || input.paidCustomColors,
-      adminGranted: false,
-      isAdmin: false,
-      isSuperadmin: false,
-      activeTeamPlan: null,
-      hasClerkPersonalPro: input.paidProFromHas,
-      hasClerkPersonalProPlus: input.paidProPlusFromHas,
-      primaryEmail: input.primaryEmail,
-    };
+        hasClerkPersonalPro: input.paidProFromHas,
+        hasClerkPersonalProPlus: input.paidProPlusFromHas,
+        primaryEmail: input.primaryEmail,
+      },
+      educationAccessFieldsFromPlanSlug(planSlug),
+    );
   }
 
   return null;
@@ -287,6 +367,9 @@ export function guestAccessContext(): AccessContext {
     hasClerkPersonalPro: false,
     hasClerkPersonalProPlus: false,
     primaryEmail: null,
+    effectivePlanSlug: null,
+    canAccessTeacherTools: false,
+    activeEducationTeamPlan: null,
   };
 }
 
@@ -342,6 +425,13 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     stripeDbPlanSlug: stripeSub?.planSlug ?? null,
   });
 
+  const educationFields = educationAccessFieldsFromSources({
+    meta: meta as Record<string, unknown>,
+    planResolution,
+    stripeDbPlanSlug: stripeSub?.planSlug ?? null,
+    has,
+  });
+
   const metadataForcedPersonalFree =
     planResolution.winner === "metadata" &&
     metadataPlanSlugFromPublicMeta(meta) == null;
@@ -388,6 +478,8 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   function aiReadingForTier(stripeSlug: string | undefined | null): boolean {
     if (unlocked) return true;
     if (teamPlanForFeatures !== null) return true;
+    if (educationFields.activeEducationTeamPlan !== null) return true;
+    if (stripeSlug === "education_plus") return true;
     return personalPaidSlugFromStripeSlug(stripeSlug) === "pro_plus";
   }
 
@@ -396,29 +488,47 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     const lim = personalWorkspaceLimits({
       unlocked: true,
       activeTeamPlan: teamPlanForFeatures,
+      activeEducationTeamPlan: educationFields.activeEducationTeamPlan,
       stripeSlug: stripeSlugForPersonalTier(planResolution),
     });
-    return {
+    return withEducationFields(
+      {
+        userId,
+        isPro: true,
+        maxPersonalDecks: lim.maxPersonalDecks,
+        maxCardsPerDeck: lim.maxCardsPerDeck,
+        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+        hasAI: true,
+        hasAiReading: true,
+        hasPrioritySupport: true,
+        hasCustomColors: true,
+        hasProPlusInterfacePalette: true,
+        adminGranted,
+        isAdmin,
+        isSuperadmin,
+        activeTeamPlan: teamPlanForFeatures,
+        hasClerkPersonalPro: paidProFromHas && !paidProPlusFromHas,
+        /** Personal URLs / plan query use Pro Plus for platform-admin complimentary tier. */
+        hasClerkPersonalProPlus: true,
+        primaryEmail,
+      },
+      educationFields,
+    );
+  }
+
+  if (
+    educationFields.activeEducationTeamPlan !== null &&
+    !superadminAllowListed
+  ) {
+    return educationTeamTierAccessContext({
       userId,
-      isPro: true,
-      maxPersonalDecks: lim.maxPersonalDecks,
-      maxCardsPerDeck: lim.maxCardsPerDeck,
-      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-      hasAI: true,
-      hasAiReading: true,
-      hasPrioritySupport: true,
-      hasCustomColors: true,
-      hasProPlusInterfacePalette: true,
-      adminGranted,
-      isAdmin,
-      isSuperadmin,
-      activeTeamPlan: teamPlanForFeatures,
-      hasClerkPersonalPro: paidProFromHas && !paidProPlusFromHas,
-      /** Personal URLs / plan query use Pro Plus for platform-admin complimentary tier. */
-      hasClerkPersonalProPlus: true,
+      activeEducationTeamPlan: educationFields.activeEducationTeamPlan,
+      education: educationFields,
+      paidProFromHas,
+      paidProPlusFromHas,
       primaryEmail,
-    };
+    });
   }
 
   // Team-tier subscriber personal workspace matches Pro Plus caps.
@@ -430,26 +540,29 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       activeTeamPlan: teamPlanForFeatures,
       stripeSlug: stripeSlugForPersonalTier(planResolution),
     });
-    return {
-      userId,
-      isPro: true,
-      maxPersonalDecks: lim.maxPersonalDecks,
-      maxCardsPerDeck: lim.maxCardsPerDeck,
-      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-      hasAI: true,
-      hasAiReading: true,
-      hasPrioritySupport: true,
-      hasCustomColors: true,
-      hasProPlusInterfacePalette: true,
-      adminGranted: false,
-      isAdmin: false,
-      isSuperadmin: false,
-      activeTeamPlan: teamPlanForFeatures,
-      hasClerkPersonalPro: paidProFromHas,
-      hasClerkPersonalProPlus: paidProPlusFromHas,
-      primaryEmail,
-    };
+    return withEducationFields(
+      {
+        userId,
+        isPro: true,
+        maxPersonalDecks: lim.maxPersonalDecks,
+        maxCardsPerDeck: lim.maxCardsPerDeck,
+        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+        hasAI: true,
+        hasAiReading: true,
+        hasPrioritySupport: true,
+        hasCustomColors: true,
+        hasProPlusInterfacePalette: true,
+        adminGranted: false,
+        isAdmin: false,
+        isSuperadmin: false,
+        activeTeamPlan: teamPlanForFeatures,
+        hasClerkPersonalPro: paidProFromHas,
+        hasClerkPersonalProPlus: paidProPlusFromHas,
+        primaryEmail,
+      },
+      educationFields,
+    );
   }
 
   if (effectivePersonalPro && !superadminAllowListed) {
@@ -459,38 +572,50 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       billingApiDrovePersonalPro;
 
     if (grantFullPersonalPro) {
-      const stripeSlug = stripeSlugForPersonalTier(planResolution);
+      const stripeSlug =
+        stripeSlugForPersonalTier(planResolution) ??
+        (educationFields.effectivePlanSlug === "education_plus"
+          ? "education_plus"
+          : undefined);
       const lim = personalWorkspaceLimits({
         unlocked: false,
         activeTeamPlan: null,
         stripeSlug,
       });
-      return {
-        userId,
-        isPro: true,
-        maxPersonalDecks: lim.maxPersonalDecks,
-        maxCardsPerDeck: lim.maxCardsPerDeck,
-        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-        hasAI: true,
-        hasAiReading: aiReadingForTier(stripeSlug),
-        hasPrioritySupport: prioritySupportForAccess({
-          isPlatformAdmin: false,
+      const isEducationPlus = stripeSlug === "education_plus";
+      return withEducationFields(
+        {
+          userId,
+          isPro: true,
+          maxPersonalDecks: lim.maxPersonalDecks,
+          maxCardsPerDeck: lim.maxCardsPerDeck,
+          hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+          has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+          hasAI: true,
+          hasAiReading: aiReadingForTier(stripeSlug),
+          hasPrioritySupport: prioritySupportForAccess({
+            isPlatformAdmin: false,
+            activeTeamPlan: null,
+            personalPlanSlug: isEducationPlus
+              ? "education_plus"
+              : personalPaidSlugFromStripeSlug(stripeSlug),
+            hasClerkProPlusPlan: paidProPlusFromHas || isEducationPlus,
+          }),
+          hasCustomColors: paidCustomColors || Boolean(stripeSlug),
+          hasProPlusInterfacePalette:
+            paidCustomColors ||
+            personalPaidSlugFromStripeSlug(stripeSlug) === "pro_plus" ||
+            isEducationPlus,
+          adminGranted: false,
+          isAdmin: false,
+          isSuperadmin: false,
           activeTeamPlan: null,
-          personalPlanSlug: personalPaidSlugFromStripeSlug(stripeSlug),
-          hasClerkProPlusPlan: paidProPlusFromHas,
-        }),
-        hasCustomColors: paidCustomColors || Boolean(stripeSlug),
-        hasProPlusInterfacePalette:
-          paidCustomColors || personalPaidSlugFromStripeSlug(stripeSlug) === "pro_plus",
-        adminGranted: false,
-        isAdmin: false,
-        isSuperadmin: false,
-        activeTeamPlan: null,
-        hasClerkPersonalPro: paidProFromHas,
-        hasClerkPersonalProPlus: paidProPlusFromHas,
-        primaryEmail,
-      };
+          hasClerkPersonalPro: paidProFromHas,
+          hasClerkPersonalProPlus: paidProPlusFromHas || isEducationPlus,
+          primaryEmail,
+        },
+        educationFields,
+      );
     }
   }
 
@@ -504,6 +629,17 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       rawBillingStatus === "active" || rawBillingStatus === "trialing";
 
     if (isBillingActiveRaw && rawBillingPlan !== null) {
+      if (isEducationTeamPlanId(rawBillingPlan)) {
+        const eduFields = educationAccessFieldsFromPlanSlug(rawBillingPlan);
+        return educationTeamTierAccessContext({
+          userId,
+          activeEducationTeamPlan: rawBillingPlan,
+          education: eduFields,
+          paidProFromHas,
+          paidProPlusFromHas,
+          primaryEmail,
+        });
+      }
       if (isTeamPlanId(rawBillingPlan)) {
         const canonical = canonicalTeamPlanId(rawBillingPlan)!;
         const lim = personalWorkspaceLimits({
@@ -511,59 +647,74 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
           activeTeamPlan: canonical,
           stripeSlug: undefined,
         });
-        return {
-          userId,
-          isPro: true,
-          maxPersonalDecks: lim.maxPersonalDecks,
-          maxCardsPerDeck: lim.maxCardsPerDeck,
-          hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-          has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-          hasAI: true,
-          hasAiReading: true,
-          hasPrioritySupport: true,
-          hasCustomColors: true,
-          hasProPlusInterfacePalette: true,
-          adminGranted: false,
-          isAdmin: false,
-          isSuperadmin: false,
-          activeTeamPlan: canonical,
-          hasClerkPersonalPro: paidProFromHas,
-          hasClerkPersonalProPlus: paidProPlusFromHas,
-          primaryEmail,
-        };
+        return withEducationFields(
+          {
+            userId,
+            isPro: true,
+            maxPersonalDecks: lim.maxPersonalDecks,
+            maxCardsPerDeck: lim.maxCardsPerDeck,
+            hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+            has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+            hasAI: true,
+            hasAiReading: true,
+            hasPrioritySupport: true,
+            hasCustomColors: true,
+            hasProPlusInterfacePalette: true,
+            adminGranted: false,
+            isAdmin: false,
+            isSuperadmin: false,
+            activeTeamPlan: canonical,
+            hasClerkPersonalPro: paidProFromHas,
+            hasClerkPersonalProPlus: paidProPlusFromHas,
+            primaryEmail,
+          },
+          educationFields,
+        );
       }
-      if (rawBillingPlan === "pro" || rawBillingPlan === "pro_plus") {
+      if (
+        rawBillingPlan === "pro" ||
+        rawBillingPlan === "pro_plus" ||
+        rawBillingPlan === "education_plus"
+      ) {
+        const isEducationPlus = rawBillingPlan === "education_plus";
         const lim = personalWorkspaceLimits({
           unlocked: false,
           activeTeamPlan: null,
           stripeSlug: rawBillingPlan,
         });
-        return {
-          userId,
-          isPro: true,
-          maxPersonalDecks: lim.maxPersonalDecks,
-          maxCardsPerDeck: lim.maxCardsPerDeck,
-          hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-          has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-          hasAI: true,
-          hasAiReading: aiReadingForTier(rawBillingPlan),
-          hasPrioritySupport: prioritySupportForAccess({
-            isPlatformAdmin: false,
+        return withEducationFields(
+          {
+            userId,
+            isPro: true,
+            maxPersonalDecks: lim.maxPersonalDecks,
+            maxCardsPerDeck: lim.maxCardsPerDeck,
+            hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+            has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+            hasAI: true,
+            hasAiReading: aiReadingForTier(rawBillingPlan),
+            hasPrioritySupport: prioritySupportForAccess({
+              isPlatformAdmin: false,
+              activeTeamPlan: null,
+              personalPlanSlug: isEducationPlus
+                ? "education_plus"
+                : personalPaidSlugFromStripeSlug(rawBillingPlan),
+              hasClerkProPlusPlan: paidProPlusFromHas || isEducationPlus,
+            }),
+            hasCustomColors: true,
+            hasProPlusInterfacePalette:
+              rawBillingPlan === "pro_plus" ||
+              paidCustomColors ||
+              isEducationPlus,
+            adminGranted: false,
+            isAdmin: false,
+            isSuperadmin: false,
             activeTeamPlan: null,
-            personalPlanSlug: personalPaidSlugFromStripeSlug(rawBillingPlan),
-            hasClerkProPlusPlan: paidProPlusFromHas,
-          }),
-          hasCustomColors: true,
-          hasProPlusInterfacePalette:
-            rawBillingPlan === "pro_plus" || paidCustomColors,
-          adminGranted: false,
-          isAdmin: false,
-          isSuperadmin: false,
-          activeTeamPlan: null,
-          hasClerkPersonalPro: paidProFromHas,
-          hasClerkPersonalProPlus: paidProPlusFromHas,
-          primaryEmail,
-        };
+            hasClerkPersonalPro: paidProFromHas,
+            hasClerkPersonalProPlus: paidProPlusFromHas || isEducationPlus,
+            primaryEmail,
+          },
+          educationFields,
+        );
       }
     }
   }
@@ -577,7 +728,9 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       paidCustomColors,
       aiReadingForTier,
     });
-    if (affiliateAccess) return affiliateAccess;
+    if (affiliateAccess) {
+      return withEducationFields(affiliateAccess, educationFields);
+    }
   }
 
   const jwtPaid = !metadataForcedPersonalFree;
@@ -614,33 +767,39 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     }
   }
 
-  return {
-    userId,
-    isPro: isProJwt || unlocked,
-    maxPersonalDecks: lim.maxPersonalDecks,
-    maxCardsPerDeck: lim.maxCardsPerDeck,
-    hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
-    has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
-    hasAI:
-      jwtPaid &&
-      (paidAI || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
-    hasAiReading: aiReadingForTier(inferredStripeSlug),
-    hasPrioritySupport: prioritySupportForAccess({
-      isPlatformAdmin: unlocked,
+  return withEducationFields(
+    {
+      userId,
+      isPro: isProJwt || unlocked,
+      maxPersonalDecks: lim.maxPersonalDecks,
+      maxCardsPerDeck: lim.maxCardsPerDeck,
+      hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+      has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+      hasAI:
+        jwtPaid &&
+        (paidAI || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
+      hasAiReading: aiReadingForTier(inferredStripeSlug),
+      hasPrioritySupport: prioritySupportForAccess({
+        isPlatformAdmin: unlocked,
+        activeTeamPlan: null,
+        personalPlanSlug:
+          educationFields.effectivePlanSlug === "education_plus"
+            ? "education_plus"
+            : personalPaidSlugFromStripeSlug(inferredStripeSlug),
+        hasClerkProPlusPlan: paidProPlusFromHas,
+      }),
+      hasCustomColors:
+        jwtPaid &&
+        (paidCustomColors || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
+      hasProPlusInterfacePalette: jwtProPlusInterfacePalette,
+      adminGranted,
+      isAdmin,
+      isSuperadmin,
       activeTeamPlan: null,
-      personalPlanSlug: personalPaidSlugFromStripeSlug(inferredStripeSlug),
-      hasClerkProPlusPlan: paidProPlusFromHas,
-    }),
-    hasCustomColors:
-      jwtPaid &&
-      (paidCustomColors || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
-    hasProPlusInterfacePalette: jwtProPlusInterfacePalette,
-    adminGranted,
-    isAdmin,
-    isSuperadmin,
-    activeTeamPlan: null,
-    hasClerkPersonalPro: jwtPaid && paidProFromHas,
-    hasClerkPersonalProPlus: jwtPaid && paidProPlusFromHas,
-    primaryEmail,
-  };
+      hasClerkPersonalPro: jwtPaid && paidProFromHas,
+      hasClerkPersonalProPlus: jwtPaid && paidProPlusFromHas,
+      primaryEmail,
+    },
+    educationFields,
+  );
 });

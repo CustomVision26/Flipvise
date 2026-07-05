@@ -1,3 +1,4 @@
+import type { EducationTeamPlanId } from "@/lib/education-plans";
 import {
   personalDashboardPlanQueryValue,
   type TeamPlanId,
@@ -17,6 +18,7 @@ export function personalDashboardHref(): string {
 export type PersonalDashboardHrefWithPlanInput = {
   userId: string;
   activeTeamPlan: TeamPlanId | null;
+  activeEducationTeamPlan?: EducationTeamPlanId | null;
   isPro: boolean;
   hasClerkPersonalPro: boolean;
   hasClerkPersonalProPlus: boolean;
@@ -36,6 +38,7 @@ export function personalDashboardHrefWithUserPlanQuery(
     input.activeTeamPlan,
     input.isPro,
     personalStripeSlug,
+    input.activeEducationTeamPlan ?? null,
   );
   const params = new URLSearchParams({ userid: input.userId });
   if (planQuery !== "") params.set("plan", planQuery);

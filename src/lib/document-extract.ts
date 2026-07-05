@@ -8,11 +8,14 @@ import {
   SOURCE_IMPORT_MAX_FILE_BYTES,
   type SourceFormat,
 } from "@/lib/source-import-formats";
-import { getUnsupportedImportUrlReason } from "@/lib/source-import-url-validation";
+import { getUnsupportedImportUrlReason, isPrivateChatImportUrl } from "@/lib/source-import-url-validation";
+import { isYouTubeUrl } from "@/lib/youtube-url";
+import { extractYouTubeTranscript } from "@/lib/youtube-transcript";
 
 export type ExtractedSource = {
   format: SourceFormat;
   text: string;
+  sourceTitle?: string;
 };
 
 function truncateExtractedText(text: string): string {
@@ -77,6 +80,9 @@ function fetchErrorMessage(status: number, parsed: URL): string {
     return "Page not found (404). Check that the URL is complete and correct.";
   }
   if (status === 403 || status === 401) {
+    if (isPrivateChatImportUrl(parsed.toString())) {
+      return "Private chat links cannot be fetched. Copy the text from your chat and add it using Plain text, or upload a file.";
+    }
     if (
       host.includes("play.google.com") ||
       host.includes("apps.apple.com") ||
@@ -101,7 +107,18 @@ const URL_FETCH_HEADERS = {
 } as const;
 
 export async function extractTextFromUrl(url: string): Promise<ExtractedSource> {
-  const parsed = parsePublicHttpUrl(url);
+  const trimmed = url.trim();
+
+  if (isYouTubeUrl(trimmed)) {
+    const { title, text } = await extractYouTubeTranscript(trimmed);
+    return {
+      format: "url",
+      text: truncateExtractedText(text),
+      sourceTitle: title,
+    };
+  }
+
+  const parsed = parsePublicHttpUrl(trimmed);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
   try {

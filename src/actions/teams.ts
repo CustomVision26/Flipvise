@@ -8,12 +8,14 @@ import { randomBytes } from "node:crypto";
 import { z, type input } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { syncPlatformAdminTeamTierInvitedMetadata } from "@/lib/platform-admin-team-tier-metadata";
+import { EDUCATION_TEAM_PLAN_IDS } from "@/lib/education-plans";
 import {
   limitsForPlan,
   isTeamPlanId,
   TEAM_PLAN_IDS,
   type TeamPlanId,
 } from "@/lib/team-plans";
+import { insertTeamMemberHistoryEvent } from "@/db/queries/team-member-history";
 import { teamMemberInviteCapacity } from "@/db/queries/team-plan-limits";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
@@ -95,6 +97,14 @@ async function completeAcceptTeamInvitation(
     addedByUserId: inviterId,
     addedByAsOwner,
   });
+  await insertTeamMemberHistoryEvent({
+    teamId: inv.teamId,
+    ownerUserId: team.ownerUserId,
+    action: "added",
+    memberUserId: userId,
+    memberRole: inv.role,
+    actorUserId: inviterId,
+  });
   await markInvitationAccepted(inv.id);
 
   try {
@@ -104,15 +114,23 @@ async function completeAcceptTeamInvitation(
   }
 }
 
+const WORKSPACE_CREATE_PLAN_IDS = [
+  ...TEAM_PLAN_IDS,
+  ...EDUCATION_TEAM_PLAN_IDS,
+] as const;
+
 const createTeamSchema = z.object({
   name: z.string().min(1).max(255),
   planSlug: z
     .string()
-    .refine((v): v is TeamPlanId => (TEAM_PLAN_IDS as readonly string[]).includes(v)),
+    .refine((v): v is (typeof WORKSPACE_CREATE_PLAN_IDS)[number] =>
+      (WORKSPACE_CREATE_PLAN_IDS as readonly string[]).includes(v),
+    ),
 });
 
 export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {
-  const { userId, activeTeamPlan, isAdmin } = await getAccessContext();
+  const { userId, activeTeamPlan, activeEducationTeamPlan, isAdmin } =
+    await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
   const parsed = createTeamSchema.safeParse(data);
@@ -124,7 +142,8 @@ export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {
     );
   }
 
-  if (activeTeamPlan !== parsed.data.planSlug) {
+  const expectedPlan = activeTeamPlan ?? activeEducationTeamPlan;
+  if (!expectedPlan || expectedPlan !== parsed.data.planSlug) {
     throw new Error("Plan mismatch — refresh and try again.");
   }
 
@@ -794,7 +813,19 @@ export async function removeTeamMemberAction(data: z.infer<typeof removeMemberSc
   const team = await assertCanManageTeam(userId, parsed.data.teamId);
   if (parsed.data.memberUserId === team.ownerUserId) throw new Error("Cannot remove the owner.");
 
+  const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
+  if (!member) throw new Error("Member not found.");
+
   await deleteTeamMember(parsed.data.teamId, parsed.data.memberUserId);
+
+  await insertTeamMemberHistoryEvent({
+    teamId: parsed.data.teamId,
+    ownerUserId: team.ownerUserId,
+    action: "removed",
+    memberUserId: parsed.data.memberUserId,
+    memberRole: member.role,
+    actorUserId: userId,
+  });
 
   try {
     await syncPlatformAdminTeamTierInvitedMetadata(clerkClient, parsed.data.memberUserId);

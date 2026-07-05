@@ -24,6 +24,9 @@ export function isDashboardTeamAdminOrWorkspaceManagementRoute(
   ) {
     return true;
   }
+  if (pathname === "/teacher" || pathname.startsWith("/teacher/")) {
+    return true;
+  }
   return false;
 }
 

@@ -12,9 +12,15 @@ import type { AccessContext } from "@/lib/access";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import {
   resolvePersonalPlanMetadataVsBilling,
+  resolveEffectivePlan,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
 import { TEAM_PLAN_LABELS, isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import {
+  EDUCATION_PLAN_LABELS,
+  isEducationPlanId,
+  isEducationTeamPlanId,
+} from "@/lib/education-plans";
 import {
   formatPersonalDashboardPlanAccessPhrase,
   resolveAdminUserPlanAccessType,
@@ -35,9 +41,13 @@ export function personalWorkspacePlanDisplayLabel(input: {
   isPro: boolean;
   /** From `getAccessContext()` — true for Pro Plus, team-tier personal caps, and platform admins. */
   hasProPlusInterfacePalette: boolean;
+  effectivePlanSlug?: string | null;
 }): string {
   if (input.activeTeamPlan != null) {
     return TEAM_PLAN_LABELS[input.activeTeamPlan];
+  }
+  if (input.effectivePlanSlug && isEducationPlanId(input.effectivePlanSlug)) {
+    return EDUCATION_PLAN_LABELS[input.effectivePlanSlug];
   }
   if (input.hasProPlusInterfacePalette) {
     return "Pro Plus";
@@ -60,6 +70,7 @@ export function personalWorkspaceLabelsFromAccessContext(
     | "activeTeamPlan"
     | "isPro"
     | "hasProPlusInterfacePalette"
+    | "effectivePlanSlug"
   >,
 ): { personalPlanLabelForWorkspace: string; personalAccountPlanLabel: string } {
   if (ctx.isSuperadmin) {
@@ -78,6 +89,7 @@ export function personalWorkspaceLabelsFromAccessContext(
     activeTeamPlan: ctx.activeTeamPlan,
     isPro: ctx.isPro,
     hasProPlusInterfacePalette: ctx.hasProPlusInterfacePalette,
+    effectivePlanSlug: ctx.effectivePlanSlug,
   });
   return {
     personalPlanLabelForWorkspace: tierLabel,
@@ -129,6 +141,7 @@ type PersonalWorkspaceLabelContext = {
     | "activeTeamPlan"
     | "isPro"
     | "hasProPlusInterfacePalette"
+    | "effectivePlanSlug"
   >;
   planDisplay: BillingTabPlanDisplay;
   planAccessType: AdminUserPlanAccessType;
@@ -184,6 +197,7 @@ function accessContextPickForPlanLabels(input: {
   activeTeamPlan: TeamPlanId | null;
   effectivePersonalPro: boolean;
   stripeSlug: string | null | undefined;
+  effectivePlanSlug?: string | null;
 }): PersonalWorkspaceLabelContext["ctx"] {
   const personalSlug =
     input.stripeSlug === "pro" || input.stripeSlug === "pro_plus"
@@ -197,11 +211,15 @@ function accessContextPickForPlanLabels(input: {
       input.isAdmin ||
       input.effectivePersonalPro ||
       input.activeTeamPlan !== null ||
-      personalSlug !== null,
+      personalSlug !== null ||
+      isEducationPlanId(input.effectivePlanSlug ?? ""),
     hasProPlusInterfacePalette:
       input.isAdmin ||
       input.activeTeamPlan !== null ||
-      personalSlug === "pro_plus",
+      personalSlug === "pro_plus" ||
+      input.effectivePlanSlug === "education_plus" ||
+      isEducationTeamPlanId(input.effectivePlanSlug ?? ""),
+    effectivePlanSlug: input.effectivePlanSlug ?? personalSlug,
   };
 }
 
@@ -233,7 +251,9 @@ export async function resolvePersonalWorkspaceLabelsForUserId(userId: string): P
     personalAccountPlanLabel: personalWorkspaceAccountPlanLabel(loaded),
     personalPlanAccessType: loaded.planAccessType,
     personalHasTeamTierPlan:
-      loaded.ctx.activeTeamPlan != null && isTeamPlanId(loaded.ctx.activeTeamPlan),
+      (loaded.ctx.activeTeamPlan != null &&
+        isTeamPlanId(loaded.ctx.activeTeamPlan)) ||
+      (await getAccessContext()).activeEducationTeamPlan != null,
     viewerIsSuperadmin: loaded.ctx.isSuperadmin,
     viewerIsPlatformAdmin: loaded.ctx.isAdmin,
   };
@@ -278,6 +298,7 @@ async function loadPersonalWorkspaceLabelContextForUserId(
     activeTeamPlan,
     effectivePersonalPro,
     stripeSlug,
+    effectivePlanSlug: resolveEffectivePlan(meta),
   });
 
   return loadPlanLabelContextForUser(userId, ctx, meta, primaryEmail);
@@ -299,6 +320,7 @@ const loadPersonalWorkspaceLabelContext = cache(
       activeTeamPlan: fullCtx.activeTeamPlan,
       isPro: fullCtx.isPro,
       hasProPlusInterfacePalette: fullCtx.hasProPlusInterfacePalette,
+      effectivePlanSlug: fullCtx.effectivePlanSlug,
     };
 
     return loadPlanLabelContextForUser(
@@ -320,6 +342,9 @@ function personalWorkspaceAccountPlanLabel(
   if (ctx.activeTeamPlan != null) {
     return TEAM_PLAN_LABELS[ctx.activeTeamPlan];
   }
+  if (ctx.effectivePlanSlug && isEducationPlanId(ctx.effectivePlanSlug)) {
+    return EDUCATION_PLAN_LABELS[ctx.effectivePlanSlug];
+  }
   if (planDisplay.planLabel) {
     return planDisplay.planLabel;
   }
@@ -327,6 +352,7 @@ function personalWorkspaceAccountPlanLabel(
     activeTeamPlan: ctx.activeTeamPlan,
     isPro: ctx.isPro,
     hasProPlusInterfacePalette: ctx.hasProPlusInterfacePalette,
+    effectivePlanSlug: ctx.effectivePlanSlug,
   });
 }
 

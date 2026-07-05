@@ -85,6 +85,15 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         },
       },
       {
+        id: "history",
+        title: "Membership history",
+        bullets: [
+          "Use the Membership history sub-tab in the Members panel (next to Roster) to review add/remove events.",
+          "Columns: Event time, Action (Added / Removed), Member, Role, By (who performed the action).",
+          "History starts from when this feature was enabled — earlier joins and removals are not backfilled.",
+        ],
+      },
+      {
         id: "actions",
         title: "Actions and restrictions",
         bullets: [
@@ -120,6 +129,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Records who assigned and when.",
           "Set study privilege on assign: Standard Review only, Quiz only, or Both (default).",
           "Unassign removes member access to that deck in the workspace.",
+          "Assignments by member table — workspace owner sees all members and workspaces; team admins see only the current workspace’s members (no Workspace column).",
         ],
       },
       {

@@ -33,8 +33,10 @@ import {
   countTeamsForOwner,
   getAssignedDecksForMemberWithCardCount,
   getDecksForTeamWithCardCount,
+  getEducationTeamAdminWorkspaceDecksWithCardCount,
   getTeamById,
   getTeamMembershipsForUser,
+  getTeamsByOwner,
   teamWorkspaceAllowsViewerAccess,
 } from "@/db/queries/teams";
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
@@ -46,14 +48,20 @@ import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
-import { syncTeamContextCookieForUser, clearTeamContextCookie } from "@/lib/team-context-cookie-server";
+import {
+  dashboardPathFromSearchParams,
+  resolveTeamContextCookieAction,
+  teamContextCookieApiPath,
+} from "@/lib/team-context-cookie-server";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
+import { isEducationTeamPlanId, isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
 import { isTeamPlanId } from "@/lib/team-plans";
 import {
   FREE_CARDS_PER_DECK_LIMIT,
   FREE_PERSONAL_DECK_LIMIT,
 } from "@/lib/personal-plan-limits";
 import { getPersonalDashboardPlanAccessPhrase } from "@/lib/personal-workspace-plan-label";
+import { redirectIfPlanReconciliationPending } from "@/lib/plan-reconciliation-gate";
 import {
   isNativeShellRequest,
   nativeSignInPath,
@@ -63,7 +71,11 @@ function teamWorkspaceHasTierExtras(
   hasOwnTeamPlan: boolean,
   teamRow: { planSlug: string } | null,
 ) {
-  return hasOwnTeamPlan || (teamRow != null && isTeamPlanId(teamRow.planSlug));
+  return (
+    hasOwnTeamPlan ||
+    (teamRow != null &&
+      (isTeamPlanId(teamRow.planSlug) || isEducationTeamPlanId(teamRow.planSlug)))
+  );
 }
 
 function DashboardPersonalHeading({
@@ -183,6 +195,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     maxCardsPerDeck,
     isPro,
     activeTeamPlan,
+    activeEducationTeamPlan,
     isAdmin,
     hasAiReading,
   } = await getAccessContext();
@@ -192,6 +205,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
     redirect("/");
   }
+
+  await redirectIfPlanReconciliationPending(userId);
 
   const sp = await searchParams;
   if (shouldRedirectUnauthorizedDashboardUseridParam(userId, sp)) {
@@ -207,10 +222,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   if (canonicalDash) redirect(canonicalDash);
 
   if (teamWorkspaceUrl != null) {
-    await tryTeamQuery(
-      () => syncTeamContextCookieForUser(teamWorkspaceUrl.teamId, userId),
-      undefined,
+    const returnPath = dashboardPathFromSearchParams(sp);
+    const cookieAction = await tryTeamQuery(
+      () => resolveTeamContextCookieAction(teamWorkspaceUrl.teamId, userId),
+      "noop" as const,
     );
+    if (cookieAction === "clear") {
+      redirect(teamContextCookieApiPath({ action: "clear", redirectPath: returnPath }));
+    }
+    if (cookieAction === "set") {
+      redirect(
+        teamContextCookieApiPath({
+          action: "sync",
+          teamId: teamWorkspaceUrl.teamId,
+          redirectPath: returnPath,
+        }),
+      );
+    }
   }
 
   const workspaceQueryString =
@@ -218,7 +246,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ? await buildResolvedTeamWorkspaceQueryString(userId, teamWorkspaceUrl)
       : "";
 
-  const ownSubscriberTeamTierExtras = activeTeamPlan !== null;
+  const ownSubscriberTeamTierExtras =
+    activeTeamPlan !== null || activeEducationTeamPlan !== null;
 
   const cookieStore = await cookies();
   const teamCtxRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
@@ -233,14 +262,25 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const isSubscriberOwner = tw.canEditTeamDecks;
     const [workspaceHeadingRow, workspaceDecksRaw] = await Promise.all([
       tryTeamQuery(() => getTeamById(tw.teamId), null),
-      tryTeamQuery(
-        () =>
-          isSubscriberOwner
-            ? getDecksForTeamWithCardCount(tw.teamId, tw.ownerUserId)
-            : getAssignedDecksForMemberWithCardCount(tw.teamId, userId),
-        [],
-      ),
+      tryTeamQuery(async () => {
+        if (isSubscriberOwner) {
+          return getDecksForTeamWithCardCount(tw.teamId, tw.ownerUserId);
+        }
+        const teamRow = await getTeamById(tw.teamId);
+        if (teamRow && isEducationTeamPlanId(teamRow.planSlug)) {
+          return getEducationTeamAdminWorkspaceDecksWithCardCount(
+            tw.teamId,
+            tw.ownerUserId,
+            userId,
+          );
+        }
+        return getAssignedDecksForMemberWithCardCount(tw.teamId, userId);
+      }, []),
     ]);
+    const isEducationTeamAdminViewer =
+      !isSubscriberOwner &&
+      workspaceHeadingRow != null &&
+      isEducationTeamPlanId(workspaceHeadingRow.planSlug);
     const teamWorkspaceTierExtras = teamWorkspaceHasTierExtras(
       ownSubscriberTeamTierExtras,
       workspaceHeadingRow,
@@ -272,7 +312,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <p className="text-muted-foreground mt-1 text-sm sm:text-base">
                 {isSubscriberOwner
                   ? "Team workspace — open decks to edit cards or study"
-                  : "Team workspace — preview and study assigned decks"}
+                  : isEducationTeamAdminViewer
+                    ? "Team workspace — edit decks you created; preview and study assigned decks"
+                    : "Team workspace — preview and study assigned decks"}
               </p>
             ) : (
               <DashboardTeamWorkspaceSubline
@@ -281,7 +323,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 tailText={
                   isSubscriberOwner
                     ? "Team workspace — open decks to edit cards or study"
-                    : "Team workspace — preview and study assigned decks"
+                    : isEducationTeamAdminViewer
+                      ? "Team workspace — edit decks you created; preview and study assigned decks"
+                      : "Team workspace — preview and study assigned decks"
                 }
               />
             )}
@@ -294,12 +338,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
             <div className="space-y-1">
               <p className="font-medium text-foreground text-sm">
-                {isSubscriberOwner ? "No decks in this workspace yet" : "No decks assigned yet"}
+                {isSubscriberOwner
+                  ? "No decks in this workspace yet"
+                  : isEducationTeamAdminViewer
+                    ? "No decks yet"
+                    : "No decks assigned yet"}
               </p>
               <p className="text-muted-foreground text-xs max-w-xs">
                 {isSubscriberOwner
                   ? "Use Deck Manager in Team Admin to link subscriber decks or assign them to members."
-                  : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
+                  : isEducationTeamAdminViewer
+                    ? "Create decks from Teacher tools or wait for your workspace owner to assign decks to you."
+                    : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
               </p>
             </div>
           </div>
@@ -411,7 +461,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       false,
     );
     if (!cookieWorkspaceLive) {
-      await clearTeamContextCookie();
+      redirect(
+        teamContextCookieApiPath({
+          action: "clear",
+          redirectPath: dashboardPathFromSearchParams(sp),
+        }),
+      );
     } else {
     const cookieMembership = invitedTeamWorkspaceMemberships.find(
       (m) => m.teamId === teamCtxId,
@@ -420,13 +475,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     /** Co-admins must use the canonical `?team=&userid=&plan=&teamMemberId=` URL — cookie-only context wrongly showed the member Study/Preview UI. */
     if (cookieMembership?.role === "team_admin") {
       const cookieTeam = await tryTeamQuery(() => getTeamById(teamCtxId), null);
-      if (cookieTeam && isTeamPlanId(cookieTeam.planSlug)) {
+      if (cookieTeam && isWorkspaceSubscriptionPlanSlug(cookieTeam.planSlug)) {
+        const isOwner = cookieTeam.ownerUserId === userId;
         const canonicalQs = await buildResolvedTeamWorkspaceQueryString(userId, {
           teamId: teamCtxId,
           ownerUserId: cookieTeam.ownerUserId,
-          canEditTeamDecks: false,
+          canEditTeamDecks: isOwner,
           isAssignedMemberPreview: false,
-          isTeamAdminWorkspaceViewer: true,
+          isTeamAdminWorkspaceViewer: !isOwner,
           workspacePlanQuery: cookieTeam.planSlug,
         });
         const redirectParams = new URLSearchParams(canonicalQs);
@@ -541,7 +597,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     : decksRaw;
   const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
   const showTeamOnboarding = Boolean(
-    activeTeamPlan && teamCount === 0 && !isAdmin,
+    (activeTeamPlan ?? activeEducationTeamPlan) && teamCount === 0 && !isAdmin,
   );
   const isFreePlan = !hasUnlimitedDecks;
   const isAtLimit = isFreePlan && decks.length >= FREE_PERSONAL_DECK_LIMIT;
@@ -566,6 +622,31 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const planAccessPhrase = isPro
     ? await getPersonalDashboardPlanAccessPhrase()
     : null;
+
+  const showEducationWorkspaceSections = activeEducationTeamPlan != null;
+  const ownedEducationTeams = showEducationWorkspaceSections
+    ? await tryTeamQuery(
+        () =>
+          getTeamsByOwner(userId).then((teams) =>
+            teams.filter((team) => isEducationTeamPlanId(team.planSlug)),
+          ),
+        [],
+      )
+    : [];
+  const personalOnlyDecks = showEducationWorkspaceSections
+    ? decks.filter((deck) => deck.teamId == null)
+    : decks;
+  const workspaceDeckSections = showEducationWorkspaceSections
+    ? ownedEducationTeams
+        .map((team) => ({
+          team,
+          decks: decks.filter((deck) => deck.teamId === team.id),
+        }))
+        .filter((section) => section.decks.length > 0)
+    : [];
+  const hasGroupedEducationDecks =
+    showEducationWorkspaceSections &&
+    (personalOnlyDecks.length > 0 || workspaceDeckSections.length > 0);
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
@@ -722,6 +803,35 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             speechToTextEnabled={ownSubscriberTeamTierExtras}
             deckFrontImageUploadEnabled={isPro}
           />
+        </div>
+      ) : hasGroupedEducationDecks ? (
+        <div className="space-y-8">
+          {personalOnlyDecks.length > 0 ? (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Personal
+              </h2>
+              <DeckGrid
+                decks={personalOnlyDecks}
+                initialView={initialView}
+                teamTierPreviewPromo={ownSubscriberTeamTierExtras}
+                hasAiReading={hasAiReading}
+              />
+            </section>
+          ) : null}
+          {workspaceDeckSections.map(({ team, decks: sectionDecks }) => (
+            <section key={team.id} className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {team.name}
+              </h2>
+              <DeckGrid
+                decks={sectionDecks}
+                initialView={initialView}
+                teamTierPreviewPromo={ownSubscriberTeamTierExtras}
+                hasAiReading={hasAiReading}
+              />
+            </section>
+          ))}
         </div>
       ) : (
         <DeckGrid

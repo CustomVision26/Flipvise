@@ -81,6 +81,7 @@ async function fetchGenerateStep(input: {
   sourceText: string;
   sourceFormat: string;
   skipRelevanceCheck: boolean;
+  readingPassageMultipleChoice?: boolean;
 }): Promise<GenerateCardsFromSourceResult> {
   const response = await fetch(`${apiOrigin()}/api/decks/source-import/generate`, {
     method: "POST",
@@ -113,6 +114,7 @@ export async function generateCardsFromUploadFile(input: {
   count: number;
   file: File;
   skipRelevanceCheck: boolean;
+  readingPassageMultipleChoice?: boolean;
   onProgress?: (step: SourceImportProgress) => void;
 }): Promise<GenerateCardsFromSourceResult> {
   const uploadFile = await normalizeUploadFile(input.file);
@@ -123,6 +125,9 @@ export async function generateCardsFromUploadFile(input: {
   formData.set("file", uploadFile);
   if (input.skipRelevanceCheck) {
     formData.set("skipRelevanceCheck", "true");
+  }
+  if (input.readingPassageMultipleChoice) {
+    formData.set("readingPassageMultipleChoice", "true");
   }
 
   try {
@@ -136,6 +141,7 @@ export async function generateCardsFromUploadFile(input: {
       sourceText: extracted.text,
       sourceFormat: extracted.format,
       skipRelevanceCheck: input.skipRelevanceCheck,
+      readingPassageMultipleChoice: input.readingPassageMultipleChoice,
     });
   } catch (firstError) {
     try {

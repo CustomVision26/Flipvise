@@ -3,8 +3,12 @@
 import { useState, useTransition, useRef, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, ImagePlus, X, Loader2 } from "lucide-react";
+import { Mic, MicOff, ImagePlus, X, Loader2, HelpCircle } from "lucide-react";
 import { GradientPicker } from "@/components/gradient-picker";
+import {
+  TeacherNameFieldHelpContent,
+  TeacherTopicFieldHelpContent,
+} from "@/components/teacher-field-help-content";
 import type { GradientSlug } from "@/lib/deck-gradients";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +24,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -29,6 +41,7 @@ import {
   uploadDeckCoverImageAction,
   removeDeckCoverImageAction,
 } from "@/actions/decks";
+import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -49,6 +62,8 @@ interface EditDeckDialogProps {
     id: number;
     name: string;
     description: string | null;
+    gradeLevel: string | null;
+    difficultyLevel: string | null;
     teamId: number | null;
     coverImageUrl?: string | null;
     gradient?: string | null;
@@ -62,6 +77,8 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(deck.name);
   const [description, setDescription] = useState(deck.description ?? "");
+  const [gradeLevel, setGradeLevel] = useState(deck.gradeLevel ?? "");
+  const [difficultyLevel, setDifficultyLevel] = useState(deck.difficultyLevel ?? "");
   const [gradient, setGradient] = useState<GradientSlug>((deck.gradient as GradientSlug) ?? "none");
   const [coverUrl, setCoverUrl] = useState(deck.coverImageUrl ?? null);
   const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
@@ -95,6 +112,8 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
       descriptionSpeech.clearError();
       setName(deck.name);
       setDescription(deck.description ?? "");
+      setGradeLevel(deck.gradeLevel ?? "");
+      setDifficultyLevel(deck.difficultyLevel ?? "");
       setGradient((deck.gradient as GradientSlug) ?? "none");
       setCoverUploadError(null);
       setError(null);
@@ -157,6 +176,8 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
           deckId: deck.id,
           name,
           description: description.trim() || undefined,
+          gradeLevel: gradeLevel.trim() || undefined,
+          difficultyLevel: difficultyLevel.trim() || undefined,
           gradient: gradient !== "none" ? gradient : undefined,
         });
         setOpen(false);
@@ -177,17 +198,35 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
             Edit deck
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed sm:text-sm">
-            Update the name and description of this deck.
+            Update the name/subject/course, description/topic, grade level, and difficulty
+            for this deck.
             {showTeamDeckCover
               ? " Team decks can use an optional cover image on dashboard deck cards."
               : ""}
           </DialogDescription>
         </DialogHeader>
 
+        <TooltipProvider>
         <div className="flex flex-col gap-3 py-1 sm:gap-4 sm:py-2">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="deck-name" className="text-xs sm:text-sm">Name</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="deck-name" className="text-xs sm:text-sm">
+                  Name/Subject/Course
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Examples for name, subject, or course"
+                  >
+                    <HelpCircle className="h-4 w-4" aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <TeacherNameFieldHelpContent />
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               {nameSpeech.supported && (
                 <Tooltip>
                   <TooltipTrigger render={<span />}>
@@ -223,7 +262,7 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
             </div>
             <Input
               id="deck-name"
-              placeholder="Deck name…"
+              placeholder="e.g. Jamaican History"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={isPending}
@@ -232,7 +271,23 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="deck-description" className="text-xs sm:text-sm">Description</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="deck-description" className="text-xs sm:text-sm">
+                  Description/Topic
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Examples for description or topic"
+                  >
+                    <HelpCircle className="h-4 w-4" aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    <TeacherTopicFieldHelpContent />
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               {descriptionSpeech.supported && (
                 <Tooltip>
                   <TooltipTrigger render={<span />}>
@@ -270,13 +325,94 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
             </div>
             <Textarea
               id="deck-description"
-              placeholder="Optional description…"
+              placeholder="e.g. Learning Jamaica's independence and national identity"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               disabled={isPending}
               className="text-sm"
             />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="deck-grade-level" className="text-xs sm:text-sm">
+                  Grade Level
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Examples for grade level"
+                  >
+                    <HelpCircle className="h-4 w-4" aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-xs leading-relaxed">
+                    <p className="mb-1 font-semibold">Examples by level:</p>
+                    <ul className="list-disc space-y-0.5 pl-4">
+                      <li>Primary: Grade 1–6</li>
+                      <li>Secondary: Grade 7–11</li>
+                      <li>Tertiary: Year 1, Year 2, 1st Year College, Undergraduate</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                id="deck-grade-level"
+                placeholder="e.g. Grade 6"
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+                disabled={isPending}
+                className="text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="deck-difficulty-level" className="text-xs sm:text-sm">
+                  Difficulty Level
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger
+                    type="button"
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="Examples for difficulty level"
+                  >
+                    <HelpCircle className="h-4 w-4" aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-xs leading-relaxed">
+                    <p className="mb-1 font-semibold">Choose the class readiness level:</p>
+                    <p>
+                      Beginner for foundational support; Intermediate for most classes;
+                      Advanced for accelerated learners; Honors/Gifted for enrichment groups.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select
+                value={difficultyLevel}
+                onValueChange={(value) => {
+                  if (value == null) return;
+                  setDifficultyLevel(value);
+                }}
+              >
+                <SelectTrigger
+                  id="deck-difficulty-level"
+                  className="h-8 w-full bg-background text-sm sm:h-9"
+                >
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LESSON_DIFFICULTY_LEVELS.filter((level) => level !== "All").map(
+                    (option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {showTeamDeckCover && (
@@ -349,6 +485,7 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
 
           {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
         </div>
+        </TooltipProvider>
 
         <DialogFooter className="mt-1 gap-2 sm:mt-2 sm:gap-0">
           <Button

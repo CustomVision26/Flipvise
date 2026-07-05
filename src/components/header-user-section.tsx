@@ -15,6 +15,7 @@ import { WorkspaceContextDropdown } from "@/components/workspace-context-dropdow
 import { InboxNavIconButton } from "@/components/inbox-nav-icon-button";
 import { DocsNavIconButton } from "@/components/docs-nav-icon-button";
 import { HelpCenterNavIconButton } from "@/components/help-center-nav-icon-button";
+import { TeacherNavIconButton } from "@/components/teacher-nav-icon-button";
 import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
 import {
   shouldHidePlatformAdminNav,
@@ -57,12 +58,16 @@ interface HeaderUserSectionProps {
   resolvedIsPro?: boolean;
   /** Server-resolved active team plan from `getAccessContext()`. */
   resolvedActiveTeamPlan?: TeamPlanId | null;
+  /** education_gold / education_enterprise workspace tier from `getAccessContext()`. */
+  resolvedActiveEducationTeamPlan?: import("@/lib/education-plans").EducationTeamPlanId | null;
   /** Server-resolved Pro Plus interface palette (12 colors) vs Pro-only (8), from `getAccessContext()`. */
   resolvedHasProPlusInterfacePalette?: boolean;
   /** Count of open (pending + non-expired) inbox invitations for the nav badge. */
   inboxUnreadCount?: number;
   /** When true, show the Help Center question-mark icon (hidden for team workspace members). */
   showHelpCenter?: boolean;
+  /** When true, show Teacher Dashboard nav link on team-admin routes (education plans only). */
+  showTeacherDashboard?: boolean;
 }
 
 export function HeaderUserSection({
@@ -79,9 +84,11 @@ export function HeaderUserSection({
   teamDashFallback = null,
   resolvedIsPro = false,
   resolvedActiveTeamPlan = null,
+  resolvedActiveEducationTeamPlan = null,
   resolvedHasProPlusInterfacePalette = false,
   inboxUnreadCount = 0,
   showHelpCenter = false,
+  showTeacherDashboard = false,
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
   const { userId } = useAuth();
@@ -173,10 +180,18 @@ export function HeaderUserSection({
 
   const hidePlatformAdminLink = shouldHidePlatformAdminNav(pathname);
 
+  const showTeacherNavButton =
+    showTeacherDashboard &&
+    (pathname === "/dashboard/team-admin" ||
+      pathname.startsWith("/dashboard/team-admin/") ||
+      pathname === "/teacher" ||
+      pathname.startsWith("/teacher/"));
+
   const workspaceDropdownEligible =
     workspaceTeams.length > 0 ||
     workspaceTeamsTotalEligible > 0 ||
     (activeTeamPlan != null && isTeamPlanId(activeTeamPlan)) ||
+    resolvedActiveEducationTeamPlan != null ||
     teamDashFallback != null ||
     isPro;
 
@@ -196,45 +211,56 @@ export function HeaderUserSection({
     >
       <div
         data-header-tools
-        className="col-start-2 row-start-1 flex shrink-0 items-center gap-0.5 justify-self-end sm:gap-1 lg:order-3"
+        className="col-start-2 row-start-1 flex min-w-0 shrink-0 items-center gap-0.5 justify-self-end sm:gap-1 lg:order-3"
       >
-        {(isAdmin && !hidePlatformAdminLink) || showAffiliatePortal ? (
-          <div
-            data-header-promo-links
-            className="mr-0.5 hidden items-center gap-1 sm:mr-1 sm:flex"
-          >
-            {isAdmin && !hidePlatformAdminLink && (
-              <HeaderNavTooltip label="Platform Admin">
-                <Link
-                  href="/admin/all-users"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
-                  )}
-                  aria-label="Platform Admin"
-                >
-                  <Shield className="size-3.5 shrink-0" aria-hidden />
-                  <span className="hidden xl:inline">Platform Admin</span>
-                </Link>
-              </HeaderNavTooltip>
-            )}
-            {showAffiliatePortal && (
-              <HeaderNavTooltip label="Affiliate portal">
-                <Link
-                  href="/dashboard/affiliate"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
-                  )}
-                  aria-label="Affiliate portal"
-                >
-                  <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
-                  <span className="hidden xl:inline">Affiliate</span>
-                </Link>
-              </HeaderNavTooltip>
-            )}
-          </div>
-        ) : null}
+        <div
+          data-header-promo-links
+          className="mr-0.5 flex shrink-0 items-center gap-1 sm:mr-1"
+        >
+          {showTeacherNavButton ? (
+            <span className="inline-flex shrink-0 items-center">
+              <TeacherNavIconButton />
+            </span>
+          ) : null}
+          {(isAdmin && !hidePlatformAdminLink) || showAffiliatePortal ? (
+            <div className="hidden items-center gap-1 sm:flex">
+              {isAdmin && !hidePlatformAdminLink && (
+                <HeaderNavTooltip label="Platform Admin">
+                  <Link
+                    href="/admin/all-users"
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
+                    )}
+                    aria-label="Platform Admin"
+                  >
+                    <Shield className="size-3.5 shrink-0" aria-hidden />
+                    <span className="hidden xl:inline">Platform Admin</span>
+                  </Link>
+                </HeaderNavTooltip>
+              )}
+              {showAffiliatePortal && (
+                <HeaderNavTooltip label="Affiliate portal">
+                  <Link
+                    href="/dashboard/affiliate"
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+                    )}
+                    aria-label="Affiliate portal"
+                  >
+                    <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
+                    <span className="hidden xl:inline">Affiliate</span>
+                  </Link>
+                </HeaderNavTooltip>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <div
+          data-header-icon-tools
+          className="flex shrink-0 items-center gap-0.5 sm:gap-1"
+        >
         {portalsReady ? (
           <>
             <span
@@ -281,6 +307,7 @@ export function HeaderUserSection({
             <InboxNavIconButton unreadCount={inboxUnreadCount} />
           </span>
         ) : null}
+        </div>
       </div>
 
       {portalsReady && showWorkspaceSwitcherUi ? (
@@ -308,9 +335,11 @@ export function HeaderUserSection({
               personalWorkspaceHref={personalWorkspaceHref}
               personalPlanLabel={personalPlanLabelForWorkspace}
               personalHasTeamTierPlan={
-                resolvedActiveTeamPlan != null &&
-                isTeamPlanId(resolvedActiveTeamPlan)
+                (resolvedActiveTeamPlan != null &&
+                  isTeamPlanId(resolvedActiveTeamPlan)) ||
+                resolvedActiveEducationTeamPlan != null
               }
+              teamDashFallback={teamDashFallback}
             />
           </span>
         </div>

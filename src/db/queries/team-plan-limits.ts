@@ -13,15 +13,16 @@ import {
   selectNewestTeamsWithinWorkspaceLimit,
   sortByNewestFirst,
 } from "@/lib/team-plan-limit-selection";
+import { isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
 import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
-import { subscriberHasActiveTeamTierPlan } from "@/lib/subscriber-team-plan-access";
+import { subscriberHasActiveWorkspacePlan } from "@/lib/subscriber-team-plan-access";
 
 export async function getOwnedTeamsWithinSubscriptionLimit(ownerUserId: string) {
-  if (!(await subscriberHasActiveTeamTierPlan(ownerUserId))) {
+  if (!(await subscriberHasActiveWorkspacePlan(ownerUserId))) {
     return [];
   }
   const owned = await getTeamsByOwner(ownerUserId);
-  const planTeam = owned.find((t) => isTeamPlanId(t.planSlug));
+  const planTeam = owned.find((t) => isWorkspaceSubscriptionPlanSlug(t.planSlug));
   if (!planTeam) return owned;
   return selectNewestTeamsWithinWorkspaceLimit(owned, planTeam.planSlug);
 }
@@ -30,8 +31,8 @@ export async function isTeamAccessibleUnderSubscriptionPlan(
   teamId: number,
 ): Promise<boolean> {
   const team = await getTeamById(teamId);
-  if (!team || !isTeamPlanId(team.planSlug)) return false;
-  if (!(await subscriberHasActiveTeamTierPlan(team.ownerUserId))) return false;
+  if (!team || !isWorkspaceSubscriptionPlanSlug(team.planSlug)) return false;
+  if (!(await subscriberHasActiveWorkspacePlan(team.ownerUserId))) return false;
   const owned = await getTeamsByOwner(team.ownerUserId);
   return isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug);
 }
@@ -41,7 +42,7 @@ export async function isTeamMemberAccessibleUnderSubscriptionPlan(
   memberUserId: string,
 ): Promise<boolean> {
   const team = await getTeamById(teamId);
-  if (!team || !isTeamPlanId(team.planSlug)) return false;
+  if (!team || !isWorkspaceSubscriptionPlanSlug(team.planSlug)) return false;
   const members = await listTeamMembers(teamId);
   return isMemberWithinMemberLimit(memberUserId, members, team.planSlug);
 }
@@ -86,7 +87,7 @@ export async function trimPendingInvitationsToPlanLimit(
   teamId: number,
   planSlug: string,
 ): Promise<void> {
-  if (!isTeamPlanId(planSlug)) return;
+  if (!isWorkspaceSubscriptionPlanSlug(planSlug)) return;
 
   const limits = limitsForPlan(planSlug);
   const [members, pendingInvites] = await Promise.all([
@@ -111,7 +112,7 @@ export async function enforceSubscriptionPlanLimitsForOwner(
   ownerUserId: string,
   planSlug: string,
 ): Promise<void> {
-  if (!isTeamPlanId(planSlug)) return;
+  if (!isWorkspaceSubscriptionPlanSlug(planSlug)) return;
 
   const owned = await getTeamsByOwner(ownerUserId);
   const withinLimit = selectNewestTeamsWithinWorkspaceLimit(owned, planSlug);

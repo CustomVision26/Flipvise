@@ -24,9 +24,16 @@ import {
   buildTeamAdminStudyPrivilegesPath,
 } from "@/lib/team-admin-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
+import { hasEducationPlan } from "@/lib/education-plans";
 import { toClientJson } from "@/lib/to-client-json";
-import { TeamAdminQuickNavPanel } from "@/components/team-admin-quick-nav-panel";
-import { TeamAdminPanelScroll } from "@/components/team-admin-panel-scroll";
+import {
+  TeamAdminPanelScroll,
+  TeamAdminQuickNavPanel,
+  TeamAdminWorkspaceStatsPanel,
+  TeamDeckManagerSubTabs,
+  TeamQuizFormatsSettings,
+  TeamStudyPrivilegesTable,
+} from "@/lib/team-admin-dynamic-components";
 import {
   TEAM_ADMIN_PANEL_IDS,
   teamAdminActivePanelClass,
@@ -34,13 +41,9 @@ import {
   teamAdminPanelScrollClass,
 } from "@/components/team-admin-panel-styles";
 import { cn } from "@/lib/utils";
-import { TeamAdminWorkspaceStatsPanel } from "@/components/team-admin-workspace-stats-panel";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
 import { labelForTeamPlanSlug, personalDashboardPlanQueryValue } from "@/lib/team-plans";
-import { TeamDeckManagerSubTabs } from "@/components/team-deck-manager-sub-tabs";
-import { TeamStudyPrivilegesTable } from "@/components/team-study-privileges-table";
-import { TeamQuizFormatsSettings } from "@/components/team-quiz-formats-settings";
 import {
   listQuizFormatsDecksForWorkspace,
   listQuizFormatsWorkspacesForOwner,
@@ -204,8 +207,10 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
           mainDashboardHref={mainDashboardHref}
           workspaceDashboardHref={workspaceDashboardHref}
           workspaceTeamId={selected.id}
+          workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
           isOwner={isOwner}
           workspacePlanSlug={selected.planSlug}
+          showTeacherDashboard={hasEducationPlan(selected.planSlug)}
         />
       </div>
 

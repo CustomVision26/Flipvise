@@ -84,6 +84,8 @@ interface DeckCardPopoverProps {
   workspaceQueryString?: string;
   /** `team-preview`: study + preview only (assigned team members). */
   variant?: "full" | "team-preview";
+  /** Education co-admin — true when this admin created the deck in the workspace. */
+  canEditContent?: boolean;
   /** Main dashboard — team-tier subscribers: preview row shows first-card image + CTA. */
   teamTierPreviewPromo?: boolean;
   /** Listen-to-card in deck preview — Pro Plus / team / platform admin only. */
@@ -95,6 +97,7 @@ export function DeckCardPopover({
   view = "grid",
   workspaceQueryString,
   variant = "full",
+  canEditContent,
   teamTierPreviewPromo = false,
   hasAiReading = false,
 }: DeckCardPopoverProps) {
@@ -504,10 +507,26 @@ export function DeckCardPopover({
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-2">
+                {canEditContent ? (
+                  <Link
+                    href={openDeckHref}
+                    className={cn(
+                      buttonVariants({ variant: "default", size: "sm" }),
+                      "w-full justify-center gap-2 font-medium no-underline",
+                    )}
+                    onClick={() => setTeamWorkspaceDialogOpen(false)}
+                  >
+                    <BookOpen className="size-4 shrink-0" aria-hidden />
+                    Open deck
+                  </Link>
+                ) : null}
                 <Link
                   href={studyHref}
                   className={cn(
-                    buttonVariants({ variant: "default", size: "sm" }),
+                    buttonVariants({
+                      variant: canEditContent ? "outline" : "default",
+                      size: "sm",
+                    }),
                     "w-full justify-center gap-2 font-medium no-underline",
                   )}
                   onClick={() => setTeamWorkspaceDialogOpen(false)}
@@ -516,6 +535,22 @@ export function DeckCardPopover({
                   Study
                 </Link>
                 {previewControlsFor(false)}
+                {canEditContent ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "w-full justify-center gap-2 font-medium text-destructive hover:bg-destructive/10 hover:text-destructive",
+                    )}
+                    onClick={() => {
+                      setTeamWorkspaceDialogOpen(false);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="size-4 shrink-0" aria-hidden />
+                    Delete deck
+                  </button>
+                ) : null}
               </div>
             </div>
             <DialogFooter className="sm:gap-0">

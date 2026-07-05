@@ -113,6 +113,21 @@ export function resolveBillingTabPlanDisplay(input: {
     planSlug = "pro_plus";
   }
 
+  const billingIsActive =
+    input.billingStatus === "active" || input.billingStatus === "trialing";
+
+  /** Prefer the live Stripe subscription row over stale Clerk metadata after plan changes. */
+  if (
+    stripeSlug &&
+    billingIsActive &&
+    !accessFromAffiliateGrant &&
+    !isPlatformAdmin &&
+    !adminGranted &&
+    !accessFromAdminGrant
+  ) {
+    planSlug = stripeSlug;
+  }
+
   const isPaid = planSlug != null && planSlug !== "free";
   const planLabel = isPaid
     ? displayNameForBillingPlanSlug(planSlug)
@@ -149,7 +164,9 @@ export function resolveBillingTabPlanDisplay(input: {
   const stripeIsAuthoritative = planCtx.stripeAuthoritative;
 
   const showPaidStripeControls =
-    stripeIsAuthoritative && !isComplimentary && !accessFromAffiliateGrant;
+    !isComplimentary &&
+    !accessFromAffiliateGrant &&
+    (stripeIsAuthoritative || (billingIsActive && !!stripeSlug));
 
   return {
     planSlug: isPaid ? planSlug : null,

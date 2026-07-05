@@ -101,7 +101,7 @@ export function StripeCheckoutToast() {
         } else {
           toast.success("Payment received", {
             description:
-              "Stripe recorded your payment. If Billing still shows an old plan, run `stripe listen` locally or wait a moment and refresh.",
+              "Your payment was processed successfully. Your subscription may take a moment to appear—refresh this page or open Billing to confirm your new plan.",
             duration: 12_000,
           });
         }
@@ -112,7 +112,7 @@ export function StripeCheckoutToast() {
         console.error("[StripeCheckoutToast] sync:", err);
         toast.warning("Payment received", {
           description:
-            "We could not refresh your plan automatically. Open Billing again or ensure Stripe webhooks are configured.",
+            "Your payment was received, but we could not update your plan automatically. Please open Billing to verify your subscription, or contact support if your plan does not update shortly.",
           duration: 12_000,
         });
       }

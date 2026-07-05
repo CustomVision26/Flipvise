@@ -10,6 +10,7 @@ export type QuizQuestion =
       question: string | null;
       questionImageUrl: string | null;
       options: string[];
+      optionImageUrls: (string | null)[];
       correctIndex: number;
     }
   | {
@@ -39,6 +40,7 @@ export type QuizCardInput = {
   frontImageUrl?: string | null;
   back: string | null;
   choices?: string[] | null;
+  choiceImageUrls?: (string | null)[] | null;
   correctChoiceIndex?: number | null;
   quizVariants?: CardQuizVariants | null;
 };
@@ -124,18 +126,34 @@ function buildMultipleChoiceQuestion(
   allCards: QuizCardInput[],
 ): QuizQuestion | null {
   if (hasStoredChoices(card)) {
-    const correctText = (card.choices as string[])[card.correctChoiceIndex as number];
-    if (!correctText?.trim()) return null;
-    const shuffled = shuffleArray(card.choices as string[]);
+    const choiceList = card.choices as string[];
+    const imageList = card.choiceImageUrls ?? [];
+    const correctIndexStored = card.correctChoiceIndex as number;
+    const correctText = choiceList[correctIndexStored];
+    const correctImage = imageList[correctIndexStored] ?? null;
+    if (!correctText?.trim() && !correctImage) return null;
+
+    const pairs = choiceList.map((text, index) => ({
+      text,
+      imageUrl: imageList[index] ?? null,
+    }));
+    const shuffled = shuffleArray(pairs);
+    const correctNorm = normalizeQuizText(correctText ?? "");
     const correctIndex = shuffled.findIndex(
-      (text) => normalizeQuizText(text) === normalizeQuizText(correctText),
+      (pair) =>
+        (correctText?.trim() &&
+          normalizeQuizText(pair.text) === correctNorm) ||
+        (!correctText?.trim() &&
+          correctImage &&
+          pair.imageUrl === correctImage),
     );
     return {
       type: "multiple_choice",
       cardId: card.id,
       question: card.front,
       questionImageUrl: card.frontImageUrl ?? null,
-      options: shuffled,
+      options: shuffled.map((pair) => pair.text),
+      optionImageUrls: shuffled.map((pair) => pair.imageUrl),
       correctIndex: correctIndex === -1 ? 0 : correctIndex,
     };
   }
@@ -166,6 +184,7 @@ function buildMultipleChoiceQuestion(
     question: card.front,
     questionImageUrl: card.frontImageUrl ?? null,
     options,
+    optionImageUrls: options.map(() => null),
     correctIndex: correctIndex === -1 ? 0 : correctIndex,
   };
 }
@@ -309,15 +328,23 @@ export function gradeQuizAnswer(
   }
 
   const hasChoices = hasStoredChoices(card);
+  const choiceImages = card.choiceImageUrls ?? [];
   const correctText = hasChoices
     ? ((card.choices as string[])[card.correctChoiceIndex as number] ?? "")
     : (card.back ?? "");
+  const correctImage = hasChoices
+    ? (choiceImages[card.correctChoiceIndex as number] ?? null)
+    : null;
   const isAnswered = payload.selectedText !== null;
+  const selected = payload.selectedText ?? "";
   const wasCorrect =
     isAnswered &&
-    Boolean(correctText) &&
-    normalizeQuizText(payload.selectedText as string) === normalizeQuizText(correctText);
-  return { correctText, wasCorrect, isAnswered };
+    ((correctText.trim() &&
+      normalizeQuizText(selected) === normalizeQuizText(correctText)) ||
+      (!correctText.trim() &&
+        correctImage &&
+        selected === correctImage));
+  return { correctText: correctText || correctImage || "", wasCorrect, isAnswered };
 }
 
 export function questionPromptText(q: QuizQuestion): string | null {

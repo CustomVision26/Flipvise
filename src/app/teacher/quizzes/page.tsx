@@ -1,0 +1,44 @@
+import { getSavedLessonPlansForQuizPicker } from "@/db/queries/saved-lesson-plans";
+import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
+import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
+import { TeacherQuizzesForm } from "@/components/teacher-quizzes-form";
+
+type TeacherQuizzesPageProps = {
+  searchParams: Promise<{
+    team?: string;
+    teamMemberId?: string;
+    lessonPlanId?: string;
+  }>;
+};
+
+export default async function TeacherQuizzesPage({
+  searchParams,
+}: TeacherQuizzesPageProps) {
+  const params = await searchParams;
+  const { userId, workspace, backHref } = await loadTeacherPageContext(
+    "/teacher/quizzes",
+    params,
+  );
+
+  const initialLessonPlanId = params.lessonPlanId
+    ? Number.parseInt(params.lessonPlanId, 10)
+    : undefined;
+
+  const [savedLessonPlans, deckContext] = await Promise.all([
+    getSavedLessonPlansForQuizPicker(userId),
+    loadTeacherDeckContext(userId),
+  ]);
+
+  return (
+    <TeacherQuizzesForm
+      savedLessonPlans={savedLessonPlans}
+      decks={deckContext.decks}
+      deckQuota={deckContext.quota}
+      initialLessonPlanId={
+        Number.isFinite(initialLessonPlanId) ? initialLessonPlanId : undefined
+      }
+      backHref={backHref}
+      teacherWorkspace={workspace}
+    />
+  );
+}

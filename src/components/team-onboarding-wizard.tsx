@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTeamAction } from "@/actions/teams";
+import type { EducationTeamPlanId } from "@/lib/education-plans";
 import type { TeamPlanId } from "@/lib/team-plans";
 
+type WorkspaceCreatePlanId = TeamPlanId | EducationTeamPlanId;
+
 interface TeamOnboardingWizardProps {
-  planSlug: TeamPlanId;
+  planSlug: WorkspaceCreatePlanId;
 }
 
 export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {

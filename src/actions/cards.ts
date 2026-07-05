@@ -33,6 +33,7 @@ import {
   type GenerateCardsFromSourceResult,
 } from "@/lib/source-import-types";
 import type { ExtractedSource } from "@/lib/document-extract";
+import { cleanReadingPassageFront, READING_PASSAGE_MC_GENERATION_PROMPT } from "@/lib/source-import-reading-passage";
 
 async function requireDeckEditor(userId: string, deckId: number) {
   const bundle = await getDeckWithViewerAccess(deckId, userId);
@@ -810,19 +811,40 @@ Generate an appropriate answer for the back of this flashcard, matching the styl
   return { answer, distractors };
 }
 
+const nullableImageUrl = z.union([z.string().url(), z.null()]);
+
+const multipleChoiceAnswerRefine = (data: {
+  question: string;
+  questionImageUrl?: string | null;
+  correctAnswer: string;
+  distractors: string[];
+  choiceImageUrls?: [string | null, string | null, string | null, string | null] | null;
+}) => {
+  if (!(data.question.trim().length > 0 || !!data.questionImageUrl)) return false;
+  const correctImage = data.choiceImageUrls?.[0] ?? null;
+  const correctOk = data.correctAnswer.trim().length > 0 || !!correctImage;
+  const distractorsOk = data.distractors.every((text) => text.trim().length > 0);
+  return correctOk && distractorsOk;
+};
+
 const createMultipleChoiceCardSchema = z
   .object({
     deckId: z.number().int().positive(),
     question: z.string(),
-    questionImageUrl: z.string().url().nullable().optional(),
-    correctAnswer: z.string().min(1, "Correct answer is required"),
-    distractors: z
-      .array(z.string().min(1, "All wrong answers are required"))
-      .length(3, "Exactly 3 wrong answers are required"),
+    questionImageUrl: nullableImageUrl.optional(),
+    correctAnswer: z.string(),
+    distractors: z.array(z.string()).length(3, "Exactly 3 wrong answers are required"),
+    choiceImageUrls: z
+      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .optional(),
   })
   .refine((d) => d.question.trim().length > 0 || !!d.questionImageUrl, {
     message: "Question must have text or an image",
     path: ["question"],
+  })
+  .refine(multipleChoiceAnswerRefine, {
+    message: "Correct answer needs text or an image; each wrong answer needs text.",
+    path: ["correctAnswer"],
   });
 
 const updateMultipleChoiceCardSchema = z
@@ -830,16 +852,24 @@ const updateMultipleChoiceCardSchema = z
     cardId: z.number().int().positive(),
     deckId: z.number().int().positive(),
     question: z.string(),
-    questionImageUrl: z.string().url().nullable().optional(),
-    oldQuestionImageUrl: z.string().url().nullable().optional(),
-    correctAnswer: z.string().min(1, "Correct answer is required"),
-    distractors: z
-      .array(z.string().min(1, "All wrong answers are required"))
-      .length(3, "Exactly 3 wrong answers are required"),
+    questionImageUrl: nullableImageUrl.optional(),
+    oldQuestionImageUrl: nullableImageUrl.optional(),
+    correctAnswer: z.string(),
+    distractors: z.array(z.string()).length(3, "Exactly 3 wrong answers are required"),
+    choiceImageUrls: z
+      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .optional(),
+    oldChoiceImageUrls: z
+      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .optional(),
   })
   .refine((d) => d.question.trim().length > 0 || !!d.questionImageUrl, {
     message: "Question must have text or an image",
     path: ["question"],
+  })
+  .refine(multipleChoiceAnswerRefine, {
+    message: "Correct answer needs text or an image; each wrong answer needs text.",
+    path: ["correctAnswer"],
   });
 
 const generateMultipleChoiceSchema = z.object({
@@ -854,6 +884,7 @@ type CreateMultipleChoiceCardInput = {
   questionImageUrl?: string | null;
   correctAnswer: string;
   distractors: string[];
+  choiceImageUrls?: [string | null, string | null, string | null, string | null];
 };
 type UpdateMultipleChoiceCardInput = {
   cardId: number;
@@ -863,6 +894,8 @@ type UpdateMultipleChoiceCardInput = {
   oldQuestionImageUrl?: string | null;
   correctAnswer: string;
   distractors: string[];
+  choiceImageUrls?: [string | null, string | null, string | null, string | null];
+  oldChoiceImageUrls?: [string | null, string | null, string | null, string | null];
 };
 type GenerateMultipleChoiceInput = z.infer<typeof generateMultipleChoiceSchema>;
 
@@ -876,7 +909,8 @@ export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceC
     throw new Error(firstError?.message ?? "Invalid input");
   }
 
-  const { deckId, question, questionImageUrl, correctAnswer, distractors } = parsed.data;
+  const { deckId, question, questionImageUrl, correctAnswer, distractors, choiceImageUrls } =
+    parsed.data;
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
@@ -912,6 +946,8 @@ export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceC
     questionImageUrl ?? null,
     choices,
     0,
+    false,
+    choiceImageUrls ?? null,
   );
 
 }
@@ -934,6 +970,8 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
     oldQuestionImageUrl,
     correctAnswer,
     distractors,
+    choiceImageUrls,
+    oldChoiceImageUrls,
   } = parsed.data;
 
   const deck = await requireDeckEditor(userId, deckId);
@@ -943,6 +981,20 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
       await deleteFromS3(oldQuestionImageUrl);
     } catch {
       // Silently ignore deletion errors — card update should still succeed
+    }
+  }
+
+  if (oldChoiceImageUrls && choiceImageUrls) {
+    for (let i = 0; i < oldChoiceImageUrls.length; i++) {
+      const oldUrl = oldChoiceImageUrls[i];
+      const nextUrl = choiceImageUrls[i] ?? null;
+      if (oldUrl && oldUrl !== nextUrl) {
+        try {
+          await deleteFromS3(oldUrl);
+        } catch {
+          // ignore
+        }
+      }
     }
   }
 
@@ -958,6 +1010,7 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
     questionImageUrl ?? null,
     choices,
     0,
+    choiceImageUrls ?? null,
   );
 
   revalidatePath(`/decks/${deckId}`);
@@ -1201,12 +1254,14 @@ export async function generateCardsFromExtractedSource(
     count: number;
     extracted: ExtractedSource;
     skipRelevanceCheck: boolean;
+    readingPassageMultipleChoice?: boolean;
   },
 ): Promise<GenerateCardsFromSourceResult> {
   const { hasAI, maxCardsPerDeck } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
 
-  const { deckId, count, extracted, skipRelevanceCheck } = input;
+  const { deckId, count, extracted, skipRelevanceCheck, readingPassageMultipleChoice = false } =
+    input;
 
   if (!Number.isInteger(deckId) || deckId <= 0) throw new Error("Invalid deck.");
   if (!Number.isInteger(count) || count < 1 || count > AI_GENERATION_CAP_PER_DECK) {
@@ -1264,6 +1319,7 @@ Is this source material appropriate for generating flashcards in this deck?`,
       }),
     }),
     system: `${FLASHCARD_GENERATION_SYSTEM_PROMPT}
+${readingPassageMultipleChoice ? `\n\n${READING_PASSAGE_MC_GENERATION_PROMPT}` : ""}
 
 You will also receive an excerpt of source material (notes, article, document, etc.). Ground every card in facts from that source while matching the deck's established style and scope. Prefer the most important concepts from the source.`,
     prompt: `${deckContext}
@@ -1271,11 +1327,17 @@ You will also receive an excerpt of source material (notes, article, document, e
 Source material:
 ${extracted.text}
 
-Generate exactly ${count} new flashcards from the source material above. They must be genuinely new (no duplicates of existing cards), match the deck style, and stay within the deck topic. For each card return front, back, and 3 distractors.`,
+Generate exactly ${count} new flashcards from the source material above. They must be genuinely new (no duplicates of existing cards), match the deck style, and stay within the deck topic. For each card return front, back, and 3 distractors.${
+      readingPassageMultipleChoice
+        ? " Use reading passage + multiple choice format on every card (Passage and Question only on front; back = correct answer text; distractors = three wrong answer texts — no A–D labels on front)."
+        : ""
+    }`,
   });
 
   const trimmed = (output?.cards ?? []).slice(0, count).map((c) => ({
-    front: cleanAiText(c.front),
+    front: cleanAiText(
+      readingPassageMultipleChoice ? cleanReadingPassageFront(c.front) : c.front,
+    ),
     back: cleanAiText(c.back),
     distractors: [
       cleanAiText(c.distractors[0]),
@@ -1306,6 +1368,8 @@ export async function generateCardsFromSourceAction(
   const urlRaw = String(formData.get("url") ?? "").trim();
   const file = formData.get("file");
   const skipRelevanceCheck = formData.get("skipRelevanceCheck") === "true";
+  const readingPassageMultipleChoice =
+    formData.get("readingPassageMultipleChoice") === "true";
 
   if (!Number.isInteger(deckId) || deckId <= 0) throw new Error("Invalid deck.");
   if (!Number.isInteger(count) || count < 1 || count > AI_GENERATION_CAP_PER_DECK) {
@@ -1352,6 +1416,7 @@ export async function generateCardsFromSourceAction(
     count,
     extracted,
     skipRelevanceCheck,
+    readingPassageMultipleChoice,
   });
 }
 

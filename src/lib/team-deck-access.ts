@@ -15,5 +15,5 @@ export async function getDeckWithViewerAccess(deckId: number, userId: string) {
 }
 
 export function canEditDeckContent(access: DeckViewerAccess): boolean {
-  return access.kind === "owner" || access.kind === "team_admin";
+  return access.canEditContent;
 }

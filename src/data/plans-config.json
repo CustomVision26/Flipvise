@@ -87,6 +87,37 @@
     }
   },
   {
+    "id": "education_plus",
+    "name": "Education Plus",
+    "monthlyPrice": 60,
+    "yearlyMonthlyPrice": 50,
+    "description": "Everything in Pro Plus, plus AI-powered teacher tools for individual educators.",
+    "features": [
+      "Everything in Pro Plus",
+      "AI Lesson Builder",
+      "Curriculum Planner",
+      "Learning Objectives Generator",
+      "Classroom Activity Generator",
+      "Grade-Level Difficulty Adjustment",
+      "AI Quiz Generator",
+      "Homework Generator",
+      "Study Guide Generator",
+      "Worksheet Generator",
+      "Answer Key Generator",
+      "Flashcards from Lesson Plans",
+      "Weekly Lesson Planner",
+      "Teacher Resource Library"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
+  },
+  {
     "id": "pro_plus_team_basic",
     "name": "Team Basic",
     "monthlyPrice": 60,
@@ -145,6 +176,34 @@
     "discontinueAt": "2026-06-14",
     "promoStartsAt": "2026-06-01T00:00",
     "promoEndsAt": "2026-06-14T23:59"
+  },
+  {
+    "id": "education_gold",
+    "name": "Education Gold",
+    "monthlyPrice": 130,
+    "yearlyMonthlyPrice": 120,
+    "description": "Everything in Team Gold, plus teacher tools and collaboration for teaching teams.",
+    "features": [
+      "Everything in Team Gold",
+      "Everything in Education Plus",
+      "Teacher Collaboration",
+      "Shared Lesson Library",
+      "Department Workspace",
+      "Shared Quizzes",
+      "Shared Flashcards",
+      "Student Progress Dashboard",
+      "Teacher Analytics",
+      "Up to 10 team workspaces",
+      "Up to 25 members per workspace"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
   },
   {
     "id": "pro_plus_platinum_plan",
@@ -207,5 +266,36 @@
     "discontinueAt": "2026-06-14",
     "promoStartsAt": "2026-06-01T00:00",
     "promoEndsAt": "2026-06-14T23:59"
+  },
+  {
+    "id": "education_enterprise",
+    "name": "Education Enterprise",
+    "monthlyPrice": 330,
+    "yearlyMonthlyPrice": 320,
+    "description": "Everything in Enterprise, plus school-wide teacher tools and administration.",
+    "features": [
+      "Everything in Enterprise",
+      "Everything in Education Gold",
+      "School Administration Dashboard",
+      "Multi-campus Support",
+      "Department Management",
+      "Curriculum Management",
+      "School Resource Library",
+      "AI Classroom Assistant",
+      "Learning Analytics",
+      "School Branding",
+      "Advanced User Roles",
+      "Teacher Performance Reports",
+      "Up to 30 team workspaces",
+      "Up to 45 members per workspace"
+    ],
+    "highlighted": false,
+    "discount": {
+      "active": false,
+      "type": "percentage",
+      "value": 0,
+      "label": "",
+      "stripeCouponId": ""
+    }
   }
 ]

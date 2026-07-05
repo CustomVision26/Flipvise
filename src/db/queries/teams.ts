@@ -19,6 +19,7 @@ import {
   withNullCover,
   type DeckRow,
 } from "@/db/queries/decks";
+import { resolveEducationTeamAdminCanEditDeck } from "@/lib/education-team-deck-permissions";
 import {
   canonicalTeamPlanId,
   isTeamPlanId,
@@ -35,8 +36,14 @@ import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
 import {
-  resolveSubscriberActiveTeamPlan,
-  subscriberHasActiveTeamTierPlan,
+  canonicalEducationPlanId,
+  isEducationTeamPlanId,
+  isWorkspaceSubscriptionPlanSlug,
+  labelForEducationPlanSlug,
+} from "@/lib/education-plans";
+import {
+  resolveSubscriberActiveWorkspacePlan,
+  subscriberHasActiveWorkspacePlan,
 } from "@/lib/subscriber-team-plan-access";
 import {
   defaultTeamMemberStudyPrivilege,
@@ -277,19 +284,33 @@ function withDefaultTeamMemberAudit(
     updatedAt: row.createdAt,
     addedByUserId: null,
     addedByAsOwner: null,
+    inactiveAt: null,
   };
 }
 
 export type DeckViewerAccess =
-  | { kind: "owner" }
-  | { kind: "team_admin"; teamId: number }
-  | { kind: "team_member"; teamId: number };
+  | { kind: "owner"; canEditContent: true }
+  | { kind: "team_admin"; teamId: number; canEditContent: boolean }
+  | { kind: "team_member"; teamId: number; canEditContent: false };
+
+async function buildTeamAdminDeckAccess(
+  teamId: number,
+  deck: DeckRow,
+  viewerUserId: string,
+): Promise<DeckViewerAccess> {
+  const team = await getTeamById(teamId);
+  return {
+    kind: "team_admin",
+    teamId,
+    canEditContent: resolveEducationTeamAdminCanEditDeck(deck, team, viewerUserId),
+  };
+}
 
 export async function countTeamsForOwner(ownerUserId: string) {
   const [row] = await db
     .select({ n: count() })
     .from(teams)
-    .where(eq(teams.ownerUserId, ownerUserId));
+    .where(and(eq(teams.ownerUserId, ownerUserId), isNull(teams.inactiveAt)));
   return Number(row?.n ?? 0);
 }
 
@@ -305,6 +326,7 @@ const teamRowSelectWithoutQuizSchedule = {
   quizFormatMultipleChoice: teams.quizFormatMultipleChoice,
   quizFormatTrueFalse: teams.quizFormatTrueFalse,
   quizFormatFillInBlank: teams.quizFormatFillInBlank,
+  inactiveAt: teams.inactiveAt,
   createdAt: teams.createdAt,
 } as const;
 
@@ -315,6 +337,7 @@ function withDefaultTeamQuizSchedule(
     ...row,
     quizStartScheduleEnabled: false,
     quizStartAt: null,
+    inactiveAt: row.inactiveAt ?? null,
   };
 }
 
@@ -344,8 +367,15 @@ async function selectTeamRows(where: SQL): Promise<TeamRow[]> {
   }
 }
 
-export async function getTeamsByOwner(ownerUserId: string) {
-  return selectTeamRows(eq(teams.ownerUserId, ownerUserId));
+export async function getTeamsByOwner(
+  ownerUserId: string,
+  options?: { includeInactive?: boolean },
+) {
+  const base = eq(teams.ownerUserId, ownerUserId);
+  const where = options?.includeInactive
+    ? base
+    : (and(base, isNull(teams.inactiveAt)) ?? base);
+  return selectTeamRows(where);
 }
 
 export async function getTeamById(teamId: number) {
@@ -434,16 +464,23 @@ export async function countPendingInvitationsForTeam(teamId: number) {
   return Number(row?.n ?? 0);
 }
 
-export async function listTeamMembers(teamId: number) {
+export async function listTeamMembers(
+  teamId: number,
+  options?: { includeInactive?: boolean },
+) {
+  const base = eq(teamMembers.teamId, teamId);
+  const where = options?.includeInactive
+    ? base
+    : (and(base, isNull(teamMembers.inactiveAt)) ?? base);
   try {
-    return await db.select().from(teamMembers).where(eq(teamMembers.teamId, teamId));
+    return await db.select().from(teamMembers).where(where);
   } catch (e) {
     if (!isMissingTeamMemberAuditColumnError(e)) throw e;
     warnMissingTeamMemberAuditColumnsOnce();
     const rows = await db
       .select(teamMemberRowSelectLegacy)
       .from(teamMembers)
-      .where(eq(teamMembers.teamId, teamId));
+      .where(where);
     return rows.map(withDefaultTeamMemberAudit);
   }
 }
@@ -652,17 +689,23 @@ export async function getDecksForTeam(
 export async function getDecksForTeamWithCardCount(
   teamId: number,
   ownerUserId: string,
+  options?: { includeInactive?: boolean },
 ) {
-  const build = (where: ReturnType<typeof decksForSubscriberWorkspaceWhere>) =>
-    db
+  const activeOnly = options?.includeInactive ? undefined : isNull(decks.inactiveAt);
+  const build = (baseWhere: ReturnType<typeof decksForSubscriberWorkspaceWhere>) => {
+    const where = activeOnly ? and(baseWhere, activeOnly) : baseWhere;
+    return db
       .select({
         id: decks.id,
         userId: decks.userId,
+        teamId: decks.teamId,
         name: decks.name,
         description: decks.description,
         coverImageUrl: decks.coverImageUrl,
+        createdByUserId: decks.createdByUserId,
         createdAt: decks.createdAt,
         updatedAt: decks.updatedAt,
+        inactiveAt: decks.inactiveAt,
         cardCount: count(cards.id),
       })
       .from(decks)
@@ -671,12 +714,16 @@ export async function getDecksForTeamWithCardCount(
       .groupBy(
         decks.id,
         decks.userId,
+        decks.teamId,
         decks.name,
         decks.description,
         decks.coverImageUrl,
+        decks.createdByUserId,
         decks.createdAt,
         decks.updatedAt,
+        decks.inactiveAt,
       );
+  };
 
   try {
     return await build(decksForSubscriberWorkspaceWhere(teamId, ownerUserId));
@@ -755,6 +802,65 @@ export async function getAssignedDecksForMemberWithCardCount(
     );
 }
 
+export type TeamAdminWorkspaceDeckWithCardCount = {
+  id: number;
+  userId: string;
+  teamId: number | null;
+  name: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  createdByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  cardCount: number;
+  canEditContent: boolean;
+};
+
+/** Education team admins — decks they created in the workspace plus owner-assigned decks (study only). */
+export async function getEducationTeamAdminWorkspaceDecksWithCardCount(
+  teamId: number,
+  ownerUserId: string,
+  teamAdminUserId: string,
+): Promise<TeamAdminWorkspaceDeckWithCardCount[]> {
+  const [workspaceDecks, assignedDecks] = await Promise.all([
+    getDecksForTeamWithCardCount(teamId, ownerUserId),
+    getAssignedDecksForMemberWithCardCount(teamId, teamAdminUserId),
+  ]);
+
+  const byId = new Map<number, TeamAdminWorkspaceDeckWithCardCount>();
+
+  for (const deck of workspaceDecks) {
+    if (deck.createdByUserId !== teamAdminUserId) continue;
+    byId.set(deck.id, {
+      ...deck,
+      teamId: deck.teamId ?? teamId,
+      createdByUserId: deck.createdByUserId ?? null,
+      canEditContent: true,
+    });
+  }
+
+  for (const deck of assignedDecks) {
+    if (byId.has(deck.id)) continue;
+    byId.set(deck.id, {
+      id: deck.id,
+      userId: deck.userId,
+      teamId: deck.teamId,
+      name: deck.name,
+      description: deck.description,
+      coverImageUrl: deck.coverImageUrl,
+      createdByUserId: null,
+      createdAt: deck.createdAt,
+      updatedAt: deck.updatedAt,
+      cardCount: deck.cardCount,
+      canEditContent: false,
+    });
+  }
+
+  return [...byId.values()].sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+  );
+}
+
 export async function isDeckLinkedToWorkspace(
   teamId: number,
   deckId: number,
@@ -770,6 +876,24 @@ export async function isDeckLinkedToWorkspace(
     return row != null;
   } catch (e) {
     if (isMissingDeckWorkspaceLinksTableError(e)) return false;
+    throw e;
+  }
+}
+
+/** Ensures a subscriber-owned deck is linked to a workspace (team dashboard + owner library). */
+export async function linkDeckToTeamWorkspace(
+  teamId: number,
+  deckId: number,
+): Promise<void> {
+  try {
+    await db
+      .insert(deckWorkspaceLinks)
+      .values({ teamId, deckId })
+      .onConflictDoNothing({
+        target: [deckWorkspaceLinks.teamId, deckWorkspaceLinks.deckId],
+      });
+  } catch (e) {
+    if (isMissingDeckWorkspaceLinksTableError(e)) return;
     throw e;
   }
 }
@@ -849,7 +973,7 @@ async function viewerHasActiveTeamMembershipAccess(
   viewerUserId: string,
 ): Promise<boolean> {
   const team = await getTeamById(teamId);
-  if (!team || !isTeamPlanId(team.planSlug)) return false;
+  if (!team || !isWorkspaceSubscriptionPlanSlug(team.planSlug)) return false;
   if (team.ownerUserId === viewerUserId) return false;
   return teamWorkspaceAllowsViewerAccess(teamId, viewerUserId);
 }
@@ -864,8 +988,8 @@ export async function teamWorkspaceAllowsViewerAccess(
   viewerUserId: string,
 ): Promise<boolean> {
   const team = await getTeamById(teamId);
-  if (!team || !isTeamPlanId(team.planSlug)) return false;
-  if (!(await subscriberHasActiveTeamTierPlan(team.ownerUserId))) return false;
+  if (!team || !isWorkspaceSubscriptionPlanSlug(team.planSlug)) return false;
+  if (!(await subscriberHasActiveWorkspacePlan(team.ownerUserId))) return false;
   const owned = await getTeamsByOwner(team.ownerUserId);
   if (!isTeamWithinWorkspaceLimit(teamId, owned, team.planSlug)) return false;
   if (team.ownerUserId === viewerUserId) return true;
@@ -894,7 +1018,7 @@ export async function resolveDeckViewerAccess(
   if (!deck) return null;
 
   if (deck.userId === viewerUserId) {
-    return { kind: "owner" };
+    return { kind: "owner", canEditContent: true };
   }
 
   /** Subscriber-owned decks with `teamId` unset are shared only via assignments. */
@@ -917,7 +1041,7 @@ export async function resolveDeckViewerAccess(
         const memberRecord = await getMemberRecord(memberPick.teamId, viewerUserId);
         if (memberRecord?.role !== "team_member") continue;
         if (await viewerHasActiveTeamMembershipAccess(memberPick.teamId, viewerUserId)) {
-          return { kind: "team_member", teamId: memberPick.teamId };
+          return { kind: "team_member", teamId: memberPick.teamId, canEditContent: false };
         }
       }
 
@@ -949,7 +1073,7 @@ export async function resolveDeckViewerAccess(
 
       for (const row of adminByLinkRows) {
         if (await viewerHasActiveTeamMembershipAccess(row.teamId, viewerUserId)) {
-          return { kind: "team_admin", teamId: row.teamId };
+          return buildTeamAdminDeckAccess(row.teamId, deck, viewerUserId);
         }
       }
 
@@ -975,7 +1099,7 @@ export async function resolveDeckViewerAccess(
 
       for (const adminPick of adminPicks) {
         if (await viewerHasActiveTeamMembershipAccess(adminPick.teamId, viewerUserId)) {
-          return { kind: "team_admin", teamId: adminPick.teamId };
+          return buildTeamAdminDeckAccess(adminPick.teamId, deck, viewerUserId);
         }
       }
 
@@ -986,7 +1110,7 @@ export async function resolveDeckViewerAccess(
       );
       if (workspaceAdminTeamId != null) {
         if (await viewerHasActiveTeamMembershipAccess(workspaceAdminTeamId, viewerUserId)) {
-          return { kind: "team_admin", teamId: workspaceAdminTeamId };
+          return buildTeamAdminDeckAccess(workspaceAdminTeamId, deck, viewerUserId);
         }
       }
 
@@ -1001,7 +1125,7 @@ export async function resolveDeckViewerAccess(
     if (!team) return null;
 
     if (team.ownerUserId === viewerUserId) {
-      return { kind: "owner" };
+      return { kind: "owner", canEditContent: true };
     }
 
     const member = await getMemberRecord(deck.teamId, viewerUserId);
@@ -1011,7 +1135,7 @@ export async function resolveDeckViewerAccess(
       if (!(await viewerHasActiveTeamMembershipAccess(deck.teamId, viewerUserId))) {
         return null;
       }
-      return { kind: "team_admin", teamId: deck.teamId };
+      return buildTeamAdminDeckAccess(deck.teamId, deck, viewerUserId);
     }
 
     const assignedRows = await db
@@ -1032,7 +1156,7 @@ export async function resolveDeckViewerAccess(
       if (!(await viewerHasActiveTeamMembershipAccess(deck.teamId, viewerUserId))) {
         return null;
       }
-      return { kind: "team_member", teamId: deck.teamId };
+      return { kind: "team_member", teamId: deck.teamId, canEditContent: false };
     }
 
     return null;
@@ -1043,13 +1167,13 @@ export async function resolveDeckViewerAccess(
 
 /** Teams the user owns or manages as `team_admin` (for `/dashboard/team-admin`). */
 export async function getTeamsForTeamDashboard(userId: string) {
-  const ownerActiveTeamPlan = await resolveSubscriberActiveTeamPlan(userId);
+  const ownerActiveWorkspacePlan = await resolveSubscriberActiveWorkspacePlan(userId);
   const owned = await getTeamsByOwner(userId);
   const ownedAccessible =
-    ownerActiveTeamPlan != null
+    ownerActiveWorkspacePlan != null
       ? selectNewestTeamsWithinWorkspaceLimit(
-          owned.filter((t) => isTeamPlanId(t.planSlug)),
-          ownerActiveTeamPlan,
+          owned.filter((t) => isWorkspaceSubscriptionPlanSlug(t.planSlug)),
+          ownerActiveWorkspacePlan,
         )
       : [];
 
@@ -1062,8 +1186,8 @@ export async function getTeamsForTeamDashboard(userId: string) {
 
   const extraAccessible: InferSelectModel<typeof teams>[] = [];
   for (const t of extra) {
-    if (!isTeamPlanId(t.planSlug)) continue;
-    if (!(await subscriberHasActiveTeamTierPlan(t.ownerUserId))) continue;
+    if (!isWorkspaceSubscriptionPlanSlug(t.planSlug)) continue;
+    if (!(await subscriberHasActiveWorkspacePlan(t.ownerUserId))) continue;
     const subscriberOwned = await getTeamsByOwner(t.ownerUserId);
     if (!isTeamWithinWorkspaceLimit(t.id, subscriberOwned, t.planSlug)) continue;
     const members = await listTeamMembers(t.id);
@@ -1103,10 +1227,10 @@ export async function getEligibleWorkspaceTeamsForUser(
 
   const map = new Map<number, InferSelectModel<typeof teams>>();
   for (const t of manageTeams) {
-    if (isTeamPlanId(t.planSlug)) map.set(t.id, t);
+    if (isWorkspaceSubscriptionPlanSlug(t.planSlug)) map.set(t.id, t);
   }
   for (const t of memberOnlyTeams) {
-    if (!isTeamPlanId(t.planSlug)) continue;
+    if (!isWorkspaceSubscriptionPlanSlug(t.planSlug)) continue;
     if (shouldOmitMemberOnlyWorkspaceForCoAdmin(t, userId, manageTeams)) continue;
     if (!(await viewerHasActiveTeamMembershipAccess(t.id, userId))) continue;
     map.set(t.id, t);
@@ -1116,7 +1240,11 @@ export async function getEligibleWorkspaceTeamsForUser(
 }
 
 function planLabelForTeam(planSlug: string): string {
-  return labelForTeamPlanSlug(planSlug) ?? planSlug;
+  return (
+    labelForTeamPlanSlug(planSlug) ??
+    labelForEducationPlanSlug(planSlug) ??
+    planSlug
+  );
 }
 
 export type WorkspaceNavTeamsResult = {
@@ -1161,12 +1289,12 @@ export async function getWorkspaceNavTeamsForUser(
   const eligible = await getEligibleWorkspaceTeamsForUser(userId, bootstrap);
   const invitedForSwitcher = eligible.filter((t) => {
     const isSubscriberOwnedTeamTier =
-      t.ownerUserId === userId && isTeamPlanId(t.planSlug);
+      t.ownerUserId === userId && isWorkspaceSubscriptionPlanSlug(t.planSlug);
     return !isSubscriberOwnedTeamTier;
   });
 
   const ownedForSwitcher = manageTeams.filter(
-    (t) => t.ownerUserId === userId && isTeamPlanId(t.planSlug),
+    (t) => t.ownerUserId === userId && isWorkspaceSubscriptionPlanSlug(t.planSlug),
   );
 
   const byId = new Map<number, InferSelectModel<typeof teams>>();
@@ -1181,7 +1309,7 @@ export async function getWorkspaceNavTeamsForUser(
   if (memberTeamIds.length > 0) {
     const memberTeams = await getTeamsByIds(memberTeamIds);
     for (const t of memberTeams) {
-      if (!isTeamPlanId(t.planSlug)) continue;
+      if (!isWorkspaceSubscriptionPlanSlug(t.planSlug)) continue;
       if (byId.has(t.id)) continue;
       if (shouldOmitMemberOnlyWorkspaceForCoAdmin(t, userId, manageTeams)) continue;
       if (!(await viewerHasActiveTeamMembershipAccess(t.id, userId))) continue;
@@ -1219,7 +1347,10 @@ export async function getWorkspaceNavTeamsForUser(
       ownerUserId: t.ownerUserId,
       teamMemberUrlParam,
       planLabel: planLabelForTeam(t.planSlug),
-      planUrlValue: canonicalTeamPlanId(t.planSlug) ?? "pro",
+      planUrlValue:
+        canonicalTeamPlanId(t.planSlug) ??
+        canonicalEducationPlanId(t.planSlug) ??
+        t.planSlug,
       ownerDisplayName: ownerDisplayNameById.get(t.ownerUserId) ?? "Subscriber",
       canAccessTeamAdmin,
       isSubscriberOwned: t.ownerUserId === userId,
@@ -1266,7 +1397,9 @@ export async function getRootLayoutTeamNavPayload(
       id: t.id,
       name: t.name,
       ownerUserId: t.ownerUserId,
-      workspacePlanQuery: isTeamPlanId(t.planSlug) ? t.planSlug : undefined,
+      workspacePlanQuery: isWorkspaceSubscriptionPlanSlug(t.planSlug)
+        ? t.planSlug
+        : undefined,
       teamMemberUrlParam:
         t.ownerUserId === userId ? 0 : (membershipByTeamId.get(t.id)?.id ?? 0),
     }),
@@ -1277,7 +1410,7 @@ export async function getRootLayoutTeamNavPayload(
 
 export async function userHasTeamAdminDashboardAccess(userId: string): Promise<boolean> {
   const manageTeams = await getTeamsForTeamDashboard(userId);
-  return manageTeams.some((t) => isTeamPlanId(t.planSlug));
+  return manageTeams.some((t) => isWorkspaceSubscriptionPlanSlug(t.planSlug));
 }
 
 export async function getInvitationByToken(token: string) {
@@ -1329,7 +1462,7 @@ export async function updateOwnedTeamsPlanSlug(
     .set({ planSlug: resolvedPlanSlug })
     .where(eq(teams.ownerUserId, ownerUserId));
 
-  if (isTeamPlanId(resolvedPlanSlug)) {
+  if (isWorkspaceSubscriptionPlanSlug(resolvedPlanSlug)) {
     const { enforceSubscriptionPlanLimitsForOwner } = await import(
       "@/db/queries/team-plan-limits"
     );

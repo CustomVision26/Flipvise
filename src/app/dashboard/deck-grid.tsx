@@ -39,6 +39,8 @@ type DeckData = {
   /** First card in preview order (latest `updatedAt`) — front image for team-tier preview promo. */
   firstPreviewCardFrontImageUrl?: string | null;
   gradient?: string | null;
+  /** Education team admins — false for owner-assigned decks (study/preview only). */
+  canEditContent?: boolean;
 };
 
 type SortOption =
@@ -60,6 +62,15 @@ const SORT_OPTIONS: DropdownSortOption<SortOption>[] = [
   { value: "cards-desc", label: "Most cards" },
   { value: "cards-asc", label: "Fewest cards" },
 ];
+
+function resolveDeckPopoverVariant(
+  deck: DeckData,
+  defaultVariant: "full" | "team-preview",
+): "full" | "team-preview" {
+  if (deck.canEditContent === true) return "full";
+  if (deck.canEditContent === false) return "team-preview";
+  return defaultVariant;
+}
 
 function sortDecks(decks: DeckData[], sort: SortOption): DeckData[] {
   const sorted = [...decks];
@@ -218,7 +229,8 @@ export function DeckGrid({
             deck={deck}
             view={view}
             workspaceQueryString={workspaceQueryString}
-            variant={deckPopoverVariant}
+            variant={resolveDeckPopoverVariant(deck, deckPopoverVariant)}
+            canEditContent={deck.canEditContent}
             teamTierPreviewPromo={teamTierPreviewPromo}
             hasAiReading={hasAiReading}
           />

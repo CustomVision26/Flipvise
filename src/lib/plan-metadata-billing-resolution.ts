@@ -5,6 +5,7 @@ import {
   resolveActiveTeamPlanFromHas,
   type TeamPlanId,
 } from "@/lib/team-plans";
+import { isEducationPlanId, isEducationTeamPlanId } from "@/lib/education-plans";
 
 /** ISO timestamp written whenever an admin applies a plan from `/admin`. */
 export const PLAN_SOURCE_UPDATED_AT_KEY = "planSourceUpdatedAt";
@@ -275,6 +276,7 @@ function paidPersonalFromHas(has: HasFn): {
 function slugImpliesPersonalProOrTeam(slug: string | undefined): boolean {
   if (!slug) return false;
   if (slug === "pro" || slug === "pro_plus") return true;
+  if (isEducationPlanId(slug)) return true;
   return isTeamPlanId(slug);
 }
 
@@ -333,7 +335,10 @@ function resolutionFromSlug(
   if (canonicalTeam) {
     return { activeTeamPlan: canonicalTeam, personalPro: true };
   }
-  if (slug === "pro" || slug === "pro_plus") {
+  if (isEducationTeamPlanId(slug)) {
+    return { activeTeamPlan: null, personalPro: true };
+  }
+  if (slug === "pro" || slug === "pro_plus" || slug === "education_plus") {
     return { activeTeamPlan: null, personalPro: true };
   }
   return { activeTeamPlan: null, personalPro: false };
