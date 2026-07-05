@@ -21,7 +21,7 @@ const PricingTable = dynamic(
 
 /** Above app shell (header z-10) and typical Radix overlays (z-50). */
 const pricingAppearance = {
-  baseTheme: dark,
+  theme: dark,
   elements: {
     modalBackdrop: { zIndex: 100 },
     modalContent: { zIndex: 101 },

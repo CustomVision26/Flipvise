@@ -17,8 +17,8 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { useClientMounted } from "@/lib/use-client-mounted";
 
 const clerkAppearance = {
-  baseTheme: dark,
-  layout: {
+  theme: dark,
+  options: {
     logoImageUrl: resolveLogoImageUrl(),
     logoLinkUrl: "/",
     logoPlacement: "inside" as const,
