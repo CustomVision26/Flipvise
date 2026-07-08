@@ -29,3 +29,16 @@ export const studyGuideResultSchema = z.object({
 });
 
 export type StudyGuideAiResult = z.infer<typeof studyGuideResultSchema>;
+
+/** Relaxed limits for teacher-edited study guides before save. */
+export const savedStudyGuideResultSchema = z.object({
+  summary: z.string().min(1),
+  keyVocabulary: z.array(z.string().min(1)).min(1).max(20),
+  importantPoints: z.array(z.string().min(1)).min(1).max(15),
+  workedExamples: z.array(z.string().min(1)).min(1).max(10),
+  sampleProblems: z.array(z.string().min(1)).min(1).max(10),
+  practiceQuestions: z.array(z.string().min(1)).min(1).max(12),
+  studyTips: z.array(z.string().min(1)).min(1).max(10),
+});
+
+export type SavedStudyGuideResult = z.infer<typeof savedStudyGuideResultSchema>;

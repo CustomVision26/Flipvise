@@ -1,16 +1,29 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
-import { resolveSavedHomeworkForViewer } from "@/db/queries/saved-homework";
-import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
+import { resolveSavedHomeworkForViewer, mapSavedHomeworkRowToPickerItem } from "@/db/queries/saved-homework";
+import {
+  resolveSavedLessonPlanForViewer,
+  mapSavedLessonPlanRowToPickerItem,
+} from "@/db/queries/saved-lesson-plans";
+import { saveStudyGuide } from "@/db/queries/saved-study-guides";
+import { homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
 import { formatMultipleLessonPlanReferencesForPrompt } from "@/lib/lesson-plan-reference-material";
 import { buildLessonPlanQuizContext } from "@/lib/lesson-plan-quiz-context";
 import { buildHomeworkStudyGuideContext } from "@/lib/study-guide-source-context";
 import {
+  generateStudyGuidePdfBuffer,
+  studyGuidePdfSafeFileName,
+} from "@/lib/study-guide-pdf-build";
+import { uploadStudyGuidePdfBufferToS3 } from "@/lib/s3";
+import {
   studyGuideResultSchema,
+  savedStudyGuideResultSchema,
   teacherStudyGuideInputSchema,
   type TeacherStudyGuideActionInput,
 } from "@/lib/teacher-study-guide-ai-schema";
@@ -92,9 +105,10 @@ async function resolveStudyGuideSourceContext(
   let lessonPlanContext: string | null = null;
   let homeworkContext: string | null = null;
   let homeworkTitle: string | null = null;
+  let savedPlan = null;
 
   if (input.savedLessonPlanId != null) {
-    const savedPlan = await resolveSavedLessonPlanForViewer(
+    savedPlan = await resolveSavedLessonPlanForViewer(
       userId,
       input.savedLessonPlanId,
       input.teamId,
@@ -117,11 +131,23 @@ async function resolveStudyGuideSourceContext(
     if (!savedHomework) {
       throw new Error("Saved homework assignment not found.");
     }
-    if (
-      input.savedLessonPlanId != null &&
-      savedHomework.savedLessonPlanId !== input.savedLessonPlanId
-    ) {
-      throw new Error("Selected homework does not match the selected lesson plan.");
+    if (input.savedLessonPlanId != null) {
+      if (!savedPlan) {
+        savedPlan = await resolveSavedLessonPlanForViewer(
+          userId,
+          input.savedLessonPlanId,
+          input.teamId,
+        );
+      }
+      if (
+        !savedPlan ||
+        !homeworkMatchesSavedLessonPlan(
+          mapSavedHomeworkRowToPickerItem(savedHomework),
+          mapSavedLessonPlanRowToPickerItem(savedPlan),
+        )
+      ) {
+        throw new Error("Selected homework does not match the selected lesson plan.");
+      }
     }
     homeworkContext = buildHomeworkStudyGuideContext(savedHomework);
     homeworkTitle = savedHomework.label;
@@ -194,4 +220,139 @@ Requirements:
       homeworkTitle: sourceContext.homeworkTitle ?? undefined,
     });
   }
+}
+
+const saveStudyGuideSchema = z.object({
+  label: z.string().min(1).max(255),
+  input: teacherStudyGuideInputSchema,
+  result: savedStudyGuideResultSchema,
+});
+
+export async function saveStudyGuideAction(data: {
+  label: string;
+  input: TeacherStudyGuideActionInput;
+  result: StudyGuideResult;
+}): Promise<{
+  id: number;
+  label: string;
+  pdfUrl: string | null;
+  sourceLessonPlanTitle: string | null;
+  sourceHomeworkLabel: string | null;
+}> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Study Guide Generator requires an education plan.",
+  );
+
+  const parsed = saveStudyGuideSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid study guide data");
+  }
+
+  const payload = parsed.data;
+  let sourceLessonPlanTitle: string | null = null;
+  let sourceHomeworkLabel: string | null = null;
+  let savedPlan = null;
+
+  if (payload.input.savedLessonPlanId != null) {
+    savedPlan = await resolveSavedLessonPlanForViewer(
+      userId,
+      payload.input.savedLessonPlanId,
+      payload.input.teamId,
+    );
+    if (!savedPlan) {
+      throw new Error("Saved lesson plan not found.");
+    }
+    sourceLessonPlanTitle = savedPlan.lessonTitle;
+  }
+
+  if (payload.input.savedHomeworkId != null) {
+    const savedHomework = await resolveSavedHomeworkForViewer(
+      userId,
+      payload.input.savedHomeworkId,
+      payload.input.teamId,
+    );
+    if (!savedHomework) {
+      throw new Error("Saved homework assignment not found.");
+    }
+    if (payload.input.savedLessonPlanId != null) {
+      const planForHomework =
+        savedPlan ??
+        (await resolveSavedLessonPlanForViewer(
+          userId,
+          payload.input.savedLessonPlanId,
+          payload.input.teamId,
+        ));
+      if (
+        !planForHomework ||
+        !homeworkMatchesSavedLessonPlan(
+          mapSavedHomeworkRowToPickerItem(savedHomework),
+          mapSavedLessonPlanRowToPickerItem(planForHomework),
+        )
+      ) {
+        throw new Error("Selected homework does not match the selected lesson plan.");
+      }
+    }
+    sourceHomeworkLabel = savedHomework.label;
+  }
+
+  const guideTitle = `${payload.input.topic} Study Guide`;
+  let pdfUrl: string | null = null;
+  let pdfFileName: string | null = null;
+
+  try {
+    const pdfBuffer = await generateStudyGuidePdfBuffer(payload.result, {
+      subject: payload.input.subject,
+      gradeLevel: payload.input.gradeLevel,
+      topic: payload.input.topic,
+    });
+    pdfFileName = `${studyGuidePdfSafeFileName(payload.input.topic)}_study_guide.pdf`;
+    pdfUrl = await uploadStudyGuidePdfBufferToS3({
+      userId,
+      fileName: pdfFileName,
+      buffer: pdfBuffer,
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[saveStudyGuideAction] PDF upload skipped or failed; saving study guide without PDF.",
+        error,
+      );
+    }
+  }
+
+  const saved = await saveStudyGuide({
+    userId,
+    label: payload.label.trim(),
+    guideTitle,
+    subject: payload.input.subject,
+    gradeLevel: payload.input.gradeLevel,
+    topic: payload.input.topic,
+    savedLessonPlanId: payload.input.savedLessonPlanId ?? null,
+    sourceLessonPlanTitle,
+    savedHomeworkId: payload.input.savedHomeworkId ?? null,
+    sourceHomeworkLabel,
+    input: {
+      subject: payload.input.subject,
+      gradeLevel: payload.input.gradeLevel,
+      topic: payload.input.topic,
+      savedLessonPlanId: payload.input.savedLessonPlanId,
+      savedHomeworkId: payload.input.savedHomeworkId,
+    },
+    result: payload.result,
+    pdfUrl,
+    pdfFileName,
+  });
+
+  revalidatePath("/teacher/resources");
+  revalidatePath("/teacher/study-guides");
+
+  return {
+    id: saved.id,
+    label: saved.label,
+    pdfUrl: saved.pdfUrl,
+    sourceLessonPlanTitle,
+    sourceHomeworkLabel,
+  };
 }

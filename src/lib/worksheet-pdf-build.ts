@@ -252,3 +252,12 @@ export async function downloadWorksheetPdf(
   const suffix = mode === "worksheet" ? "worksheet" : "answer_key";
   doc.save(`${worksheetPdfSafeFileName(worksheet.worksheetTitle, suffix)}.pdf`);
 }
+
+export async function generateWorksheetPdfBuffer(
+  worksheet: DeckWorksheetResult,
+  mode: WorksheetPdfMode,
+): Promise<Buffer> {
+  const doc = await buildWorksheetPdfDocument(worksheet, mode);
+  const arrayBuffer = doc.output("arraybuffer") as ArrayBuffer;
+  return Buffer.from(arrayBuffer);
+}

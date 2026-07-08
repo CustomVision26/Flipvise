@@ -2,8 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, RefreshCw, Search } from "lucide-react";
+import { Download, ExternalLink, Loader2, Pencil, RefreshCw, Save, Search, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,9 +43,16 @@ import type {
 } from "@/db/queries/teacher-owner-pickers";
 import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
-import { generateStudyGuideAction } from "@/actions/teacher-study-guide";
+import { generateStudyGuideAction, saveStudyGuideAction } from "@/actions/teacher-study-guide";
 import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
+import { downloadStudyGuidePdf } from "@/lib/study-guide-pdf";
+import { filterHomeworkForLessonPlan, homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
 import type { StudyGuideResult } from "@/lib/teacher-generators";
+import {
+  StudyGuidePreviewEditor,
+  cloneStudyGuideResult,
+} from "@/components/study-guide-preview-editor";
+import { savedStudyGuideResultSchema } from "@/lib/teacher-study-guide-ai-schema";
 
 const SAVED_PLAN_NONE = "__none__";
 const HOMEWORK_NONE = "__none__";
@@ -89,6 +105,13 @@ export function TeacherStudyGuidesForm({
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenerationSeed, setRegenerationSeed] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [savedStudyGuideId, setSavedStudyGuideId] = useState<number | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveLabel, setSaveLabel] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<StudyGuideResult | null>(null);
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
   const [homeworkSearchQuery, setHomeworkSearchQuery] = useState("");
 
@@ -106,19 +129,39 @@ export function TeacherStudyGuidesForm({
     savedHomework,
   );
 
+  const allLessonPlans = useMemo(() => {
+    if (!isWorkspaceOwner) {
+      return savedLessonPlans;
+    }
+    const merged = Object.values(ownerLessonPlanPicker.lessonPlansByAdminUserId).flat();
+    const byId = new Map(merged.map((plan) => [plan.id, plan]));
+    for (const plan of savedLessonPlans) {
+      byId.set(plan.id, plan);
+    }
+    return [...byId.values()];
+  }, [
+    isWorkspaceOwner,
+    savedLessonPlans,
+    ownerLessonPlanPicker.lessonPlansByAdminUserId,
+  ]);
+
+  const homeworkPool = useMemo(() => {
+    if (!isWorkspaceOwner) {
+      return activeHomework;
+    }
+    const merged = Object.values(ownerHomeworkPicker.itemsByAdminUserId).flat();
+    const byId = new Map(merged.map((item) => [item.id, item]));
+    return [...byId.values()];
+  }, [isWorkspaceOwner, activeHomework, ownerHomeworkPicker.itemsByAdminUserId]);
+
   const selectedPlan =
     form.savedLessonPlanId != null
-      ? activeLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
+      ? allLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
       : null;
 
   const homeworkForPlan = useMemo(
-    () =>
-      form.savedLessonPlanId != null
-        ? activeHomework.filter(
-            (item) => item.savedLessonPlanId === form.savedLessonPlanId,
-          )
-        : [],
-    [form.savedLessonPlanId, activeHomework],
+    () => filterHomeworkForLessonPlan(homeworkPool, selectedPlan, form.savedLessonPlanId),
+    [homeworkPool, selectedPlan, form.savedLessonPlanId],
   );
 
   const filteredHomeworkForPlan = useMemo(() => {
@@ -153,6 +196,19 @@ export function TeacherStudyGuidesForm({
         teacherWorkspace.teamMemberId,
       )
     : "/teacher/homework";
+
+  const homeworkHrefForSelectedPlan =
+    form.savedLessonPlanId != null
+      ? `${homeworkHref}?lessonPlanId=${form.savedLessonPlanId}&sourceType=lesson_plan`
+      : homeworkHref;
+
+  const resourcesHref = teacherWorkspace
+    ? buildTeacherSubPath(
+        "/resources",
+        teacherWorkspace.teamId,
+        teacherWorkspace.teamMemberId,
+      )
+    : "/teacher/resources";
 
   function handleAdminChange(adminUserId: string) {
     setSelectedAdminUserId(adminUserId);
@@ -217,33 +273,39 @@ export function TeacherStudyGuidesForm({
 
   useEffect(() => {
     if (initialHomeworkId) {
-      const homework = activeHomework.find((item) => item.id === initialHomeworkId);
+      const homework =
+        homeworkPool.find((item) => item.id === initialHomeworkId) ??
+        activeHomework.find((item) => item.id === initialHomeworkId);
       if (homework) {
-        if (homework.savedLessonPlanId != null) {
-          const plan = activeLessonPlans.find((item) => item.id === homework.savedLessonPlanId);
-          if (plan) {
-            const defaults = lessonPlanInputToQuizDefaults(plan.input);
-            if (isWorkspaceOwner) {
-              const adminWithPlan = ownerLessonPlanPicker.teamAdmins.find((admin) =>
-                (ownerLessonPlanPicker.lessonPlansByAdminUserId[admin.userId] ?? []).some(
-                  (item) => item.id === plan.id,
-                ),
-              );
-              if (adminWithPlan) {
-                setSelectedAdminUserId(adminWithPlan.userId);
-              }
+        const linkedPlanId = homework.savedLessonPlanId ?? homework.inputSavedLessonPlanId;
+        const plan =
+          linkedPlanId != null
+            ? allLessonPlans.find((item) => item.id === linkedPlanId) ?? null
+            : allLessonPlans.find((item) =>
+                homeworkMatchesSavedLessonPlan(homework, item),
+              ) ?? null;
+        if (plan) {
+          const defaults = lessonPlanInputToQuizDefaults(plan.input);
+          if (isWorkspaceOwner) {
+            const adminWithPlan = ownerLessonPlanPicker.teamAdmins.find((admin) =>
+              (ownerLessonPlanPicker.lessonPlansByAdminUserId[admin.userId] ?? []).some(
+                (item) => item.id === plan.id,
+              ),
+            );
+            if (adminWithPlan) {
+              setSelectedAdminUserId(adminWithPlan.userId);
             }
-            setSelectedPlanKey(String(plan.id));
-            setSelectedHomeworkKey(String(homework.id));
-            setForm({
-              savedLessonPlanId: plan.id,
-              savedHomeworkId: homework.id,
-              subject: defaults.subject,
-              gradeLevel: defaults.gradeLevel,
-              topic: defaults.topic,
-            });
-            return;
           }
+          setSelectedPlanKey(String(plan.id));
+          setSelectedHomeworkKey(String(homework.id));
+          setForm({
+            savedLessonPlanId: plan.id,
+            savedHomeworkId: homework.id,
+            subject: defaults.subject,
+            gradeLevel: defaults.gradeLevel,
+            topic: defaults.topic,
+          });
+          return;
         }
       }
     }
@@ -267,6 +329,8 @@ export function TeacherStudyGuidesForm({
     initialHomeworkId,
     initialLessonPlanId,
     activeHomework,
+    homeworkPool,
+    allLessonPlans,
     activeLessonPlans,
     isWorkspaceOwner,
     ownerLessonPlanPicker,
@@ -306,6 +370,9 @@ export function TeacherStudyGuidesForm({
 
       setResult(studyGuide);
       setShowResult(true);
+      setSavedStudyGuideId(null);
+      setIsEditing(false);
+      setEditDraft(null);
     } catch (error) {
       const message =
         error instanceof Error
@@ -325,6 +392,105 @@ export function TeacherStudyGuidesForm({
     void runGeneration(true);
   }
 
+  function openSaveDialog() {
+    if (!result) return;
+    setSaveLabel(`${form.topic.trim() || "Topic"} Study Guide`);
+    setSaveDialogOpen(true);
+  }
+
+  function startEditing() {
+    if (!result) return;
+    setEditDraft(cloneStudyGuideResult(result));
+    setIsEditing(true);
+  }
+
+  function cancelEditing() {
+    setIsEditing(false);
+    setEditDraft(null);
+  }
+
+  function finishEditing() {
+    if (!editDraft) return;
+    const parsed = savedStudyGuideResultSchema.safeParse(editDraft);
+    if (!parsed.success) {
+      toast.error("Each section needs at least one item and a non-empty summary.");
+      return;
+    }
+    setResult(parsed.data);
+    setSavedStudyGuideId(null);
+    setIsEditing(false);
+    setEditDraft(null);
+    toast.success("Study guide updated", {
+      description: "Your edits are ready to save or download.",
+    });
+  }
+
+  async function handleSaveStudyGuide() {
+    if (!result || !saveLabel.trim()) return;
+    setIsSaving(true);
+    try {
+      const saved = await saveStudyGuideAction({
+        label: saveLabel.trim(),
+        input: {
+          subject: form.subject,
+          gradeLevel: form.gradeLevel,
+          topic: form.topic,
+          savedLessonPlanId: form.savedLessonPlanId,
+          savedHomeworkId: form.savedHomeworkId,
+          teamId: teacherWorkspace?.teamId ?? undefined,
+        },
+        result,
+      });
+      setSavedStudyGuideId(saved.id);
+      setSaveDialogOpen(false);
+      toast.success("Study guide saved", {
+        description: (
+          <span>
+            {saved.label} was saved
+            {saved.pdfUrl ? " with PDF" : ""}.
+            {saved.sourceLessonPlanTitle ? (
+              <>
+                {" "}
+                Linked to lesson plan: <strong>{saved.sourceLessonPlanTitle}</strong>.
+              </>
+            ) : null}
+            {saved.sourceHomeworkLabel ? (
+              <>
+                {" "}
+                Linked to homework: <strong>{saved.sourceHomeworkLabel}</strong>.
+              </>
+            ) : null}{" "}
+            View it in the{" "}
+            <Link href={resourcesHref} className="underline underline-offset-2">
+              Resource Library
+            </Link>
+            .
+          </span>
+        ),
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save study guide.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!result) return;
+    setIsDownloading(true);
+    try {
+      await downloadStudyGuidePdf(result, {
+        subject: form.subject,
+        gradeLevel: form.gradeLevel,
+        topic: form.topic,
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
   const selectedPlanLabel = selectedPlan
     ? `${selectedPlan.lessonTitle} (${selectedPlan.subject} · ${selectedPlan.gradeLevel})`
     : null;
@@ -332,6 +498,7 @@ export function TeacherStudyGuidesForm({
   const selectedHomeworkLabel = selectedHomework?.label ?? null;
 
   return (
+    <>
     <TeacherToolPageShell
       title="Study Guide Generator"
       description="Build study guides with summaries, vocabulary, and practice questions."
@@ -345,76 +512,88 @@ export function TeacherStudyGuidesForm({
       errorMessage={errorMessage ?? referenceError}
       previewActions={
         result ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={isGenerating}
-            onClick={handleRegenerate}
-          >
-            {isGenerating ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
+          <>
+            {isEditing ? (
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={cancelEditing}>
+                  <X className="size-4" aria-hidden />
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={finishEditing}>
+                  Done editing
+                </Button>
+              </>
             ) : (
-              <RefreshCw className="size-4" aria-hidden />
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isGenerating || isSaving}
+                  onClick={startEditing}
+                >
+                  <Pencil className="size-4" aria-hidden />
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isSaving || savedStudyGuideId !== null}
+                  onClick={openSaveDialog}
+                >
+                  {isSaving ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Save className="size-4" aria-hidden />
+                  )}
+                  {savedStudyGuideId !== null ? "Saved" : "Save"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isDownloading}
+                  onClick={() => void handleDownloadPdf()}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="size-4" aria-hidden />
+                  )}
+                  Download PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={isGenerating}
+                  onClick={handleRegenerate}
+                >
+                  {isGenerating ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <RefreshCw className="size-4" aria-hidden />
+                  )}
+                  Regenerate AI
+                </Button>
+              </>
             )}
-            Regenerate AI
-          </Button>
+          </>
         ) : null
       }
       result={
         result ? (
-          <div className="space-y-4 text-foreground">
-            <p>{result.summary}</p>
-            <div>
-              <p className="font-medium text-foreground">Key Vocabulary</p>
-              <ul className="list-disc pl-5">
-                {(result.keyVocabulary ?? []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Important Points</p>
-              <ul className="list-disc pl-5">
-                {(result.importantPoints ?? []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Worked Examples</p>
-              <ul className="list-disc pl-5">
-                {(result.workedExamples ?? []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Sample Problems</p>
-              <ul className="list-disc pl-5">
-                {(result.sampleProblems ?? []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Practice Questions</p>
-              <ul className="list-disc pl-5">
-                {(result.practiceQuestions ?? []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Study Tips</p>
-              <ul className="list-disc pl-5">
-                {(result.studyTips ?? []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <StudyGuidePreviewEditor
+            result={result}
+            isEditing={isEditing}
+            editDraft={editDraft}
+            onEditDraftChange={setEditDraft}
+          />
         ) : null
       }
     >
@@ -572,7 +751,7 @@ export function TeacherStudyGuidesForm({
               ) : (
                 <p className="text-xs text-muted-foreground">
                   No saved homework for this lesson plan. Generate homework in the{" "}
-                  <Link href={homeworkHref} className="underline underline-offset-2">
+                  <Link href={homeworkHrefForSelectedPlan} className="underline underline-offset-2">
                     Homework Generator
                   </Link>{" "}
                   using this lesson plan as the source.
@@ -624,5 +803,66 @@ export function TeacherStudyGuidesForm({
         </div>
       </TooltipProvider>
     </TeacherToolPageShell>
+
+    <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Save study guide</DialogTitle>
+          <DialogDescription>
+            Choose a label so you can find this study guide later in your Resource
+            Library. A PDF copy is stored when upload is available.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <TeacherFieldLabel
+            htmlFor="studyGuideSaveLabel"
+            label="Label"
+            help='Use a name your future self will recognize, e.g. "PEP 2026 Jamaica geography guide".'
+          />
+          <Input
+            id="studyGuideSaveLabel"
+            value={saveLabel}
+            onChange={(event) => setSaveLabel(event.target.value)}
+            placeholder="e.g. Grade 6 — Geography of Jamaica study guide"
+            maxLength={255}
+          />
+          {selectedPlan ? (
+            <p className="text-xs text-muted-foreground">
+              From lesson plan: <span className="text-foreground">{selectedPlan.lessonTitle}</span>
+            </p>
+          ) : null}
+          {selectedHomework ? (
+            <p className="text-xs text-muted-foreground">
+              From homework: <span className="text-foreground">{selectedHomework.label}</span>
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setSaveDialogOpen(false)}
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={isSaving || !saveLabel.trim()}
+            onClick={() => void handleSaveStudyGuide()}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                Saving…
+              </>
+            ) : (
+              "Save study guide"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

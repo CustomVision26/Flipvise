@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -12,16 +13,39 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
-import type { TeacherRegisteredStudentRow } from "@/db/schema";
+import type { TeacherClassWithDeck } from "@/db/queries/teacher-classes";
+import type { TeacherRegisteredStudentWithClass } from "@/db/queries/teacher-registered-students";
+import {
+  teacherClassDisplayTitle,
+  teacherClassSubjectLabel,
+} from "@/lib/teacher-class-links";
 import { cn } from "@/lib/utils";
 
+const CLASS_NONE = "__none__";
+
 type TeacherRegisterStudentPanelProps = {
-  students: TeacherRegisteredStudentRow[];
+  students: TeacherRegisteredStudentWithClass[];
+  classes: TeacherClassWithDeck[];
 };
+
+function formatAssignedClass(student: TeacherRegisteredStudentWithClass): string {
+  if (student.classId == null || !student.classPeriod || !student.classDeckName) {
+    return "—";
+  }
+  return `${student.classPeriod} — ${student.classDeckName}`;
+}
 
 export function TeacherRegisterStudentPanel({
   students: initialStudents,
+  classes,
 }: TeacherRegisterStudentPanelProps) {
   const router = useRouter();
   const [students, setStudents] = useState(initialStudents);
@@ -31,6 +55,18 @@ export function TeacherRegisterStudentPanel({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
+  const [classId, setClassId] = useState(CLASS_NONE);
+
+  const classOptions = useMemo(
+    () =>
+      classes.map((cls) => ({
+        id: String(cls.id),
+        label: teacherClassDisplayTitle(cls),
+        subject: teacherClassSubjectLabel(cls),
+        term: `${cls.termSemester} · ${cls.academicYear}`,
+      })),
+    [classes],
+  );
 
   useEffect(() => {
     setStudents(initialStudents);
@@ -38,12 +74,24 @@ export function TeacherRegisterStudentPanel({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+
+    if (classes.length > 0 && classId === CLASS_NONE) {
+      toast.error("Select a class for this student.");
+      return;
+    }
+
     setIsPending(true);
     try {
-      const saved = await registerTeacherStudentAction({ fullName, email, telephone });
+      const saved = await registerTeacherStudentAction({
+        fullName,
+        email,
+        telephone,
+        ...(classId !== CLASS_NONE ? { classId: Number(classId) } : {}),
+      });
       setFullName("");
       setEmail("");
       setTelephone("");
+      setClassId(CLASS_NONE);
       setShowForm(false);
       toast.success("Student registered", {
         description: `${saved.fullName} was added to your roster.`,
@@ -82,7 +130,7 @@ export function TeacherRegisterStudentPanel({
             <CardTitle className="text-base">Registering a student</CardTitle>
             <CardDescription>
               Education Plus teachers maintain a personal student roster with contact
-              details for classroom follow-up.
+              details and a single class assignment per student.
             </CardDescription>
           </div>
           <Button
@@ -133,6 +181,37 @@ export function TeacherRegisterStudentPanel({
                 placeholder="e.g. (876) 555-0123"
               />
             </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="register-student-class">Class</Label>
+              {classes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Create a class first on the{" "}
+                  <Link href="/teacher/classes" className="text-primary underline-offset-4 hover:underline">
+                    Classes
+                  </Link>{" "}
+                  page, then assign each student to one class here.
+                </p>
+              ) : (
+                <Select
+                  value={classId}
+                  onValueChange={(value) => setClassId(value ?? CLASS_NONE)}
+                >
+                  <SelectTrigger id="register-student-class" className="w-full">
+                    <SelectValue placeholder="Select a class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label} · {option.subject} · {option.term}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Each student can be assigned to only one class.
+              </p>
+            </div>
             <div className="flex gap-2 sm:col-span-2">
               <Button type="submit" disabled={isPending} className="gap-2">
                 {isPending ? (
@@ -157,16 +236,17 @@ export function TeacherRegisterStudentPanel({
         {students.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
             No registered students yet. Click <strong>Register student</strong> to add
-            full name, email, and telephone.
+            full name, email, telephone, and class.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border/70">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b border-border/70 bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Full name</th>
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Telephone</th>
+                  <th className="px-4 py-3 font-medium">Class</th>
                   <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
@@ -177,6 +257,9 @@ export function TeacherRegisterStudentPanel({
                     <td className="px-4 py-3 text-muted-foreground">{student.email}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {student.telephone ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatAssignedClass(student)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button

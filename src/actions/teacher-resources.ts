@@ -13,6 +13,10 @@ import {
   getSavedLessonPlanById,
 } from "@/db/queries/saved-lesson-plans";
 import {
+  deleteSavedWorksheetById,
+  getSavedWorksheetById,
+} from "@/db/queries/saved-worksheets";
+import {
   deleteTeacherClassById,
   getTeacherClassById,
 } from "@/db/queries/teacher-classes";
@@ -20,7 +24,7 @@ import { getTeamById } from "@/db/queries/teams";
 import { deleteFromS3 } from "@/lib/s3";
 
 const deleteTeacherResourceSchema = z.object({
-  resourceType: z.enum(["lessonPlans", "homework"]),
+  resourceType: z.enum(["lessonPlans", "homework", "worksheets"]),
   resourceId: z.number().int().positive(),
   teamId: z.number().int().positive().nullable(),
 });
@@ -74,7 +78,7 @@ export async function deleteTeacherResourceAction(
     }
 
     await deleteSavedLessonPlanById(parsed.data.resourceId);
-  } else {
+  } else if (parsed.data.resourceType === "homework") {
     const row = await getSavedHomeworkAssignmentById(parsed.data.resourceId);
     if (!row) throw new Error("Homework not found");
 
@@ -89,6 +93,29 @@ export async function deleteTeacherResourceAction(
     }
 
     await deleteSavedHomeworkAssignmentById(parsed.data.resourceId);
+  } else {
+    const row = await getSavedWorksheetById(parsed.data.resourceId);
+    if (!row) throw new Error("Worksheet not found");
+
+    await assertCanManageSavedResource(userId, row.userId, parsed.data.teamId);
+
+    if (row.worksheetPdfUrl) {
+      try {
+        await deleteFromS3(row.worksheetPdfUrl);
+      } catch {
+        // proceed with DB delete even if object removal fails
+      }
+    }
+
+    if (row.answerKeyPdfUrl) {
+      try {
+        await deleteFromS3(row.answerKeyPdfUrl);
+      } catch {
+        // proceed with DB delete even if object removal fails
+      }
+    }
+
+    await deleteSavedWorksheetById(parsed.data.resourceId);
   }
 
   revalidatePath("/teacher/resources");

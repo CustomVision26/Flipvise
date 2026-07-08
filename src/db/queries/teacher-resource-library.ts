@@ -2,6 +2,8 @@ import "server-only";
 
 import { getSavedHomeworkAssignmentsByUserIds } from "@/db/queries/saved-homework";
 import { getSavedLessonPlansByUserIds } from "@/db/queries/saved-lesson-plans";
+import { getSavedStudyGuidesByUserIds } from "@/db/queries/saved-study-guides";
+import { getSavedWorksheetsByUserIds } from "@/db/queries/saved-worksheets";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import type { WorkspaceMemberMeta } from "@/lib/teacher-workspace-member-grouping";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
@@ -17,8 +19,10 @@ export type TeacherResourceLibraryItem = {
   creatorEmail: string | null;
   savedAt: string;
   pdfUrl: string | null;
+  answerKeyPdfUrl: string | null;
   lessonPlanId: number | null;
   homeworkId: number | null;
+  worksheetId: number | null;
   quizHref: string | null;
   sourceLabel: string | null;
   isPlaceholder: boolean;
@@ -51,6 +55,22 @@ const PLACEHOLDER_RESOURCES = {
   ],
 } as const;
 
+function formatStudyGuideSourceLabel(guide: {
+  sourceLessonPlanTitle: string | null;
+  sourceHomeworkLabel: string | null;
+}): string | null {
+  if (guide.sourceLessonPlanTitle && guide.sourceHomeworkLabel) {
+    return `From lesson plan: ${guide.sourceLessonPlanTitle} · Homework: ${guide.sourceHomeworkLabel}`;
+  }
+  if (guide.sourceLessonPlanTitle) {
+    return `From lesson plan: ${guide.sourceLessonPlanTitle}`;
+  }
+  if (guide.sourceHomeworkLabel) {
+    return `From homework: ${guide.sourceHomeworkLabel}`;
+  }
+  return null;
+}
+
 function formatHomeworkSourceLabel(homework: {
   sourceType: string;
   sourceLessonPlanTitle: string | null;
@@ -66,6 +86,12 @@ function formatHomeworkSourceLabel(homework: {
     return "From custom topic";
   }
   return null;
+}
+
+function formatWorksheetSourceLabel(worksheet: {
+  sourceDeckName: string;
+}): string {
+  return `From deck: ${worksheet.sourceDeckName}`;
 }
 
 function placeholderItems(
@@ -85,8 +111,10 @@ function placeholderItems(
     creatorEmail,
     savedAt: new Date(0).toISOString(),
     pdfUrl: null,
+    answerKeyPdfUrl: null,
     lessonPlanId: null,
     homeworkId: null,
+    worksheetId: null,
     quizHref: null,
     sourceLabel: null,
     isPlaceholder: true,
@@ -128,9 +156,11 @@ export async function loadTeacherResourceLibrary(
     };
   }
 
-  const [lessonPlans, homeworkAssignments] = await Promise.all([
+  const [lessonPlans, homeworkAssignments, studyGuides, worksheets] = await Promise.all([
     getSavedLessonPlansByUserIds(workspaceUserIds),
     getSavedHomeworkAssignmentsByUserIds(workspaceUserIds),
+    getSavedStudyGuidesByUserIds(workspaceUserIds),
+    getSavedWorksheetsByUserIds(workspaceUserIds),
   ]);
 
   const lessonPlanItems: TeacherResourceLibraryItem[] = lessonPlans.map((plan) => {
@@ -146,8 +176,10 @@ export async function loadTeacherResourceLibrary(
       creatorEmail: creatorDisplay?.primaryEmail ?? null,
       savedAt: plan.createdAt.toISOString(),
       pdfUrl: plan.pdfUrl,
+      answerKeyPdfUrl: null,
       lessonPlanId: plan.id,
       homeworkId: null,
+      worksheetId: null,
       quizHref: null,
       sourceLabel: null,
       isPlaceholder: false,
@@ -167,10 +199,58 @@ export async function loadTeacherResourceLibrary(
       creatorEmail: creatorDisplay?.primaryEmail ?? null,
       savedAt: homework.createdAt.toISOString(),
       pdfUrl: homework.pdfUrl,
+      answerKeyPdfUrl: null,
       lessonPlanId: homework.savedLessonPlanId,
       homeworkId: homework.id,
+      worksheetId: null,
       quizHref: null,
       sourceLabel: formatHomeworkSourceLabel(homework),
+      isPlaceholder: false,
+    };
+  });
+
+  const studyGuideItems: TeacherResourceLibraryItem[] = studyGuides.map((guide) => {
+    const creatorDisplay = userDisplayById[guide.userId];
+    return {
+      key: `study-guide:${guide.id}`,
+      title: guide.label,
+      subject: guide.subject,
+      gradeLevel: guide.gradeLevel,
+      difficultyLevel: null,
+      creatorUserId: guide.userId,
+      creatorName: creatorDisplay?.primaryLine ?? null,
+      creatorEmail: creatorDisplay?.primaryEmail ?? null,
+      savedAt: guide.createdAt.toISOString(),
+      pdfUrl: guide.pdfUrl,
+      answerKeyPdfUrl: null,
+      lessonPlanId: guide.savedLessonPlanId,
+      homeworkId: guide.savedHomeworkId,
+      worksheetId: null,
+      quizHref: null,
+      sourceLabel: formatStudyGuideSourceLabel(guide),
+      isPlaceholder: false,
+    };
+  });
+
+  const worksheetItems: TeacherResourceLibraryItem[] = worksheets.map((worksheet) => {
+    const creatorDisplay = userDisplayById[worksheet.userId];
+    return {
+      key: `worksheet:${worksheet.id}`,
+      title: worksheet.label,
+      subject: worksheet.subject,
+      gradeLevel: worksheet.gradeLevel,
+      difficultyLevel: worksheet.difficultyLevel,
+      creatorUserId: worksheet.userId,
+      creatorName: creatorDisplay?.primaryLine ?? null,
+      creatorEmail: creatorDisplay?.primaryEmail ?? null,
+      savedAt: worksheet.createdAt.toISOString(),
+      pdfUrl: worksheet.worksheetPdfUrl,
+      answerKeyPdfUrl: worksheet.answerKeyPdfUrl,
+      lessonPlanId: null,
+      homeworkId: null,
+      worksheetId: worksheet.id,
+      quizHref: null,
+      sourceLabel: formatWorksheetSourceLabel(worksheet),
       isPlaceholder: false,
     };
   });
@@ -214,24 +294,16 @@ export async function loadTeacherResourceLibrary(
     {
       id: "worksheets",
       title: "Saved Worksheets",
-      emptyMessage: "No saved worksheets yet.",
-      items: placeholderItems(
-        "worksheets",
-        placeholderCreatorId,
-        placeholderCreatorName,
-        placeholderCreatorEmail,
-      ),
+      emptyMessage:
+        "No saved worksheets yet. Generate one in the Worksheet Generator and click Save.",
+      items: worksheetItems,
     },
     {
       id: "studyGuides",
       title: "Saved Study Guides",
-      emptyMessage: "No saved study guides yet.",
-      items: placeholderItems(
-        "studyGuides",
-        placeholderCreatorId,
-        placeholderCreatorName,
-        placeholderCreatorEmail,
-      ),
+      emptyMessage:
+        "No saved study guides yet. Generate one in the Study Guide Generator and click Save.",
+      items: studyGuideItems,
     },
   ];
 

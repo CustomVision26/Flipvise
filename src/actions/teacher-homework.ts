@@ -8,8 +8,9 @@ import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 import { getDeckRowById } from "@/db/queries/decks";
-import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
-import { saveHomeworkAssignment } from "@/db/queries/saved-homework";
+import { resolveSavedLessonPlanForViewer, getSavedLessonPlansByUser, mapSavedLessonPlanRowToPickerItem } from "@/db/queries/saved-lesson-plans";
+import { saveHomeworkAssignment, type SavedHomeworkPickerItem } from "@/db/queries/saved-homework";
+import { homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
 import { buildDeckHomeworkContext } from "@/lib/homework-source-context";
 import { buildLessonPlanQuizContext } from "@/lib/lesson-plan-quiz-context";
@@ -213,19 +214,45 @@ export async function saveHomeworkAction(data: {
   }
 
   const payload = parsed.data;
+  let resolvedLessonPlanId =
+    payload.savedLessonPlanId ?? payload.input.savedLessonPlanId ?? null;
   let sourceLessonPlanTitle: string | null = null;
   let sourceDeckName: string | null = null;
 
-  if (payload.sourceType === "lesson_plan" && payload.savedLessonPlanId != null) {
+  if (resolvedLessonPlanId != null) {
     const savedPlan = await resolveSavedLessonPlanForViewer(
       userId,
-      payload.savedLessonPlanId,
+      resolvedLessonPlanId,
       payload.input.teamId,
     );
     if (!savedPlan) {
       throw new Error("Saved lesson plan not found.");
     }
     sourceLessonPlanTitle = savedPlan.lessonTitle;
+  } else if (payload.sourceType === "deck") {
+    const homeworkCandidate: SavedHomeworkPickerItem = {
+      id: -1,
+      label: payload.label,
+      assignmentTitle: payload.result.assignmentTitle,
+      savedLessonPlanId: null,
+      sourceLessonPlanTitle: null,
+      sourceType: payload.sourceType,
+      inputSavedLessonPlanId: payload.input.savedLessonPlanId ?? null,
+      deckId: payload.deckId ?? null,
+      sourceDeckName: null,
+      inputDeckId: payload.input.deckId ?? null,
+      subject: payload.input.subject,
+      gradeLevel: payload.input.gradeLevel,
+      topic: payload.input.topic,
+    };
+    const plans = await getSavedLessonPlansByUser(userId);
+    const matchedPlan = plans
+      .map(mapSavedLessonPlanRowToPickerItem)
+      .find((plan) => homeworkMatchesSavedLessonPlan(homeworkCandidate, plan));
+    if (matchedPlan) {
+      resolvedLessonPlanId = matchedPlan.id;
+      sourceLessonPlanTitle = matchedPlan.lessonTitle;
+    }
   }
 
   if (payload.sourceType === "deck" && payload.deckId != null) {
@@ -269,7 +296,7 @@ export async function saveHomeworkAction(data: {
     topic: payload.input.topic,
     difficultyLevel: payload.input.difficultyLevel,
     sourceType: payload.sourceType,
-    savedLessonPlanId: payload.savedLessonPlanId ?? null,
+    savedLessonPlanId: resolvedLessonPlanId,
     sourceLessonPlanTitle,
     deckId: payload.deckId ?? null,
     sourceDeckName,
@@ -290,6 +317,7 @@ export async function saveHomeworkAction(data: {
 
   revalidatePath("/teacher/resources");
   revalidatePath("/teacher/homework");
+  revalidatePath("/teacher/study-guides");
 
   return {
     id: saved.id,

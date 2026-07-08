@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
-import { generateWorksheetFromDeckAction } from "@/actions/teacher-worksheet";
+import Link from "next/link";
+import { Download, Loader2, Pencil, Save, X } from "lucide-react";
+import { toast } from "sonner";
+import { generateWorksheetFromDeckAction, saveWorksheetAction } from "@/actions/teacher-worksheet";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,11 +33,15 @@ import {
 } from "@/components/owner-team-admin-resource-picker";
 import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
 import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
-import type { TeacherWorkspaceContext } from "@/lib/teacher-url";
+import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import type { DeckRow } from "@/db/queries/decks";
 import type { DeckWorksheetResult } from "@/lib/teacher-worksheet-schema";
 import { downloadWorksheetPdf } from "@/lib/worksheet-pdf-build";
+import {
+  WorksheetPreviewEditor,
+  cloneWorksheetResult,
+} from "@/components/worksheet-preview-editor";
 
 const DECK_NONE = "__none__";
 
@@ -85,6 +99,12 @@ export function TeacherWorksheetsForm({
   const [isDownloadingWorksheet, setIsDownloadingWorksheet] = useState(false);
   const [isDownloadingAnswerKey, setIsDownloadingAnswerKey] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<DeckWorksheetResult | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedWorksheetId, setSavedWorksheetId] = useState<number | null>(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveLabel, setSaveLabel] = useState("");
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
 
   const isWorkspaceOwner = ownerDeckPicker.isWorkspaceOwner;
@@ -97,6 +117,14 @@ export function TeacherWorksheetsForm({
 
   const selectedDeck =
     deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+
+  const resourcesHref = teacherWorkspace
+    ? buildTeacherSubPath(
+        "/resources",
+        teacherWorkspace.teamId,
+        teacherWorkspace.teamMemberId,
+      )
+    : "/teacher/resources";
 
   function handleAdminChange(adminUserId: string) {
     setSelectedAdminUserId(adminUserId);
@@ -168,6 +196,9 @@ export function TeacherWorksheetsForm({
 
       setResult(worksheet);
       setShowResult(true);
+      setSavedWorksheetId(null);
+      setIsEditing(false);
+      setEditDraft(null);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -199,7 +230,88 @@ export function TeacherWorksheetsForm({
     }
   }
 
+  function startEditing() {
+    if (!result) return;
+    setEditDraft(cloneWorksheetResult(result));
+    setIsEditing(true);
+  }
+
+  function cancelEditing() {
+    setIsEditing(false);
+    setEditDraft(null);
+  }
+
+  function finishEditing() {
+    if (!editDraft) return;
+    if (!editDraft.instructions.trim()) {
+      toast.error("Instructions cannot be empty.");
+      return;
+    }
+    if (editDraft.items.some((item) => !item.prompt.trim() || !item.answer.trim())) {
+      toast.error("Every question needs both a prompt and an answer.");
+      return;
+    }
+    setResult(editDraft);
+    setSavedWorksheetId(null);
+    setIsEditing(false);
+    setEditDraft(null);
+    toast.success("Worksheet updated", {
+      description: "Your edits are ready to save or download.",
+    });
+  }
+
+  function openSaveDialog() {
+    if (!result) return;
+    setSaveLabel(result.worksheetTitle);
+    setSaveDialogOpen(true);
+  }
+
+  async function handleSaveWorksheet() {
+    if (!result || !saveLabel.trim() || deckId == null) return;
+    setIsSaving(true);
+    try {
+      const saved = await saveWorksheetAction({
+        label: saveLabel.trim(),
+        input: {
+          deckId,
+          subject: form.subject,
+          gradeLevel: form.gradeLevel,
+          topic: form.topic,
+          worksheetType: form.worksheetType,
+          difficultyLevel: form.difficultyLevel,
+        },
+        result,
+      });
+      setSavedWorksheetId(saved.id);
+      setSaveDialogOpen(false);
+      toast.success("Worksheet saved", {
+        description: (
+          <span>
+            {saved.label} was saved
+            {saved.worksheetPdfUrl && saved.answerKeyPdfUrl
+              ? " with worksheet and answer key PDFs"
+              : saved.worksheetPdfUrl || saved.answerKeyPdfUrl
+                ? " with PDF"
+                : ""}
+            . From deck: <strong>{saved.sourceDeckName}</strong>. View it in the{" "}
+            <Link href={resourcesHref} className="underline underline-offset-2">
+              Resource Library
+            </Link>
+            .
+          </span>
+        ),
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save worksheet.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
+    <>
     <TeacherToolPageShell
       title="Worksheet Generator"
       description="Create worksheets with student sections and teacher answer keys from your flashcard decks."
@@ -215,68 +327,83 @@ export function TeacherWorksheetsForm({
       previewActions={
         result ? (
           <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isDownloadingWorksheet}
-              onClick={handleDownloadWorksheet}
-            >
-              {isDownloadingWorksheet ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Download className="size-4" aria-hidden />
-              )}
-              Worksheet PDF
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isDownloadingAnswerKey}
-              onClick={handleDownloadAnswerKey}
-            >
-              {isDownloadingAnswerKey ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <Download className="size-4" aria-hidden />
-              )}
-              Answer Key PDF
-            </Button>
+            {isEditing ? (
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={cancelEditing}>
+                  <X className="size-4" aria-hidden />
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={finishEditing}>
+                  Done editing
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isGenerating || isSaving}
+                  onClick={startEditing}
+                >
+                  <Pencil className="size-4" aria-hidden />
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isSaving || savedWorksheetId !== null}
+                  onClick={openSaveDialog}
+                >
+                  {isSaving ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Save className="size-4" aria-hidden />
+                  )}
+                  {savedWorksheetId !== null ? "Saved" : "Save"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isDownloadingWorksheet}
+                  onClick={handleDownloadWorksheet}
+                >
+                  {isDownloadingWorksheet ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="size-4" aria-hidden />
+                  )}
+                  Worksheet PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isDownloadingAnswerKey}
+                  onClick={handleDownloadAnswerKey}
+                >
+                  {isDownloadingAnswerKey ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <Download className="size-4" aria-hidden />
+                  )}
+                  Answer Key PDF
+                </Button>
+              </>
+            )}
           </>
         ) : null
       }
       result={
         result ? (
-          <div className="space-y-4 whitespace-pre-wrap text-foreground">
-            <p className="text-sm text-muted-foreground">{result.instructions}</p>
-            <div>
-              <p className="font-medium text-foreground">Questions ({result.items.length})</p>
-              <ol className="list-decimal space-y-2 pl-5">
-                {result.items.map((item) => (
-                  <li key={item.questionNumber}>
-                    <span>{item.prompt}</span>
-                    {item.frontImageUrl ? (
-                      <p className="text-xs text-muted-foreground">Includes card front image</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">Answer key preview</p>
-              <ol className="list-decimal space-y-2 pl-5">
-                {result.items.map((item) => (
-                  <li key={item.questionNumber}>
-                    <span>{item.answer}</span>
-                    {item.backImageUrl || item.answerImageUrl ? (
-                      <p className="text-xs text-muted-foreground">Includes card back image</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
+          <WorksheetPreviewEditor
+            result={result}
+            isEditing={isEditing}
+            editDraft={editDraft}
+            onEditDraftChange={setEditDraft}
+          />
         ) : null
       }
     >
@@ -390,5 +517,61 @@ export function TeacherWorksheetsForm({
         </div>
       </TooltipProvider>
     </TeacherToolPageShell>
+
+    <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Save worksheet</DialogTitle>
+          <DialogDescription>
+            Choose a label so you can find this worksheet later in your Resource
+            Library. Both the student worksheet and answer key PDFs are saved.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <TeacherFieldLabel
+            htmlFor="worksheetSaveLabel"
+            label="Label"
+            help="Use a name your future self will recognize, e.g. “Week 3 Jamaica geography worksheet”."
+          />
+          <Input
+            id="worksheetSaveLabel"
+            value={saveLabel}
+            onChange={(event) => setSaveLabel(event.target.value)}
+            placeholder="e.g. Geography of Jamaica practice worksheet"
+            maxLength={255}
+          />
+          {selectedDeck ? (
+            <p className="text-xs text-muted-foreground">
+              From deck: <span className="text-foreground">{selectedDeck.name}</span>
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setSaveDialogOpen(false)}
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSaveWorksheet}
+            disabled={isSaving || !saveLabel.trim()}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                Saving…
+              </>
+            ) : (
+              "Save with PDFs"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

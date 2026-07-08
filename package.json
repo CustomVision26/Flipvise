@@ -25,6 +25,8 @@
     "db:ensure-quiz-security-tables": "tsx scripts/ensure-quiz-security-tables.ts",
     "db:ensure-teacher-classes-table": "tsx scripts/ensure-teacher-classes-table.ts",
     "db:ensure-saved-lesson-plans-deck-columns": "tsx scripts/ensure-saved-lesson-plans-deck-columns.ts",
+    "db:ensure-saved-study-guides-table": "tsx scripts/ensure-saved-study-guides-table.ts",
+    "db:ensure-saved-worksheets-table": "tsx scripts/ensure-saved-worksheets-table.ts",
     "db:ensure-teacher-student-tracking-tables": "tsx scripts/ensure-teacher-student-tracking-tables.ts",
     "db:ensure-quiz-schedule-columns": "tsx scripts/ensure-quiz-schedule-columns.ts",
     "db:ensure-quiz-question-formats": "tsx scripts/ensure-quiz-question-formats.ts",

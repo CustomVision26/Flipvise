@@ -3,6 +3,7 @@ import { getTeamById } from "@/db/queries/teams";
 import { listTeacherStudentProgressForWorkspace } from "@/db/queries/teacher-student-progress";
 import { listTeacherRegisteredStudentsForUser } from "@/db/queries/teacher-registered-students";
 import { listTeacherManualGradesForWorkspace } from "@/db/queries/teacher-manual-grades";
+import { listTeacherClassesForUser } from "@/db/queries/teacher-classes";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { TeacherStudentProgressView } from "@/components/teacher-student-progress-view";
@@ -34,7 +35,8 @@ export default async function TeacherStudentsPage({
     workspacePlanSlug != null && isEducationTeamPlanId(workspacePlanSlug);
   const showGradesAndReportsTabs = isEducationPlus || showQuizResultsTab;
 
-  const [progress, team, registeredStudents, manualGrades] = await Promise.all([
+  const [progress, team, registeredStudents, manualGrades, personalClasses] =
+    await Promise.all([
     listTeacherStudentProgressForWorkspace(userId, workspace.teamId),
     workspace.teamId != null ? getTeamById(workspace.teamId) : Promise.resolve(null),
     showRegisterStudentTab
@@ -42,6 +44,9 @@ export default async function TeacherStudentsPage({
       : Promise.resolve([]),
     showGradesAndReportsTabs
       ? listTeacherManualGradesForWorkspace(userId, workspace.teamId)
+      : Promise.resolve([]),
+    showRegisterStudentTab
+      ? listTeacherClassesForUser(userId, null)
       : Promise.resolve([]),
   ]);
 
@@ -67,6 +72,7 @@ export default async function TeacherStudentsPage({
       showQuizResultsTab={showQuizResultsTab}
       showGradesAndReportsTabs={showGradesAndReportsTabs}
       registeredStudents={registeredStudents}
+      personalClasses={personalClasses}
       manualGrades={manualGrades}
     />
   );

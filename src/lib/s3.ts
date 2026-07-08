@@ -260,3 +260,62 @@ export async function uploadHomeworkPdfBufferToS3(options: {
 
   return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
+
+export async function uploadStudyGuidePdfBufferToS3(options: {
+  userId: string;
+  fileName: string;
+  buffer: Buffer;
+}): Promise<string> {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const key = `study-guides/${options.userId}/${timestamp}-${randomString}-${options.fileName}`;
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: options.buffer,
+      ContentType: "application/pdf",
+      CacheControl: "public, max-age=31536000, immutable",
+    },
+  });
+
+  await upload.done();
+
+  if (CDN_URL) {
+    return `${CDN_URL}/${key}`;
+  }
+
+  return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
+
+export async function uploadWorksheetPdfBufferToS3(options: {
+  userId: string;
+  fileName: string;
+  buffer: Buffer;
+  variant: "worksheet" | "answer_key";
+}): Promise<string> {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const key = `worksheets/${options.userId}/${options.variant}/${timestamp}-${randomString}-${options.fileName}`;
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: options.buffer,
+      ContentType: "application/pdf",
+      CacheControl: "public, max-age=31536000, immutable",
+    },
+  });
+
+  await upload.done();
+
+  if (CDN_URL) {
+    return `${CDN_URL}/${key}`;
+  }
+
+  return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}

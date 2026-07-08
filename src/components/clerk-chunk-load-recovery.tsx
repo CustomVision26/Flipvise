@@ -24,6 +24,36 @@ function isClerkChunkLoadFailure(error: unknown): boolean {
   );
 }
 
+function isClerkSessionNetworkError(error: unknown): boolean {
+  const parts: string[] = [];
+
+  function collect(value: unknown, depth = 0) {
+    if (depth > 6 || value == null) return;
+    if (value instanceof Error) {
+      parts.push(value.name, value.message);
+      collect(value.cause, depth + 1);
+      return;
+    }
+    if (typeof value === "object" && "message" in value) {
+      const message = (value as { message?: unknown }).message;
+      if (typeof message === "string") parts.push(message);
+      if ("cause" in value) collect((value as { cause?: unknown }).cause, depth + 1);
+      return;
+    }
+    if (typeof value === "string") parts.push(value);
+  }
+
+  collect(error);
+  const flat = parts.join(" ");
+  return (
+    flat.includes("clerk.accounts.dev") &&
+    (flat.includes("ClerkJS: Network error") ||
+      flat.includes("Failed to fetch") ||
+      flat.includes("/sessions/") ||
+      flat.includes("/touch"))
+  );
+}
+
 /**
  * Clerk loads UI sub-chunks from *.clerk.accounts.dev. Slow networks, ad blockers,
  * or CDN hiccups can throw ChunkLoadError. One automatic hard reload usually fixes it.
@@ -47,6 +77,13 @@ export function ClerkChunkLoadRecovery() {
     }
 
     function onRejection(event: PromiseRejectionEvent) {
+      if (isClerkSessionNetworkError(event.reason)) {
+        event.preventDefault();
+        console.warn(
+          "[clerk] Session touch failed (network). Sign-in state may be stale until connectivity returns.",
+        );
+        return;
+      }
       recover(event.reason);
     }
 

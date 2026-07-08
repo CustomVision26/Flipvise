@@ -31,8 +31,9 @@ import type {
 } from "@/db/queries/teacher-student-progress";
 import type {
   TeacherManualGradeRow,
-  TeacherRegisteredStudentRow,
 } from "@/db/schema";
+import type { TeacherClassWithDeck } from "@/db/queries/teacher-classes";
+import type { TeacherRegisteredStudentWithClass } from "@/db/queries/teacher-registered-students";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import {
   AlertDialog,
@@ -512,7 +513,8 @@ type TeacherStudentProgressViewProps = {
   showRegisterStudentTab: boolean;
   showQuizResultsTab: boolean;
   showGradesAndReportsTabs: boolean;
-  registeredStudents: TeacherRegisteredStudentRow[];
+  registeredStudents: TeacherRegisteredStudentWithClass[];
+  personalClasses: TeacherClassWithDeck[];
   manualGrades: TeacherManualGradeRow[];
 };
 
@@ -531,6 +533,7 @@ export function TeacherStudentProgressView({
   showQuizResultsTab,
   showGradesAndReportsTabs,
   registeredStudents,
+  personalClasses,
   manualGrades,
 }: TeacherStudentProgressViewProps) {
   const router = useRouter();
@@ -1070,7 +1073,10 @@ export function TeacherStudentProgressView({
 
         {showRegisterStudentTab ? (
           <TabsContent value="register-student" className="mt-0">
-            <TeacherRegisterStudentPanel students={registeredStudents} />
+            <TeacherRegisterStudentPanel
+              students={registeredStudents}
+              classes={personalClasses}
+            />
           </TabsContent>
         ) : null}
 

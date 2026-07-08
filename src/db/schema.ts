@@ -13,12 +13,17 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { CardQuizVariants, FillInBlankSegment } from '@/lib/card-quiz-variants';
 import type { QuizQuestionType } from '@/lib/quiz-questions';
-import type { LessonPlanInput, LessonPlanResult } from '@/lib/teacher-generators';
+import type { LessonPlanInput, LessonPlanResult, StudyGuideResult } from '@/lib/teacher-generators';
 import type {
   HomeworkResult,
   HomeworkSourceType,
   TeacherHomeworkActionInput,
 } from '@/lib/teacher-homework-ai-schema';
+import type { TeacherStudyGuideActionInput } from '@/lib/teacher-study-guide-ai-schema';
+import type {
+  DeckWorksheetResult,
+  TeacherWorksheetActionInput,
+} from '@/lib/teacher-worksheet-schema';
 import type { PlanReconciliationSnapshot } from '@/lib/plan-reconciliation-types';
 
 export type SavedHomeworkGenerationInput = Pick<
@@ -31,6 +36,16 @@ export type SavedHomeworkGenerationInput = Pick<
   | 'topic'
   | 'numberOfQuestions'
   | 'difficultyLevel'
+>;
+
+export type SavedStudyGuideGenerationInput = Pick<
+  TeacherStudyGuideActionInput,
+  'subject' | 'gradeLevel' | 'topic' | 'savedLessonPlanId' | 'savedHomeworkId'
+>;
+
+export type SavedWorksheetGenerationInput = Pick<
+  TeacherWorksheetActionInput,
+  'deckId' | 'subject' | 'gradeLevel' | 'topic' | 'worksheetType' | 'difficultyLevel'
 >;
 
 export const supportCategoryEnum = pgEnum('support_category', [
@@ -1018,6 +1033,58 @@ export const savedHomeworkAssignments = pgTable(
   (table) => [index('saved_homework_assignments_user_id_idx').on(table.userId)],
 );
 
+/** Teacher-saved AI study guides (personal library per Clerk user). */
+export const savedStudyGuides = pgTable(
+  'saved_study_guides',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    label: varchar({ length: 255 }).notNull(),
+    guideTitle: varchar({ length: 512 }).notNull(),
+    subject: varchar({ length: 255 }).notNull(),
+    gradeLevel: varchar({ length: 64 }).notNull(),
+    topic: varchar({ length: 255 }).notNull(),
+    savedLessonPlanId: integer(),
+    sourceLessonPlanTitle: varchar({ length: 512 }),
+    savedHomeworkId: integer(),
+    sourceHomeworkLabel: varchar({ length: 255 }),
+    input: json().$type<SavedStudyGuideGenerationInput>().notNull(),
+    result: json().$type<StudyGuideResult>().notNull(),
+    pdfUrl: text(),
+    pdfFileName: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [index('saved_study_guides_user_id_idx').on(table.userId)],
+);
+
+/** Teacher-saved deck worksheets with student + answer key PDFs. */
+export const savedWorksheets = pgTable(
+  'saved_worksheets',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    label: varchar({ length: 255 }).notNull(),
+    worksheetTitle: varchar({ length: 512 }).notNull(),
+    subject: varchar({ length: 255 }).notNull(),
+    gradeLevel: varchar({ length: 64 }).notNull(),
+    topic: varchar({ length: 255 }).notNull(),
+    worksheetType: varchar({ length: 64 }).notNull(),
+    difficultyLevel: varchar({ length: 32 }).notNull(),
+    deckId: integer().notNull(),
+    sourceDeckName: varchar({ length: 255 }).notNull(),
+    input: json().$type<SavedWorksheetGenerationInput>().notNull(),
+    result: json().$type<DeckWorksheetResult>().notNull(),
+    worksheetPdfUrl: text(),
+    worksheetPdfFileName: varchar({ length: 255 }),
+    answerKeyPdfUrl: text(),
+    answerKeyPdfFileName: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [index('saved_worksheets_user_id_idx').on(table.userId)],
+);
+
 /** Teacher class schedules linked to a deck for lesson planning workflows. */
 export const teacherClasses = pgTable(
   'teacher_classes',
@@ -1053,10 +1120,14 @@ export const teacherRegisteredStudents = pgTable(
     fullName: varchar({ length: 255 }).notNull(),
     email: varchar({ length: 255 }).notNull(),
     telephone: varchar({ length: 64 }),
+    classId: integer().references(() => teacherClasses.id, { onDelete: 'set null' }),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },
-  (table) => [index('teacher_registered_students_user_id_idx').on(table.userId)],
+  (table) => [
+    index('teacher_registered_students_user_id_idx').on(table.userId),
+    index('teacher_registered_students_class_id_idx').on(table.classId),
+  ],
 );
 
 /** Education Gold / Enterprise — manually entered assignment grades. */

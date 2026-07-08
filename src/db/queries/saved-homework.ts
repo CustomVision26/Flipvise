@@ -145,24 +145,40 @@ export type SavedHomeworkPickerItem = {
   label: string;
   assignmentTitle: string;
   savedLessonPlanId: number | null;
+  sourceLessonPlanTitle: string | null;
+  sourceType: string;
+  inputSavedLessonPlanId: number | null;
+  deckId: number | null;
+  sourceDeckName: string | null;
+  inputDeckId: number | null;
   subject: string;
   gradeLevel: string;
   topic: string;
 };
 
-export async function getSavedHomeworkForPicker(
-  userId: string,
-): Promise<SavedHomeworkPickerItem[]> {
-  const rows = await getSavedHomeworkAssignmentsByUser(userId);
-  return rows.map((row) => ({
+export function mapSavedHomeworkRowToPickerItem(row: SavedHomeworkRow): SavedHomeworkPickerItem {
+  return {
     id: row.id,
     label: row.label,
     assignmentTitle: row.assignmentTitle,
     savedLessonPlanId: row.savedLessonPlanId,
+    sourceLessonPlanTitle: row.sourceLessonPlanTitle,
+    sourceType: row.sourceType,
+    inputSavedLessonPlanId: row.input.savedLessonPlanId ?? null,
+    deckId: row.deckId,
+    sourceDeckName: row.sourceDeckName,
+    inputDeckId: row.input.deckId ?? null,
     subject: row.subject,
     gradeLevel: row.gradeLevel,
     topic: row.topic,
-  }));
+  };
+}
+
+export async function getSavedHomeworkForPicker(
+  userId: string,
+): Promise<SavedHomeworkPickerItem[]> {
+  const rows = await getSavedHomeworkAssignmentsByUser(userId);
+  return rows.map(mapSavedHomeworkRowToPickerItem);
 }
 
 export async function listSavedHomeworkPdfUrlsForUser(userId: string): Promise<string[]> {

@@ -107,6 +107,8 @@ export type SavedLessonPlanPickerItem = {
   topic: string;
   difficultyLevel: string;
   pdfUrl: string | null;
+  deckId: number | null;
+  sourceDeckName: string | null;
   input: LessonPlanInput;
   result: LessonPlanResult;
 };
@@ -118,7 +120,7 @@ export async function getSavedLessonPlansForQuizPicker(
   return rows.map(mapSavedLessonPlanRowToPickerItem);
 }
 
-function mapSavedLessonPlanRowToPickerItem(
+export function mapSavedLessonPlanRowToPickerItem(
   row: SavedLessonPlanRow,
 ): SavedLessonPlanPickerItem {
   return {
@@ -129,6 +131,8 @@ function mapSavedLessonPlanRowToPickerItem(
     topic: row.topic,
     difficultyLevel: row.difficultyLevel,
     pdfUrl: row.pdfUrl,
+    deckId: row.deckId,
+    sourceDeckName: row.sourceDeckName,
     input: row.input,
     result: row.result,
   };

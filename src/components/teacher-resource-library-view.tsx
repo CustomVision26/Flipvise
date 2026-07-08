@@ -130,8 +130,10 @@ function formatSavedDate(value: string): string {
 
 function isDeletableSection(
   sectionId: TeacherResourceLibrarySection["id"],
-): sectionId is "lessonPlans" | "homework" {
-  return sectionId === "lessonPlans" || sectionId === "homework";
+): sectionId is "lessonPlans" | "homework" | "worksheets" {
+  return (
+    sectionId === "lessonPlans" || sectionId === "homework" || sectionId === "worksheets"
+  );
 }
 
 function canDeleteItem(
@@ -150,6 +152,7 @@ function resolveResourceId(
 ): number | null {
   if (sectionId === "lessonPlans") return item.lessonPlanId;
   if (sectionId === "homework") return item.homeworkId;
+  if (sectionId === "worksheets") return item.worksheetId;
   return null;
 }
 
@@ -377,7 +380,17 @@ function ResourceItemCard({
             rel="noopener noreferrer"
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            PDF
+            {sectionId === "worksheets" ? "Worksheet PDF" : "PDF"}
+          </a>
+        ) : null}
+        {sectionId === "worksheets" && item.answerKeyPdfUrl ? (
+          <a
+            href={item.answerKeyPdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Answer Key PDF
           </a>
         ) : null}
         {sectionId === "lessonPlans" && item.quizHref ? (

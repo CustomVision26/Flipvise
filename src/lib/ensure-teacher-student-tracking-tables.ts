@@ -33,6 +33,14 @@ async function runEnsure(): Promise<void> {
     CREATE INDEX IF NOT EXISTS "teacher_registered_students_user_id_idx"
     ON "teacher_registered_students" ("userId")
   `;
+  await sql`
+    ALTER TABLE "teacher_registered_students"
+    ADD COLUMN IF NOT EXISTS "classId" integer REFERENCES "teacher_classes"("id") ON DELETE SET NULL
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS "teacher_registered_students_class_id_idx"
+    ON "teacher_registered_students" ("classId")
+  `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS "teacher_manual_grades" (
@@ -88,13 +96,41 @@ function isMissingTeacherStudentTrackingTableError(
   );
 }
 
+function isMissingTeacherRegisteredStudentsSchemaError(error: unknown): boolean {
+  if (isMissingTeacherStudentTrackingTableError(error, "teacher_registered_students")) {
+    return true;
+  }
+
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    if (obj.code === "42703") return true;
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      /teacher_registered_students/i.test(message) &&
+      /classId/i.test(message) &&
+      /(does not exist|undefined column)/i.test(message)
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+
+  const flat = String(error);
+  return (
+    (/42703/i.test(flat) || /Failed query/i.test(flat)) &&
+    /teacher_registered_students/i.test(flat) &&
+    /classId/i.test(flat)
+  );
+}
+
 export async function withTeacherRegisteredStudentsTable<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   try {
     return await fn();
   } catch (error) {
-    if (!isMissingTeacherStudentTrackingTableError(error, "teacher_registered_students")) {
+    if (!isMissingTeacherRegisteredStudentsSchemaError(error)) {
       throw error;
     }
     await ensureTeacherStudentTrackingTables();
