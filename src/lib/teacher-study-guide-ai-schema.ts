@@ -13,6 +13,7 @@ export const teacherStudyGuideInputSchema = z.object({
     .max(MAX_LESSON_PLAN_REFERENCES)
     .optional(),
   regenerationSeed: z.number().int().nonnegative().optional(),
+  teamId: z.number().int().positive().optional(),
 });
 
 export type TeacherStudyGuideActionInput = z.infer<typeof teacherStudyGuideInputSchema>;

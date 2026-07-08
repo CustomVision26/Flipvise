@@ -19,6 +19,12 @@ import {
 } from "@/lib/lesson-plan-curriculum-research";
 import { vocabularyApproachPromptLine } from "@/lib/lesson-plan-vocabulary-approach";
 import { saveLessonPlan } from "@/db/queries/saved-lesson-plans";
+import { createDeck, getDeckRowById } from "@/db/queries/decks";
+import { linkDeckToTeamWorkspace, resolveDeckViewerAccess } from "@/db/queries/teams";
+import {
+  buildTeacherLessonDeckMetadata,
+  resolveTeacherQuizSaveTarget,
+} from "@/lib/teacher-quiz-deck-save";
 import {
   generateLessonPlanPdfBuffer,
   lessonPlanPdfSafeFileName,
@@ -176,7 +182,75 @@ const saveLessonPlanSchema = z.object({
     referenceSourceSummary: true,
   }),
   result: lessonPlanResultSchema,
+  deckId: z.number().int().positive().optional(),
+  newDeckName: z.string().min(1).max(255).optional(),
+  teamId: z.number().int().positive().optional(),
 });
+
+async function resolveLessonPlanDeckTarget(
+  userId: string,
+  payload: {
+    deckId?: number;
+    newDeckName?: string;
+    teamId?: number;
+    input: LessonPlanInput;
+  },
+): Promise<{ deckId: number; sourceDeckName: string }> {
+  if (payload.deckId != null) {
+    const deck = await getDeckRowById(payload.deckId);
+    if (!deck) {
+      throw new Error("Deck not found.");
+    }
+    const access = await resolveDeckViewerAccess(payload.deckId, userId);
+    if (!access) {
+      throw new Error("You do not have access to that deck.");
+    }
+    return { deckId: payload.deckId, sourceDeckName: deck.name };
+  }
+
+  if (payload.newDeckName?.trim()) {
+    const saveTarget = await resolveTeacherQuizSaveTarget(userId, payload.teamId);
+    if (saveTarget.needsWorkspace) {
+      throw new Error(
+        `Create an ${saveTarget.planLabel} workspace in Team Admin before creating decks.`,
+      );
+    }
+    if (saveTarget.maxDecks > 0 && saveTarget.deckCount >= saveTarget.maxDecks) {
+      const scopeLabel =
+        saveTarget.scope === "workspace" ? "workspace" : "personal";
+      throw new Error(
+        `Deck limit reached — up to ${saveTarget.maxDecks} ${scopeLabel} deck(s) on your ${saveTarget.planLabel} plan.`,
+      );
+    }
+
+    const { name, description } = buildTeacherLessonDeckMetadata({
+      name: payload.newDeckName.trim(),
+      subject: payload.input.subject,
+      topic: payload.input.topic,
+      gradeLevel: payload.input.gradeLevel,
+      difficultyLevel: payload.input.difficultyLevel,
+    });
+
+    const deckId = await createDeck(
+      saveTarget.deckOwnerUserId,
+      name,
+      description,
+      saveTarget.teamId,
+      null,
+      payload.input.gradeLevel,
+      payload.input.difficultyLevel,
+      userId,
+    );
+
+    if (saveTarget.teamId != null) {
+      await linkDeckToTeamWorkspace(saveTarget.teamId, deckId);
+    }
+
+    return { deckId, sourceDeckName: name };
+  }
+
+  throw new Error("Select an existing deck or enter a name for a new deck.");
+}
 
 export async function extractLessonPlanReferenceAction(
   formData: FormData,
@@ -226,7 +300,16 @@ export async function extractLessonPlanReferenceAction(
 export async function saveLessonPlanAction(data: {
   input: LessonPlanInput;
   result: LessonPlanResult;
-}): Promise<{ id: number; lessonTitle: string; pdfUrl: string | null }> {
+  deckId?: number;
+  newDeckName?: string;
+  teamId?: number;
+}): Promise<{
+  id: number;
+  lessonTitle: string;
+  pdfUrl: string | null;
+  deckId: number;
+  sourceDeckName: string;
+}> {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -237,6 +320,8 @@ export async function saveLessonPlanAction(data: {
   if (!parsed.success) {
     throw new Error("Invalid lesson plan data");
   }
+
+  const deckTarget = await resolveLessonPlanDeckTarget(userId, parsed.data);
 
   let pdfUrl: string | null = null;
   let pdfFileName: string | null = null;
@@ -264,14 +349,20 @@ export async function saveLessonPlanAction(data: {
     result: parsed.data.result,
     pdfUrl,
     pdfFileName,
+    deckId: deckTarget.deckId,
+    sourceDeckName: deckTarget.sourceDeckName,
   });
 
   revalidatePath("/teacher/resources");
   revalidatePath("/teacher/quizzes");
+  revalidatePath("/teacher/classes");
+  revalidatePath("/dashboard");
 
   return {
     id: saved.id,
     lessonTitle: saved.lessonTitle,
     pdfUrl: saved.pdfUrl,
+    deckId: deckTarget.deckId,
+    sourceDeckName: deckTarget.sourceDeckName,
   };
 }

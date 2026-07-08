@@ -59,6 +59,7 @@ export const teacherQuizInputSchema = z
       .min(0)
       .max(PRO_PLUS_CARDS_PER_DECK_LIMIT)
       .optional(),
+    teamId: z.number().int().positive().optional(),
   })
   .superRefine((data, ctx) => {
     const passageCount = data.readingPassageQuestions

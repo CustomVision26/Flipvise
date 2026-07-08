@@ -8,9 +8,18 @@ import { markClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
 export function ClerkAuthHandoffMarker() {
   const { isLoaded, isSignedIn } = useAuth();
   const wasSignedIn = useRef(false);
+  const sessionRestoreHandled = useRef(false);
 
   useLayoutEffect(() => {
     if (!isLoaded) return;
+
+    // Clerk restores an existing session on first load — not a fresh sign-in.
+    if (!sessionRestoreHandled.current) {
+      sessionRestoreHandled.current = true;
+      wasSignedIn.current = isSignedIn;
+      return;
+    }
+
     if (isSignedIn && !wasSignedIn.current) {
       markClerkAuthHandoff();
     }

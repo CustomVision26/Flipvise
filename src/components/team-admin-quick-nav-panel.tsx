@@ -44,30 +44,35 @@ export function TeamAdminQuickNavPanel({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <Card className={cn(teamAdminCardClass, className)}>
+    <Card className={cn(teamAdminCardClass, "overflow-visible", className)}>
       <CardHeader className="space-y-0 p-0">
         <Button
           type="button"
           variant="ghost"
-          className="h-auto w-full justify-between gap-3 rounded-xl px-4 py-3 text-left sm:px-5 sm:py-4"
+          className="h-auto w-full items-start justify-between gap-3 whitespace-normal rounded-xl px-4 py-3 text-left sm:px-5 sm:py-4"
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
         >
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Quick navigation
-              </CardTitle>
-              <span className="text-muted-foreground/50" aria-hidden>
-                ·
-              </span>
-              <span className="text-xs font-medium text-foreground">{planLabel}</span>
-            </div>
+          <div className="min-w-0 flex-1 space-y-1.5 text-pretty">
+            <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Quick navigation
+            </CardTitle>
+            <p className="text-xs font-medium leading-snug text-foreground">{planLabel}</p>
             {!open ? (
-              <p className="text-xs text-muted-foreground">
-                Personal dashboard
-                {!isOwner ? " · Workspace dashboard" : ""}
-                {showTeacherDashboard ? " · Teacher dashboard" : ""}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                <span className="block sm:inline">Personal dashboard</span>
+                {!isOwner ? (
+                  <span className="block sm:inline">
+                    <span className="hidden sm:inline"> · </span>
+                    Workspace dashboard
+                  </span>
+                ) : null}
+                {showTeacherDashboard ? (
+                  <span className="block sm:inline">
+                    <span className="hidden sm:inline"> · </span>
+                    Teacher dashboard
+                  </span>
+                ) : null}
               </p>
             ) : null}
           </div>
@@ -89,6 +94,7 @@ export function TeamAdminQuickNavPanel({
             workspaceTeamMemberUrlParam={workspaceTeamMemberUrlParam}
             isOwner={isOwner}
             showTeacherDashboard={showTeacherDashboard}
+            className="grid-cols-1 sm:grid-cols-1 lg:grid-cols-1"
           />
         </CardContent>
       ) : null}

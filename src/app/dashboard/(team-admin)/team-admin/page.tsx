@@ -3,7 +3,7 @@ import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { getTeamsForTeamDashboard } from "@/db/queries/teams";
-import { buildTeamAdminAssignDecksToMembersPath } from "@/lib/team-admin-url";
+import { buildTeamAdminMembersPath } from "@/lib/team-admin-url";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
 
 interface PageProps {
@@ -17,7 +17,7 @@ interface PageProps {
 
 /**
  * `/dashboard/team-admin` entry — resolves workspace context and redirects to
- * `/dashboard/team-admin/deck-manager/assign-decks-to-members?team=`.
+ * `/dashboard/team-admin/members?team=`.
  *
  * **Workspace main dashboard** (for co-admins; hidden for the subscriber owner) uses:
  * `/dashboard?team=<workspaceId>&userid=<ownerClerkId>&plan=<team.planSlug>&teamMemberId=<viewerRowId>`
@@ -51,13 +51,13 @@ export default async function TeamAdminDashboardRootPage({ searchParams }: PageP
     cookieTeamRaw: cookieRaw,
     useridParam,
     planParam,
-    buildCanonicalPath: buildTeamAdminAssignDecksToMembersPath,
+    buildCanonicalPath: buildTeamAdminMembersPath,
   });
   if (resolution.outcome === "redirect") {
     redirect(resolution.to);
   }
   redirect(
-    buildTeamAdminAssignDecksToMembersPath(
+    buildTeamAdminMembersPath(
       resolution.selected.id,
       resolution.viewerTeamMemberUrlParam,
     ),

@@ -45,6 +45,33 @@ export function buildTeacherQuizDeckMetadata(input: {
   return { name, description };
 }
 
+export function buildTeacherLessonDeckMetadata(input: {
+  name?: string;
+  subject: string;
+  topic: string;
+  gradeLevel: string;
+  difficultyLevel: string;
+}): { name: string; description: string } {
+  const subject = input.subject.trim();
+  const topic = input.topic.trim();
+  const gradeLevel = input.gradeLevel.trim();
+  const difficultyLevel = input.difficultyLevel.trim();
+  const name =
+    input.name?.trim() ||
+    (subject && topic ? `${subject} — ${topic}` : subject || topic || "Lesson deck");
+  const description = [
+    topic,
+    subject,
+    gradeLevel ? `Grade ${gradeLevel}` : null,
+    difficultyLevel ? `${difficultyLevel} difficulty` : null,
+    "Teacher lesson plan deck",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return { name, description };
+}
+
 export type TeacherQuizSaveTarget = {
   deckOwnerUserId: string;
   teamId: number | null;

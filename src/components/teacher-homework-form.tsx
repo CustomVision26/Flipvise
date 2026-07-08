@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Download, ExternalLink, Loader2, Pencil, Save, X } from "lucide-react";
 import { generateHomeworkAction, saveHomeworkAction } from "@/actions/teacher-homework";
@@ -31,7 +31,16 @@ import {
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
+import {
+  OwnerTeamAdminResourcePicker,
+  useOwnerScopedItems,
+} from "@/components/owner-team-admin-resource-picker";
 import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
+import type {
+  OwnerTeamAdminDeckPickerPayload,
+  OwnerTeamAdminLessonPlanPickerPayload,
+} from "@/db/queries/teacher-owner-pickers";
+import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
 import type { DeckRow } from "@/db/queries/decks";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import { downloadHomeworkPdf } from "@/lib/homework-pdf";
@@ -74,21 +83,57 @@ const EMPTY_FORM: HomeworkFormState = {
 
 export function TeacherHomeworkForm({
   savedLessonPlans,
+  ownerLessonPlanPicker,
+  ownerDeckPicker,
   decks,
   backHref = "/teacher",
   teacherWorkspace,
+  initialDeckId,
+  initialLessonPlanId,
+  initialSourceType,
 }: {
   savedLessonPlans: SavedLessonPlanPickerItem[];
+  ownerLessonPlanPicker: OwnerTeamAdminLessonPlanPickerPayload;
+  ownerDeckPicker: OwnerTeamAdminDeckPickerPayload;
   decks: DeckRow[];
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
+  initialDeckId?: number;
+  initialLessonPlanId?: number;
+  initialSourceType?: HomeworkSourceType;
 }) {
-  const [sourceType, setSourceType] = useState<HomeworkSourceType>("topic");
+  const isWorkspaceOwner = ownerLessonPlanPicker.isWorkspaceOwner;
+  const initialDeck =
+    !isWorkspaceOwner && initialDeckId != null
+      ? decks.find((deck) => deck.id === initialDeckId) ?? null
+      : null;
+  const initialDeckDefaults = initialDeck ? deckToHomeworkDefaults(initialDeck) : null;
+
+  const [sourceType, setSourceType] = useState<HomeworkSourceType>(
+    initialSourceType ??
+      (initialLessonPlanId != null
+        ? "lesson_plan"
+        : initialDeck
+          ? "deck"
+          : "topic"),
+  );
   const [selectedPlanKey, setSelectedPlanKey] = useState<string>(SOURCE_NONE);
-  const [selectedDeckKey, setSelectedDeckKey] = useState<string>(SOURCE_NONE);
+  const [selectedDeckKey, setSelectedDeckKey] = useState<string>(
+    initialDeck ? String(initialDeck.id) : SOURCE_NONE,
+  );
   const [savedLessonPlanId, setSavedLessonPlanId] = useState<number | undefined>();
-  const [deckId, setDeckId] = useState<number | undefined>();
-  const [form, setForm] = useState<HomeworkFormState>(EMPTY_FORM);
+  const [deckId, setDeckId] = useState<number | undefined>(initialDeck?.id);
+  const [form, setForm] = useState<HomeworkFormState>(
+    initialDeckDefaults
+      ? {
+          subject: initialDeckDefaults.subject,
+          gradeLevel: initialDeckDefaults.gradeLevel,
+          topic: initialDeckDefaults.topic,
+          numberOfQuestions: 8,
+          difficultyLevel: initialDeckDefaults.difficultyLevel,
+        }
+      : EMPTY_FORM,
+  );
   const [result, setResult] = useState<HomeworkResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -100,14 +145,65 @@ export function TeacherHomeworkForm({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedLessonPlanAdminUserId, setSelectedLessonPlanAdminUserId] =
+    useState<string>(ADMIN_NONE);
+  const [selectedDeckAdminUserId, setSelectedDeckAdminUserId] =
+    useState<string>(ADMIN_NONE);
+
+  const activeLessonPlans = useOwnerScopedItems(
+    isWorkspaceOwner,
+    selectedLessonPlanAdminUserId,
+    ownerLessonPlanPicker.lessonPlansByAdminUserId,
+    savedLessonPlans,
+  );
+  const activeDecks = useOwnerScopedItems(
+    isWorkspaceOwner,
+    selectedDeckAdminUserId,
+    ownerDeckPicker.itemsByAdminUserId,
+    decks,
+  );
 
   const selectedPlan =
     savedLessonPlanId != null
-      ? savedLessonPlans.find((plan) => plan.id === savedLessonPlanId) ?? null
+      ? activeLessonPlans.find((plan) => plan.id === savedLessonPlanId) ?? null
       : null;
 
   const selectedDeck =
-    deckId != null ? decks.find((deck) => deck.id === deckId) ?? null : null;
+    deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+
+  function handleLessonPlanAdminChange(adminUserId: string) {
+    setSelectedLessonPlanAdminUserId(adminUserId);
+    setSelectedPlanKey(SOURCE_NONE);
+    setSavedLessonPlanId(undefined);
+    if (sourceType === "lesson_plan") {
+      setForm(EMPTY_FORM);
+    }
+    setErrorMessage(null);
+  }
+
+  function handleDeckAdminChange(adminUserId: string) {
+    setSelectedDeckAdminUserId(adminUserId);
+    setSelectedDeckKey(SOURCE_NONE);
+    setDeckId(undefined);
+    if (sourceType === "deck") {
+      setForm(EMPTY_FORM);
+    }
+    setErrorMessage(null);
+  }
+
+  function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
+    return [plan.lessonTitle, plan.subject, plan.gradeLevel, plan.topic]
+      .filter((part) => part.trim())
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function deckHaystack(deck: DeckRow): string {
+    return [deck.name, deck.description, deck.gradeLevel]
+      .filter((part): part is string => Boolean(part && part.trim()))
+      .join(" ")
+      .toLowerCase();
+  }
 
   function handleSourceTypeChange(value: HomeworkSourceType) {
     setSourceType(value);
@@ -128,7 +224,7 @@ export function TeacherHomeworkForm({
     }
 
     const planId = Number(value);
-    const plan = savedLessonPlans.find((item) => item.id === planId);
+    const plan = activeLessonPlans.find((item) => item.id === planId);
     if (!plan) return;
 
     const defaults = lessonPlanInputToQuizDefaults(plan.input);
@@ -153,7 +249,7 @@ export function TeacherHomeworkForm({
     }
 
     const id = Number(value);
-    const deck = decks.find((item) => item.id === id);
+    const deck = activeDecks.find((item) => item.id === id);
     if (!deck) return;
 
     const defaults = deckToHomeworkDefaults(deck);
@@ -167,6 +263,83 @@ export function TeacherHomeworkForm({
       difficultyLevel: defaults.difficultyLevel,
     });
   }
+
+  useEffect(() => {
+    if (!initialDeckId || !isWorkspaceOwner) return;
+    const adminWithDeck = ownerDeckPicker.teamAdmins.find((admin) =>
+      (ownerDeckPicker.itemsByAdminUserId[admin.userId] ?? []).some(
+        (item) => item.id === initialDeckId,
+      ),
+    );
+    if (!adminWithDeck) return;
+
+    const deck = ownerDeckPicker.itemsByAdminUserId[adminWithDeck.userId]?.find(
+      (item) => item.id === initialDeckId,
+    );
+    if (!deck) return;
+
+    const defaults = deckToHomeworkDefaults(deck);
+    setSourceType(initialSourceType ?? "deck");
+    setSelectedDeckAdminUserId(adminWithDeck.userId);
+    setSelectedDeckKey(String(initialDeckId));
+    setDeckId(deck.id);
+    setForm({
+      subject: defaults.subject,
+      gradeLevel: defaults.gradeLevel,
+      topic: defaults.topic,
+      numberOfQuestions: 8,
+      difficultyLevel: defaults.difficultyLevel,
+    });
+  }, [initialDeckId, initialSourceType, isWorkspaceOwner, ownerDeckPicker]);
+
+  useEffect(() => {
+    if (!initialLessonPlanId) return;
+
+    if (isWorkspaceOwner) {
+      const adminWithPlan = ownerLessonPlanPicker.teamAdmins.find((admin) =>
+        (ownerLessonPlanPicker.lessonPlansByAdminUserId[admin.userId] ?? []).some(
+          (item) => item.id === initialLessonPlanId,
+        ),
+      );
+      if (!adminWithPlan) return;
+
+      const plan = ownerLessonPlanPicker.lessonPlansByAdminUserId[adminWithPlan.userId]?.find(
+        (item) => item.id === initialLessonPlanId,
+      );
+      if (!plan) return;
+
+      const defaults = lessonPlanInputToQuizDefaults(plan.input);
+      setSourceType("lesson_plan");
+      setSelectedLessonPlanAdminUserId(adminWithPlan.userId);
+      setSelectedPlanKey(String(initialLessonPlanId));
+      setSavedLessonPlanId(plan.id);
+      setForm({
+        subject: defaults.subject,
+        gradeLevel: defaults.gradeLevel,
+        topic: defaults.topic,
+        numberOfQuestions: 8,
+        difficultyLevel:
+          defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
+      });
+      return;
+    }
+
+    const plan = savedLessonPlans.find((item) => item.id === initialLessonPlanId);
+    if (!plan) return;
+
+    const defaults = lessonPlanInputToQuizDefaults(plan.input);
+    setSourceType("lesson_plan");
+    setSelectedPlanKey(String(initialLessonPlanId));
+    setSavedLessonPlanId(plan.id);
+    setForm({
+      subject: defaults.subject,
+      gradeLevel: defaults.gradeLevel,
+      topic: defaults.topic,
+      numberOfQuestions: 8,
+      difficultyLevel:
+        defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
+    });
+  }, [initialLessonPlanId, isWorkspaceOwner, ownerLessonPlanPicker, savedLessonPlans]);
 
   const lessonBuilderHref = teacherWorkspace
     ? buildTeacherSubPath(
@@ -203,6 +376,7 @@ export function TeacherHomeworkForm({
         topic: form.topic,
         numberOfQuestions: form.numberOfQuestions,
         difficultyLevel: form.difficultyLevel,
+        teamId: teacherWorkspace?.teamId ?? undefined,
       });
       setResult(homework);
       setShowResult(true);
@@ -294,6 +468,7 @@ export function TeacherHomeworkForm({
           topic: form.topic,
           numberOfQuestions: form.numberOfQuestions,
           difficultyLevel: form.difficultyLevel,
+          teamId: teacherWorkspace?.teamId ?? undefined,
         },
         result,
       });
@@ -481,6 +656,43 @@ export function TeacherHomeworkForm({
           </div>
 
           {sourceType === "lesson_plan" ? (
+            isWorkspaceOwner ? (
+              <OwnerTeamAdminResourcePicker
+                ownerPicker={ownerLessonPlanPicker}
+                itemsByAdminUserId={ownerLessonPlanPicker.lessonPlansByAdminUserId}
+                selectedAdminUserId={selectedLessonPlanAdminUserId}
+                onAdminChange={handleLessonPlanAdminChange}
+                selectedItemKey={selectedPlanKey}
+                onItemChange={handleLessonPlanChange}
+                noneValue={SOURCE_NONE}
+                noneLabel="Select a lesson plan"
+                placeholder="Select a lesson plan"
+                resourceLabel="Saved lesson plan"
+                resourceSelectId="homeworkLessonPlan"
+                adminSelectId="homeworkTeamAdmin"
+                getItemKey={(plan) => String(plan.id)}
+                getItemLabel={(plan) => `${plan.lessonTitle} (${plan.subject} · ${plan.gradeLevel})`}
+                getItemHaystack={lessonPlanHaystack}
+                searchPlaceholder="Search lesson plans by title, subject, grade, or topic…"
+                resourceHelp="Pick a plan saved from the AI Lesson Builder. Subject, grade, topic, and difficulty will auto-fill."
+                resourceFooter={
+                  selectedPlan?.pdfUrl ? (
+                    <p className="text-xs text-muted-foreground">
+                      Lesson plan PDF:{" "}
+                      <a
+                        href={selectedPlan.pdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 underline underline-offset-2"
+                      >
+                        View saved PDF
+                        <ExternalLink className="size-3" aria-hidden />
+                      </a>
+                    </p>
+                  ) : null
+                }
+              />
+            ) : (
             <div className="space-y-2 sm:col-span-2">
               <TeacherFieldLabel
                 htmlFor="homeworkLessonPlan"
@@ -497,14 +709,14 @@ export function TeacherHomeworkForm({
                   <SelectItem value={SOURCE_NONE} disabled>
                     Select a lesson plan
                   </SelectItem>
-                  {savedLessonPlans.map((plan) => (
+                  {activeLessonPlans.map((plan) => (
                     <SelectItem key={plan.id} value={String(plan.id)}>
                       {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {savedLessonPlans.length === 0 ? (
+              {activeLessonPlans.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No saved lesson plans yet. Save one in the{" "}
                   <Link href={lessonBuilderHref} className="underline underline-offset-2">
@@ -528,9 +740,44 @@ export function TeacherHomeworkForm({
                 </p>
               ) : null}
             </div>
+            )
           ) : null}
 
           {sourceType === "deck" ? (
+            isWorkspaceOwner ? (
+              <OwnerTeamAdminResourcePicker
+                ownerPicker={ownerDeckPicker}
+                itemsByAdminUserId={ownerDeckPicker.itemsByAdminUserId}
+                selectedAdminUserId={selectedDeckAdminUserId}
+                onAdminChange={handleDeckAdminChange}
+                selectedItemKey={selectedDeckKey}
+                onItemChange={handleDeckChange}
+                noneValue={SOURCE_NONE}
+                noneLabel="Select a deck"
+                placeholder="Select a deck"
+                resourceLabel="Deck"
+                resourceSelectId="homeworkDeck"
+                adminSelectId="homeworkDeckTeamAdmin"
+                getItemKey={(deck) => String(deck.id)}
+                getItemLabel={(deck) => deck.name}
+                getItemHaystack={deckHaystack}
+                searchPlaceholder="Search decks by name, subject, or description…"
+                resourceHelp="Pick one of the team admin's decks. Homework questions will be based on the flashcards in that deck."
+                resourceFooter={
+                  selectedDeck ? (
+                    <p className="text-xs text-muted-foreground">
+                      <Link
+                        href={`/decks/${selectedDeck.id}`}
+                        className="inline-flex items-center gap-1 underline underline-offset-2"
+                      >
+                        Open deck
+                        <ExternalLink className="size-3" aria-hidden />
+                      </Link>
+                    </p>
+                  ) : null
+                }
+              />
+            ) : (
             <div className="space-y-2 sm:col-span-2">
               <TeacherFieldLabel
                 htmlFor="homeworkDeck"
@@ -547,14 +794,14 @@ export function TeacherHomeworkForm({
                   <SelectItem value={SOURCE_NONE} disabled>
                     Select a deck
                   </SelectItem>
-                  {decks.map((deck) => (
+                  {activeDecks.map((deck) => (
                     <SelectItem key={deck.id} value={String(deck.id)}>
                       {deck.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {decks.length === 0 ? (
+              {activeDecks.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No decks available yet. Create a deck from the{" "}
                   <Link href="/dashboard" className="underline underline-offset-2">
@@ -579,6 +826,7 @@ export function TeacherHomeworkForm({
                 </p>
               ) : null}
             </div>
+            )
           ) : null}
 
           <div className="space-y-2">

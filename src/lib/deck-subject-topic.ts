@@ -32,3 +32,16 @@ export function parseDeckSubjectTopic(deck: {
 
   return { subject: name, topic: "" };
 }
+
+/** Deck name → subject; deck `description` field → topic (Description/Topic in edit deck). */
+export function resolveDeckSubjectAndTopic(deck: {
+  name: string;
+  description?: string | null;
+}): { subject: string; topic: string } {
+  const parsed = parseDeckSubjectTopic(deck);
+  const topicFromDescription = deck.description?.trim() ?? "";
+  return {
+    subject: parsed.subject,
+    topic: topicFromDescription || parsed.topic,
+  };
+}

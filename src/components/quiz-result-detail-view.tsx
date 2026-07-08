@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   CheckCircle,
   XCircle,
@@ -67,56 +66,192 @@ function getStatus(card: PerCardSnapshot): CardStatus {
   return card.correct ? "correct" : "incorrect";
 }
 
+function scoreTierStyles(percent: number) {
+  if (percent >= 90) {
+    return {
+      text: "text-yellow-500",
+      bar: "bg-yellow-500",
+      surface: "from-yellow-500/10 via-yellow-500/5 to-transparent",
+      ring: "ring-yellow-500/15",
+    };
+  }
+  if (percent >= 50) {
+    return {
+      text: "text-blue-400",
+      bar: "bg-blue-500",
+      surface: "from-blue-500/10 via-blue-500/5 to-transparent",
+      ring: "ring-blue-500/15",
+    };
+  }
+  return {
+    text: "text-purple-400",
+    bar: "bg-purple-500",
+    surface: "from-purple-500/10 via-purple-500/5 to-transparent",
+    ring: "ring-purple-500/15",
+  };
+}
+
+function memberRoleLabel(role: QuizResultSummary["memberRole"]) {
+  if (role === "owner") return "Owner";
+  if (role === "team_admin") return "Team admin";
+  if (role === "team_member") return "Member";
+  return null;
+}
+
+function ContextField({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("min-w-0 space-y-1", className)}>
+      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
 function QuizResultMemberContext({ result }: { result: QuizResultSummary }) {
   if (!(result.userName || result.userEmail || result.teamName)) return null;
 
+  const showOwner = Boolean(
+    result.teamName && (result.ownerName || result.ownerEmail),
+  );
+
   return (
-    <div className="space-y-3 rounded-lg border border-border/80 bg-muted/15 px-4 py-3 text-sm">
-      {(result.userName || result.userEmail) && (
-        <div className="space-y-0.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Taken by
-          </p>
-          {result.userName ? (
-            <p className="font-medium text-foreground">{result.userName}</p>
-          ) : null}
-          {result.userEmail ? (
-            <p className="text-muted-foreground">{result.userEmail}</p>
-          ) : null}
-        </div>
+    <div className="rounded-xl border border-border/70 bg-muted/15 p-4 sm:p-5">
+      <div
+        className={cn(
+          "grid gap-4",
+          showOwner ? "sm:grid-cols-3" : "sm:grid-cols-2",
+        )}
+      >
+        {(result.userName || result.userEmail) && (
+          <ContextField
+            label="Taken by"
+            className={cn(showOwner && "sm:border-r sm:border-border/60 sm:pr-4")}
+          >
+            {result.userName ? (
+              <p className="truncate text-sm font-medium text-foreground">{result.userName}</p>
+            ) : null}
+            {result.userEmail ? (
+              <p className="truncate text-sm text-muted-foreground">{result.userEmail}</p>
+            ) : null}
+          </ContextField>
+        )}
+        {result.teamName ? (
+          <ContextField
+            label="Workspace"
+            className={cn(showOwner && "sm:border-r sm:border-border/60 sm:pr-4")}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="min-w-0 text-sm font-medium leading-snug text-foreground">
+                {result.teamName}
+              </p>
+              {result.memberRole ? (
+                <Badge variant="secondary" className="h-5 shrink-0 px-2 text-[10px] font-medium">
+                  {memberRoleLabel(result.memberRole)}
+                </Badge>
+              ) : null}
+            </div>
+          </ContextField>
+        ) : null}
+        {showOwner ? (
+          <ContextField label="Owner">
+            {result.ownerName ? (
+              <p className="truncate text-sm font-medium text-foreground">{result.ownerName}</p>
+            ) : null}
+            {result.ownerEmail ? (
+              <p className="truncate text-sm text-muted-foreground">{result.ownerEmail}</p>
+            ) : null}
+          </ContextField>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function QuizResultScoreCard({ result }: { result: QuizResultSummary }) {
+  const tier = scoreTierStyles(result.percent);
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border bg-gradient-to-br p-4 ring-1 sm:p-5",
+        tier.surface,
+        tier.ring,
+        "border-border/70",
       )}
-      {result.teamName ? (
+    >
+      <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Workspace
+            Score
           </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">{result.teamName}</span>
-            {result.memberRole ? (
-              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-                {result.memberRole === "owner"
-                  ? "Owner"
-                  : result.memberRole === "team_admin"
-                    ? "Team admin"
-                    : "Member"}
-              </Badge>
-            ) : null}
-          </div>
+          <p className={cn("text-4xl font-bold tabular-nums tracking-tight", tier.text)}>
+            {result.percent}%
+          </p>
         </div>
-      ) : null}
-      {result.teamName && (result.ownerName || result.ownerEmail) ? (
-        <div className="space-y-0.5">
+        <div className="space-y-1 text-right">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Owner
+            Correct cards
           </p>
-          {result.ownerName ? (
-            <p className="font-medium text-foreground">{result.ownerName}</p>
-          ) : null}
-          {result.ownerEmail ? (
-            <p className="text-muted-foreground">{result.ownerEmail}</p>
-          ) : null}
+          <p className="text-lg font-semibold tabular-nums text-foreground">
+            {result.correct}
+            <span className="text-sm font-normal text-muted-foreground"> / {result.total}</span>
+          </p>
+          <p className="text-xs tabular-nums text-muted-foreground">
+            {formatClock(result.elapsedSeconds)}
+          </p>
         </div>
-      ) : null}
+      </div>
+
+      <div
+        className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-muted/80 ring-1 ring-border/40"
+        role="progressbar"
+        aria-valuenow={result.percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Quiz score ${result.percent} percent`}
+      >
+        <div
+          className={cn("h-full rounded-full transition-[width]", tier.bar)}
+          style={{ width: `${Math.max(0, Math.min(100, result.percent))}%` }}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Badge
+          variant="outline"
+          className="gap-1.5 border-emerald-500/30 bg-emerald-500/5 px-2.5 py-1 text-xs font-medium text-emerald-500"
+        >
+          <CheckCircle className="size-3.5" aria-hidden />
+          {result.correct} correct
+        </Badge>
+        <Badge
+          variant="outline"
+          className="gap-1.5 border-rose-500/30 bg-rose-500/5 px-2.5 py-1 text-xs font-medium text-rose-500"
+        >
+          <XCircle className="size-3.5" aria-hidden />
+          {result.incorrect} incorrect
+        </Badge>
+        <Badge
+          variant="outline"
+          className="gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground"
+        >
+          <CircleHelp className="size-3.5" aria-hidden />
+          {result.unanswered} unanswered
+        </Badge>
+        <span className="ml-auto self-center text-xs tabular-nums text-muted-foreground">
+          {result.total} card{result.total !== 1 ? "s" : ""}
+        </span>
+      </div>
     </div>
   );
 }
@@ -457,8 +592,11 @@ export function QuizResultInlineDetail({ result }: { result: QuizResultSummary }
   return (
     <div className="space-y-4">
       <QuizResultMemberContext result={result} />
-      <div className="space-y-4 rounded-lg border border-border/80 bg-muted/10 p-4 sm:p-5">
-        <h4 className="text-sm font-semibold text-foreground">Question review</h4>
+      <QuizResultScoreCard result={result} />
+      <div className="space-y-4 rounded-xl border border-border/70 bg-card/40 p-4 sm:p-5">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Question review
+        </h4>
         <QuizResultPerCardReview cards={cards} expanded />
       </div>
       <div className="flex justify-stretch sm:justify-end">
@@ -708,26 +846,19 @@ export type QuizResultDetailViewProps = {
 };
 
 export function QuizResultDetailView({ result, variant, onClose }: QuizResultDetailViewProps) {
-  const tierColor =
-    result.percent >= 90
-      ? "text-yellow-500"
-      : result.percent >= 50
-        ? "text-blue-400"
-        : "text-purple-400";
-
   const titleBlock =
     variant === "dialog" ? (
-      <DialogHeader className="space-y-1 text-left">
-        <DialogTitle className="text-lg font-semibold leading-tight tracking-tight">
+      <DialogHeader className="space-y-1.5 border-b border-border/60 pb-4 text-left">
+        <DialogTitle className="text-xl font-semibold leading-tight tracking-tight">
           {result.deckName}
         </DialogTitle>
-        <DialogDescription className="text-sm">
+        <DialogDescription className="text-sm text-muted-foreground">
           Saved {formatDate(result.savedAt)}
         </DialogDescription>
       </DialogHeader>
     ) : (
-      <div className="space-y-1">
-        <h1 className="text-lg font-semibold leading-tight tracking-tight text-foreground">
+      <div className="space-y-1.5 border-b border-border/60 pb-4">
+        <h1 className="text-xl font-semibold leading-tight tracking-tight text-foreground">
           {result.deckName}
         </h1>
         <p className="text-sm text-muted-foreground">Saved {formatDate(result.savedAt)}</p>
@@ -746,44 +877,10 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
   );
 
   const summarySection = (
-    <div className="shrink-0 space-y-3 border-b border-border/80 px-4 pt-4 pb-4 sm:space-y-4 sm:px-6 sm:pt-6">
+    <div className="shrink-0 space-y-4 px-4 pt-4 pb-5 sm:px-6 sm:pt-6">
       {titleBlock}
-
       <QuizResultMemberContext result={result} />
-
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Score</span>
-          <span className={`font-semibold tabular-nums ${tierColor}`}>{result.percent}%</span>
-        </div>
-        <Progress value={result.percent} className="h-2" />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>Correct cards</span>
-          <span className="font-medium tabular-nums text-foreground">
-            {result.correct} / {result.total}
-          </span>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-border/70 bg-muted/25 px-3 py-3 sm:px-4">
-        <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-3 sm:gap-3">
-          <span className="flex items-center gap-1.5">
-            <CheckCircle className="size-3.5 shrink-0 text-emerald-500" aria-hidden />
-            {result.correct} correct
-          </span>
-          <span className="flex items-center gap-1.5">
-            <XCircle className="size-3.5 shrink-0 text-rose-500" aria-hidden />
-            {result.incorrect} incorrect
-          </span>
-          <span className="flex items-center gap-1.5">
-            <CircleHelp className="size-3.5 shrink-0" aria-hidden />
-            {result.unanswered} unanswered
-          </span>
-        </div>
-        <p className="mt-2 border-t border-border/50 pt-2 text-xs font-medium tabular-nums text-foreground">
-          {result.total} card{result.total !== 1 ? "s" : ""} · {formatClock(result.elapsedSeconds)}
-        </p>
-      </div>
+      <QuizResultScoreCard result={result} />
     </div>
   );
 
@@ -792,7 +889,7 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
   const reviewSection = (
     <div
       className={cn(
-        "px-4 py-4 sm:px-6 sm:py-5",
+        "border-t border-border/60 px-4 py-5 sm:px-6",
         variant === "dialog"
           ? "shrink-0 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
           : variant === "embedded"
@@ -800,20 +897,18 @@ export function QuizResultDetailView({ result, variant, onClose }: QuizResultDet
             : "flex min-h-0 flex-1 flex-col overflow-hidden",
       )}
     >
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Question review
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Expand each question to compare answers, or filter by result type.
-          </p>
-        </div>
+      <div className="mb-4 space-y-1">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Question review
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Expand each question to compare answers, or filter by result type.
+        </p>
       </div>
 
       <div
         className={cn(
-          "rounded-xl border border-border/80 bg-muted/10 p-4 sm:p-5 lg:p-6",
+          "rounded-xl border border-border/70 bg-card/40 p-4 sm:p-5",
           variant === "page" && "flex min-h-0 flex-1 flex-col overflow-y-auto",
           reviewExpanded && "w-full",
         )}

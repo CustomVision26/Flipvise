@@ -197,11 +197,33 @@ export async function updateCardChoices(
   deckId: number,
   choices: string[],
   correctChoiceIndex: number,
+  choiceImageUrls: (string | null)[] | null = null,
 ) {
-  return db
-    .update(cards)
-    .set({ choices, correctChoiceIndex, updatedAt: new Date() })
-    .where(and(eq(cards.id, cardId), eq(cards.deckId, deckId)));
+  const patch: {
+    choices: string[];
+    correctChoiceIndex: number;
+    updatedAt: Date;
+    choiceImageUrls?: string[];
+  } = { choices, correctChoiceIndex, updatedAt: new Date() };
+  if (choiceImageUrls) {
+    const normalized = normalizeChoiceImageUrlsForDb(choiceImageUrls);
+    if (normalized) {
+      patch.choiceImageUrls = normalized;
+    }
+  }
+  try {
+    return await db
+      .update(cards)
+      .set(patch)
+      .where(and(eq(cards.id, cardId), eq(cards.deckId, deckId)));
+  } catch (e) {
+    if (!isMissingChoiceImageUrlsColumnError(e)) throw e;
+    const { choiceImageUrls: _omit, ...legacyPatch } = patch;
+    return db
+      .update(cards)
+      .set(legacyPatch)
+      .where(and(eq(cards.id, cardId), eq(cards.deckId, deckId)));
+  }
 }
 
 export async function updateCard(

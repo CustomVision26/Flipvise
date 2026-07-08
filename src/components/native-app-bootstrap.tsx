@@ -4,7 +4,10 @@ import * as React from "react";
 import { useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { unwrapNativeSignInRetryUrl } from "@/lib/native-live-navigation";
-import { isFlipviseNativeApp } from "@/lib/offline/is-flipvise-native-app";
+import {
+  isFlipviseNativeApp,
+  isFlipviseNativeShell,
+} from "@/lib/offline/is-flipvise-native-app";
 
 /**
  * Persists a native-app marker (Capacitor Preferences) when the live site loads
@@ -127,6 +130,10 @@ export function NativeAppBootstrap() {
       return;
     }
 
+    if (!isFlipviseNativeShell()) {
+      return;
+    }
+
     void import("@/lib/offline/session").then(async (session) => {
       // Keep the offline shell's user id in sync whenever the live dashboard loads
       // (not only after "Make available offline") so a cold start can load SQLite rows.
@@ -144,6 +151,7 @@ export function NativeAppBootstrap() {
         const res = await fetch("/api/native/ensure-sync-token", {
           method: "POST",
           credentials: "include",
+          headers: { "X-Flipvise-Native-Shell": "1" },
         });
         if (!res.ok) return;
         const data = (await res.json()) as { token?: string };

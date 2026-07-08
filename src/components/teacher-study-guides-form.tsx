@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,17 @@ import {
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
+import {
+  OwnerTeamAdminResourcePicker,
+  useOwnerScopedItems,
+} from "@/components/owner-team-admin-resource-picker";
 import type { SavedHomeworkPickerItem } from "@/db/queries/saved-homework";
 import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
+import type {
+  OwnerTeamAdminHomeworkPickerPayload,
+  OwnerTeamAdminLessonPlanPickerPayload,
+} from "@/db/queries/teacher-owner-pickers";
+import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
 import { generateStudyGuideAction } from "@/actions/teacher-study-guide";
 import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
@@ -49,15 +58,21 @@ const EMPTY_FORM: StudyGuideFormState = {
 export function TeacherStudyGuidesForm({
   savedLessonPlans = [],
   savedHomework = [],
+  ownerLessonPlanPicker,
+  ownerHomeworkPicker,
   hasAdvancedSourceImport = false,
   initialLessonPlanId,
+  initialHomeworkId,
   backHref = "/teacher",
   teacherWorkspace,
 }: {
   savedLessonPlans?: SavedLessonPlanPickerItem[];
   savedHomework?: SavedHomeworkPickerItem[];
+  ownerLessonPlanPicker: OwnerTeamAdminLessonPlanPickerPayload;
+  ownerHomeworkPicker: OwnerTeamAdminHomeworkPickerPayload;
   hasAdvancedSourceImport?: boolean;
   initialLessonPlanId?: number;
+  initialHomeworkId?: number;
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
 }) {
@@ -74,21 +89,49 @@ export function TeacherStudyGuidesForm({
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenerationSeed, setRegenerationSeed] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
+  const [homeworkSearchQuery, setHomeworkSearchQuery] = useState("");
+
+  const isWorkspaceOwner = ownerLessonPlanPicker.isWorkspaceOwner;
+  const activeLessonPlans = useOwnerScopedItems(
+    isWorkspaceOwner,
+    selectedAdminUserId,
+    ownerLessonPlanPicker.lessonPlansByAdminUserId,
+    savedLessonPlans,
+  );
+  const activeHomework = useOwnerScopedItems(
+    isWorkspaceOwner,
+    selectedAdminUserId,
+    ownerHomeworkPicker.itemsByAdminUserId,
+    savedHomework,
+  );
 
   const selectedPlan =
     form.savedLessonPlanId != null
-      ? savedLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
+      ? activeLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
       : null;
 
   const homeworkForPlan = useMemo(
     () =>
       form.savedLessonPlanId != null
-        ? savedHomework.filter(
+        ? activeHomework.filter(
             (item) => item.savedLessonPlanId === form.savedLessonPlanId,
           )
         : [],
-    [form.savedLessonPlanId, savedHomework],
+    [form.savedLessonPlanId, activeHomework],
   );
+
+  const filteredHomeworkForPlan = useMemo(() => {
+    const query = homeworkSearchQuery.trim().toLowerCase();
+    if (!query) return homeworkForPlan;
+    return homeworkForPlan.filter((item) =>
+      [item.label, item.assignmentTitle, item.subject, item.topic]
+        .filter((part) => part.trim())
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [homeworkForPlan, homeworkSearchQuery]);
 
   const selectedHomework =
     form.savedHomeworkId != null
@@ -111,21 +154,38 @@ export function TeacherStudyGuidesForm({
       )
     : "/teacher/homework";
 
+  function handleAdminChange(adminUserId: string) {
+    setSelectedAdminUserId(adminUserId);
+    setHomeworkSearchQuery("");
+    setSelectedPlanKey(SAVED_PLAN_NONE);
+    setSelectedHomeworkKey(HOMEWORK_NONE);
+    setForm(EMPTY_FORM);
+  }
+
+  function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
+    return [plan.lessonTitle, plan.subject, plan.gradeLevel, plan.topic]
+      .filter((part) => part.trim())
+      .join(" ")
+      .toLowerCase();
+  }
+
   function handleSavedPlanChange(value: string | null) {
     if (!value || value === SAVED_PLAN_NONE) {
       setSelectedPlanKey(SAVED_PLAN_NONE);
       setSelectedHomeworkKey(HOMEWORK_NONE);
+      setHomeworkSearchQuery("");
       setForm(EMPTY_FORM);
       return;
     }
 
     const planId = Number(value);
-    const plan = savedLessonPlans.find((item) => item.id === planId);
+    const plan = activeLessonPlans.find((item) => item.id === planId);
     if (!plan) return;
 
     const defaults = lessonPlanInputToQuizDefaults(plan.input);
     setSelectedPlanKey(value);
     setSelectedHomeworkKey(HOMEWORK_NONE);
+    setHomeworkSearchQuery("");
     setForm({
       savedLessonPlanId: plan.id,
       subject: defaults.subject,
@@ -156,12 +216,61 @@ export function TeacherStudyGuidesForm({
   }
 
   useEffect(() => {
+    if (initialHomeworkId) {
+      const homework = activeHomework.find((item) => item.id === initialHomeworkId);
+      if (homework) {
+        if (homework.savedLessonPlanId != null) {
+          const plan = activeLessonPlans.find((item) => item.id === homework.savedLessonPlanId);
+          if (plan) {
+            const defaults = lessonPlanInputToQuizDefaults(plan.input);
+            if (isWorkspaceOwner) {
+              const adminWithPlan = ownerLessonPlanPicker.teamAdmins.find((admin) =>
+                (ownerLessonPlanPicker.lessonPlansByAdminUserId[admin.userId] ?? []).some(
+                  (item) => item.id === plan.id,
+                ),
+              );
+              if (adminWithPlan) {
+                setSelectedAdminUserId(adminWithPlan.userId);
+              }
+            }
+            setSelectedPlanKey(String(plan.id));
+            setSelectedHomeworkKey(String(homework.id));
+            setForm({
+              savedLessonPlanId: plan.id,
+              savedHomeworkId: homework.id,
+              subject: defaults.subject,
+              gradeLevel: defaults.gradeLevel,
+              topic: defaults.topic,
+            });
+            return;
+          }
+        }
+      }
+    }
+
     if (!initialLessonPlanId) return;
-    const exists = savedLessonPlans.some((plan) => plan.id === initialLessonPlanId);
+    const exists = activeLessonPlans.some((plan) => plan.id === initialLessonPlanId);
     if (exists) {
+      if (isWorkspaceOwner) {
+        const adminWithPlan = ownerLessonPlanPicker.teamAdmins.find((admin) =>
+          (ownerLessonPlanPicker.lessonPlansByAdminUserId[admin.userId] ?? []).some(
+            (item) => item.id === initialLessonPlanId,
+          ),
+        );
+        if (adminWithPlan) {
+          setSelectedAdminUserId(adminWithPlan.userId);
+        }
+      }
       handleSavedPlanChange(String(initialLessonPlanId));
     }
-  }, [initialLessonPlanId, savedLessonPlans]);
+  }, [
+    initialHomeworkId,
+    initialLessonPlanId,
+    activeHomework,
+    activeLessonPlans,
+    isWorkspaceOwner,
+    ownerLessonPlanPicker,
+  ]);
 
   async function runGeneration(isRegenerate = false) {
     setIsGenerating(true);
@@ -192,7 +301,7 @@ export function TeacherStudyGuidesForm({
         savedHomeworkId: form.savedHomeworkId,
         referenceMaterials:
           resolvedReferences.length > 0 ? resolvedReferences : undefined,
-        regenerationSeed: seed,
+        teamId: teacherWorkspace?.teamId ?? undefined,
       });
 
       setResult(studyGuide);
@@ -311,6 +420,51 @@ export function TeacherStudyGuidesForm({
     >
       <TooltipProvider>
         <div className="grid gap-4 sm:grid-cols-2">
+          {isWorkspaceOwner ? (
+            <OwnerTeamAdminResourcePicker
+              ownerPicker={ownerLessonPlanPicker}
+              itemsByAdminUserId={ownerLessonPlanPicker.lessonPlansByAdminUserId}
+              selectedAdminUserId={selectedAdminUserId}
+              onAdminChange={handleAdminChange}
+              selectedItemKey={selectedPlanKey}
+              onItemChange={handleSavedPlanChange}
+              noneValue={SAVED_PLAN_NONE}
+              noneLabel="No saved lesson plan"
+              placeholder="No saved lesson plan"
+              resourceLabel="Saved lesson plan (optional)"
+              resourceSelectId="studyGuideLessonPlan"
+              adminSelectId="studyGuideTeamAdmin"
+              getItemKey={(plan) => String(plan.id)}
+              getItemLabel={(plan) => `${plan.lessonTitle} (${plan.subject} · ${plan.gradeLevel})`}
+              getItemHaystack={lessonPlanHaystack}
+              searchPlaceholder="Search lesson plans by title, subject, grade, or topic…"
+              resourceHelp={
+                <>
+                  <p className="mb-1 font-semibold">Example:</p>
+                  <p>
+                    Select a plan saved from the AI Lesson Builder. Subject, grade,
+                    and topic will auto-fill for your study guide.
+                  </p>
+                </>
+              }
+              resourceFooter={
+                selectedPlan?.pdfUrl ? (
+                  <p className="text-xs text-muted-foreground">
+                    Lesson plan PDF:{" "}
+                    <a
+                      href={selectedPlan.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 underline underline-offset-2"
+                    >
+                      View saved PDF
+                      <ExternalLink className="size-3" aria-hidden />
+                    </a>
+                  </p>
+                ) : null
+              }
+            />
+          ) : (
           <div className="space-y-2 sm:col-span-2">
             <TeacherFieldLabel
               htmlFor="studyGuideLessonPlan"
@@ -333,14 +487,14 @@ export function TeacherStudyGuidesForm({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={SAVED_PLAN_NONE}>No saved lesson plan</SelectItem>
-                {savedLessonPlans.map((plan) => (
+                {activeLessonPlans.map((plan) => (
                   <SelectItem key={plan.id} value={String(plan.id)}>
                     {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {savedLessonPlans.length === 0 ? (
+            {activeLessonPlans.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No saved lesson plans yet. Save one in the{" "}
                 <Link href={lessonBuilderHref} className="underline underline-offset-2">
@@ -364,6 +518,7 @@ export function TeacherStudyGuidesForm({
               </p>
             ) : null}
           </div>
+          )}
 
           {form.savedLessonPlanId != null ? (
             <div className="space-y-2 sm:col-span-2">
@@ -373,21 +528,47 @@ export function TeacherStudyGuidesForm({
                 help="If you generated homework from this lesson plan, select it to align the study guide with those questions."
               />
               {homeworkForPlan.length > 0 ? (
-                <Select value={selectedHomeworkKey} onValueChange={handleHomeworkChange}>
-                  <SelectTrigger id="studyGuideHomework" className="h-10 w-full bg-background">
-                    <SelectValue placeholder="Select homework">
-                      {selectedHomeworkLabel ?? "No homework selected"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={HOMEWORK_NONE}>No homework selected</SelectItem>
-                    {homeworkForPlan.map((homework) => (
-                      <SelectItem key={homework.id} value={String(homework.id)}>
-                        {homework.label} ({homework.assignmentTitle})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  {isWorkspaceOwner ? (
+                    <div className="relative">
+                      <Search
+                        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <Input
+                        value={homeworkSearchQuery}
+                        onChange={(e) => setHomeworkSearchQuery(e.target.value)}
+                        placeholder="Search homework by label, title, subject, or topic…"
+                        className="pl-9"
+                        aria-label="Search homework assignments"
+                      />
+                    </div>
+                  ) : null}
+                  <Select value={selectedHomeworkKey} onValueChange={handleHomeworkChange}>
+                    <SelectTrigger id="studyGuideHomework" className="h-10 w-full bg-background">
+                      <SelectValue placeholder="Select homework">
+                        {selectedHomeworkLabel ?? "No homework selected"}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={HOMEWORK_NONE}>No homework selected</SelectItem>
+                      {(isWorkspaceOwner ? filteredHomeworkForPlan : homeworkForPlan).map(
+                        (homework) => (
+                          <SelectItem key={homework.id} value={String(homework.id)}>
+                            {homework.label} ({homework.assignmentTitle})
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {isWorkspaceOwner &&
+                  homeworkForPlan.length > 0 &&
+                  filteredHomeworkForPlan.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No homework matches your search.
+                    </p>
+                  ) : null}
+                </>
               ) : (
                 <p className="text-xs text-muted-foreground">
                   No saved homework for this lesson plan. Generate homework in the{" "}

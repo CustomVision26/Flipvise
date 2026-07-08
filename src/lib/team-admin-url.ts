@@ -184,6 +184,15 @@ export function buildTeamAdminQueryString(
   return p.toString();
 }
 
+export function buildTeamAdminNavHref(
+  path: string,
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs ? `${path}?${qs}` : path;
+}
+
 /** Alias for callers that historically only named `team` (+ optional `teamMemberId`). */
 export function buildTeamAdminSearchParams(
   teamId?: number | null,

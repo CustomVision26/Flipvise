@@ -8,7 +8,7 @@ import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 import { getDeckRowById } from "@/db/queries/decks";
-import { getSavedLessonPlanByIdForUser } from "@/db/queries/saved-lesson-plans";
+import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
 import { saveHomeworkAssignment } from "@/db/queries/saved-homework";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
 import { buildDeckHomeworkContext } from "@/lib/homework-source-context";
@@ -84,7 +84,11 @@ async function resolveHomeworkSourceContext(
   userId: string,
 ): Promise<string | null> {
   if (input.sourceType === "lesson_plan" && input.savedLessonPlanId != null) {
-    const saved = await getSavedLessonPlanByIdForUser(userId, input.savedLessonPlanId);
+    const saved = await resolveSavedLessonPlanForViewer(
+      userId,
+      input.savedLessonPlanId,
+      input.teamId,
+    );
     if (!saved) {
       throw new Error("Saved lesson plan not found.");
     }
@@ -213,7 +217,11 @@ export async function saveHomeworkAction(data: {
   let sourceDeckName: string | null = null;
 
   if (payload.sourceType === "lesson_plan" && payload.savedLessonPlanId != null) {
-    const savedPlan = await getSavedLessonPlanByIdForUser(userId, payload.savedLessonPlanId);
+    const savedPlan = await resolveSavedLessonPlanForViewer(
+      userId,
+      payload.savedLessonPlanId,
+      payload.input.teamId,
+    );
     if (!savedPlan) {
       throw new Error("Saved lesson plan not found.");
     }

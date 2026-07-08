@@ -43,6 +43,8 @@ async function requireDeckEditor(userId: string, deckId: number) {
   return bundle.deck;
 }
 
+const nullableImageUrl = z.union([z.string().url(), z.null()]);
+
 const createCardSchema = z
   .object({
     deckId: z.number().int().positive(),
@@ -81,9 +83,15 @@ const updateCardSchema = z
     oldFrontImageUrl: z.string().url().nullable().optional(),
     oldBackImageUrl: z.string().url().nullable().optional(),
     distractors: z
-      .array(z.string().min(1))
+      .array(z.string())
       .length(3)
       .nullable()
+      .optional(),
+    choiceImageUrls: z
+      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .optional(),
+    oldChoiceImageUrls: z
+      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
       .optional(),
   })
   .refine((d) => d.front.trim().length > 0 || !!d.frontImageUrl, {
@@ -93,7 +101,20 @@ const updateCardSchema = z
   .refine((d) => d.back.trim().length > 0 || !!d.backImageUrl, {
     message: "Back must have text or an image",
     path: ["back"],
-  });
+  })
+  .refine(
+    (d) => {
+      if (!d.distractors) return true;
+      return d.distractors.every((text, index) => {
+        const image = d.choiceImageUrls?.[index + 1] ?? null;
+        return text.trim().length > 0 || !!image;
+      });
+    },
+    {
+      message: "Each wrong answer needs text or an image.",
+      path: ["distractors"],
+    },
+  );
 
 const uploadCardImageSchema = z.object({
   deckId: z.number().int().positive(),
@@ -313,6 +334,8 @@ type UpdateCardInput = {
   oldFrontImageUrl?: string | null;
   oldBackImageUrl?: string | null;
   distractors?: string[] | null;
+  choiceImageUrls?: [string | null, string | null, string | null, string | null];
+  oldChoiceImageUrls?: [string | null, string | null, string | null, string | null];
 };
 type DeleteCardInput = z.infer<typeof deleteCardSchema>;
 type GenerateCardsInput = z.infer<typeof generateCardsSchema>;
@@ -457,6 +480,8 @@ export async function updateCardAction(data: UpdateCardInput) {
     oldFrontImageUrl,
     oldBackImageUrl,
     distractors,
+    choiceImageUrls,
+    oldChoiceImageUrls,
   } = parsed.data;
 
   const deck = await requireDeckEditor(userId, deckId);
@@ -477,6 +502,20 @@ export async function updateCardAction(data: UpdateCardInput) {
     }
   }
 
+  if (oldChoiceImageUrls && choiceImageUrls) {
+    for (let i = 0; i < oldChoiceImageUrls.length; i++) {
+      const oldUrl = oldChoiceImageUrls[i];
+      const nextUrl = choiceImageUrls[i] ?? null;
+      if (oldUrl && oldUrl !== nextUrl) {
+        try {
+          await deleteFromS3(oldUrl);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
   const backText = cleanUserText(back) || null;
 
   await updateCard(
@@ -490,14 +529,26 @@ export async function updateCardAction(data: UpdateCardInput) {
 
   const providedDistractors =
     Array.isArray(distractors) && distractors.length === 3 && backText
-      ? [cleanAiText(distractors[0]), cleanAiText(distractors[1]), cleanAiText(distractors[2])]
+      ? [
+          cleanUserText(distractors[0]) || "",
+          cleanUserText(distractors[1]) || "",
+          cleanUserText(distractors[2]) || "",
+        ]
       : null;
-  if (
-    backText &&
-    providedDistractors &&
-    providedDistractors.every((d) => d.length > 0)
-  ) {
-    await updateCardChoices(cardId, deckId, [backText, ...providedDistractors], 0);
+  const distractorsValid =
+    providedDistractors != null &&
+    providedDistractors.every((text, index) => {
+      const image = choiceImageUrls?.[index + 1] ?? null;
+      return text.length > 0 || !!image;
+    });
+  if (backText && providedDistractors && distractorsValid) {
+    await updateCardChoices(
+      cardId,
+      deckId,
+      [backText, ...providedDistractors],
+      0,
+      choiceImageUrls ?? null,
+    );
   }
 
   revalidatePath(`/decks/${deckId}`);
@@ -811,8 +862,6 @@ Generate an appropriate answer for the back of this flashcard, matching the styl
   return { answer, distractors };
 }
 
-const nullableImageUrl = z.union([z.string().url(), z.null()]);
-
 const multipleChoiceAnswerRefine = (data: {
   question: string;
   questionImageUrl?: string | null;
@@ -823,7 +872,10 @@ const multipleChoiceAnswerRefine = (data: {
   if (!(data.question.trim().length > 0 || !!data.questionImageUrl)) return false;
   const correctImage = data.choiceImageUrls?.[0] ?? null;
   const correctOk = data.correctAnswer.trim().length > 0 || !!correctImage;
-  const distractorsOk = data.distractors.every((text) => text.trim().length > 0);
+  const distractorsOk = data.distractors.every((text, index) => {
+    const image = data.choiceImageUrls?.[index + 1] ?? null;
+    return text.trim().length > 0 || !!image;
+  });
   return correctOk && distractorsOk;
 };
 

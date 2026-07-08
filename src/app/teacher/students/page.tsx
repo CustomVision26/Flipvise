@@ -1,37 +1,11 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { getAccessContext } from "@/lib/access";
+import { getTeamById } from "@/db/queries/teams";
+import { listTeacherStudentProgressForWorkspace } from "@/db/queries/teacher-student-progress";
+import { listTeacherRegisteredStudentsForUser } from "@/db/queries/teacher-registered-students";
+import { listTeacherManualGradesForWorkspace } from "@/db/queries/teacher-manual-grades";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
-
-const PLACEHOLDER_STUDENTS = [
-  {
-    name: "Ava Martinez",
-    className: "Period 1 — Algebra I",
-    averageQuizScore: 88,
-    completedAssignments: 12,
-    weakTopics: ["Factoring"],
-    lastActivity: "2 hours ago",
-  },
-  {
-    name: "Jordan Lee",
-    className: "Period 3 — US History",
-    averageQuizScore: 76,
-    completedAssignments: 9,
-    weakTopics: ["Reconstruction", "Primary sources"],
-    lastActivity: "Yesterday",
-  },
-  {
-    name: "Sam Patel",
-    className: "Period 5 — Biology",
-    averageQuizScore: 92,
-    completedAssignments: 14,
-    weakTopics: ["Cell division"],
-    lastActivity: "Today",
-  },
-];
+import { isEducationTeamPlanId } from "@/lib/education-plans";
+import { TeacherStudentProgressView } from "@/components/teacher-student-progress-view";
 
 type TeacherStudentsPageProps = {
   searchParams: Promise<{
@@ -44,53 +18,56 @@ export default async function TeacherStudentsPage({
   searchParams,
 }: TeacherStudentsPageProps) {
   const params = await searchParams;
-  const { backHref } = await loadTeacherPageContext("/teacher/students", params);
+  const { userId, workspace, backHref } = await loadTeacherPageContext(
+    "/teacher/students",
+    params,
+  );
+
+  const ctx = await getAccessContext();
+  const isEducationPlus = ctx.effectivePlanSlug === "education_plus";
+  const showRegisterStudentTab = isEducationPlus;
+  const workspacePlanSlug =
+    workspace.teamId != null
+      ? (await getTeamById(workspace.teamId))?.planSlug ?? null
+      : ctx.activeEducationTeamPlan;
+  const showQuizResultsTab =
+    workspacePlanSlug != null && isEducationTeamPlanId(workspacePlanSlug);
+  const showGradesAndReportsTabs = isEducationPlus || showQuizResultsTab;
+
+  const [progress, team, registeredStudents, manualGrades] = await Promise.all([
+    listTeacherStudentProgressForWorkspace(userId, workspace.teamId),
+    workspace.teamId != null ? getTeamById(workspace.teamId) : Promise.resolve(null),
+    showRegisterStudentTab
+      ? listTeacherRegisteredStudentsForUser(userId)
+      : Promise.resolve([]),
+    showGradesAndReportsTabs
+      ? listTeacherManualGradesForWorkspace(userId, workspace.teamId)
+      : Promise.resolve([]),
+  ]);
+
+  const isWorkspaceOwner = team != null && team.ownerUserId === userId;
+  const canDeleteResults =
+    workspace.teamId != null &&
+    (isWorkspaceOwner ||
+      progress.memberMetaByUserId[userId]?.role === "team_admin");
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex items-center gap-3">
-        <Link
-          href={backHref}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Back
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Student Progress</h1>
-          <p className="text-sm text-muted-foreground">
-            Track quiz performance, assignments, and topics needing support.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {PLACEHOLDER_STUDENTS.map((student) => (
-          <Card key={student.name} className="border-border/80 bg-card/60">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">{student.name}</CardTitle>
-                <Badge variant="secondary">{student.lastActivity}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">{student.className}</p>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-              <p>
-                <span className="font-medium text-foreground">Avg quiz score: </span>
-                {student.averageQuizScore}%
-              </p>
-              <p>
-                <span className="font-medium text-foreground">Completed assignments: </span>
-                {student.completedAssignments}
-              </p>
-              <p className="sm:col-span-2">
-                <span className="font-medium text-foreground">Weak topics: </span>
-                {student.weakTopics.join(", ")}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <TeacherStudentProgressView
+      rows={progress.rows}
+      teamId={workspace.teamId}
+      canDeleteResults={canDeleteResults}
+      ownerUserId={progress.ownerUserId}
+      ownerName={progress.ownerName}
+      ownerEmail={progress.ownerEmail}
+      memberMetaByUserId={progress.memberMetaByUserId}
+      workspaceLabel={team?.name ?? null}
+      backHref={backHref}
+      isWorkspaceOwner={isWorkspaceOwner}
+      showRegisterStudentTab={showRegisterStudentTab}
+      showQuizResultsTab={showQuizResultsTab}
+      showGradesAndReportsTabs={showGradesAndReportsTabs}
+      registeredStudents={registeredStudents}
+      manualGrades={manualGrades}
+    />
   );
 }

@@ -8,6 +8,7 @@ import { HeaderLogo } from "@/components/header-logo";
 import { AppTopNav } from "@/components/app-top-nav";
 import { AuthenticatedShellChrome } from "@/components/authenticated-shell-chrome";
 import { HeaderUserSection } from "@/components/header-user-section";
+import { HelpCenter } from "@/components/help-center";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
@@ -38,10 +39,6 @@ import "./globals.css";
 /** Defer heavy optional UI — keep AppProviders static so Clerk hydrates without mismatch. */
 const TeamAdminHeaderSwitcherClient = dynamic(
   () => import("@/components/team-admin-header-switcher-client"),
-  { loading: () => null },
-);
-const HelpCenter = dynamic(
-  () => import("@/components/help-center").then((mod) => mod.HelpCenter),
   { loading: () => null },
 );
 const poppins = Poppins({
@@ -104,6 +101,7 @@ export default async function RootLayout({
     hasClerkPersonalProPlus,
     canAccessTeacherTools,
     activeEducationTeamPlan,
+    isAdmin,
   } = access;
 
   const teamContext = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
@@ -278,6 +276,7 @@ export default async function RootLayout({
                         resolvedHasProPlusInterfacePalette={
                           hasProPlusInterfacePalette
                         }
+                        resolvedIsPlatformAdmin={isAdmin}
                         inboxUnreadCount={shell.inboxUnreadCount}
                         showHelpCenter={!shell.hideHelpCenter}
                         showTeacherDashboard={shell.showTeacherDashboard}
@@ -289,6 +288,7 @@ export default async function RootLayout({
                   <HelpCenter
                     showPrioritySupport={hasPrioritySupport}
                     showTrigger={false}
+                    isPlatformAdmin={isAdmin}
                   />
                 ) : null}
                 <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">

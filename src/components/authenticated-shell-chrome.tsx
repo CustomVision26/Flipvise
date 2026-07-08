@@ -20,17 +20,29 @@ export function AuthenticatedShellChrome({
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      clearClerkAuthHandoff();
+      setHidden(false);
+      return;
+    }
+
     const delay = clerkAuthHandoffDelayMs();
     if (delay === 0) {
       clearClerkAuthHandoff();
+      setHidden(false);
       return;
     }
+
     setHidden(true);
     const timer = window.setTimeout(() => {
       clearClerkAuthHandoff();
       setHidden(false);
     }, delay);
-    return () => window.clearTimeout(timer);
+
+    return () => {
+      window.clearTimeout(timer);
+      setHidden(false);
+    };
   }, []);
 
   return (

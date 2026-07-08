@@ -40,7 +40,7 @@ function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
 
 function ClerkWithTheme({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={clerkAppearance}>
+    <ClerkProvider appearance={clerkAppearance} telemetry={false}>
       <ClerkChunkLoadRecovery />
       <ClerkAuthHandoffMarker />
       <ClerkPostSignInHardNavigation />

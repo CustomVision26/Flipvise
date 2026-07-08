@@ -14,6 +14,7 @@ export const teacherHomeworkInputSchema = z
     topic: z.string().min(1),
     numberOfQuestions: z.number().int().min(1).max(30),
     difficultyLevel: z.string().min(1),
+    teamId: z.number().int().positive().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.sourceType === "lesson_plan" && data.savedLessonPlanId == null) {

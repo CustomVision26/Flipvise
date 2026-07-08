@@ -111,7 +111,7 @@ function TeamAdminHeaderSwitcherInner({
                 : buildTeamAdminPath;
 
   return (
-    <>
+    <div className="flex min-w-0 flex-wrap items-center justify-center gap-2">
       <p id="team-admin-header-team-switcher-hint" className="sr-only">
         Choose which team this page is for—members, invites, and deck access update when you
         switch.
@@ -129,7 +129,7 @@ function TeamAdminHeaderSwitcherInner({
         showManageWorkspaces={displayedTeams.some((t) => t.ownerUserId === userId)}
         buildTeamChangeHref={buildTeamChangeHref}
       />
-    </>
+    </div>
   );
 }
 

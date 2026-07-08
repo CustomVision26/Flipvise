@@ -38,6 +38,11 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  AnswerChoiceImageControl,
+  buildChoiceImageTuple,
+  extractWrongChoiceImages,
+} from "./answer-choice-image-control";
 
 interface EditCardDialogProps {
   card: {
@@ -260,6 +265,11 @@ function WrongAnswersSection({
   cardId,
   distractors,
   onDistractorChange,
+  wrongImagePreviews,
+  uploadingWrongImageIndex,
+  wrongImageInputRefs,
+  onWrongImageChange,
+  onWrongImageRemove,
   disabled,
   hasAI,
   onRegenerate,
@@ -269,6 +279,11 @@ function WrongAnswersSection({
   cardId: number;
   distractors: string[];
   onDistractorChange: (index: number, value: string) => void;
+  wrongImagePreviews: (string | null)[];
+  uploadingWrongImageIndex: number | null;
+  wrongImageInputRefs: React.RefObject<HTMLInputElement | null>[];
+  onWrongImageChange: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
+  onWrongImageRemove: (index: number) => void;
   disabled: boolean;
   hasAI: boolean;
   onRegenerate: () => void;
@@ -312,14 +327,25 @@ function WrongAnswersSection({
             <Label htmlFor={`wrong-answer-${cardId}-${i}`} className="text-xs sm:text-sm">
               Wrong answer {i + 1}
             </Label>
-            <Input
-              id={`wrong-answer-${cardId}-${i}`}
-              value={d}
-              onChange={(e) => onDistractorChange(i, e.target.value)}
-              disabled={disabled}
-              placeholder={`Wrong answer ${i + 1}`}
-              className="text-sm bg-background"
-            />
+            <div className="flex items-start gap-2">
+              <Input
+                id={`wrong-answer-${cardId}-${i}`}
+                value={d}
+                onChange={(e) => onDistractorChange(i, e.target.value)}
+                disabled={disabled}
+                placeholder={`Wrong answer ${i + 1}`}
+                className="text-sm bg-background"
+              />
+              <AnswerChoiceImageControl
+                imagePreview={wrongImagePreviews[i] ?? null}
+                isUploading={uploadingWrongImageIndex === i}
+                isBusy={disabled}
+                fileInputRef={wrongImageInputRefs[i]!}
+                onFileChange={(e) => onWrongImageChange(i, e)}
+                onRemove={() => onWrongImageRemove(i)}
+                altText={`Wrong answer ${i + 1} image`}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -356,8 +382,24 @@ function StandardEditForm({
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const correctIdx = card.correctChoiceIndex ?? 0;
   const initialDistractors = extractDistractorsFromChoices(card.choices, correctIdx);
+  const initialWrongImages = extractWrongChoiceImages(card.choiceImageUrls, correctIdx);
   const hasQuizChoices = (card.choices?.length ?? 0) >= 4;
   const [distractors, setDistractors] = useState<string[]>([...initialDistractors]);
+  const [wrongImageUrls, setWrongImageUrls] = useState<
+    [string | null, string | null, string | null]
+  >([initialWrongImages[0], initialWrongImages[1], initialWrongImages[2]]);
+  const [wrongImagePreviews, setWrongImagePreviews] = useState<
+    [string | null, string | null, string | null]
+  >([initialWrongImages[0], initialWrongImages[1], initialWrongImages[2]]);
+  const [uploadingWrongImageIndex, setUploadingWrongImageIndex] = useState<number | null>(null);
+  const wrongImageInputRef0 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRef1 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRef2 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRefs = [wrongImageInputRef0, wrongImageInputRef1, wrongImageInputRef2];
+  const initialChoiceImageTuple = buildChoiceImageTuple(
+    card.backImageUrl ?? initialCorrectAnswerImage(card.choiceImageUrls, correctIdx),
+    initialWrongImages,
+  );
   const [aiDistractors, setAiDistractors] = useState<[string, string, string] | null>(
     hasQuizChoices ? initialDistractors : null,
   );
@@ -371,11 +413,14 @@ function StandardEditForm({
   const backSpeech = useSpeechRecognition((t) => setBack((prev) => prev + t));
   const speechError = frontSpeech.error ?? backSpeech.error;
 
-  const isUploading = isUploadingFront || isUploadingBack;
+  const isUploading =
+    isUploadingFront || isUploadingBack || uploadingWrongImageIndex !== null;
   const isBusy = isPending || isUploading || isGeneratingAnswer || isRegeneratingDistractors;
   const frontHasContent = front.trim().length > 0 || !!frontImageUrl;
   const backHasContent = back.trim().length > 0 || !!backImageUrl;
-  const allDistractorsFilled = distractors.every((d) => d.trim().length > 0);
+  const allDistractorsFilled = distractors.every(
+    (d, index) => d.trim().length > 0 || !!wrongImageUrls[index],
+  );
   const showWrongAnswers = hasQuizChoices;
 
   function setDistractorAt(i: number, value: string) {
@@ -384,6 +429,67 @@ function StandardEditForm({
       next[i] = value;
       return next;
     });
+  }
+
+  async function handleWrongImageChange(
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
+      if (wrongImageInputRefs[index]?.current) {
+        wrongImageInputRefs[index]!.current!.value = "";
+      }
+      return;
+    }
+    setError(null);
+    setUploadingWrongImageIndex(index);
+    setWrongImagePreviews((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = URL.createObjectURL(file);
+      return next;
+    });
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const url = await uploadCardImageAction({ deckId }, formData);
+      setWrongImageUrls((prev) => {
+        const next: [string | null, string | null, string | null] = [...prev];
+        next[index] = url;
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+      setWrongImagePreviews((prev) => {
+        const next: [string | null, string | null, string | null] = [...prev];
+        next[index] = wrongImageUrls[index];
+        return next;
+      });
+    } finally {
+      setUploadingWrongImageIndex(null);
+      if (wrongImageInputRefs[index]?.current) {
+        wrongImageInputRefs[index]!.current!.value = "";
+      }
+    }
+  }
+
+  function handleWrongImageRemove(index: number) {
+    setWrongImageUrls((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = null;
+      return next;
+    });
+    setWrongImagePreviews((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = null;
+      return next;
+    });
+    if (wrongImageInputRefs[index]?.current) {
+      wrongImageInputRefs[index]!.current!.value = "";
+    }
   }
 
   async function handleRegenerateDistractors() {
@@ -491,6 +597,9 @@ function StandardEditForm({
         : null;
     startTransition(async () => {
       try {
+        const choiceImageUrls = showWrongAnswers
+          ? buildChoiceImageTuple(backImageUrl, wrongImageUrls)
+          : undefined;
         await updateCardAction({
           cardId: card.id,
           deckId,
@@ -501,6 +610,8 @@ function StandardEditForm({
           oldFrontImageUrl: card.frontImageUrl ?? null,
           oldBackImageUrl: card.backImageUrl ?? null,
           distractors: distractorsToSend,
+          choiceImageUrls,
+          oldChoiceImageUrls: showWrongAnswers ? initialChoiceImageTuple : undefined,
         });
         onClose();
       } catch (err) {
@@ -581,13 +692,11 @@ function StandardEditForm({
       </EditCardSection>
 
       <EditCardSection title="Back">
-        <EditCardTextField
-          id={`back-${card.id}`}
-          value={back}
-          onChange={setBack}
-          placeholder="Answer or definition… (optional if image added)"
-          disabled={isBusy}
-          actions={
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`back-${card.id}`} className="text-xs sm:text-sm">
+              Text
+            </Label>
             <div className="flex items-center gap-1.5 shrink-0">
               {hasAI && (
                 <TooltipProvider>
@@ -650,31 +759,41 @@ function StandardEditForm({
                 </TooltipProvider>
               )}
             </div>
-          }
-        />
-        <ImageUploadSection
-          label="Image (optional)"
-          imagePreview={backImagePreview}
-          isUploading={isUploadingBack}
-          isBusy={isBusy}
-          fileInputRef={backFileInputRef}
-          onFileChange={(e) =>
-            handleImageChange(
-              e,
-              setBackImageUrl,
-              setBackImagePreview,
-              setIsUploadingBack,
-              backFileInputRef,
-              card.backImageUrl ?? null,
-            )
-          }
-          onRemove={() => {
-            setBackImageUrl(null);
-            setBackImagePreview(null);
-            if (backFileInputRef.current) backFileInputRef.current.value = "";
-          }}
-          altText="Back image preview"
-        />
+          </div>
+          <div className="flex items-start gap-2">
+            <Textarea
+              id={`back-${card.id}`}
+              placeholder="Answer or definition… (optional if image added)"
+              value={back}
+              onChange={(e) => setBack(e.target.value)}
+              rows={3}
+              disabled={isBusy}
+              className="text-sm bg-background flex-1"
+            />
+            <AnswerChoiceImageControl
+              imagePreview={backImagePreview}
+              isUploading={isUploadingBack}
+              isBusy={isBusy}
+              fileInputRef={backFileInputRef}
+              onFileChange={(e) =>
+                handleImageChange(
+                  e,
+                  setBackImageUrl,
+                  setBackImagePreview,
+                  setIsUploadingBack,
+                  backFileInputRef,
+                  card.backImageUrl ?? null,
+                )
+              }
+              onRemove={() => {
+                setBackImageUrl(null);
+                setBackImagePreview(null);
+                if (backFileInputRef.current) backFileInputRef.current.value = "";
+              }}
+              altText="Correct answer image"
+            />
+          </div>
+        </div>
       </EditCardSection>
 
       {showWrongAnswers && (
@@ -682,6 +801,11 @@ function StandardEditForm({
           cardId={card.id}
           distractors={distractors}
           onDistractorChange={setDistractorAt}
+          wrongImagePreviews={wrongImagePreviews}
+          uploadingWrongImageIndex={uploadingWrongImageIndex}
+          wrongImageInputRefs={wrongImageInputRefs}
+          onWrongImageChange={handleWrongImageChange}
+          onWrongImageRemove={handleWrongImageRemove}
           disabled={isBusy}
           hasAI={hasAI}
           onRegenerate={handleRegenerateDistractors}
@@ -753,6 +877,8 @@ function MultipleChoiceEditForm({
   while (initialDistractors.length < 3) initialDistractors.push("");
 
   const initialCorrectImage = initialCorrectAnswerImage(card.choiceImageUrls, correctIdx);
+  const initialWrongImages = extractWrongChoiceImages(card.choiceImageUrls, correctIdx);
+  const initialChoiceImageTuple = buildChoiceImageTuple(initialCorrectImage, initialWrongImages);
 
   const [question, setQuestion] = useState(card.front ?? "");
   const [questionImageUrl, setQuestionImageUrl] = useState<string | null>(
@@ -772,6 +898,17 @@ function MultipleChoiceEditForm({
   );
   const [isUploadingCorrectImage, setIsUploadingCorrectImage] = useState(false);
   const correctAnswerImageInputRef = useRef<HTMLInputElement>(null);
+  const [wrongImageUrls, setWrongImageUrls] = useState<
+    [string | null, string | null, string | null]
+  >([initialWrongImages[0], initialWrongImages[1], initialWrongImages[2]]);
+  const [wrongImagePreviews, setWrongImagePreviews] = useState<
+    [string | null, string | null, string | null]
+  >([initialWrongImages[0], initialWrongImages[1], initialWrongImages[2]]);
+  const [uploadingWrongImageIndex, setUploadingWrongImageIndex] = useState<number | null>(null);
+  const wrongImageInputRef0 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRef1 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRef2 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRefs = [wrongImageInputRef0, wrongImageInputRef1, wrongImageInputRef2];
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -782,10 +919,16 @@ function MultipleChoiceEditForm({
   const mcSpeechError = questionSpeech.error ?? correctSpeech.error;
 
   const isBusy =
-    isPending || isUploadingImage || isRegeneratingDistractors || isUploadingCorrectImage;
+    isPending ||
+    isUploadingImage ||
+    isRegeneratingDistractors ||
+    isUploadingCorrectImage ||
+    uploadingWrongImageIndex !== null;
   const questionHasContent = question.trim().length > 0 || !!questionImageUrl;
   const correctFilled = correctAnswer.trim().length > 0 || !!correctAnswerImageUrl;
-  const allDistractorsFilled = distractors.every((d) => d.trim().length > 0);
+  const allDistractorsFilled = distractors.every(
+    (d, index) => d.trim().length > 0 || !!wrongImageUrls[index],
+  );
 
   async function handleCorrectAnswerImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -847,6 +990,67 @@ function MultipleChoiceEditForm({
     });
   }
 
+  async function handleWrongImageChange(
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
+      if (wrongImageInputRefs[index]?.current) {
+        wrongImageInputRefs[index]!.current!.value = "";
+      }
+      return;
+    }
+    setError(null);
+    setUploadingWrongImageIndex(index);
+    setWrongImagePreviews((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = URL.createObjectURL(file);
+      return next;
+    });
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const url = await uploadCardImageAction({ deckId }, formData);
+      setWrongImageUrls((prev) => {
+        const next: [string | null, string | null, string | null] = [...prev];
+        next[index] = url;
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+      setWrongImagePreviews((prev) => {
+        const next: [string | null, string | null, string | null] = [...prev];
+        next[index] = wrongImageUrls[index];
+        return next;
+      });
+    } finally {
+      setUploadingWrongImageIndex(null);
+      if (wrongImageInputRefs[index]?.current) {
+        wrongImageInputRefs[index]!.current!.value = "";
+      }
+    }
+  }
+
+  function handleWrongImageRemove(index: number) {
+    setWrongImageUrls((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = null;
+      return next;
+    });
+    setWrongImagePreviews((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = null;
+      return next;
+    });
+    if (wrongImageInputRefs[index]?.current) {
+      wrongImageInputRefs[index]!.current!.value = "";
+    }
+  }
+
   async function handleRegenerateDistractors() {
     if (!question.trim()) {
       setError("Please enter a question first.");
@@ -888,8 +1092,8 @@ function MultipleChoiceEditForm({
           oldQuestionImageUrl: card.frontImageUrl ?? null,
           correctAnswer,
           distractors,
-          choiceImageUrls: [correctAnswerImageUrl, null, null, null],
-          oldChoiceImageUrls: [initialCorrectImage, null, null, null],
+          choiceImageUrls: buildChoiceImageTuple(correctAnswerImageUrl, wrongImageUrls),
+          oldChoiceImageUrls: initialChoiceImageTuple,
         });
         onClose();
       } catch (err) {
@@ -961,14 +1165,12 @@ function MultipleChoiceEditForm({
       </EditCardSection>
 
       <EditCardSection title="Back">
-        <EditCardTextField
-          id={`mc-correct-${card.id}`}
-          value={correctAnswer}
-          onChange={setCorrectAnswer}
-          placeholder="Correct answer… (optional if image added)"
-          disabled={isBusy}
-          actions={
-            correctSpeech.supported ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={`mc-correct-${card.id}`} className="text-xs sm:text-sm">
+              Text
+            </Label>
+            {correctSpeech.supported ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={<span />}>
@@ -1001,31 +1203,46 @@ function MultipleChoiceEditForm({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            ) : null
-          }
-        />
-        <ImageUploadSection
-          label="Image (optional)"
-          imagePreview={correctAnswerImagePreview}
-          isUploading={isUploadingCorrectImage}
-          isBusy={isBusy}
-          fileInputRef={correctAnswerImageInputRef}
-          onFileChange={handleCorrectAnswerImageChange}
-          onRemove={() => {
-            setCorrectAnswerImageUrl(null);
-            setCorrectAnswerImagePreview(null);
-            if (correctAnswerImageInputRef.current) {
-              correctAnswerImageInputRef.current.value = "";
-            }
-          }}
-          altText="Back image preview"
-        />
+            ) : null}
+          </div>
+          <div className="flex items-start gap-2">
+            <Textarea
+              id={`mc-correct-${card.id}`}
+              placeholder="Correct answer… (optional if image added)"
+              value={correctAnswer}
+              onChange={(e) => setCorrectAnswer(e.target.value)}
+              rows={3}
+              disabled={isBusy}
+              className="text-sm bg-background flex-1"
+            />
+            <AnswerChoiceImageControl
+              imagePreview={correctAnswerImagePreview}
+              isUploading={isUploadingCorrectImage}
+              isBusy={isBusy}
+              fileInputRef={correctAnswerImageInputRef}
+              onFileChange={handleCorrectAnswerImageChange}
+              onRemove={() => {
+                setCorrectAnswerImageUrl(null);
+                setCorrectAnswerImagePreview(null);
+                if (correctAnswerImageInputRef.current) {
+                  correctAnswerImageInputRef.current.value = "";
+                }
+              }}
+              altText="Correct answer image"
+            />
+          </div>
+        </div>
       </EditCardSection>
 
       <WrongAnswersSection
         cardId={card.id}
         distractors={distractors}
         onDistractorChange={setDistractorAt}
+        wrongImagePreviews={wrongImagePreviews}
+        uploadingWrongImageIndex={uploadingWrongImageIndex}
+        wrongImageInputRefs={wrongImageInputRefs}
+        onWrongImageChange={handleWrongImageChange}
+        onWrongImageRemove={handleWrongImageRemove}
         disabled={isBusy}
         hasAI={hasAI}
         onRegenerate={handleRegenerateDistractors}

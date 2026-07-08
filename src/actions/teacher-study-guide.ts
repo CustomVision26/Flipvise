@@ -4,8 +4,8 @@ import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
-import { getSavedHomeworkAssignmentByIdForUser } from "@/db/queries/saved-homework";
-import { getSavedLessonPlanByIdForUser } from "@/db/queries/saved-lesson-plans";
+import { resolveSavedHomeworkForViewer } from "@/db/queries/saved-homework";
+import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
 import { formatMultipleLessonPlanReferencesForPrompt } from "@/lib/lesson-plan-reference-material";
 import { buildLessonPlanQuizContext } from "@/lib/lesson-plan-quiz-context";
 import { buildHomeworkStudyGuideContext } from "@/lib/study-guide-source-context";
@@ -94,7 +94,11 @@ async function resolveStudyGuideSourceContext(
   let homeworkTitle: string | null = null;
 
   if (input.savedLessonPlanId != null) {
-    const savedPlan = await getSavedLessonPlanByIdForUser(userId, input.savedLessonPlanId);
+    const savedPlan = await resolveSavedLessonPlanForViewer(
+      userId,
+      input.savedLessonPlanId,
+      input.teamId,
+    );
     if (!savedPlan) {
       throw new Error("Saved lesson plan not found.");
     }
@@ -105,9 +109,10 @@ async function resolveStudyGuideSourceContext(
   }
 
   if (input.savedHomeworkId != null) {
-    const savedHomework = await getSavedHomeworkAssignmentByIdForUser(
+    const savedHomework = await resolveSavedHomeworkForViewer(
       userId,
       input.savedHomeworkId,
+      input.teamId,
     );
     if (!savedHomework) {
       throw new Error("Saved homework assignment not found.");

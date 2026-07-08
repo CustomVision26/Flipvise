@@ -28,4 +28,5 @@ export async function deleteQuizResultAction(data: z.infer<typeof deleteQuizResu
   await deleteQuizResultForTeamAdmin(parsed.data.resultId, parsed.data.teamId);
 
   revalidatePath("/dashboard/team-admin/quiz-results");
+  revalidatePath("/teacher/students");
 }

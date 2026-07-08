@@ -62,6 +62,8 @@ interface HeaderUserSectionProps {
   resolvedActiveEducationTeamPlan?: import("@/lib/education-plans").EducationTeamPlanId | null;
   /** Server-resolved Pro Plus interface palette (12 colors) vs Pro-only (8), from `getAccessContext()`. */
   resolvedHasProPlusInterfacePalette?: boolean;
+  /** Server-resolved platform admin from `getAccessContext()` (includes env superadmin allow-list). */
+  resolvedIsPlatformAdmin?: boolean;
   /** Count of open (pending + non-expired) inbox invitations for the nav badge. */
   inboxUnreadCount?: number;
   /** When true, show the Help Center question-mark icon (hidden for team workspace members). */
@@ -86,6 +88,7 @@ export function HeaderUserSection({
   resolvedActiveTeamPlan = null,
   resolvedActiveEducationTeamPlan = null,
   resolvedHasProPlusInterfacePalette = false,
+  resolvedIsPlatformAdmin = false,
   inboxUnreadCount = 0,
   showHelpCenter = false,
   showTeacherDashboard = false,
@@ -135,7 +138,8 @@ export function HeaderUserSection({
     | { adminGranted?: boolean; role?: string }
     | undefined;
   const adminGranted = meta?.adminGranted === true;
-  const isAdmin = isClerkPlatformAdminRole(meta?.role);
+  const isAdmin =
+    resolvedIsPlatformAdmin || isClerkPlatformAdminRole(meta?.role);
   const activeTeamPlan = resolvedActiveTeamPlan;
   const isPro = resolvedIsPro || adminGranted || isAdmin;
 
@@ -162,13 +166,24 @@ export function HeaderUserSection({
       setPortalsReady(false);
       return;
     }
+
+    if (process.env.NODE_ENV === "development") {
+      setPortalsReady(true);
+      return;
+    }
+
     const delay = clerkAuthHandoffDelayMs();
     if (delay === 0) {
       setPortalsReady(true);
       return;
     }
+
+    setPortalsReady(false);
     const timer = window.setTimeout(() => setPortalsReady(true), delay);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      setPortalsReady(true);
+    };
   }, [userId]);
 
   // Never signed in on this page → nothing to render. When signing out we keep
@@ -180,12 +195,13 @@ export function HeaderUserSection({
 
   const hidePlatformAdminLink = shouldHidePlatformAdminNav(pathname);
 
-  const showTeacherNavButton =
-    showTeacherDashboard &&
-    (pathname === "/dashboard/team-admin" ||
-      pathname.startsWith("/dashboard/team-admin/") ||
-      pathname === "/teacher" ||
-      pathname.startsWith("/teacher/"));
+  const isTeacherRoute =
+    pathname === "/teacher" || pathname.startsWith("/teacher/");
+  const isTeamAdminRoute =
+    pathname === "/dashboard/team-admin" ||
+    pathname.startsWith("/dashboard/team-admin/");
+
+  const showTeacherNavButton = showTeacherDashboard && isTeamAdminRoute;
 
   const workspaceDropdownEligible =
     workspaceTeams.length > 0 ||
@@ -223,7 +239,7 @@ export function HeaderUserSection({
             </span>
           ) : null}
           {(isAdmin && !hidePlatformAdminLink) || showAffiliatePortal ? (
-            <div className="hidden items-center gap-1 sm:flex">
+            <div className="flex items-center gap-1">
               {isAdmin && !hidePlatformAdminLink && (
                 <HeaderNavTooltip label="Platform Admin">
                   <Link
@@ -340,6 +356,7 @@ export function HeaderUserSection({
                 resolvedActiveEducationTeamPlan != null
               }
               teamDashFallback={teamDashFallback}
+              showTeacherDashboard={showTeacherDashboard}
             />
           </span>
         </div>

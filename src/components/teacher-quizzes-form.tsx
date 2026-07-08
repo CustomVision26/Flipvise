@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { ExternalLink, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { saveTeacherQuizDeckAction, generateTeacherQuizAction } from "@/actions/teacher-quiz";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,11 @@ import { buttonVariants, Button } from "@/components/ui/button";
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
-import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
+import type {
+  OwnerQuizLessonPlanPickerPayload,
+  SavedLessonPlanPickerItem,
+  TeamAdminQuizPickerOption,
+} from "@/db/queries/saved-lesson-plans";
 import type { DeckRow } from "@/db/queries/decks";
 import {
   teacherDeckQuotaLabel,
@@ -50,9 +54,17 @@ import {
 import { TeacherQuizReviewPanel } from "@/components/teacher-quiz-review-panel";
 import { TeacherTooltipButton } from "@/components/teacher-tooltip-button";
 import { cn } from "@/lib/utils";
+import { ADMIN_NONE, adminDisplayLabel } from "@/lib/owner-team-admin-picker";
 import { toast } from "sonner";
 
 const SAVED_PLAN_NONE = "__none__";
+
+function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
+  return [plan.lessonTitle, plan.subject, plan.gradeLevel, plan.topic]
+    .filter((part) => part.trim())
+    .join(" ")
+    .toLowerCase();
+}
 
 type QuizDeckFormState = {
   savedLessonPlanId?: number;
@@ -99,6 +111,7 @@ function defaultNumberOfCards(maxCardsPerDeck: number): string {
 
 export function TeacherQuizzesForm({
   savedLessonPlans,
+  ownerPicker,
   initialLessonPlanId,
   decks,
   deckQuota,
@@ -106,6 +119,7 @@ export function TeacherQuizzesForm({
   teacherWorkspace,
 }: {
   savedLessonPlans: SavedLessonPlanPickerItem[];
+  ownerPicker: OwnerQuizLessonPlanPickerPayload;
   initialLessonPlanId?: number;
   decks: DeckRow[];
   deckQuota: TeacherDeckQuota;
@@ -113,11 +127,14 @@ export function TeacherQuizzesForm({
   teacherWorkspace?: TeacherWorkspaceContext;
 }) {
   const router = useRouter();
+  const isWorkspaceOwner = ownerPicker.isWorkspaceOwner;
   const [form, setForm] = useState<QuizDeckFormState>(() => ({
     ...EMPTY_FORM,
     numberOfCards: defaultNumberOfCards(deckQuota.maxCardsPerDeck),
   }));
   const [selectedPlanKey, setSelectedPlanKey] = useState<string>(SAVED_PLAN_NONE);
+  const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
+  const [lessonPlanSearchQuery, setLessonPlanSearchQuery] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [reviewRows, setReviewRows] = useState<TeacherQuizReviewRow[] | null>(null);
@@ -127,7 +144,10 @@ export function TeacherQuizzesForm({
   const [readingPassageQuestions, setReadingPassageQuestions] = useState(false);
   const [readingPassageQuestionCount, setReadingPassageQuestionCount] = useState("5");
 
-  function handleSavedPlanChange(value: string | null) {
+  function handleSavedPlanChange(
+    value: string | null,
+    plans: SavedLessonPlanPickerItem[],
+  ) {
     if (!value || value === SAVED_PLAN_NONE) {
       setSelectedPlanKey(SAVED_PLAN_NONE);
       setForm((current) => ({
@@ -138,7 +158,7 @@ export function TeacherQuizzesForm({
     }
 
     const planId = Number(value);
-    const plan = savedLessonPlans.find((item) => item.id === planId);
+    const plan = plans.find((item) => item.id === planId);
     if (!plan) return;
 
     const defaults = lessonPlanInputToQuizDefaults(plan.input);
@@ -153,18 +173,60 @@ export function TeacherQuizzesForm({
     }));
   }
 
+  function handleAdminChange(value: string | null) {
+    if (!value || value === ADMIN_NONE) {
+      setSelectedAdminUserId(ADMIN_NONE);
+      setLessonPlanSearchQuery("");
+      handleSavedPlanChange(SAVED_PLAN_NONE, []);
+      return;
+    }
+
+    setSelectedAdminUserId(value);
+    setLessonPlanSearchQuery("");
+    handleSavedPlanChange(
+      SAVED_PLAN_NONE,
+      ownerPicker.lessonPlansByAdminUserId[value] ?? [],
+    );
+  }
+
+  const adminLessonPlans =
+    isWorkspaceOwner && selectedAdminUserId !== ADMIN_NONE
+      ? ownerPicker.lessonPlansByAdminUserId[selectedAdminUserId] ?? []
+      : [];
+
+  const activeLessonPlans = isWorkspaceOwner ? adminLessonPlans : savedLessonPlans;
+
+  const filteredLessonPlans = useMemo(() => {
+    const query = lessonPlanSearchQuery.trim().toLowerCase();
+    if (!query) return activeLessonPlans;
+    return activeLessonPlans.filter((plan) => lessonPlanHaystack(plan).includes(query));
+  }, [activeLessonPlans, lessonPlanSearchQuery]);
+
   const selectedPlan =
     form.savedLessonPlanId != null
-      ? savedLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
+      ? activeLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
       : null;
 
   useEffect(() => {
     if (!initialLessonPlanId) return;
+
+    if (isWorkspaceOwner) {
+      for (const admin of ownerPicker.teamAdmins) {
+        const plans = ownerPicker.lessonPlansByAdminUserId[admin.userId] ?? [];
+        if (plans.some((plan) => plan.id === initialLessonPlanId)) {
+          setSelectedAdminUserId(admin.userId);
+          handleSavedPlanChange(String(initialLessonPlanId), plans);
+          return;
+        }
+      }
+      return;
+    }
+
     const exists = savedLessonPlans.some((plan) => plan.id === initialLessonPlanId);
     if (exists) {
-      handleSavedPlanChange(String(initialLessonPlanId));
+      handleSavedPlanChange(String(initialLessonPlanId), savedLessonPlans);
     }
-  }, [initialLessonPlanId, savedLessonPlans]);
+  }, [initialLessonPlanId, savedLessonPlans, isWorkspaceOwner, ownerPicker]);
 
   async function handleGenerate() {
     setIsGenerating(true);
@@ -200,6 +262,7 @@ export function TeacherQuizzesForm({
         questionTypes: TEACHER_QUIZ_DEFAULT_QUESTION_TYPE,
         readingPassageQuestions,
         readingPassageQuestionCount: readingPassageQuestions ? passageCount : undefined,
+        teamId: teacherWorkspace?.teamId ?? undefined,
       });
       setReviewRows(
         teacherQuizMixedResultToReviewRows({
@@ -289,7 +352,14 @@ export function TeacherQuizzesForm({
   const selectedPlanLabel =
     selectedPlanKey === SAVED_PLAN_NONE
       ? null
-      : savedLessonPlans.find((plan) => String(plan.id) === selectedPlanKey)?.lessonTitle;
+      : activeLessonPlans.find((plan) => String(plan.id) === selectedPlanKey)?.lessonTitle;
+
+  const selectedAdminLabel =
+    selectedAdminUserId === ADMIN_NONE
+      ? null
+      : ownerPicker.teamAdmins.find((admin) => admin.userId === selectedAdminUserId);
+
+  const selectedCreatorIsWorkspaceOwner = selectedAdminLabel?.isWorkspaceOwner === true;
 
   const decksSectionTitle = teacherDeckSectionTitle(deckQuota);
   const quotaLabel = teacherDeckQuotaLabel(deckQuota);
@@ -471,6 +541,47 @@ export function TeacherQuizzesForm({
     >
       <TooltipProvider>
         <div className="grid gap-4 sm:grid-cols-2">
+          {isWorkspaceOwner ? (
+            <div className="space-y-2 sm:col-span-2">
+              <TeacherFieldLabel
+                htmlFor="teamAdmin"
+                label="Workspace owner or team admin"
+                help={
+                  <>
+                    <p className="mb-1 font-semibold">Workspace owner:</p>
+                    <p>
+                      Select yourself (workspace owner) or a team admin by name or email,
+                      then choose one of their saved lesson plans to auto-fill the quiz fields.
+                    </p>
+                  </>
+                }
+              />
+              <Select value={selectedAdminUserId} onValueChange={handleAdminChange}>
+                <SelectTrigger id="teamAdmin" className="h-10 w-full bg-background">
+                  <SelectValue placeholder="Select workspace owner or team admin">
+                    {selectedAdminLabel
+                      ? adminDisplayLabel(selectedAdminLabel)
+                      : "Select workspace owner or team admin"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ADMIN_NONE}>Select workspace owner or team admin</SelectItem>
+                  {ownerPicker.teamAdmins.map((admin) => (
+                    <SelectItem key={admin.userId} value={admin.userId}>
+                      {adminDisplayLabel(admin)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {ownerPicker.teamAdmins.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No team admins in this workspace yet. Invite team admins from Team Admin
+                  settings.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="space-y-2 sm:col-span-2">
             <TeacherFieldLabel
               htmlFor="savedLessonPlan"
@@ -485,22 +596,58 @@ export function TeacherQuizzesForm({
                 </>
               }
             />
-          <Select value={selectedPlanKey} onValueChange={handleSavedPlanChange}>
-            <SelectTrigger id="savedLessonPlan" className="h-10 w-full bg-background">
-              <SelectValue placeholder="Select a saved lesson plan">
-                {selectedPlanLabel ?? "No saved lesson plan"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={SAVED_PLAN_NONE}>No saved lesson plan</SelectItem>
-              {savedLessonPlans.map((plan) => (
-                <SelectItem key={plan.id} value={String(plan.id)}>
-                  {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {savedLessonPlans.length === 0 ? (
+          {isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE ? (
+            <p className="text-sm text-muted-foreground">
+              Select the workspace owner or a team admin above to browse their saved lesson
+              plans.
+            </p>
+          ) : (
+            <>
+              {isWorkspaceOwner && activeLessonPlans.length > 0 ? (
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    value={lessonPlanSearchQuery}
+                    onChange={(e) => setLessonPlanSearchQuery(e.target.value)}
+                    placeholder="Search lesson plans by title, subject, grade, or topic…"
+                    className="pl-9"
+                    aria-label="Search lesson plans"
+                  />
+                </div>
+              ) : null}
+              <Select
+                value={selectedPlanKey}
+                onValueChange={(value) => handleSavedPlanChange(value, activeLessonPlans)}
+                disabled={isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE}
+              >
+                <SelectTrigger id="savedLessonPlan" className="h-10 w-full bg-background">
+                  <SelectValue placeholder="Select a saved lesson plan">
+                    {selectedPlanLabel ?? "No saved lesson plan"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SAVED_PLAN_NONE}>No saved lesson plan</SelectItem>
+                  {filteredLessonPlans.map((plan) => (
+                    <SelectItem key={plan.id} value={String(plan.id)}>
+                      {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isWorkspaceOwner &&
+              selectedAdminUserId !== ADMIN_NONE &&
+              activeLessonPlans.length > 0 &&
+              filteredLessonPlans.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No lesson plans match your search.
+                </p>
+              ) : null}
+            </>
+          )}
+          {!isWorkspaceOwner && savedLessonPlans.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No saved lesson plans yet. Save one in the{" "}
               <Link
@@ -518,6 +665,15 @@ export function TeacherQuizzesForm({
                 AI Lesson Builder
               </Link>{" "}
               first — input data and the PDF are stored for quiz generation.
+            </p>
+          ) : null}
+          {isWorkspaceOwner &&
+          selectedAdminUserId !== ADMIN_NONE &&
+          activeLessonPlans.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {selectedCreatorIsWorkspaceOwner
+                ? "No saved lesson plans yet. Save one in the AI Lesson Builder first."
+                : "This team admin has no saved lesson plans yet."}
             </p>
           ) : null}
           {selectedPlan?.pdfUrl ? (

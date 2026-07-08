@@ -169,6 +169,15 @@ function resolvePlanSlugFromInvoiceLines(
   invoice: Stripe.Invoice,
 ): StripePaidPlanId | null {
   const lines = invoice.lines?.data ?? [];
+
+  // Plan-change invoices are proration-only — prefer the positive (new plan) line.
+  for (const line of lines) {
+    if (!(line as { proration?: boolean }).proration) continue;
+    if ((line.amount ?? 0) <= 0) continue;
+    const fromDesc = planSlugFromStripeLineDescription(line.description);
+    if (fromDesc) return fromDesc;
+  }
+
   for (const line of lines) {
     if ((line as { proration?: boolean }).proration) continue;
     const fromDesc = planSlugFromStripeLineDescription(line.description);

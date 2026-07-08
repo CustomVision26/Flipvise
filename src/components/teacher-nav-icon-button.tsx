@@ -9,17 +9,20 @@ import { buildTeacherPath } from "@/lib/teacher-url";
 import { cn } from "@/lib/utils";
 
 function resolveTeacherNavHref(searchParams: URLSearchParams): string {
-  const team = searchParams.get("team");
-  const teamMemberId = searchParams.get("teamMemberId");
-  if (team != null || teamMemberId != null) {
-    const teamId = team != null ? Number(team) : null;
-    const memberId = teamMemberId != null ? Number(teamMemberId) : 0;
-    return buildTeacherPath(
-      teamId != null && Number.isFinite(teamId) && teamId > 0 ? teamId : null,
-      Number.isFinite(memberId) ? memberId : 0,
-    );
+  const team = searchParams.get("team")?.trim();
+  const teamMemberId = searchParams.get("teamMemberId")?.trim();
+  const teamId =
+    team && Number.isFinite(Number(team)) && Number(team) > 0
+      ? Number(team)
+      : null;
+  if (teamId == null) {
+    return buildTeacherPath();
   }
-  return buildTeacherPath(null, 0);
+  const memberId =
+    teamMemberId != null && Number.isFinite(Number(teamMemberId))
+      ? Number(teamMemberId)
+      : 0;
+  return buildTeacherPath(teamId, memberId);
 }
 
 export function TeacherNavIconButton() {

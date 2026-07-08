@@ -1,11 +1,6 @@
-import { cookies } from "next/headers";
-import { auth } from "@/lib/clerk-auth";
-import { redirect } from "next/navigation";
-import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
   getDecksForTeam,
   getDecksForTeamWithCardCount,
-  getTeamsForTeamDashboard,
   listAssignmentsForTeam,
   listPendingInvitations,
   listTeamInvitationHistoryForTeam,
@@ -19,12 +14,8 @@ import {
   teamMemberInviteCapacity,
 } from "@/db/queries/team-plan-limits";
 import { selectNewestMembersWithinMemberLimit } from "@/lib/team-plan-limit-selection";
-import { hasEducationPlan, isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
-import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import {
-  limitsForPlan,
-  personalDashboardPlanQueryValue,
-} from "@/lib/team-plans";
+import { isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
+import { limitsForPlan } from "@/lib/team-plans";
 import {
   buildTeamAdminAssignDecksToMembersPath,
   buildTeamAdminInviteHistoryPath,
@@ -38,7 +29,9 @@ import {
   buildTeamAdminQuizTimerPath,
   buildTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
-import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
+import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
+import { TEAM_ADMIN_SIDEBAR_NAV_ENABLED } from "@/lib/team-admin-dashboard-nav";
+import { teamAdminPageMetaForPath } from "@/lib/team-admin-page-meta";
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
 import { listTeamMemberHistoryForTeam } from "@/db/queries/team-member-history";
 import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
@@ -47,14 +40,14 @@ import {
   getClerkUserDisplayNameById,
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
-import { getAccessContext } from "@/lib/access";
 import {
   AddTeamDialog,
   TeamAdminManageTabs,
   TeamAdminQuickNavPanel,
   TeamAdminWorkspaceStatsPanel,
 } from "@/lib/team-admin-dynamic-components";
-import { TeamAdminWorkspaceDeckCardTotals } from "@/components/team-admin-workspace-deck-card-totals";
+import { TeamAdminHome } from "@/components/team-admin-home";
+import { TeamAdminPageChrome } from "@/components/team-admin-page-chrome";
 
 interface TeamAdminDashboardViewProps {
   searchParams: Promise<{
@@ -71,40 +64,21 @@ export default async function TeamAdminDashboardView({
   searchParams,
   buildCanonicalPath = buildTeamAdminMembersPath,
 }: TeamAdminDashboardViewProps) {
-  const { userId } = await auth();
-  if (!userId) redirect("/");
+  const ctx = await loadTeamAdminPageContext(buildCanonicalPath, searchParams);
+  const {
+    userId,
+    selected,
+    teamsForSubscriber,
+    subscriberTeamIds,
+    viewerTeamMemberUrlParam,
+    isOwner,
+    planLabel,
+    mainDashboardHref,
+    workspaceDashboardHref,
+    showTeacherDashboard,
+  } = ctx;
 
-  const teams = await getTeamsForTeamDashboard(userId);
-  if (teams.length === 0) {
-    redirect("/onboarding/team");
-  }
-
-  const sp = await searchParams;
-  const teamParam = sp.team;
-  const teamMemberIdParam =
-    typeof sp.teamMemberId === "string" ? sp.teamMemberId : undefined;
-  const useridParam = typeof sp.userid === "string" ? sp.userid : undefined;
-  const planParam =
-    typeof sp.plan === "string" && sp.plan.trim() !== "" ? sp.plan.trim() : undefined;
-
-  const cookieStore = await cookies();
-  const cookieRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
-
-  const resolution = await resolveTeamAdminDashboardSelection(teams, {
-    viewerUserId: userId,
-    teamParam,
-    teamMemberIdParam,
-    cookieTeamRaw: cookieRaw,
-    useridParam,
-    planParam,
-    buildCanonicalPath,
-  });
-  if (resolution.outcome === "redirect") {
-    redirect(resolution.to);
-  }
-  const { selected, teamsForSubscriber, subscriberTeamIds, viewerTeamMemberUrlParam } =
-    resolution;
-
+  const pageMeta = teamAdminPageMetaForPath(buildCanonicalPath(0, 0).split("?")[0] ?? "");
   const limits = limitsForPlan(selected.planSlug);
 
   const [
@@ -194,7 +168,7 @@ export default async function TeamAdminDashboardView({
     ...memberHistory.map((h) => h.memberUserId),
     ...memberHistory.map((h) => h.actorUserId).filter((id): id is string => Boolean(id)),
   ];
-  const [userFieldDisplayById, access, inviteWorkspaceOptions, invitationStoredDisplayNames] =
+  const [userFieldDisplayById, inviteWorkspaceOptions, invitationStoredDisplayNames] =
     await Promise.all([
       getClerkUserFieldDisplaysByIds(
         [
@@ -208,7 +182,6 @@ export default async function TeamAdminDashboardView({
           ]),
         ],
       ),
-      getAccessContext(),
       Promise.all(
         teamsForSubscriber.map(async (t) => {
           const [capacity, memberRows] = await Promise.all([
@@ -229,30 +202,6 @@ export default async function TeamAdminDashboardView({
       getLatestInviteeDisplayNamesForTeamIds(subscriberTeamIds),
     ]);
 
-  const personalStripeSlug = access.hasClerkPersonalProPlus
-    ? ("pro_plus" as const)
-    : access.hasClerkPersonalPro
-      ? ("pro" as const)
-      : null;
-
-  const personalPlanQuery = personalDashboardPlanQueryValue(
-    access.activeTeamPlan,
-    access.isPro,
-    personalStripeSlug,
-  );
-  const personalDashboardParams = new URLSearchParams({ userid: userId });
-  if (personalPlanQuery !== "") personalDashboardParams.set("plan", personalPlanQuery);
-
-  const mainDashboardHref = `/dashboard?${personalDashboardParams.toString()}`;
-
-  const workspaceDashboardParams = new URLSearchParams({
-    team: String(selected.id),
-    userid: selected.ownerUserId,
-    plan: selected.planSlug,
-    teamMemberId: String(viewerTeamMemberUrlParam),
-  });
-  const workspaceDashboardHref = `/dashboard?${workspaceDashboardParams.toString()}`;
-
   const memberEmailToDisplayHint: Record<string, string> = {};
   for (const snap of assignWorkspaceSnapshots) {
     for (const m of snap.allMembers) {
@@ -270,8 +219,6 @@ export default async function TeamAdminDashboardView({
 
   const subscriberOwnerPrimaryEmail =
     userFieldDisplayById[selected.ownerUserId]?.primaryEmail?.trim().toLowerCase() ?? null;
-
-  const isOwner = selected.ownerUserId === userId;
 
   const selectedAssignSnapshot = assignWorkspaceSnapshots.find((w) => w.id === selected.id);
   const deckNameById = new Map(
@@ -310,7 +257,117 @@ export default async function TeamAdminDashboardView({
         )
       : undefined;
 
-  const planLabel = displayNameForBillingPlanSlug(selected.planSlug);
+  const quickNavDescription = isOwner
+    ? "Return to your personal dashboard to create and edit decks."
+    : "Open your personal dashboard or the workspace-scoped main dashboard.";
+
+  const manageTabs = (
+    <TeamAdminManageTabs
+      key={selected.id}
+      teamId={selected.id}
+      deckManagerHref={buildTeamAdminAssignDecksToMembersPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      membersHref={buildTeamAdminMembersPath(selected.id, viewerTeamMemberUrlParam)}
+      membersHistoryHref={buildTeamAdminMembersHistoryPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      workspaceHistoryHref={buildTeamAdminWsHistoryPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      inviteSendHref={buildTeamAdminInviteSendPath(selected.id, viewerTeamMemberUrlParam)}
+      invitePendingHref={buildTeamAdminInvitePendingPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      inviteHistoryHref={buildTeamAdminInviteHistoryPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      quizResultsHref={buildTeamAdminQuizResultsPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      quizTimerHref={buildTeamAdminQuizTimerPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      quizScheduleHref={buildTeamAdminQuizSchedulePath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      quizSecurityHref={buildTeamAdminQuizSecurityPath(
+        selected.id,
+        viewerTeamMemberUrlParam,
+      )}
+      teamName={selected.name}
+      deckNamesByMemberUserId={deckNamesByMemberUserId}
+      workspaceDeckNames={workspaceDeckNames}
+      ownerUserId={selected.ownerUserId}
+      teamCreatedAt={selected.createdAt}
+      currentUserId={userId}
+      isOwner={isOwner}
+      workspaces={inviteWorkspaceOptions}
+      inviteAggregatedMemberEmails={inviteAggregatedMemberEmails}
+      defaultWorkspaceId={selected.id}
+      members={members}
+      userFieldDisplayById={userFieldDisplayById}
+      pendingInvitations={invitations}
+      invitationHistory={invitationHistory}
+      memberHistory={memberHistory}
+      workspaceHistory={workspaceHistory}
+      inviteDisplayHintsByEmail={inviteDisplayHintsByEmail}
+      subscriberOwnerPrimaryEmail={subscriberOwnerPrimaryEmail}
+      workspaceQuizSnapshots={workspaceQuizSnapshots}
+    />
+  );
+
+  const addTeamAside =
+    isOwner && isWorkspaceSubscriptionPlanSlug(selected.planSlug) ? (
+      <AddTeamDialog
+        planSlug={selected.planSlug}
+        isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
+      />
+    ) : null;
+
+  if (TEAM_ADMIN_SIDEBAR_NAV_ENABLED) {
+    return (
+      <TeamAdminPageChrome
+        section={pageMeta.section}
+        title={pageMeta.title}
+        description={pageMeta.description}
+        workspaceName={selected.name}
+        planLabel={planLabel}
+        quickNavDescription={quickNavDescription}
+        mainDashboardHref={mainDashboardHref}
+        workspaceDashboardHref={workspaceDashboardHref}
+        workspaceTeamId={selected.id}
+        workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
+        isOwner={isOwner}
+        workspacePlanSlug={selected.planSlug}
+        showTeacherDashboard={showTeacherDashboard}
+        headerAside={pageMeta.isOverview ? addTeamAside : undefined}
+      >
+        {pageMeta.isOverview ? (
+          <>
+            <TeamAdminHome />
+            <TeamAdminWorkspaceStatsPanel
+              workspacesCount={teamsForSubscriber.length}
+              maxWorkspaces={limits.maxTeams}
+              memberCount={memberCount}
+              maxMembersPerTeam={limits.maxMembersPerTeam}
+              teamDecksWithCardCounts={teamDecksWithCardCounts}
+              planSlug={selected.planSlug}
+            />
+          </>
+        ) : null}
+        {manageTabs}
+      </TeamAdminPageChrome>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-8 p-4 sm:p-8">
@@ -341,30 +398,19 @@ export default async function TeamAdminDashboardView({
               Manage teams, members, and deck access for your subscription.
             </p>
           </div>
-          {isOwner && isWorkspaceSubscriptionPlanSlug(selected.planSlug) ? (
-            <div className="flex shrink-0 sm:justify-end">
-              <AddTeamDialog
-                planSlug={selected.planSlug}
-                isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
-              />
-            </div>
-          ) : null}
+          {addTeamAside}
         </div>
 
         <TeamAdminQuickNavPanel
           planLabel={planLabel}
-          description={
-            isOwner
-              ? "Return to your personal dashboard to create and edit decks."
-              : "Open your personal dashboard or the workspace-scoped main dashboard."
-          }
+          description={quickNavDescription}
           mainDashboardHref={mainDashboardHref}
           workspaceDashboardHref={workspaceDashboardHref}
           workspaceTeamId={selected.id}
           workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
           isOwner={isOwner}
           workspacePlanSlug={selected.planSlug}
-          showTeacherDashboard={hasEducationPlan(selected.planSlug)}
+          showTeacherDashboard={showTeacherDashboard}
         />
       </div>
 
@@ -377,67 +423,7 @@ export default async function TeamAdminDashboardView({
         planSlug={selected.planSlug}
       />
 
-      <TeamAdminManageTabs
-        key={selected.id}
-        teamId={selected.id}
-        deckManagerHref={buildTeamAdminAssignDecksToMembersPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        membersHref={buildTeamAdminMembersPath(selected.id, viewerTeamMemberUrlParam)}
-        membersHistoryHref={buildTeamAdminMembersHistoryPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        workspaceHistoryHref={buildTeamAdminWsHistoryPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        inviteSendHref={buildTeamAdminInviteSendPath(selected.id, viewerTeamMemberUrlParam)}
-        invitePendingHref={buildTeamAdminInvitePendingPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        inviteHistoryHref={buildTeamAdminInviteHistoryPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        quizResultsHref={buildTeamAdminQuizResultsPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        quizTimerHref={buildTeamAdminQuizTimerPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        quizScheduleHref={buildTeamAdminQuizSchedulePath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        quizSecurityHref={buildTeamAdminQuizSecurityPath(
-          selected.id,
-          viewerTeamMemberUrlParam,
-        )}
-        teamName={selected.name}
-        deckNamesByMemberUserId={deckNamesByMemberUserId}
-        workspaceDeckNames={workspaceDeckNames}
-        ownerUserId={selected.ownerUserId}
-        teamCreatedAt={selected.createdAt}
-        currentUserId={userId}
-        isOwner={isOwner}
-        workspaces={inviteWorkspaceOptions}
-        inviteAggregatedMemberEmails={inviteAggregatedMemberEmails}
-        defaultWorkspaceId={selected.id}
-        members={members}
-        userFieldDisplayById={userFieldDisplayById}
-        pendingInvitations={invitations}
-        invitationHistory={invitationHistory}
-        memberHistory={memberHistory}
-        workspaceHistory={workspaceHistory}
-        inviteDisplayHintsByEmail={inviteDisplayHintsByEmail}
-        subscriberOwnerPrimaryEmail={subscriberOwnerPrimaryEmail}
-        workspaceQuizSnapshots={workspaceQuizSnapshots}
-      />
+      {manageTabs}
     </div>
   );
 }

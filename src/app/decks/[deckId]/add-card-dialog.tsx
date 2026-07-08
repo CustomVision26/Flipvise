@@ -36,6 +36,10 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  AnswerChoiceImageControl,
+  buildChoiceImageTuple,
+} from "./answer-choice-image-control";
+import {
   createCardAction,
   createMultipleChoiceCardAction,
   generateAnswerAction,
@@ -833,7 +837,22 @@ function MultipleChoiceCardForm({
   const [questionPendingFile, setQuestionPendingFile] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [correctAnswer, setCorrectAnswer] = useState("");
+  const [correctAnswerImageUrl, setCorrectAnswerImageUrl] = useState<string | null>(null);
+  const [correctAnswerImagePreview, setCorrectAnswerImagePreview] = useState<string | null>(null);
+  const [isUploadingCorrectImage, setIsUploadingCorrectImage] = useState(false);
+  const correctAnswerImageInputRef = useRef<HTMLInputElement>(null);
   const [distractors, setDistractors] = useState<string[]>(["", "", ""]);
+  const [wrongImageUrls, setWrongImageUrls] = useState<
+    [string | null, string | null, string | null]
+  >([null, null, null]);
+  const [wrongImagePreviews, setWrongImagePreviews] = useState<
+    [string | null, string | null, string | null]
+  >([null, null, null]);
+  const [uploadingWrongImageIndex, setUploadingWrongImageIndex] = useState<number | null>(null);
+  const wrongImageInputRef0 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRef1 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRef2 = useRef<HTMLInputElement>(null);
+  const wrongImageInputRefs = [wrongImageInputRef0, wrongImageInputRef1, wrongImageInputRef2];
   const [showDistractors, setShowDistractors] = useState(true);
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -848,13 +867,17 @@ function MultipleChoiceCardForm({
   const isBusy =
     isPending ||
     isUploadingImage ||
+    isUploadingCorrectImage ||
+    uploadingWrongImageIndex !== null ||
     isGenerating ||
     isGeneratingQuestionImage ||
     isRegeneratingDistractors;
   const questionHasContent =
     question.trim().length > 0 || !!questionImageUrl || !!questionImagePreview;
-  const correctFilled = correctAnswer.trim().length > 0;
-  const allDistractorsFilled = distractors.every((d) => d.trim().length > 0);
+  const correctFilled = correctAnswer.trim().length > 0 || !!correctAnswerImageUrl;
+  const allDistractorsFilled = distractors.every(
+    (d, index) => d.trim().length > 0 || !!wrongImageUrls[index],
+  );
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -889,6 +912,93 @@ function MultipleChoiceCardForm({
       next[i] = value;
       return next;
     });
+  }
+
+  async function handleCorrectAnswerImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
+      if (correctAnswerImageInputRef.current) correctAnswerImageInputRef.current.value = "";
+      return;
+    }
+    setError(null);
+    setIsUploadingCorrectImage(true);
+    setCorrectAnswerImagePreview(URL.createObjectURL(file));
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const url = await uploadCardImageAction({ deckId }, formData);
+      setCorrectAnswerImageUrl(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+      setCorrectAnswerImagePreview(correctAnswerImageUrl);
+    } finally {
+      setIsUploadingCorrectImage(false);
+      if (correctAnswerImageInputRef.current) correctAnswerImageInputRef.current.value = "";
+    }
+  }
+
+  async function handleWrongImageChange(
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
+      if (wrongImageInputRefs[index]?.current) {
+        wrongImageInputRefs[index]!.current!.value = "";
+      }
+      return;
+    }
+    setError(null);
+    setUploadingWrongImageIndex(index);
+    setWrongImagePreviews((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = URL.createObjectURL(file);
+      return next;
+    });
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const url = await uploadCardImageAction({ deckId }, formData);
+      setWrongImageUrls((prev) => {
+        const next: [string | null, string | null, string | null] = [...prev];
+        next[index] = url;
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed.");
+      setWrongImagePreviews((prev) => {
+        const next: [string | null, string | null, string | null] = [...prev];
+        next[index] = wrongImageUrls[index];
+        return next;
+      });
+    } finally {
+      setUploadingWrongImageIndex(null);
+      if (wrongImageInputRefs[index]?.current) {
+        wrongImageInputRefs[index]!.current!.value = "";
+      }
+    }
+  }
+
+  function handleWrongImageRemove(index: number) {
+    setWrongImageUrls((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = null;
+      return next;
+    });
+    setWrongImagePreviews((prev) => {
+      const next: [string | null, string | null, string | null] = [...prev];
+      next[index] = null;
+      return next;
+    });
+    if (wrongImageInputRefs[index]?.current) {
+      wrongImageInputRefs[index]!.current!.value = "";
+    }
   }
 
   async function runMcAiGeneration(includeImage: boolean) {
@@ -998,13 +1108,18 @@ function MultipleChoiceCardForm({
           questionImageUrl: resolvedQuestionImageUrl,
           correctAnswer,
           distractors,
+          choiceImageUrls: buildChoiceImageTuple(correctAnswerImageUrl, wrongImageUrls),
         });
         setQuestion("");
         setQuestionImageUrl(null);
         setQuestionImagePreview(null);
         setQuestionPendingFile(null);
         setCorrectAnswer("");
+        setCorrectAnswerImageUrl(null);
+        setCorrectAnswerImagePreview(null);
         setDistractors(["", "", ""]);
+        setWrongImageUrls([null, null, null]);
+        setWrongImagePreviews([null, null, null]);
         onSuccess();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -1199,14 +1314,31 @@ function MultipleChoiceCardForm({
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             Correct answer
           </Label>
-          <Input
-            id="mc-correct"
-            value={correctAnswer}
-            onChange={(e) => setCorrectAnswer(e.target.value)}
-            disabled={isBusy}
-            placeholder="The right answer"
-            className="text-sm border-emerald-500/40 focus-visible:ring-emerald-500/30"
-          />
+          <div className="flex items-start gap-2">
+            <Input
+              id="mc-correct"
+              value={correctAnswer}
+              onChange={(e) => setCorrectAnswer(e.target.value)}
+              disabled={isBusy}
+              placeholder="The right answer"
+              className="text-sm border-emerald-500/40 focus-visible:ring-emerald-500/30"
+            />
+            <AnswerChoiceImageControl
+              imagePreview={correctAnswerImagePreview}
+              isUploading={isUploadingCorrectImage}
+              isBusy={isBusy}
+              fileInputRef={correctAnswerImageInputRef}
+              onFileChange={handleCorrectAnswerImageChange}
+              onRemove={() => {
+                setCorrectAnswerImageUrl(null);
+                setCorrectAnswerImagePreview(null);
+                if (correctAnswerImageInputRef.current) {
+                  correctAnswerImageInputRef.current.value = "";
+                }
+              }}
+              altText="Correct answer image"
+            />
+          </div>
         </div>
 
         {/* Distractors */}
@@ -1261,14 +1393,24 @@ function MultipleChoiceCardForm({
           {showDistractors && (
             <div id="mc-distractors" className="flex flex-col gap-2">
               {distractors.map((d, i) => (
-                <Input
-                  key={i}
-                  value={d}
-                  onChange={(e) => setDistractorAt(i, e.target.value)}
-                  disabled={isBusy}
-                  placeholder={`Wrong answer ${i + 1}`}
-                  className="text-sm"
-                />
+                <div key={i} className="flex items-start gap-2">
+                  <Input
+                    value={d}
+                    onChange={(e) => setDistractorAt(i, e.target.value)}
+                    disabled={isBusy}
+                    placeholder={`Wrong answer ${i + 1}`}
+                    className="text-sm"
+                  />
+                  <AnswerChoiceImageControl
+                    imagePreview={wrongImagePreviews[i] ?? null}
+                    isUploading={uploadingWrongImageIndex === i}
+                    isBusy={isBusy}
+                    fileInputRef={wrongImageInputRefs[i]!}
+                    onFileChange={(e) => handleWrongImageChange(i, e)}
+                    onRemove={() => handleWrongImageRemove(i)}
+                    altText={`Wrong answer ${i + 1} image`}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -1306,7 +1448,7 @@ function MultipleChoiceCardForm({
         >
           {isPending
             ? "Adding…"
-            : isUploadingImage
+            : isUploadingImage || isUploadingCorrectImage
               ? "Uploading…"
               : isGenerating || isGeneratingQuestionImage || isRegeneratingDistractors
                 ? "Generating…"

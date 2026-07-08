@@ -7,10 +7,10 @@ import { getTeamsForTeamDashboard } from "@/db/queries/teams";
 import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import { resolveTeamAdminDashboardSelection } from "@/lib/resolve-team-admin-dashboard-selection";
-import { buildTeamAdminQueryString } from "@/lib/team-admin-url";
 import {
   buildTeacherPageCanonicalPath,
   buildTeacherPath,
+  buildTeacherQueryString,
   type TeacherWorkspaceContext,
 } from "@/lib/teacher-url";
 
@@ -35,11 +35,23 @@ function preservedExtraParams(
     pathname === "/teacher/quizzes" ||
     pathname.startsWith("/teacher/quizzes/") ||
     pathname === "/teacher/study-guides" ||
-    pathname.startsWith("/teacher/study-guides/")
+    pathname.startsWith("/teacher/study-guides/") ||
+    pathname === "/teacher/homework" ||
+    pathname.startsWith("/teacher/homework/") ||
+    pathname === "/teacher/worksheets" ||
+    pathname.startsWith("/teacher/worksheets/")
   ) {
     const lessonPlanId = firstParam(searchParams, "lessonPlanId");
     if (lessonPlanId) {
       extra.set("lessonPlanId", lessonPlanId);
+    }
+    const deckId = firstParam(searchParams, "deckId");
+    if (deckId) {
+      extra.set("deckId", deckId);
+    }
+    const sourceType = firstParam(searchParams, "sourceType");
+    if (sourceType) {
+      extra.set("sourceType", sourceType);
     }
   }
   return extra;
@@ -71,7 +83,7 @@ export async function resolveTeacherWorkspaceContext(
       redirect(result.to);
     }
 
-    const queryString = buildTeamAdminQueryString(
+    const queryString = buildTeacherQueryString(
       result.selected.id,
       result.viewerTeamMemberUrlParam,
     );
@@ -82,26 +94,18 @@ export async function resolveTeacherWorkspaceContext(
     };
   }
 
-  const teamMemberParam = firstParam(searchParams, "teamMemberId");
-  const parsedTeamMember =
-    teamMemberParam != null ? Number(teamMemberParam) : Number.NaN;
-  const expectedTeamMemberId = 0;
-  const missingTeamMember =
-    !Number.isFinite(parsedTeamMember) ||
-    parsedTeamMember !== expectedTeamMemberId;
-  const hasTeamParam = firstParam(searchParams, "team") != null;
+  const hasTeamQuery =
+    firstParam(searchParams, "team") != null ||
+    firstParam(searchParams, "teamMemberId") != null;
 
-  if (missingTeamMember || hasTeamParam) {
-    redirect(
-      buildTeacherPageCanonicalPath(pathname, null, expectedTeamMemberId, extra),
-    );
+  if (hasTeamQuery) {
+    redirect(buildTeacherPageCanonicalPath(pathname, null, null, extra));
   }
 
-  const queryString = buildTeamAdminQueryString(null, expectedTeamMemberId);
   return {
     teamId: null,
-    teamMemberId: expectedTeamMemberId,
-    queryString,
+    teamMemberId: 0,
+    queryString: "",
   };
 }
 

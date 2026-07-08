@@ -61,3 +61,17 @@ export function personalDashboardHrefAfterCheckoutSuccess(input: {
   if (slug) params.set("plan", slug);
   return `/dashboard?${params.toString()}`;
 }
+
+/** SetupIntent return after prorated plan swap — must not include `checkout=success`. */
+export function personalDashboardHrefAfterPlanChangeSuccess(input: {
+  userId: string;
+  purchasedPlanSlug: string;
+}): string {
+  const slug = input.purchasedPlanSlug.trim();
+  const params = new URLSearchParams({
+    userid: input.userId,
+    checkout: "plan_change",
+  });
+  if (slug) params.set("plan", slug);
+  return `/dashboard?${params.toString()}`;
+}

@@ -9,7 +9,7 @@ import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import { createDeck } from "@/db/queries/decks";
 import { createMultipleChoiceCard } from "@/db/queries/cards";
 import { linkDeckToTeamWorkspace } from "@/db/queries/teams";
-import { getSavedLessonPlanByIdForUser } from "@/db/queries/saved-lesson-plans";
+import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
 import { buildLessonPlanQuizContext, buildLessonPlanPassageQuizContext, buildLessonPlanPassageFallbackQuestions } from "@/lib/lesson-plan-quiz-context";
 import {
   buildTeacherQuizDeckMetadata,
@@ -86,15 +86,27 @@ Generate exactly 3 plausible wrong answers.`,
   return [output.distractors[0]!, output.distractors[1]!, output.distractors[2]!];
 }
 
+async function resolveQuizLessonPlan(
+  viewerUserId: string,
+  planId: number,
+  teamId?: number | null,
+) {
+  return resolveSavedLessonPlanForViewer(viewerUserId, planId, teamId);
+}
+
 async function generateReadingPassageQuizForDeck(
   input: TeacherQuizActionInput,
   userId: string,
 ): Promise<TeacherQuizPassageQuestion[]> {
   let lessonContext: string | null = null;
-  let savedLessonPlan: Awaited<ReturnType<typeof getSavedLessonPlanByIdForUser>> = null;
+  let savedLessonPlan: Awaited<ReturnType<typeof resolveQuizLessonPlan>> = null;
 
   if (input.savedLessonPlanId) {
-    savedLessonPlan = await getSavedLessonPlanByIdForUser(userId, input.savedLessonPlanId);
+    savedLessonPlan = await resolveQuizLessonPlan(
+      userId,
+      input.savedLessonPlanId,
+      input.teamId,
+    );
     if (!savedLessonPlan) {
       throw new Error("Saved lesson plan not found.");
     }
@@ -175,9 +187,10 @@ async function generateQuizForDeck(
   let lessonContext: string | null = null;
 
   if (input.savedLessonPlanId) {
-    const saved = await getSavedLessonPlanByIdForUser(
+    const saved = await resolveQuizLessonPlan(
       userId,
       input.savedLessonPlanId,
+      input.teamId,
     );
     if (!saved) {
       throw new Error("Saved lesson plan not found.");

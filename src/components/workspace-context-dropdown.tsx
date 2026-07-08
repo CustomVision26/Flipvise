@@ -22,6 +22,7 @@ import {
   type TeamWorkspaceNavTeam,
 } from "@/lib/team-workspace-url";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
+import { buildTeacherPath } from "@/lib/teacher-url";
 import { shouldHidePlatformAdminNav } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
 import { isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
@@ -55,6 +56,8 @@ interface WorkspaceContextDropdownProps {
    * When workspace nav omits owned team-tier rows, server still supplies a Team Admin Dash target.
    */
   teamDashFallback?: TeamDashFallbackTarget | null;
+  /** Personal education plan (e.g. Education Plus) — show Teacher Dash on the personal row. */
+  showTeacherDashboard?: boolean;
 }
 
 export function WorkspaceContextDropdown({
@@ -65,6 +68,7 @@ export function WorkspaceContextDropdown({
   personalPlanLabel = "Free",
   personalHasTeamTierPlan = false,
   teamDashFallback = null,
+  showTeacherDashboard = false,
 }: WorkspaceContextDropdownProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -264,6 +268,15 @@ export function WorkspaceContextDropdown({
     });
   }
 
+  function goToTeacherDash() {
+    setOpen(false);
+    setQuery("");
+    requestAnimationFrame(() => {
+      router.push(buildTeacherPath());
+      router.refresh();
+    });
+  }
+
   function teamWorkspaceMenuItem(t: TeamWorkspaceNavTeam) {
     const isActive = t.id === activeTeamId;
     const teamAdminHref = buildTeamAdminPath(t.id, t.teamMemberUrlParam);
@@ -402,47 +415,71 @@ export function WorkspaceContextDropdown({
               Workspace
             </DropdownMenuLabel>
             {personalMatches && (
-              <DropdownMenuItem
-                onClick={() => void selectPersonal()}
-                className="cursor-pointer gap-2"
-                disabled={pending || !sessionLoaded}
-              >
-                <Check
-                  className={cn(
-                    "size-4 shrink-0",
-                    activeTeamId === null ? "opacity-100" : "opacity-0",
-                  )}
-                  aria-hidden
-                />
-                <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="truncate">{personalPrimaryLabel}</span>
-                  <span className="shrink-0 text-muted-foreground">·</span>
-                  <span className="shrink-0 text-muted-foreground">{personalPlanLabel}</span>
-                </span>
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem
+                  onClick={() => void selectPersonal()}
+                  className="cursor-pointer gap-2 items-start py-2"
+                  disabled={pending || !sessionLoaded}
+                >
+                  <Check
+                    className={cn(
+                      "mt-0.5 size-4 shrink-0",
+                      activeTeamId === null ? "opacity-100" : "opacity-0",
+                    )}
+                    aria-hidden
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+                    <span className="text-sm font-medium leading-tight">
+                      {personalPrimaryLabel}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {personalPlanLabel}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+                {(showTeacherDashboard || teamDashTarget != null) && (
+                  <div className="grid gap-1.5 px-2 pb-1.5">
+                    {showTeacherDashboard ? (
+                      <Button
+                        data-teacher-dash-link
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 w-full text-xs font-medium"
+                        disabled={pending || !sessionLoaded}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          goToTeacherDash();
+                        }}
+                      >
+                        Teacher Dash
+                      </Button>
+                    ) : null}
+                    {teamDashTarget != null ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 w-full text-xs font-medium"
+                        disabled={pending || !sessionLoaded}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                          goToTeamAdmin(
+                            buildTeamAdminPath(
+                              teamDashTarget.id,
+                              teamDashTarget.teamMemberUrlParam,
+                            ),
+                          );
+                        }}
+                      >
+                        Team Admin Dash
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
+              </>
             )}
-            {teamDashTarget != null && (
-                <div className="px-2 pb-1 pt-0.5">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-9 w-full text-xs font-medium"
-                    disabled={pending || !sessionLoaded}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => {
-                      goToTeamAdmin(
-                        buildTeamAdminPath(
-                          teamDashTarget.id,
-                          teamDashTarget.teamMemberUrlParam,
-                        ),
-                      );
-                    }}
-                  >
-                    Team Admin Dash
-                  </Button>
-                </div>
-              )}
             {!subscriberOwnsTeamTierWorkspace &&
               personalMatches &&
               filteredTeams.length > 0 && (

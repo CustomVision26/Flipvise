@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition, useRef, useCallback, useEffect } from "react";
 import { HELP_CENTER_OPEN_EVENT } from "@/lib/help-center-open";
-import { useUser } from "@clerk/nextjs";
 import {
   HelpCircle,
   MessageSquare,
@@ -19,7 +18,6 @@ import {
   Zap,
   Eye,
 } from "lucide-react";
-import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -844,24 +842,24 @@ function HelpLanding({
 export function HelpCenter({
   showPrioritySupport = false,
   showTrigger = true,
+  isPlatformAdmin = false,
 }: {
   /** Server-resolved: Pro Plus, team tier, or platform admin only. */
   showPrioritySupport?: boolean;
   /** When false, only the sheet is mounted (opened via top nav or `openHelpCenter()`). */
   showTrigger?: boolean;
+  /** Server-resolved platform admin — avoids Clerk hooks during SSR. */
+  isPlatformAdmin?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const { user } = useUser();
-
-  const meta = user?.publicMetadata as
-    | { adminGranted?: boolean; role?: string }
-    | undefined;
-  const isAdmin = isClerkPlatformAdminRole(meta?.role);
 
   const tabs = useMemo<readonly HelpTab[]>(
-    () => (showPrioritySupport || isAdmin ? [PRIORITY_TAB, ...BASE_TABS] : [...BASE_TABS]),
-    [showPrioritySupport, isAdmin],
+    () =>
+      showPrioritySupport || isPlatformAdmin
+        ? [PRIORITY_TAB, ...BASE_TABS]
+        : [...BASE_TABS],
+    [showPrioritySupport, isPlatformAdmin],
   );
 
   const activeTabData = activeTab ? tabs.find((t) => t.id === activeTab) : null;

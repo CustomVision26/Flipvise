@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { currentUser } from "@/lib/clerk-auth";
@@ -42,8 +43,6 @@ import {
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialog } from "@/components/add-deck-dialog";
-import { NativeAppBackButton } from "@/components/native-app-back-button";
-import { OfflineAvailabilityButton } from "@/components/offline-availability-button";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
@@ -66,6 +65,16 @@ import {
   isNativeShellRequest,
   nativeSignInPath,
 } from "@/lib/native-auth-redirect";
+
+/** Turbopack: load native-only client UI via dynamic from this RSC page. */
+const DashboardNativeActions = dynamic(
+  () =>
+    import("@/components/dashboard-native-actions").then(
+      (mod) => mod.DashboardNativeActions,
+    ),
+  { loading: () => null },
+);
+
 /** Team-tier deck extras (speech, images): own Clerk team plan or a subscriber’s team-tier workspace. */
 function teamWorkspaceHasTierExtras(
   hasOwnTeamPlan: boolean,
@@ -683,8 +692,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your flashcard decks</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <NativeAppBackButton />
-          <OfflineAvailabilityButton />
+          <DashboardNativeActions />
           <AddDeckDialog
             isAtLimit={isAtLimit}
             forPersonalWorkspace

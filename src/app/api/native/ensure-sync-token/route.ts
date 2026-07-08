@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/clerk-auth";
 import { createDeviceSyncToken } from "@/db/queries/device-sync-tokens";
-import { isFlipviseNativeUserAgent } from "@/lib/native-live-navigation";
+import { detectNativeShellFromUserAgent } from "@/lib/native-shell-from-request";
 
 export const runtime = "nodejs";
+
+function allowNativeSyncTokenRequest(request: Request): boolean {
+  const ua = request.headers.get("user-agent") ?? "";
+  if (detectNativeShellFromUserAgent(ua).isNativeShell) {
+    return true;
+  }
+  // Set by NativeAppBootstrap only when isFlipviseNativeShell() (Capacitor bridge or UA marker).
+  return request.headers.get("x-flipvise-native-shell") === "1";
+}
 
 function corsHeaders(origin: string | null): Record<string, string> {
   if (!origin) return {};
@@ -18,7 +27,7 @@ function corsHeaders(origin: string | null): Record<string, string> {
       return {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, X-Flipvise-Native-Shell",
         "Access-Control-Max-Age": "86400",
         Vary: "Origin",
       };
@@ -42,8 +51,7 @@ export function OPTIONS(request: Request) {
  */
 export async function POST(request: Request) {
   const cors = corsHeaders(request.headers.get("origin"));
-  const ua = request.headers.get("user-agent");
-  if (!isFlipviseNativeUserAgent(ua)) {
+  if (!allowNativeSyncTokenRequest(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: cors });
   }
 

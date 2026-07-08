@@ -17,7 +17,7 @@ import {
   type PlanChangeProrationPreview,
 } from "@/lib/plan-change-proration-preview";
 import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
-import { personalDashboardHrefAfterCheckoutSuccess } from "@/lib/personal-dashboard-url";
+import { personalDashboardHrefAfterPlanChangeSuccess } from "@/lib/personal-dashboard-url";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { isStripeSetupIntentId } from "@/lib/stripe-checkout-session-id";
 import { asPaidPlanId } from "@/lib/stripe-billing-sync";
@@ -112,11 +112,10 @@ export async function createPlanChangeSetupIntentAction(
   }
 
   const appUrl = resolveAppUrl();
-  const returnPath = personalDashboardHrefAfterCheckoutSuccess({
+  const returnUrl = `${appUrl}${personalDashboardHrefAfterPlanChangeSuccess({
     userId,
     purchasedPlanSlug: plan,
-  });
-  const returnUrl = `${appUrl}${returnPath}${returnPath.includes("?") ? "&" : "?"}checkout=plan_change`;
+  })}`;
 
   return { clientSecret: setupIntent.client_secret, returnUrl };
 }

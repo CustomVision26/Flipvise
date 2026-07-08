@@ -6,7 +6,6 @@ import { EDUCATION_PLAN_LABELS, isEducationTeamPlanId } from "@/lib/education-pl
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
 import { resolveTeacherWorkspaceContext } from "@/lib/resolve-teacher-workspace-url";
 import { redirectIfPlanReconciliationPending } from "@/lib/plan-reconciliation-gate";
-import { buildTeacherPath } from "@/lib/teacher-url";
 import { TeacherDashboardHome } from "@/components/teacher-dashboard-home";
 
 type TeacherDashboardPageProps = {
@@ -65,7 +64,6 @@ export default async function TeacherDashboardPage({
       planLabel={planLabel}
       workspaceNote={workspaceNote}
       teamAdminHref={teamAdminHref}
-      teacherWorkspace={workspace}
     />
   );
 }

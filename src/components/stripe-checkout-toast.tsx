@@ -7,6 +7,31 @@ import { syncBillingAfterCheckoutAction } from "@/actions/billing-page";
 import { finalizePlanChangePaymentAction } from "@/actions/plan-change-checkout";
 import { showSubscriptionSuccessToast } from "@/lib/subscription-success-toast";
 
+function resolveCheckoutRedirectKind(
+  searchParams: URLSearchParams,
+): "success" | "canceled" | "plan_change" | null {
+  const setupIntentId = searchParams.get("setup_intent")?.trim() ?? "";
+  if (setupIntentId.startsWith("seti_")) {
+    return "plan_change";
+  }
+
+  const checkoutValues = searchParams.getAll("checkout");
+  if (checkoutValues.includes("plan_change")) return "plan_change";
+  if (checkoutValues.includes("canceled")) return "canceled";
+  if (checkoutValues.includes("success")) return "success";
+
+  const checkout = searchParams.get("checkout")?.trim();
+  if (
+    checkout === "success" ||
+    checkout === "canceled" ||
+    checkout === "plan_change"
+  ) {
+    return checkout;
+  }
+
+  return null;
+}
+
 export const BILLING_SYNCED_EVENT = "flipvise:billing-synced";
 
 async function reloadClerkUserSession() {
@@ -29,12 +54,8 @@ export function StripeCheckoutToast() {
   useEffect(() => {
     if (handled.current) return;
 
-    const checkout = searchParams.get("checkout")?.trim();
-    if (
-      checkout !== "success" &&
-      checkout !== "canceled" &&
-      checkout !== "plan_change"
-    ) {
+    const checkout = resolveCheckoutRedirectKind(searchParams);
+    if (!checkout) {
       return;
     }
 

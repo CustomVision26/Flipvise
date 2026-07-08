@@ -9,11 +9,22 @@ export type TeacherWorkspaceContext = {
   queryString: string;
 };
 
+/** Personal education plans (e.g. Education Plus) use bare `/teacher` — no team query params. */
+export function buildTeacherQueryString(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  if (teamId == null || !Number.isFinite(teamId) || teamId <= 0) {
+    return "";
+  }
+  return buildTeamAdminQueryString(teamId, teamMemberId);
+}
+
 export function buildTeacherPath(
   teamId?: number | null,
   teamMemberId?: number | null,
 ): string {
-  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  const qs = buildTeacherQueryString(teamId, teamMemberId);
   return qs ? `${TEACHER_PATH}?${qs}` : TEACHER_PATH;
 }
 
@@ -22,7 +33,7 @@ export function buildTeacherQuizzesPath(
   teamMemberId?: number | null,
   extra?: URLSearchParams,
 ): string {
-  const p = new URLSearchParams(buildTeamAdminQueryString(teamId, teamMemberId));
+  const p = new URLSearchParams(buildTeacherQueryString(teamId, teamMemberId));
   if (extra) {
     extra.forEach((value, key) => {
       if (!p.has(key)) {
@@ -41,8 +52,17 @@ export function buildTeacherSubPath(
 ): string {
   const normalized = suffix.startsWith("/") ? suffix : `/${suffix}`;
   const path = `${TEACHER_PATH}${normalized}`;
-  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  const qs = buildTeacherQueryString(teamId, teamMemberId);
   return qs ? `${path}?${qs}` : path;
+}
+
+/** Prefer this in server-rendered teacher nav so workspace query params stay canonical. */
+export function buildTeacherToolHref(
+  suffix: string,
+  workspace: TeacherWorkspaceContext,
+): string {
+  const normalized = suffix.startsWith("/") ? suffix : `/${suffix}`;
+  return withTeacherQuery(`${TEACHER_PATH}${normalized}`, workspace.queryString);
 }
 
 export function withTeacherQuery(pathname: string, queryString: string): string {

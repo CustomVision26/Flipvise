@@ -983,6 +983,8 @@ export const savedLessonPlans = pgTable(
     result: json().$type<LessonPlanResult>().notNull(),
     pdfUrl: text(),
     pdfFileName: varchar({ length: 255 }),
+    deckId: integer(),
+    sourceDeckName: varchar({ length: 255 }),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },
@@ -1015,6 +1017,76 @@ export const savedHomeworkAssignments = pgTable(
   },
   (table) => [index('saved_homework_assignments_user_id_idx').on(table.userId)],
 );
+
+/** Teacher class schedules linked to a deck for lesson planning workflows. */
+export const teacherClasses = pgTable(
+  'teacher_classes',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    /** Education workspace id when the class belongs to a team context. */
+    teamId: integer().references(() => teams.id, { onDelete: 'cascade' }),
+    deckId: integer()
+      .notNull()
+      .references(() => decks.id, { onDelete: 'cascade' }),
+    academicYear: varchar({ length: 64 }).notNull(),
+    termSemester: varchar({ length: 128 }).notNull(),
+    week: varchar({ length: 64 }).notNull(),
+    day: varchar({ length: 64 }).notNull(),
+    period: varchar({ length: 64 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [
+    index('teacher_classes_user_id_idx').on(table.userId),
+    index('teacher_classes_team_id_idx').on(table.teamId),
+    index('teacher_classes_deck_id_idx').on(table.deckId),
+  ],
+);
+
+/** Education Plus — teacher-registered students (personal roster, not workspace members). */
+export const teacherRegisteredStudents = pgTable(
+  'teacher_registered_students',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    fullName: varchar({ length: 255 }).notNull(),
+    email: varchar({ length: 255 }).notNull(),
+    telephone: varchar({ length: 64 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [index('teacher_registered_students_user_id_idx').on(table.userId)],
+);
+
+/** Education Gold / Enterprise — manually entered assignment grades. */
+export const teacherManualGrades = pgTable(
+  'teacher_manual_grades',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    teamId: integer().references(() => teams.id, { onDelete: 'cascade' }),
+    studentName: varchar({ length: 255 }).notNull(),
+    studentEmail: varchar({ length: 255 }),
+    assignmentTitle: varchar({ length: 512 }).notNull(),
+    grade: varchar({ length: 32 }).notNull(),
+    maxGrade: varchar({ length: 32 }),
+    subject: varchar({ length: 255 }),
+    academicYear: varchar({ length: 64 }).notNull(),
+    termSemester: varchar({ length: 128 }).notNull(),
+    period: varchar({ length: 64 }),
+    notes: text(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [
+    index('teacher_manual_grades_user_id_idx').on(table.userId),
+    index('teacher_manual_grades_team_id_idx').on(table.teamId),
+  ],
+);
+
+export type TeacherRegisteredStudentRow = InferSelectModel<typeof teacherRegisteredStudents>;
+export type TeacherManualGradeRow = InferSelectModel<typeof teacherManualGrades>;
 
 export const planReconciliationStatusEnum = pgEnum('plan_reconciliation_status', [
   'pending',
@@ -1049,3 +1121,4 @@ export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
 export type DeckRow = InferSelectModel<typeof decks>;
 export type TeamDeckAssignmentRow = InferSelectModel<typeof teamDeckAssignments>;
 export type PlanReconciliationSession = InferSelectModel<typeof planReconciliationSessions>;
+export type TeacherClassRow = InferSelectModel<typeof teacherClasses>;

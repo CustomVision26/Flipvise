@@ -1,30 +1,9 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
-
-const PLACEHOLDER_CLASSES = [
-  {
-    name: "Period 1 — Algebra I",
-    subject: "Math",
-    gradeLevel: "9th",
-    students: 28,
-  },
-  {
-    name: "Period 3 — US History",
-    subject: "Social Studies",
-    gradeLevel: "8th",
-    students: 24,
-  },
-  {
-    name: "Period 5 — Biology",
-    subject: "Science",
-    gradeLevel: "10th",
-    students: 26,
-  },
-];
+import { loadTeacherClassesPagePayload } from "@/db/queries/teacher-classes";
+import { getTeacherClassDeckResources } from "@/db/queries/teacher-class-resources";
+import type { ClassDeckResources } from "@/db/queries/teacher-class-resources";
+import { TeacherClassesView } from "@/components/teacher-classes-view";
 
 type TeacherClassesPageProps = {
   searchParams: Promise<{
@@ -37,43 +16,68 @@ export default async function TeacherClassesPage({
   searchParams,
 }: TeacherClassesPageProps) {
   const params = await searchParams;
-  const { backHref } = await loadTeacherPageContext("/teacher/classes", params);
+  const { userId, workspace, backHref } = await loadTeacherPageContext(
+    "/teacher/classes",
+    params,
+  );
+
+  const [classesPayload, deckContext] = await Promise.all([
+    loadTeacherClassesPagePayload(userId, workspace.teamId),
+    loadTeacherDeckContext(userId),
+  ]);
+
+  const decksById = new Map(
+    deckContext.decks.map((deck) => [
+      deck.id,
+      {
+        id: deck.id,
+        name: deck.name,
+        description: deck.description,
+        gradeLevel: deck.gradeLevel,
+        difficultyLevel: deck.difficultyLevel,
+      },
+    ]),
+  );
+
+  const deckResourcesByClassId: Record<number, ClassDeckResources> = {};
+
+  const classesByCreator = new Map<string, typeof classesPayload.classes>();
+  for (const cls of classesPayload.classes) {
+    const bucket = classesByCreator.get(cls.userId) ?? [];
+    bucket.push(cls);
+    classesByCreator.set(cls.userId, bucket);
+  }
+
+  for (const [creatorUserId, creatorClasses] of classesByCreator) {
+    const resourcesMap = await getTeacherClassDeckResources(
+      creatorUserId,
+      creatorClasses.map((cls) => cls.deckId),
+      decksById,
+      workspace,
+    );
+
+    for (const cls of creatorClasses) {
+      const resources = resourcesMap.get(cls.deckId);
+      if (resources) {
+        deckResourcesByClassId[cls.id] = resources;
+      }
+    }
+  }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href={backHref}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-            Back
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Classes</h1>
-            <p className="text-sm text-muted-foreground">
-              Decks linked to classes used for lesson plan generation.
-            </p>
-          </div>
-        </div>
-        <Button>Create class</Button>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {PLACEHOLDER_CLASSES.map((cls) => (
-          <Card key={cls.name} className="border-border/80 bg-card/60">
-            <CardHeader>
-              <CardTitle className="text-base">{cls.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm text-muted-foreground">
-              <p>Subject: {cls.subject}</p>
-              <p>Grade level: {cls.gradeLevel}</p>
-              <p>Students: {cls.students}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+    <TeacherClassesView
+      classes={classesPayload.classes}
+      viewerUserId={userId}
+      creatorDisplayByUserId={classesPayload.creatorDisplayByUserId}
+      ownerUserId={classesPayload.ownerUserId}
+      ownerName={classesPayload.ownerName}
+      ownerEmail={classesPayload.ownerEmail}
+      memberMetaByUserId={classesPayload.memberMetaByUserId}
+      isWorkspaceOwner={classesPayload.isWorkspaceOwner}
+      decks={deckContext.decks}
+      deckResourcesByClassId={deckResourcesByClassId}
+      workspace={workspace}
+      backHref={backHref}
+    />
   );
 }

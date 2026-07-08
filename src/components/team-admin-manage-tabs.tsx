@@ -50,6 +50,7 @@ import {
   scrollToTeamAdminPanel,
   TeamAdminPanelScroll,
 } from "@/components/team-admin-panel-scroll";
+import { TEAM_ADMIN_SIDEBAR_NAV_ENABLED } from "@/lib/team-admin-dashboard-nav";
 
 type InvitationRow = TeamInvitationRow;
 type MemberRow = TeamMemberRow;
@@ -145,14 +146,24 @@ function TeamAdminPanelCard({
   title,
   description,
   headerAside,
+  contentOnly = false,
   children,
 }: {
   panelId: string;
   title: string;
   description: string;
   headerAside?: ReactNode;
+  contentOnly?: boolean;
   children: ReactNode;
 }) {
+  if (contentOnly) {
+    return (
+      <Card className={teamAdminActivePanelClass}>
+        <CardContent className="pt-6">{children}</CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className={teamAdminActivePanelClass}>
       <CardHeader className="space-y-2 pb-4">
@@ -221,47 +232,50 @@ export function TeamAdminManageTabs({
   const workspaceHistoryLinkActive = mainPanel === "workspace-history";
   const quizResultsLinkActive = mainPanel === "quiz-results";
   const inviteMembersLinkActive = invitePanelVisible;
+  const contentOnly = TEAM_ADMIN_SIDEBAR_NAV_ENABLED;
 
   return (
     <div className="flex w-full flex-col gap-5">
-      <TeamAdminPanelScroll />
-      <div className="-mx-1 overflow-x-auto px-1">
-        <div
-          role="tablist"
-          aria-orientation="horizontal"
-          className="flex min-w-max gap-2 py-0.5 sm:gap-0 sm:border-b sm:border-border/80 sm:py-0"
-        >
-          <TeamAdminTabLink
-            href={membersHref}
-            panelId={TEAM_ADMIN_PANEL_IDS.members}
-            isActive={membersLinkActive}
+      {!contentOnly ? <TeamAdminPanelScroll /> : null}
+      {!TEAM_ADMIN_SIDEBAR_NAV_ENABLED ? (
+        <div className="-mx-1 overflow-x-auto px-1">
+          <div
+            role="tablist"
+            aria-orientation="horizontal"
+            className="flex min-w-max gap-2 py-0.5 sm:gap-0 sm:border-b sm:border-border/80 sm:py-0"
           >
-            Members
-          </TeamAdminTabLink>
-          <TeamAdminDeckManagerNavLink href={deckManagerHref}>Deck Manager</TeamAdminDeckManagerNavLink>
-          <TeamAdminTabLink
-            href={workspaceHistoryHref}
-            panelId={TEAM_ADMIN_PANEL_IDS.workspaceHistory}
-            isActive={workspaceHistoryLinkActive}
-          >
-            Workspace history
-          </TeamAdminTabLink>
-          <TeamAdminTabLink
-            href={inviteSendHref}
-            panelId={TEAM_ADMIN_PANEL_IDS.inviteMembers}
-            isActive={inviteMembersLinkActive}
-          >
-            Invite members
-          </TeamAdminTabLink>
-          <TeamAdminTabLink
-            href={quizResultsHref}
-            panelId={TEAM_ADMIN_PANEL_IDS.quizResults}
-            isActive={quizResultsLinkActive}
-          >
-            Quiz results
-          </TeamAdminTabLink>
+            <TeamAdminTabLink
+              href={membersHref}
+              panelId={TEAM_ADMIN_PANEL_IDS.members}
+              isActive={membersLinkActive}
+            >
+              Members
+            </TeamAdminTabLink>
+            <TeamAdminDeckManagerNavLink href={deckManagerHref}>Deck Manager</TeamAdminDeckManagerNavLink>
+            <TeamAdminTabLink
+              href={workspaceHistoryHref}
+              panelId={TEAM_ADMIN_PANEL_IDS.workspaceHistory}
+              isActive={workspaceHistoryLinkActive}
+            >
+              Workspace history
+            </TeamAdminTabLink>
+            <TeamAdminTabLink
+              href={inviteSendHref}
+              panelId={TEAM_ADMIN_PANEL_IDS.inviteMembers}
+              isActive={inviteMembersLinkActive}
+            >
+              Invite members
+            </TeamAdminTabLink>
+            <TeamAdminTabLink
+              href={quizResultsHref}
+              panelId={TEAM_ADMIN_PANEL_IDS.quizResults}
+              isActive={quizResultsLinkActive}
+            >
+              Quiz results
+            </TeamAdminTabLink>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div key={pathname} className="w-full">
       {mainPanel === "members" && !invitePanelVisible ? (
@@ -273,27 +287,30 @@ export function TeamAdminManageTabs({
               ? "When members joined or were removed from this workspace, including who performed each action."
               : "Change roles or remove members. Double-click a row to view member details."
           }
+          contentOnly={contentOnly}
           headerAside={
-            <div
-              role="tablist"
-              aria-orientation="horizontal"
-              className="inline-flex rounded-lg border border-border/80 bg-muted/20 p-1"
-            >
-              <Link
-                href={membersHref}
-                className={teamAdminSubTabClass(!isTeamAdminMembersHistoryPath(pathname))}
-                role="tab"
+            !TEAM_ADMIN_SIDEBAR_NAV_ENABLED ? (
+              <div
+                role="tablist"
+                aria-orientation="horizontal"
+                className="inline-flex rounded-lg border border-border/80 bg-muted/20 p-1"
               >
-                Roster
-              </Link>
-              <Link
-                href={membersHistoryHref}
-                className={teamAdminSubTabClass(isTeamAdminMembersHistoryPath(pathname))}
-                role="tab"
-              >
-                Membership history
-              </Link>
-            </div>
+                <Link
+                  href={membersHref}
+                  className={teamAdminSubTabClass(!isTeamAdminMembersHistoryPath(pathname))}
+                  role="tab"
+                >
+                  Roster
+                </Link>
+                <Link
+                  href={membersHistoryHref}
+                  className={teamAdminSubTabClass(isTeamAdminMembersHistoryPath(pathname))}
+                  role="tab"
+                >
+                  Membership history
+                </Link>
+              </div>
+            ) : undefined
           }
         >
           {isTeamAdminMembersHistoryPath(pathname) ? (
@@ -325,6 +342,7 @@ export function TeamAdminManageTabs({
           panelId={TEAM_ADMIN_PANEL_IDS.workspaceHistory}
           title="Workspace history"
           description="When this workspace was created, renamed, or removed. Each row is recorded at the time the change happened."
+          contentOnly={contentOnly}
         >
           <TeamWorkspaceHistoryTable rows={workspaceHistory} />
         </TeamAdminPanelCard>
@@ -335,37 +353,40 @@ export function TeamAdminManageTabs({
           panelId={TEAM_ADMIN_PANEL_IDS.inviteMembers}
           title="Invite members"
           description={`Send invitations, manage active invites, or review history for this workspace. Invites expire in ${TEAM_INVITE_EXPIRY_DAYS} days.`}
+          contentOnly={contentOnly}
         >
           <div className="space-y-5">
-            <div className="overflow-x-auto">
-              <div
-                role="tablist"
-                aria-orientation="horizontal"
-                className="inline-flex min-w-full rounded-lg border border-border/80 bg-muted/20 p-1 sm:min-w-0"
-              >
-                <Link
-                  href={inviteSendHref}
-                  className={teamAdminSubTabClass(isTeamAdminInviteSendPath(pathname))}
-                  role="tab"
+            {!TEAM_ADMIN_SIDEBAR_NAV_ENABLED ? (
+              <div className="overflow-x-auto">
+                <div
+                  role="tablist"
+                  aria-orientation="horizontal"
+                  className="inline-flex min-w-full rounded-lg border border-border/80 bg-muted/20 p-1 sm:min-w-0"
                 >
-                  Send invite
-                </Link>
-                <Link
-                  href={invitePendingHref}
-                  className={teamAdminSubTabClass(isTeamAdminInvitePendingPath(pathname))}
-                  role="tab"
-                >
-                  Pending
-                </Link>
-                <Link
-                  href={inviteHistoryHref}
-                  className={teamAdminSubTabClass(isTeamAdminInviteHistoryPath(pathname))}
-                  role="tab"
-                >
-                  History
-                </Link>
+                  <Link
+                    href={inviteSendHref}
+                    className={teamAdminSubTabClass(isTeamAdminInviteSendPath(pathname))}
+                    role="tab"
+                  >
+                    Send invite
+                  </Link>
+                  <Link
+                    href={invitePendingHref}
+                    className={teamAdminSubTabClass(isTeamAdminInvitePendingPath(pathname))}
+                    role="tab"
+                  >
+                    Pending
+                  </Link>
+                  <Link
+                    href={inviteHistoryHref}
+                    className={teamAdminSubTabClass(isTeamAdminInviteHistoryPath(pathname))}
+                    role="tab"
+                  >
+                    History
+                  </Link>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             {isTeamAdminInviteSendPath(pathname) ? (
               <div className={cn(teamAdminSubTabPanelClass, "space-y-4")}>

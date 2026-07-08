@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Download, Loader2, Pencil, RefreshCw, Save, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Pencil, RefreshCw, Save, X } from "lucide-react";
 import { generateLessonPlanAction, saveLessonPlanAction } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,15 @@ import {
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
+import {
+  OwnerTeamAdminResourcePicker,
+  useOwnerScopedItems,
+} from "@/components/owner-team-admin-resource-picker";
+import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
+import type { DeckRow } from "@/db/queries/decks";
+import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
+import type { TeacherDeckQuota } from "@/lib/teacher-deck-quota";
+import { teacherDeckQuotaLabel } from "@/lib/teacher-deck-quota";
 import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 import type {
   LessonPlanActionInput,
@@ -52,29 +62,58 @@ import {
 } from "@/lib/teacher-url";
 
 const DIFFICULTY_LEVEL_OPTIONS = LESSON_DIFFICULTY_LEVELS;
+const DECK_NONE = "__none__";
+
+type DeckTargetMode = "existing" | "new";
+
+function defaultNewDeckName(subject: string, topic: string): string {
+  const subjectTrim = subject.trim();
+  const topicTrim = topic.trim();
+  if (subjectTrim && topicTrim) return `${subjectTrim} — ${topicTrim}`;
+  return subjectTrim || topicTrim;
+}
 
 type TeacherLessonBuilderFormProps = {
   hasAdvancedSourceImport: boolean;
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
+  decks: DeckRow[];
+  ownerDeckPicker: OwnerTeamAdminDeckPickerPayload;
+  deckQuota: TeacherDeckQuota;
+  initialDeckId?: number;
+  initialDeckDefaults?: {
+    subject: string;
+    gradeLevel: string;
+    topic: string;
+    difficultyLevel: string;
+  };
 };
 
 export function TeacherLessonBuilderForm({
   hasAdvancedSourceImport,
   backHref = "/teacher",
   teacherWorkspace,
+  decks,
+  ownerDeckPicker,
+  deckQuota,
+  initialDeckId,
+  initialDeckDefaults,
 }: TeacherLessonBuilderFormProps) {
+  const isWorkspaceOwner = ownerDeckPicker.isWorkspaceOwner;
+  const initialDeck =
+    initialDeckId != null ? decks.find((deck) => deck.id === initialDeckId) ?? null : null;
+
   const referenceFieldsRef = useRef<LessonPlanReferenceMaterialFieldsHandle>(null);
   const [referenceMaterials, setReferenceMaterials] = useState<
     LessonPlanReferenceMaterial[]
   >([]);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [form, setForm] = useState<LessonPlanInput>({
-    subject: "",
-    gradeLevel: "",
-    topic: "",
+    subject: initialDeckDefaults?.subject ?? "",
+    gradeLevel: initialDeckDefaults?.gradeLevel ?? "",
+    topic: initialDeckDefaults?.topic ?? "",
     lessonDuration: "45 minutes",
-    difficultyLevel: "Intermediate",
+    difficultyLevel: initialDeckDefaults?.difficultyLevel ?? "Intermediate",
     learningStandard: "",
     classSize: "",
     specialInstructions: "",
@@ -92,6 +131,57 @@ export function TeacherLessonBuilderForm({
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
   const [regenerateApproach, setRegenerateApproach] =
     useState<VocabularyTeachingApproach>("weekly");
+  const [deckTargetMode, setDeckTargetMode] = useState<DeckTargetMode>(
+    initialDeck ? "existing" : "existing",
+  );
+  const [selectedDeckKey, setSelectedDeckKey] = useState<string>(
+    initialDeck ? String(initialDeck.id) : DECK_NONE,
+  );
+  const [deckId, setDeckId] = useState<number | undefined>(initialDeck?.id);
+  const [selectedDeckAdminUserId, setSelectedDeckAdminUserId] =
+    useState<string>(ADMIN_NONE);
+
+  const activeDecks = useOwnerScopedItems(
+    isWorkspaceOwner,
+    selectedDeckAdminUserId,
+    ownerDeckPicker.itemsByAdminUserId,
+    decks,
+  );
+  const selectedDeck =
+    deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+
+  function deckHaystack(deck: DeckRow): string {
+    return [deck.name, deck.description, deck.gradeLevel]
+      .filter((part): part is string => Boolean(part && part.trim()))
+      .join(" ")
+      .toLowerCase();
+  }
+
+  function handleDeckAdminChange(adminUserId: string) {
+    setSelectedDeckAdminUserId(adminUserId);
+    setSelectedDeckKey(DECK_NONE);
+    setDeckId(undefined);
+  }
+
+  function handleDeckChange(value: string | null) {
+    const next = value ?? DECK_NONE;
+    setSelectedDeckKey(next);
+    if (next === DECK_NONE) {
+      setDeckId(undefined);
+      return;
+    }
+    const parsed = Number(next);
+    setDeckId(Number.isFinite(parsed) ? parsed : undefined);
+  }
+
+  function handleDeckTargetModeChange(mode: DeckTargetMode) {
+    setDeckTargetMode(mode);
+    setSavedPlanId(null);
+    if (mode === "new") {
+      setSelectedDeckKey(DECK_NONE);
+      setDeckId(undefined);
+    }
+  }
 
   const runGeneration = useCallback(
     async (
@@ -170,10 +260,33 @@ export function TeacherLessonBuilderForm({
 
   async function handleSavePlan() {
     if (!result) return;
+    if (deckTargetMode === "existing" && deckId == null) {
+      toast.error("Select a deck to save this lesson plan.");
+      return;
+    }
+    if (deckTargetMode === "new" && !defaultNewDeckName(form.subject, form.topic).trim()) {
+      toast.error("Enter Subject and Topic — they become the new deck name when you save.");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const saved = await saveLessonPlanAction({ input: form, result });
+      const saved = await saveLessonPlanAction({
+        input: form,
+        result,
+        deckId: deckTargetMode === "existing" ? deckId : undefined,
+        newDeckName:
+          deckTargetMode === "new"
+            ? defaultNewDeckName(form.subject, form.topic)
+            : undefined,
+        teamId: teacherWorkspace?.teamId ?? undefined,
+      });
       setSavedPlanId(saved.id);
+      if (deckTargetMode === "new") {
+        setDeckTargetMode("existing");
+        setDeckId(saved.deckId);
+        setSelectedDeckKey(String(saved.deckId));
+      }
       const quizzesHref = teacherWorkspace
         ? buildTeacherQuizzesPath(
             teacherWorkspace.teamId,
@@ -191,8 +304,11 @@ export function TeacherLessonBuilderForm({
       toast.success("Lesson plan saved", {
         description: (
           <span>
-            {saved.lessonTitle} was saved with input data
-            {saved.pdfUrl ? " and PDF" : ""}. Use it in the{" "}
+            {saved.lessonTitle} was saved to{" "}
+            <Link href={`/decks/${saved.deckId}`} className="underline underline-offset-2">
+              {saved.sourceDeckName}
+            </Link>
+            {saved.pdfUrl ? " with PDF" : ""}. Use it in the{" "}
             <Link href={quizzesHref} className="underline underline-offset-2">
               Quiz Generator
             </Link>{" "}
@@ -323,6 +439,142 @@ export function TeacherLessonBuilderForm({
       >
       <TooltipProvider>
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <TeacherFieldLabel
+              htmlFor="lessonDeckTargetMode"
+              label="Save to deck"
+              help={
+                <>
+                  <p className="mb-2">
+                    Link this lesson plan to a deck so it appears in Classes and your
+                    Resource Library for that deck.
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>
+                      <strong>Existing deck</strong> — attach the lesson to a deck you
+                      already created.
+                    </li>
+                    <li>
+                      <strong>New deck</strong> — creates a deck named Subject — Topic when you
+                      save the lesson plan.
+                    </li>
+                  </ul>
+                </>
+              }
+            />
+            <ToggleGroup
+              id="lessonDeckTargetMode"
+              value={[deckTargetMode]}
+              onValueChange={(next) => {
+                const value = next[0] as DeckTargetMode | undefined;
+                if (value) handleDeckTargetModeChange(value);
+              }}
+              variant="outline"
+              spacing={0}
+              className="flex w-full"
+            >
+              <ToggleGroupItem value="existing" className="h-10 flex-1 px-3">
+                Existing deck
+              </ToggleGroupItem>
+              <ToggleGroupItem value="new" className="h-10 flex-1 px-3">
+                New deck
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <p className="text-xs text-muted-foreground">{teacherDeckQuotaLabel(deckQuota)}</p>
+          </div>
+
+          {deckTargetMode === "existing" ? (
+            isWorkspaceOwner ? (
+              <OwnerTeamAdminResourcePicker
+                ownerPicker={ownerDeckPicker}
+                itemsByAdminUserId={ownerDeckPicker.itemsByAdminUserId}
+                selectedAdminUserId={selectedDeckAdminUserId}
+                onAdminChange={handleDeckAdminChange}
+                selectedItemKey={selectedDeckKey}
+                onItemChange={handleDeckChange}
+                noneValue={DECK_NONE}
+                noneLabel="Select a deck"
+                placeholder="Select a deck"
+                resourceLabel="Deck"
+                resourceSelectId="lessonBuilderDeck"
+                adminSelectId="lessonBuilderDeckTeamAdmin"
+                getItemKey={(deck) => String(deck.id)}
+                getItemLabel={(deck) => deck.name}
+                getItemHaystack={deckHaystack}
+                searchPlaceholder="Search decks by name, subject, or description…"
+                resourceHelp="Pick the deck this lesson plan belongs to."
+                resourceFooter={
+                  selectedDeck ? (
+                    <p className="text-xs text-muted-foreground">
+                      <Link
+                        href={`/decks/${selectedDeck.id}`}
+                        className="inline-flex items-center gap-1 underline underline-offset-2"
+                      >
+                        Open deck
+                        <ExternalLink className="size-3" aria-hidden />
+                      </Link>
+                    </p>
+                  ) : null
+                }
+              />
+            ) : (
+              <div className="space-y-2 sm:col-span-2">
+                <TeacherFieldLabel
+                  htmlFor="lessonBuilderDeck"
+                  label="Deck"
+                  help="Pick the deck this lesson plan belongs to."
+                />
+                <Select value={selectedDeckKey} onValueChange={handleDeckChange}>
+                  <SelectTrigger id="lessonBuilderDeck" className="h-10 w-full bg-background">
+                    <SelectValue placeholder="Select a deck">
+                      {selectedDeck?.name ?? "Select a deck"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DECK_NONE} disabled>
+                      Select a deck
+                    </SelectItem>
+                    {activeDecks.map((deck) => (
+                      <SelectItem key={deck.id} value={String(deck.id)}>
+                        {deck.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeDecks.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No decks yet. Switch to <strong>New deck</strong> or create a deck from
+                    your Personal Dashboard first.
+                  </p>
+                ) : null}
+                {selectedDeck ? (
+                  <p className="text-xs text-muted-foreground">
+                    <Link
+                      href={`/decks/${selectedDeck.id}`}
+                      className="inline-flex items-center gap-1 underline underline-offset-2"
+                    >
+                      Open deck
+                      <ExternalLink className="size-3" aria-hidden />
+                    </Link>
+                  </p>
+                ) : null}
+              </div>
+            )
+          ) : (
+            <div className="space-y-2 sm:col-span-2">
+              <p className="text-sm text-muted-foreground">
+                A new deck is created when you save, using{" "}
+                <span className="font-medium text-foreground">Subject — Topic</span> as the deck
+                name.
+              </p>
+              {deckQuota.atLimit ? (
+                <p className="text-xs text-destructive">
+                  Deck limit reached on your plan. Select an existing deck instead.
+                </p>
+              ) : null}
+            </div>
+          )}
+
           <div className="space-y-2">
             <TeacherFieldLabel
               htmlFor="subject"
