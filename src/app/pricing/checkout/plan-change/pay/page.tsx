@@ -9,6 +9,7 @@ import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { parsePricingBillingPeriod } from "@/lib/pricing-billing-period";
 import {
+  EMPTY_PLAN_CHANGE_PRORATION_PREVIEW,
   fetchPlanChangeProrationPreview,
   resolvePlanChangeCheckoutContext,
 } from "@/lib/plan-change-proration-preview";
@@ -35,14 +36,19 @@ export default async function PlanChangeCheckoutPayPage({
   }
 
   const context = await resolvePlanChangeCheckoutContext(userId, planId);
-  if (!context) redirect("/pricing");
+  if (!context) {
+    redirect(
+      `/pricing/checkout?plan=${encodeURIComponent(planId)}&period=${period}`,
+    );
+  }
 
-  const preview = await fetchPlanChangeProrationPreview({
+  const previewResult = await fetchPlanChangeProrationPreview({
     userId,
     planSlug: planId,
     period,
   });
-  if (!preview) redirect("/pricing/checkout");
+  const previewEstimated = previewResult == null;
+  const preview = previewResult ?? EMPTY_PLAN_CHANGE_PRORATION_PREVIEW;
 
   let setupPayload: { clientSecret: string; returnUrl: string };
   try {
@@ -65,6 +71,7 @@ export default async function PlanChangeCheckoutPayPage({
     period,
     customerEmail,
     preview,
+    previewEstimated,
   };
 
   return (

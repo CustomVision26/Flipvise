@@ -31,6 +31,8 @@ export type PlanChangeCheckoutSummary = {
   period: PricingBillingPeriod;
   customerEmail: string | null;
   preview: PlanChangeProrationPreview;
+  /** False when Stripe returned a full proration invoice preview. */
+  previewEstimated: boolean;
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -42,7 +44,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function PlanChangeOrderSummary({ summary }: { summary: PlanChangeCheckoutSummary }) {
-  const { context, preview, period } = summary;
+  const { context, preview, period, previewEstimated } = summary;
   const periodLabel = period === "yearly" ? "Annual billing" : "Monthly billing";
 
   return (
@@ -94,15 +96,23 @@ function PlanChangeOrderSummary({ summary }: { summary: PlanChangeCheckoutSummar
             ))}
           </ul>
         ) : (
-          <p className="text-[#6b7280]">No line-item breakdown available.</p>
+          <p className="text-[#6b7280]">
+            {previewEstimated
+              ? "Proration estimate unavailable — Stripe will calculate the exact amount when you confirm."
+              : "No line-item breakdown available."}
+          </p>
         )}
 
         <Separator className="bg-[#e0e4e8]" />
 
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <span className="font-medium text-[#1a2332]">Estimated due today</span>
+          <span className="font-medium text-[#1a2332]">
+            {previewEstimated ? "Estimated due today" : "Estimated due today"}
+          </span>
           <span className="font-serif text-2xl font-semibold tabular-nums text-[#1a2332]">
-            {formatCentsMoney(preview.amountDueCents, preview.currency)}
+            {previewEstimated
+              ? "Calculated at confirmation"
+              : formatCentsMoney(preview.amountDueCents, preview.currency)}
           </span>
         </div>
       </div>
@@ -130,11 +140,10 @@ function PlanChangePaymentForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const totalLabel = formatCentsMoney(
-    summary.preview.amountDueCents,
-    summary.preview.currency,
-  );
-  const slideLabel = `Slide to confirm plan change — ${totalLabel}`;
+  const totalLabel = summary.previewEstimated
+    ? "plan change"
+    : formatCentsMoney(summary.preview.amountDueCents, summary.preview.currency);
+  const slideLabel = `Slide to confirm plan change${summary.previewEstimated ? "" : ` — ${totalLabel}`}`;
 
   async function handleConfirm() {
     if (!stripe || !elements) return;

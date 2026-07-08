@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { createStripeCheckoutSessionAction } from "@/actions/stripe";
 import {
   getPlanChangeProrationPreviewAction,
+  validatePlanChangeTargetPriceAction,
   type PlanChangeCheckoutContextResult,
 } from "@/actions/plan-change-checkout";
 import { SlideToSubmitButton } from "@/components/slide-to-submit-button";
@@ -113,6 +114,7 @@ export function PricingCheckoutStep({
     startTransition(async () => {
       try {
         if (isPlanChange) {
+          await validatePlanChangeTargetPriceAction({ plan: planId, period });
           const params = new URLSearchParams({ plan: planId, period });
           router.push(`/pricing/checkout/plan-change/pay?${params.toString()}`);
           return;

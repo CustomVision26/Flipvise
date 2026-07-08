@@ -2,7 +2,8 @@
 
 import { z } from "zod";
 import { auth } from "@/lib/clerk-auth";
-import { STRIPE_PAID_PLAN_IDS } from "@/lib/billing-plan-ids";
+import { STRIPE_PAID_PLAN_IDS, type StripePaidPlanId } from "@/lib/billing-plan-ids";
+import { isEducationPlanId } from "@/lib/education-plans";
 import {
   fetchUpgradableStripeSubscription,
   tryUpgradeExistingStripeSubscription,
@@ -21,6 +22,10 @@ import { personalDashboardHrefAfterPlanChangeSuccess } from "@/lib/personal-dash
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { isStripeSetupIntentId } from "@/lib/stripe-checkout-session-id";
 import { asPaidPlanId } from "@/lib/stripe-billing-sync";
+import {
+  resolveStripePriceIdForPlan,
+  stripePriceEnvPairForPlan,
+} from "@/lib/stripe-plan-price-env";
 
 const planChangeSchema = z.object({
   plan: z.enum(STRIPE_PAID_PLAN_IDS),
@@ -34,6 +39,43 @@ const planChangeFinalizeSchema = z.object({
 export type PlanChangeCheckoutContextResult = PlanChangeCheckoutContext & {
   initialPreview: PlanChangeProrationPreview | null;
 };
+
+function assertPlanChangeTargetPriceConfigured(
+  plan: StripePaidPlanId,
+  period: "monthly" | "yearly",
+): void {
+  const priceId = resolveStripePriceIdForPlan(plan, period);
+  if (priceId) return;
+
+  const envKey = stripePriceEnvPairForPlan(plan, period).primary;
+  if (isEducationPlanId(plan)) {
+    throw new Error(
+      `Education plan checkout is not configured yet (${envKey}). Please contact support and we will help you upgrade.`,
+    );
+  }
+  throw new Error(
+    `This plan is not available for checkout right now (${envKey}). Please contact support.`,
+  );
+}
+
+export async function validatePlanChangeTargetPriceAction(
+  data: z.infer<typeof planChangeSchema>,
+): Promise<void> {
+  const parsed = planChangeSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const live = await fetchUpgradableStripeSubscription(userId);
+  if (!live) {
+    throw new Error(
+      "No active subscription found to change. Start a new subscription from the pricing page.",
+    );
+  }
+
+  assertPlanChangeTargetPriceConfigured(parsed.data.plan, parsed.data.period);
+}
 
 export async function getPlanChangeCheckoutContextAction(
   data: z.infer<typeof planChangeSchema>,
@@ -86,6 +128,8 @@ export async function createPlanChangeSetupIntentAction(
   if (!userId) throw new Error("Unauthorized");
 
   const { plan, period } = parsed.data;
+  assertPlanChangeTargetPriceConfigured(plan, period);
+
   const live = await fetchUpgradableStripeSubscription(userId);
   if (!live) {
     throw new Error(

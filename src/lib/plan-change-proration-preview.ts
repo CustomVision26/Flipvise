@@ -5,7 +5,10 @@ import {
 } from "@/lib/apply-plan-upgrade";
 import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
 import { resolveCatalogAlignedStripePriceId } from "@/lib/stripe-catalog-price";
-import { resolveStripePriceIdForPlan } from "@/lib/stripe-plan-price-env";
+import {
+  planSlugFromStripePriceId,
+  resolveStripePriceIdForPlan,
+} from "@/lib/stripe-plan-price-env";
 import { stripe } from "@/lib/stripe";
 import { STRIPE_CLEAR_DISCOUNTS } from "@/lib/stripe-clear-discounts";
 import { asPaidPlanId } from "@/lib/stripe-billing-sync";
@@ -25,6 +28,14 @@ export type PlanChangeProrationPreview = {
   /** Sum of proration charges (positive line items), if any. */
   chargeCents: number | null;
   lines: PlanChangePreviewLine[];
+};
+
+export const EMPTY_PLAN_CHANGE_PRORATION_PREVIEW: PlanChangeProrationPreview = {
+  amountDueCents: 0,
+  currency: "USD",
+  creditCents: null,
+  chargeCents: null,
+  lines: [],
 };
 
 async function resolveTargetPriceId(
@@ -93,7 +104,12 @@ export async function resolvePlanChangeCheckoutContext(
   const sub = await stripe.subscriptions.retrieve(live.subscriptionId, {
     expand: ["items.data.price"],
   });
-  const currentPlanSlug = asPaidPlanId(sub.metadata?.plan);
+  let currentPlanSlug = asPaidPlanId(sub.metadata?.plan);
+  if (!currentPlanSlug) {
+    currentPlanSlug = planSlugFromStripePriceId(
+      priceIdOnItem(sub.items?.data?.[0]),
+    );
+  }
   if (!currentPlanSlug) return null;
 
   return {
