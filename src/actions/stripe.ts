@@ -247,6 +247,12 @@ async function resolveCheckoutCustomerParams(
 
 function checkoutActionErrorMessage(error: unknown): string {
   if (error instanceof Error) {
+    if (/missing stripe price id env var/i.test(error.message)) {
+      if (/STRIPE_EDUCATION/i.test(error.message)) {
+        return "Education plans are not available for checkout yet. Please contact support and we will help you subscribe.";
+      }
+      return "This plan is not available for checkout right now. Please contact support.";
+    }
     if (
       "type" in error &&
       typeof error.type === "string" &&

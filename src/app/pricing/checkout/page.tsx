@@ -69,17 +69,22 @@ export default async function PricingCheckoutPage({
     access.userId,
     planId,
   );
-  const planChangeContext =
-    planChangeBase != null
-      ? {
-          ...planChangeBase,
-          initialPreview: await fetchPlanChangeProrationPreview({
-            userId: access.userId,
-            planSlug: planId,
-            period: initialPeriod,
-          }),
-        }
-      : null;
+  let planChangeContext = null;
+  if (planChangeBase != null) {
+    try {
+      planChangeContext = {
+        ...planChangeBase,
+        initialPreview: await fetchPlanChangeProrationPreview({
+          userId: access.userId,
+          planSlug: planId,
+          period: initialPeriod,
+        }),
+      };
+    } catch (error) {
+      console.error("[PricingCheckoutPage] plan change preview:", error);
+      planChangeContext = { ...planChangeBase, initialPreview: null };
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background px-4 py-10 sm:px-6 sm:py-14">

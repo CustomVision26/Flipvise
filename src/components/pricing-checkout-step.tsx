@@ -209,6 +209,11 @@ export function PricingCheckoutStep({
                     </p>
                   ) : null}
                 </div>
+              ) : !previewLoading ? (
+                <p className="text-xs text-amber-400/90">
+                  We couldn&apos;t calculate proration right now. You can still continue — if
+                  checkout fails, contact support and we&apos;ll help you switch plans.
+                </p>
               ) : null}
             </div>
           ) : null}

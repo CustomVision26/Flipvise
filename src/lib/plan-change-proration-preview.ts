@@ -31,17 +31,22 @@ async function resolveTargetPriceId(
   planSlug: StripePaidPlanId,
   period: "monthly" | "yearly",
 ): Promise<string | null> {
-  const plansConfig = await readPlansConfigFromDisk();
-  const planRow = plansConfig.find((p) => p.id === planSlug);
-  if (planRow) {
-    return resolveCatalogAlignedStripePriceId({
-      plan: planSlug,
-      period,
-      monthlyPrice: planRow.monthlyPrice,
-      yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
-    });
+  try {
+    const plansConfig = await readPlansConfigFromDisk();
+    const planRow = plansConfig.find((p) => p.id === planSlug);
+    if (planRow) {
+      return await resolveCatalogAlignedStripePriceId({
+        plan: planSlug,
+        period,
+        monthlyPrice: planRow.monthlyPrice,
+        yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
+      });
+    }
+    return resolveStripePriceIdForPlan(planSlug, period);
+  } catch (error) {
+    console.error("[resolveTargetPriceId]", { planSlug, period, error });
+    return resolveStripePriceIdForPlan(planSlug, period);
   }
-  return resolveStripePriceIdForPlan(planSlug, period);
 }
 
 async function detectBillingPeriod(
@@ -151,33 +156,32 @@ export async function fetchPlanChangeProrationPreview(input: {
   planSlug: StripePaidPlanId;
   period: "monthly" | "yearly";
 }): Promise<PlanChangeProrationPreview | null> {
-  const live = await fetchUpgradableStripeSubscription(input.userId);
-  if (!live) return null;
-
-  const newPriceId = await resolveTargetPriceId(input.planSlug, input.period);
-  if (!newPriceId) return null;
-
-  if (
-    await isSamePlanAndPeriod({
-      live,
-      targetPlanSlug: input.planSlug,
-      targetPeriod: input.period,
-    })
-  ) {
-    return {
-      amountDueCents: 0,
-      currency: "USD",
-      creditCents: null,
-      chargeCents: null,
-      lines: [],
-    };
-  }
-
-  const plansConfig = await readPlansConfigFromDisk();
-  const targetPlanRow = plansConfig.find((p) => p.id === input.planSlug);
-  const targetPlanDiscountActive = Boolean(targetPlanRow?.discount?.active);
-
   try {
+    const live = await fetchUpgradableStripeSubscription(input.userId);
+    if (!live) return null;
+
+    const newPriceId = await resolveTargetPriceId(input.planSlug, input.period);
+    if (!newPriceId) return null;
+
+    if (
+      await isSamePlanAndPeriod({
+        live,
+        targetPlanSlug: input.planSlug,
+        targetPeriod: input.period,
+      })
+    ) {
+      return {
+        amountDueCents: 0,
+        currency: "USD",
+        creditCents: null,
+        chargeCents: null,
+        lines: [],
+      };
+    }
+
+    const plansConfig = await readPlansConfigFromDisk();
+    const targetPlanRow = plansConfig.find((p) => p.id === input.planSlug);
+    const targetPlanDiscountActive = Boolean(targetPlanRow?.discount?.active);
     const prorationDate = Math.floor(Date.now() / 1000);
     const preview = await stripe.invoices.createPreview({
       customer: live.customerId,

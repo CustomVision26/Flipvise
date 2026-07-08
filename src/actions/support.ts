@@ -1,7 +1,8 @@
 "use server";
 
 import { z } from "zod";
-import { auth, currentUser } from "@/lib/clerk-auth";
+import { auth } from "@/lib/clerk-auth";
+import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import {
   createSupportTicket,
   getSupportTicketsByUser,
@@ -84,23 +85,47 @@ export type AccountInput = z.infer<typeof accountSchema>;
 async function getAuthenticatedUser() {
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
-  const user = await currentUser();
+  const profile = await getClerkUserFieldDisplayById(userId).catch(() => null);
   return {
     userId,
-    userEmail: user?.emailAddresses?.[0]?.emailAddress,
-    userName: user?.fullName ?? user?.username ?? undefined,
+    userEmail: profile?.primaryEmail ?? undefined,
+    userName: profile?.primaryLine ?? undefined,
   };
 }
 
 async function afterTicketCreated(ticket: Awaited<ReturnType<typeof createSupportTicket>>) {
-  await notifyAdminsOfNewSupportTicket({
-    ticketId: ticket.id,
-    subject: ticket.subject,
-    message: ticket.message,
-    userName: ticket.userName,
-  });
-  revalidatePath("/admin/support-center");
-  revalidatePath("/dashboard/inbox");
+  try {
+    await notifyAdminsOfNewSupportTicket({
+      ticketId: ticket.id,
+      subject: ticket.subject,
+      message: ticket.message,
+      userName: ticket.userName,
+    });
+  } catch (error) {
+    console.error("[afterTicketCreated] notify admins:", error);
+  }
+
+  try {
+    revalidatePath("/admin/support-center");
+    revalidatePath("/dashboard/inbox");
+  } catch (error) {
+    console.error("[afterTicketCreated] revalidate:", error);
+  }
+}
+
+async function submitSupportTicketSafely(
+  create: () => Promise<Awaited<ReturnType<typeof createSupportTicket>>>,
+) {
+  try {
+    const ticket = await create();
+    await afterTicketCreated(ticket);
+    return ticket;
+  } catch (error) {
+    console.error("[support] submit ticket:", error);
+    throw new Error(
+      "We couldn't send your message. Please try again in a moment or email support directly.",
+    );
+  }
 }
 
 const ticketIdSchema = z.object({
@@ -141,16 +166,17 @@ export async function submitGeneralSupportAction(data: GeneralSupportInput) {
   const parsed = generalSupportSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
-  const ticket = await createSupportTicket({
-    userId,
-    userEmail,
-    userName: userName ?? undefined,
-    subject: parsed.data.subject,
-    message: parsed.data.message,
-    category: "general_support",
-    attachmentUrl: parsed.data.attachmentUrl ?? null,
-  });
-  await afterTicketCreated(ticket);
+  const ticket = await submitSupportTicketSafely(() =>
+    createSupportTicket({
+      userId,
+      userEmail,
+      userName: userName ?? undefined,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      category: "general_support",
+      attachmentUrl: parsed.data.attachmentUrl ?? null,
+    }),
+  );
   return ticket;
 }
 
@@ -160,17 +186,18 @@ export async function submitBugReportAction(data: BugReportInput) {
   const parsed = bugReportSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
-  const ticket = await createSupportTicket({
-    userId,
-    userEmail,
-    userName: userName ?? undefined,
-    subject: parsed.data.subject,
-    message: parsed.data.message,
-    category: "bug_report",
-    priority: parsed.data.priority,
-    attachmentUrl: parsed.data.attachmentUrl ?? null,
-  });
-  await afterTicketCreated(ticket);
+  const ticket = await submitSupportTicketSafely(() =>
+    createSupportTicket({
+      userId,
+      userEmail,
+      userName: userName ?? undefined,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      category: "bug_report",
+      priority: parsed.data.priority,
+      attachmentUrl: parsed.data.attachmentUrl ?? null,
+    }),
+  );
   return ticket;
 }
 
@@ -180,17 +207,18 @@ export async function submitFeatureRequestAction(data: FeatureRequestInput) {
   const parsed = featureRequestSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
-  const ticket = await createSupportTicket({
-    userId,
-    userEmail,
-    userName: userName ?? undefined,
-    subject: parsed.data.subject,
-    message: parsed.data.message,
-    category: "feature_request",
-    priority: "normal",
-    attachmentUrl: parsed.data.attachmentUrl ?? null,
-  });
-  await afterTicketCreated(ticket);
+  const ticket = await submitSupportTicketSafely(() =>
+    createSupportTicket({
+      userId,
+      userEmail,
+      userName: userName ?? undefined,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      category: "feature_request",
+      priority: "normal",
+      attachmentUrl: parsed.data.attachmentUrl ?? null,
+    }),
+  );
   return ticket;
 }
 
@@ -200,17 +228,18 @@ export async function submitFeedbackAction(data: FeedbackInput) {
   const parsed = feedbackSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
-  const ticket = await createSupportTicket({
-    userId,
-    userEmail,
-    userName: userName ?? undefined,
-    subject: parsed.data.subject,
-    message: parsed.data.message,
-    category: "feedback",
-    priority: "low",
-    attachmentUrl: parsed.data.attachmentUrl ?? null,
-  });
-  await afterTicketCreated(ticket);
+  const ticket = await submitSupportTicketSafely(() =>
+    createSupportTicket({
+      userId,
+      userEmail,
+      userName: userName ?? undefined,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      category: "feedback",
+      priority: "low",
+      attachmentUrl: parsed.data.attachmentUrl ?? null,
+    }),
+  );
   return ticket;
 }
 
@@ -220,17 +249,18 @@ export async function submitBillingIssueAction(data: BillingInput) {
   const parsed = billingSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
-  const ticket = await createSupportTicket({
-    userId,
-    userEmail,
-    userName: userName ?? undefined,
-    subject: parsed.data.subject,
-    message: parsed.data.message,
-    category: "billing",
-    priority: "high",
-    attachmentUrl: parsed.data.attachmentUrl ?? null,
-  });
-  await afterTicketCreated(ticket);
+  const ticket = await submitSupportTicketSafely(() =>
+    createSupportTicket({
+      userId,
+      userEmail,
+      userName: userName ?? undefined,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      category: "billing",
+      priority: "high",
+      attachmentUrl: parsed.data.attachmentUrl ?? null,
+    }),
+  );
   return ticket;
 }
 
@@ -240,17 +270,18 @@ export async function submitAccountIssueAction(data: AccountInput) {
   const parsed = accountSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
 
-  const ticket = await createSupportTicket({
-    userId,
-    userEmail,
-    userName: userName ?? undefined,
-    subject: parsed.data.subject,
-    message: parsed.data.message,
-    category: "account",
-    priority: "normal",
-    attachmentUrl: parsed.data.attachmentUrl ?? null,
-  });
-  await afterTicketCreated(ticket);
+  const ticket = await submitSupportTicketSafely(() =>
+    createSupportTicket({
+      userId,
+      userEmail,
+      userName: userName ?? undefined,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      category: "account",
+      priority: "normal",
+      attachmentUrl: parsed.data.attachmentUrl ?? null,
+    }),
+  );
   return ticket;
 }
 
