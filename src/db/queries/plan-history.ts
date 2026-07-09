@@ -188,11 +188,18 @@ function reconcileActivePaidPlanStatusInHistory(
       (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
     );
 
-  const current = matching.find((row) => {
-    if (!row.endAt) return true;
-    const endMs = new Date(row.endAt).getTime();
-    return !Number.isNaN(endMs) && endMs > now;
-  });
+  const current =
+    matching.find((row) => {
+      if (!row.id.startsWith("inv-")) return false;
+      if (!row.endAt) return true;
+      const endMs = new Date(row.endAt).getTime();
+      return !Number.isNaN(endMs) && endMs > now;
+    }) ??
+    matching.find((row) => {
+      if (!row.endAt) return true;
+      const endMs = new Date(row.endAt).getTime();
+      return !Number.isNaN(endMs) && endMs > now;
+    });
 
   if (!current) return;
 
@@ -270,13 +277,20 @@ function latestPaidInvoiceForPlan(
   invoices: StoredBillingInvoice[],
   planSlug: string,
 ): StoredBillingInvoice | undefined {
-  return invoices
-    .filter(
-      (inv) =>
-        inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase() &&
-        inv.status?.toLowerCase() === "paid",
-    )
-    .sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a))[0];
+  const paid = invoices.filter(
+    (inv) =>
+      inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase() &&
+      inv.status?.toLowerCase() === "paid",
+  );
+  if (paid.length === 0) return undefined;
+
+  const withReceipt = paid.filter((inv) => receiptUrlFromStoredInvoice(inv));
+  const candidates = withReceipt.length > 0 ? withReceipt : paid;
+
+  const preferred = candidates.filter((inv) => !isSubscriptionUpdateInvoice(inv));
+  const pool = preferred.length > 0 ? preferred : candidates;
+
+  return pool.sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a))[0];
 }
 
 function rowCoversActiveSubscriptionPeriod(
@@ -284,11 +298,20 @@ function rowCoversActiveSubscriptionPeriod(
   planSlug: string,
   latestPaidExternalId: string | null,
   subUpdatedAt: Date | null,
+  activePeriodEndIso: string | null,
 ): boolean {
   if (row.planType === "Proration") return false;
   if (!planNamesMatch(row.planName, planSlug)) return false;
 
   if (latestPaidExternalId && row.id === `inv-${latestPaidExternalId}`) {
+    return true;
+  }
+
+  if (
+    activePeriodEndIso &&
+    row.endAt === activePeriodEndIso &&
+    row.id.startsWith("inv-")
+  ) {
     return true;
   }
 
@@ -502,6 +525,170 @@ function pruneDuplicatePaidSubscriptionRows(
   }
 }
 
+function findActivePaidRowsForPlan(
+  rows: PlanHistoryRow[],
+  planSlug: string,
+): PlanHistoryRow[] {
+  return rows.filter(
+    (row) =>
+      row.planType === "Paid subscription" &&
+      (row.statusLabel === "Active" || row.statusLabel === "Trialing") &&
+      planNamesMatch(row.planName, planSlug),
+  );
+}
+
+function isSameSubscriptionPeriod(
+  rowA: PlanHistoryRow,
+  rowB: PlanHistoryRow,
+): boolean {
+  if (!rowA.endAt || !rowB.endAt || rowA.endAt !== rowB.endAt) return false;
+  const startDelta = Math.abs(
+    new Date(rowA.startAt).getTime() - new Date(rowB.startAt).getTime(),
+  );
+  return startDelta <= 5 * 60_000;
+}
+
+async function enrichActivePaidRowsWithBillingReceipts(
+  userId: string,
+  rows: PlanHistoryRow[],
+  activeSub: ActiveStripeSubRow | null,
+  invoices: StoredBillingInvoice[],
+  prorationLines: ProrationLineWithReceipt[],
+): Promise<void> {
+  const planSlug = activeSub?.planSlug?.trim();
+  if (!planSlug) return;
+
+  const activeRows = findActivePaidRowsForPlan(rows, planSlug);
+  if (activeRows.length === 0) return;
+
+  let paidInvoice = latestPaidInvoiceForPlan(invoices, planSlug);
+  const needsReceipt = activeRows.some((row) => !row.receiptUrl);
+  const needsPromo = activeRows.some((row) => !row.promoDisplay?.trim());
+
+  if (
+    needsReceipt &&
+    (!paidInvoice || !receiptUrlFromStoredInvoice(paidInvoice))
+  ) {
+    try {
+      const { refreshLatestPaidInvoiceForUser } = await import(
+        "@/lib/stripe-invoice-persist"
+      );
+      const refreshed = await refreshLatestPaidInvoiceForUser(userId, planSlug);
+      if (refreshed) {
+        paidInvoice = refreshed;
+        const existingIdx = invoices.findIndex(
+          (inv) => inv.externalId === refreshed.externalId,
+        );
+        if (existingIdx >= 0) {
+          invoices[existingIdx] = refreshed;
+        } else {
+          invoices.push(refreshed);
+        }
+      }
+    } catch (error) {
+      console.error("[plan-history] refresh latest paid invoice:", error);
+    }
+  }
+
+  if (needsPromo && paidInvoice && !promoDisplayForInvoice(paidInvoice)) {
+    const invoiceId = paidInvoice.externalId?.trim();
+    if (invoiceId?.startsWith("in_")) {
+      try {
+        const { backfillInvoicePromoForUser } = await import(
+          "@/lib/stripe-invoice-persist"
+        );
+        const emailLower =
+          paidInvoice.userEmail?.toLowerCase() ??
+          invoices.find((inv) => inv.userEmail)?.userEmail?.toLowerCase() ??
+          null;
+        await backfillInvoicePromoForUser(userId, emailLower, invoiceId);
+        const { listBillingInvoicesForUser } = await import("@/db/queries/billing");
+        const refreshedInvoices = await listBillingInvoicesForUser(
+          userId,
+          emailLower,
+        );
+        const refreshed = refreshedInvoices.find(
+          (inv) => inv.externalId === invoiceId,
+        );
+        if (refreshed) {
+          paidInvoice = refreshed;
+          const existingIdx = invoices.findIndex(
+            (inv) => inv.externalId === invoiceId,
+          );
+          if (existingIdx >= 0) {
+            invoices[existingIdx] = refreshed;
+          } else {
+            invoices.push(refreshed);
+          }
+        }
+      } catch (error) {
+        console.error("[plan-history] backfill promo for active row:", error);
+      }
+    }
+  }
+
+  const siblingReceiptRow = rows.find(
+    (row) =>
+      row.planType === "Paid subscription" &&
+      !activeRows.includes(row) &&
+      planNamesMatch(row.planName, planSlug) &&
+      !!row.receiptUrl,
+  );
+
+  const prorationReceipt = latestUpgradeReceiptForPlanSlug(
+    planSlug,
+    invoices,
+    prorationLines,
+  );
+
+  const receiptUrl =
+    (paidInvoice ? receiptUrlFromStoredInvoice(paidInvoice) : null) ??
+    siblingReceiptRow?.receiptUrl ??
+    prorationReceipt?.receiptUrl ??
+    null;
+  const receiptLabel =
+    paidInvoice?.invoiceNumber?.trim() ||
+    siblingReceiptRow?.receiptLabel ||
+    prorationReceipt?.receiptLabel ||
+    null;
+  const promoDisplay =
+    (paidInvoice ? promoDisplayForInvoice(paidInvoice) : null) ??
+    siblingReceiptRow?.promoDisplay ??
+    null;
+
+  for (const row of activeRows) {
+    if (!row.receiptUrl && receiptUrl) {
+      row.receiptUrl = receiptUrl;
+      row.receiptLabel = row.receiptLabel ?? receiptLabel;
+    }
+    if (!row.promoDisplay?.trim() && promoDisplay) {
+      row.promoDisplay = promoDisplay;
+    }
+  }
+}
+
+function removeDuplicatePaidRowsSupersededByActive(
+  rows: PlanHistoryRow[],
+  activeSub: ActiveStripeSubRow | null,
+): void {
+  const planSlug = activeSub?.planSlug?.trim();
+  if (!planSlug) return;
+
+  const activeRows = findActivePaidRowsForPlan(rows, planSlug);
+  const activeRow = activeRows[0];
+  if (!activeRow?.receiptUrl) return;
+
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]!;
+    if (activeRows.includes(row)) continue;
+    if (row.planType !== "Paid subscription") continue;
+    if (row.statusLabel === "Active" || row.statusLabel === "Trialing") continue;
+    if (!planNamesMatch(row.planName, planSlug)) continue;
+    if (!isSameSubscriptionPeriod(activeRow, row)) continue;
+    rows.splice(i, 1);
+  }
+}
+
 function enrichActivePaidRowsWithProrationReceipts(
   rows: PlanHistoryRow[],
   activeSub: ActiveStripeSubRow | null,
@@ -590,6 +777,7 @@ async function appendActiveStripeSubscriptionRow(
     invoices,
     prorationLines,
   );
+  const activePeriodEndIso = toIsoString(periodEnd);
 
   if (
     rows.some((row) =>
@@ -598,6 +786,7 @@ async function appendActiveStripeSubscriptionRow(
         planSlug,
         latestPaidExternalId,
         subUpdatedAt,
+        activePeriodEndIso,
       ),
     )
   ) {
@@ -653,6 +842,7 @@ async function enrichPlanHistoryPromoFromReceipts(
   userEmail: string | null,
   rows: PlanHistoryRow[],
   invoices: StoredBillingInvoice[],
+  activeSub: ActiveStripeSubRow | null,
 ): Promise<void> {
   const invoiceByExternalId = new Map(
     invoices.map((inv) => [inv.externalId, inv]),
@@ -676,6 +866,11 @@ async function enrichPlanHistoryPromoFromReceipts(
       inv = invoiceByExternalId.get(row.id.slice(4));
     } else if (row.receiptLabel?.trim()) {
       inv = invoiceByNumber.get(row.receiptLabel.trim());
+    } else if (
+      (row.statusLabel === "Active" || row.statusLabel === "Trialing") &&
+      activeSub?.planSlug?.trim()
+    ) {
+      inv = latestPaidInvoiceForPlan(invoices, activeSub.planSlug.trim());
     }
 
     const fromDb = inv ? promoDisplayForInvoice(inv) : null;
@@ -699,7 +894,9 @@ async function enrichPlanHistoryPromoFromReceipts(
     }
 
     const invoiceId =
-      (row.id.startsWith("inv-") ? row.id.slice(4) : null) ?? inv?.externalId ?? null;
+      (row.id.startsWith("inv-") ? row.id.slice(4) : null) ??
+      inv?.externalId ??
+      null;
     if (!invoiceId?.startsWith("in_")) continue;
 
     const fromStripe = await backfillInvoicePromoForUser(
@@ -861,6 +1058,14 @@ async function buildMergedPlanHistoryForUser(
 
   reconcileActivePaidPlanStatusInHistory(rows, activeSubForHistory);
 
+  await enrichActivePaidRowsWithBillingReceipts(
+    userId,
+    rows,
+    activeSubForHistory,
+    invoices,
+    prorationLines,
+  );
+
   enrichActivePaidRowsWithProrationReceipts(
     rows,
     activeSubForHistory,
@@ -868,9 +1073,17 @@ async function buildMergedPlanHistoryForUser(
     prorationLines,
   );
 
+  removeDuplicatePaidRowsSupersededByActive(rows, activeSubForHistory);
+
   removeRedundantProrationRows(rows, activeSubForHistory);
 
-  await enrichPlanHistoryPromoFromReceipts(userId, emailLower, rows, invoices);
+  await enrichPlanHistoryPromoFromReceipts(
+    userId,
+    emailLower,
+    rows,
+    invoices,
+    activeSubForHistory,
+  );
 
   rows.sort(
     (a, b) =>

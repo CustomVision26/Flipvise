@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -53,6 +54,17 @@ export function TeacherToolPageShell({
 }) {
   const [internalShowResult, setInternalShowResult] = useState(false);
   const showResult = controlledShowResult ?? internalShowResult;
+  const lastErrorToast = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!errorMessage) {
+      lastErrorToast.current = null;
+      return;
+    }
+    if (lastErrorToast.current === errorMessage) return;
+    lastErrorToast.current = errorMessage;
+    toast.error(errorMessage);
+  }, [errorMessage]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

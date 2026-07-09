@@ -1,9 +1,21 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { LessonPlanResult } from "@/lib/teacher-generators";
+import type { LessonPlanDaySchedule } from "@/lib/lesson-plan-ai-schema";
+import { formatUnitPacingLabel } from "@/lib/lesson-plan-weekly-schedule";
+import { LessonPlanWeeklySchedulePanel } from "@/components/lesson-plan-day-vocabulary-detail";
+import type { LessonPlanDetailLessonContext } from "@/components/lesson-plan-day-vocabulary-detail";
+
+export type LessonPlanUnitContext = {
+  planPeriodDays: number;
+  lessonDuration: string;
+};
+
+export type { LessonPlanDetailLessonContext };
 
 function linesToArray(text: string): string[] {
   return text
@@ -46,10 +58,36 @@ function ArrayFieldEditor({
   );
 }
 
-function LessonPlanReadOnly({ result }: { result: LessonPlanResult }) {
+function LessonPlanReadOnly({
+  result,
+  unitContext,
+  lessonContext,
+  onWeeklyScheduleChange,
+  isGeneratingAllDayDetails,
+}: {
+  result: LessonPlanResult;
+  unitContext?: LessonPlanUnitContext;
+  lessonContext?: LessonPlanDetailLessonContext;
+  onWeeklyScheduleChange?: (next: LessonPlanDaySchedule[]) => void;
+  isGeneratingAllDayDetails?: boolean;
+}) {
+  const hasWeeklySchedule =
+    result.weeklySchedule && result.weeklySchedule.length > 0;
+  const unitLabel =
+    unitContext && unitContext.planPeriodDays > 1
+      ? formatUnitPacingLabel(unitContext.planPeriodDays, unitContext.lessonDuration)
+      : undefined;
+
   return (
     <div className="space-y-4 text-foreground">
-      <p className="font-medium">{result.lessonTitle}</p>
+      <div className="space-y-2">
+        <p className="font-medium">{result.lessonTitle}</p>
+        {unitLabel ? (
+          <Badge variant="outline" className="text-foreground">
+            {unitLabel}
+          </Badge>
+        ) : null}
+      </div>
       <div>
         <p className="font-medium text-foreground">Learning Objectives</p>
         <ul className="list-disc pl-5">
@@ -66,22 +104,44 @@ function LessonPlanReadOnly({ result }: { result: LessonPlanResult }) {
           ))}
         </ul>
       </div>
+      {hasWeeklySchedule ? (
+        <LessonPlanWeeklySchedulePanel
+          schedule={result.weeklySchedule!}
+          unitLabel={unitLabel}
+          lessonContext={lessonContext}
+          onScheduleChange={onWeeklyScheduleChange}
+          isGeneratingAllDayDetails={isGeneratingAllDayDetails}
+        />
+      ) : null}
       <div>
-        <p className="font-medium text-foreground">Vocabulary</p>
+        <p className="font-medium text-foreground">
+          {hasWeeklySchedule ? "Vocabulary (full unit)" : "Vocabulary"}
+        </p>
         <ul className="list-disc pl-5">
           {result.vocabulary.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
       </div>
-      <div>
-        <p className="font-medium text-foreground">Lesson Timeline</p>
-        <ul className="list-disc pl-5">
-          {result.lessonTimeline.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
+      {hasWeeklySchedule ? (
+        <div>
+          <p className="font-medium text-foreground">Unit pacing overview</p>
+          <ul className="list-disc pl-5">
+            {result.lessonTimeline.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div>
+          <p className="font-medium text-foreground">Lesson Timeline</p>
+          <ul className="list-disc pl-5">
+            {result.lessonTimeline.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p>
         <span className="font-medium text-foreground">Warm-Up: </span>
         {result.warmUpActivity}
@@ -129,13 +189,24 @@ function LessonPlanReadOnly({ result }: { result: LessonPlanResult }) {
 function LessonPlanEditable({
   draft,
   onChange,
+  unitContext,
+  lessonContext,
 }: {
   draft: LessonPlanResult;
   onChange: (next: LessonPlanResult) => void;
+  unitContext?: LessonPlanUnitContext;
+  lessonContext?: LessonPlanDetailLessonContext;
 }) {
   function patch(partial: Partial<LessonPlanResult>) {
     onChange({ ...draft, ...partial });
   }
+
+  const hasWeeklySchedule =
+    draft.weeklySchedule && draft.weeklySchedule.length > 0;
+  const unitLabel =
+    unitContext && unitContext.planPeriodDays > 1
+      ? formatUnitPacingLabel(unitContext.planPeriodDays, unitContext.lessonDuration)
+      : undefined;
 
   return (
     <div className="space-y-4 text-foreground">
@@ -147,6 +218,11 @@ function LessonPlanEditable({
           onChange={(event) => patch({ lessonTitle: event.target.value })}
           className="bg-background"
         />
+        {unitLabel ? (
+          <Badge variant="outline" className="text-foreground">
+            {unitLabel}
+          </Badge>
+        ) : null}
       </div>
       <ArrayFieldEditor
         id="edit-learning-objectives"
@@ -161,19 +237,36 @@ function LessonPlanEditable({
         value={draft.materialsNeeded}
         onChange={(materialsNeeded) => patch({ materialsNeeded })}
       />
+      {hasWeeklySchedule ? (
+        <LessonPlanWeeklySchedulePanel
+          schedule={draft.weeklySchedule!}
+          unitLabel={unitLabel}
+          lessonContext={lessonContext}
+          onScheduleChange={(weeklySchedule) => patch({ weeklySchedule })}
+        />
+      ) : null}
       <ArrayFieldEditor
         id="edit-vocabulary"
-        label="Vocabulary"
+        label={hasWeeklySchedule ? "Vocabulary (full unit list)" : "Vocabulary"}
         value={draft.vocabulary}
         onChange={(vocabulary) => patch({ vocabulary })}
         rows={6}
       />
-      <ArrayFieldEditor
-        id="edit-timeline"
-        label="Lesson Timeline"
-        value={draft.lessonTimeline}
-        onChange={(lessonTimeline) => patch({ lessonTimeline })}
-      />
+      {hasWeeklySchedule ? (
+        <ArrayFieldEditor
+          id="edit-unit-timeline"
+          label="Unit pacing overview"
+          value={draft.lessonTimeline}
+          onChange={(lessonTimeline) => patch({ lessonTimeline })}
+        />
+      ) : (
+        <ArrayFieldEditor
+          id="edit-timeline"
+          label="Lesson Timeline"
+          value={draft.lessonTimeline}
+          onChange={(lessonTimeline) => patch({ lessonTimeline })}
+        />
+      )}
       <div className="space-y-2">
         <Label htmlFor="edit-warm-up">Warm-Up</Label>
         <Textarea
@@ -242,16 +335,51 @@ export function LessonPlanPreviewEditor({
   isEditing,
   editDraft,
   onEditDraftChange,
+  unitContext,
+  lessonContext,
+  onResultChange,
+  isGeneratingAllDayDetails,
 }: {
   result: LessonPlanResult;
   isEditing: boolean;
   editDraft: LessonPlanResult | null;
   onEditDraftChange: (next: LessonPlanResult) => void;
+  unitContext?: LessonPlanUnitContext;
+  lessonContext?: LessonPlanDetailLessonContext;
+  onResultChange?: (next: LessonPlanResult) => void;
+  isGeneratingAllDayDetails?: boolean;
 }) {
-  if (isEditing && editDraft) {
-    return <LessonPlanEditable draft={editDraft} onChange={onEditDraftChange} />;
+  function handleWeeklyScheduleChange(next: LessonPlanDaySchedule[]) {
+    const nextResult = {
+      ...(isEditing && editDraft ? editDraft : result),
+      weeklySchedule: next,
+    };
+    if (isEditing && editDraft) {
+      onEditDraftChange(nextResult);
+    } else {
+      onResultChange?.(nextResult);
+    }
   }
-  return <LessonPlanReadOnly result={result} />;
+
+  if (isEditing && editDraft) {
+    return (
+      <LessonPlanEditable
+        draft={editDraft}
+        onChange={onEditDraftChange}
+        unitContext={unitContext}
+        lessonContext={lessonContext}
+      />
+    );
+  }
+  return (
+    <LessonPlanReadOnly
+      result={result}
+      unitContext={unitContext}
+      lessonContext={lessonContext}
+      onWeeklyScheduleChange={handleWeeklyScheduleChange}
+      isGeneratingAllDayDetails={isGeneratingAllDayDetails}
+    />
+  );
 }
 
 export function cloneLessonPlanResult(result: LessonPlanResult): LessonPlanResult {
@@ -261,6 +389,35 @@ export function cloneLessonPlanResult(result: LessonPlanResult): LessonPlanResul
     materialsNeeded: [...result.materialsNeeded],
     vocabulary: [...result.vocabulary],
     lessonTimeline: [...result.lessonTimeline],
+    weeklySchedule: result.weeklySchedule?.map((day) => ({
+      ...day,
+      vocabulary: [...day.vocabulary],
+      lessonTimeline: [...day.lessonTimeline],
+      vocabularyDetail: day.vocabularyDetail
+        ? {
+            ...day.vocabularyDetail,
+            terms: day.vocabularyDetail.terms.map((term) => ({ ...term })),
+            additionalVocabulary: day.vocabularyDetail.additionalVocabulary?.map(
+              (term) => ({ ...term }),
+            ),
+            process: day.vocabularyDetail.process
+              ? {
+                  ...day.vocabularyDetail.process,
+                  steps: day.vocabularyDetail.process.steps.map((step) => ({
+                    ...step,
+                    bullets: [...step.bullets],
+                  })),
+                }
+              : undefined,
+            learningGoal: day.vocabularyDetail.learningGoal
+              ? {
+                  ...day.vocabularyDetail.learningGoal,
+                  objectives: [...day.vocabularyDetail.learningGoal.objectives],
+                }
+              : undefined,
+          }
+        : undefined,
+    })),
     mainTeachingSteps: [...result.mainTeachingSteps],
     assessmentQuestions: [...result.assessmentQuestions],
     differentiatedInstruction: [...result.differentiatedInstruction],

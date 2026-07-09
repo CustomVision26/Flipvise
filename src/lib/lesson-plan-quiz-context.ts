@@ -14,6 +14,12 @@ export function buildLessonPlanQuizContext(input: {
     `Lesson duration: ${lessonInput.lessonDuration}`,
   ];
 
+  if (lessonInput.planPeriodDays && lessonInput.planPeriodDays > 1) {
+    lines.push(
+      `Plan period: ${lessonInput.planPeriodDays} days (${lessonInput.lessonDuration} per class)`,
+    );
+  }
+
   if (lessonInput.learningStandard?.trim()) {
     lines.push(`Learning standard: ${lessonInput.learningStandard.trim()}`);
   }
@@ -31,6 +37,19 @@ export function buildLessonPlanQuizContext(input: {
     "",
     "Vocabulary:",
     ...result.vocabulary.map((item) => `- ${item}`),
+  );
+
+  if (result.weeklySchedule?.length) {
+    lines.push("", "Daily vocabulary pacing:");
+    for (const day of result.weeklySchedule) {
+      lines.push(
+        `${day.dayLabel}: ${day.dailyFocus}`,
+        ...day.vocabulary.map((item) => `  - ${item}`),
+      );
+    }
+  }
+
+  lines.push(
     "",
     "Assessment questions from lesson plan:",
     ...result.assessmentQuestions.map((item) => `- ${item}`),

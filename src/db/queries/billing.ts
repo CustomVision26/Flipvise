@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { billingInvoices } from "@/db/schema";
-import { countDistinct, desc, eq, or, inArray, and } from "drizzle-orm";
+import { and, countDistinct, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 type InvoiceLike = {
   id?: string | null;
@@ -214,15 +214,34 @@ export async function upsertBillingInvoiceRecord(input: {
           subtotalCents: input.subtotalCents ?? null,
           taxAmountCents: input.taxAmountCents ?? null,
           currency: input.currency ?? null,
-          hostedInvoiceUrl: input.hostedInvoiceUrl ?? null,
-          invoicePdfUrl: input.invoicePdfUrl ?? null,
+          // Keep existing receipt/promo when a later Stripe sync has not populated them yet.
+          hostedInvoiceUrl:
+            input.hostedInvoiceUrl != null
+              ? input.hostedInvoiceUrl
+              : sql`${billingInvoices.hostedInvoiceUrl}`,
+          invoicePdfUrl:
+            input.invoicePdfUrl != null
+              ? input.invoicePdfUrl
+              : sql`${billingInvoices.invoicePdfUrl}`,
           periodStart: input.periodStart ?? null,
           periodEnd: input.periodEnd ?? null,
           paidAt: input.paidAt ?? null,
-          discountAmountCents: input.discountAmountCents ?? null,
-          discountLabel: input.discountLabel ?? null,
-          promoCode: input.promoCode ?? null,
-          promoKind: input.promoKind ?? null,
+          discountAmountCents:
+            input.discountAmountCents != null
+              ? input.discountAmountCents
+              : sql`${billingInvoices.discountAmountCents}`,
+          discountLabel:
+            input.discountLabel != null
+              ? input.discountLabel
+              : sql`${billingInvoices.discountLabel}`,
+          promoCode:
+            input.promoCode != null
+              ? input.promoCode
+              : sql`${billingInvoices.promoCode}`,
+          promoKind:
+            input.promoKind != null
+              ? input.promoKind
+              : sql`${billingInvoices.promoKind}`,
           stripeBillingReason: input.stripeBillingReason ?? null,
           updatedAt: now,
         },

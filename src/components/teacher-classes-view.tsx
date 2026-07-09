@@ -52,6 +52,7 @@ import {
 } from "@/lib/teacher-workspace-member-grouping";
 import type { TeacherWorkspaceContext } from "@/lib/teacher-url";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   DEFAULT_TEACHER_PAGE_SIZE,
   paginateTeacherRecords,
@@ -262,8 +263,17 @@ function ClassDeleteButton({
   function handleConfirm() {
     setOpen(false);
     startTransition(async () => {
-      await deleteTeacherClassAction({ classId: cls.id, teamId });
-      onDeleted();
+      try {
+        await deleteTeacherClassAction({ classId: cls.id, teamId });
+        toast.success("Class deleted", {
+          description: `${teacherClassDisplayTitle(cls)} was removed from your class list.`,
+        });
+        onDeleted();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not delete class.",
+        );
+      }
     });
   }
 

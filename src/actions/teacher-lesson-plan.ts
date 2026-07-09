@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import {
+  lessonPlanDayVocabularyDetailSchema,
   lessonPlanInputSchema,
   lessonPlanResultSchema,
   type LessonPlanActionInput,
@@ -17,7 +18,18 @@ import {
   formatCurriculumContextForPrompt,
   type CurriculumResearchContext,
 } from "@/lib/lesson-plan-curriculum-research";
+import {
+  buildTemplateDayVocabularyDetail,
+  parseVocabularyLine,
+} from "@/lib/lesson-plan-vocabulary-detail";
 import { vocabularyApproachPromptLine } from "@/lib/lesson-plan-vocabulary-approach";
+import {
+  clampPlanPeriodDays,
+  DEFAULT_PLAN_PERIOD_DAYS,
+  formatUnitPacingLabel,
+  reconcileWeeklySchedule,
+  weeklySchedulePromptBlock,
+} from "@/lib/lesson-plan-weekly-schedule";
 import { saveLessonPlan } from "@/db/queries/saved-lesson-plans";
 import { createDeck, getDeckRowById } from "@/db/queries/decks";
 import { linkDeckToTeamWorkspace, resolveDeckViewerAccess } from "@/db/queries/teams";
@@ -56,7 +68,8 @@ function buildLessonPlanPrompt(
     `Subject: ${input.subject}`,
     `Grade level: ${input.gradeLevel}`,
     `Topic: ${input.topic}`,
-    `Lesson duration: ${input.lessonDuration}`,
+    `Lesson duration (one class period): ${input.lessonDuration}`,
+    `Plan period: ${input.planPeriodDays} day${input.planPeriodDays === 1 ? "" : "s"} (${formatUnitPacingLabel(input.planPeriodDays, input.lessonDuration)})`,
     `Target difficulty level: ${input.difficultyLevel}`,
   ];
 
@@ -91,6 +104,7 @@ function buildLessonPlanPrompt(
   if (input.vocabularyTeachingApproach) {
     lines.push("", vocabularyApproachPromptLine(input.vocabularyTeachingApproach));
   }
+  lines.push("", weeklySchedulePromptBlock(input.planPeriodDays, input.lessonDuration));
   if (input.regenerationSeed && input.regenerationSeed > 0) {
     lines.push(
       `Variation request #${input.regenerationSeed}: produce a fresh alternative lesson plan with different activities, examples, and sequencing while keeping the same topic and standards.`,
@@ -98,6 +112,35 @@ function buildLessonPlanPrompt(
   }
 
   return lines.join("\n");
+}
+
+function normalizeLessonPlanResult(
+  output: LessonPlanResult,
+  input: LessonPlanActionInput,
+): LessonPlanResult {
+  const planPeriodDays = clampPlanPeriodDays(input.planPeriodDays);
+  const filtered = {
+    ...output,
+    differentiatedInstruction: filterDifferentiatedInstruction(
+      output.differentiatedInstruction,
+      input.difficultyLevel,
+    ),
+  };
+
+  if (planPeriodDays <= 1) {
+    return { ...filtered, weeklySchedule: undefined };
+  }
+
+  const schedule = reconcileWeeklySchedule({
+    vocabulary: filtered.vocabulary,
+    weeklySchedule: filtered.weeklySchedule,
+    planPeriodDays,
+    lessonDuration: input.lessonDuration,
+    topic: input.topic,
+    difficulty: input.difficultyLevel,
+  });
+
+  return { ...filtered, weeklySchedule: schedule };
 }
 
 export async function generateLessonPlanAction(
@@ -140,6 +183,7 @@ Requirements:
 - Main teaching steps must be detailed procedural steps a teacher can follow (5–8 steps).
 - Warm-up, classroom activity, homework, and assessment must be concrete and topic-specific.
 - Lesson timeline must break the full lesson duration into timed segments that add up logically.
+${weeklySchedulePromptBlock(input.planPeriodDays, input.lessonDuration)}
 ${difficultyRigorAiRules(input.difficultyLevel)}
 ${differentiatedInstructionAiRules(input.difficultyLevel)}
 - Never use outdated labels like "On-level", "Support", or "Extension".
@@ -156,13 +200,7 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
       throw new Error("AI lesson generation returned no output.");
     }
 
-    return {
-      ...output,
-      differentiatedInstruction: filterDifferentiatedInstruction(
-        output.differentiatedInstruction,
-        input.difficultyLevel,
-      ),
-    };
+    return normalizeLessonPlanResult(output, input);
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
@@ -172,6 +210,148 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
     }
     return generateLessonPlan(input);
   }
+}
+
+const generateDayVocabularyDetailSchema = z.object({
+  subject: z.string().min(1),
+  gradeLevel: z.string().min(1),
+  topic: z.string().min(1),
+  difficultyLevel: lessonPlanInputSchema.shape.difficultyLevel,
+  learningStandard: z.string().optional(),
+  lessonTitle: z.string().min(1),
+  dayLabel: z.string().min(1),
+  dailyFocus: z.string().min(1),
+  vocabulary: z.array(z.string().min(1)).min(1).max(8),
+});
+
+async function generateDayVocabularyDetailCore(
+  input: z.infer<typeof generateDayVocabularyDetailSchema>,
+) {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    return buildTemplateDayVocabularyDetail(input);
+  }
+
+  const vocabularyLines = input.vocabulary
+    .map((line) => {
+      const { term, shortDefinition } = parseVocabularyLine(line);
+      return `- ${term}: ${shortDefinition}`;
+    })
+    .join("\n");
+
+  try {
+    const { output } = await generateText({
+      model: openai("gpt-4o"),
+      output: Output.object({
+        schema: lessonPlanDayVocabularyDetailSchema,
+      }),
+      system: `You are an expert K–12 curriculum writer. Expand a lesson day's vocabulary into classroom-ready teacher reference material.
+
+Requirements:
+- Write specific, accurate content for the subject, grade, topic, and learning standard (when provided).
+- terms: one entry per assigned vocabulary line for this day. shortDefinition is the concise student-friendly meaning; definition is a fuller classroom explanation (2–4 sentences); example is a concrete italic-ready classroom example starting with "Example:".
+- mainConcept: a "Main Concept" section explaining how the day's terms connect to the topic (like a study guide overview).
+- process: numbered instructional steps (Collect, Organize, Display, Analyze, Interpret, etc. when appropriate) with bullet sub-points — match the rigor of ${input.difficultyLevel}.
+- learningGoal: "By the end of this class period, students should be able to:" plus measurable objectives.
+- additionalVocabulary: 6–12 related terms students should know for this topic/day (PEP/exam-aligned when learning standard mentions Jamaica PEP or similar).
+- contextIntro: one sentence framing the detail section for teachers.
+- Never use markdown. Use plain text only.`,
+      prompt: [
+        `Lesson: ${input.lessonTitle}`,
+        `Subject: ${input.subject}`,
+        `Grade: ${input.gradeLevel}`,
+        `Topic: ${input.topic}`,
+        `Difficulty: ${input.difficultyLevel}`,
+        input.learningStandard?.trim()
+          ? `Learning standard: ${input.learningStandard.trim()}`
+          : null,
+        `Day: ${input.dayLabel}`,
+        `Daily focus: ${input.dailyFocus}`,
+        "",
+        "Assigned vocabulary for this day:",
+        vocabularyLines,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+
+    if (!output) {
+      throw new Error("AI vocabulary detail generation returned no output.");
+    }
+
+    return output;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[generateDayVocabularyDetailAction] AI failed; using template fallback.",
+        error,
+      );
+    }
+    return buildTemplateDayVocabularyDetail(input);
+  }
+}
+
+export async function generateDayVocabularyDetailAction(
+  data: z.infer<typeof generateDayVocabularyDetailSchema>,
+) {
+  const ctx = await getAccessContext();
+  await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+
+  const parsed = generateDayVocabularyDetailSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid input");
+  }
+
+  return generateDayVocabularyDetailCore(parsed.data);
+}
+
+const generateAllDaysVocabularyDetailSchema = z.object({
+  subject: z.string().min(1),
+  gradeLevel: z.string().min(1),
+  topic: z.string().min(1),
+  difficultyLevel: lessonPlanInputSchema.shape.difficultyLevel,
+  learningStandard: z.string().optional(),
+  lessonTitle: z.string().min(1),
+  days: z
+    .array(
+      z.object({
+        dayLabel: z.string().min(1),
+        dailyFocus: z.string().min(1),
+        vocabulary: z.array(z.string().min(1)).min(1).max(8),
+      }),
+    )
+    .min(1)
+    .max(7),
+});
+
+export async function generateAllDaysVocabularyDetailAction(
+  data: z.infer<typeof generateAllDaysVocabularyDetailSchema>,
+) {
+  const ctx = await getAccessContext();
+  await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+
+  const parsed = generateAllDaysVocabularyDetailSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid input");
+  }
+
+  const { days, ...lessonContext } = parsed.data;
+
+  return Promise.all(
+    days.map((day) =>
+      generateDayVocabularyDetailCore({
+        ...lessonContext,
+        dayLabel: day.dayLabel,
+        dailyFocus: day.dailyFocus,
+        vocabulary: day.vocabulary,
+      }),
+    ),
+  );
 }
 
 const saveLessonPlanSchema = z.object({
@@ -327,7 +507,12 @@ export async function saveLessonPlanAction(data: {
   let pdfFileName: string | null = null;
 
   try {
-    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result);
+    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, {
+      planPeriodDays: clampPlanPeriodDays(
+        parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+      ),
+      lessonDuration: parsed.data.input.lessonDuration,
+    });
     pdfFileName = `${lessonPlanPdfSafeFileName(parsed.data.result.lessonTitle)}.pdf`;
     pdfUrl = await uploadLessonPlanPdfBufferToS3({
       userId,

@@ -61,6 +61,39 @@ function invoiceDiscountCents(invoice: Stripe.Invoice): number | null {
   return null;
 }
 
+function invoicePromotionCodeFromInvoice(
+  invoice: Stripe.Invoice,
+): string | null {
+  const raw = invoice as unknown as Record<string, unknown>;
+  const discountEntries: Record<string, unknown>[] = [];
+
+  if (Array.isArray(raw.total_discount_amounts)) {
+    for (const entry of raw.total_discount_amounts as {
+      discount?: Record<string, unknown>;
+    }[]) {
+      if (entry.discount) discountEntries.push(entry.discount);
+    }
+  }
+  if (Array.isArray(raw.discounts)) {
+    for (const entry of raw.discounts as Record<string, unknown>[]) {
+      discountEntries.push(entry);
+    }
+  }
+
+  for (const discount of discountEntries) {
+    const pc = discount.promotion_code;
+    if (pc && typeof pc === "object") {
+      const code =
+        typeof (pc as { code?: string }).code === "string"
+          ? (pc as { code: string }).code.trim()
+          : null;
+      if (code) return code;
+    }
+  }
+
+  return null;
+}
+
 function invoiceCouponFromInvoice(
   invoice: Stripe.Invoice,
 ): Record<string, unknown> | null {
@@ -332,6 +365,23 @@ async function resolveInvoicePromoFromStripe(
     return {
       promoCode: parsedFromLabel.promoCode,
       promoKind: parsedFromLabel.promoKind,
+      percentOff,
+    };
+  }
+
+  const promotionCode = invoicePromotionCodeFromInvoice(invoice);
+  if (promotionCode) {
+    const generalKind: AdminInvoicePromoKind = "general";
+    const percentOff =
+      percentFromCoupon ??
+      (await resolvePromoPercentFromPlanConfig({
+        promoCode: promotionCode,
+        promoKind: generalKind,
+        planSlug,
+      }));
+    return {
+      promoCode: promotionCode,
+      promoKind: generalKind,
       percentOff,
     };
   }

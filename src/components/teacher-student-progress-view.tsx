@@ -46,6 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   DEFAULT_TEACHER_PAGE_SIZE,
   paginateTeacherRecords,
@@ -395,8 +396,17 @@ function ProgressResultDeleteButton({
   function handleConfirm() {
     setOpen(false);
     startTransition(async () => {
-      await deleteQuizResultAction({ resultId, teamId });
-      onDeleted();
+      try {
+        await deleteQuizResultAction({ resultId, teamId });
+        toast.success("Quiz result deleted", {
+          description: `Removed the result for ${memberLabel}.`,
+        });
+        onDeleted();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not delete quiz result.",
+        );
+      }
     });
   }
 

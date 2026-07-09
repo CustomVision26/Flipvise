@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Download, ExternalLink, Loader2, Pencil, RefreshCw, Save, X } from "lucide-react";
-import { generateLessonPlanAction, saveLessonPlanAction } from "@/actions/teacher-lesson-plan";
+import { generateLessonPlanAction, saveLessonPlanAction, generateAllDaysVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,7 +50,12 @@ import type {
   VocabularyTeachingApproach,
 } from "@/lib/lesson-plan-ai-schema";
 import { VOCABULARY_TEACHING_APPROACH_OPTIONS } from "@/lib/lesson-plan-vocabulary-approach";
+import {
+  DEFAULT_PLAN_PERIOD_DAYS,
+  PLAN_PERIOD_DAY_OPTIONS,
+} from "@/lib/lesson-plan-weekly-schedule";
 import { downloadLessonPlanPdf } from "@/lib/lesson-plan-pdf";
+import { attachVocabularyDetailsToSchedule } from "@/lib/lesson-plan-vocabulary-detail";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -113,6 +118,7 @@ export function TeacherLessonBuilderForm({
     gradeLevel: initialDeckDefaults?.gradeLevel ?? "",
     topic: initialDeckDefaults?.topic ?? "",
     lessonDuration: "45 minutes",
+    planPeriodDays: DEFAULT_PLAN_PERIOD_DAYS,
     difficultyLevel: initialDeckDefaults?.difficultyLevel ?? "Intermediate",
     learningStandard: "",
     classSize: "",
@@ -121,6 +127,7 @@ export function TeacherLessonBuilderForm({
   const [result, setResult] = useState<LessonPlanResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingDayDetails, setIsGeneratingDayDetails] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPlanId, setSavedPlanId] = useState<number | null>(null);
@@ -204,20 +211,66 @@ export function TeacherLessonBuilderForm({
         const resolvedReferences =
           (await referenceFieldsRef.current?.resolveReferences()) ?? referenceMaterials;
 
-        const plan = await generateLessonPlanAction({
+        const planPeriodDays = form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
+        let plan = await generateLessonPlanAction({
           ...form,
+          planPeriodDays,
           difficultyLevel:
             form.difficultyLevel as LessonPlanActionInput["difficultyLevel"],
           regenerationSeed: seed,
           vocabularyTeachingApproach: isRegenerate
             ? vocabularyTeachingApproach
-            : undefined,
+            : planPeriodDays > 1
+              ? "weekly"
+              : undefined,
           referenceMaterials:
             resolvedReferences.length > 0 ? resolvedReferences : undefined,
         });
-        setResult(plan);
         setShowResult(true);
         setSavedPlanId(null);
+
+        if (planPeriodDays > 1 && plan.weeklySchedule?.length) {
+          setResult(plan);
+          setIsGeneratingDayDetails(true);
+          try {
+            const details = await generateAllDaysVocabularyDetailAction({
+              subject: form.subject,
+              gradeLevel: form.gradeLevel,
+              topic: form.topic,
+              difficultyLevel:
+                form.difficultyLevel as LessonPlanActionInput["difficultyLevel"],
+              learningStandard: form.learningStandard,
+              lessonTitle: plan.lessonTitle,
+              days: plan.weeklySchedule.map((day) => ({
+                dayLabel: day.dayLabel,
+                dailyFocus: day.dailyFocus,
+                vocabulary: day.vocabulary,
+              })),
+            });
+            plan = {
+              ...plan,
+              weeklySchedule: attachVocabularyDetailsToSchedule(
+                plan.weeklySchedule,
+                details,
+              ),
+            };
+            setResult(plan);
+          } catch (detailError) {
+            console.warn(
+              "[TeacherLessonBuilderForm] All-day vocabulary detail failed.",
+              detailError,
+            );
+            setResult(plan);
+            toast.warning("Lesson plan ready", {
+              description:
+                "Could not auto-generate vocabulary detail for every day. Use 'AI detail — all days' in the Daily Schedule.",
+            });
+          } finally {
+            setIsGeneratingDayDetails(false);
+          }
+        } else {
+          setResult(plan);
+        }
       } catch (error) {
         const message =
           error instanceof Error
@@ -333,7 +386,10 @@ export function TeacherLessonBuilderForm({
     if (!result) return;
     setIsDownloading(true);
     try {
-      await downloadLessonPlanPdf(result);
+      await downloadLessonPlanPdf(result, {
+        planPeriodDays: form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+        lessonDuration: form.lessonDuration,
+      });
     } finally {
       setIsDownloading(false);
     }
@@ -356,6 +412,21 @@ export function TeacherLessonBuilderForm({
               isEditing={isEditing}
               editDraft={editDraft}
               onEditDraftChange={setEditDraft}
+              onResultChange={setResult}
+              isGeneratingAllDayDetails={isGeneratingDayDetails}
+              unitContext={{
+                planPeriodDays: form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+                lessonDuration: form.lessonDuration,
+              }}
+              lessonContext={{
+                subject: form.subject,
+                gradeLevel: form.gradeLevel,
+                topic: form.topic,
+                difficultyLevel:
+                  form.difficultyLevel as LessonPlanActionInput["difficultyLevel"],
+                learningStandard: form.learningStandard,
+                lessonTitle: result.lessonTitle,
+              }}
             />
           ) : null
         }
@@ -394,7 +465,15 @@ export function TeacherLessonBuilderForm({
                     variant="outline"
                     size="sm"
                     disabled={isGenerating}
-                    onClick={() => setRegenerateDialogOpen(true)}
+                    onClick={() => {
+                      const planPeriodDays =
+                        form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
+                      if (planPeriodDays > 1) {
+                        void runGeneration(true, "weekly");
+                        return;
+                      }
+                      setRegenerateDialogOpen(true);
+                    }}
                   >
                     {isGenerating ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -502,7 +581,7 @@ export function TeacherLessonBuilderForm({
                 getItemLabel={(deck) => deck.name}
                 getItemHaystack={deckHaystack}
                 searchPlaceholder="Search decks by name, subject, or description…"
-                resourceHelp="Pick the deck this lesson plan belongs to."
+                resourceHelp="Only decks without an existing lesson plan are listed."
                 resourceFooter={
                   selectedDeck ? (
                     <p className="text-xs text-muted-foreground">
@@ -522,7 +601,7 @@ export function TeacherLessonBuilderForm({
                 <TeacherFieldLabel
                   htmlFor="lessonBuilderDeck"
                   label="Deck"
-                  help="Pick the deck this lesson plan belongs to."
+                  help="Only decks without an existing lesson plan are listed. Pick the deck this lesson plan belongs to."
                 />
                 <Select value={selectedDeckKey} onValueChange={handleDeckChange}>
                   <SelectTrigger id="lessonBuilderDeck" className="h-10 w-full bg-background">
@@ -543,8 +622,9 @@ export function TeacherLessonBuilderForm({
                 </Select>
                 {activeDecks.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No decks yet. Switch to <strong>New deck</strong> or create a deck from
-                    your Personal Dashboard first.
+                    No decks without a lesson plan are available. Switch to{" "}
+                    <strong>New deck</strong> or create a deck from your Personal Dashboard
+                    first.
                   </p>
                 ) : null}
                 {selectedDeck ? (
@@ -637,8 +717,8 @@ export function TeacherLessonBuilderForm({
               label="Lesson Duration"
               help={
                 <>
-                  <p className="mb-1 font-semibold">Example:</p>
-                  <p>45 minutes, 1 hour, 2 × 40-minute blocks</p>
+                  <p className="mb-1 font-semibold">One class period</p>
+                  <p>How long each daily lesson runs — e.g. 45 minutes or 1 hour.</p>
                 </>
               }
             />
@@ -651,6 +731,45 @@ export function TeacherLessonBuilderForm({
               }
               required
             />
+          </div>
+          <div className="space-y-2">
+            <TeacherFieldLabel
+              htmlFor="planPeriodDays"
+              label="Plan Period"
+              help={
+                <>
+                  <p className="mb-1 font-semibold">Unit length in school days</p>
+                  <p>
+                    Vocabulary and a class timeline are distributed across this many
+                    days. Each day uses the lesson duration above.
+                  </p>
+                </>
+              }
+            />
+            <Select
+              value={String(form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS)}
+              onValueChange={(value) => {
+                if (value == null) return;
+                setForm((f) => ({
+                  ...f,
+                  planPeriodDays: Number(value),
+                }));
+              }}
+            >
+              <SelectTrigger
+                id="planPeriodDays"
+                className="h-10 w-full bg-background"
+              >
+                <SelectValue placeholder="Select plan period" />
+              </SelectTrigger>
+              <SelectContent>
+                {PLAN_PERIOD_DAY_OPTIONS.map((days) => (
+                  <SelectItem key={days} value={String(days)}>
+                    {days === 1 ? "1 day (single lesson)" : `${days} days`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <TeacherFieldLabel

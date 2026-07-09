@@ -2,6 +2,11 @@ import { getAccessContext } from "@/lib/access";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadOwnerTeamAdminDeckPicker } from "@/db/queries/teacher-owner-pickers";
+import { getDeckIdsWithSavedLessonPlans } from "@/db/queries/saved-lesson-plans";
+import {
+  filterDecksWithoutLessonPlans,
+  filterOwnerDeckPickerWithoutLessonPlans,
+} from "@/lib/filter-decks-without-lesson-plans";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
@@ -38,15 +43,30 @@ export default async function TeacherLessonBuilderPage({
   const parsedDeckId = params.deckId ? Number.parseInt(params.deckId, 10) : Number.NaN;
   const initialDeckId = Number.isFinite(parsedDeckId) ? parsedDeckId : undefined;
 
-  const [deckContext, ownerDeckPicker, ctx] = await Promise.all([
-    loadTeacherDeckContext(userId),
-    loadOwnerTeamAdminDeckPicker(userId, workspace.teamId),
-    getAccessContext(),
-  ]);
+  const [deckContext, ownerDeckPickerRaw, ctx, deckIdsWithLessonPlans] =
+    await Promise.all([
+      loadTeacherDeckContext(userId),
+      loadOwnerTeamAdminDeckPicker(userId, workspace.teamId),
+      getAccessContext(),
+      getDeckIdsWithSavedLessonPlans(),
+    ]);
+
+  const decks = filterDecksWithoutLessonPlans(
+    deckContext.decks,
+    deckIdsWithLessonPlans,
+    initialDeckId,
+  );
+  const ownerDeckPicker = filterOwnerDeckPickerWithoutLessonPlans(
+    ownerDeckPickerRaw,
+    deckIdsWithLessonPlans,
+    initialDeckId,
+  );
 
   const initialDeck =
     initialDeckId != null
-      ? deckContext.decks.find((deck) => deck.id === initialDeckId) ?? null
+      ? decks.find((deck) => deck.id === initialDeckId) ??
+        deckContext.decks.find((deck) => deck.id === initialDeckId) ??
+        null
       : null;
 
   const hasAdvancedSourceImport = canUseAdvancedSourceImport({
@@ -59,7 +79,7 @@ export default async function TeacherLessonBuilderPage({
       hasAdvancedSourceImport={hasAdvancedSourceImport}
       backHref={backHref}
       teacherWorkspace={workspace}
-      decks={deckContext.decks}
+      decks={decks}
       ownerDeckPicker={ownerDeckPicker}
       deckQuota={deckContext.quota}
       initialDeckId={initialDeck?.id}

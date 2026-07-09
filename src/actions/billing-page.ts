@@ -176,6 +176,32 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
   }
 }
 
+/** Re-sync invoices from Stripe and return fresh plan history (post-checkout / billing tab). */
+export async function refreshBillingPlanHistoryAction(): Promise<PlanHistoryRow[]> {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  const email = await resolveUserEmail(userId);
+
+  try {
+    await syncActiveSubscriptionFromStripeForUser(userId);
+  } catch (error) {
+    console.error("[refreshBillingPlanHistoryAction] subscription sync:", error);
+  }
+
+  try {
+    await syncBillingInvoicesForUser(userId);
+  } catch (error) {
+    console.error("[refreshBillingPlanHistoryAction] invoice sync:", error);
+  }
+
+  const planHistory = await getMergedPlanHistoryForUser(userId, email);
+  planHistory.sort(
+    (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+  );
+  return planHistory;
+}
+
 /** After Checkout redirect when webhooks did not run (e.g. local `stripe listen` missing). */
 const syncBillingAfterCheckoutSchema = z.object({
   checkoutSessionId: z.string().max(256).optional(),
@@ -219,6 +245,12 @@ export async function syncBillingAfterCheckoutAction(
     result.planSlug != null
       ? displayNameForBillingPlanSlug(result.planSlug)
       : null;
+
+  try {
+    await refreshBillingPlanHistoryAction();
+  } catch (error) {
+    console.error("[syncBillingAfterCheckoutAction] plan history refresh:", error);
+  }
 
   if (isStripeCheckoutSessionId(checkoutSessionId)) {
     try {

@@ -2,6 +2,10 @@ import { z } from "zod";
 import { SOURCE_IMPORT_MAX_EXTRACTED_CHARS } from "@/lib/source-import-formats";
 import { MAX_LESSON_PLAN_REFERENCES } from "@/lib/lesson-plan-reference-material";
 
+export const PLAN_PERIOD_DAY_OPTIONS = [1, 3, 5, 7] as const;
+export type PlanPeriodDays = (typeof PLAN_PERIOD_DAY_OPTIONS)[number];
+export const DEFAULT_PLAN_PERIOD_DAYS: PlanPeriodDays = 5;
+
 export const lessonPlanReferenceMaterialSchema = z.object({
   text: z.string().max(SOURCE_IMPORT_MAX_EXTRACTED_CHARS),
   summary: z.string().max(200),
@@ -24,23 +28,78 @@ export type VocabularyTeachingApproach = z.infer<
   typeof vocabularyTeachingApproachSchema
 >;
 
+export const lessonPlanVocabularyTermDetailSchema = z.object({
+  term: z.string().min(1),
+  shortDefinition: z.string().min(1),
+  definition: z.string().min(1),
+  example: z.string().optional(),
+});
+
+export type LessonPlanVocabularyTermDetail = z.infer<
+  typeof lessonPlanVocabularyTermDetailSchema
+>;
+
+export const lessonPlanProcessStepSchema = z.object({
+  stepNumber: z.coerce.number().int().min(1).max(12),
+  title: z.string().min(1),
+  bullets: z.array(z.string().min(1)).min(1).max(8),
+});
+
+export const lessonPlanDayVocabularyDetailSchema = z.object({
+  contextIntro: z.string().min(1),
+  terms: z.array(lessonPlanVocabularyTermDetailSchema).min(1).max(12),
+  mainConcept: z
+    .object({
+      heading: z.string().min(1),
+      body: z.string().min(1),
+    })
+    .optional(),
+  process: z
+    .object({
+      heading: z.string().min(1),
+      steps: z.array(lessonPlanProcessStepSchema).min(1).max(10),
+    })
+    .optional(),
+  learningGoal: z
+    .object({
+      heading: z.string().min(1),
+      intro: z.string().optional(),
+      objectives: z.array(z.string().min(1)).min(1).max(10),
+    })
+    .optional(),
+  additionalVocabulary: z.array(lessonPlanVocabularyTermDetailSchema).max(20).optional(),
+});
+
+export type LessonPlanDayVocabularyDetail = z.infer<
+  typeof lessonPlanDayVocabularyDetailSchema
+>;
+
+export const lessonPlanDaySchema = z.object({
+  dayLabel: z.string().min(1),
+  dailyFocus: z.string().min(1),
+  vocabulary: z.array(z.string().min(1)).min(1).max(8),
+  lessonTimeline: z.array(z.string().min(1)).min(3).max(10),
+  vocabularyDetail: lessonPlanDayVocabularyDetailSchema.optional(),
+});
+
+export type LessonPlanDaySchedule = z.infer<typeof lessonPlanDaySchema>;
+
 export const lessonPlanInputSchema = z.object({
   subject: z.string().min(1),
   gradeLevel: z.string().min(1),
   topic: z.string().min(1),
   lessonDuration: z.string().min(1),
+  /** Number of school days the unit spans (1 = single lesson). */
+  planPeriodDays: z.coerce.number().int().min(1).max(7).default(DEFAULT_PLAN_PERIOD_DAYS),
   difficultyLevel: lessonPlanDifficultySchema,
   learningStandard: z.string().optional(),
   classSize: z.string().optional(),
   specialInstructions: z.string().optional(),
-  /** Extracted text from optional URL/file references — generation only, not persisted on save. */
   referenceMaterials: z
     .array(lessonPlanReferenceMaterialSchema)
     .max(MAX_LESSON_PLAN_REFERENCES)
     .optional(),
-  /** @deprecated Prefer `referenceMaterials`. Combined text for legacy callers. */
   referenceMaterialText: z.string().max(SOURCE_IMPORT_MAX_EXTRACTED_CHARS).optional(),
-  /** @deprecated Prefer `referenceMaterials`. Combined summary for legacy callers. */
   referenceSourceSummary: z.string().max(500).optional(),
   regenerationSeed: z.number().int().nonnegative().optional(),
   vocabularyTeachingApproach: vocabularyTeachingApproachSchema.optional(),
@@ -52,8 +111,9 @@ export const lessonPlanResultSchema = z.object({
   lessonTitle: z.string().min(1),
   learningObjectives: z.array(z.string().min(1)).min(3).max(8),
   materialsNeeded: z.array(z.string().min(1)).min(4).max(12),
-  vocabulary: z.array(z.string().min(1)).min(6).max(14),
-  lessonTimeline: z.array(z.string().min(1)).min(4).max(8),
+  vocabulary: z.array(z.string().min(1)).min(6).max(20),
+  lessonTimeline: z.array(z.string().min(1)).min(2).max(10),
+  weeklySchedule: z.array(lessonPlanDaySchema).max(7).optional(),
   warmUpActivity: z.string().min(1),
   mainTeachingSteps: z.array(z.string().min(1)).min(5).max(10),
   classroomActivity: z.string().min(1),

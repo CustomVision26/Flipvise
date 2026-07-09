@@ -2,6 +2,12 @@ import {
   difficultyLabelForContent,
   getDifficultyRigorProfile,
 } from "@/lib/lesson-plan-difficulty";
+import type { LessonPlanDaySchedule } from "@/lib/lesson-plan-ai-schema";
+import {
+  buildWeeklyScheduleFromVocabulary,
+  clampPlanPeriodDays,
+  DEFAULT_PLAN_PERIOD_DAYS,
+} from "@/lib/lesson-plan-weekly-schedule";
 import { PRO_PLUS_CARDS_PER_DECK_LIMIT } from "@/lib/personal-plan-limits";
 
 export type LessonPlanInput = {
@@ -9,6 +15,7 @@ export type LessonPlanInput = {
   gradeLevel: string;
   topic: string;
   lessonDuration: string;
+  planPeriodDays?: number;
   difficultyLevel: string;
   learningStandard?: string;
   classSize?: string;
@@ -21,6 +28,7 @@ export type LessonPlanResult = {
   materialsNeeded: string[];
   vocabulary: string[];
   lessonTimeline: string[];
+  weeklySchedule?: LessonPlanDaySchedule[];
   warmUpActivity: string;
   mainTeachingSteps: string[];
   classroomActivity: string;
@@ -110,11 +118,24 @@ export function generateLessonPlan(input: LessonPlanInput): LessonPlanResult {
   const difficultyLabel = difficultyLabelForContent(difficulty);
   const rigor = getDifficultyRigorProfile(difficulty);
   const duration = input.lessonDuration.trim() || "45 minutes";
+  const planPeriodDays = clampPlanPeriodDays(
+    input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+  );
   const classSize = input.classSize?.trim() || "25";
   const standard = input.learningStandard?.trim();
   const accommodations = input.specialInstructions?.trim();
 
   const vocabulary = buildTopicVocabulary(topic, subject, difficulty);
+  const weeklySchedule =
+    planPeriodDays > 1
+      ? buildWeeklyScheduleFromVocabulary({
+          vocabulary,
+          planPeriodDays,
+          lessonDuration: duration,
+          topic,
+          difficulty,
+        })
+      : undefined;
   const differentiatedInstruction = buildDifferentiatedInstruction(
     difficulty,
     topic,
@@ -144,7 +165,11 @@ export function generateLessonPlan(input: LessonPlanInput): LessonPlanResult {
       `Timer visible to students for ${duration} pacing`,
     ],
     vocabulary,
-    lessonTimeline: buildLessonTimeline(topic, duration, difficulty),
+    lessonTimeline:
+      planPeriodDays > 1
+        ? buildUnitTimeline(topic, planPeriodDays, duration)
+        : buildLessonTimeline(topic, duration, difficulty),
+    weeklySchedule,
     warmUpActivity: buildWarmUpActivity(topic, difficulty, rigor.activityGuidance),
     mainTeachingSteps: buildMainTeachingSteps(
       topic,
@@ -210,6 +235,19 @@ function buildLearningObjectives(
         `Students will demonstrate understanding via formative assessment.${standardNote}`,
       ];
   }
+}
+
+function buildUnitTimeline(
+  topic: string,
+  planPeriodDays: number,
+  lessonDuration: string,
+): string[] {
+  return [
+    `Day 1 — Launch ${topic}: hook, prior knowledge, and first vocabulary set (${lessonDuration})`,
+    `Days 2–${Math.max(2, planPeriodDays - 1)} — Build understanding with new terms and guided practice each class (${lessonDuration} per day)`,
+    `Day ${planPeriodDays} — Consolidate, assess, and connect ${topic} to upcoming learning (${lessonDuration})`,
+    `Vocabulary is distributed across all ${planPeriodDays} days; see the daily schedule for timed segments.`,
+  ];
 }
 
 function buildLessonTimeline(

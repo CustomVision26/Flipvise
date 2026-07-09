@@ -36,7 +36,8 @@ export async function resolveLatestBillingReceiptForUser(
       return bMs - aMs;
     });
 
-  const latest = paid[0];
+  const withReceipt = paid.filter((inv) => receiptUrlFromStoredInvoice(inv));
+  const latest = withReceipt[0] ?? paid[0];
   if (!latest) {
     return { receiptUrl: null, isProration: false, invoiceNumber: null };
   }

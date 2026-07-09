@@ -15,6 +15,7 @@ import {
   type TeacherQuizReviewRow,
 } from "@/lib/teacher-quiz-review";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { ArrowUpDown, Loader2, RefreshCw } from "lucide-react";
 
 type QuizContext = {
@@ -53,6 +54,9 @@ export function TeacherQuizReviewPanel({
         ),
       );
     } catch {
+      toast.error("Could not generate distractors", {
+        description: "Try again or edit choices manually.",
+      });
       onRowsChange(
         rows.map((item) =>
           item.id === row.id ? { ...item, distractorsLoading: false } : item,

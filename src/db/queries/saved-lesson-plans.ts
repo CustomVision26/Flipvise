@@ -3,7 +3,7 @@ import { savedLessonPlans } from "@/db/schema";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
-import { desc, eq, and, inArray } from "drizzle-orm";
+import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type SavedLessonPlanRow = InferSelectModel<typeof savedLessonPlans>;
@@ -40,6 +40,19 @@ export async function saveLessonPlan(
     .returning();
 
   return row;
+}
+
+export async function getDeckIdsWithSavedLessonPlans(): Promise<Set<number>> {
+  const rows = await db
+    .select({ deckId: savedLessonPlans.deckId })
+    .from(savedLessonPlans)
+    .where(isNotNull(savedLessonPlans.deckId));
+
+  return new Set(
+    rows
+      .map((row) => row.deckId)
+      .filter((deckId): deckId is number => deckId != null),
+  );
 }
 
 export async function getSavedLessonPlansByUser(

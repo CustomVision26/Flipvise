@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { createTeacherClassAction } from "@/actions/teacher-classes";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,7 +96,9 @@ export function CreateTeacherClassDialog({
     setError(null);
 
     if (!selectedDeck) {
-      setError("Select a deck for this class.");
+      const message = "Select a deck for this class.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -112,9 +115,14 @@ export function CreateTeacherClassDialog({
       });
       setOpen(false);
       resetForm();
+      toast.success("Class created", {
+        description: "Your new class is ready in the class list.",
+      });
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create class.");
+      const message = err instanceof Error ? err.message : "Could not create class.";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsPending(false);
     }

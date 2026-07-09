@@ -42,6 +42,7 @@ import {
   type WorkspaceMemberMeta,
 } from "@/lib/teacher-workspace-member-grouping";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const FILTER_ALL = "__all__";
 
@@ -292,12 +293,21 @@ function ResourceDeleteButton({
   function handleConfirm() {
     setOpen(false);
     startTransition(async () => {
-      await deleteTeacherResourceAction({
-        resourceType,
-        resourceId: resolvedResourceId,
-        teamId,
-      });
-      onDeleted();
+      try {
+        await deleteTeacherResourceAction({
+          resourceType,
+          resourceId: resolvedResourceId,
+          teamId,
+        });
+        toast.success("Resource deleted", {
+          description: `${item.title} was removed from your library.`,
+        });
+        onDeleted();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not delete resource.",
+        );
+      }
     });
   }
 

@@ -1,4 +1,11 @@
 import type { LessonPlanResult } from "@/lib/teacher-generators";
+import type { LessonPlanDayVocabularyDetail } from "@/lib/lesson-plan-ai-schema";
+import { formatUnitPacingLabel } from "@/lib/lesson-plan-weekly-schedule";
+
+export type LessonPlanPdfUnitContext = {
+  planPeriodDays: number;
+  lessonDuration: string;
+};
 
 export function lessonPlanPdfSafeFileName(title: string): string {
   return (
@@ -47,7 +54,59 @@ function addSection(
   yRef.y += 6;
 }
 
-export async function buildLessonPlanPdfDocument(plan: LessonPlanResult) {
+export function vocabularyDetailPdfLines(
+  detail: LessonPlanDayVocabularyDetail,
+): string[] {
+  const lines: string[] = [detail.contextIntro, "", "Vocabulary:"];
+
+  for (const term of detail.terms) {
+    lines.push(`• ${term.term} — ${term.definition}`);
+    if (term.example) {
+      lines.push(`  Example: ${term.example}`);
+    }
+  }
+
+  if (detail.mainConcept) {
+    lines.push("", detail.mainConcept.heading, detail.mainConcept.body);
+  }
+
+  if (detail.process) {
+    lines.push("", detail.process.heading);
+    for (const step of detail.process.steps) {
+      lines.push(`${step.stepNumber}. ${step.title}`);
+      for (const bullet of step.bullets) {
+        lines.push(`   • ${bullet}`);
+      }
+    }
+  }
+
+  if (detail.learningGoal) {
+    lines.push("", detail.learningGoal.heading);
+    if (detail.learningGoal.intro) {
+      lines.push(detail.learningGoal.intro);
+    }
+    for (const objective of detail.learningGoal.objectives) {
+      lines.push(`• ${objective}`);
+    }
+  }
+
+  if (detail.additionalVocabulary?.length) {
+    lines.push("", "Additional Vocabulary:");
+    for (const term of detail.additionalVocabulary) {
+      lines.push(`• ${term.term} — ${term.definition}`);
+      if (term.example) {
+        lines.push(`  Example: ${term.example}`);
+      }
+    }
+  }
+
+  return lines;
+}
+
+export async function buildLessonPlanPdfDocument(
+  plan: LessonPlanResult,
+  unitContext?: LessonPlanPdfUnitContext,
+) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
 
@@ -68,7 +127,22 @@ export async function buildLessonPlanPdfDocument(plan: LessonPlanResult) {
   doc.setTextColor(40);
   const titleWrapped = doc.splitTextToSize(plan.lessonTitle, contentW);
   doc.text(titleWrapped, margin, yRef.y);
-  yRef.y += titleWrapped.length * 15 + 12;
+  yRef.y += titleWrapped.length * 15 + 8;
+
+  const unitLabel =
+    unitContext && unitContext.planPeriodDays > 1
+      ? formatUnitPacingLabel(unitContext.planPeriodDays, unitContext.lessonDuration)
+      : null;
+  if (unitLabel) {
+    doc.setFontSize(10);
+    doc.setTextColor(80);
+    doc.text(unitLabel, margin, yRef.y);
+    yRef.y += 14;
+  }
+
+  doc.setFontSize(12);
+  doc.setTextColor(40);
+  yRef.y += 4;
 
   doc.setDrawColor(220);
   doc.line(margin, yRef.y, margin + contentW, yRef.y);
@@ -92,24 +166,69 @@ export async function buildLessonPlanPdfDocument(plan: LessonPlanResult) {
     "Materials Needed",
     plan.materialsNeeded.map((item) => `• ${item}`),
   );
-  addSection(
-    doc,
-    margin,
-    contentW,
-    yRef,
-    pageH,
-    "Vocabulary",
-    plan.vocabulary.map((item) => `• ${item}`),
-  );
-  addSection(
-    doc,
-    margin,
-    contentW,
-    yRef,
-    pageH,
-    "Lesson Timeline",
-    plan.lessonTimeline.map((item) => `• ${item}`),
-  );
+
+  if (plan.weeklySchedule?.length) {
+    for (const day of plan.weeklySchedule) {
+      addSection(doc, margin, contentW, yRef, pageH, day.dayLabel, [
+        day.dailyFocus,
+        "",
+        "Vocabulary:",
+        ...day.vocabulary.map((item) => `• ${item}`),
+        "",
+        "Class timeline:",
+        ...day.lessonTimeline.map((item) => `• ${item}`),
+      ]);
+
+      if (day.vocabularyDetail) {
+        addSection(
+          doc,
+          margin,
+          contentW,
+          yRef,
+          pageH,
+          `${day.dayLabel} — Vocabulary detail`,
+          vocabularyDetailPdfLines(day.vocabularyDetail),
+        );
+      }
+    }
+    addSection(
+      doc,
+      margin,
+      contentW,
+      yRef,
+      pageH,
+      "Vocabulary (full unit)",
+      plan.vocabulary.map((item) => `• ${item}`),
+    );
+    addSection(
+      doc,
+      margin,
+      contentW,
+      yRef,
+      pageH,
+      "Unit Pacing Overview",
+      plan.lessonTimeline.map((item) => `• ${item}`),
+    );
+  } else {
+    addSection(
+      doc,
+      margin,
+      contentW,
+      yRef,
+      pageH,
+      "Vocabulary",
+      plan.vocabulary.map((item) => `• ${item}`),
+    );
+    addSection(
+      doc,
+      margin,
+      contentW,
+      yRef,
+      pageH,
+      "Lesson Timeline",
+      plan.lessonTimeline.map((item) => `• ${item}`),
+    );
+  }
   addSection(doc, margin, contentW, yRef, pageH, "Warm-Up Activity", [plan.warmUpActivity]);
   addSection(
     doc,
@@ -149,8 +268,9 @@ export async function buildLessonPlanPdfDocument(plan: LessonPlanResult) {
 
 export async function generateLessonPlanPdfBuffer(
   plan: LessonPlanResult,
+  unitContext?: LessonPlanPdfUnitContext,
 ): Promise<Buffer> {
-  const doc = await buildLessonPlanPdfDocument(plan);
+  const doc = await buildLessonPlanPdfDocument(plan, unitContext);
   const arrayBuffer = doc.output("arraybuffer");
   return Buffer.from(arrayBuffer);
 }
