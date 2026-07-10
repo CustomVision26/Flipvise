@@ -23,8 +23,8 @@ export type SerializedUser = {
   /** Current timestamp shown alongside the effective personal plan. */
   currentPersonalPlanDateTime: string;
   /**
-   * Billing: Clerk `publicMetadata.plan` or `teamPlanId`, else DB workspace owner `plan_slug`,
-   * or platform role / complimentary Pro. See `getAdminUserPlanColumnLabel`.
+   * Personal subscription tier for the All Users "Plan" column (Clerk billing/admin metadata).
+   * Owning a team workspace does not change this — see `teamTierPlanSlug` / `associatePlan`.
    */
   planDisplayName: string;
   /** Paid, Assigned, Affiliate, Complimentary (platform admin), or Free. */

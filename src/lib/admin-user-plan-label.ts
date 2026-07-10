@@ -237,3 +237,35 @@ export function getAdminUserPlanColumnLabel(input: {
 
   return "Free";
 }
+
+/**
+ * Admin All Users "Plan" column — the user's personal subscription tier only.
+ * Must stay consistent with {@link resolveAdminUserPlanAccessType}: never show a paid
+ * team tier when personal access is Free (owning a workspace ≠ personal plan).
+ */
+export function resolveAdminUserPlanDisplayName(input: {
+  clerkColumnLabel: string;
+  planAccessType: AdminUserPlanAccessType;
+  ownedTeamPlanLabel: string | null;
+  planCtx: AdminUserPlanBillingContext;
+}): string {
+  if (input.planAccessType === "Free") {
+    return "Free";
+  }
+
+  if (input.clerkColumnLabel !== "Free") {
+    return input.clerkColumnLabel;
+  }
+
+  // Stale Clerk metadata: owned-workspace plan label only when billing/admin still grants access.
+  if (
+    input.ownedTeamPlanLabel &&
+    (input.planCtx.stripeAuthoritative ||
+      input.planCtx.adminAssignmentAuthoritative ||
+      input.planCtx.legacyAdminAssignment)
+  ) {
+    return input.ownedTeamPlanLabel;
+  }
+
+  return input.clerkColumnLabel;
+}

@@ -4,6 +4,7 @@ import {
   getAdminUserPlanColumnLabel,
   resolveAdminUserPlanAccessType,
   resolveAdminUserPlanBillingContext,
+  resolveAdminUserPlanDisplayName,
 } from "@/lib/admin-user-plan-label";
 import {
   augmentAdminPlanLabelWithWinner,
@@ -165,22 +166,26 @@ export function serializeAdminUsers(ctx: SerializeAdminUsersContext): Serialized
       planMeta: planOrTeamSlug,
       stripeSubscriptionActive: meta?.stripe_subscription_status === "active",
     });
-    const withAssociateFallback =
-      fromClerk !== "Free" ? fromClerk : (ctx.teamOwnerPlanByUserId.get(user.id) ?? "Free");
-    const planDisplayName = augmentAdminPlanLabelWithWinner(withAssociateFallback, {
-      comparedMetadataToBilling: planResolutionAdmin.comparedMetadataToBilling,
-      winner: planResolutionAdmin.winner,
-      legacyMetadataOverride: planResolutionAdmin.legacyMetadataOverride,
-    });
     const planAccessType = resolveAdminUserPlanAccessType({
       meta,
       isSuperadmin,
       isCoAdmin,
       isActiveAffiliate: ctx.activeAffiliateUserIds?.has(user.id) ?? false,
     });
+    const planCtx = resolveAdminUserPlanBillingContext(meta);
+    const ownedTeamPlanLabel = ctx.teamOwnerPlanByUserId.get(user.id) ?? null;
+    const planColumnLabel = resolveAdminUserPlanDisplayName({
+      clerkColumnLabel: fromClerk,
+      planAccessType,
+      ownedTeamPlanLabel,
+      planCtx,
+    });
+    const planDisplayName = augmentAdminPlanLabelWithWinner(planColumnLabel, {
+      comparedMetadataToBilling: planResolutionAdmin.comparedMetadataToBilling,
+      winner: planResolutionAdmin.winner,
+      legacyMetadataOverride: planResolutionAdmin.legacyMetadataOverride,
+    });
     const roleAutoProLabel = isAdmin ? "Pro" : null;
-    const nonFreePlanFallback =
-      roleAutoProLabel ?? (withAssociateFallback !== "Free" ? withAssociateFallback : null);
     const clerkPlanLabel = adminPlanLabelFromSlug(clerkCurrentSlug);
     const adminAssignedPlanLabel = metadataAssignedSlug
       ? adminPlanLabelFromSlug(metadataAssignedSlug)
@@ -194,9 +199,11 @@ export function serializeAdminUsers(ctx: SerializeAdminUsersContext): Serialized
       },
     );
     const currentPersonalPlanLabel =
-      currentPersonalPlanLabelRaw.startsWith("Free") && nonFreePlanFallback != null
-        ? nonFreePlanFallback
-        : currentPersonalPlanLabelRaw;
+      planAccessType === "Free"
+        ? "Free"
+        : currentPersonalPlanLabelRaw.startsWith("Free") && roleAutoProLabel != null
+          ? roleAutoProLabel
+          : currentPersonalPlanLabelRaw;
     const activeSessionCount = !isBanned ? (ctx.activeSessionData.get(user.id) ?? 0) : 0;
     const isOnline = activeSessionCount > 0;
     const ownedTeamPlanSlugs = (ctx.teamOwnerPlanSlugsByUserId.get(user.id) ?? []).filter(
