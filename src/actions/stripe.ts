@@ -410,7 +410,7 @@ async function createStripeCheckoutSessionActionInner(
     });
   }
 
-  const returnUrl = `${appUrl}${successReturnPath}${successReturnPath.includes("?") ? "&" : "?"}checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+  const returnUrl = `${appUrl}${successReturnPath}${successReturnPath.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`;
 
   const subscriptionMetadata: Record<string, string> = {
     clerkUserId: userId,

@@ -21,6 +21,9 @@ import { canonicalEducationPlanId, isEducationTeamPlanId } from "@/lib/education
 import { planSlugFromStripePriceId } from "@/lib/stripe-plan-price-env";
 import { stripe } from "@/lib/stripe";
 import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
+import { cancelOtherActiveSubscriptionsForCustomer } from "@/lib/apply-plan-upgrade";
+import { syncCheckoutCompletedSubscription } from "@/lib/stripe-subscription-lifecycle";
+import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 
 function planRank(planSlug: string | undefined): number {
   const slug = planSlug?.trim() ?? "";
@@ -312,36 +315,120 @@ async function findActiveSubscriptionForClerkUserInner(userId: string): Promise<
 export async function syncActiveSubscriptionFromStripeForUser(
   userId: string,
 ): Promise<{ synced: boolean; planSlug: StripePaidPlanId | null }> {
-  const resolved = await findActiveSubscriptionForClerkUser(userId);
-  if (!resolved) {
+  try {
+    const resolved = await findActiveSubscriptionForClerkUser(userId);
+    if (!resolved) {
+      return { synced: false, planSlug: null };
+    }
+
+    const { sub, customerId } = resolved;
+
+    const plan = await resolvePlanSlugFromStripeSubscription(sub, customerId);
+    if (!plan) {
+      console.error(
+        "[syncActiveSubscriptionFromStripeForUser] could not resolve plan",
+        { userId, subscriptionId: sub.id },
+      );
+      return { synced: false, planSlug: null };
+    }
+    const billingStatus = billingStatusFromStripeSubscription(sub.status);
+
+    await setStripeBillingState(userId, plan, billingStatus);
+    await upsertStripeSubscriptionFromStripeSub(userId, sub, plan);
+
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer.deleted) {
+        await stripe.customers.update(customerId, {
+          metadata: { clerkUserId: userId, plan },
+        });
+      }
+    } catch (error) {
+      console.error("[syncActiveSubscriptionFromStripeForUser] customer update:", error);
+    }
+
+    return { synced: true, planSlug: plan };
+  } catch (error) {
+    console.error("[syncActiveSubscriptionFromStripeForUser]", userId, error);
+    return { synced: false, planSlug: null };
+  }
+}
+
+/**
+ * Sync billing immediately from a completed Checkout Session id (`cs_` / `sess_`).
+ * More reliable than subscription search right after payment (Stripe indexing lag).
+ */
+export async function syncBillingFromCheckoutSession(
+  userId: string,
+  checkoutSessionId: string,
+): Promise<{ synced: boolean; planSlug: StripePaidPlanId | null }> {
+  if (!isStripeCheckoutSessionId(checkoutSessionId)) {
     return { synced: false, planSlug: null };
   }
 
-  const { sub, customerId } = resolved;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
 
-  const plan = await resolvePlanSlugFromStripeSubscription(sub, customerId);
-  if (!plan) {
+    if (session.metadata?.clerkUserId !== userId) {
+      console.warn("[syncBillingFromCheckoutSession] clerkUserId mismatch", {
+        checkoutSessionId,
+        userId,
+      });
+      return { synced: false, planSlug: null };
+    }
+
+    if (session.status !== "complete") {
+      return { synced: false, planSlug: null };
+    }
+
+    const selectedPlan = asPaidPlanId(session.metadata?.plan);
+    const customerId =
+      typeof session.customer === "string"
+        ? session.customer
+        : session.customer?.id ?? null;
+    const subscriptionId =
+      typeof session.subscription === "string"
+        ? session.subscription
+        : session.subscription?.id ?? null;
+
+    if (!selectedPlan || !customerId || !subscriptionId) {
+      console.error("[syncBillingFromCheckoutSession] missing checkout fields", {
+        checkoutSessionId,
+        selectedPlan,
+        customerId: Boolean(customerId),
+        subscriptionId: Boolean(subscriptionId),
+      });
+      return { synced: false, planSlug: null };
+    }
+
+    await stripe.customers.update(customerId, {
+      metadata: { clerkUserId: userId, plan: selectedPlan },
+    });
+
+    await syncCheckoutCompletedSubscription({
+      userId,
+      selectedPlan,
+      subscriptionId,
+      customerId,
+      isTrialCheckout: session.metadata?.isTrial === "true",
+    });
+
+    try {
+      await cancelOtherActiveSubscriptionsForCustomer(customerId, subscriptionId);
+    } catch (error) {
+      console.error(
+        "[syncBillingFromCheckoutSession] cancel other subs:",
+        error,
+      );
+    }
+
+    return { synced: true, planSlug: selectedPlan };
+  } catch (error) {
     console.error(
-      "[syncActiveSubscriptionFromStripeForUser] could not resolve plan",
-      { userId, subscriptionId: sub.id },
+      "[syncBillingFromCheckoutSession]",
+      checkoutSessionId,
+      error,
     );
     return { synced: false, planSlug: null };
   }
-  const billingStatus = billingStatusFromStripeSubscription(sub.status);
-
-  await setStripeBillingState(userId, plan, billingStatus);
-  await upsertStripeSubscriptionFromStripeSub(userId, sub, plan);
-
-  try {
-    const customer = await stripe.customers.retrieve(customerId);
-    if (!customer.deleted) {
-      await stripe.customers.update(customerId, {
-        metadata: { clerkUserId: userId, plan },
-      });
-    }
-  } catch (error) {
-    console.error("[syncActiveSubscriptionFromStripeForUser] customer update:", error);
-  }
-
-  return { synced: true, planSlug: plan };
 }

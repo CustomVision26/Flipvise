@@ -22,7 +22,7 @@ import {
   navigateToOfflineShellFast,
 } from "@/lib/offline/is-flipvise-native-app";
 
-const CLERK_LOAD_TIMEOUT_MS = 10_000;
+const CLERK_LOAD_TIMEOUT_MS = 6_000;
 const REDIRECT_STALL_TIMEOUT_MS = 12_000;
 const TICKET_FLOW_TIMEOUT_MS = 25_000;
 /** Probe server session once on mount — avoids stacked probes that freeze the WebView. */
@@ -242,7 +242,9 @@ export function NativeSignInClient({
 
   if (manualOnly && isLoaded) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+      <main
+        className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+      >
         <SignInForm
           redirectTo={postAuthTarget}
           notice={
@@ -260,7 +262,11 @@ export function NativeSignInClient({
     return (
       <SignInRecovery
         title="Sign-in is taking too long"
-        description="Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
+        description={
+          isNativeContext
+            ? "Sign-in could not connect. Use Try again or Back to offline study at the bottom of the screen."
+            : "Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
+        }
         showSignOut={false}
         isNativeContext={isNativeContext}
       />
@@ -300,7 +306,7 @@ export function NativeSignInClient({
           continuing || isSignedIn ? "Opening dashboard…" : "Connecting to sign-in…"
         }
         isNativeContext={isNativeContext}
-        showEscapeActions={loadingEscapeDue || isNativeContext}
+        showEscapeActions={!isNativeContext && (loadingEscapeDue || false)}
       />
     );
   }
@@ -310,13 +316,15 @@ export function NativeSignInClient({
       <CenteredSpinner
         label="Signing you in…"
         isNativeContext={isNativeContext}
-        showEscapeActions={loadingEscapeDue || isNativeContext}
+        showEscapeActions={!isNativeContext && (loadingEscapeDue || false)}
       />
     );
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+    <main
+      className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+    >
       <SignInForm
         redirectTo={postAuthTarget}
         notice={ticketError}
@@ -337,12 +345,18 @@ function CenteredSpinner({
   showEscapeActions?: boolean;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 pb-36">
+    <main
+      className={`flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+    >
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
           <CardTitle>{label ?? "Loading…"}</CardTitle>
-          <CardDescription>This only takes a moment.</CardDescription>
+          <CardDescription>
+            {isNativeContext
+              ? "If this takes more than a few seconds, use the buttons at the bottom of the screen."
+              : "This only takes a moment."}
+          </CardDescription>
         </CardHeader>
         {showEscapeActions ? (
           <CardFooter className="flex flex-col gap-2">
@@ -393,12 +407,15 @@ function SignInRecovery({
   const { signOut } = useClerk();
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+    <main
+      className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+    >
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
+        {!isNativeContext || onContinue || showSignOut ? (
         <CardFooter className="flex flex-col gap-2">
           {onContinue ? (
             <Button
@@ -408,21 +425,17 @@ function SignInRecovery({
             >
               {continueLabel ?? "Continue"}
             </Button>
-          ) : (
+          ) : !isNativeContext ? (
             <Button
               type="button"
               className={NATIVE_BTN_CLASS}
               onPointerDown={() => {
-                if (isNativeContext) {
-                  window.location.href = "/api/auth/clear-stale-session";
-                  return;
-                }
                 window.location.reload();
               }}
             >
               Try again
             </Button>
-          )}
+          ) : null}
           {showSignOut ? (
             <Button
               type="button"
@@ -435,19 +448,8 @@ function SignInRecovery({
               Sign out and try again
             </Button>
           ) : null}
-          {isNativeContext ? (
-            <Button
-              type="button"
-              variant="outline"
-              className={NATIVE_BTN_CLASS}
-              onPointerDown={() => {
-                navigateToOfflineShellFast();
-              }}
-            >
-              Back to offline study
-            </Button>
-          ) : null}
         </CardFooter>
+        ) : null}
       </Card>
     </main>
   );
@@ -735,20 +737,6 @@ function SignInForm({
           </form>
         )}
       </CardContent>
-      {isNativeContext ? (
-        <CardFooter>
-          <Button
-            type="button"
-            variant="outline"
-            className={NATIVE_BTN_CLASS}
-            onPointerDown={() => {
-              navigateToOfflineShellFast();
-            }}
-          >
-            Back to offline study
-          </Button>
-        </CardFooter>
-      ) : null}
     </Card>
   );
 }

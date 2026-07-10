@@ -34,6 +34,12 @@ function resolveCheckoutRedirectKind(
 
 export const BILLING_SYNCED_EVENT = "flipvise:billing-synced";
 
+const CHECKOUT_SYNC_RETRY_DELAYS_MS = [0, 1_500, 3_500, 6_000] as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 async function reloadClerkUserSession() {
   if (typeof window === "undefined") return;
   const clerk = (
@@ -42,9 +48,58 @@ async function reloadClerkUserSession() {
   await clerk?.user?.reload?.();
 }
 
+async function waitForClerkUserId(maxMs = 8_000): Promise<boolean> {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    const clerk = (
+      window as Window & {
+        Clerk?: { user?: { id?: string | null; reload?: () => Promise<unknown> } };
+      }
+    ).Clerk;
+    if (clerk?.user?.id) return true;
+    try {
+      await clerk?.user?.reload?.();
+    } catch {
+      // Clerk may still be booting in the WebView.
+    }
+    if (clerk?.user?.id) return true;
+    await sleep(400);
+  }
+  return Boolean(
+    (
+      window as Window & { Clerk?: { user?: { id?: string | null } } }
+    ).Clerk?.user?.id,
+  );
+}
+
+type CheckoutSyncResult = Awaited<ReturnType<typeof syncBillingAfterCheckoutAction>>;
+
+async function syncBillingAfterCheckoutWithRetry(input: {
+  checkoutSessionId: string;
+}): Promise<CheckoutSyncResult> {
+  let last: CheckoutSyncResult = {
+    synced: false,
+    planSlug: null,
+    planLabel: null,
+    receiptUrl: null,
+    receiptIsProration: false,
+  };
+
+  for (const delayMs of CHECKOUT_SYNC_RETRY_DELAYS_MS) {
+    if (delayMs > 0) await sleep(delayMs);
+    await waitForClerkUserId(delayMs === 0 ? 4_000 : 2_000);
+    last = await syncBillingAfterCheckoutAction({
+      ...(input.checkoutSessionId ? { checkoutSessionId: input.checkoutSessionId } : {}),
+    });
+    if (last.synced && last.planLabel) return last;
+  }
+
+  return last;
+}
+
 /**
  * One-shot toasts after Stripe Checkout redirect (`?checkout=success` | `?checkout=canceled`).
- * On success, syncs billing from Stripe API when webhooks did not reach the app (local dev).
+ * On success, syncs billing from Stripe when webhooks did not reach the app (local dev / lag).
  */
 export function StripeCheckoutToast() {
   const searchParams = useSearchParams();
@@ -83,6 +138,7 @@ export function StripeCheckoutToast() {
     void (async () => {
       try {
         if (checkout === "plan_change") {
+          await waitForClerkUserId();
           const result = await finalizePlanChangePaymentAction({
             ...(setupIntentId ? { setupIntentId } : {}),
           });
@@ -108,8 +164,8 @@ export function StripeCheckoutToast() {
           return;
         }
 
-        const result = await syncBillingAfterCheckoutAction({
-          ...(checkoutSessionId ? { checkoutSessionId } : {}),
+        const result = await syncBillingAfterCheckoutWithRetry({
+          checkoutSessionId,
         });
         await reloadClerkUserSession();
 
@@ -120,10 +176,16 @@ export function StripeCheckoutToast() {
             isProration: result.receiptIsProration,
           });
         } else {
-          toast.success("Payment received", {
+          toast.warning("Payment received", {
             description:
-              "Your payment was processed successfully. Your subscription may take a moment to appear—refresh this page or open Billing to confirm your new plan.",
-            duration: 12_000,
+              "Your payment went through, but your plan is still syncing. Pull to refresh, or open your profile → Billing to confirm.",
+            duration: 14_000,
+            action: {
+              label: "Refresh",
+              onClick: () => {
+                window.location.reload();
+              },
+            },
           });
         }
 
@@ -133,9 +195,16 @@ export function StripeCheckoutToast() {
         console.error("[StripeCheckoutToast] sync:", err);
         toast.warning("Payment received", {
           description:
-            "Your payment was received, but we could not update your plan automatically. Please open Billing to verify your subscription, or contact support if your plan does not update shortly.",
-          duration: 12_000,
+            "Your payment was received, but we could not update your plan automatically. Please open your profile → Billing to verify your subscription, or contact support if your plan does not update shortly.",
+          duration: 14_000,
+          action: {
+            label: "Refresh",
+            onClick: () => {
+              window.location.reload();
+            },
+          },
         });
+        router.refresh();
       }
     })();
   }, [searchParams, router]);

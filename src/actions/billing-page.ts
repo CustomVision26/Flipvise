@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { createClerkClient } from "@clerk/backend";
 import { z } from "zod";
 import {
@@ -16,12 +16,16 @@ import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
 } from "@/db/queries/stripe-subscriptions";
-import { syncActiveSubscriptionFromStripeForUser } from "@/lib/stripe-billing-sync";
+import {
+  syncActiveSubscriptionFromStripeForUser,
+  syncBillingFromCheckoutSession,
+} from "@/lib/stripe-billing-sync";
 import { syncBillingInvoicesForUser, syncCheckoutSessionInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import { recordSubscriptionCheckoutInboxForSession } from "@/lib/record-subscription-checkout-inbox";
 import { resolveLatestBillingReceiptForUser } from "@/lib/billing-receipt-url";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { getAccessContext } from "@/lib/access";
+import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
   fetchCancelSubscriptionPreview,
@@ -65,7 +69,7 @@ async function resolveUserEmail(userId: string): Promise<string | null> {
 /** Single billing-tab fetch: plan history + cancel eligibility (avoids action spam). */
 export async function loadBillingTabDataAction(): Promise<BillingTabData> {
   try {
-    const { userId } = await auth();
+    const { userId } = await clerkAuth();
     if (!userId) {
       return {
         planHistory: [],
@@ -178,7 +182,7 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
 
 /** Re-sync invoices from Stripe and return fresh plan history (post-checkout / billing tab). */
 export async function refreshBillingPlanHistoryAction(): Promise<PlanHistoryRow[]> {
-  const { userId } = await auth();
+  const { userId } = await clerkAuth();
   if (!userId) return [];
 
   const email = await resolveUserEmail(userId);
@@ -202,10 +206,17 @@ export async function refreshBillingPlanHistoryAction(): Promise<PlanHistoryRow[
   return planHistory;
 }
 
-/** After Checkout redirect when webhooks did not run (e.g. local `stripe listen` missing). */
 const syncBillingAfterCheckoutSchema = z.object({
   checkoutSessionId: z.string().max(256).optional(),
 });
+
+const emptyCheckoutSyncResult = {
+  synced: false,
+  planSlug: null,
+  planLabel: null,
+  receiptUrl: null,
+  receiptIsProration: false,
+} as const;
 
 export async function syncBillingAfterCheckoutAction(
   data: z.infer<typeof syncBillingAfterCheckoutSchema> = {},
@@ -217,15 +228,25 @@ export async function syncBillingAfterCheckoutAction(
   receiptIsProration: boolean;
 }> {
   const parsed = syncBillingAfterCheckoutSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid input");
+  if (!parsed.success) {
+    return { ...emptyCheckoutSyncResult };
+  }
 
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { userId } = await clerkAuth();
+  if (!userId) {
+    return { ...emptyCheckoutSyncResult };
+  }
 
   const email = await resolveUserEmail(userId);
   const checkoutSessionId = parsed.data.checkoutSessionId?.trim() ?? "";
 
+  let result: { synced: boolean; planSlug: StripePaidPlanId | null } = {
+    synced: false,
+    planSlug: null,
+  };
+
   if (isStripeCheckoutSessionId(checkoutSessionId)) {
+    result = await syncBillingFromCheckoutSession(userId, checkoutSessionId);
     try {
       await syncCheckoutSessionInvoicesForUser(userId, checkoutSessionId);
     } catch (error) {
@@ -233,14 +254,26 @@ export async function syncBillingAfterCheckoutAction(
     }
   }
 
-  const result = await syncActiveSubscriptionFromStripeForUser(userId);
+  if (!result.synced) {
+    result = await syncActiveSubscriptionFromStripeForUser(userId);
+  }
+
   try {
     await syncBillingInvoicesForUser(userId);
   } catch (error) {
     console.error("[syncBillingAfterCheckoutAction] invoice sync:", error);
   }
 
-  const receipt = await resolveLatestBillingReceiptForUser(userId, email);
+  let receipt = {
+    receiptUrl: null as string | null,
+    isProration: false,
+  };
+  try {
+    receipt = await resolveLatestBillingReceiptForUser(userId, email);
+  } catch (error) {
+    console.error("[syncBillingAfterCheckoutAction] receipt resolve:", error);
+  }
+
   const planLabel =
     result.planSlug != null
       ? displayNameForBillingPlanSlug(result.planSlug)

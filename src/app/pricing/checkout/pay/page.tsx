@@ -65,7 +65,8 @@ export default async function PricingCheckoutPayPage({
   }
 
   if (session.status === "complete") {
-    redirect("/dashboard?checkout=success");
+    const params = new URLSearchParams({ checkout: "success", session_id: sessionId });
+    redirect(`/dashboard?${params.toString()}`);
   }
 
   if (!session.client_secret) {

@@ -152,8 +152,12 @@ export async function POST(req: NextRequest) {
                 customerId,
                 subscriptionId,
               );
-            } catch {
-              // Best-effort
+            } catch (error) {
+              console.error(
+                "[stripe webhook] checkout.session.completed sync",
+                session.id,
+                error,
+              );
             }
           }
 
