@@ -24,6 +24,11 @@ const THEME_PREFS_KEY = "flipvise.offline.theme";
 /** Whether the app requires the device security credential (biometric/PIN) to open. */
 const APP_LOCK_KEY = "flipvise.offline.appLock";
 /**
+ * Timestamp (ms) of the last visit to the live dashboard inside the native WebView.
+ * When greater than `accessContext.updatedAtMs`, the offline workspace menu is stale.
+ */
+const LAST_LIVE_DASHBOARD_VISIT_MS_KEY = "flipvise.offline.lastLiveDashboardVisitMs";
+/**
  * When set, the offline shell must not auto hand off to the live dashboard via the
  * device sync token (user signed out explicitly).
  */
@@ -165,9 +170,14 @@ export async function clearPendingOfflinePull(): Promise<void> {
 
 /** Clears all device sync credentials (e.g. on sign-out). */
 export async function clearStoredSyncCredentials(): Promise<void> {
-  await Preferences.remove({ key: SYNC_TOKEN_KEY });
-  await Preferences.remove({ key: USER_ID_KEY });
-  await clearPendingOfflinePull();
+  const { clearOfflineAccessContext } = await import("@/lib/offline/access-context");
+  await Promise.all([
+    Preferences.remove({ key: SYNC_TOKEN_KEY }),
+    Preferences.remove({ key: USER_ID_KEY }),
+    clearPendingOfflinePull(),
+    clearOfflineAccessContext(),
+    clearLastLiveDashboardVisit(),
+  ]);
 }
 
 /** Blocks clerk-handoff until the user signs in manually again. */
@@ -182,4 +192,23 @@ export async function setRequireManualSignIn(required: boolean): Promise<void> {
 export async function getRequireManualSignIn(): Promise<boolean> {
   const { value } = await Preferences.get({ key: REQUIRE_MANUAL_SIGNIN_KEY });
   return value === "1";
+}
+
+/** Record that the user left the live dashboard — offline shell should re-sync workspaces. */
+export async function markLastLiveDashboardVisit(): Promise<void> {
+  await Preferences.set({
+    key: LAST_LIVE_DASHBOARD_VISIT_MS_KEY,
+    value: String(Date.now()),
+  });
+}
+
+export async function getLastLiveDashboardVisitMs(): Promise<number | null> {
+  const { value } = await Preferences.get({ key: LAST_LIVE_DASHBOARD_VISIT_MS_KEY });
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export async function clearLastLiveDashboardVisit(): Promise<void> {
+  await Preferences.remove({ key: LAST_LIVE_DASHBOARD_VISIT_MS_KEY });
 }

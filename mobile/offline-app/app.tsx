@@ -23,10 +23,13 @@ import type {
 import {
   consumeOfflineLibraryMigrationPendingSync,
   defaultOfflineAccessContext,
-  getOfflineAccessContext,
   resolveOfflineAccountPlanDisplay,
   resolveOfflinePersonalPlanLabel,
 } from "../../src/lib/offline/access-context";
+import {
+  ensureFreshOfflineAccessContext,
+  isOfflineAccessContextStale,
+} from "../../src/lib/offline/access-context-freshness";
 import type { OfflineDeckRow } from "../../src/lib/offline/schema";
 import {
   getStoredApiBaseUrl,
@@ -130,6 +133,7 @@ export function App() {
   const [accessContext, setAccessContext] = useState<OfflineAccessContext>(
     defaultOfflineAccessContext(),
   );
+  const [workspaceContextStale, setWorkspaceContextStale] = useState(false);
   const [workspaceScope, setWorkspaceScope] = useState<SavedWorkspaceScope>("personal");
   const [activeDeck, setActiveDeck] = useState<OfflineDeckRow | null>(null);
   const [deckView, setDeckView] = useState<
@@ -174,11 +178,35 @@ export function App() {
     [],
   );
 
-  const refreshAccessContext = useCallback(async () => {
-    const ctx = (await getOfflineAccessContext()) ?? defaultOfflineAccessContext();
-    setAccessContext(ctx);
-    return ctx;
-  }, []);
+  const ensureAccessContextFresh = useCallback(
+    async (options?: { force?: boolean; fullPull?: boolean; userId?: string }) => {
+      const effectiveUserId = options?.userId ?? userId;
+      if (!effectiveUserId) {
+        const empty = defaultOfflineAccessContext();
+        setAccessContext(empty);
+        setWorkspaceContextStale(false);
+        return empty;
+      }
+
+      const token = await getStoredSyncToken().catch(() => null);
+      const result = await ensureFreshOfflineAccessContext({
+        userId: effectiveUserId,
+        apiBaseUrl: bundledLiveUrl(),
+        token,
+        online,
+        force: options?.force,
+        fullPull: options?.fullPull,
+      });
+      setAccessContext(result.context);
+      const stillStale = await isOfflineAccessContextStale(
+        result.context,
+        effectiveUserId,
+      );
+      setWorkspaceContextStale(stillStale && !online);
+      return result.context;
+    },
+    [userId, online],
+  );
 
   useEffect(() => {
     void setNativeAppFlag().catch(() => {});
@@ -225,8 +253,25 @@ export function App() {
           );
         }
 
-        const ctx = await refreshAccessContext();
+        let ctx = uid
+          ? await ensureAccessContextFresh({ userId: uid })
+          : defaultOfflineAccessContext();
         if (cancelled) return;
+
+        if (
+          uid &&
+          ctx.userId &&
+          ctx.userId !== uid &&
+          (await getStoredSyncToken().catch(() => null))
+        ) {
+          await resetSyncPullCursor().catch(() => {});
+          ctx = await ensureAccessContextFresh({
+            userId: uid,
+            force: true,
+            fullPull: true,
+          });
+          if (cancelled) return;
+        }
 
         if (uid && (await consumeOfflineLibraryMigrationPendingSync())) {
           await resetSyncPullCursor().catch(() => {});
@@ -272,49 +317,6 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reload the library when returning from the live dashboard or resuming the app.
-  useEffect(() => {
-    if (!libraryReady || !userId) return;
-
-    const refreshFromStorage = async () => {
-      const ctx = await refreshAccessContext();
-      const scope = await loadWorkspaceScope();
-      setWorkspaceScope(scope);
-      await repairPersonalDeckRows(userId).catch(() => {});
-      await purgeStaleInvitedWorkspaceStudyDecks(userId, ctx.workspaces).catch(() => {});
-      await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
-      await loadDecks(userId, scope, ctx);
-    };
-
-    const onResume = () => {
-      void refreshFromStorage();
-    };
-
-    const onPageShow = () => {
-      onResume();
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") onResume();
-    };
-
-    window.addEventListener("pageshow", onPageShow);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    let appStateListener: PluginListenerHandle | undefined;
-    void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) onResume();
-    }).then((handle) => {
-      appStateListener = handle;
-    });
-
-    return () => {
-      window.removeEventListener("pageshow", onPageShow);
-      document.removeEventListener("visibilitychange", onVisibility);
-      void appStateListener?.remove();
-    };
-  }, [libraryReady, userId, loadDecks, refreshAccessContext]);
-
   const runSyncNow = useCallback(
     async (options?: { showSuccess?: boolean; fullPull?: boolean }): Promise<boolean> => {
       if (!userId) return false;
@@ -338,7 +340,7 @@ export function App() {
           token,
           fullPull: options?.fullPull === true,
         });
-        const ctx = await refreshAccessContext();
+        const ctx = await ensureAccessContextFresh();
         await purgeStaleInvitedWorkspaceStudyDecks(userId, ctx.workspaces).catch(() => {});
         await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
         await loadDecks(userId, workspaceScope, ctx);
@@ -375,7 +377,7 @@ export function App() {
         setSyncing(false);
       }
     },
-    [userId, online, loadDecks, workspaceScope, refreshAccessContext],
+    [userId, online, loadDecks, workspaceScope, ensureAccessContextFresh],
   );
 
   // Push/pull incremental changes when the library opens online (no full reconcile).
@@ -383,8 +385,59 @@ export function App() {
   useEffect(() => {
     if (!libraryReady || !userId || !online || didAutoSyncRef.current) return;
     didAutoSyncRef.current = true;
-    void runSyncNow({ showSuccess: false, fullPull: false });
-  }, [libraryReady, userId, online, runSyncNow]);
+    void (async () => {
+      await ensureAccessContextFresh();
+      await runSyncNow({ showSuccess: false, fullPull: false });
+    })();
+  }, [libraryReady, userId, online, runSyncNow, ensureAccessContextFresh]);
+
+  // Reload workspace list + decks when returning from the live dashboard or resuming the app.
+  useEffect(() => {
+    if (!libraryReady || !userId) return;
+
+    const refreshFromServerWhenOnline = async () => {
+      const ctx = await ensureAccessContextFresh();
+      if (online) {
+        const synced = await runSyncNow({ showSuccess: false, fullPull: false });
+        if (synced) return;
+      }
+      const scope = await loadWorkspaceScope();
+      setWorkspaceScope(scope);
+      await repairPersonalDeckRows(userId).catch(() => {});
+      await purgeStaleInvitedWorkspaceStudyDecks(userId, ctx.workspaces).catch(() => {});
+      await repairTeamWorkspaceDeckRows(userId, ctx.workspaces).catch(() => {});
+      await loadDecks(userId, scope, ctx);
+    };
+
+    const onResume = () => {
+      void refreshFromServerWhenOnline();
+    };
+
+    const onPageShow = () => {
+      didAutoSyncRef.current = false;
+      onResume();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") onResume();
+    };
+
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    let appStateListener: PluginListenerHandle | undefined;
+    void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) onResume();
+    }).then((handle) => {
+      appStateListener = handle;
+    });
+
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibility);
+      void appStateListener?.remove();
+    };
+  }, [libraryReady, userId, online, loadDecks, ensureAccessContextFresh, runSyncNow]);
 
   const handleSync = useCallback(async () => {
     if (!userId) {
@@ -406,13 +459,13 @@ export function App() {
       if (!userId) return;
       setScopeLoading(true);
       try {
-        const ctx = await refreshAccessContext();
+        const ctx = await ensureAccessContextFresh();
         await loadDecks(userId, scope, ctx);
       } finally {
         setScopeLoading(false);
       }
     },
-    [userId, loadDecks, refreshAccessContext],
+    [userId, loadDecks, ensureAccessContextFresh],
   );
 
   const canCreateDeck = useMemo(
@@ -435,6 +488,8 @@ export function App() {
 
   const showTeamAdminDash =
     Boolean(accessContext.personalHasTeamTierPlan) && ownerWorkspace != null;
+
+  const showTeacherDashboard = accessContext.showTeacherDashboard ?? false;
 
   const openLivePath = useCallback(async (path: string) => {
     const storedBase = await getStoredApiBaseUrl().catch(() => null);
@@ -517,6 +572,11 @@ export function App() {
     );
     void openLivePath(path);
   }, [online, ownerWorkspace, openLivePath]);
+
+  const openTeacherDash = useCallback(() => {
+    if (!online) return;
+    void openLivePath("/teacher");
+  }, [online, openLivePath]);
 
   const openToAdminDash = useCallback(
     (workspace: OfflineWorkspaceContext) => {
@@ -691,11 +751,15 @@ export function App() {
           workspaces={accessContext.workspaces}
           personalPlanLabel={personalPlanLabel}
           personalHasTeamTierPlan={accessContext.personalHasTeamTierPlan ?? false}
+          showTeacherDashboard={showTeacherDashboard}
+          workspaceContextUpdatedAtMs={accessContext.updatedAtMs}
+          workspaceContextStale={workspaceContextStale}
           viewerDisplayName={accessContext.viewerDisplayName}
           viewerEmail={accessContext.viewerEmail}
           canCreateDeck={canCreateDeck}
           onWorkspaceChange={handleWorkspaceChange}
           onTeamAdminDash={showTeamAdminDash ? openTeamAdminDash : undefined}
+          onTeacherDash={showTeacherDashboard ? openTeacherDash : undefined}
           onToAdminDash={openToAdminDash}
           onNewDeck={() => setShowNewDeck(true)}
           onOpenDeck={(deck) => {

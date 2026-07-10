@@ -64,6 +64,12 @@ export type OfflineAccessContext = {
   viewerIsSuperadmin?: boolean;
   /** True when the signed-in user is a platform admin or superadmin. */
   viewerIsPlatformAdmin?: boolean;
+  /** Clerk user id when this snapshot was written — used to discard stale cross-account caches. */
+  userId?: string;
+  /** Mirrors the online workspace menu Teacher Dash entry when education access applies. */
+  showTeacherDashboard?: boolean;
+  /** Full eligible team count (may exceed `workspaces.length` on Free personal). */
+  totalEligibleTeamCount?: number;
   updatedAtMs: number;
 };
 
@@ -77,6 +83,11 @@ export async function setOfflineAccessContext(
       libraryRevision: OFFLINE_LIBRARY_REVISION,
     }),
   });
+}
+
+/** Removes cached workspace/plan metadata (e.g. on sign-out or account switch). */
+export async function clearOfflineAccessContext(): Promise<void> {
+  await Preferences.remove({ key: ACCESS_CONTEXT_KEY });
 }
 
 /** True after a library revision migration until the offline shell completes a full sync. */

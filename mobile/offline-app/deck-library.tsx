@@ -387,7 +387,11 @@ export function DeckLibrary({
   canCreateDeck,
   onWorkspaceChange,
   onTeamAdminDash,
+  onTeacherDash,
   onToAdminDash,
+  showTeacherDashboard = false,
+  workspaceContextUpdatedAtMs = 0,
+  workspaceContextStale = false,
   onNewDeck,
   onOpenDeck,
   onDecksChanged,
@@ -405,7 +409,11 @@ export function DeckLibrary({
   canCreateDeck: boolean;
   onWorkspaceChange: (scope: SavedWorkspaceScope) => void;
   onTeamAdminDash?: () => void;
+  onTeacherDash?: () => void;
   onToAdminDash?: (workspace: OfflineWorkspaceContext) => void;
+  showTeacherDashboard?: boolean;
+  workspaceContextUpdatedAtMs?: number;
+  workspaceContextStale?: boolean;
   onNewDeck: () => void;
   onOpenDeck: (deck: OfflineDeckRow) => void;
   onDecksChanged: () => void | Promise<void>;
@@ -556,6 +564,10 @@ export function DeckLibrary({
             online={online}
             onChange={onWorkspaceChange}
             onTeamAdminDash={onTeamAdminDash}
+            onTeacherDash={onTeacherDash}
+            showTeacherDashboard={showTeacherDashboard}
+            workspaceContextUpdatedAtMs={workspaceContextUpdatedAtMs}
+            workspaceContextStale={workspaceContextStale}
             onToAdminDash={onToAdminDash}
           />
           {canCreateDeck && (

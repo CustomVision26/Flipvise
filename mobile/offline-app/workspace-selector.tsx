@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
+import { formatOfflineWorkspaceContextAge } from "../../src/lib/offline/access-context-freshness";
 import type { SavedWorkspaceScope } from "./workspace-prefs";
 import {
   listenForOfflineOverlayOpen,
@@ -17,8 +18,12 @@ export function WorkspaceSelector({
   viewerDisplayName,
   viewerEmail,
   online = false,
+  showTeacherDashboard = false,
+  workspaceContextUpdatedAtMs = 0,
+  workspaceContextStale = false,
   onChange,
   onTeamAdminDash,
+  onTeacherDash,
   onToAdminDash,
 }: {
   scope: SavedWorkspaceScope;
@@ -28,8 +33,12 @@ export function WorkspaceSelector({
   viewerDisplayName?: string;
   viewerEmail?: string | null;
   online?: boolean;
+  showTeacherDashboard?: boolean;
+  workspaceContextUpdatedAtMs?: number;
+  workspaceContextStale?: boolean;
   onChange: (scope: SavedWorkspaceScope) => void;
   onTeamAdminDash?: () => void;
+  onTeacherDash?: () => void;
   onToAdminDash?: (workspace: OfflineWorkspaceContext) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -89,6 +98,8 @@ export function WorkspaceSelector({
     subscriberOwnsTeamTierWorkspace &&
     invitedTeams.length > 0 &&
     (personalMatches || ownerWorkspace != null);
+
+  const workspaceAgeLabel = formatOfflineWorkspaceContextAge(workspaceContextUpdatedAtMs);
 
   useEffect(() => {
     return listenForOfflineOverlayOpen("workspace", () => {
@@ -232,6 +243,17 @@ export function WorkspaceSelector({
           </div>
 
           <div className="workspace-scope__scroll">
+            {workspaceContextStale && !online ? (
+              <p className="workspace-scope__stale-hint">
+                Workspaces may be out of date
+                {workspaceAgeLabel ? ` (${workspaceAgeLabel})` : ""}. Connect to refresh.
+              </p>
+            ) : workspaceAgeLabel && online ? (
+              <p className="workspace-scope__stale-hint workspace-scope__stale-hint--muted">
+                Workspaces updated {workspaceAgeLabel}
+              </p>
+            ) : null}
+
             <div className="workspace-scope__section-label">Workspace</div>
 
             {personalMatches && (
@@ -258,20 +280,36 @@ export function WorkspaceSelector({
               </button>
             )}
 
-            {online && personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash && (
+            {online && personalMatches && (showTeacherDashboard || (personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash)) && (
               <div className="workspace-scope__admin-row">
-                <button
-                  type="button"
-                  className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => {
-                    onTeamAdminDash();
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                >
-                  Team Admin Dash
-                </button>
+                {showTeacherDashboard && onTeacherDash ? (
+                  <button
+                    type="button"
+                    className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      onTeacherDash();
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                  >
+                    Teacher Dash
+                  </button>
+                ) : null}
+                {personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash ? (
+                  <button
+                    type="button"
+                    className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      onTeamAdminDash();
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                  >
+                    Team Admin Dash
+                  </button>
+                ) : null}
               </div>
             )}
 

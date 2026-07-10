@@ -667,6 +667,21 @@ html, body, #root {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
+.workspace-scope__stale-hint {
+  margin: 4px 8px 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--destructive, #ef4444) 35%, var(--border));
+  background: color-mix(in oklab, var(--destructive, #ef4444) 12%, transparent);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+.workspace-scope__stale-hint--muted {
+  border-color: var(--border-subtle);
+  background: color-mix(in oklab, var(--muted) 18%, transparent);
+  color: var(--muted);
+}
 .workspace-scope__section-label {
   padding: 6px 8px 4px;
   font-size: 12px;

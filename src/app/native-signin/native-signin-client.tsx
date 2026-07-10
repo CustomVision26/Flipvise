@@ -18,15 +18,17 @@ import { Label } from "@/components/ui/label";
 import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
 import { waitForServerSession } from "@/lib/native-session-probe";
 import {
-  isFlipviseNativeShell,
+  isFlipviseNativeApp,
   navigateToOfflineShell,
 } from "@/lib/offline/is-flipvise-native-app";
 
-const CLERK_LOAD_TIMEOUT_MS = 15_000;
+const CLERK_LOAD_TIMEOUT_MS = 10_000;
 const REDIRECT_STALL_TIMEOUT_MS = 12_000;
 const TICKET_FLOW_TIMEOUT_MS = 25_000;
 /** When Clerk JS is stuck refreshing, fall back to server session probe. */
 const CLERK_SERVER_SESSION_FALLBACK_MS = 2_500;
+/** Show escape actions while Clerk is still loading inside the native app. */
+const LOADING_ESCAPE_UI_MS = 4_000;
 
 function describeClerkError(err: unknown): string {
   if (!err) return "";
@@ -89,11 +91,21 @@ function useTimeoutFlag(active: boolean, ms: number): boolean {
   return timedOut;
 }
 
+function resolveNativeSignInContext(serverNativeContext: boolean): boolean {
+  if (serverNativeContext) return true;
+  if (typeof window === "undefined") return false;
+  return isFlipviseNativeApp();
+}
+
 /**
  * In-app sign-in for the Capacitor WebView — no Clerk modal (OOM risk).
  * Always verifies the server session before leaving this page.
  */
-export function NativeSignInClient() {
+export function NativeSignInClient({
+  isNativeContext: serverNativeContext = false,
+}: {
+  isNativeContext?: boolean;
+}) {
   const { isLoaded, isSignedIn } = useAuth();
   const { signIn } = useSignIn();
   const { signOut } = useClerk();
@@ -102,6 +114,7 @@ export function NativeSignInClient() {
   const sessionRetry = searchParams.get("session_retry") === "1";
   const redirectTo = safeRedirectPath(searchParams.get("redirect"));
   const postAuthTarget = authContinueUrl(redirectTo);
+  const isNativeContext = resolveNativeSignInContext(serverNativeContext);
   const [ticketError, setTicketError] = useState<string | null>(null);
   const [manualOnly, setManualOnly] = useState(sessionRetry);
   const [continuing, setContinuing] = useState(false);
@@ -109,6 +122,10 @@ export function NativeSignInClient() {
   const continueRef = useRef(false);
 
   const clerkLoadTimedOut = useTimeoutFlag(!isLoaded, CLERK_LOAD_TIMEOUT_MS);
+  const loadingEscapeDue = useTimeoutFlag(
+    !isLoaded && !manualOnly && !continuing,
+    LOADING_ESCAPE_UI_MS,
+  );
   const clerkServerFallbackDue = useTimeoutFlag(
     !isLoaded && !manualOnly && !continuing,
     CLERK_SERVER_SESSION_FALLBACK_MS,
@@ -148,6 +165,18 @@ export function NativeSignInClient() {
 
     window.location.replace(postAuthTarget);
   }, [postAuthTarget, signOut]);
+
+  // Server cookies can be valid before Clerk JS finishes booting in the WebView.
+  useEffect(() => {
+    if (manualOnly || sessionRetry || continueRef.current) return;
+    void (async () => {
+      const serverReady = await waitForServerSession(5_000);
+      if (!serverReady || continueRef.current || manualOnly) return;
+      continueRef.current = true;
+      setContinuing(true);
+      window.location.replace(postAuthTarget);
+    })();
+  }, [manualOnly, postAuthTarget, sessionRetry]);
 
   // Clerk JS can spin on session refresh in the WebView while SSR cookies are valid.
   useEffect(() => {
@@ -228,6 +257,7 @@ export function NativeSignInClient() {
             "Please sign in to open the online dashboard."
           }
           onFinishSignIn={finishSignIn}
+          isNativeContext={isNativeContext}
         />
       </main>
     );
@@ -239,6 +269,7 @@ export function NativeSignInClient() {
         title="Sign-in is taking too long"
         description="Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
         showSignOut={false}
+        isNativeContext={isNativeContext}
       />
     );
   }
@@ -249,6 +280,7 @@ export function NativeSignInClient() {
         title="Could not open the dashboard"
         description="Sign-in synced slowly. Try again or sign in manually."
         showSignOut
+        isNativeContext={isNativeContext}
       />
     );
   }
@@ -259,6 +291,7 @@ export function NativeSignInClient() {
         title="Automatic sign-in timed out"
         description="Your saved device sign-in did not finish in time. Try again or sign in manually below."
         showSignOut={false}
+        isNativeContext={isNativeContext}
         onContinue={() =>
           setTicketError("Automatic sign-in timed out. Sign in below.")
         }
@@ -271,14 +304,22 @@ export function NativeSignInClient() {
     return (
       <CenteredSpinner
         label={
-          continuing || isSignedIn ? "Opening dashboard…" : undefined
+          continuing || isSignedIn ? "Opening dashboard…" : "Connecting to sign-in…"
         }
+        isNativeContext={isNativeContext}
+        showEscapeActions={loadingEscapeDue || isNativeContext}
       />
     );
   }
 
   if (ticket && !ticketError) {
-    return <CenteredSpinner label="Signing you in…" />;
+    return (
+      <CenteredSpinner
+        label="Signing you in…"
+        isNativeContext={isNativeContext}
+        showEscapeActions={loadingEscapeDue || isNativeContext}
+      />
+    );
   }
 
   return (
@@ -287,18 +328,21 @@ export function NativeSignInClient() {
         redirectTo={postAuthTarget}
         notice={ticketError}
         onFinishSignIn={finishSignIn}
+        isNativeContext={isNativeContext}
       />
     </main>
   );
 }
 
-function CenteredSpinner({ label }: { label?: string }) {
-  const [isNative, setIsNative] = useState(false);
-
-  useEffect(() => {
-    setIsNative(isFlipviseNativeShell());
-  }, []);
-
+function CenteredSpinner({
+  label,
+  isNativeContext,
+  showEscapeActions = false,
+}: {
+  label?: string;
+  isNativeContext: boolean;
+  showEscapeActions?: boolean;
+}) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6">
       <Card className="w-full max-w-sm">
@@ -307,18 +351,34 @@ function CenteredSpinner({ label }: { label?: string }) {
           <CardTitle>{label ?? "Loading…"}</CardTitle>
           <CardDescription>This only takes a moment.</CardDescription>
         </CardHeader>
-        {isNative ? (
+        {showEscapeActions ? (
           <CardFooter className="flex flex-col gap-2">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               className="w-full"
               onClick={() => {
-                void navigateToOfflineShell();
+                if (isNativeContext) {
+                  window.location.href = "/api/auth/clear-stale-session";
+                  return;
+                }
+                window.location.reload();
               }}
             >
-              Back to offline study
+              Try again
             </Button>
+            {isNativeContext ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  void navigateToOfflineShell();
+                }}
+              >
+                Back to offline study
+              </Button>
+            ) : null}
           </CardFooter>
         ) : null}
       </Card>
@@ -332,19 +392,16 @@ function SignInRecovery({
   showSignOut,
   onContinue,
   continueLabel,
+  isNativeContext,
 }: {
   title: string;
   description: string;
   showSignOut: boolean;
   onContinue?: () => void;
   continueLabel?: string;
+  isNativeContext: boolean;
 }) {
   const { signOut } = useClerk();
-  const [isNative, setIsNative] = useState(false);
-
-  useEffect(() => {
-    setIsNative(isFlipviseNativeShell());
-  }, []);
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6">
@@ -363,7 +420,7 @@ function SignInRecovery({
               type="button"
               className="w-full"
               onClick={() => {
-                if (isNative) {
+                if (isNativeContext) {
                   window.location.href = "/api/auth/clear-stale-session";
                   return;
                 }
@@ -385,7 +442,7 @@ function SignInRecovery({
               Sign out and try again
             </Button>
           ) : null}
-          {isNative ? (
+          {isNativeContext ? (
             <Button
               type="button"
               variant="outline"
@@ -409,10 +466,12 @@ function SignInForm({
   redirectTo,
   notice,
   onFinishSignIn,
+  isNativeContext,
 }: {
   redirectTo: string;
   notice: string | null;
   onFinishSignIn: () => Promise<void>;
+  isNativeContext: boolean;
 }) {
   const { signIn } = useSignIn();
   const [mode, setMode] = useState<"password" | "code">("code");
@@ -422,15 +481,12 @@ function SignInForm({
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
-  const [isNative, setIsNative] = useState(false);
 
   useEffect(() => {
-    const native = isFlipviseNativeShell();
-    setIsNative(native);
-    if (native) {
+    if (isNativeContext) {
       setMode("code");
     }
-  }, []);
+  }, [isNativeContext]);
 
   useEffect(() => {
     setError(notice);
@@ -569,7 +625,7 @@ function SignInForm({
         <CardDescription>
           {mode === "code" && step === "code"
             ? `Enter the code we emailed to ${email}.`
-            : isNative
+            : isNativeContext
               ? "Most accounts use an email sign-in code. Password sign-in works only if you created one on the web."
               : "Use your email to continue to the dashboard."}
         </CardDescription>
@@ -686,7 +742,7 @@ function SignInForm({
           </form>
         )}
       </CardContent>
-      {isNative ? (
+      {isNativeContext ? (
         <CardFooter>
           <Button
             type="button"

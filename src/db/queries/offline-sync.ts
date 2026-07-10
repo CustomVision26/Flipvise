@@ -21,6 +21,7 @@ import {
 } from "@/lib/personal-workspace-plan-label";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
+import { hasEducationPlan } from "@/lib/education-plans";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import {
   FREE_CARDS_PER_DECK_LIMIT,
@@ -363,6 +364,9 @@ export type OfflineSyncContext = {
   viewerIsPlatformAdmin: boolean;
   viewerDisplayName: string;
   viewerEmail: string | null;
+  userId: string;
+  showTeacherDashboard: boolean;
+  totalEligibleTeamCount: number;
   updatedAtMs: number;
 };
 
@@ -537,6 +541,10 @@ export async function buildOfflineSyncContext(
   const workspacesForOffline = personalHasTeamTierPlan
     ? workspaceContexts
     : workspaceContexts.filter((w) => !w.isSubscriberOwned);
+  const showTeacherDashboard =
+    personalLabels.viewerIsSuperadmin ||
+    personalLabels.viewerIsPlatformAdmin ||
+    navPayload.teams.some((t) => hasEducationPlan(t.planUrlValue));
 
   return {
     maxPersonalDecks: personal.maxPersonalDecks,
@@ -550,6 +558,9 @@ export async function buildOfflineSyncContext(
     viewerIsPlatformAdmin: personalLabels.viewerIsPlatformAdmin,
     viewerDisplayName: viewerField.primaryLine,
     viewerEmail: viewerField.primaryEmail,
+    userId,
+    showTeacherDashboard,
+    totalEligibleTeamCount: navPayload.totalEligibleCount,
     updatedAtMs: Date.now(),
   };
 }

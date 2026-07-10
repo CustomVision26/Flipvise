@@ -56,6 +56,13 @@ export function resolveOfflineShellUrl(): string {
 export async function navigateToOfflineShell(): Promise<void> {
   if (typeof window === "undefined") return;
 
+  try {
+    const { markLastLiveDashboardVisit } = await import("@/lib/offline/session");
+    await markLastLiveDashboardVisit();
+  } catch {
+    // Non-fatal — offline shell may still open with cached workspaces.
+  }
+
   if (isFlipviseNativeShell()) {
     try {
       if (Capacitor.getPlatform() === "ios") {

@@ -99,6 +99,9 @@ interface SyncResponse {
     viewerIsPlatformAdmin?: boolean;
     viewerDisplayName?: string;
     viewerEmail?: string | null;
+    userId?: string;
+    showTeacherDashboard?: boolean;
+    totalEligibleTeamCount?: number;
     updatedAtMs: number;
   };
 }
