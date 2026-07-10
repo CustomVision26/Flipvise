@@ -5,17 +5,26 @@ import {
   FLIPVISE_NATIVE_QUERY_PARAM,
   FLIPVISE_NATIVE_UA_MARKER,
 } from "@/lib/flipvise-native-constants";
+import {
+  FLIPVISE_OFFLINE_SHELL_ANDROID_URL,
+  FLIPVISE_OFFLINE_SHELL_IOS_URL,
+} from "@/lib/offline/offline-shell-url";
 
 export { FLIPVISE_NATIVE_QUERY_PARAM, FLIPVISE_NATIVE_UA_MARKER };
-
-/** Android bundled shell (`server.androidScheme: https`). */
-export const FLIPVISE_OFFLINE_SHELL_ANDROID_URL = "https://localhost/";
-
-/** iOS bundled shell (`server.iosScheme` default: `capacitor`). */
-export const FLIPVISE_OFFLINE_SHELL_IOS_URL = "capacitor://localhost/index.html";
+export {
+  FLIPVISE_OFFLINE_SHELL_ANDROID_URL,
+  FLIPVISE_OFFLINE_SHELL_IOS_URL,
+};
 
 /** @deprecated Prefer {@link resolveOfflineShellUrl} — Android URL only. */
 export const FLIPVISE_OFFLINE_SHELL_URL = FLIPVISE_OFFLINE_SHELL_ANDROID_URL;
+
+/** Synchronous native-shell check — safe during first client render in Capacitor. */
+export function detectNativeShellNow(): boolean {
+  if (typeof window === "undefined") return false;
+  if (document.documentElement.dataset.flipviseNativeShell === "1") return true;
+  return isFlipviseNativeShell();
+}
 
 function isIosUserAgent(ua: string): boolean {
   return (
@@ -50,24 +59,24 @@ export function resolveOfflineShellUrl(): string {
 }
 
 /**
- * Navigate back to the bundled offline Study shell inside the Capacitor WebView.
- * On iOS, prefers the native `FlipviseShell` plugin so navigation never escapes to Safari.
+ * Navigate back to the bundled offline Study shell — no async work before navigation.
+ * Use from button handlers so taps feel instant even when Clerk is still loading.
  */
-export async function navigateToOfflineShell(): Promise<void> {
+export function navigateToOfflineShellFast(): void {
   if (typeof window === "undefined") return;
 
-  try {
-    const { markLastLiveDashboardVisit } = await import("@/lib/offline/session");
-    await markLastLiveDashboardVisit();
-  } catch {
-    // Non-fatal — offline shell may still open with cached workspaces.
-  }
+  void import("@/lib/offline/session")
+    .then((s) => s.markLastLiveDashboardVisit())
+    .catch(() => {});
 
   if (isFlipviseNativeShell()) {
     try {
       if (Capacitor.getPlatform() === "ios") {
-        const { FlipviseShell } = await import("@/lib/capacitor/flipvise-shell-plugin");
-        await FlipviseShell.openOfflineShell();
+        void import("@/lib/capacitor/flipvise-shell-plugin")
+          .then(({ FlipviseShell }) => FlipviseShell.openOfflineShell())
+          .catch(() => {
+            window.location.replace(resolveOfflineShellUrl());
+          });
         return;
       }
     } catch {
@@ -76,6 +85,14 @@ export async function navigateToOfflineShell(): Promise<void> {
   }
 
   window.location.replace(resolveOfflineShellUrl());
+}
+
+/**
+ * Navigate back to the bundled offline Study shell inside the Capacitor WebView.
+ * On iOS, prefers the native `FlipviseShell` plugin so navigation never escapes to Safari.
+ */
+export async function navigateToOfflineShell(): Promise<void> {
+  navigateToOfflineShellFast();
 }
 
 /**

@@ -5,7 +5,12 @@ import { useAuth } from "@clerk/nextjs";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { isFlipviseNativeShell } from "@/lib/offline/is-flipvise-native-app";
+import {
+  detectNativeShellNow,
+} from "@/lib/offline/is-flipvise-native-app";
+
+const NATIVE_BTN_CLASS =
+  "min-h-11 touch-manipulation active:scale-[0.98] transition-transform";
 
 /**
  * "Make available offline" — downloads the signed-in user's decks/cards into the
@@ -18,21 +23,17 @@ import { isFlipviseNativeShell } from "@/lib/offline/is-flipvise-native-app";
  */
 export function OfflineAvailabilityButton() {
   const { userId, isSignedIn } = useAuth();
-  const [isNative, setIsNative] = React.useState(false);
+  const [isNative] = React.useState(detectNativeShellNow);
   const [busy, setBusy] = React.useState(false);
 
-  // Strict native-only: this download relies on the native SQLite plugin, so it
-  // must never render in a browser/PWA where it can't work.
   React.useEffect(() => {
-    const native = isFlipviseNativeShell();
-    setIsNative(native);
+    if (!isNative) return;
     try {
-      // Keep the post-navigation heuristic alive for other native-aware features.
-      if (native) sessionStorage.setItem("flipvise.native", "1");
+      sessionStorage.setItem("flipvise.native", "1");
     } catch {
       // ignore
     }
-  }, []);
+  }, [isNative]);
 
   if (!isNative || !isSignedIn || !userId) return null;
 
@@ -110,7 +111,15 @@ export function OfflineAvailabilityButton() {
   };
 
   return (
-    <Button variant="secondary" onClick={handleClick} disabled={busy}>
+    <Button
+      variant="secondary"
+      className={NATIVE_BTN_CLASS}
+      disabled={busy}
+      onPointerDown={() => {
+        if (!busy) setBusy(true);
+      }}
+      onClick={handleClick}
+    >
       <Download className="size-4" />
       {busy ? "Downloading…" : "Make available offline"}
     </Button>

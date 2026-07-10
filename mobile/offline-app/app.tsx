@@ -140,6 +140,7 @@ export function App() {
     "menu" | "study-hub" | "flash" | "quiz"
   >("menu");
   const [syncing, setSyncing] = useState(false);
+  const [openingLive, setOpeningLive] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showNewDeck, setShowNewDeck] = useState(false);
   const [addCardsDeck, setAddCardsDeck] = useState<OfflineDeckRow | null>(null);
@@ -634,8 +635,11 @@ export function App() {
   );
 
   const openLiveApp = useCallback(() => {
+    if (openingLive) return;
+    setOpeningLive(true);
     void openLivePath("/dashboard");
-  }, [openLivePath]);
+    window.setTimeout(() => setOpeningLive(false), 20_000);
+  }, [openLivePath, openingLive]);
 
   const libraryLoading = dbReady === null || !libraryReady || scopeLoading;
 
@@ -643,7 +647,7 @@ export function App() {
     const dbHint = getLastOfflineDbError();
     return (
       <div className="app">
-        <Topbar online={online} onOpen={openLiveApp} onSync={handleSync} syncing={syncing} />
+        <Topbar online={online} onOpen={openLiveApp} onSync={handleSync} syncing={syncing} openingLive={openingLive} />
         <div className="content">
           <div className="empty">
             <h2>Offline storage unavailable</h2>
@@ -735,6 +739,7 @@ export function App() {
         onOpen={openLiveApp}
         onSync={handleSync}
         syncing={syncing}
+        openingLive={openingLive}
         appearanceAccess={appearanceAccess}
         viewerDisplayName={accessContext.viewerDisplayName}
         viewerEmail={accessContext.viewerEmail}
@@ -797,6 +802,7 @@ function Topbar({
   onOpen,
   onSync,
   syncing,
+  openingLive = false,
   appearanceAccess,
   viewerDisplayName,
   viewerEmail,
@@ -807,6 +813,7 @@ function Topbar({
   onOpen: () => void;
   onSync: () => void;
   syncing: boolean;
+  openingLive?: boolean;
   appearanceAccess?: { isPro: boolean; hasProPlusInterfacePalette: boolean };
   viewerDisplayName?: string;
   viewerEmail?: string | null;
@@ -828,7 +835,7 @@ function Topbar({
           <button
             type="button"
             className="btn secondary btn--sm topbar-actions__sync"
-            onClick={onSync}
+            onPointerDown={onSync}
             disabled={syncing}
           >
             {syncing ? "Syncing…" : "Sync"}
@@ -836,11 +843,15 @@ function Topbar({
           <button
             type="button"
             className="btn secondary btn--sm topbar-actions__online-dash"
-            onClick={onOpen}
-            disabled={!online}
+            onPointerDown={() => {
+              if (!online || openingLive) return;
+              onOpen();
+            }}
+            disabled={!online || openingLive}
+            aria-busy={openingLive}
             title={online ? "Open the live dashboard" : "Requires an internet connection"}
           >
-            Online Dashboard
+            {openingLive ? "Opening…" : "Online Dashboard"}
           </button>
         </div>
         <SettingsMenu

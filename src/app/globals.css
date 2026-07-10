@@ -1760,6 +1760,19 @@ html[data-flipvise-native-shell][data-platform="ios"] {
   --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
 }
 
+/* Instant tap response in Capacitor WebViews — avoids 300ms click delay. */
+html[data-flipvise-native-shell] button,
+html[data-flipvise-native-shell] a.native-touch-btn,
+html[data-native-shell] button,
+html[data-native-shell] a.native-touch-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-flipvise-native-shell] #native-signin-escape a.native-touch-btn:active {
+  transform: scale(0.98);
+}
+
 html[data-flipvise-native-shell] [data-app-header] {
   padding-top: calc(0.75rem + var(--flipvise-safe-top, 28px)) !important;
 }

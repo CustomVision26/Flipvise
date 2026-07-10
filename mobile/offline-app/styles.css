@@ -1133,7 +1133,12 @@ html, body, #root {
   font-size: 13px; font-weight: 600;
   padding: 10px 14px; border-radius: var(--radius);
   white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  transition: transform 0.1s ease, opacity 0.1s ease;
 }
+.btn:active:not(:disabled) { transform: scale(0.98); }
 .btn.secondary {
   background: var(--panel-2); border: 1px solid var(--border);
   color: var(--fg);

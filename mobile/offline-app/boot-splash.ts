@@ -1,5 +1,5 @@
-/** Minimum branded splash time so launch feels intentional (not a flash). */
-const MIN_SPLASH_MS = 5000;
+/** Minimum branded splash time — keep short so the shell feels responsive. */
+const MIN_SPLASH_MS = 1200;
 
 let appReady = false;
 let minElapsed = false;

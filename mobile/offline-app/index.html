@@ -214,10 +214,22 @@
         window.setTimeout(function () {
           if (splash && document.body.contains(splash)) {
             showBootError(
-              "Still loading… Force-quit and reopen. If this continues, wait for the next TestFlight build.",
+              "Still loading… Tap the screen to continue, or force-quit and reopen.",
             );
           }
         }, 12000);
+        window.setTimeout(function () {
+          if (!splash) return;
+          splash.style.cursor = "pointer";
+          splash.addEventListener(
+            "click",
+            function dismissSplash() {
+              window.__flipviseDismissBootSplash?.();
+              splash.removeEventListener("click", dismissSplash);
+            },
+            { once: true },
+          );
+        }, 800);
       })();
     </script>
     <script type="module" src="/main.tsx"></script>

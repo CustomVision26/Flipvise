@@ -9,6 +9,7 @@ import {
   authContinueUrl,
   safeRedirectPath,
 } from "@/lib/safe-redirect-path";
+import { resolveOfflineShellUrlFromPlatform } from "@/lib/offline/offline-shell-url";
 import { NativeSignInClient } from "./native-signin-client";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +40,9 @@ export default async function NativeSignInPage({
     (Array.isArray(sp.session_retry) && sp.session_retry.includes("1"));
   const nativeQuery = readSearchParam(sp[FLIPVISE_NATIVE_QUERY_PARAM]);
   const userAgent = headerStore.get("user-agent") ?? "";
-  const isNativeContext =
-    detectNativeShellFromUserAgent(userAgent).isNativeShell || nativeQuery === "1";
+  const nativeShell = detectNativeShellFromUserAgent(userAgent);
+  const isNativeContext = nativeShell.isNativeShell || nativeQuery === "1";
+  const offlineShellUrl = resolveOfflineShellUrlFromPlatform(nativeShell.platform);
 
   // Server cookies already valid — skip client Clerk bootstrap (avoids infinite spinner).
   if (!sessionRetry) {
@@ -51,14 +53,36 @@ export default async function NativeSignInPage({
   }
 
   return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-dvh items-center justify-center bg-background p-6">
-          <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-        </main>
-      }
-    >
-      <NativeSignInClient isNativeContext={isNativeContext} />
-    </Suspense>
+    <>
+      {isNativeContext ? (
+        <nav
+          id="native-signin-escape"
+          aria-label="Sign-in recovery"
+          className="fixed inset-x-0 bottom-0 z-[200] flex flex-col gap-2 border-t border-border bg-background/95 p-4 pb-[calc(1rem+var(--flipvise-safe-bottom,16px))] backdrop-blur-sm"
+        >
+          <a
+            href="/api/auth/clear-stale-session"
+            className="native-touch-btn inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-secondary px-4 text-sm font-medium text-secondary-foreground"
+          >
+            Try again
+          </a>
+          <a
+            href={offlineShellUrl}
+            className="native-touch-btn inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-input bg-background px-4 text-sm font-medium"
+          >
+            Back to offline study
+          </a>
+        </nav>
+      ) : null}
+      <Suspense
+        fallback={
+          <main className="flex min-h-dvh items-center justify-center bg-background p-6 pb-36">
+            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+          </main>
+        }
+      >
+        <NativeSignInClient isNativeContext={isNativeContext} />
+      </Suspense>
+    </>
   );
 }

@@ -19,16 +19,19 @@ import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
 import { waitForServerSession } from "@/lib/native-session-probe";
 import {
   isFlipviseNativeApp,
-  navigateToOfflineShell,
+  navigateToOfflineShellFast,
 } from "@/lib/offline/is-flipvise-native-app";
 
 const CLERK_LOAD_TIMEOUT_MS = 10_000;
 const REDIRECT_STALL_TIMEOUT_MS = 12_000;
 const TICKET_FLOW_TIMEOUT_MS = 25_000;
-/** When Clerk JS is stuck refreshing, fall back to server session probe. */
-const CLERK_SERVER_SESSION_FALLBACK_MS = 2_500;
-/** Show escape actions while Clerk is still loading inside the native app. */
-const LOADING_ESCAPE_UI_MS = 4_000;
+/** Probe server session once on mount — avoids stacked probes that freeze the WebView. */
+const SERVER_SESSION_PROBE_MS = 5_000;
+/** Show escape actions immediately in the native app (server escape bar is the fallback). */
+const LOADING_ESCAPE_UI_MS = 0;
+
+const NATIVE_BTN_CLASS =
+  "min-h-11 w-full touch-manipulation active:scale-[0.98] transition-transform";
 
 function describeClerkError(err: unknown): string {
   if (!err) return "";
@@ -126,10 +129,6 @@ export function NativeSignInClient({
     !isLoaded && !manualOnly && !continuing,
     LOADING_ESCAPE_UI_MS,
   );
-  const clerkServerFallbackDue = useTimeoutFlag(
-    !isLoaded && !manualOnly && !continuing,
-    CLERK_SERVER_SESSION_FALLBACK_MS,
-  );
   const redirectStalled = useTimeoutFlag(
     Boolean(continuing),
     REDIRECT_STALL_TIMEOUT_MS,
@@ -166,29 +165,23 @@ export function NativeSignInClient({
     window.location.replace(postAuthTarget);
   }, [postAuthTarget, signOut]);
 
-  // Server cookies can be valid before Clerk JS finishes booting in the WebView.
+  // Single server-session probe on mount — valid cookies can exist before Clerk JS boots.
   useEffect(() => {
     if (manualOnly || sessionRetry || continueRef.current) return;
-    void (async () => {
-      const serverReady = await waitForServerSession(5_000);
-      if (!serverReady || continueRef.current || manualOnly) return;
-      continueRef.current = true;
-      setContinuing(true);
-      window.location.replace(postAuthTarget);
-    })();
-  }, [manualOnly, postAuthTarget, sessionRetry]);
 
-  // Clerk JS can spin on session refresh in the WebView while SSR cookies are valid.
-  useEffect(() => {
-    if (!clerkServerFallbackDue || continueRef.current || manualOnly) return;
+    let cancelled = false;
     void (async () => {
-      const serverReady = await waitForServerSession(4_000);
-      if (!serverReady || continueRef.current) return;
+      const serverReady = await waitForServerSession(SERVER_SESSION_PROBE_MS);
+      if (cancelled || !serverReady || continueRef.current || manualOnly) return;
       continueRef.current = true;
       setContinuing(true);
       window.location.replace(postAuthTarget);
     })();
-  }, [clerkServerFallbackDue, manualOnly, postAuthTarget]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [manualOnly, postAuthTarget, sessionRetry]);
 
   // Server rejected a prior session — clear client state and show the form.
   useEffect(() => {
@@ -344,7 +337,7 @@ function CenteredSpinner({
   showEscapeActions?: boolean;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6 pb-36">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
@@ -356,13 +349,9 @@ function CenteredSpinner({
             <Button
               type="button"
               variant="secondary"
-              className="w-full"
-              onClick={() => {
-                if (isNativeContext) {
-                  window.location.href = "/api/auth/clear-stale-session";
-                  return;
-                }
-                window.location.reload();
+              className={NATIVE_BTN_CLASS}
+              onPointerDown={() => {
+                window.location.href = "/api/auth/clear-stale-session";
               }}
             >
               Try again
@@ -371,9 +360,9 @@ function CenteredSpinner({
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
-                onClick={() => {
-                  void navigateToOfflineShell();
+                className={NATIVE_BTN_CLASS}
+                onPointerDown={() => {
+                  navigateToOfflineShellFast();
                 }}
               >
                 Back to offline study
@@ -412,14 +401,18 @@ function SignInRecovery({
         </CardHeader>
         <CardFooter className="flex flex-col gap-2">
           {onContinue ? (
-            <Button type="button" className="w-full" onClick={onContinue}>
+            <Button
+              type="button"
+              className={NATIVE_BTN_CLASS}
+              onPointerDown={onContinue}
+            >
               {continueLabel ?? "Continue"}
             </Button>
           ) : (
             <Button
               type="button"
-              className="w-full"
-              onClick={() => {
+              className={NATIVE_BTN_CLASS}
+              onPointerDown={() => {
                 if (isNativeContext) {
                   window.location.href = "/api/auth/clear-stale-session";
                   return;
@@ -434,8 +427,8 @@ function SignInRecovery({
             <Button
               type="button"
               variant="secondary"
-              className="w-full"
-              onClick={() => {
+              className={NATIVE_BTN_CLASS}
+              onPointerDown={() => {
                 void signOut().then(() => window.location.reload());
               }}
             >
@@ -446,9 +439,9 @@ function SignInRecovery({
             <Button
               type="button"
               variant="outline"
-              className="w-full"
-              onClick={() => {
-                void navigateToOfflineShell();
+              className={NATIVE_BTN_CLASS}
+              onPointerDown={() => {
+                navigateToOfflineShellFast();
               }}
             >
               Back to offline study
@@ -747,9 +740,9 @@ function SignInForm({
           <Button
             type="button"
             variant="outline"
-            className="w-full"
-            onClick={() => {
-              void navigateToOfflineShell();
+            className={NATIVE_BTN_CLASS}
+            onPointerDown={() => {
+              navigateToOfflineShellFast();
             }}
           >
             Back to offline study
