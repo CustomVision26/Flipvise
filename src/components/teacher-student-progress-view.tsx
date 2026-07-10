@@ -1108,19 +1108,35 @@ export function TeacherStudentProgressView({
       </div>
 
       <Tabs defaultValue={defaultTab} className="w-full gap-4">
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-muted/40 p-1">
+        <TabsList
+          className={cn(
+            "h-auto w-full gap-1.5 bg-muted/60 p-1.5",
+            showRegisterStudentTab && showQuizResultsTab && showGradesAndReportsTabs
+              ? "grid grid-cols-3"
+              : "flex flex-nowrap justify-start overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          )}
+        >
           {showRegisterStudentTab ? (
-            <TabsTrigger value="register-student" className="px-3 py-2">
+            <TabsTrigger
+              value="register-student"
+              className="h-auto min-h-11 flex-none whitespace-normal px-2 py-2.5 text-center text-xs leading-snug sm:px-3 sm:text-sm"
+            >
               Registering a student
             </TabsTrigger>
           ) : null}
           {showQuizResultsTab ? (
-            <TabsTrigger value="quiz-results" className="px-3 py-2">
+            <TabsTrigger
+              value="quiz-results"
+              className="h-auto min-h-11 flex-none whitespace-normal px-2 py-2.5 text-center text-xs leading-snug sm:px-3 sm:text-sm"
+            >
               Quiz results
             </TabsTrigger>
           ) : null}
           {showGradesAndReportsTabs ? (
-            <TabsTrigger value="reports-and-grades" className="px-3 py-2">
+            <TabsTrigger
+              value="reports-and-grades"
+              className="h-auto min-h-11 flex-none whitespace-normal px-2 py-2.5 text-center text-xs leading-snug sm:px-3 sm:text-sm"
+            >
               Reports & Grades
             </TabsTrigger>
           ) : null}
