@@ -12,9 +12,11 @@ import { withTeacherRegisteredStudentsTable } from "@/lib/ensure-teacher-student
 
 export type TeacherRegisteredStudentWithClass = TeacherRegisteredStudentRow & {
   classPeriod: string | null;
+  classDeckId: number | null;
   classDeckName: string | null;
   classAcademicYear: string | null;
   classTermSemester: string | null;
+  classWeek: string | null;
 };
 
 export async function listTeacherRegisteredStudentsForUser(
@@ -32,9 +34,11 @@ export async function listTeacherRegisteredStudentsForUser(
         createdAt: teacherRegisteredStudents.createdAt,
         updatedAt: teacherRegisteredStudents.updatedAt,
         classPeriod: teacherClasses.period,
+        classDeckId: teacherClasses.deckId,
         classDeckName: decks.name,
         classAcademicYear: teacherClasses.academicYear,
         classTermSemester: teacherClasses.termSemester,
+        classWeek: teacherClasses.week,
       })
       .from(teacherRegisteredStudents)
       .leftJoin(teacherClasses, eq(teacherRegisteredStudents.classId, teacherClasses.id))
@@ -86,6 +90,38 @@ export async function createTeacherRegisteredStudent(
       .returning();
 
     return row;
+  });
+}
+
+export async function updateTeacherRegisteredStudent(
+  userId: string,
+  studentId: number,
+  input: {
+    fullName: string;
+    email: string;
+    telephone: string | null;
+    classId: number | null;
+  },
+): Promise<TeacherRegisteredStudentRow | null> {
+  return withTeacherRegisteredStudentsTable(async () => {
+    const [row] = await db
+      .update(teacherRegisteredStudents)
+      .set({
+        fullName: input.fullName,
+        email: input.email,
+        telephone: input.telephone,
+        classId: input.classId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(teacherRegisteredStudents.id, studentId),
+          eq(teacherRegisteredStudents.userId, userId),
+        ),
+      )
+      .returning();
+
+    return row ?? null;
   });
 }
 

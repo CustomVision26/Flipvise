@@ -11,7 +11,7 @@ import {
   resolveSavedLessonPlanForViewer,
   mapSavedLessonPlanRowToPickerItem,
 } from "@/db/queries/saved-lesson-plans";
-import { saveStudyGuide } from "@/db/queries/saved-study-guides";
+import { saveStudyGuide, updateSavedStudyGuideById, resolveSavedStudyGuideForViewer } from "@/db/queries/saved-study-guides";
 import { homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
 import { formatMultipleLessonPlanReferencesForPrompt } from "@/lib/lesson-plan-reference-material";
 import { buildLessonPlanQuizContext } from "@/lib/lesson-plan-quiz-context";
@@ -20,7 +20,7 @@ import {
   generateStudyGuidePdfBuffer,
   studyGuidePdfSafeFileName,
 } from "@/lib/study-guide-pdf-build";
-import { uploadStudyGuidePdfBufferToS3 } from "@/lib/s3";
+import { uploadStudyGuidePdfBufferToS3, deleteFromS3 } from "@/lib/s3";
 import {
   studyGuideResultSchema,
   savedStudyGuideResultSchema,
@@ -46,7 +46,7 @@ function buildStudyGuidePrompt(
     `Topic: ${input.topic}`,
   ];
 
-  if (input.referenceMaterials?.length) {
+  if (input.referenceMaterials?.length && !sourceContext.lessonPlanContext) {
     lines.push(
       "",
       formatMultipleLessonPlanReferencesForPrompt(input.referenceMaterials).replace(
@@ -119,6 +119,7 @@ async function resolveStudyGuideSourceContext(
     lessonPlanContext = buildLessonPlanQuizContext({
       input: savedPlan.input,
       result: savedPlan.result,
+      referencePurpose: "study guide",
     });
   }
 
@@ -228,6 +229,77 @@ const saveStudyGuideSchema = z.object({
   result: savedStudyGuideResultSchema,
 });
 
+const updateStudyGuideSchema = saveStudyGuideSchema.extend({
+  studyGuideId: z.number().int().positive(),
+});
+
+async function resolveStudyGuideSaveMetadata(
+  userId: string,
+  input: TeacherStudyGuideActionInput,
+) {
+  let sourceLessonPlanTitle: string | null = null;
+  let sourceHomeworkLabel: string | null = null;
+  let savedPlan = null;
+
+  if (input.savedLessonPlanId != null) {
+    savedPlan = await resolveSavedLessonPlanForViewer(
+      userId,
+      input.savedLessonPlanId,
+      input.teamId,
+    );
+    if (!savedPlan) {
+      throw new Error("Saved lesson plan not found.");
+    }
+    sourceLessonPlanTitle = savedPlan.lessonTitle;
+  }
+
+  if (input.savedHomeworkId != null) {
+    const savedHomework = await resolveSavedHomeworkForViewer(
+      userId,
+      input.savedHomeworkId,
+      input.teamId,
+    );
+    if (!savedHomework) {
+      throw new Error("Saved homework assignment not found.");
+    }
+    if (input.savedLessonPlanId != null) {
+      const planForHomework =
+        savedPlan ??
+        (await resolveSavedLessonPlanForViewer(
+          userId,
+          input.savedLessonPlanId,
+          input.teamId,
+        ));
+      if (
+        !planForHomework ||
+        !homeworkMatchesSavedLessonPlan(
+          mapSavedHomeworkRowToPickerItem(savedHomework),
+          mapSavedLessonPlanRowToPickerItem(planForHomework),
+        )
+      ) {
+        throw new Error("Selected homework does not match the selected lesson plan.");
+      }
+    }
+    sourceHomeworkLabel = savedHomework.label;
+  }
+
+  return {
+    sourceLessonPlanTitle,
+    sourceHomeworkLabel,
+    persistedInput: {
+      subject: input.subject,
+      gradeLevel: input.gradeLevel,
+      topic: input.topic,
+      savedLessonPlanId: input.savedLessonPlanId,
+      savedHomeworkId: input.savedHomeworkId,
+      referenceMaterials:
+        input.referenceMaterials && input.referenceMaterials.length > 0
+          ? input.referenceMaterials
+          : undefined,
+    },
+  };
+}
+
 export async function saveStudyGuideAction(data: {
   label: string;
   input: TeacherStudyGuideActionInput;
@@ -251,51 +323,7 @@ export async function saveStudyGuideAction(data: {
   }
 
   const payload = parsed.data;
-  let sourceLessonPlanTitle: string | null = null;
-  let sourceHomeworkLabel: string | null = null;
-  let savedPlan = null;
-
-  if (payload.input.savedLessonPlanId != null) {
-    savedPlan = await resolveSavedLessonPlanForViewer(
-      userId,
-      payload.input.savedLessonPlanId,
-      payload.input.teamId,
-    );
-    if (!savedPlan) {
-      throw new Error("Saved lesson plan not found.");
-    }
-    sourceLessonPlanTitle = savedPlan.lessonTitle;
-  }
-
-  if (payload.input.savedHomeworkId != null) {
-    const savedHomework = await resolveSavedHomeworkForViewer(
-      userId,
-      payload.input.savedHomeworkId,
-      payload.input.teamId,
-    );
-    if (!savedHomework) {
-      throw new Error("Saved homework assignment not found.");
-    }
-    if (payload.input.savedLessonPlanId != null) {
-      const planForHomework =
-        savedPlan ??
-        (await resolveSavedLessonPlanForViewer(
-          userId,
-          payload.input.savedLessonPlanId,
-          payload.input.teamId,
-        ));
-      if (
-        !planForHomework ||
-        !homeworkMatchesSavedLessonPlan(
-          mapSavedHomeworkRowToPickerItem(savedHomework),
-          mapSavedLessonPlanRowToPickerItem(planForHomework),
-        )
-      ) {
-        throw new Error("Selected homework does not match the selected lesson plan.");
-      }
-    }
-    sourceHomeworkLabel = savedHomework.label;
-  }
+  const metadata = await resolveStudyGuideSaveMetadata(userId, payload.input);
 
   const guideTitle = `${payload.input.topic} Study Guide`;
   let pdfUrl: string | null = null;
@@ -330,16 +358,10 @@ export async function saveStudyGuideAction(data: {
     gradeLevel: payload.input.gradeLevel,
     topic: payload.input.topic,
     savedLessonPlanId: payload.input.savedLessonPlanId ?? null,
-    sourceLessonPlanTitle,
+    sourceLessonPlanTitle: metadata.sourceLessonPlanTitle,
     savedHomeworkId: payload.input.savedHomeworkId ?? null,
-    sourceHomeworkLabel,
-    input: {
-      subject: payload.input.subject,
-      gradeLevel: payload.input.gradeLevel,
-      topic: payload.input.topic,
-      savedLessonPlanId: payload.input.savedLessonPlanId,
-      savedHomeworkId: payload.input.savedHomeworkId,
-    },
+    sourceHomeworkLabel: metadata.sourceHomeworkLabel,
+    input: metadata.persistedInput,
     result: payload.result,
     pdfUrl,
     pdfFileName,
@@ -352,7 +374,107 @@ export async function saveStudyGuideAction(data: {
     id: saved.id,
     label: saved.label,
     pdfUrl: saved.pdfUrl,
-    sourceLessonPlanTitle,
-    sourceHomeworkLabel,
+    sourceLessonPlanTitle: metadata.sourceLessonPlanTitle,
+    sourceHomeworkLabel: metadata.sourceHomeworkLabel,
+  };
+}
+
+export async function updateStudyGuideAction(data: {
+  studyGuideId: number;
+  label: string;
+  input: TeacherStudyGuideActionInput;
+  result: StudyGuideResult;
+}): Promise<{
+  id: number;
+  label: string;
+  pdfUrl: string | null;
+  sourceLessonPlanTitle: string | null;
+  sourceHomeworkLabel: string | null;
+}> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Study Guide Generator requires an education plan.",
+  );
+
+  const parsed = updateStudyGuideSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid study guide data");
+  }
+
+  const existing = await resolveSavedStudyGuideForViewer(
+    userId,
+    parsed.data.studyGuideId,
+    parsed.data.input.teamId,
+  );
+  if (!existing) {
+    throw new Error("Study guide not found.");
+  }
+
+  const payload = parsed.data;
+  const metadata = await resolveStudyGuideSaveMetadata(userId, payload.input);
+  const guideTitle = `${payload.input.topic} Study Guide`;
+
+  let pdfUrl: string | null = existing.pdfUrl;
+  let pdfFileName: string | null = existing.pdfFileName;
+
+  try {
+    const pdfBuffer = await generateStudyGuidePdfBuffer(payload.result, {
+      subject: payload.input.subject,
+      gradeLevel: payload.input.gradeLevel,
+      topic: payload.input.topic,
+    });
+    pdfFileName = `${studyGuidePdfSafeFileName(payload.input.topic)}_study_guide.pdf`;
+    const uploadedUrl = await uploadStudyGuidePdfBufferToS3({
+      userId: existing.userId,
+      fileName: pdfFileName,
+      buffer: pdfBuffer,
+    });
+    if (uploadedUrl && existing.pdfUrl && existing.pdfUrl !== uploadedUrl) {
+      try {
+        await deleteFromS3(existing.pdfUrl);
+      } catch {
+        // proceed even if old PDF removal fails
+      }
+    }
+    pdfUrl = uploadedUrl;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[updateStudyGuideAction] PDF upload skipped or failed; keeping prior PDF if any.",
+        error,
+      );
+    }
+  }
+
+  const updated = await updateSavedStudyGuideById(parsed.data.studyGuideId, {
+    label: payload.label.trim(),
+    guideTitle,
+    subject: payload.input.subject,
+    gradeLevel: payload.input.gradeLevel,
+    topic: payload.input.topic,
+    savedLessonPlanId: payload.input.savedLessonPlanId ?? null,
+    sourceLessonPlanTitle: metadata.sourceLessonPlanTitle,
+    savedHomeworkId: payload.input.savedHomeworkId ?? null,
+    sourceHomeworkLabel: metadata.sourceHomeworkLabel,
+    input: metadata.persistedInput,
+    result: payload.result,
+    pdfUrl,
+    pdfFileName,
+  });
+
+  if (!updated) {
+    throw new Error("Could not update study guide.");
+  }
+
+  revalidatePath("/teacher/resources");
+  revalidatePath("/teacher/study-guides");
+
+  return {
+    id: updated.id,
+    label: updated.label,
+    pdfUrl: updated.pdfUrl,
+    sourceLessonPlanTitle: metadata.sourceLessonPlanTitle,
+    sourceHomeworkLabel: metadata.sourceHomeworkLabel,
   };
 }

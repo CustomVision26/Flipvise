@@ -28,6 +28,8 @@ import {
   type LessonPlanReferenceMaterial,
   type LessonPlanReferenceMaterialFieldsHandle,
 } from "@/components/lesson-plan-reference-material-fields";
+import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
+import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
@@ -36,6 +38,7 @@ import {
   useOwnerScopedItems,
 } from "@/components/owner-team-admin-resource-picker";
 import type { SavedHomeworkPickerItem } from "@/db/queries/saved-homework";
+import type { SavedStudyGuideEditItem } from "@/db/queries/saved-study-guides";
 import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
 import type {
   OwnerTeamAdminHomeworkPickerPayload,
@@ -43,7 +46,7 @@ import type {
 } from "@/db/queries/teacher-owner-pickers";
 import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
-import { generateStudyGuideAction, saveStudyGuideAction } from "@/actions/teacher-study-guide";
+import { generateStudyGuideAction, saveStudyGuideAction, updateStudyGuideAction } from "@/actions/teacher-study-guide";
 import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
 import { downloadStudyGuidePdf } from "@/lib/study-guide-pdf";
 import { filterHomeworkForLessonPlan, homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
@@ -79,6 +82,7 @@ export function TeacherStudyGuidesForm({
   hasAdvancedSourceImport = false,
   initialLessonPlanId,
   initialHomeworkId,
+  initialSavedStudyGuide,
   backHref = "/teacher",
   teacherWorkspace,
 }: {
@@ -89,29 +93,58 @@ export function TeacherStudyGuidesForm({
   hasAdvancedSourceImport?: boolean;
   initialLessonPlanId?: number;
   initialHomeworkId?: number;
+  initialSavedStudyGuide?: SavedStudyGuideEditItem;
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
 }) {
+  const isEditingExistingStudyGuide = initialSavedStudyGuide != null;
   const referenceFieldsRef = useRef<LessonPlanReferenceMaterialFieldsHandle>(null);
   const [referenceMaterials, setReferenceMaterials] = useState<
     LessonPlanReferenceMaterial[]
-  >([]);
+  >(initialSavedStudyGuide?.input.referenceMaterials ?? []);
   const [referenceError, setReferenceError] = useState<string | null>(null);
-  const [form, setForm] = useState<StudyGuideFormState>(EMPTY_FORM);
-  const [selectedPlanKey, setSelectedPlanKey] = useState<string>(SAVED_PLAN_NONE);
-  const [selectedHomeworkKey, setSelectedHomeworkKey] = useState<string>(HOMEWORK_NONE);
-  const [result, setResult] = useState<StudyGuideResult | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const [form, setForm] = useState<StudyGuideFormState>(
+    initialSavedStudyGuide
+      ? {
+          subject: initialSavedStudyGuide.input.subject,
+          gradeLevel: initialSavedStudyGuide.input.gradeLevel,
+          topic: initialSavedStudyGuide.input.topic,
+          savedLessonPlanId: initialSavedStudyGuide.input.savedLessonPlanId,
+          savedHomeworkId: initialSavedStudyGuide.input.savedHomeworkId,
+        }
+      : EMPTY_FORM,
+  );
+  const [selectedPlanKey, setSelectedPlanKey] = useState<string>(
+    initialSavedStudyGuide?.savedLessonPlanId != null
+      ? String(initialSavedStudyGuide.savedLessonPlanId)
+      : SAVED_PLAN_NONE,
+  );
+  const [selectedHomeworkKey, setSelectedHomeworkKey] = useState<string>(
+    initialSavedStudyGuide?.savedHomeworkId != null
+      ? String(initialSavedStudyGuide.savedHomeworkId)
+      : HOMEWORK_NONE,
+  );
+  const [result, setResult] = useState<StudyGuideResult | null>(
+    initialSavedStudyGuide?.result ?? null,
+  );
+  const [showResult, setShowResult] = useState(isEditingExistingStudyGuide);
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenerationSeed, setRegenerationSeed] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [savedStudyGuideId, setSavedStudyGuideId] = useState<number | null>(null);
+  const [savedStudyGuideId, setSavedStudyGuideId] = useState<number | null>(
+    isEditingExistingStudyGuide ? initialSavedStudyGuide.id : null,
+  );
+  const [editingStudyGuideId, setEditingStudyGuideId] = useState<number | null>(
+    isEditingExistingStudyGuide ? initialSavedStudyGuide.id : null,
+  );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [saveLabel, setSaveLabel] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState<StudyGuideResult | null>(null);
+  const [saveLabel, setSaveLabel] = useState(initialSavedStudyGuide?.label ?? "");
+  const [isEditing, setIsEditing] = useState(isEditingExistingStudyGuide);
+  const [editDraft, setEditDraft] = useState<StudyGuideResult | null>(
+    initialSavedStudyGuide ? cloneStudyGuideResult(initialSavedStudyGuide.result) : null,
+  );
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
   const [homeworkSearchQuery, setHomeworkSearchQuery] = useState("");
 
@@ -230,6 +263,7 @@ export function TeacherStudyGuidesForm({
       setSelectedPlanKey(SAVED_PLAN_NONE);
       setSelectedHomeworkKey(HOMEWORK_NONE);
       setHomeworkSearchQuery("");
+      setReferenceMaterials([]);
       setForm(EMPTY_FORM);
       return;
     }
@@ -242,6 +276,7 @@ export function TeacherStudyGuidesForm({
     setSelectedPlanKey(value);
     setSelectedHomeworkKey(HOMEWORK_NONE);
     setHomeworkSearchQuery("");
+    setReferenceMaterials(getLessonPlanReferenceMaterials(plan.input));
     setForm({
       savedLessonPlanId: plan.id,
       subject: defaults.subject,
@@ -272,6 +307,7 @@ export function TeacherStudyGuidesForm({
   }
 
   useEffect(() => {
+    if (initialSavedStudyGuide) return;
     if (initialHomeworkId) {
       const homework =
         homeworkPool.find((item) => item.id === initialHomeworkId) ??
@@ -298,6 +334,7 @@ export function TeacherStudyGuidesForm({
           }
           setSelectedPlanKey(String(plan.id));
           setSelectedHomeworkKey(String(homework.id));
+          setReferenceMaterials(getLessonPlanReferenceMaterials(plan.input));
           setForm({
             savedLessonPlanId: plan.id,
             savedHomeworkId: homework.id,
@@ -334,6 +371,7 @@ export function TeacherStudyGuidesForm({
     activeLessonPlans,
     isWorkspaceOwner,
     ownerLessonPlanPicker,
+    initialSavedStudyGuide,
   ]);
 
   async function runGeneration(isRegenerate = false) {
@@ -427,26 +465,76 @@ export function TeacherStudyGuidesForm({
 
   async function handleSaveStudyGuide() {
     if (!result || !saveLabel.trim()) return;
+    await persistStudyGuide(saveLabel.trim());
+  }
+
+  async function handleSaveChanges() {
+    if (!result || editingStudyGuideId == null) return;
+    const label = saveLabel.trim() || initialSavedStudyGuide?.label;
+    if (!label) {
+      toast.error("Study guide label is missing.");
+      return;
+    }
+
+    let planToSave = isEditing && editDraft ? editDraft : result;
+    if (isEditing && editDraft) {
+      const parsed = savedStudyGuideResultSchema.safeParse(editDraft);
+      if (!parsed.success) {
+        toast.error("Each section needs at least one item and a non-empty summary.");
+        return;
+      }
+      setResult(parsed.data);
+      setIsEditing(false);
+      setEditDraft(null);
+    }
+
+    await persistStudyGuide(label, editingStudyGuideId);
+  }
+
+  async function persistStudyGuide(label: string, studyGuideId?: number) {
+    if (!result) return;
     setIsSaving(true);
     try {
-      const saved = await saveStudyGuideAction({
-        label: saveLabel.trim(),
+      const resolvedReferences =
+        referenceMaterials.length > 0
+          ? referenceMaterials
+          : ((await referenceFieldsRef.current?.resolveReferences()) ?? []);
+
+      const payload = {
+        label,
         input: {
           subject: form.subject,
           gradeLevel: form.gradeLevel,
           topic: form.topic,
           savedLessonPlanId: form.savedLessonPlanId,
           savedHomeworkId: form.savedHomeworkId,
+          referenceMaterials:
+            resolvedReferences.length > 0 ? resolvedReferences : undefined,
           teamId: teacherWorkspace?.teamId ?? undefined,
         },
         result,
-      });
+      };
+
+      const saved =
+        studyGuideId != null
+          ? await updateStudyGuideAction({ studyGuideId, ...payload })
+          : await saveStudyGuideAction(payload);
+
       setSavedStudyGuideId(saved.id);
+      setEditingStudyGuideId(saved.id);
+      setSaveLabel(saved.label);
       setSaveDialogOpen(false);
-      toast.success("Study guide saved", {
+      toast.success(
+        studyGuideId != null && initialSavedStudyGuide?.id === saved.id
+          ? "Study guide updated"
+          : "Study guide saved",
+        {
         description: (
           <span>
-            {saved.label} was saved
+            {saved.label} was {studyGuideId != null ? "updated in" : "saved to"} your{" "}
+            <Link href={resourcesHref} className="underline underline-offset-2">
+              Resource Library
+            </Link>
             {saved.pdfUrl ? " with PDF" : ""}.
             {saved.sourceLessonPlanTitle ? (
               <>
@@ -459,15 +547,11 @@ export function TeacherStudyGuidesForm({
                 {" "}
                 Linked to homework: <strong>{saved.sourceHomeworkLabel}</strong>.
               </>
-            ) : null}{" "}
-            View it in the{" "}
-            <Link href={resourcesHref} className="underline underline-offset-2">
-              Resource Library
-            </Link>
-            .
+            ) : null}
           </span>
         ),
-      });
+      },
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not save study guide.",
@@ -500,8 +584,12 @@ export function TeacherStudyGuidesForm({
   return (
     <>
     <TeacherToolPageShell
-      title="Study Guide Generator"
-      description="Build study guides with summaries, vocabulary, and practice questions."
+      title={isEditingExistingStudyGuide ? "Edit Study Guide" : "Study Guide Generator"}
+      description={
+        isEditingExistingStudyGuide
+          ? `Update ${initialSavedStudyGuide.label} and save changes back to your Resource Library.`
+          : "Build study guides with summaries, vocabulary, and practice questions."
+      }
       backHref={backHref}
       showResult={showResult}
       onGenerate={handleGenerate}
@@ -541,15 +629,19 @@ export function TeacherStudyGuidesForm({
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  disabled={isSaving || savedStudyGuideId !== null}
-                  onClick={openSaveDialog}
+                  disabled={isSaving}
+                  onClick={() =>
+                    editingStudyGuideId != null
+                      ? void handleSaveChanges()
+                      : openSaveDialog()
+                  }
                 >
                   {isSaving ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                   ) : (
                     <Save className="size-4" aria-hidden />
                   )}
-                  {savedStudyGuideId !== null ? "Saved" : "Save"}
+                  {editingStudyGuideId != null ? "Save changes" : "Save"}
                 </Button>
                 <Button
                   type="button"
@@ -792,14 +884,26 @@ export function TeacherStudyGuidesForm({
             />
           </div>
 
-          <LessonPlanReferenceMaterialFields
-            ref={referenceFieldsRef}
-            hasAdvancedSourceImport={hasAdvancedSourceImport}
-            disabled={isGenerating}
-            value={referenceMaterials}
-            onChange={setReferenceMaterials}
-            onError={setReferenceError}
-          />
+          {(isEditingExistingStudyGuide && referenceMaterials.length > 0) ||
+          (form.savedLessonPlanId != null &&
+            getLessonPlanReferenceMaterials(selectedPlan?.input).length > 0) ? (
+            <LessonPlanSavedReferenceSummary
+              references={
+                referenceMaterials.length > 0
+                  ? referenceMaterials
+                  : getLessonPlanReferenceMaterials(selectedPlan?.input)
+              }
+            />
+          ) : (
+            <LessonPlanReferenceMaterialFields
+              ref={referenceFieldsRef}
+              hasAdvancedSourceImport={hasAdvancedSourceImport}
+              disabled={isGenerating}
+              value={referenceMaterials}
+              onChange={setReferenceMaterials}
+              onError={setReferenceError}
+            />
+          )}
         </div>
       </TooltipProvider>
     </TeacherToolPageShell>

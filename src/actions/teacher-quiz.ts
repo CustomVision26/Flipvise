@@ -198,6 +198,7 @@ async function generateQuizForDeck(
     lessonContext = buildLessonPlanQuizContext({
       input: saved.input,
       result: saved.result,
+      referencePurpose: "quiz",
     });
   }
 

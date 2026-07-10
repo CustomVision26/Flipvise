@@ -39,11 +39,25 @@ function preservedExtraParams(
     pathname === "/teacher/homework" ||
     pathname.startsWith("/teacher/homework/") ||
     pathname === "/teacher/worksheets" ||
-    pathname.startsWith("/teacher/worksheets/")
+    pathname.startsWith("/teacher/worksheets/") ||
+    pathname === "/teacher/lesson-builder" ||
+    pathname.startsWith("/teacher/lesson-builder/")
   ) {
     const lessonPlanId = firstParam(searchParams, "lessonPlanId");
     if (lessonPlanId) {
       extra.set("lessonPlanId", lessonPlanId);
+    }
+    const homeworkId = firstParam(searchParams, "homeworkId");
+    if (homeworkId) {
+      extra.set("homeworkId", homeworkId);
+    }
+    const worksheetId = firstParam(searchParams, "worksheetId");
+    if (worksheetId) {
+      extra.set("worksheetId", worksheetId);
+    }
+    const studyGuideId = firstParam(searchParams, "studyGuideId");
+    if (studyGuideId) {
+      extra.set("studyGuideId", studyGuideId);
     }
     const deckId = firstParam(searchParams, "deckId");
     if (deckId) {

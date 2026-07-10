@@ -21,6 +21,7 @@ export type TeacherStudentProgressSchedule = {
 
 export type TeacherStudentProgressRow = {
   resultId: number;
+  deckId: number | null;
   memberUserId: string;
   memberName: string | null;
   memberEmail: string | null;
@@ -191,6 +192,7 @@ export async function listTeacherStudentProgressForWorkspace(
 
     return {
       resultId: result.id,
+      deckId: result.deckId ?? null,
       memberUserId: result.userId,
       memberName: takerDisplay?.primaryLine ?? null,
       memberEmail: takerDisplay?.primaryEmail ?? null,

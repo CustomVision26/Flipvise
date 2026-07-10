@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { FormattedCardFront } from "@/components/formatted-card-front";
 import {
   SpeakButton,
   VoiceSelector,
@@ -318,9 +319,7 @@ function CardSlide({
           ) : null}
         </div>
         {card.front ? (
-          <p className="text-foreground text-base sm:text-lg font-medium leading-relaxed whitespace-pre-line">
-            {card.front}
-          </p>
+          <FormattedCardFront text={card.front} variant="preview" />
         ) : (
           <p className="text-muted-foreground italic text-sm">No question text</p>
         )}

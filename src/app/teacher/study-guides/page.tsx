@@ -1,11 +1,17 @@
+import { redirect } from "next/navigation";
 import { getAccessContext } from "@/lib/access";
 import { getSavedHomeworkForPicker } from "@/db/queries/saved-homework";
 import { getSavedLessonPlansForQuizPicker } from "@/db/queries/saved-lesson-plans";
+import {
+  resolveSavedStudyGuideForViewer,
+  mapSavedStudyGuideRowToEditItem,
+} from "@/db/queries/saved-study-guides";
 import {
   loadOwnerTeamAdminHomeworkPicker,
   loadOwnerTeamAdminLessonPlanPicker,
 } from "@/db/queries/teacher-owner-pickers";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
+import { buildTeacherSubPath } from "@/lib/teacher-url";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import { TeacherStudyGuidesForm } from "@/components/teacher-study-guides-form";
 
@@ -15,6 +21,7 @@ type TeacherStudyGuidesPageProps = {
     teamMemberId?: string;
     lessonPlanId?: string;
     homeworkId?: string;
+    studyGuideId?: string;
     deckId?: string;
   }>;
 };
@@ -34,6 +41,27 @@ export default async function TeacherStudyGuidesPage({
   const initialHomeworkId = params.homeworkId
     ? Number.parseInt(params.homeworkId, 10)
     : undefined;
+  const parsedStudyGuideId = params.studyGuideId
+    ? Number.parseInt(params.studyGuideId, 10)
+    : Number.NaN;
+  const initialStudyGuideId = Number.isFinite(parsedStudyGuideId)
+    ? parsedStudyGuideId
+    : undefined;
+
+  const savedStudyGuide =
+    initialStudyGuideId != null
+      ? await resolveSavedStudyGuideForViewer(
+          userId,
+          initialStudyGuideId,
+          workspace.teamId,
+        )
+      : null;
+
+  if (initialStudyGuideId != null && !savedStudyGuide) {
+    redirect(
+      buildTeacherSubPath("/resources", workspace.teamId, workspace.teamMemberId),
+    );
+  }
 
   const ctx = await getAccessContext();
   const hasAdvancedSourceImport = canUseAdvancedSourceImport({
@@ -61,6 +89,9 @@ export default async function TeacherStudyGuidesPage({
       }
       initialHomeworkId={
         Number.isFinite(initialHomeworkId) ? initialHomeworkId : undefined
+      }
+      initialSavedStudyGuide={
+        savedStudyGuide ? mapSavedStudyGuideRowToEditItem(savedStudyGuide) : undefined
       }
       backHref={backHref}
       teacherWorkspace={workspace}

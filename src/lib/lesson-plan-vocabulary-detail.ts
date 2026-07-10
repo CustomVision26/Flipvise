@@ -122,3 +122,33 @@ export function attachVocabularyDetailsToSchedule(
     vocabularyDetail: details[index] ?? day.vocabularyDetail,
   }));
 }
+
+export function scheduleDaysEligibleForVocabularyDetail(
+  schedule: LessonPlanDaySchedule[],
+): LessonPlanDaySchedule[] {
+  return schedule.filter(
+    (day) => day.dailyFocus.trim().length > 0 && day.vocabulary.length > 0,
+  );
+}
+
+/** Map AI-generated details onto schedule rows by day label (stable after edits). */
+export function mergeVocabularyDetailsByDayLabel(
+  schedule: LessonPlanDaySchedule[],
+  targetDays: Array<Pick<LessonPlanDaySchedule, "dayLabel">>,
+  details: LessonPlanDayVocabularyDetail[],
+): LessonPlanDaySchedule[] {
+  const detailByLabel = new Map(
+    targetDays.map((day, index) => [day.dayLabel, details[index]!]),
+  );
+
+  return schedule.map((day) => {
+    const refreshed = detailByLabel.get(day.dayLabel);
+    if (refreshed) {
+      return { ...day, vocabularyDetail: refreshed };
+    }
+    if (!day.dailyFocus.trim() || day.vocabulary.length === 0) {
+      return { ...day, vocabularyDetail: undefined };
+    }
+    return day;
+  });
+}

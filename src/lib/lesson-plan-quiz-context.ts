@@ -1,8 +1,13 @@
+import {
+  formatLessonPlanReferencesForGeneratorContext,
+  getLessonPlanReferenceMaterials,
+} from "@/lib/lesson-plan-reference-material";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
 
 export function buildLessonPlanQuizContext(input: {
   input: LessonPlanInput;
   result: LessonPlanResult;
+  referencePurpose?: "quiz" | "homework" | "study guide";
 }): string {
   const { input: lessonInput, result } = input;
   const lines = [
@@ -63,6 +68,17 @@ export function buildLessonPlanQuizContext(input: {
     "Homework:",
     result.homework,
   );
+
+  const references = getLessonPlanReferenceMaterials(lessonInput);
+  if (references.length > 0) {
+    lines.push(
+      "",
+      formatLessonPlanReferencesForGeneratorContext(
+        references,
+        input.referencePurpose ?? "quiz",
+      ),
+    );
+  }
 
   return lines.join("\n");
 }

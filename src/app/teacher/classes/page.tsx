@@ -2,6 +2,7 @@ import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import { loadTeacherClassesPagePayload } from "@/db/queries/teacher-classes";
 import { getTeacherClassDeckResources } from "@/db/queries/teacher-class-resources";
+import { getPlanPeriodDaysByDeckIdsForUser } from "@/db/queries/saved-lesson-plans";
 import type { ClassDeckResources } from "@/db/queries/teacher-class-resources";
 import { TeacherClassesView } from "@/components/teacher-classes-view";
 
@@ -25,6 +26,11 @@ export default async function TeacherClassesPage({
     loadTeacherClassesPagePayload(userId, workspace.teamId),
     loadTeacherDeckContext(userId),
   ]);
+
+  const planPeriodDaysByDeckId = await getPlanPeriodDaysByDeckIdsForUser(
+    userId,
+    deckContext.decks,
+  );
 
   const decksById = new Map(
     deckContext.decks.map((deck) => [
@@ -75,6 +81,7 @@ export default async function TeacherClassesPage({
       memberMetaByUserId={classesPayload.memberMetaByUserId}
       isWorkspaceOwner={classesPayload.isWorkspaceOwner}
       decks={deckContext.decks}
+      planPeriodDaysByDeckId={planPeriodDaysByDeckId}
       deckResourcesByClassId={deckResourcesByClassId}
       workspace={workspace}
       backHref={backHref}

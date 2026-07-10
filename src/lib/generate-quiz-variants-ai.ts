@@ -2,6 +2,12 @@ import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import {
+  formatMcqContextForAiPrompt,
+  mcqSnapshotFromContext,
+  resolveCardMcqContext,
+  type CardMcqContext,
+} from "@/lib/card-mcq-context";
+import {
   type CardQuizVariants,
   type FillInBlankSegment,
 } from "@/lib/card-quiz-variants";
@@ -73,8 +79,9 @@ export async function generateQuizVariantsForCard(input: {
   back: string;
   includeTrueFalse: boolean;
   includeFillInBlank: boolean;
+  mcqContext?: CardMcqContext | null;
 }): Promise<CardQuizVariants> {
-  const { front, back, includeTrueFalse, includeFillInBlank } = input;
+  const { front, back, includeTrueFalse, includeFillInBlank, mcqContext } = input;
   if (!includeTrueFalse && !includeFillInBlank) {
     return {};
   }
@@ -86,11 +93,24 @@ export async function generateQuizVariantsForCard(input: {
     "",
   ];
 
+  if (mcqContext) {
+    parts.push(formatMcqContextForAiPrompt(mcqContext), "");
+  } else {
+    parts.push(
+      "No stored multiple-choice distractors were found for this card. Ground variants only in the flashcard question and correct answer.",
+      "",
+    );
+  }
+
   if (includeTrueFalse) {
     parts.push(
       "TRUE/FALSE: Write one grammatically correct declarative sentence that is either true or false based on the fact.",
-      "About half the time make the statement true (correctAnswer: true), half false (correctAnswer: false).",
-      "When false, the statement must be plausible but clearly wrong when you know the fact.",
+      mcqContext?.distractors.length
+        ? "When correctAnswer is false, the statement MUST use one of the stored wrong options as the claimed value (not a new invented number or fact)."
+        : "About half the time make the statement true (correctAnswer: true), half false (correctAnswer: false).",
+      mcqContext?.distractors.length
+        ? "When correctAnswer is true, the statement must match the stored correct answer."
+        : "When false, the statement must be plausible but clearly wrong when you know the fact.",
       "Do not prefix with 'True or false:' — only the sentence.",
     );
   }
@@ -98,6 +118,9 @@ export async function generateQuizVariantsForCard(input: {
   if (includeFillInBlank) {
     parts.push(
       "FILL IN THE BLANK: Build a single grammatically correct sentence with exactly one blank.",
+      mcqContext
+        ? "The blank's primary accepted answer must be the stored correct answer."
+        : "Use segments with type 'text' or 'blank'.",
       "Use segments with type 'text' or 'blank'.",
       "For text segments: set text to the visible words and answers to [].",
       "For the blank segment: set text to '' and answers to 1–3 acceptable spellings.",
@@ -137,11 +160,22 @@ export async function generateQuizVariantsForCard(input: {
     }
   }
 
+  if (mcqContext && (result.trueFalse || result.fillInBlank)) {
+    result.sourceMcq = mcqSnapshotFromContext(mcqContext);
+  }
+
   return result;
 }
 
 export async function generateQuizVariantsBatch(
-  cards: { id: number; front: string; back: string }[],
+  cards: {
+    id: number;
+    front: string;
+    back: string;
+    choices?: string[] | null;
+    correctChoiceIndex?: number | null;
+    quizVariants?: CardQuizVariants | null;
+  }[],
   formats: { trueFalse: boolean; fillInBlank: boolean },
   onProgress?: (done: number, total: number) => void,
 ): Promise<Map<number, CardQuizVariants>> {
@@ -156,11 +190,13 @@ export async function generateQuizVariantsBatch(
       continue;
     }
     try {
+      const mcqContext = resolveCardMcqContext(card);
       const variants = await generateQuizVariantsForCard({
         front,
         back,
         includeTrueFalse: formats.trueFalse,
         includeFillInBlank: formats.fillInBlank,
+        mcqContext,
       });
       if (variants.trueFalse || variants.fillInBlank) {
         out.set(card.id, variants);

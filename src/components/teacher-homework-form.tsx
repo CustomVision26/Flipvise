@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Download, ExternalLink, Loader2, Pencil, Save, X } from "lucide-react";
-import { generateHomeworkAction, saveHomeworkAction } from "@/actions/teacher-homework";
+import { generateHomeworkAction, saveHomeworkAction, updateHomeworkAction } from "@/actions/teacher-homework";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,6 +35,7 @@ import {
   OwnerTeamAdminResourcePicker,
   useOwnerScopedItems,
 } from "@/components/owner-team-admin-resource-picker";
+import type { SavedHomeworkEditItem } from "@/db/queries/saved-homework";
 import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
 import type {
   OwnerTeamAdminDeckPickerPayload,
@@ -45,6 +46,8 @@ import type { DeckRow } from "@/db/queries/decks";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import { downloadHomeworkPdf } from "@/lib/homework-pdf";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
+import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
+import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
 import type { HomeworkResult } from "@/lib/teacher-homework-ai-schema";
 import type { HomeworkSourceType } from "@/lib/teacher-homework-ai-schema";
 import {
@@ -53,6 +56,7 @@ import {
   type TeacherWorkspaceContext,
 } from "@/lib/teacher-url";
 import { buildHomeworkExamplePreview } from "@/lib/homework-example-preview";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 const SOURCE_NONE = "__none__";
@@ -91,6 +95,7 @@ export function TeacherHomeworkForm({
   initialDeckId,
   initialLessonPlanId,
   initialSourceType,
+  initialSavedHomework,
 }: {
   savedLessonPlans: SavedLessonPlanPickerItem[];
   ownerLessonPlanPicker: OwnerTeamAdminLessonPlanPickerPayload;
@@ -101,8 +106,10 @@ export function TeacherHomeworkForm({
   initialDeckId?: number;
   initialLessonPlanId?: number;
   initialSourceType?: HomeworkSourceType;
+  initialSavedHomework?: SavedHomeworkEditItem;
 }) {
   const isWorkspaceOwner = ownerLessonPlanPicker.isWorkspaceOwner;
+  const isEditingExistingHomework = initialSavedHomework != null;
   const initialDeck =
     !isWorkspaceOwner && initialDeckId != null
       ? decks.find((deck) => deck.id === initialDeckId) ?? null
@@ -110,40 +117,70 @@ export function TeacherHomeworkForm({
   const initialDeckDefaults = initialDeck ? deckToHomeworkDefaults(initialDeck) : null;
 
   const [sourceType, setSourceType] = useState<HomeworkSourceType>(
-    initialSourceType ??
+    initialSavedHomework?.sourceType ??
+      initialSourceType ??
       (initialLessonPlanId != null
         ? "lesson_plan"
         : initialDeck
           ? "deck"
           : "topic"),
   );
-  const [selectedPlanKey, setSelectedPlanKey] = useState<string>(SOURCE_NONE);
+  const [selectedPlanKey, setSelectedPlanKey] = useState<string>(
+    initialSavedHomework?.savedLessonPlanId != null
+      ? String(initialSavedHomework.savedLessonPlanId)
+      : SOURCE_NONE,
+  );
   const [selectedDeckKey, setSelectedDeckKey] = useState<string>(
-    initialDeck ? String(initialDeck.id) : SOURCE_NONE,
+    initialSavedHomework?.deckId != null
+      ? String(initialSavedHomework.deckId)
+      : initialDeck
+        ? String(initialDeck.id)
+        : SOURCE_NONE,
   );
-  const [savedLessonPlanId, setSavedLessonPlanId] = useState<number | undefined>();
-  const [deckId, setDeckId] = useState<number | undefined>(initialDeck?.id);
+  const [savedLessonPlanId, setSavedLessonPlanId] = useState<number | undefined>(
+    initialSavedHomework?.savedLessonPlanId ?? undefined,
+  );
+  const [deckId, setDeckId] = useState<number | undefined>(
+    initialSavedHomework?.deckId ?? initialDeck?.id,
+  );
   const [form, setForm] = useState<HomeworkFormState>(
-    initialDeckDefaults
+    initialSavedHomework
       ? {
-          subject: initialDeckDefaults.subject,
-          gradeLevel: initialDeckDefaults.gradeLevel,
-          topic: initialDeckDefaults.topic,
-          numberOfQuestions: 8,
-          difficultyLevel: initialDeckDefaults.difficultyLevel,
+          subject: initialSavedHomework.input.subject,
+          gradeLevel: initialSavedHomework.input.gradeLevel,
+          topic: initialSavedHomework.input.topic,
+          numberOfQuestions: initialSavedHomework.input.numberOfQuestions,
+          difficultyLevel: initialSavedHomework.input.difficultyLevel,
         }
-      : EMPTY_FORM,
+      : initialDeckDefaults
+        ? {
+            subject: initialDeckDefaults.subject,
+            gradeLevel: initialDeckDefaults.gradeLevel,
+            topic: initialDeckDefaults.topic,
+            numberOfQuestions: 8,
+            difficultyLevel: initialDeckDefaults.difficultyLevel,
+          }
+        : EMPTY_FORM,
   );
-  const [result, setResult] = useState<HomeworkResult | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const [result, setResult] = useState<HomeworkResult | null>(
+    initialSavedHomework?.result ?? null,
+  );
+  const [showResult, setShowResult] = useState(isEditingExistingHomework);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [savedHomeworkId, setSavedHomeworkId] = useState<number | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState<HomeworkResult | null>(null);
+  const [savedHomeworkId, setSavedHomeworkId] = useState<number | null>(
+    isEditingExistingHomework ? initialSavedHomework.id : null,
+  );
+  const [editingHomeworkId, setEditingHomeworkId] = useState<number | null>(
+    isEditingExistingHomework ? initialSavedHomework.id : null,
+  );
+  const [isEditing, setIsEditing] = useState(isEditingExistingHomework);
+  const [editDraft, setEditDraft] = useState<HomeworkResult | null>(
+    initialSavedHomework ? cloneHomeworkResult(initialSavedHomework.result) : null,
+  );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [saveLabel, setSaveLabel] = useState("");
+  const [saveLabel, setSaveLabel] = useState(initialSavedHomework?.label ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedLessonPlanAdminUserId, setSelectedLessonPlanAdminUserId] =
     useState<string>(ADMIN_NONE);
@@ -265,6 +302,7 @@ export function TeacherHomeworkForm({
   }
 
   useEffect(() => {
+    if (initialSavedHomework) return;
     if (!initialDeckId || !isWorkspaceOwner) return;
     const adminWithDeck = ownerDeckPicker.teamAdmins.find((admin) =>
       (ownerDeckPicker.itemsByAdminUserId[admin.userId] ?? []).some(
@@ -290,9 +328,10 @@ export function TeacherHomeworkForm({
       numberOfQuestions: 8,
       difficultyLevel: defaults.difficultyLevel,
     });
-  }, [initialDeckId, initialSourceType, isWorkspaceOwner, ownerDeckPicker]);
+  }, [initialDeckId, initialSourceType, isWorkspaceOwner, ownerDeckPicker, initialSavedHomework]);
 
   useEffect(() => {
+    if (initialSavedHomework) return;
     if (!initialLessonPlanId) return;
 
     if (isWorkspaceOwner) {
@@ -339,7 +378,11 @@ export function TeacherHomeworkForm({
       difficultyLevel:
         defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
     });
-  }, [initialLessonPlanId, isWorkspaceOwner, ownerLessonPlanPicker, savedLessonPlans]);
+  }, [initialLessonPlanId, isWorkspaceOwner, ownerLessonPlanPicker, savedLessonPlans, initialSavedHomework]);
+
+  const savedHomeworkReferences =
+    initialSavedHomework?.input.referenceMaterials ??
+    getLessonPlanReferenceMaterials(selectedPlan?.input);
 
   const lessonBuilderHref = teacherWorkspace
     ? buildTeacherSubPath(
@@ -452,10 +495,37 @@ export function TeacherHomeworkForm({
 
   async function handleSaveHomework() {
     if (!result || !saveLabel.trim()) return;
+    await persistHomework(saveLabel.trim());
+  }
+
+  async function handleSaveChanges() {
+    if (!result || editingHomeworkId == null) return;
+    const label = saveLabel.trim() || initialSavedHomework?.label;
+    if (!label) {
+      toast.error("Homework label is missing.");
+      return;
+    }
+
+    let planToSave = isEditing && editDraft ? editDraft : result;
+    if (isEditing && editDraft) {
+      if (editDraft.questions.length !== editDraft.answerKey.length) {
+        toast.error("Questions and answers must match in count.");
+        return;
+      }
+      setResult(planToSave);
+      setIsEditing(false);
+      setEditDraft(null);
+    }
+
+    await persistHomework(label, editingHomeworkId);
+  }
+
+  async function persistHomework(label: string, homeworkId?: number) {
+    if (!result) return;
     setIsSaving(true);
     try {
-      const saved = await saveHomeworkAction({
-        label: saveLabel.trim(),
+      const payload = {
+        label,
         sourceType,
         savedLessonPlanId,
         deckId,
@@ -471,13 +541,28 @@ export function TeacherHomeworkForm({
           teamId: teacherWorkspace?.teamId ?? undefined,
         },
         result,
-      });
+      };
+
+      const saved =
+        homeworkId != null
+          ? await updateHomeworkAction({ homeworkId, ...payload })
+          : await saveHomeworkAction(payload);
+
       setSavedHomeworkId(saved.id);
+      setEditingHomeworkId(saved.id);
+      setSaveLabel(saved.label);
       setSaveDialogOpen(false);
-      toast.success("Homework saved", {
+      toast.success(
+        homeworkId != null && initialSavedHomework?.id === saved.id
+          ? "Homework updated"
+          : "Homework saved",
+        {
         description: (
           <span>
-            {saved.label} was saved
+            {saved.label} was {homeworkId != null ? "updated in" : "saved to"} your{" "}
+            <Link href={resourcesHref} className="underline underline-offset-2">
+              Resource Library
+            </Link>
             {saved.pdfUrl ? " with PDF" : ""}.
             {saved.sourceLessonPlanTitle ? (
               <>
@@ -490,15 +575,11 @@ export function TeacherHomeworkForm({
                 {" "}
                 Linked to deck: <strong>{saved.sourceDeckName}</strong>.
               </>
-            ) : null}{" "}
-            View it in the{" "}
-            <Link href={resourcesHref} className="underline underline-offset-2">
-              Resource Library
-            </Link>
-            .
+            ) : null}
           </span>
         ),
-      });
+      },
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not save homework.",
@@ -521,8 +602,12 @@ export function TeacherHomeworkForm({
   return (
     <>
     <TeacherToolPageShell
-      title="Homework Generator"
-      description="Create homework assignments with answer keys."
+      title={isEditingExistingHomework ? "Edit Homework" : "Homework Generator"}
+      description={
+        isEditingExistingHomework
+          ? `Update ${initialSavedHomework.label} and save changes back to your Resource Library.`
+          : "Create homework assignments with answer keys."
+      }
       showResult={showResult && result != null}
       isGenerating={isGenerating}
       generateLabel="Generate"
@@ -560,17 +645,20 @@ export function TeacherHomeworkForm({
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
                   size="sm"
-                  disabled={isSaving || savedHomeworkId !== null}
-                  onClick={openSaveDialog}
+                  disabled={isSaving}
+                  onClick={() =>
+                    editingHomeworkId != null
+                      ? void handleSaveChanges()
+                      : openSaveDialog()
+                  }
                 >
                   {isSaving ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                   ) : (
                     <Save className="size-4" aria-hidden />
                   )}
-                  {savedHomeworkId !== null ? "Saved" : "Save Homework"}
+                  {editingHomeworkId != null ? "Save changes" : "Save Homework"}
                 </Button>
                 <Button
                   type="button"
@@ -633,7 +721,9 @@ export function TeacherHomeworkForm({
             <ToggleGroup
               id="homeworkSourceType"
               value={[sourceType]}
+              disabled={isEditingExistingHomework}
               onValueChange={(next) => {
+                if (isEditingExistingHomework) return;
                 const value = next[0] as HomeworkSourceType | undefined;
                 if (value) {
                   handleSourceTypeChange(value);
@@ -641,7 +731,10 @@ export function TeacherHomeworkForm({
               }}
               variant="outline"
               spacing={0}
-              className="flex w-full"
+              className={cn(
+                "flex w-full",
+                isEditingExistingHomework && "opacity-60",
+              )}
             >
               <ToggleGroupItem value="topic" className="h-10 flex-1 px-3">
                 Custom topic
@@ -739,6 +832,9 @@ export function TeacherHomeworkForm({
                   </a>
                 </p>
               ) : null}
+              <LessonPlanSavedReferenceSummary
+                references={savedHomeworkReferences}
+              />
             </div>
             )
           ) : null}

@@ -13,6 +13,8 @@ import {
   listAssignmentsForTeam,
   listTeamMembers,
 } from "@/db/queries/teams";
+import { isEducationTeamPlanId } from "@/lib/education-plans";
+import { Separator } from "@/components/ui/separator";
 import {
   TEAM_ADMIN_STUDY_PRIVILEGES_PATH,
   buildTeamAdminAssignDecksToMembersPath,
@@ -39,8 +41,8 @@ import { TeamAdminToolPageLayout } from "@/components/team-admin-tool-page-layou
 import { cn } from "@/lib/utils";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import {
+  buildQuizFormatsWorkspaceSnapshots,
   listQuizFormatsDecksForWorkspace,
-  listQuizFormatsWorkspacesForOwner,
 } from "@/db/queries/quiz-formats";
 
 interface PageProps {
@@ -56,8 +58,7 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
   const ctx = await loadTeamAdminPageContext(buildTeamAdminStudyPrivilegesPath, searchParams);
   const { userId, selected, teamsForSubscriber, viewerTeamMemberUrlParam, isOwner } = ctx;
 
-  const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts, quizFormatWorkspaces] =
-    await Promise.all([
+  const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
     Promise.all(
       teamsForSubscriber.map(async (t) => {
         const [teamMembers, decks, assignments] = await Promise.all([
@@ -68,6 +69,7 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
         return {
           id: t.id,
           name: t.name,
+          planSlug: t.planSlug,
           teamMembers,
           decks,
           assignments,
@@ -75,13 +77,9 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
       }),
     ),
     getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
-    listQuizFormatsWorkspacesForOwner(userId),
   ]);
 
-  const subscriberTeamIds = new Set(teamsForSubscriber.map((t) => t.id));
-  const quizFormatsWorkspacesForUi = quizFormatWorkspaces.filter((w) =>
-    subscriberTeamIds.has(w.id),
-  );
+  const quizFormatWorkspaces = buildQuizFormatsWorkspaceSnapshots(teamsForSubscriber);
   const decksByWorkspaceId: Record<
     number,
     Awaited<ReturnType<typeof listQuizFormatsDecksForWorkspace>>
@@ -101,6 +99,24 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
   const userFieldDisplayById = await getClerkUserFieldDisplaysByIds([
     ...new Set(memberUserIds),
   ]);
+
+  const educationTeamIds = new Set(
+    teamsForSubscriber
+      .filter((t) => isEducationTeamPlanId(t.planSlug))
+      .map((t) => t.id),
+  );
+  const educationQuizWorkspaces = quizFormatWorkspaces.filter((w) =>
+    educationTeamIds.has(w.id),
+  );
+  const educationDecksByWorkspaceId = Object.fromEntries(
+    Object.entries(decksByWorkspaceId).filter(([id]) =>
+      educationTeamIds.has(Number(id)),
+    ),
+  );
+  const defaultQuizWorkspaceId = educationTeamIds.has(selected.id)
+    ? selected.id
+    : (educationQuizWorkspaces[0]?.id ?? selected.id);
+  const showQuizFormatSettings = educationQuizWorkspaces.length > 0;
 
   const quickNavDescription = isOwner
     ? "Return to your personal dashboard to create and edit decks."
@@ -141,7 +157,8 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
                 </p>
               </div>
               <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Control which study modes regular members may use for each assigned deck.
+                Control study modes per assignment and quiz question formats on Education Gold /
+                Enterprise workspaces.
               </p>
             </div>
             <TeamAdminQuickNavPanel
@@ -177,23 +194,29 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
         </>
       }
     >
-      <TeamQuizFormatsSettings
-        workspaces={toClientJson(quizFormatsWorkspacesForUi)}
-        decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
-        defaultWorkspaceId={selected.id}
-      />
-
       <Card className={teamAdminActivePanelClass}>
         <CardHeader className="space-y-2 pb-4">
           <CardTitle className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}>
             Member study modes
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Each row is a deck assignment for a regular team member. Update or remove study features
-            as needed — changes apply on their next study session.
+            Set Standard Review, Quiz, or both per assigned member or team admin. On Education Gold
+            and Enterprise you can also configure quiz question formats below. Changes apply on the
+            next study session.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-8">
+          {showQuizFormatSettings ? (
+            <>
+              <TeamQuizFormatsSettings
+                embedded
+                workspaces={toClientJson(educationQuizWorkspaces)}
+                decksByWorkspaceId={toClientJson(educationDecksByWorkspaceId)}
+                defaultWorkspaceId={defaultQuizWorkspaceId}
+              />
+              <Separator />
+            </>
+          ) : null}
           <TeamStudyPrivilegesTable
             workspaces={toClientJson(privilegeWorkspaceSnapshots)}
             defaultWorkspaceId={selected.id}

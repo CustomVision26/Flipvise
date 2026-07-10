@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getAccessContext } from "@/lib/access";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
+import { canUseDeckAiFeatures } from "@/lib/deck-ai-access";
 import Link from "next/link";
 import { ArrowLeft, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,8 +43,9 @@ interface DeckPageProps {
 }
 
 export default async function DeckPage({ params, searchParams }: DeckPageProps) {
-  const { userId, hasAI, hasAiReading, maxCardsPerDeck } = await getAccessContext();
-  if (!userId) redirect("/");
+  const access = await getAccessContext();
+  if (!access.userId) redirect("/");
+  const { userId, hasAiReading, maxCardsPerDeck } = access;
 
   const { deckId } = await params;
   const id = Number(deckId);
@@ -96,7 +98,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
     personalMaxCardsPerDeck: maxCardsPerDeck,
   });
   const paidDeckCards = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
   const effectiveAdvancedSourceImport = canUseAdvancedSourceImport({
     hasAiReading,
     teamTierProWorkspace: teamTierPro,

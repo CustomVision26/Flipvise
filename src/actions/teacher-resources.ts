@@ -17,6 +17,10 @@ import {
   getSavedWorksheetById,
 } from "@/db/queries/saved-worksheets";
 import {
+  deleteSavedQuizById,
+  getSavedQuizById,
+} from "@/db/queries/saved-quizzes";
+import {
   deleteTeacherClassById,
   getTeacherClassById,
 } from "@/db/queries/teacher-classes";
@@ -24,7 +28,7 @@ import { getTeamById } from "@/db/queries/teams";
 import { deleteFromS3 } from "@/lib/s3";
 
 const deleteTeacherResourceSchema = z.object({
-  resourceType: z.enum(["lessonPlans", "homework", "worksheets"]),
+  resourceType: z.enum(["lessonPlans", "homework", "worksheets", "quizzes"]),
   resourceId: z.number().int().positive(),
   teamId: z.number().int().positive().nullable(),
 });
@@ -78,6 +82,7 @@ export async function deleteTeacherResourceAction(
     }
 
     await deleteSavedLessonPlanById(parsed.data.resourceId);
+    revalidatePath("/teacher/lesson-builder");
   } else if (parsed.data.resourceType === "homework") {
     const row = await getSavedHomeworkAssignmentById(parsed.data.resourceId);
     if (!row) throw new Error("Homework not found");
@@ -93,7 +98,7 @@ export async function deleteTeacherResourceAction(
     }
 
     await deleteSavedHomeworkAssignmentById(parsed.data.resourceId);
-  } else {
+  } else if (parsed.data.resourceType === "worksheets") {
     const row = await getSavedWorksheetById(parsed.data.resourceId);
     if (!row) throw new Error("Worksheet not found");
 
@@ -116,6 +121,29 @@ export async function deleteTeacherResourceAction(
     }
 
     await deleteSavedWorksheetById(parsed.data.resourceId);
+  } else {
+    const row = await getSavedQuizById(parsed.data.resourceId);
+    if (!row) throw new Error("Quiz sheet not found");
+
+    await assertCanManageSavedResource(userId, row.userId, parsed.data.teamId);
+
+    if (row.questionSheetPdfUrl) {
+      try {
+        await deleteFromS3(row.questionSheetPdfUrl);
+      } catch {
+        // proceed with DB delete even if object removal fails
+      }
+    }
+
+    if (row.answerKeyPdfUrl) {
+      try {
+        await deleteFromS3(row.answerKeyPdfUrl);
+      } catch {
+        // proceed with DB delete even if object removal fails
+      }
+    }
+
+    await deleteSavedQuizById(parsed.data.resourceId);
   }
 
   revalidatePath("/teacher/resources");

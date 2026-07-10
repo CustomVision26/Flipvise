@@ -319,3 +319,33 @@ export async function uploadWorksheetPdfBufferToS3(options: {
 
   return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
+
+export async function uploadQuizSheetPdfBufferToS3(options: {
+  userId: string;
+  fileName: string;
+  buffer: Buffer;
+  variant: "question_sheet" | "answer_key";
+}): Promise<string> {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const key = `quiz-sheets/${options.userId}/${options.variant}/${timestamp}-${randomString}-${options.fileName}`;
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: options.buffer,
+      ContentType: "application/pdf",
+      CacheControl: "public, max-age=31536000, immutable",
+    },
+  });
+
+  await upload.done();
+
+  if (CDN_URL) {
+    return `${CDN_URL}/${key}`;
+  }
+
+  return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}

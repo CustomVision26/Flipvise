@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ChevronDown, Pencil, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -131,9 +131,12 @@ function formatSavedDate(value: string): string {
 
 function isDeletableSection(
   sectionId: TeacherResourceLibrarySection["id"],
-): sectionId is "lessonPlans" | "homework" | "worksheets" {
+): sectionId is "lessonPlans" | "homework" | "worksheets" | "quizzes" {
   return (
-    sectionId === "lessonPlans" || sectionId === "homework" || sectionId === "worksheets"
+    sectionId === "lessonPlans" ||
+    sectionId === "homework" ||
+    sectionId === "worksheets" ||
+    sectionId === "quizzes"
   );
 }
 
@@ -154,6 +157,7 @@ function resolveResourceId(
   if (sectionId === "lessonPlans") return item.lessonPlanId;
   if (sectionId === "homework") return item.homeworkId;
   if (sectionId === "worksheets") return item.worksheetId;
+  if (sectionId === "quizzes") return item.savedQuizId;
   return null;
 }
 
@@ -390,10 +394,14 @@ function ResourceItemCard({
             rel="noopener noreferrer"
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            {sectionId === "worksheets" ? "Worksheet PDF" : "PDF"}
+            {sectionId === "worksheets"
+              ? "Worksheet PDF"
+              : sectionId === "quizzes"
+                ? "Question sheet"
+                : "PDF"}
           </a>
         ) : null}
-        {sectionId === "worksheets" && item.answerKeyPdfUrl ? (
+        {(sectionId === "worksheets" || sectionId === "quizzes") && item.answerKeyPdfUrl ? (
           <a
             href={item.answerKeyPdfUrl}
             target="_blank"
@@ -402,6 +410,42 @@ function ResourceItemCard({
           >
             Answer Key PDF
           </a>
+        ) : null}
+        {sectionId === "lessonPlans" && item.lessonPlanEditHref ? (
+          <Link
+            href={item.lessonPlanEditHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit
+          </Link>
+        ) : null}
+        {sectionId === "homework" && item.homeworkEditHref ? (
+          <Link
+            href={item.homeworkEditHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit
+          </Link>
+        ) : null}
+        {sectionId === "worksheets" && item.worksheetEditHref ? (
+          <Link
+            href={item.worksheetEditHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit
+          </Link>
+        ) : null}
+        {sectionId === "studyGuides" && item.studyGuideEditHref ? (
+          <Link
+            href={item.studyGuideEditHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit
+          </Link>
         ) : null}
         {sectionId === "lessonPlans" && item.quizHref ? (
           <Link

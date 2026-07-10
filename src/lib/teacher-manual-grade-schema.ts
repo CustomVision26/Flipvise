@@ -1,7 +1,10 @@
 import { z } from "zod";
 
+export const teacherManualGradeTypeSchema = z.enum(["assignment", "quiz"]);
+
 export const createTeacherManualGradeSchema = z.object({
   teamId: z.number().int().positive().optional(),
+  gradeType: teacherManualGradeTypeSchema.default("assignment"),
   studentName: z.string().trim().min(1, "Student name is required.").max(255),
   studentEmail: z.string().trim().email("Enter a valid email.").max(255).optional().or(z.literal("")),
   assignmentTitle: z.string().trim().min(1, "Assignment title is required.").max(512),
@@ -14,7 +17,12 @@ export const createTeacherManualGradeSchema = z.object({
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
+export const updateTeacherManualGradeSchema = createTeacherManualGradeSchema.extend({
+  gradeId: z.coerce.number().int().positive("Grade record not found."),
+});
+
 export type CreateTeacherManualGradeInput = z.infer<typeof createTeacherManualGradeSchema>;
+export type UpdateTeacherManualGradeInput = z.infer<typeof updateTeacherManualGradeSchema>;
 
 export const teacherStudentReportFilterSchema = z.object({
   academicYear: z.string().trim().max(64).optional(),

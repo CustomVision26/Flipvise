@@ -1,4 +1,5 @@
 import type { DeckRow } from "@/db/queries/decks";
+import type { LessonPlanDeckUsage } from "@/db/queries/saved-lesson-plans";
 import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
 
 export function filterDecksWithoutLessonPlans(
@@ -14,7 +15,7 @@ export function filterDecksWithoutLessonPlans(
 
 export function filterOwnerDeckPickerWithoutLessonPlans(
   picker: OwnerTeamAdminDeckPickerPayload,
-  deckIdsWithLessonPlans: Set<number>,
+  deckUsage: LessonPlanDeckUsage,
   keepDeckId?: number,
 ): OwnerTeamAdminDeckPickerPayload {
   if (!picker.isWorkspaceOwner) {
@@ -25,9 +26,11 @@ export function filterOwnerDeckPickerWithoutLessonPlans(
   for (const [adminUserId, adminDecks] of Object.entries(
     picker.itemsByAdminUserId,
   )) {
+    const usedForAdmin =
+      deckUsage.usedDeckIdsByUserId.get(adminUserId) ?? new Set<number>();
     itemsByAdminUserId[adminUserId] = filterDecksWithoutLessonPlans(
       adminDecks,
-      deckIdsWithLessonPlans,
+      usedForAdmin,
       keepDeckId,
     );
   }

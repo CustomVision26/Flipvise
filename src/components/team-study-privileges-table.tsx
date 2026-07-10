@@ -22,12 +22,14 @@ import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import {
   TEAM_MEMBER_STUDY_PRIVILEGES,
   TEAM_MEMBER_STUDY_PRIVILEGE_LABELS,
+  memberRoleQualifiesForStudyPrivileges,
   type TeamMemberStudyPrivilege,
 } from "@/lib/team-study-privilege";
 
 export type TeamStudyPrivilegeWorkspaceSnapshot = {
   id: number;
   name: string;
+  planSlug: string;
   teamMembers: TeamMemberRow[];
   decks: DeckRow[];
   assignments: TeamDeckAssignmentListRow[];
@@ -45,6 +47,7 @@ type StudyPrivilegeRow = {
   deckId: number;
   memberUserId: string;
   memberLabel: string;
+  memberRole: TeamMemberRow["role"];
   deckName: string;
   workspaceName: string;
   studyPrivilege: TeamMemberStudyPrivilege;
@@ -83,7 +86,8 @@ export function TeamStudyPrivilegesTable({
     for (const w of workspaces) {
       const memberRoleByUserId = new Map(w.teamMembers.map((m) => [m.userId, m.role]));
       for (const a of w.assignments) {
-        if (memberRoleByUserId.get(a.memberUserId) !== "team_member") continue;
+        const role = memberRoleByUserId.get(a.memberUserId);
+        if (!role || !memberRoleQualifiesForStudyPrivileges(role, w.planSlug)) continue;
         const deck = w.decks.find((d) => d.id === a.deckId);
         out.push({
           key: `${a.teamId}-${a.deckId}-${a.memberUserId}`,
@@ -91,6 +95,7 @@ export function TeamStudyPrivilegesTable({
           deckId: a.deckId,
           memberUserId: a.memberUserId,
           memberLabel: memberLabel(a.memberUserId, userFieldDisplayById[a.memberUserId]),
+          memberRole: role,
           deckName: deck?.name ?? `Deck #${a.deckId}`,
           workspaceName: w.name,
           studyPrivilege: a.studyPrivilege,
@@ -238,12 +243,6 @@ export function TeamStudyPrivilegesTable({
       ) : null}
 
       <div className="space-y-4">
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Regular team members only. Set which study modes each member may use per assigned deck —
-          Standard Review, Quiz, or both. Swipe or use the arrows to browse assignments. Double-click a
-          record to load its workspace in Search &amp; filters.
-        </p>
-
         <TeamAdminRecordSlider
           items={rows}
           activeKey={activeRowKey ?? workspaceId}
@@ -254,6 +253,9 @@ export function TeamStudyPrivilegesTable({
           filterPanelExtraActive={workspaceLocked}
           filterPanelExtra={({ filtersOpen }) => (
             <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                Double-click a record to load its workspace here.
+              </p>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label
                   htmlFor="study-priv-workspace"
@@ -305,10 +307,13 @@ export function TeamStudyPrivilegesTable({
               ) : null}
             </div>
           )}
-          emptyMessage="No deck assignments for regular members yet."
+          emptyMessage="No deck assignments eligible for study mode controls yet."
           noResultsMessage="No assignments match your search or filters."
           renderCard={(row) => {
             const display = userFieldDisplayById[row.memberUserId];
+            const grantedAccess = TEAM_MEMBER_STUDY_PRIVILEGE_LABELS[
+              privilegeForRow(row.key, row.studyPrivilege)
+            ];
             return (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -322,6 +327,9 @@ export function TeamStudyPrivilegesTable({
                         {display.primaryEmail}
                       </p>
                     ) : null}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {row.memberRole === "team_admin" ? "Team admin" : "Team member"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -334,6 +342,12 @@ export function TeamStudyPrivilegesTable({
                       Workspace
                     </p>
                     <p className="text-sm text-foreground">{row.workspaceName}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      Access granted
+                    </p>
+                    <p className="text-sm font-medium text-foreground">{grantedAccess}</p>
                   </div>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

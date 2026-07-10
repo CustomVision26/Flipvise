@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Download, ExternalLink, Loader2, Pencil, RefreshCw, Save, X } from "lucide-react";
-import { generateLessonPlanAction, saveLessonPlanAction, generateAllDaysVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
+import { generateLessonPlanAction, saveLessonPlanAction, updateLessonPlanAction, generateAllDaysVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +32,7 @@ import {
   type LessonPlanReferenceMaterial,
   type LessonPlanReferenceMaterialFieldsHandle,
 } from "@/components/lesson-plan-reference-material-fields";
+import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
@@ -55,7 +56,7 @@ import {
   PLAN_PERIOD_DAY_OPTIONS,
 } from "@/lib/lesson-plan-weekly-schedule";
 import { downloadLessonPlanPdf } from "@/lib/lesson-plan-pdf";
-import { attachVocabularyDetailsToSchedule } from "@/lib/lesson-plan-vocabulary-detail";
+import { attachVocabularyDetailsToSchedule, mergeVocabularyDetailsByDayLabel, scheduleDaysEligibleForVocabularyDetail } from "@/lib/lesson-plan-vocabulary-detail";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -78,6 +79,15 @@ function defaultNewDeckName(subject: string, topic: string): string {
   return subjectTrim || topicTrim;
 }
 
+type InitialSavedLessonPlan = {
+  id: number;
+  input: LessonPlanInput;
+  result: LessonPlanResult;
+  deckId: number | null;
+  sourceDeckName: string | null;
+  lessonTitle: string;
+};
+
 type TeacherLessonBuilderFormProps = {
   hasAdvancedSourceImport: boolean;
   backHref?: string;
@@ -86,6 +96,8 @@ type TeacherLessonBuilderFormProps = {
   ownerDeckPicker: OwnerTeamAdminDeckPickerPayload;
   deckQuota: TeacherDeckQuota;
   initialDeckId?: number;
+  initialDeckAdminUserId?: string;
+  initialSavedPlan?: InitialSavedLessonPlan;
   initialDeckDefaults?: {
     subject: string;
     gradeLevel: string;
@@ -102,51 +114,73 @@ export function TeacherLessonBuilderForm({
   ownerDeckPicker,
   deckQuota,
   initialDeckId,
+  initialDeckAdminUserId,
+  initialSavedPlan,
   initialDeckDefaults,
 }: TeacherLessonBuilderFormProps) {
   const isWorkspaceOwner = ownerDeckPicker.isWorkspaceOwner;
+  const isEditingExistingPlan = initialSavedPlan != null;
+  const resolvedInitialDeckId = initialSavedPlan?.deckId ?? initialDeckId;
   const initialDeck =
-    initialDeckId != null ? decks.find((deck) => deck.id === initialDeckId) ?? null : null;
+    resolvedInitialDeckId != null
+      ? decks.find((deck) => deck.id === resolvedInitialDeckId) ?? null
+      : null;
 
   const referenceFieldsRef = useRef<LessonPlanReferenceMaterialFieldsHandle>(null);
   const [referenceMaterials, setReferenceMaterials] = useState<
     LessonPlanReferenceMaterial[]
-  >([]);
+  >(
+    initialSavedPlan
+      ? getLessonPlanReferenceMaterials(initialSavedPlan.input)
+      : [],
+  );
   const [referenceError, setReferenceError] = useState<string | null>(null);
-  const [form, setForm] = useState<LessonPlanInput>({
-    subject: initialDeckDefaults?.subject ?? "",
-    gradeLevel: initialDeckDefaults?.gradeLevel ?? "",
-    topic: initialDeckDefaults?.topic ?? "",
-    lessonDuration: "45 minutes",
-    planPeriodDays: DEFAULT_PLAN_PERIOD_DAYS,
-    difficultyLevel: initialDeckDefaults?.difficultyLevel ?? "Intermediate",
-    learningStandard: "",
-    classSize: "",
-    specialInstructions: "",
-  });
-  const [result, setResult] = useState<LessonPlanResult | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const [form, setForm] = useState<LessonPlanInput>(
+    initialSavedPlan?.input ?? {
+      subject: initialDeckDefaults?.subject ?? "",
+      gradeLevel: initialDeckDefaults?.gradeLevel ?? "",
+      topic: initialDeckDefaults?.topic ?? "",
+      lessonDuration: "45 minutes",
+      planPeriodDays: DEFAULT_PLAN_PERIOD_DAYS,
+      difficultyLevel: initialDeckDefaults?.difficultyLevel ?? "Intermediate",
+      learningStandard: "",
+      classSize: "",
+      specialInstructions: "",
+    },
+  );
+  const [result, setResult] = useState<LessonPlanResult | null>(
+    initialSavedPlan?.result ?? null,
+  );
+  const [showResult, setShowResult] = useState(isEditingExistingPlan);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDayDetails, setIsGeneratingDayDetails] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedPlanId, setSavedPlanId] = useState<number | null>(null);
+  const [savedPlanId, setSavedPlanId] = useState<number | null>(
+    isEditingExistingPlan ? initialSavedPlan.id : null,
+  );
+  const [editingPlanId, setEditingPlanId] = useState<number | null>(
+    isEditingExistingPlan ? initialSavedPlan.id : null,
+  );
   const [regenerationSeed, setRegenerationSeed] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState<LessonPlanResult | null>(null);
+  const [isEditing, setIsEditing] = useState(isEditingExistingPlan);
+  const [editDraft, setEditDraft] = useState<LessonPlanResult | null>(
+    initialSavedPlan ? cloneLessonPlanResult(initialSavedPlan.result) : null,
+  );
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
   const [regenerateApproach, setRegenerateApproach] =
     useState<VocabularyTeachingApproach>("weekly");
-  const [deckTargetMode, setDeckTargetMode] = useState<DeckTargetMode>(
-    initialDeck ? "existing" : "existing",
-  );
+  const [deckTargetMode, setDeckTargetMode] = useState<DeckTargetMode>("existing");
   const [selectedDeckKey, setSelectedDeckKey] = useState<string>(
-    initialDeck ? String(initialDeck.id) : DECK_NONE,
+    resolvedInitialDeckId != null ? String(resolvedInitialDeckId) : DECK_NONE,
   );
-  const [deckId, setDeckId] = useState<number | undefined>(initialDeck?.id);
-  const [selectedDeckAdminUserId, setSelectedDeckAdminUserId] =
-    useState<string>(ADMIN_NONE);
+  const [deckId, setDeckId] = useState<number | undefined>(
+    resolvedInitialDeckId ?? undefined,
+  );
+  const [selectedDeckAdminUserId, setSelectedDeckAdminUserId] = useState<string>(
+    initialDeckAdminUserId ?? ADMIN_NONE,
+  );
 
   const activeDecks = useOwnerScopedItems(
     isWorkspaceOwner,
@@ -156,6 +190,11 @@ export function TeacherLessonBuilderForm({
   );
   const selectedDeck =
     deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+  const selectedDeckLabel =
+    selectedDeck?.name ??
+    (isEditingExistingPlan && initialSavedPlan.sourceDeckName
+      ? initialSavedPlan.sourceDeckName
+      : null);
 
   function deckHaystack(deck: DeckRow): string {
     return [deck.name, deck.description, deck.gradeLevel]
@@ -284,6 +323,68 @@ export function TeacherLessonBuilderForm({
     [form, regenerationSeed, referenceMaterials],
   );
 
+  const shouldAutoRefreshVocabularyDetails = useCallback(
+    (plan: LessonPlanResult) => {
+      const planPeriodDays = form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
+      return (
+        planPeriodDays > 1 &&
+        (plan.weeklySchedule?.length ?? 0) > 0 &&
+        scheduleDaysEligibleForVocabularyDetail(plan.weeklySchedule ?? []).length > 0
+      );
+    },
+    [form.planPeriodDays],
+  );
+
+  const refreshVocabularyDetailsForPlan = useCallback(
+    async (plan: LessonPlanResult): Promise<LessonPlanResult> => {
+      const schedule = plan.weeklySchedule ?? [];
+      const targetDays = scheduleDaysEligibleForVocabularyDetail(schedule);
+      if (targetDays.length === 0) {
+        return plan;
+      }
+
+      setIsGeneratingDayDetails(true);
+      try {
+        const details = await generateAllDaysVocabularyDetailAction({
+          subject: form.subject,
+          gradeLevel: form.gradeLevel,
+          topic: form.topic,
+          difficultyLevel:
+            form.difficultyLevel as LessonPlanActionInput["difficultyLevel"],
+          learningStandard: form.learningStandard,
+          lessonTitle: plan.lessonTitle,
+          days: targetDays.map((day) => ({
+            dayLabel: day.dayLabel,
+            dailyFocus: day.dailyFocus,
+            vocabulary: day.vocabulary,
+          })),
+        });
+
+        return {
+          ...plan,
+          weeklySchedule: mergeVocabularyDetailsByDayLabel(
+            schedule,
+            targetDays,
+            details,
+          ),
+        };
+      } catch (error) {
+        console.warn(
+          "[TeacherLessonBuilderForm] Post-edit vocabulary detail refresh failed.",
+          error,
+        );
+        toast.warning("Edits saved locally", {
+          description:
+            "Could not auto-refresh AI vocabulary details. Use 'AI detail — all days' in the Daily Schedule.",
+        });
+        return plan;
+      } finally {
+        setIsGeneratingDayDetails(false);
+      }
+    },
+    [form],
+  );
+
   function startEditing() {
     if (!result) return;
     setEditDraft(cloneLessonPlanResult(result));
@@ -295,14 +396,24 @@ export function TeacherLessonBuilderForm({
     setEditDraft(null);
   }
 
-  function finishEditing() {
+  async function finishEditing() {
     if (!editDraft) return;
-    setResult(editDraft);
-    setSavedPlanId(null);
+
+    let updated = editDraft;
+    if (shouldAutoRefreshVocabularyDetails(editDraft)) {
+      updated = await refreshVocabularyDetailsForPlan(editDraft);
+    }
+
+    setResult(updated);
+    if (editingPlanId == null) {
+      setSavedPlanId(null);
+    }
     setIsEditing(false);
     setEditDraft(null);
     toast.success("Lesson plan updated", {
-      description: "Your edits are ready to save or download.",
+      description: shouldAutoRefreshVocabularyDetails(updated)
+        ? "Your edits were applied and daily vocabulary details were refreshed with AI."
+        : "Your edits are ready to save or download.",
     });
   }
 
@@ -313,6 +424,17 @@ export function TeacherLessonBuilderForm({
 
   async function handleSavePlan() {
     if (!result) return;
+    let planToSave = isEditing && editDraft ? editDraft : result;
+
+    if (shouldAutoRefreshVocabularyDetails(planToSave)) {
+      planToSave = await refreshVocabularyDetailsForPlan(planToSave);
+      setResult(planToSave);
+      if (isEditing) {
+        setIsEditing(false);
+        setEditDraft(null);
+      }
+    }
+
     if (deckTargetMode === "existing" && deckId == null) {
       toast.error("Select a deck to save this lesson plan.");
       return;
@@ -324,17 +446,40 @@ export function TeacherLessonBuilderForm({
 
     setIsSaving(true);
     try {
-      const saved = await saveLessonPlanAction({
-        input: form,
-        result,
+      const resolvedReferences =
+        (await referenceFieldsRef.current?.resolveReferences()) ?? referenceMaterials;
+
+      const payload = {
+        input: {
+          ...form,
+          referenceMaterials:
+            resolvedReferences.length > 0 ? resolvedReferences : undefined,
+        },
+        result: planToSave,
         deckId: deckTargetMode === "existing" ? deckId : undefined,
         newDeckName:
           deckTargetMode === "new"
             ? defaultNewDeckName(form.subject, form.topic)
             : undefined,
         teamId: teacherWorkspace?.teamId ?? undefined,
-      });
+      };
+
+      const saved =
+        editingPlanId != null
+          ? await updateLessonPlanAction({
+              lessonPlanId: editingPlanId,
+              ...payload,
+            })
+          : await saveLessonPlanAction(payload);
+
+      if (isEditing && editDraft) {
+        setResult(planToSave);
+        setIsEditing(false);
+        setEditDraft(null);
+      }
+
       setSavedPlanId(saved.id);
+      setEditingPlanId(saved.id);
       if (deckTargetMode === "new") {
         setDeckTargetMode("existing");
         setDeckId(saved.deckId);
@@ -354,10 +499,14 @@ export function TeacherLessonBuilderForm({
             teacherWorkspace.teamMemberId,
           )
         : "/teacher/resources";
-      toast.success("Lesson plan saved", {
+      toast.success(
+        editingPlanId != null && initialSavedPlan?.id === saved.id
+          ? "Lesson plan updated"
+          : "Lesson plan saved",
+        {
         description: (
           <span>
-            {saved.lessonTitle} was saved to{" "}
+            {saved.lessonTitle} was {editingPlanId != null ? "updated in" : "saved to"}{" "}
             <Link href={`/decks/${saved.deckId}`} className="underline underline-offset-2">
               {saved.sourceDeckName}
             </Link>
@@ -372,7 +521,8 @@ export function TeacherLessonBuilderForm({
             .
           </span>
         ),
-      });
+      },
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not save lesson plan.";
@@ -398,8 +548,12 @@ export function TeacherLessonBuilderForm({
   return (
     <>
       <TeacherToolPageShell
-        title="AI Lesson Builder"
-        description="Generate a structured lesson plan for review before saving."
+        title={isEditingExistingPlan ? "Edit Lesson Plan" : "AI Lesson Builder"}
+        description={
+          isEditingExistingPlan
+            ? `Update ${initialSavedPlan.lessonTitle} and save changes back to your Resource Library.`
+            : "Generate a structured lesson plan for review before saving."
+        }
         backHref={backHref}
         showResult={showResult}
         isGenerating={isGenerating}
@@ -444,9 +598,32 @@ export function TeacherLessonBuilderForm({
                     <X className="size-4" aria-hidden />
                     Cancel
                   </Button>
-                  <Button type="button" size="sm" onClick={finishEditing}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isGeneratingDayDetails}
+                    onClick={() => void finishEditing()}
+                  >
+                    {isGeneratingDayDetails ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : null}
                     Done editing
                   </Button>
+                  {editingPlanId != null ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isSaving || isGeneratingDayDetails}
+                      onClick={() => void handleSavePlan()}
+                    >
+                      {isSaving ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                      ) : (
+                        <Save className="size-4" aria-hidden />
+                      )}
+                      Save changes
+                    </Button>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -486,15 +663,19 @@ export function TeacherLessonBuilderForm({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={isSaving || savedPlanId !== null}
-                    onClick={handleSavePlan}
+                    disabled={isSaving || isGeneratingDayDetails || (savedPlanId !== null && editingPlanId == null)}
+                    onClick={() => void handleSavePlan()}
                   >
                     {isSaving ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden />
                     ) : (
                       <Save className="size-4" aria-hidden />
                     )}
-                    {savedPlanId !== null ? "Saved" : "Save Lesson Plan"}
+                    {editingPlanId != null
+                      ? "Save changes"
+                      : savedPlanId !== null
+                        ? "Saved"
+                        : "Save Lesson Plan"}
                   </Button>
                   <Button
                     type="button"
@@ -518,7 +699,12 @@ export function TeacherLessonBuilderForm({
       >
       <TooltipProvider>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
+          <div
+            className={cn(
+              "space-y-2 sm:col-span-2",
+              isEditingExistingPlan && "opacity-60",
+            )}
+          >
             <TeacherFieldLabel
               htmlFor="lessonDeckTargetMode"
               label="Save to deck"
@@ -545,6 +731,7 @@ export function TeacherLessonBuilderForm({
               id="lessonDeckTargetMode"
               value={[deckTargetMode]}
               onValueChange={(next) => {
+                if (isEditingExistingPlan) return;
                 const value = next[0] as DeckTargetMode | undefined;
                 if (value) handleDeckTargetModeChange(value);
               }}
@@ -552,17 +739,51 @@ export function TeacherLessonBuilderForm({
               spacing={0}
               className="flex w-full"
             >
-              <ToggleGroupItem value="existing" className="h-10 flex-1 px-3">
+              <ToggleGroupItem
+                value="existing"
+                className="h-10 flex-1 px-3"
+                disabled={isEditingExistingPlan}
+              >
                 Existing deck
               </ToggleGroupItem>
-              <ToggleGroupItem value="new" className="h-10 flex-1 px-3">
+              <ToggleGroupItem
+                value="new"
+                className="h-10 flex-1 px-3"
+                disabled={isEditingExistingPlan}
+              >
                 New deck
               </ToggleGroupItem>
             </ToggleGroup>
             <p className="text-xs text-muted-foreground">{teacherDeckQuotaLabel(deckQuota)}</p>
           </div>
 
-          {deckTargetMode === "existing" ? (
+          {isEditingExistingPlan ? (
+            <div className="space-y-2 sm:col-span-2">
+              <TeacherFieldLabel
+                htmlFor="lessonBuilderDeckLocked"
+                label="Deck"
+                help="A saved lesson plan stays linked to its original deck. Create a new lesson plan if you need a different deck."
+              />
+              <Input
+                id="lessonBuilderDeckLocked"
+                value={selectedDeckLabel ?? initialSavedPlan?.sourceDeckName ?? "Linked deck"}
+                readOnly
+                disabled
+                className="h-10 cursor-not-allowed bg-muted/40 text-muted-foreground"
+              />
+              {(initialSavedPlan?.deckId ?? deckId) != null ? (
+                <p className="text-xs text-muted-foreground">
+                  <Link
+                    href={`/decks/${initialSavedPlan?.deckId ?? deckId}`}
+                    className="inline-flex items-center gap-1 underline underline-offset-2"
+                  >
+                    Open deck
+                    <ExternalLink className="size-3" aria-hidden />
+                  </Link>
+                </p>
+              ) : null}
+            </div>
+          ) : deckTargetMode === "existing" ? (
             isWorkspaceOwner ? (
               <OwnerTeamAdminResourcePicker
                 ownerPicker={ownerDeckPicker}
@@ -606,7 +827,7 @@ export function TeacherLessonBuilderForm({
                 <Select value={selectedDeckKey} onValueChange={handleDeckChange}>
                   <SelectTrigger id="lessonBuilderDeck" className="h-10 w-full bg-background">
                     <SelectValue placeholder="Select a deck">
-                      {selectedDeck?.name ?? "Select a deck"}
+                      {selectedDeckLabel ?? "Select a deck"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>

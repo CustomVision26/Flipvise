@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSavedHomeworkAssignmentsByUserIds } from "@/db/queries/saved-homework";
 import { getSavedLessonPlansByUserIds } from "@/db/queries/saved-lesson-plans";
+import { getSavedQuizzesByUserIds } from "@/db/queries/saved-quizzes";
 import { getSavedStudyGuidesByUserIds } from "@/db/queries/saved-study-guides";
 import { getSavedWorksheetsByUserIds } from "@/db/queries/saved-worksheets";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
@@ -21,8 +22,14 @@ export type TeacherResourceLibraryItem = {
   pdfUrl: string | null;
   answerKeyPdfUrl: string | null;
   lessonPlanId: number | null;
+  lessonPlanEditHref: string | null;
+  homeworkEditHref: string | null;
+  worksheetEditHref: string | null;
+  studyGuideEditHref: string | null;
   homeworkId: number | null;
   worksheetId: number | null;
+  studyGuideId: number | null;
+  savedQuizId: number | null;
   quizHref: string | null;
   sourceLabel: string | null;
   isPlaceholder: boolean;
@@ -45,10 +52,6 @@ export type TeacherResourceLibraryPayload = {
 };
 
 const PLACEHOLDER_RESOURCES = {
-  quizzes: [
-    { title: "Civil War Review Quiz", subject: "History", grade: "8th" },
-    { title: "Grammar Check-up", subject: "English", grade: "6th" },
-  ],
   worksheets: [{ title: "Linear Equations Practice", subject: "Math", grade: "9th" }],
   studyGuides: [
     { title: "Cell Structure Study Guide", subject: "Biology", grade: "10th" },
@@ -113,12 +116,28 @@ function placeholderItems(
     pdfUrl: null,
     answerKeyPdfUrl: null,
     lessonPlanId: null,
+    lessonPlanEditHref: null,
+    homeworkEditHref: null,
+    worksheetEditHref: null,
+    studyGuideEditHref: null,
     homeworkId: null,
     worksheetId: null,
+    studyGuideId: null,
+    savedQuizId: null,
     quizHref: null,
     sourceLabel: null,
     isPlaceholder: true,
   }));
+}
+
+function formatSavedQuizSourceLabel(quiz: {
+  sourceDeckName: string;
+  memberLabel: string | null;
+}): string {
+  const member = quiz.memberLabel?.trim();
+  return member
+    ? `From quiz attempt · ${quiz.sourceDeckName} · ${member}`
+    : `From quiz attempt · ${quiz.sourceDeckName}`;
 }
 
 export async function loadTeacherResourceLibrary(
@@ -156,11 +175,12 @@ export async function loadTeacherResourceLibrary(
     };
   }
 
-  const [lessonPlans, homeworkAssignments, studyGuides, worksheets] = await Promise.all([
+  const [lessonPlans, homeworkAssignments, studyGuides, worksheets, savedQuizzes] = await Promise.all([
     getSavedLessonPlansByUserIds(workspaceUserIds),
     getSavedHomeworkAssignmentsByUserIds(workspaceUserIds),
     getSavedStudyGuidesByUserIds(workspaceUserIds),
     getSavedWorksheetsByUserIds(workspaceUserIds),
+    getSavedQuizzesByUserIds(workspaceUserIds),
   ]);
 
   const lessonPlanItems: TeacherResourceLibraryItem[] = lessonPlans.map((plan) => {
@@ -178,8 +198,14 @@ export async function loadTeacherResourceLibrary(
       pdfUrl: plan.pdfUrl,
       answerKeyPdfUrl: null,
       lessonPlanId: plan.id,
+      lessonPlanEditHref: null,
+    homeworkEditHref: null,
+    worksheetEditHref: null,
+    studyGuideEditHref: null,
       homeworkId: null,
       worksheetId: null,
+      studyGuideId: null,
+      savedQuizId: null,
       quizHref: null,
       sourceLabel: null,
       isPlaceholder: false,
@@ -201,8 +227,14 @@ export async function loadTeacherResourceLibrary(
       pdfUrl: homework.pdfUrl,
       answerKeyPdfUrl: null,
       lessonPlanId: homework.savedLessonPlanId,
+      lessonPlanEditHref: null,
+    homeworkEditHref: null,
+    worksheetEditHref: null,
+    studyGuideEditHref: null,
       homeworkId: homework.id,
       worksheetId: null,
+      studyGuideId: null,
+      savedQuizId: null,
       quizHref: null,
       sourceLabel: formatHomeworkSourceLabel(homework),
       isPlaceholder: false,
@@ -224,8 +256,14 @@ export async function loadTeacherResourceLibrary(
       pdfUrl: guide.pdfUrl,
       answerKeyPdfUrl: null,
       lessonPlanId: guide.savedLessonPlanId,
+      lessonPlanEditHref: null,
+    homeworkEditHref: null,
+    worksheetEditHref: null,
+    studyGuideEditHref: null,
       homeworkId: guide.savedHomeworkId,
       worksheetId: null,
+      studyGuideId: guide.id,
+      savedQuizId: null,
       quizHref: null,
       sourceLabel: formatStudyGuideSourceLabel(guide),
       isPlaceholder: false,
@@ -247,10 +285,45 @@ export async function loadTeacherResourceLibrary(
       pdfUrl: worksheet.worksheetPdfUrl,
       answerKeyPdfUrl: worksheet.answerKeyPdfUrl,
       lessonPlanId: null,
+      lessonPlanEditHref: null,
+    homeworkEditHref: null,
+    worksheetEditHref: null,
+    studyGuideEditHref: null,
       homeworkId: null,
       worksheetId: worksheet.id,
+      studyGuideId: null,
+      savedQuizId: null,
       quizHref: null,
       sourceLabel: formatWorksheetSourceLabel(worksheet),
+      isPlaceholder: false,
+    };
+  });
+
+  const quizItems: TeacherResourceLibraryItem[] = savedQuizzes.map((quiz) => {
+    const creatorDisplay = userDisplayById[quiz.userId];
+    return {
+      key: `quiz:${quiz.id}`,
+      title: quiz.label,
+      subject: quiz.subject,
+      gradeLevel: quiz.gradeLevel,
+      difficultyLevel: null,
+      creatorUserId: quiz.userId,
+      creatorName: creatorDisplay?.primaryLine ?? null,
+      creatorEmail: creatorDisplay?.primaryEmail ?? null,
+      savedAt: quiz.createdAt.toISOString(),
+      pdfUrl: quiz.questionSheetPdfUrl,
+      answerKeyPdfUrl: quiz.answerKeyPdfUrl,
+      lessonPlanId: null,
+      lessonPlanEditHref: null,
+      homeworkEditHref: null,
+      worksheetEditHref: null,
+      studyGuideEditHref: null,
+      homeworkId: null,
+      worksheetId: null,
+      studyGuideId: null,
+      savedQuizId: quiz.id,
+      quizHref: null,
+      sourceLabel: formatSavedQuizSourceLabel(quiz),
       isPlaceholder: false,
     };
   });
@@ -283,13 +356,9 @@ export async function loadTeacherResourceLibrary(
     {
       id: "quizzes",
       title: "Saved Quizzes",
-      emptyMessage: "No saved quizzes yet.",
-      items: placeholderItems(
-        "quizzes",
-        placeholderCreatorId,
-        placeholderCreatorName,
-        placeholderCreatorEmail,
-      ),
+      emptyMessage:
+        "No saved quizzes yet. Double-click a quiz result in Team Admin or Student Progress to save a question sheet and answer key.",
+      items: quizItems,
     },
     {
       id: "worksheets",

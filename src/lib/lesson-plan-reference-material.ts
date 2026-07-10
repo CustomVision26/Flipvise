@@ -98,3 +98,46 @@ export function formatMultipleLessonPlanReferencesForPrompt(
     ...blocks,
   ].join("\n\n");
 }
+
+export type LessonPlanReferenceGeneratorPurpose =
+  | "lesson plan"
+  | "quiz"
+  | "homework"
+  | "study guide"
+  | "worksheet";
+
+const REFERENCE_GROUNDING_BY_PURPOSE: Record<LessonPlanReferenceGeneratorPurpose, string> = {
+  "lesson plan":
+    "Use these sources to narrow and ground the lesson plan. Prioritize facts, vocabulary, concepts, sequencing, and examples from the references when they align with the topic, grade level, and learning standard. Do not contradict the references or invent unrelated content.",
+  quiz:
+    "Use these sources to narrow and ground the quiz. Prioritize facts, vocabulary, concepts, and examples from the references when they align with the topic, grade level, and lesson plan. Do not contradict the references or invent unrelated content.",
+  homework:
+    "Use these sources to narrow and ground the homework. Prioritize facts, vocabulary, concepts, and examples from the references when they align with the topic, grade level, and lesson plan. Do not contradict the references or invent unrelated content.",
+  "study guide":
+    "Use these sources to narrow and ground the study guide. Prioritize facts, vocabulary, concepts, and examples from the references when they align with the topic, grade level, and lesson plan. Do not contradict the references or invent unrelated content.",
+  worksheet:
+    "These reference materials were used when building the linked lesson plan. Keep worksheet prompts and vocabulary aligned with them when they match the deck topic.",
+};
+
+export function getLessonPlanReferenceMaterials(
+  input: { referenceMaterials?: LessonPlanReferenceMaterial[] } | null | undefined,
+): LessonPlanReferenceMaterial[] {
+  return (
+    input?.referenceMaterials?.filter(
+      (reference) => reference.text.trim().length > 0,
+    ) ?? []
+  );
+}
+
+export function formatLessonPlanReferencesForGeneratorContext(
+  references: LessonPlanReferenceMaterial[],
+  purpose: LessonPlanReferenceGeneratorPurpose,
+): string {
+  if (references.length === 0) return "";
+
+  const grounding = REFERENCE_GROUNDING_BY_PURPOSE[purpose];
+  return formatMultipleLessonPlanReferencesForPrompt(references).replace(
+    "Use these sources to narrow and ground the lesson plan. Prioritize facts, vocabulary, concepts, sequencing, and examples from the references when they align with the topic, grade level, and learning standard. Do not contradict the references or invent unrelated content.",
+    grounding,
+  );
+}

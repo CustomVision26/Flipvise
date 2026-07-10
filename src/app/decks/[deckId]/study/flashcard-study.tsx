@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { FormattedCardAnswer } from "@/components/formatted-card-answer";
+import { FormattedCardFront } from "@/components/formatted-card-front";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -545,11 +546,13 @@ export function FlashcardStudy({
                 </div>
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col items-center justify-center">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col justify-start">
               {currentCard.front && (
-                <p className={cn("text-center text-xl sm:text-2xl md:text-3xl font-semibold leading-relaxed break-words", hasGradient && "text-white")}>
-                  {currentCard.front}
-                </p>
+                <FormattedCardFront
+                  text={currentCard.front}
+                  variant="study"
+                  hasGradient={hasGradient}
+                />
               )}
             </div>
           </div>
@@ -585,7 +588,7 @@ export function FlashcardStudy({
                 </div>
               </div>
             )}
-            <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-4 py-3 sm:px-8">
+            <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-start overflow-y-auto px-4 py-3 sm:px-8">
               {currentCard.back && (
                 <FormattedCardAnswer
                   text={currentCard.back}

@@ -57,6 +57,7 @@ async function runEnsure(): Promise<void> {
       "termSemester" varchar(128) NOT NULL,
       "period" varchar(64),
       "notes" text,
+      "gradeType" varchar(32) NOT NULL DEFAULT 'assignment',
       "createdAt" timestamp NOT NULL DEFAULT now(),
       "updatedAt" timestamp NOT NULL DEFAULT now()
     )
@@ -68,6 +69,10 @@ async function runEnsure(): Promise<void> {
   await sql`
     CREATE INDEX IF NOT EXISTS "teacher_manual_grades_team_id_idx"
     ON "teacher_manual_grades" ("teamId")
+  `;
+  await sql`
+    ALTER TABLE "teacher_manual_grades"
+    ADD COLUMN IF NOT EXISTS "gradeType" varchar(32) NOT NULL DEFAULT 'assignment'
   `;
 }
 

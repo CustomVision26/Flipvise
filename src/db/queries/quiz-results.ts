@@ -9,6 +9,7 @@ import {
   resolveQuizResultInboxRecipients,
   type QuizResultInboxTarget,
 } from "@/lib/quiz-result-inbox-targets";
+import { listTeamMembers } from "@/db/queries/teams";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -22,6 +23,8 @@ export type SaveQuizResultOutput = {
   ownerUserId: string | null;
   /** Team workspace name when this was a team-deck quiz; null for personal quizzes. */
   teamName: string | null;
+  /** Team admin user IDs when `team_admin` was included in inbox targets. */
+  teamAdminUserIds: string[];
 };
 
 export type SaveQuizResultInput = {
@@ -77,10 +80,19 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQu
     }
   }
 
+  let teamAdminUserIds: string[] = [];
+  if (input.teamId !== null && input.inboxTargets?.includes("team_admin")) {
+    const members = await listTeamMembers(input.teamId);
+    teamAdminUserIds = members
+      .filter((member) => member.role === "team_admin")
+      .map((member) => member.userId);
+  }
+
   const inboxRecipients = resolveQuizResultInboxRecipients(
     input.userId,
     ownerUserId,
     input.inboxTargets,
+    teamAdminUserIds,
   );
 
   if (inboxRecipients.length > 0) {
@@ -92,7 +104,7 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQu
     );
   }
 
-  return { result: saved, ownerUserId, teamName };
+  return { result: saved, ownerUserId, teamName, teamAdminUserIds };
 }
 
 /** Quiz result row if `viewerUserId` is the taker or the team owner (for team results). */
@@ -109,6 +121,18 @@ export async function getQuizResultByIdForViewer(
       .from(teams)
       .where(eq(teams.id, row.teamId));
     if (team?.ownerUserId === viewerUserId) return row;
+
+    const [inboxRow] = await db
+      .select({ id: quizResultInboxMessages.id })
+      .from(quizResultInboxMessages)
+      .where(
+        and(
+          eq(quizResultInboxMessages.quizResultId, resultId),
+          eq(quizResultInboxMessages.recipientUserId, viewerUserId),
+        ),
+      )
+      .limit(1);
+    if (inboxRow) return row;
   }
   return null;
 }
@@ -153,6 +177,19 @@ export async function deleteQuizResultForTeamAdmin(
   if (deleted.length === 0) {
     throw new Error("Quiz result not found");
   }
+}
+
+/** Loads a team quiz result when it belongs to the given workspace. */
+export async function getQuizResultForTeamAdmin(
+  resultId: number,
+  teamId: number,
+): Promise<QuizResultRow | null> {
+  const [row] = await db
+    .select()
+    .from(quizResults)
+    .where(and(eq(quizResults.id, resultId), eq(quizResults.teamId, teamId)))
+    .limit(1);
+  return row ?? null;
 }
 
 export type QuizResultInboxEntry = QuizResultInboxMessageRow & {

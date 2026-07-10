@@ -1,6 +1,12 @@
 import { db } from "@/db";
 import { savedLessonPlans } from "@/db/schema";
+import type { DeckRow } from "@/db/queries/decks";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
+import { lessonPlanMatchesDeck } from "@/lib/lesson-plan-deck-match";
+import {
+  clampPlanPeriodDays,
+  DEFAULT_PLAN_PERIOD_DAYS,
+} from "@/lib/lesson-plan-weekly-schedule";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
@@ -55,6 +61,71 @@ export async function getDeckIdsWithSavedLessonPlans(): Promise<Set<number>> {
   );
 }
 
+export type LessonPlanDeckUsage = {
+  usedDeckIds: Set<number>;
+  usedDeckIdsByUserId: Map<string, Set<number>>;
+};
+
+function deckCreatorUserId(deck: DeckRow): string {
+  return deck.createdByUserId ?? deck.userId;
+}
+
+function resolveDeckIdForSavedLessonPlan(
+  plan: SavedLessonPlanRow,
+  availableDecks: DeckRow[],
+): number | null {
+  if (plan.deckId != null) {
+    const byId = availableDecks.find((deck) => deck.id === plan.deckId);
+    if (byId) return byId.id;
+  }
+
+  const sourceName = plan.sourceDeckName?.trim().toLowerCase();
+  if (!sourceName) return null;
+
+  const nameMatches = availableDecks.filter(
+    (deck) => deck.name.trim().toLowerCase() === sourceName,
+  );
+  if (nameMatches.length === 0) return null;
+  if (nameMatches.length === 1) return nameMatches[0]!.id;
+
+  const ownedByCreator = nameMatches.find(
+    (deck) => deckCreatorUserId(deck) === plan.userId,
+  );
+  return ownedByCreator?.id ?? nameMatches[0]!.id;
+}
+
+/** Decks already linked to a saved lesson plan (by deckId or matching source deck name). */
+export async function resolveLessonPlanDeckUsage(
+  userIds: string[],
+  availableDecks: DeckRow[],
+): Promise<LessonPlanDeckUsage> {
+  const uniqueUserIds = [...new Set(userIds.filter((id) => id.trim().length > 0))];
+  const usedDeckIds = new Set<number>();
+  const usedDeckIdsByUserId = new Map<string, Set<number>>();
+
+  for (const userId of uniqueUserIds) {
+    usedDeckIdsByUserId.set(userId, new Set());
+  }
+
+  if (uniqueUserIds.length === 0 || availableDecks.length === 0) {
+    return { usedDeckIds, usedDeckIdsByUserId };
+  }
+
+  const plans = await getSavedLessonPlansByUserIds(uniqueUserIds);
+  for (const plan of plans) {
+    const deckId = resolveDeckIdForSavedLessonPlan(plan, availableDecks);
+    if (deckId == null) continue;
+
+    usedDeckIds.add(deckId);
+    const forUser = usedDeckIdsByUserId.get(plan.userId);
+    if (forUser) {
+      forUser.add(deckId);
+    }
+  }
+
+  return { usedDeckIds, usedDeckIdsByUserId };
+}
+
 export async function getSavedLessonPlansByUser(
   userId: string,
 ): Promise<SavedLessonPlanRow[]> {
@@ -101,12 +172,131 @@ export async function getSavedLessonPlanById(
   return row ?? null;
 }
 
+function resolveDeckIdForLessonPlan(
+  plan: SavedLessonPlanRow,
+  availableDecks: DeckRow[],
+): number | null {
+  const byIdOrName = resolveDeckIdForSavedLessonPlan(plan, availableDecks);
+  if (byIdOrName != null) {
+    return byIdOrName;
+  }
+
+  for (const deck of availableDecks) {
+    if (lessonPlanMatchesDeck(plan, deck)) {
+      return deck.id;
+    }
+  }
+
+  return null;
+}
+
+/** Most recent saved lesson plan plan-period (school days) per deck for the given user. */
+export async function getPlanPeriodDaysByDeckIdsForUser(
+  userId: string,
+  availableDecks: DeckRow[],
+): Promise<Record<number, number>> {
+  const targetDeckIds = new Set(
+    availableDecks.map((deck) => deck.id).filter((id) => id > 0),
+  );
+  if (targetDeckIds.size === 0) {
+    return {};
+  }
+
+  const plans = await getSavedLessonPlansByUser(userId);
+  const byDeckId: Record<number, number> = {};
+
+  for (const plan of plans) {
+    const deckId = resolveDeckIdForLessonPlan(plan, availableDecks);
+    if (deckId == null || !targetDeckIds.has(deckId) || byDeckId[deckId] != null) {
+      continue;
+    }
+
+    byDeckId[deckId] = clampPlanPeriodDays(
+      plan.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+    );
+  }
+
+  return byDeckId;
+}
+
+export async function getPlanPeriodDaysForDeckForUser(
+  userId: string,
+  deckId: number,
+  availableDecks: DeckRow[],
+): Promise<number | null> {
+  const deck = availableDecks.find((row) => row.id === deckId);
+  if (!deck) {
+    return null;
+  }
+
+  const plans = await getSavedLessonPlansByUser(userId);
+  for (const plan of plans) {
+    const resolvedDeckId = resolveDeckIdForLessonPlan(plan, availableDecks);
+    if (resolvedDeckId !== deckId) {
+      continue;
+    }
+
+    return clampPlanPeriodDays(plan.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS);
+  }
+
+  return null;
+}
+
+export async function getSavedLessonPlanByDeckIdForUser(
+  userId: string,
+  deckId: number,
+): Promise<SavedLessonPlanPickerItem | null> {
+  const [row] = await db
+    .select()
+    .from(savedLessonPlans)
+    .where(
+      and(eq(savedLessonPlans.userId, userId), eq(savedLessonPlans.deckId, deckId)),
+    )
+    .orderBy(desc(savedLessonPlans.createdAt))
+    .limit(1);
+
+  return row ? mapSavedLessonPlanRowToPickerItem(row) : null;
+}
+
 export async function deleteSavedLessonPlanById(
   id: number,
 ): Promise<SavedLessonPlanRow | null> {
   const [row] = await db
     .delete(savedLessonPlans)
     .where(eq(savedLessonPlans.id, id))
+    .returning();
+
+  return row ?? null;
+}
+
+export async function updateSavedLessonPlanById(
+  planId: number,
+  data: {
+    input: LessonPlanInput;
+    result: LessonPlanResult;
+    pdfUrl?: string | null;
+    pdfFileName?: string | null;
+    deckId?: number | null;
+    sourceDeckName?: string | null;
+  },
+): Promise<SavedLessonPlanRow | null> {
+  const [row] = await db
+    .update(savedLessonPlans)
+    .set({
+      lessonTitle: data.result.lessonTitle,
+      subject: data.input.subject,
+      gradeLevel: data.input.gradeLevel,
+      topic: data.input.topic,
+      difficultyLevel: data.input.difficultyLevel,
+      input: data.input,
+      result: data.result,
+      pdfUrl: data.pdfUrl ?? null,
+      pdfFileName: data.pdfFileName ?? null,
+      deckId: data.deckId ?? null,
+      sourceDeckName: data.sourceDeckName ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedLessonPlans.id, planId))
     .returning();
 
   return row ?? null;

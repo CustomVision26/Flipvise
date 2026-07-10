@@ -23,6 +23,7 @@ import type { QuizResultRow } from "@/db/queries/quiz-results";
 import type { PerCardSnapshot } from "@/db/schema";
 import {
   shouldSendQuizResultEmailToOwner,
+  shouldSendQuizResultEmailToTeamAdmin,
   shouldSendQuizResultEmailToUser,
   type QuizResultInboxTarget,
 } from "@/lib/quiz-result-inbox-targets";
@@ -186,7 +187,9 @@ const saveQuizResultSchema = z.object({
   percent: z.number().int().min(0).max(100),
   elapsedSeconds: z.number().int().min(0),
   perCard: z.array(perCardSnapshotSchema),
-  inboxTargets: z.array(z.enum(["user", "owner"])).min(1).optional(),
+  inboxTargets: z.array(z.enum(["user", "owner", "team_admin"])).min(1).optional(),
+  /** When true, persist inbox rows only — no Loops email notifications. */
+  inboxOnly: z.boolean().optional(),
 });
 
 type SaveQuizResultInput = z.infer<typeof saveQuizResultSchema>;
@@ -215,6 +218,7 @@ export async function saveQuizResultAction(data: SaveQuizResultInput): Promise<{
     elapsedSeconds: d.elapsedSeconds,
     perCard: d.perCard,
     inboxTargets: d.inboxTargets,
+    inboxOnly: d.inboxOnly,
   });
 }
 
@@ -226,6 +230,7 @@ type QuizEmailContext = {
   /** Study opened/saved from team workspace URL — see `.cursor/rules/loops-quiz-result-email.mdc`. */
   savedFromTeamWorkspace: boolean;
   inboxTargets?: QuizResultInboxTarget[];
+  teamAdminUserIds?: string[];
 };
 
 /**
@@ -236,10 +241,18 @@ type QuizEmailContext = {
  * `.cursor/rules/loops-quiz-result-email.mdc` for the full matrix.
  */
 async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
-  const { result, userId, ownerUserId, teamName, savedFromTeamWorkspace, inboxTargets } =
-    ctx;
+  const {
+    result,
+    userId,
+    ownerUserId,
+    teamName,
+    savedFromTeamWorkspace,
+    inboxTargets,
+    teamAdminUserIds = [],
+  } = ctx;
   const emailUser = shouldSendQuizResultEmailToUser(inboxTargets);
   const emailOwner = shouldSendQuizResultEmailToOwner(inboxTargets);
+  const emailTeamAdmins = shouldSendQuizResultEmailToTeamAdmin(inboxTargets);
 
   const teamMemberNotOwner = Boolean(ownerUserId && ownerUserId !== userId);
   const teamDeck = ownerUserId !== null;
@@ -367,6 +380,45 @@ async function sendQuizResultEmails(ctx: QuizEmailContext): Promise<void> {
       pdfBuffer,
     );
   }
+
+  if (
+    savedFromTeamWorkspace &&
+    teamDeck &&
+    emailTeamAdmins &&
+    teamAdminUserIds.length > 0
+  ) {
+    const adminIdsToEmail = teamAdminUserIds.filter(
+      (adminId) => adminId !== userId && adminId !== ownerUserId,
+    );
+    if (adminIdsToEmail.length > 0) {
+      const adminDisplays = await Promise.all(
+        adminIdsToEmail.map((adminId) => getClerkUserFieldDisplayById(adminId)),
+      );
+      for (let i = 0; i < adminIdsToEmail.length; i++) {
+        const adminEmail = adminDisplays[i]?.primaryEmail;
+        if (!adminEmail) {
+          console.warn(
+            `[QuizEmail] Loops send skipped for team admin: Clerk user ${adminIdsToEmail[i]} has no email address on file.`,
+          );
+          continue;
+        }
+        await loopsSendQuizResultEmail(
+          {
+            ...sharedFields,
+            email: adminEmail,
+            userName: adminDisplays[i]?.primaryLine ?? adminEmail,
+            memberName: takerName,
+            isOwnerCopy: 1,
+            loopsTemplateRole: "owner",
+            viewUrl,
+            subjectLine: subjectLineOwner,
+            performanceMessage,
+          },
+          pdfBuffer,
+        );
+      }
+    }
+  }
 }
 
 async function persistQuizResultAndNotify(params: {
@@ -383,8 +435,9 @@ async function persistQuizResultAndNotify(params: {
   elapsedSeconds: number;
   perCard: PerCardSnapshot[];
   inboxTargets?: QuizResultInboxTarget[];
+  inboxOnly?: boolean;
 }): Promise<{ id: number }> {
-  const { result: saved, ownerUserId, teamName } = await saveQuizResult({
+  const { result: saved, ownerUserId, teamName, teamAdminUserIds } = await saveQuizResult({
     userId: params.userId,
     deckId: params.deckId,
     deckName: params.deckName,
@@ -399,14 +452,17 @@ async function persistQuizResultAndNotify(params: {
     inboxTargets: params.inboxTargets,
   });
 
-  await sendQuizResultEmails({
-    userId: params.userId,
-    ownerUserId,
-    teamName,
-    result: saved,
-    savedFromTeamWorkspace: params.savedFromTeamWorkspace,
-    inboxTargets: params.inboxTargets,
-  });
+  if (!params.inboxOnly) {
+    await sendQuizResultEmails({
+      userId: params.userId,
+      ownerUserId,
+      teamName,
+      result: saved,
+      savedFromTeamWorkspace: params.savedFromTeamWorkspace,
+      inboxTargets: params.inboxTargets,
+      teamAdminUserIds,
+    });
+  }
 
   return { id: saved.id };
 }

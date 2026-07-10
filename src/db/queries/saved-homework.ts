@@ -4,6 +4,7 @@ import type { SavedHomeworkGenerationInput } from "@/db/schema";
 import type { HomeworkResult } from "@/lib/teacher-homework-ai-schema";
 import { desc, eq, and, inArray } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
+import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 
 export type SavedHomeworkRow = InferSelectModel<typeof savedHomeworkAssignments>;
 
@@ -113,6 +114,78 @@ export async function deleteSavedHomeworkAssignmentById(
   return row ?? null;
 }
 
+export async function updateSavedHomeworkById(
+  homeworkId: number,
+  data: {
+    label: string;
+    assignmentTitle: string;
+    subject: string;
+    gradeLevel: string;
+    topic: string;
+    difficultyLevel: string;
+    sourceType: SavedHomeworkGenerationInput["sourceType"];
+    savedLessonPlanId?: number | null;
+    sourceLessonPlanTitle?: string | null;
+    deckId?: number | null;
+    sourceDeckName?: string | null;
+    input: SavedHomeworkGenerationInput;
+    result: HomeworkResult;
+    pdfUrl?: string | null;
+    pdfFileName?: string | null;
+  },
+): Promise<SavedHomeworkRow | null> {
+  const [row] = await db
+    .update(savedHomeworkAssignments)
+    .set({
+      label: data.label,
+      assignmentTitle: data.assignmentTitle,
+      subject: data.subject,
+      gradeLevel: data.gradeLevel,
+      topic: data.topic,
+      difficultyLevel: data.difficultyLevel,
+      sourceType: data.sourceType,
+      savedLessonPlanId: data.savedLessonPlanId ?? null,
+      sourceLessonPlanTitle: data.sourceLessonPlanTitle ?? null,
+      deckId: data.deckId ?? null,
+      sourceDeckName: data.sourceDeckName ?? null,
+      input: data.input,
+      result: data.result,
+      pdfUrl: data.pdfUrl ?? null,
+      pdfFileName: data.pdfFileName ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedHomeworkAssignments.id, homeworkId))
+    .returning();
+
+  return row ?? null;
+}
+
+export type SavedHomeworkEditItem = {
+  id: number;
+  label: string;
+  sourceType: SavedHomeworkGenerationInput["sourceType"];
+  savedLessonPlanId: number | null;
+  deckId: number | null;
+  sourceDeckName: string | null;
+  sourceLessonPlanTitle: string | null;
+  input: SavedHomeworkGenerationInput;
+  result: HomeworkResult;
+};
+
+export function mapSavedHomeworkRowToEditItem(row: SavedHomeworkRow): SavedHomeworkEditItem {
+  return {
+    id: row.id,
+    label: row.label,
+    sourceType: row.sourceType,
+    savedLessonPlanId: row.savedLessonPlanId,
+    deckId: row.deckId,
+    sourceDeckName: row.sourceDeckName,
+    sourceLessonPlanTitle: row.sourceLessonPlanTitle,
+    input: row.input,
+    result: row.result,
+  };
+}
+
 export async function resolveSavedHomeworkForViewer(
   viewerUserId: string,
   homeworkId: number,
@@ -190,4 +263,54 @@ export async function listSavedHomeworkPdfUrlsForUser(userId: string): Promise<s
   return rows
     .map((row) => row.pdfUrl?.trim())
     .filter((url): url is string => Boolean(url));
+}
+
+export type SavedHomeworkAssignmentOption = {
+  id: number;
+  label: string;
+  assignmentTitle: string;
+  deckId: number | null;
+  inputDeckId: number | null;
+  pdfUrl: string | null;
+  subject: string;
+};
+
+export async function listSavedHomeworkAssignmentOptionsForUser(
+  userId: string,
+): Promise<SavedHomeworkAssignmentOption[]> {
+  const rows = await getSavedHomeworkAssignmentsByUser(userId);
+
+  return rows.map(mapSavedHomeworkRowToAssignmentOption);
+}
+
+function mapSavedHomeworkRowToAssignmentOption(
+  row: SavedHomeworkRow,
+): SavedHomeworkAssignmentOption {
+  return {
+    id: row.id,
+    label: row.label,
+    assignmentTitle: row.assignmentTitle,
+    deckId: row.deckId,
+    inputDeckId: row.input.deckId ?? null,
+    pdfUrl: row.pdfUrl,
+    subject: row.subject,
+  };
+}
+
+/** Workspace-visible saved homework (owner sees all members; admins see their own). */
+export async function listSavedHomeworkAssignmentOptionsForWorkspace(
+  viewerUserId: string,
+  teamId: number,
+): Promise<SavedHomeworkAssignmentOption[]> {
+  const team = await getTeamById(teamId);
+  if (!team) return [];
+
+  const members = await listTeamMembers(teamId);
+  const isWorkspaceOwner = team.ownerUserId === viewerUserId;
+  const workspaceUserIds = isWorkspaceOwner
+    ? [...new Set([team.ownerUserId, ...members.map((member) => member.userId)])]
+    : [viewerUserId];
+
+  const rows = await getSavedHomeworkAssignmentsByUserIds(workspaceUserIds);
+  return rows.map(mapSavedHomeworkRowToAssignmentOption);
 }

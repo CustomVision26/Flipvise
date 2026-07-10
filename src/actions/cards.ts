@@ -27,6 +27,10 @@ import {
   resolveDeckCardCap,
 } from "@/lib/deck-limits";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
+import {
+  canUseDeckAiFeatures,
+  DECK_AI_PLAN_REQUIREMENT,
+} from "@/lib/deck-ai-access";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import {
   importedCardPreviewSchema,
@@ -379,8 +383,9 @@ export async function uploadCardImageAction(
 }
 
 export async function createCardAction(data: CreateCardInput) {
-  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId, maxCardsPerDeck } = access;
 
   const parsed = createCardSchema.safeParse(data);
   if (!parsed.success) {
@@ -397,7 +402,7 @@ export async function createCardAction(data: CreateCardInput) {
     personalMaxCardsPerDeck: maxCardsPerDeck,
   });
   const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
   if (existingCards.length >= deckCardLimit) {
@@ -411,53 +416,52 @@ export async function createCardAction(data: CreateCardInput) {
   const frontText = cleanUserText(front) || null;
   const backText = cleanUserText(back) || null;
 
-  // If the client already fetched AI distractors during the "Generate answer"
-  // flow, persist them on insert — no second AI round-trip needed.
-  const providedDistractors =
-    Array.isArray(distractors) && distractors.length === 3 && backText
-      ? [cleanAiText(distractors[0]), cleanAiText(distractors[1]), cleanAiText(distractors[2])]
-      : null;
+  let resolvedDistractors: [string, string, string] | null = null;
 
-  const initialChoices = providedDistractors && backText
-    ? [backText, ...providedDistractors]
-    : null;
+  if (Array.isArray(distractors) && distractors.length === 3 && backText) {
+    const normalized: [string, string, string] = [
+      cleanAiText(distractors[0]),
+      cleanAiText(distractors[1]),
+      cleanAiText(distractors[2]),
+    ];
+    if (normalized.every((d) => d.length > 0)) {
+      resolvedDistractors = normalized;
+    }
+  }
 
-  const inserted = await createCard(
+  if (
+    !resolvedDistractors &&
+    effectiveAI &&
+    frontText &&
+    backText
+  ) {
+    try {
+      resolvedDistractors = await generateStandardDistractors(
+        deck,
+        existingCards,
+        frontText,
+        backText,
+      );
+    } catch {
+      // Best-effort — card still saves without stored wrong answers.
+    }
+  }
+
+  const choices =
+    resolvedDistractors && backText ? [backText, ...resolvedDistractors] : null;
+
+  await createCard(
     deckId,
     frontText,
     frontImageUrl ?? null,
     backText,
     backImageUrl ?? null,
     false,
-    initialChoices,
-    initialChoices ? 0 : null,
+    choices,
+    choices ? 0 : null,
   );
 
-  // Manual path on a Pro plan: the user typed the question + correct answer
-  // themselves. Silently generate 3 AI distractors in the same request and
-  // back-fill them onto the card. Only when both sides are real text (we can't
-  // meaningfully distract an image-only card).
-  if (
-    !initialChoices &&
-    effectiveAI &&
-    frontText &&
-    backText &&
-    inserted?.id
-  ) {
-    try {
-      const aiDistractors = await generateStandardDistractors(
-        deck,
-        existingCards,
-        frontText,
-        backText,
-      );
-      await updateCardChoices(inserted.id, deckId, [backText, ...aiDistractors], 0);
-    } catch {
-      // Distractor generation is a best-effort enhancement — never fail the
-      // card creation because of an AI hiccup.
-    }
-  }
-
+  revalidatePath(`/decks/${deckId}`);
 }
 
 export async function updateCardAction(data: UpdateCardInput) {
@@ -609,8 +613,9 @@ export async function deleteAllCardsAction(data: DeleteAllCardsInput) {
 }
 
 export async function generateCardsAction(data: GenerateCardsInput) {
-  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId, maxCardsPerDeck } = access;
 
   const parsed = generateCardsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -619,14 +624,14 @@ export async function generateCardsAction(data: GenerateCardsInput) {
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
   const deckCardLimit = resolveDeckCardCap({
     teamTierProWorkspace: teamTierPro,
     personalMaxCardsPerDeck: maxCardsPerDeck,
   });
   const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
 
-  if (!effectiveAI) throw new Error("AI flashcard generation requires a Pro plan.");
+  if (!effectiveAI) throw new Error(DECK_AI_PLAN_REQUIREMENT);
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
   const aiGeneratedSoFar = existingCards.filter((c) => c.aiGenerated).length;
@@ -759,8 +764,9 @@ export async function getCardsForDeckViewerPreviewAction(
 export async function generateAnswerAction(
   data: GenerateAnswerInput,
 ): Promise<{ answer: string; distractors: [string, string, string] }> {
-  const { userId, hasAI } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId } = access;
 
   const parsed = generateAnswerSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -769,7 +775,9 @@ export async function generateAnswerAction(
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  if (!(hasAI || teamTierPro)) throw new Error("AI answer generation requires a Pro plan.");
+  if (!canUseDeckAiFeatures(access, teamTierPro)) {
+    throw new Error(DECK_AI_PLAN_REQUIREMENT);
+  }
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
   const fullContext = buildDeckContext(deck, existingCards);
@@ -1071,8 +1079,10 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
 export async function generateMultipleChoiceAction(
   data: GenerateMultipleChoiceInput,
 ): Promise<{ correctAnswer: string; distractors: [string, string, string] }> {
-  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { maxCardsPerDeck } = access;
+  const userId = access.userId;
 
   const parsed = generateMultipleChoiceSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -1086,14 +1096,14 @@ export async function generateMultipleChoiceAction(
     personalMaxCardsPerDeck: maxCardsPerDeck,
   });
   const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
 
   if (!paidCardTier) {
     throw new Error(
       "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
     );
   }
-  if (!effectiveAI) throw new Error("AI multiple-choice generation requires a Pro plan.");
+  if (!effectiveAI) throw new Error(DECK_AI_PLAN_REQUIREMENT);
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
   const fullContext = buildDeckContext(deck, existingCards);
@@ -1309,8 +1319,9 @@ export async function generateCardsFromExtractedSource(
     readingPassageMultipleChoice?: boolean;
   },
 ): Promise<GenerateCardsFromSourceResult> {
-  const { hasAI, maxCardsPerDeck } = await getAccessContext();
+  const access = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
+  const { maxCardsPerDeck } = access;
 
   const { deckId, count, extracted, skipRelevanceCheck, readingPassageMultipleChoice = false } =
     input;
@@ -1322,9 +1333,9 @@ export async function generateCardsFromExtractedSource(
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
   if (!effectiveAI) {
-    throw new Error("Import and AI generation from sources requires a Pro plan.");
+    throw new Error(DECK_AI_PLAN_REQUIREMENT);
   }
 
   const { existingCards } = await assertSourceImportLimits(
@@ -1412,8 +1423,9 @@ Generate exactly ${count} new flashcards from the source material above. They mu
 export async function generateCardsFromSourceAction(
   formData: FormData,
 ): Promise<GenerateCardsFromSourceResult> {
-  const { userId, hasAI, hasAiReading } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId, hasAiReading } = access;
 
   const deckId = Number(formData.get("deckId"));
   const count = Number(formData.get("count"));
@@ -1430,9 +1442,9 @@ export async function generateCardsFromSourceAction(
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
   if (!effectiveAI) {
-    throw new Error("Import and AI generation from sources requires a Pro plan.");
+    throw new Error(DECK_AI_PLAN_REQUIREMENT);
   }
 
   const advancedImport = canUseAdvancedSourceImport({
@@ -1476,8 +1488,9 @@ export async function generateCardsFromSourceAction(
 export async function previewImportDistractorsAction(
   data: z.infer<typeof previewImportDistractorsSchema>,
 ): Promise<{ distractors: [string, string, string] }> {
-  const { userId, hasAI } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId } = access;
 
   const parsed = previewImportDistractorsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -1485,8 +1498,8 @@ export async function previewImportDistractorsAction(
   const { deckId, distractorQuestion, distractorAnswer } = parsed.data;
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  if (!(hasAI || teamTierPro)) {
-    throw new Error("Import and AI generation from sources requires a Pro plan.");
+  if (!canUseDeckAiFeatures(access, teamTierPro)) {
+    throw new Error(DECK_AI_PLAN_REQUIREMENT);
   }
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
@@ -1503,8 +1516,9 @@ export async function previewImportDistractorsAction(
 export async function commitImportedCardsAction(
   data: CommitImportedCardsInput,
 ): Promise<{ added: number }> {
-  const { userId, hasAI, maxCardsPerDeck } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId, maxCardsPerDeck } = access;
 
   const parsed = commitImportedCardsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -1512,9 +1526,9 @@ export async function commitImportedCardsAction(
   const { deckId, cards } = parsed.data;
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const effectiveAI = hasAI || teamTierPro;
+  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
   if (!effectiveAI) {
-    throw new Error("Import and AI generation from sources requires a Pro plan.");
+    throw new Error(DECK_AI_PLAN_REQUIREMENT);
   }
 
   await assertSourceImportLimits(deckId, cards.length, maxCardsPerDeck, teamTierPro);

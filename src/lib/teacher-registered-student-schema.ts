@@ -11,4 +11,22 @@ export const registerTeacherStudentSchema = z.object({
     .optional(),
 });
 
+export const updateTeacherStudentSchema = registerTeacherStudentSchema.extend({
+  studentId: z.coerce.number().int().positive("Student not found."),
+});
+
+export const registerWorkspaceInviteeStudentSchema = z.object({
+  teamId: z.coerce.number().int().positive("Workspace not found."),
+  inviteeKey: z.string().trim().min(1, "Select a workspace student."),
+  classId: z.coerce
+    .number()
+    .int()
+    .positive("Select a class for this student.")
+    .optional(),
+});
+
 export type RegisterTeacherStudentInput = z.infer<typeof registerTeacherStudentSchema>;
+export type UpdateTeacherStudentInput = z.infer<typeof updateTeacherStudentSchema>;
+export type RegisterWorkspaceInviteeStudentInput = z.infer<
+  typeof registerWorkspaceInviteeStudentSchema
+>;

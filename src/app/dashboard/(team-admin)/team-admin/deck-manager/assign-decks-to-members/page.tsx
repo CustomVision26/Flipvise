@@ -67,6 +67,7 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
         return {
           id: t.id,
           name: t.name,
+          planSlug: t.planSlug,
           ownerUserId: t.ownerUserId,
           normalMembers: allMembers.filter((m) => roleReceivesDeckAssignments(m.role)),
           allMembers,

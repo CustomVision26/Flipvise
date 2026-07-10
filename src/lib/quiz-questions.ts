@@ -77,11 +77,27 @@ export function summarizeSessionQuestionFormats(questions: QuizQuestion[]): stri
   };
   for (const q of questions) counts[q.type]++;
 
+  return summarizeQuizFormatCounts(counts);
+}
+
+export function summarizeQuizFormatDistribution(
+  distribution: {
+    multipleChoice: number;
+    trueFalse: number;
+    fillInBlank: number;
+  },
+): string | null {
+  return summarizeQuizFormatCounts({
+    multiple_choice: distribution.multipleChoice,
+    true_false: distribution.trueFalse,
+    fill_in_blank: distribution.fillInBlank,
+  });
+}
+
+function summarizeQuizFormatCounts(counts: Record<QuizQuestionType, number>): string | null {
   const parts: string[] = [];
   if (counts.multiple_choice > 0) {
-    parts.push(
-      `${counts.multiple_choice} multiple choice`,
-    );
+    parts.push(`${counts.multiple_choice} multiple choice`);
   }
   if (counts.true_false > 0) {
     parts.push(`${counts.true_false} true/false`);
@@ -259,18 +275,37 @@ export function buildQuizQuestions(
   formats: QuizFormatsSettings,
   assignments?: Record<number, QuizQuestionType> | null,
 ): QuizQuestion[] {
+  const hasAssignments =
+    assignments != null && Object.keys(assignments).length > 0;
+
+  if (hasAssignments) {
+    const cardById = new Map(cards.map((c) => [c.id, c]));
+    const questions: QuizQuestion[] = [];
+
+    for (const [rawCardId, assigned] of Object.entries(assignments!)) {
+      const cardId = Number(rawCardId);
+      if (!Number.isFinite(cardId)) continue;
+      const card = cardById.get(cardId);
+      if (!card) continue;
+
+      let question = buildQuestionForCardType(card, cards, assigned, formats);
+      if (!question) {
+        const available = getAvailableQuestionTypesForCard(card, cards, formats);
+        for (const fallbackType of available) {
+          if (fallbackType === assigned) continue;
+          question = buildQuestionForCardType(card, cards, fallbackType, formats);
+          if (question) break;
+        }
+      }
+      if (question) questions.push(question);
+    }
+
+    return shuffleArray(questions);
+  }
+
   const questions: QuizQuestion[] = [];
 
   for (const card of cards) {
-    const assigned = assignments?.[card.id];
-    if (assigned) {
-      const assignedQuestion = buildQuestionForCardType(card, cards, assigned, formats);
-      if (assignedQuestion) {
-        questions.push(assignedQuestion);
-        continue;
-      }
-    }
-
     const candidates: QuizQuestion[] = [];
 
     if (formats.multipleChoice) {

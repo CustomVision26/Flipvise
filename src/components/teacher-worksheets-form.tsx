@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Download, Loader2, Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
-import { generateWorksheetFromDeckAction, saveWorksheetAction } from "@/actions/teacher-worksheet";
+import { generateWorksheetFromDeckAction, saveWorksheetAction, updateWorksheetAction } from "@/actions/teacher-worksheet";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,7 +35,12 @@ import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner
 import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
 import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
+import { cn } from "@/lib/utils";
 import type { DeckRow } from "@/db/queries/decks";
+import type { SavedWorksheetEditItem } from "@/db/queries/saved-worksheets";
+import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
+import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
+import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
 import type { DeckWorksheetResult } from "@/lib/teacher-worksheet-schema";
 import { downloadWorksheetPdf } from "@/lib/worksheet-pdf-build";
 import {
@@ -64,47 +69,73 @@ const EMPTY_FORM: WorksheetFormState = {
 export function TeacherWorksheetsForm({
   decks,
   ownerDeckPicker,
+  savedLessonPlans,
   backHref = "/teacher",
   teacherWorkspace,
   initialDeckId,
+  initialSavedWorksheet,
 }: {
   decks: DeckRow[];
   ownerDeckPicker: OwnerTeamAdminDeckPickerPayload;
+  savedLessonPlans: SavedLessonPlanPickerItem[];
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
   initialDeckId?: number;
+  initialSavedWorksheet?: SavedWorksheetEditItem;
 }) {
+  const isEditingExistingWorksheet = initialSavedWorksheet != null;
+  const resolvedInitialDeckId = initialSavedWorksheet?.deckId ?? initialDeckId;
   const initialDeck =
-    initialDeckId != null ? decks.find((deck) => deck.id === initialDeckId) ?? null : null;
+    resolvedInitialDeckId != null
+      ? decks.find((deck) => deck.id === resolvedInitialDeckId) ?? null
+      : null;
+
   const initialDeckDefaults = initialDeck ? deckToHomeworkDefaults(initialDeck) : null;
 
   const [selectedDeckKey, setSelectedDeckKey] = useState<string>(
-    initialDeck ? String(initialDeck.id) : DECK_NONE,
+    resolvedInitialDeckId != null ? String(resolvedInitialDeckId) : DECK_NONE,
   );
-  const [deckId, setDeckId] = useState<number | undefined>(initialDeck?.id);
+  const [deckId, setDeckId] = useState<number | undefined>(resolvedInitialDeckId ?? undefined);
   const [form, setForm] = useState<WorksheetFormState>(
-    initialDeckDefaults
+    initialSavedWorksheet
       ? {
-          subject: initialDeckDefaults.subject,
-          gradeLevel: initialDeckDefaults.gradeLevel,
-          topic: initialDeckDefaults.topic,
-          worksheetType: "Practice",
-          difficultyLevel: initialDeckDefaults.difficultyLevel,
+          subject: initialSavedWorksheet.input.subject,
+          gradeLevel: initialSavedWorksheet.input.gradeLevel,
+          topic: initialSavedWorksheet.input.topic,
+          worksheetType: initialSavedWorksheet.input.worksheetType,
+          difficultyLevel: initialSavedWorksheet.input.difficultyLevel,
         }
-      : EMPTY_FORM,
+      : initialDeckDefaults
+        ? {
+            subject: initialDeckDefaults.subject,
+            gradeLevel: initialDeckDefaults.gradeLevel,
+            topic: initialDeckDefaults.topic,
+            worksheetType: "Practice",
+            difficultyLevel: initialDeckDefaults.difficultyLevel,
+          }
+        : EMPTY_FORM,
   );
-  const [result, setResult] = useState<DeckWorksheetResult | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  const [result, setResult] = useState<DeckWorksheetResult | null>(
+    initialSavedWorksheet?.result ?? null,
+  );
+  const [showResult, setShowResult] = useState(isEditingExistingWorksheet);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloadingWorksheet, setIsDownloadingWorksheet] = useState(false);
   const [isDownloadingAnswerKey, setIsDownloadingAnswerKey] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDraft, setEditDraft] = useState<DeckWorksheetResult | null>(null);
+  const [isEditing, setIsEditing] = useState(isEditingExistingWorksheet);
+  const [editDraft, setEditDraft] = useState<DeckWorksheetResult | null>(
+    initialSavedWorksheet ? cloneWorksheetResult(initialSavedWorksheet.result) : null,
+  );
   const [isSaving, setIsSaving] = useState(false);
-  const [savedWorksheetId, setSavedWorksheetId] = useState<number | null>(null);
+  const [savedWorksheetId, setSavedWorksheetId] = useState<number | null>(
+    isEditingExistingWorksheet ? initialSavedWorksheet.id : null,
+  );
+  const [editingWorksheetId, setEditingWorksheetId] = useState<number | null>(
+    isEditingExistingWorksheet ? initialSavedWorksheet.id : null,
+  );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [saveLabel, setSaveLabel] = useState("");
+  const [saveLabel, setSaveLabel] = useState(initialSavedWorksheet?.label ?? "");
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
 
   const isWorkspaceOwner = ownerDeckPicker.isWorkspaceOwner;
@@ -117,6 +148,14 @@ export function TeacherWorksheetsForm({
 
   const selectedDeck =
     deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+
+  const linkedLessonPlan =
+    deckId != null
+      ? savedLessonPlans.find((plan) => plan.deckId === deckId) ?? null
+      : null;
+  const linkedLessonPlanReferences =
+    initialSavedWorksheet?.input.referenceMaterials ??
+    getLessonPlanReferenceMaterials(linkedLessonPlan?.input);
 
   const resourcesHref = teacherWorkspace
     ? buildTeacherSubPath(
@@ -268,10 +307,41 @@ export function TeacherWorksheetsForm({
 
   async function handleSaveWorksheet() {
     if (!result || !saveLabel.trim() || deckId == null) return;
+    await persistWorksheet(saveLabel.trim());
+  }
+
+  async function handleSaveChanges() {
+    if (!result || editingWorksheetId == null || deckId == null) return;
+    const label = saveLabel.trim() || initialSavedWorksheet?.label;
+    if (!label) {
+      toast.error("Worksheet label is missing.");
+      return;
+    }
+
+    let planToSave = isEditing && editDraft ? editDraft : result;
+    if (isEditing && editDraft) {
+      if (!editDraft.instructions.trim()) {
+        toast.error("Instructions cannot be empty.");
+        return;
+      }
+      if (editDraft.items.some((item) => !item.prompt.trim() || !item.answer.trim())) {
+        toast.error("Every question needs both a prompt and an answer.");
+        return;
+      }
+      setResult(planToSave);
+      setIsEditing(false);
+      setEditDraft(null);
+    }
+
+    await persistWorksheet(label, editingWorksheetId);
+  }
+
+  async function persistWorksheet(label: string, worksheetId?: number) {
+    if (!result || deckId == null) return;
     setIsSaving(true);
     try {
-      const saved = await saveWorksheetAction({
-        label: saveLabel.trim(),
+      const payload = {
+        label,
         input: {
           deckId,
           subject: form.subject,
@@ -281,26 +351,42 @@ export function TeacherWorksheetsForm({
           difficultyLevel: form.difficultyLevel,
         },
         result,
-      });
+      };
+
+      const saved =
+        worksheetId != null
+          ? await updateWorksheetAction({
+              worksheetId,
+              ...payload,
+              teamId: teacherWorkspace?.teamId ?? undefined,
+            })
+          : await saveWorksheetAction(payload);
+
       setSavedWorksheetId(saved.id);
+      setEditingWorksheetId(saved.id);
+      setSaveLabel(saved.label);
       setSaveDialogOpen(false);
-      toast.success("Worksheet saved", {
+      toast.success(
+        worksheetId != null && initialSavedWorksheet?.id === saved.id
+          ? "Worksheet updated"
+          : "Worksheet saved",
+        {
         description: (
           <span>
-            {saved.label} was saved
+            {saved.label} was {worksheetId != null ? "updated in" : "saved to"} your{" "}
+            <Link href={resourcesHref} className="underline underline-offset-2">
+              Resource Library
+            </Link>
             {saved.worksheetPdfUrl && saved.answerKeyPdfUrl
               ? " with worksheet and answer key PDFs"
               : saved.worksheetPdfUrl || saved.answerKeyPdfUrl
                 ? " with PDF"
                 : ""}
-            . From deck: <strong>{saved.sourceDeckName}</strong>. View it in the{" "}
-            <Link href={resourcesHref} className="underline underline-offset-2">
-              Resource Library
-            </Link>
-            .
+            . From deck: <strong>{saved.sourceDeckName}</strong>.
           </span>
         ),
-      });
+      },
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not save worksheet.",
@@ -313,8 +399,12 @@ export function TeacherWorksheetsForm({
   return (
     <>
     <TeacherToolPageShell
-      title="Worksheet Generator"
-      description="Create worksheets with student sections and teacher answer keys from your flashcard decks."
+      title={isEditingExistingWorksheet ? "Edit Worksheet" : "Worksheet Generator"}
+      description={
+        isEditingExistingWorksheet
+          ? `Update ${initialSavedWorksheet.label} and save changes back to your Resource Library.`
+          : "Create worksheets with student sections and teacher answer keys from your flashcard decks."
+      }
       showResult={showResult && result != null}
       isGenerating={isGenerating}
       generateLabel="Generate"
@@ -351,17 +441,20 @@ export function TeacherWorksheetsForm({
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
                   size="sm"
-                  disabled={isSaving || savedWorksheetId !== null}
-                  onClick={openSaveDialog}
+                  disabled={isSaving}
+                  onClick={() =>
+                    editingWorksheetId != null
+                      ? void handleSaveChanges()
+                      : openSaveDialog()
+                  }
                 >
                   {isSaving ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                   ) : (
                     <Save className="size-4" aria-hidden />
                   )}
-                  {savedWorksheetId !== null ? "Saved" : "Save"}
+                  {editingWorksheetId != null ? "Save changes" : "Save"}
                 </Button>
                 <Button
                   type="button"
@@ -409,7 +502,16 @@ export function TeacherWorksheetsForm({
     >
       <TooltipProvider>
         <div className="grid gap-4 sm:grid-cols-2">
-          {isWorkspaceOwner ? (
+          {isEditingExistingWorksheet ? (
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="worksheetDeckReadonly">Deck</Label>
+              <Input
+                id="worksheetDeckReadonly"
+                disabled
+                value={initialSavedWorksheet.sourceDeckName}
+              />
+            </div>
+          ) : isWorkspaceOwner ? (
             <OwnerTeamAdminResourcePicker
               ownerPicker={ownerDeckPicker}
               itemsByAdminUserId={ownerDeckPicker.itemsByAdminUserId}
@@ -436,8 +538,8 @@ export function TeacherWorksheetsForm({
               label="Deck"
               help="Pick one of your decks. Subject, grade, topic, and difficulty will auto-fill from the deck."
             />
-            <Select value={selectedDeckKey} onValueChange={handleDeckChange}>
-              <SelectTrigger id="worksheetDeck" className="h-10 w-full bg-background">
+            <Select value={selectedDeckKey} onValueChange={handleDeckChange} disabled={isEditingExistingWorksheet}>
+              <SelectTrigger id="worksheetDeck" className={cn("h-10 w-full bg-background", isEditingExistingWorksheet && "opacity-60")}>
                 <SelectValue placeholder="Select a deck">
                   {selectedDeck?.name ?? "Select a deck"}
                 </SelectValue>
@@ -458,6 +560,10 @@ export function TeacherWorksheetsForm({
                 No decks available. Create a deck first, then return here to generate a worksheet.
               </p>
             ) : null}
+            <LessonPlanSavedReferenceSummary
+              references={linkedLessonPlanReferences}
+              description="Reference materials saved with the lesson plan for this deck are included in the worksheet instructions."
+            />
           </div>
           )}
 

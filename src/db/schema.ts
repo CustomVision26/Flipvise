@@ -24,6 +24,7 @@ import type {
   DeckWorksheetResult,
   TeacherWorksheetActionInput,
 } from '@/lib/teacher-worksheet-schema';
+import type { LessonPlanReferenceMaterial } from '@/lib/lesson-plan-reference-material';
 import type { PlanReconciliationSnapshot } from '@/lib/plan-reconciliation-types';
 
 export type SavedHomeworkGenerationInput = Pick<
@@ -36,17 +37,26 @@ export type SavedHomeworkGenerationInput = Pick<
   | 'topic'
   | 'numberOfQuestions'
   | 'difficultyLevel'
->;
+> & {
+  referenceMaterials?: LessonPlanReferenceMaterial[];
+};
 
 export type SavedStudyGuideGenerationInput = Pick<
   TeacherStudyGuideActionInput,
-  'subject' | 'gradeLevel' | 'topic' | 'savedLessonPlanId' | 'savedHomeworkId'
+  | 'subject'
+  | 'gradeLevel'
+  | 'topic'
+  | 'savedLessonPlanId'
+  | 'savedHomeworkId'
+  | 'referenceMaterials'
 >;
 
 export type SavedWorksheetGenerationInput = Pick<
   TeacherWorksheetActionInput,
   'deckId' | 'subject' | 'gradeLevel' | 'topic' | 'worksheetType' | 'difficultyLevel'
->;
+> & {
+  referenceMaterials?: LessonPlanReferenceMaterial[];
+};
 
 export const supportCategoryEnum = pgEnum('support_category', [
   'general_support',
@@ -1085,6 +1095,33 @@ export const savedWorksheets = pgTable(
   (table) => [index('saved_worksheets_user_id_idx').on(table.userId)],
 );
 
+/** Teacher-saved quiz question sheets + answer keys exported from team quiz results. */
+export const savedQuizzes = pgTable(
+  'saved_quizzes',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    teamId: integer().references(() => teams.id, { onDelete: 'set null' }),
+    quizResultId: integer().references(() => quizResults.id, { onDelete: 'set null' }),
+    deckId: integer().references(() => decks.id, { onDelete: 'set null' }),
+    label: varchar({ length: 255 }).notNull(),
+    title: varchar({ length: 512 }).notNull(),
+    subject: varchar({ length: 255 }).notNull(),
+    gradeLevel: varchar({ length: 64 }).notNull(),
+    sourceDeckName: varchar({ length: 255 }).notNull(),
+    memberLabel: varchar({ length: 255 }),
+    memberEmail: varchar({ length: 255 }),
+    perCard: json().$type<PerCardSnapshot[]>().notNull(),
+    questionSheetPdfUrl: text(),
+    questionSheetPdfFileName: varchar({ length: 255 }),
+    answerKeyPdfUrl: text(),
+    answerKeyPdfFileName: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (table) => [index('saved_quizzes_user_id_idx').on(table.userId)],
+);
+
 /** Teacher class schedules linked to a deck for lesson planning workflows. */
 export const teacherClasses = pgTable(
   'teacher_classes',
@@ -1100,7 +1137,7 @@ export const teacherClasses = pgTable(
     termSemester: varchar({ length: 128 }).notNull(),
     week: varchar({ length: 64 }).notNull(),
     day: varchar({ length: 64 }).notNull(),
-    period: varchar({ length: 64 }).notNull(),
+    period: varchar({ length: 512 }).notNull(),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },
@@ -1147,6 +1184,7 @@ export const teacherManualGrades = pgTable(
     termSemester: varchar({ length: 128 }).notNull(),
     period: varchar({ length: 64 }),
     notes: text(),
+    gradeType: varchar({ length: 32 }).notNull().default("assignment"),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },

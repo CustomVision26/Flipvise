@@ -1,3 +1,5 @@
+import { isEducationTeamPlanId } from "@/lib/education-plans";
+
 export const TEAM_MEMBER_STUDY_PRIVILEGES = [
   "standard_review",
   "quiz",
@@ -32,4 +34,16 @@ export function resolveMemberStudyModes(
 
 export function defaultTeamMemberStudyPrivilege(): TeamMemberStudyPrivilege {
   return "both";
+}
+
+/** Roles that may have per-deck study mode limits on Education Gold / Enterprise. */
+export function memberRoleQualifiesForStudyPrivileges(
+  role: "team_admin" | "team_member",
+  planSlug: string,
+): boolean {
+  if (role === "team_member") return true;
+  if (role === "team_admin") {
+    return isEducationTeamPlanId(planSlug);
+  }
+  return false;
 }

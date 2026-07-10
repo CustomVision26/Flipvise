@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getAccessContext } from "@/lib/access";
 import {
   assertDeckInWorkspaceForFormats,
+  getDeckQuizFormatAssignmentsForStudy,
   resolveQuizFormatsForStudy,
   reshuffleDeckQuizFormatAssignments,
   updateDeckQuizFormats,
@@ -14,14 +15,22 @@ import { getCardsByDeckUnscoped, mergeCardQuizVariants } from "@/db/queries/card
 import { generateQuizVariantsForCard } from "@/lib/generate-quiz-variants-ai";
 import {
   countCardsReadyForQuizFormats,
-  deckAiQuizContentReady,
+  explainQuizFormatContentBlock,
   validateQuizFormatDistribution,
   type QuizFormatDistribution,
 } from "@/lib/quiz-format-assignments";
-import { parseCardQuizVariants } from "@/lib/card-quiz-variants";
+import { parseCardQuizVariants, fillInBlankSegmentSchema } from "@/lib/card-quiz-variants";
+import { resolveCardMcqContext } from "@/lib/card-mcq-context";
+import { getAvailableQuestionTypesForCard } from "@/lib/quiz-questions";
+import {
+  buildQuizFormatPreviewItems,
+  resolvePreviewAssignments,
+  type QuizFormatPreviewItem,
+} from "@/lib/quiz-format-preview";
 import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { canEditDeckContent } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
+import { canUseDeckAiFeatures, DECK_AI_PLAN_REQUIREMENT } from "@/lib/deck-ai-access";
 
 async function assertCanManageTeam(userId: string, teamId: number) {
   const { getTeamById, getMemberRecord } = await import("@/db/queries/teams");
@@ -67,6 +76,29 @@ const reshuffleDeckQuizFormatsSchema = z.object({
   deckId: z.number().int().positive(),
   teamId: z.number().int().positive(),
   distribution: quizFormatDistributionSchema,
+});
+
+const previewDeckQuizFormatsSchema = z.object({
+  deckId: z.number().int().positive(),
+  teamId: z.number().int().positive(),
+  distribution: quizFormatDistributionSchema,
+});
+
+const saveQuizFormatVariantEditSchema = z.object({
+  deckId: z.number().int().positive(),
+  teamId: z.number().int().positive(),
+  cardId: z.number().int().positive(),
+  trueFalse: z
+    .object({
+      statement: z.string().min(1),
+      correctAnswer: z.boolean(),
+    })
+    .optional(),
+  fillInBlank: z
+    .object({
+      segments: z.array(fillInBlankSegmentSchema).min(1),
+    })
+    .optional(),
 });
 
 export async function updateTeamQuizFormatsAction(
@@ -128,8 +160,9 @@ export async function updateDeckQuizFormatsAction(
 export async function generateDeckQuizVariantsAction(
   data: z.infer<typeof generateDeckQuizVariantsSchema>,
 ) {
-  const { userId, hasAI } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId } = access;
 
   const parsed = generateDeckQuizVariantsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -140,8 +173,8 @@ export async function generateDeckQuizVariantsAction(
   }
 
   const teamTierPro = await deckHasTeamTierProFeatures(bundle.deck);
-  if (!hasAI && !teamTierPro) {
-    throw new Error("AI generation requires a Pro plan.");
+  if (!canUseDeckAiFeatures(access, teamTierPro)) {
+    throw new Error(DECK_AI_PLAN_REQUIREMENT);
   }
 
   const formats = await resolveQuizFormatsForStudy(
@@ -176,11 +209,16 @@ export async function generateDeckQuizVariantsAction(
   const eligible = prepared.filter((c) => (c.front ?? "").trim() && (c.back ?? "").trim());
   shuffleInPlace(eligible);
 
+  const cardSupportsTrueFalse = (card: (typeof prepared)[number]) =>
+    getAvailableQuestionTypesForCard(card, prepared, formats).includes("true_false");
+  const cardSupportsFillInBlank = (card: (typeof prepared)[number]) =>
+    getAvailableQuestionTypesForCard(card, prepared, formats).includes("fill_in_blank");
+
   let generated = 0;
   let failed = 0;
   let skipped = 0;
-  let trueFalseReady = eligible.filter((c) => c.quizVariants?.trueFalse).length;
-  let fillInBlankReady = eligible.filter((c) => c.quizVariants?.fillInBlank).length;
+  let trueFalseReady = eligible.filter((c) => cardSupportsTrueFalse(c)).length;
+  let fillInBlankReady = eligible.filter((c) => cardSupportsFillInBlank(c)).length;
 
   for (const card of eligible) {
     const front = (card.front ?? "").trim();
@@ -194,12 +232,12 @@ export async function generateDeckQuizVariantsAction(
       formats.trueFalse &&
       distribution.trueFalse > 0 &&
       trueFalseReady < distribution.trueFalse &&
-      !card.quizVariants?.trueFalse;
+      !cardSupportsTrueFalse(card);
     const needsFib =
       formats.fillInBlank &&
       distribution.fillInBlank > 0 &&
       fillInBlankReady < distribution.fillInBlank &&
-      !card.quizVariants?.fillInBlank;
+      !cardSupportsFillInBlank(card);
 
     if (!needsTf && !needsFib) {
       skipped++;
@@ -215,17 +253,19 @@ export async function generateDeckQuizVariantsAction(
     }
 
     try {
+      const mcqContext = resolveCardMcqContext(card);
       const variants = await generateQuizVariantsForCard({
         front,
         back,
         includeTrueFalse: needsTf,
         includeFillInBlank: needsFib,
+        mcqContext,
       });
       if (variants.trueFalse || variants.fillInBlank) {
         await mergeCardQuizVariants(card.id, parsed.data.deckId, variants);
         generated++;
-        if (variants.trueFalse) trueFalseReady++;
-        if (variants.fillInBlank) fillInBlankReady++;
+        if (variants.trueFalse?.statement?.trim()) trueFalseReady++;
+        if (variants.fillInBlank?.segments?.length) fillInBlankReady++;
       } else {
         failed++;
       }
@@ -248,12 +288,21 @@ export async function generateDeckQuizVariantsAction(
   }));
   const refreshedCounts = countCardsReadyForQuizFormats(afterPrepared, formats);
 
+  const contentBlockReason = explainQuizFormatContentBlock(
+    formats,
+    refreshedCounts,
+    distribution,
+    afterPrepared,
+  );
+
   return {
     generated,
     total: cards.length,
     failed,
     skipped,
-    contentReady: deckAiQuizContentReady(formats, refreshedCounts, distribution),
+    contentReady: contentBlockReason === null,
+    contentBlockReason,
+    formatReadyCounts: refreshedCounts,
   };
 }
 
@@ -299,4 +348,115 @@ export async function reshuffleDeckQuizFormatAssignmentsAction(
     cardCount: Object.keys(payload.byCardId).length,
     shuffledAt: payload.shuffledAt,
   };
+}
+
+/** Preview quiz format questions before or after publish (T/F and FIB edits save to quizVariants only). */
+export async function previewDeckQuizFormatsAction(
+  data: z.infer<typeof previewDeckQuizFormatsSchema>,
+): Promise<{
+  items: QuizFormatPreviewItem[];
+  usesPublishedAssignments: boolean;
+}> {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = previewDeckQuizFormatsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  await assertDeckInWorkspaceForFormats(
+    parsed.data.teamId,
+    team.ownerUserId,
+    parsed.data.deckId,
+  );
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+
+  const formats = await resolveQuizFormatsForStudy(
+    parsed.data.deckId,
+    parsed.data.teamId,
+  );
+  const cardRows = await getCardsByDeckUnscoped(parsed.data.deckId);
+  const prepared = cardRows.map((c) => ({
+    id: c.id,
+    front: c.front,
+    back: c.back,
+    choices: c.choices,
+    correctChoiceIndex: c.correctChoiceIndex,
+    quizVariants: parseCardQuizVariants(c.quizVariants),
+  }));
+
+  const saved = await getDeckQuizFormatAssignmentsForStudy(parsed.data.deckId);
+  const { byCardId, usesPublishedAssignments } = resolvePreviewAssignments(
+    prepared,
+    formats,
+    parsed.data.distribution,
+    saved,
+  );
+
+  if (Object.keys(byCardId).length === 0) {
+    throw new Error(
+      "Could not build a preview for this mix. Generate AI content and verify counts first.",
+    );
+  }
+
+  return {
+    items: buildQuizFormatPreviewItems(prepared, formats, byCardId),
+    usesPublishedAssignments,
+  };
+}
+
+/**
+ * Save an edited T/F or FIB quiz variant. Overwrites the quiz-facing format only —
+ * the original card question, answer, and MCQ choices are never modified.
+ */
+export async function saveQuizFormatVariantEditAction(
+  data: z.infer<typeof saveQuizFormatVariantEditSchema>,
+): Promise<{ ok: true }> {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = saveQuizFormatVariantEditSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  if (!parsed.data.trueFalse && !parsed.data.fillInBlank) {
+    throw new Error("Nothing to save.");
+  }
+
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  await assertDeckInWorkspaceForFormats(
+    parsed.data.teamId,
+    team.ownerUserId,
+    parsed.data.deckId,
+  );
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+
+  const patch: import("@/lib/card-quiz-variants").CardQuizVariants = {};
+  if (parsed.data.trueFalse) {
+    patch.trueFalse = {
+      statement: parsed.data.trueFalse.statement.trim(),
+      correctAnswer: parsed.data.trueFalse.correctAnswer,
+    };
+  }
+  if (parsed.data.fillInBlank) {
+    patch.fillInBlank = { segments: parsed.data.fillInBlank.segments };
+  }
+
+  const merged = await mergeCardQuizVariants(
+    parsed.data.cardId,
+    parsed.data.deckId,
+    patch,
+  );
+  if (!merged) throw new Error("Card not found");
+
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
+  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  return { ok: true };
 }

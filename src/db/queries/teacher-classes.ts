@@ -191,6 +191,38 @@ export async function getTeacherClassById(
   return row ?? null;
 }
 
+export async function updateTeacherClassById(
+  id: number,
+  input: {
+    deckId: number;
+    academicYear: string;
+    termSemester: string;
+    week: string;
+    day: string;
+    period: string;
+  },
+): Promise<TeacherClassRow> {
+  const [row] = await db
+    .update(teacherClasses)
+    .set({
+      deckId: input.deckId,
+      academicYear: input.academicYear,
+      termSemester: input.termSemester,
+      week: input.week,
+      day: input.day,
+      period: input.period,
+      updatedAt: new Date(),
+    })
+    .where(eq(teacherClasses.id, id))
+    .returning();
+
+  if (!row) {
+    throw new Error("Could not update class.");
+  }
+
+  return row;
+}
+
 export async function deleteTeacherClassById(
   id: number,
 ): Promise<TeacherClassRow | null> {

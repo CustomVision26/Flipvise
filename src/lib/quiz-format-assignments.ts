@@ -1,6 +1,9 @@
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
 import type { QuizCardInput, QuizQuestionType } from "@/lib/quiz-questions";
-import { getAvailableQuestionTypesForCard } from "@/lib/quiz-questions";
+import {
+  buildQuestionForCardType,
+  getAvailableQuestionTypesForCard,
+} from "@/lib/quiz-questions";
 
 export type QuizFormatDistribution = {
   multipleChoice: number;
@@ -19,6 +22,19 @@ export const EMPTY_QUIZ_FORMAT_DISTRIBUTION: QuizFormatDistribution = {
   trueFalse: 0,
   fillInBlank: 0,
 };
+
+export function quizFormatDistributionsEqual(
+  a: QuizFormatDistribution | null | undefined,
+  b: QuizFormatDistribution | null | undefined,
+): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    a.multipleChoice === b.multipleChoice &&
+    a.trueFalse === b.trueFalse &&
+    a.fillInBlank === b.fillInBlank
+  );
+}
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -153,32 +169,143 @@ export function validateQuizFormatDistribution(
   return { valid: true };
 }
 
+function formatTypeLabel(type: QuizQuestionType): string {
+  if (type === "multiple_choice") return "multiple choice";
+  if (type === "true_false") return "true / false";
+  return "fill in the blank";
+}
+
+/** Why AI generation / card content is not sufficient for the requested distribution. */
+export function explainQuizFormatContentBlock(
+  formats: QuizFormatsSettings,
+  counts: ReturnType<typeof countCardsReadyForQuizFormats> | undefined,
+  distribution: QuizFormatDistribution,
+  cards?: QuizCardInput[],
+): string | null {
+  if (!counts) return null;
+
+  const validation = validateQuizFormatDistribution(formats, distribution, counts.total);
+  if (!validation.valid) return validation.error;
+
+  if (
+    formats.multipleChoice &&
+    distribution.multipleChoice > 0 &&
+    counts.multipleChoice < distribution.multipleChoice
+  ) {
+    return `Only ${counts.multipleChoice} of ${distribution.multipleChoice} cards support multiple choice. Add answer choices or lower the multiple-choice count.`;
+  }
+  if (
+    formats.trueFalse &&
+    distribution.trueFalse > 0 &&
+    counts.trueFalse < distribution.trueFalse
+  ) {
+    return `Generate AI quiz sentences for true / false — ${counts.trueFalse} of ${distribution.trueFalse} cards ready.`;
+  }
+  if (
+    formats.fillInBlank &&
+    distribution.fillInBlank > 0 &&
+    counts.fillInBlank < distribution.fillInBlank
+  ) {
+    return `Generate AI quiz sentences for fill in the blank — ${counts.fillInBlank} of ${distribution.fillInBlank} cards ready.`;
+  }
+
+  if (cards) {
+    const assign = canAssignDistributionToCards(cards, formats, distribution);
+    if (!assign.ok) return assign.error;
+  }
+
+  return null;
+}
+
+/** Why saved card assignments cannot produce a full quiz — null means every slot builds. */
+export function explainQuizFormatAssignmentsBuildable(
+  cards: QuizCardInput[],
+  formats: QuizFormatsSettings,
+  byCardId: Record<number, QuizQuestionType>,
+  distribution?: QuizFormatDistribution | null,
+): string | null {
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+  const assignedEntries = Object.entries(byCardId);
+
+  if (distribution) {
+    const expected =
+      distribution.multipleChoice + distribution.trueFalse + distribution.fillInBlank;
+    if (assignedEntries.length !== expected) {
+      return `Published format counts (${expected}) do not match assigned cards (${assignedEntries.length}). Republish the quiz.`;
+    }
+
+    const actual = distributionFromQuestionTypes(Object.values(byCardId));
+    if (!quizFormatDistributionsEqual(actual, distribution)) {
+      return "Published format mix does not match card assignments. Republish the quiz.";
+    }
+  }
+
+  for (const [rawCardId, type] of assignedEntries) {
+    const cardId = Number(rawCardId);
+    const card = cardById.get(cardId);
+    if (!card) {
+      return "A published question refers to a missing card. Republish the quiz.";
+    }
+
+    if (!buildQuestionForCardType(card, cards, type, formats)) {
+      const label = formatTypeLabel(type);
+      const preview = (card.front ?? "").trim().slice(0, 48);
+      const suffix = preview ? ` (“${preview}${(card.front ?? "").trim().length > 48 ? "…" : ""}”)` : "";
+      return `One card${suffix} cannot build a ${label} question. Regenerate AI content and republish.`;
+    }
+  }
+
+  return null;
+}
+
 export function deckAiQuizContentReady(
   formats: QuizFormatsSettings,
   counts: ReturnType<typeof countCardsReadyForQuizFormats>,
   distribution?: QuizFormatDistribution | null,
+  cards?: QuizCardInput[],
 ): boolean {
   if (counts.total === 0) return false;
 
   if (distribution) {
-    const validation = validateQuizFormatDistribution(formats, distribution, counts.total);
-    if (!validation.valid) return false;
-    if (formats.trueFalse && distribution.trueFalse > 0 && counts.trueFalse < distribution.trueFalse) {
-      return false;
-    }
-    if (
-      formats.fillInBlank &&
-      distribution.fillInBlank > 0 &&
-      counts.fillInBlank < distribution.fillInBlank
-    ) {
-      return false;
-    }
-    return true;
+    return explainQuizFormatContentBlock(formats, counts, distribution, cards) === null;
   }
 
   if (formats.trueFalse && counts.trueFalse < counts.total) return false;
   if (formats.fillInBlank && counts.fillInBlank < counts.total) return false;
   return true;
+}
+
+/** Why reshuffle cannot run yet — null means reshuffle is allowed. */
+export function explainQuizFormatReshuffleBlock(
+  formats: QuizFormatsSettings,
+  counts: ReturnType<typeof countCardsReadyForQuizFormats>,
+  distribution?: QuizFormatDistribution | null,
+  cards?: QuizCardInput[],
+): string | null {
+  if (counts.total === 0) {
+    return "This deck has no cards with front and back text.";
+  }
+
+  if (!distribution) {
+    const enabled = enabledQuizQuestionTypes(formats);
+    if (enabled.length === 0) {
+      return "Enable at least one question format before reshuffling.";
+    }
+    for (const type of enabled) {
+      if (type === "multiple_choice" && counts.multipleChoice === 0) {
+        return `No cards support ${formatTypeLabel(type)} yet.`;
+      }
+      if (type === "true_false" && counts.trueFalse === 0) {
+        return `Generate AI quiz sentences for ${formatTypeLabel(type)} first.`;
+      }
+      if (type === "fill_in_blank" && counts.fillInBlank === 0) {
+        return `Generate AI quiz sentences for ${formatTypeLabel(type)} first.`;
+      }
+    }
+    return null;
+  }
+
+  return explainQuizFormatContentBlock(formats, counts, distribution, cards);
 }
 
 export function canReshuffleQuizFormats(
@@ -187,35 +314,7 @@ export function canReshuffleQuizFormats(
   distribution?: QuizFormatDistribution | null,
   cards?: QuizCardInput[],
 ): boolean {
-  if (counts.total === 0) return false;
-
-  if (!distribution) {
-    const enabled = enabledQuizQuestionTypes(formats);
-    if (enabled.length < 2) return false;
-    for (const type of enabled) {
-      if (type === "multiple_choice" && counts.multipleChoice === 0) return false;
-      if (type === "true_false" && counts.trueFalse === 0) return false;
-      if (type === "fill_in_blank" && counts.fillInBlank === 0) return false;
-    }
-    return true;
-  }
-
-  const validation = validateQuizFormatDistribution(formats, distribution, counts.total);
-  if (!validation.valid) return false;
-
-  const formatTypesInDistribution =
-    (distribution.multipleChoice > 0 ? 1 : 0) +
-    (distribution.trueFalse > 0 ? 1 : 0) +
-    (distribution.fillInBlank > 0 ? 1 : 0);
-  if (formatTypesInDistribution < 2) return false;
-
-  if (!deckAiQuizContentReady(formats, counts, distribution)) return false;
-
-  if (cards) {
-    return canAssignDistributionToCards(cards, formats, distribution).ok;
-  }
-
-  return true;
+  return explainQuizFormatReshuffleBlock(formats, counts, distribution, cards) === null;
 }
 
 function canAssignDistributionToCards(
@@ -312,10 +411,22 @@ export function reshuffleQuizFormatAssignments(
         ),
       );
       const card = candidates[0];
-      if (!card) continue;
+      if (!card) return {};
       assignments[card.id] = type;
       unassigned.delete(card.id);
     }
+
+    const expected =
+      distribution.multipleChoice + distribution.trueFalse + distribution.fillInBlank;
+    if (Object.keys(assignments).length !== expected) return {};
+
+    const buildError = explainQuizFormatAssignmentsBuildable(
+      cards,
+      formats,
+      assignments,
+      distribution,
+    );
+    if (buildError) return {};
 
     return assignments;
   }

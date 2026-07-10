@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
+import { canUseDeckAiFeatures, DECK_AI_PLAN_REQUIREMENT } from "@/lib/deck-ai-access";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import { generateAnswerBackImage } from "@/lib/generate-answer-back-image";
@@ -12,8 +13,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { userId, hasAI } = await getAccessContext();
-  if (!userId) {
+  const access = await getAccessContext();
+  if (!access.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -25,17 +26,14 @@ export async function POST(req: NextRequest) {
 
   const { deckId, question, answer } = parsed.data;
 
-  const bundle = await getDeckWithViewerAccess(deckId, userId);
+  const bundle = await getDeckWithViewerAccess(deckId, access.userId);
   if (!bundle || !canEditDeckContent(bundle.access)) {
     return NextResponse.json({ error: "Deck not found" }, { status: 404 });
   }
 
   const teamTierPro = await deckHasTeamTierProFeatures(bundle.deck);
-  if (!(hasAI || teamTierPro)) {
-    return NextResponse.json(
-      { error: "AI answer generation requires a Pro plan." },
-      { status: 403 },
-    );
+  if (!canUseDeckAiFeatures(access, teamTierPro)) {
+    return NextResponse.json({ error: DECK_AI_PLAN_REQUIREMENT }, { status: 403 });
   }
 
   const image = await generateAnswerBackImage(bundle.deck, question, answer);

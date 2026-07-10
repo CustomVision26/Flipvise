@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CreateTeacherClassDialog } from "@/components/create-teacher-class-dialog";
+import { EditTeacherClassDialog } from "@/components/edit-teacher-class-dialog";
 import { TeacherClassResourceButton } from "@/components/teacher-class-resource-button";
 import { deleteTeacherClassAction } from "@/actions/teacher-resources";
 import type { ClassDeckResources } from "@/db/queries/teacher-class-resources";
@@ -44,6 +45,7 @@ import type { DeckRow } from "@/db/queries/decks";
 import {
   teacherClassDisplayTitle,
   teacherClassSubjectLabel,
+  teacherClassWeekDisplay,
   buildTeacherClassDeckHref,
 } from "@/lib/teacher-class-links";
 import {
@@ -97,6 +99,7 @@ type TeacherClassesViewProps = {
   memberMetaByUserId: Record<string, WorkspaceMemberMeta>;
   isWorkspaceOwner: boolean;
   decks: DeckRow[];
+  planPeriodDaysByDeckId: Record<number, number>;
   deckResourcesByClassId: Record<number, ClassDeckResources>;
   workspace: TeacherWorkspaceContext;
   backHref: string;
@@ -324,14 +327,18 @@ function ClassCard({
   cls,
   resources,
   creatorLabel,
-  canDelete,
+  canManage,
+  decks,
+  planPeriodDaysByDeckId,
   teamId,
   onDeleted,
 }: {
   cls: TeacherClassWithDeck;
   resources: ClassDeckResources;
   creatorLabel?: string | null;
-  canDelete: boolean;
+  canManage: boolean;
+  decks: DeckRow[];
+  planPeriodDaysByDeckId: Record<number, number>;
   teamId: number | null;
   onDeleted: () => void;
 }) {
@@ -344,8 +351,16 @@ function ClassCard({
           <CardTitle className="text-base leading-snug">
             {teacherClassDisplayTitle(cls)}
           </CardTitle>
-          {canDelete ? (
-            <ClassDeleteButton cls={cls} teamId={teamId} onDeleted={onDeleted} />
+          {canManage ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <EditTeacherClassDialog
+                cls={cls}
+                decks={decks}
+                teamId={teamId}
+                planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+              />
+              <ClassDeleteButton cls={cls} teamId={teamId} onDeleted={onDeleted} />
+            </div>
           ) : null}
         </div>
         {creatorLabel ? (
@@ -357,9 +372,7 @@ function ClassCard({
         <p>Grade level: {cls.deckGradeLevel?.trim() || "—"}</p>
         <p>Academic year: {cls.academicYear}</p>
         <p>Term: {cls.termSemester}</p>
-        <p>
-          Week: {cls.week} · {cls.day}
-        </p>
+        <p>Week: {teacherClassWeekDisplay(cls, planPeriodDaysByDeckId)}</p>
       </CardContent>
       <CardFooter className="mt-auto flex flex-wrap gap-2 border-t border-border/60 pt-4">
         <TeacherClassResourceButton
@@ -432,6 +445,8 @@ function GroupedClassesList({
   deckResourcesByClassId,
   viewerUserId,
   isWorkspaceOwner,
+  decks,
+  planPeriodDaysByDeckId,
   teamId,
   onClassDeleted,
 }: {
@@ -444,6 +459,8 @@ function GroupedClassesList({
   deckResourcesByClassId: Record<number, ClassDeckResources>;
   viewerUserId: string;
   isWorkspaceOwner: boolean;
+  decks: DeckRow[];
+  planPeriodDaysByDeckId: Record<number, number>;
   teamId: number | null;
   onClassDeleted: (classId: number) => void;
 }) {
@@ -497,7 +514,7 @@ function GroupedClassesList({
     });
   }
 
-  function canDeleteClass(cls: TeacherClassWithDeck): boolean {
+  function canManageClass(cls: TeacherClassWithDeck): boolean {
     return cls.userId === viewerUserId || isWorkspaceOwner;
   }
 
@@ -551,7 +568,9 @@ function GroupedClassesList({
                         key={cls.id}
                         cls={cls}
                         resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
-                        canDelete={canDeleteClass(cls)}
+                        canManage={canManageClass(cls)}
+                        decks={decks}
+                        planPeriodDaysByDeckId={planPeriodDaysByDeckId}
                         teamId={teamId}
                         onDeleted={() => onClassDeleted(cls.id)}
                       />
@@ -609,7 +628,9 @@ function GroupedClassesList({
                               cls={cls}
                               resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
                               creatorLabel={memberGroup.memberLabel}
-                              canDelete={canDeleteClass(cls)}
+                              canManage={canManageClass(cls)}
+                              decks={decks}
+                              planPeriodDaysByDeckId={planPeriodDaysByDeckId}
                               teamId={teamId}
                               onDeleted={() => onClassDeleted(cls.id)}
                             />
@@ -638,6 +659,7 @@ export function TeacherClassesView({
   memberMetaByUserId,
   isWorkspaceOwner,
   decks,
+  planPeriodDaysByDeckId,
   deckResourcesByClassId,
   workspace,
   backHref,
@@ -712,7 +734,7 @@ export function TeacherClassesView({
     router.refresh();
   }
 
-  function canDeleteClass(cls: TeacherClassWithDeck): boolean {
+  function canManageClass(cls: TeacherClassWithDeck): boolean {
     return cls.userId === viewerUserId || isWorkspaceOwner;
   }
 
@@ -735,7 +757,11 @@ export function TeacherClassesView({
             </p>
           </div>
         </div>
-        <CreateTeacherClassDialog decks={decks} teamId={workspace.teamId} />
+        <CreateTeacherClassDialog
+          decks={decks}
+          teamId={workspace.teamId}
+          planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+        />
       </div>
 
       {decks.length === 0 ? (
@@ -909,6 +935,8 @@ export function TeacherClassesView({
                 deckResourcesByClassId={deckResourcesByClassId}
                 viewerUserId={viewerUserId}
                 isWorkspaceOwner={isWorkspaceOwner}
+                decks={decks}
+                planPeriodDaysByDeckId={planPeriodDaysByDeckId}
                 teamId={workspace.teamId}
                 onClassDeleted={handleClassDeleted}
               />
@@ -926,7 +954,9 @@ export function TeacherClassesView({
                     key={cls.id}
                     cls={cls}
                     resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
-                    canDelete={canDeleteClass(cls)}
+                    canManage={canManageClass(cls)}
+                    decks={decks}
+                    planPeriodDaysByDeckId={planPeriodDaysByDeckId}
                     teamId={workspace.teamId}
                     onDeleted={() => handleClassDeleted(cls.id)}
                   />

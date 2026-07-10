@@ -8,6 +8,7 @@ import {
   clampPlanPeriodDays,
   DEFAULT_PLAN_PERIOD_DAYS,
 } from "@/lib/lesson-plan-weekly-schedule";
+import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-material";
 import { PRO_PLUS_CARDS_PER_DECK_LIMIT } from "@/lib/personal-plan-limits";
 
 export type LessonPlanInput = {
@@ -20,6 +21,7 @@ export type LessonPlanInput = {
   learningStandard?: string;
   classSize?: string;
   specialInstructions?: string;
+  referenceMaterials?: LessonPlanReferenceMaterial[];
 };
 
 export type LessonPlanResult = {

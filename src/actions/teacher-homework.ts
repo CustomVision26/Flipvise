@@ -8,8 +8,17 @@ import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 import { getDeckRowById } from "@/db/queries/decks";
-import { resolveSavedLessonPlanForViewer, getSavedLessonPlansByUser, mapSavedLessonPlanRowToPickerItem } from "@/db/queries/saved-lesson-plans";
-import { saveHomeworkAssignment, type SavedHomeworkPickerItem } from "@/db/queries/saved-homework";
+import {
+  resolveSavedLessonPlanForViewer,
+  getSavedLessonPlansByUser,
+  mapSavedLessonPlanRowToPickerItem,
+} from "@/db/queries/saved-lesson-plans";
+import {
+  resolveSavedHomeworkForViewer,
+  saveHomeworkAssignment,
+  updateSavedHomeworkById,
+  type SavedHomeworkPickerItem,
+} from "@/db/queries/saved-homework";
 import { homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
 import { buildDeckHomeworkContext } from "@/lib/homework-source-context";
@@ -18,7 +27,8 @@ import {
   generateHomeworkPdfBuffer,
   homeworkPdfSafeFileName,
 } from "@/lib/homework-pdf-build";
-import { uploadHomeworkPdfBufferToS3 } from "@/lib/s3";
+import { uploadHomeworkPdfBufferToS3, deleteFromS3 } from "@/lib/s3";
+import { resolveReferenceMaterialsForHomeworkSource } from "@/lib/resolve-saved-resource-references";
 import {
   homeworkResultSchema,
   homeworkSourceTypeSchema,
@@ -96,6 +106,7 @@ async function resolveHomeworkSourceContext(
     return buildLessonPlanQuizContext({
       input: saved.input,
       result: saved.result,
+      referencePurpose: "homework",
     });
   }
 
@@ -188,32 +199,14 @@ const saveHomeworkSchema = z.object({
   result: homeworkResultSchema,
 });
 
-export async function saveHomeworkAction(data: {
-  label: string;
-  sourceType: TeacherHomeworkActionInput["sourceType"];
-  savedLessonPlanId?: number;
-  deckId?: number;
-  input: TeacherHomeworkActionInput;
-  result: HomeworkResult;
-}): Promise<{
-  id: number;
-  label: string;
-  pdfUrl: string | null;
-  sourceLessonPlanTitle: string | null;
-  sourceDeckName: string | null;
-}> {
-  const ctx = await getAccessContext();
-  const { userId } = await requireTeacherToolsAccess(
-    ctx,
-    "Homework Generator requires an education plan.",
-  );
+const updateHomeworkSchema = saveHomeworkSchema.extend({
+  homeworkId: z.number().int().positive(),
+});
 
-  const parsed = saveHomeworkSchema.safeParse(data);
-  if (!parsed.success) {
-    throw new Error("Invalid homework data");
-  }
-
-  const payload = parsed.data;
+async function buildHomeworkSavePayload(
+  userId: string,
+  payload: z.infer<typeof saveHomeworkSchema>,
+) {
   let resolvedLessonPlanId =
     payload.savedLessonPlanId ?? payload.input.savedLessonPlanId ?? null;
   let sourceLessonPlanTitle: string | null = null;
@@ -267,6 +260,61 @@ export async function saveHomeworkAction(data: {
     sourceDeckName = deck.name;
   }
 
+  const referenceMaterials = await resolveReferenceMaterialsForHomeworkSource(userId, {
+    sourceType: payload.sourceType,
+    savedLessonPlanId: resolvedLessonPlanId,
+    deckId: payload.deckId ?? payload.input.deckId ?? null,
+    teamId: payload.input.teamId,
+  });
+
+  return {
+    resolvedLessonPlanId,
+    sourceLessonPlanTitle,
+    sourceDeckName,
+    referenceMaterials,
+    persistedInput: {
+      sourceType: payload.input.sourceType,
+      savedLessonPlanId: payload.input.savedLessonPlanId,
+      deckId: payload.input.deckId,
+      subject: payload.input.subject,
+      gradeLevel: payload.input.gradeLevel,
+      topic: payload.input.topic,
+      numberOfQuestions: payload.input.numberOfQuestions,
+      difficultyLevel: payload.input.difficultyLevel,
+      referenceMaterials:
+        referenceMaterials.length > 0 ? referenceMaterials : undefined,
+    },
+  };
+}
+
+export async function saveHomeworkAction(data: {
+  label: string;
+  sourceType: TeacherHomeworkActionInput["sourceType"];
+  savedLessonPlanId?: number;
+  deckId?: number;
+  input: TeacherHomeworkActionInput;
+  result: HomeworkResult;
+}): Promise<{
+  id: number;
+  label: string;
+  pdfUrl: string | null;
+  sourceLessonPlanTitle: string | null;
+  sourceDeckName: string | null;
+}> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Homework Generator requires an education plan.",
+  );
+
+  const parsed = saveHomeworkSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid homework data");
+  }
+
+  const payload = parsed.data;
+  const savePayload = await buildHomeworkSavePayload(userId, payload);
+
   let pdfUrl: string | null = null;
   let pdfFileName: string | null = null;
 
@@ -296,20 +344,11 @@ export async function saveHomeworkAction(data: {
     topic: payload.input.topic,
     difficultyLevel: payload.input.difficultyLevel,
     sourceType: payload.sourceType,
-    savedLessonPlanId: resolvedLessonPlanId,
-    sourceLessonPlanTitle,
+    savedLessonPlanId: savePayload.resolvedLessonPlanId,
+    sourceLessonPlanTitle: savePayload.sourceLessonPlanTitle,
     deckId: payload.deckId ?? null,
-    sourceDeckName,
-    input: {
-      sourceType: payload.input.sourceType,
-      savedLessonPlanId: payload.input.savedLessonPlanId,
-      deckId: payload.input.deckId,
-      subject: payload.input.subject,
-      gradeLevel: payload.input.gradeLevel,
-      topic: payload.input.topic,
-      numberOfQuestions: payload.input.numberOfQuestions,
-      difficultyLevel: payload.input.difficultyLevel,
-    },
+    sourceDeckName: savePayload.sourceDeckName,
+    input: savePayload.persistedInput,
     result: payload.result,
     pdfUrl,
     pdfFileName,
@@ -325,5 +364,106 @@ export async function saveHomeworkAction(data: {
     pdfUrl: saved.pdfUrl,
     sourceLessonPlanTitle: saved.sourceLessonPlanTitle,
     sourceDeckName: saved.sourceDeckName,
+  };
+}
+
+export async function updateHomeworkAction(data: {
+  homeworkId: number;
+  label: string;
+  sourceType: TeacherHomeworkActionInput["sourceType"];
+  savedLessonPlanId?: number;
+  deckId?: number;
+  input: TeacherHomeworkActionInput;
+  result: HomeworkResult;
+}): Promise<{
+  id: number;
+  label: string;
+  pdfUrl: string | null;
+  sourceLessonPlanTitle: string | null;
+  sourceDeckName: string | null;
+}> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Homework Generator requires an education plan.",
+  );
+
+  const parsed = updateHomeworkSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid homework data");
+  }
+
+  const existing = await resolveSavedHomeworkForViewer(
+    userId,
+    parsed.data.homeworkId,
+    parsed.data.input.teamId,
+  );
+  if (!existing) {
+    throw new Error("Homework assignment not found.");
+  }
+
+  const payload = parsed.data;
+  const savePayload = await buildHomeworkSavePayload(userId, payload);
+
+  let pdfUrl: string | null = existing.pdfUrl;
+  let pdfFileName: string | null = existing.pdfFileName;
+
+  try {
+    const pdfBuffer = await generateHomeworkPdfBuffer(payload.result);
+    pdfFileName = `${homeworkPdfSafeFileName(payload.result.assignmentTitle)}.pdf`;
+    const uploadedUrl = await uploadHomeworkPdfBufferToS3({
+      userId: existing.userId,
+      fileName: pdfFileName,
+      buffer: pdfBuffer,
+    });
+    if (uploadedUrl && existing.pdfUrl && existing.pdfUrl !== uploadedUrl) {
+      try {
+        await deleteFromS3(existing.pdfUrl);
+      } catch {
+        // proceed even if old PDF removal fails
+      }
+    }
+    pdfUrl = uploadedUrl;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[updateHomeworkAction] PDF upload skipped or failed; keeping prior PDF if any.",
+        error,
+      );
+    }
+  }
+
+  const updated = await updateSavedHomeworkById(parsed.data.homeworkId, {
+    label: payload.label.trim(),
+    assignmentTitle: payload.result.assignmentTitle,
+    subject: payload.input.subject,
+    gradeLevel: payload.input.gradeLevel,
+    topic: payload.input.topic,
+    difficultyLevel: payload.input.difficultyLevel,
+    sourceType: payload.sourceType,
+    savedLessonPlanId: savePayload.resolvedLessonPlanId,
+    sourceLessonPlanTitle: savePayload.sourceLessonPlanTitle,
+    deckId: payload.deckId ?? existing.deckId,
+    sourceDeckName: savePayload.sourceDeckName ?? existing.sourceDeckName,
+    input: savePayload.persistedInput,
+    result: payload.result,
+    pdfUrl,
+    pdfFileName,
+  });
+
+  if (!updated) {
+    throw new Error("Could not update homework assignment.");
+  }
+
+  revalidatePath("/teacher/resources");
+  revalidatePath("/teacher/homework");
+  revalidatePath("/teacher/study-guides");
+
+  return {
+    id: updated.id,
+    label: updated.label,
+    pdfUrl: updated.pdfUrl,
+    sourceLessonPlanTitle: updated.sourceLessonPlanTitle,
+    sourceDeckName: updated.sourceDeckName,
   };
 }

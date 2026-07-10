@@ -7,6 +7,7 @@ import { parseCardQuizVariants } from "@/lib/card-quiz-variants";
 import {
   canReshuffleQuizFormats,
   countCardsReadyForQuizFormats,
+  explainQuizFormatReshuffleBlock,
   deckAiQuizContentReady,
   parseDeckQuizFormatAssignments,
   reshuffleQuizFormatAssignments,
@@ -28,6 +29,12 @@ export type QuizFormatsDeckSnapshot = {
   id: number;
   name: string;
   eligibleCardCount: number;
+  formatReadyCounts: {
+    multipleChoice: number;
+    trueFalse: number;
+    fillInBlank: number;
+    total: number;
+  };
   quizFormatMultipleChoice: boolean | null;
   quizFormatTrueFalse: boolean | null;
   quizFormatFillInBlank: boolean | null;
@@ -53,6 +60,26 @@ export async function listQuizFormatsWorkspacesForOwner(
     .where(eq(teams.ownerUserId, ownerUserId));
 
   return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function buildQuizFormatsWorkspaceSnapshots(
+  teamRows: Array<{
+    id: number;
+    name: string;
+    quizFormatMultipleChoice: boolean;
+    quizFormatTrueFalse: boolean;
+    quizFormatFillInBlank: boolean;
+  }>,
+): QuizFormatsWorkspaceSnapshot[] {
+  return teamRows
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      quizFormatMultipleChoice: t.quizFormatMultipleChoice,
+      quizFormatTrueFalse: t.quizFormatTrueFalse,
+      quizFormatFillInBlank: t.quizFormatFillInBlank,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function listQuizFormatsDecksForWorkspace(
@@ -130,6 +157,7 @@ export async function listQuizFormatsDecksForWorkspace(
         id: r.id,
         name: r.name,
         eligibleCardCount: counts.total,
+        formatReadyCounts: counts,
         quizFormatMultipleChoice: r.quizFormatMultipleChoice ?? null,
         quizFormatTrueFalse: r.quizFormatTrueFalse ?? null,
         quizFormatFillInBlank: r.quizFormatFillInBlank ?? null,
@@ -137,7 +165,12 @@ export async function listQuizFormatsDecksForWorkspace(
         hasQuizFormatAssignments:
           assignments != null && Object.keys(assignments.byCardId).length > 0,
         quizFormatShuffledAt: assignments?.shuffledAt ?? null,
-        aiQuizContentReady: deckAiQuizContentReady(formats, counts, savedDistribution),
+        aiQuizContentReady: deckAiQuizContentReady(
+          formats,
+          counts,
+          savedDistribution,
+          deckCards,
+        ),
         canReshuffleFormats: canReshuffleQuizFormats(
           formats,
           counts,
@@ -200,14 +233,15 @@ export async function clearDeckQuizFormatAssignmentsForOwner(
 
 export async function getDeckQuizFormatAssignmentsForStudy(
   deckId: number,
-): Promise<Record<number, import("@/lib/quiz-questions").QuizQuestionType> | null> {
+): Promise<import("@/lib/quiz-format-assignments").DeckQuizFormatAssignments | null> {
   const [row] = await db
     .select({ quizFormatAssignments: decks.quizFormatAssignments })
     .from(decks)
     .where(eq(decks.id, deckId))
     .limit(1);
   const parsed = parseDeckQuizFormatAssignments(row?.quizFormatAssignments);
-  return parsed?.byCardId ?? null;
+  if (!parsed || Object.keys(parsed.byCardId).length === 0) return null;
+  return parsed;
 }
 
 export async function reshuffleDeckQuizFormatAssignments(
@@ -228,13 +262,22 @@ export async function reshuffleDeckQuizFormatAssignments(
   }));
 
   const counts = countCardsReadyForQuizFormats(prepared, formats);
-  if (!canReshuffleQuizFormats(formats, counts, distribution, prepared)) {
-    throw new Error(
-      "Set question counts that add up to the deck total, generate AI content where needed, then try again.",
-    );
+  const reshuffleBlock = explainQuizFormatReshuffleBlock(
+    formats,
+    counts,
+    distribution,
+    prepared,
+  );
+  if (reshuffleBlock) {
+    throw new Error(reshuffleBlock);
   }
 
   const byCardId = reshuffleQuizFormatAssignments(prepared, formats, distribution);
+  if (Object.keys(byCardId).length === 0) {
+    throw new Error(
+      "Could not assign question formats to every card. Regenerate AI content and try again.",
+    );
+  }
   const payload: DeckQuizFormatAssignments = {
     distribution,
     byCardId,

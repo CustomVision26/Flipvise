@@ -45,12 +45,17 @@ import {
 } from "@/components/team-admin-panel-styles";
 import { TeamQuizResultsSubTabs } from "@/components/team-quiz-results-sub-tabs";
 import { deleteQuizResultAction } from "@/actions/quiz-results";
+import {
+  QuizResultSheetsDialog,
+  type QuizResultSheetsDialogRow,
+} from "@/components/quiz-result-sheets-dialog";
 import { cn } from "@/lib/utils";
 
 export type TeamQuizWorkspaceSnapshot = {
   teamId: number;
   teamName: string;
   ownerUserId: string;
+  planSlug: string;
   members: TeamMemberRow[];
   results: QuizResultRow[];
 };
@@ -107,6 +112,7 @@ type WorkspaceQuizResultGroup = {
   teamId: number;
   teamName: string;
   ownerUserId: string;
+  planSlug: string;
   memberGroups: MemberQuizResultGroup[];
   attemptCount: number;
 };
@@ -115,6 +121,7 @@ type QuizResultTableRow = {
   key: string;
   teamId: number;
   teamName: string;
+  workspacePlanSlug: string;
   memberLabel: string;
   memberEmail: string | null;
   memberRole: QuizResultSummary["memberRole"];
@@ -131,6 +138,7 @@ function flattenToTableRows(groups: WorkspaceQuizResultGroup[]): QuizResultTable
           key: `${workspace.teamId}:${result.id}`,
           teamId: workspace.teamId,
           teamName: workspace.teamName,
+          workspacePlanSlug: workspace.planSlug,
           memberLabel: member.memberLabel,
           memberEmail: member.memberEmail,
           memberRole: member.memberRole,
@@ -152,6 +160,7 @@ function QuizResultsTable({
   deletingKey,
   onView,
   onDelete,
+  onOpenSheets,
 }: {
   rows: QuizResultTableRow[];
   showWorkspaceColumn: boolean;
@@ -159,6 +168,7 @@ function QuizResultsTable({
   deletingKey: string | null;
   onView: (row: QuizResultTableRow) => void;
   onDelete: (row: QuizResultTableRow) => void;
+  onOpenSheets: (row: QuizResultTableRow) => void;
 }) {
   return (
     <div className="rounded-lg border border-border/80">
@@ -193,6 +203,9 @@ function QuizResultsTable({
               <TableRow
                 key={row.key}
                 data-state={activeResultId === r.id ? "selected" : undefined}
+                className="cursor-pointer"
+                onDoubleClick={() => onOpenSheets(row)}
+                title="Double-click to open quiz question sheet and answer key"
               >
                 {showWorkspaceColumn ? (
                   <TableCell className="max-w-[14rem]">
@@ -270,7 +283,10 @@ function QuizResultsTable({
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5 text-xs"
-                      onClick={() => onView(row)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onView(row);
+                      }}
                     >
                       <Eye className="size-3.5" aria-hidden />
                       View
@@ -281,7 +297,10 @@ function QuizResultsTable({
                       size="sm"
                       className="h-8 gap-1.5 text-xs text-muted-foreground hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
                       disabled={deletingKey === row.key}
-                      onClick={() => onDelete(row)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void onDelete(row);
+                      }}
                     >
                       <Trash2 className="size-3.5" aria-hidden />
                       {deletingKey === row.key ? "Deleting…" : "Delete"}
@@ -463,6 +482,7 @@ function buildWorkspaceGroups(
         teamId: workspace.teamId,
         teamName: workspace.teamName,
         ownerUserId: workspace.ownerUserId,
+        planSlug: workspace.planSlug,
         memberGroups,
         attemptCount: workspace.results.length,
       };
@@ -491,6 +511,10 @@ export function TeamQuizResultsTab({
   const [detailSummary, setDetailSummary] = React.useState<QuizResultSummary | null>(null);
   const [deletingKey, setDeletingKey] = React.useState<string | null>(null);
   const [removedResultKeys, setRemovedResultKeys] = React.useState<Set<string>>(new Set());
+  const [sheetsDialogRow, setSheetsDialogRow] = React.useState<QuizResultSheetsDialogRow | null>(
+    null,
+  );
+  const [sheetsDialogOpen, setSheetsDialogOpen] = React.useState(false);
 
   React.useEffect(() => {
     setRemovedResultKeys(new Set());
@@ -570,6 +594,20 @@ export function TeamQuizResultsTab({
     setDeckFilter(FILTER_ALL_DECKS);
   }
 
+  function openSheets(row: QuizResultTableRow) {
+    const email =
+      row.memberEmail ?? (row.memberLabel.includes("@") ? row.memberLabel : null);
+    setSheetsDialogRow({
+      resultId: row.result.id,
+      teamId: row.teamId,
+      workspacePlanSlug: row.workspacePlanSlug,
+      deckName: row.result.deckName,
+      memberLabel: row.memberLabel,
+      memberEmail: email,
+    });
+    setSheetsDialogOpen(true);
+  }
+
   function openView(row: QuizResultTableRow) {
     setDetailSummary(row.summary);
     requestAnimationFrame(() => {
@@ -629,7 +667,8 @@ export function TeamQuizResultsTab({
               Quiz results
             </CardTitle>
             <CardDescription className="text-sm leading-relaxed">
-              Saved quiz attempts by workspace and member. Use View to expand full details below the table.
+              Saved quiz attempts by workspace and member. Use View to expand full details below the
+              table, or double-click a row to open the quiz question sheet and answer key.
               {totalAttempts > 0 ? (
                 <span className="mt-1 block font-medium text-foreground">
                   {hasActiveFilters ? (
@@ -826,6 +865,7 @@ export function TeamQuizResultsTab({
                 deletingKey={deletingKey}
                 onView={openView}
                 onDelete={handleDelete}
+                onOpenSheets={openSheets}
               />
 
               {detailSummary ? (
@@ -853,6 +893,12 @@ export function TeamQuizResultsTab({
           )}
         </CardContent>
       </Card>
+
+      <QuizResultSheetsDialog
+        open={sheetsDialogOpen}
+        onOpenChange={setSheetsDialogOpen}
+        row={sheetsDialogRow}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { cards } from "@/db/schema";
 import type { DeckRow } from "@/db/queries/decks";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
+import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-material";
 import type { DeckWorksheetResult, WorksheetItem } from "@/lib/teacher-worksheet-schema";
 
 type CardRow = typeof cards.$inferSelect;
@@ -51,6 +52,21 @@ export function buildWorksheetItemsFromCards(cardRows: CardRow[]): WorksheetItem
   });
 }
 
+function buildWorksheetReferenceInstructions(
+  references: LessonPlanReferenceMaterial[],
+): string {
+  if (references.length === 0) return "";
+
+  const labels = references
+    .map((reference) => reference.summary.trim())
+    .filter(Boolean)
+    .join(", ");
+
+  return labels
+    ? ` This worksheet is aligned with lesson reference materials: ${labels}.`
+    : " This worksheet is aligned with reference materials from the linked lesson plan.";
+}
+
 export function buildDeckWorksheetResult(
   deck: DeckRow,
   cardRows: CardRow[],
@@ -61,6 +77,9 @@ export function buildDeckWorksheetResult(
     worksheetType: string;
     difficultyLevel: string;
   },
+  options?: {
+    referenceMaterials?: LessonPlanReferenceMaterial[];
+  },
 ): DeckWorksheetResult {
   const items = buildWorksheetItemsFromCards(cardRows);
   const defaults = deckToHomeworkDefaults(deck);
@@ -69,6 +88,9 @@ export function buildDeckWorksheetResult(
   const gradeLevel = input.gradeLevel.trim() || defaults.gradeLevel;
   const worksheetType = input.worksheetType.trim() || "Practice";
   const difficultyLevel = input.difficultyLevel.trim() || defaults.difficultyLevel;
+  const referenceNote = buildWorksheetReferenceInstructions(
+    options?.referenceMaterials ?? [],
+  );
 
   return {
     worksheetTitle: `${topic} — ${worksheetType} Worksheet`,
@@ -78,7 +100,7 @@ export function buildDeckWorksheetResult(
     topic,
     worksheetType,
     difficultyLevel,
-    instructions: `Complete this ${worksheetType.toLowerCase()} worksheet on ${topic}. Use the questions below. Write your answers in the space provided.`,
+    instructions: `Complete this ${worksheetType.toLowerCase()} worksheet on ${topic}. Use the questions below. Write your answers in the space provided.${referenceNote}`,
     studentHeader: `Name: ____________________    Date: ____________________\n\n${topic} — ${worksheetType} (${difficultyLevel})`,
     items,
   };

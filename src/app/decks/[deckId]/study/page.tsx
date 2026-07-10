@@ -21,6 +21,7 @@ import {
 } from "@/db/queries/quiz-schedule";
 import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
+import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   teamWorkspaceDeckTitleLinkClass,
@@ -132,11 +133,22 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   let memberAllowReview = true;
   let memberAllowQuiz = true;
-  if (access.kind === "team_member") {
-    const privilege = await getDeckAssignmentStudyPrivilege(access.teamId, id, userId);
-    const modes = resolveMemberStudyModes(privilege);
-    memberAllowReview = modes.allowReview;
-    memberAllowQuiz = modes.allowQuiz;
+  if (access.kind === "team_member" || access.kind === "team_admin") {
+    const privilegeTeamId = access.teamId;
+    const team = await getTeamById(privilegeTeamId);
+    const applyStudyPrivileges =
+      access.kind === "team_member" ||
+      (team != null && isEducationTeamPlanId(team.planSlug));
+    if (applyStudyPrivileges) {
+      const privilege = await getDeckAssignmentStudyPrivilege(
+        privilegeTeamId,
+        id,
+        userId,
+      );
+      const modes = resolveMemberStudyModes(privilege);
+      memberAllowReview = modes.allowReview;
+      memberAllowQuiz = modes.allowQuiz;
+    }
   }
 
   let studyBackHref: string;
@@ -176,16 +188,17 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   }
   const studyExitLabel = studyBackLabel.replace(/^←\s*/, "");
 
+  const studyTeam = studyTeamId != null ? await getTeamById(studyTeamId) : null;
   const ownerInboxAvailable =
-    studyTeamId != null
-      ? (await getTeamById(studyTeamId))?.ownerUserId !== userId
-      : false;
+    studyTeam != null ? studyTeam.ownerUserId !== userId : false;
+  const isEducationTeamPlan =
+    studyTeam != null && isEducationTeamPlanId(studyTeam.planSlug);
 
   const quizFormats = await resolveQuizFormatsForStudy(
     id,
     studyTeamId ?? deck.teamId ?? null,
   );
-  const quizFormatAssignments = await getDeckQuizFormatAssignmentsForStudy(id);
+  const quizFormatAssignmentPlan = await getDeckQuizFormatAssignmentsForStudy(id);
 
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
@@ -255,8 +268,9 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         exitHref={studyBackHref}
         exitLabel={studyExitLabel}
         ownerInboxAvailable={ownerInboxAvailable}
+        isEducationTeamPlan={isEducationTeamPlan}
         quizFormats={quizFormats}
-        quizFormatAssignments={quizFormatAssignments}
+        quizFormatAssignmentPlan={quizFormatAssignmentPlan}
       />
     </div>
   );

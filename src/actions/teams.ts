@@ -24,6 +24,10 @@ import {
   MIN_TEAM_QUIZ_DURATION_MINUTES,
 } from "@/lib/team-quiz-duration";
 import {
+  defaultTeamMemberStudyPrivilege,
+  memberRoleQualifiesForStudyPrivileges,
+} from "@/lib/team-study-privilege";
+import {
   countTeamsForOwner,
   deleteInvitation,
   deleteTeamMember,
@@ -563,12 +567,16 @@ export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSc
     throw new Error("Deck does not belong to this team.");
   }
 
+  const studyPrivilege = memberRoleQualifiesForStudyPrivileges(member.role, team.planSlug)
+    ? parsed.data.studyPrivilege
+    : defaultTeamMemberStudyPrivilege();
+
   await insertDeckAssignment(
     parsed.data.teamId,
     parsed.data.deckId,
     parsed.data.memberUserId,
     userId,
-    parsed.data.studyPrivilege,
+    studyPrivilege,
   );
 
   revalidatePath("/dashboard/team-admin", "layout");
@@ -593,9 +601,14 @@ export async function updateDeckAssignmentStudyPrivilegeAction(
 
   await assertCanManageTeam(userId, parsed.data.teamId);
 
+  const team = await getTeamById(parsed.data.teamId);
+  if (!team) throw new Error("Team not found");
+
   const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
-  if (!member || member.role !== "team_member") {
-    throw new Error("Study privileges apply only to regular team members.");
+  if (!member || !memberRoleQualifiesForStudyPrivileges(member.role, team.planSlug)) {
+    throw new Error(
+      "Study privileges apply only to team members, or to team admins on Education Gold / Enterprise.",
+    );
   }
 
   await updateDeckAssignmentStudyPrivilege(

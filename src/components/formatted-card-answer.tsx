@@ -32,7 +32,7 @@ export function FormattedCardAnswer({
           key={revealKey}
           className={cn(
             isStudy
-              ? "animate-magic-answer-reveal text-center text-xl font-semibold leading-relaxed break-words sm:text-2xl md:text-3xl"
+              ? "animate-magic-answer-reveal w-full text-left text-base font-medium leading-relaxed break-words sm:text-lg md:text-xl"
               : "text-base font-medium leading-relaxed break-words whitespace-pre-wrap",
             hasGradient && isStudy && "text-white",
             className,
@@ -47,8 +47,8 @@ export function FormattedCardAnswer({
       <div
         key={revealKey}
         className={cn(
-          "space-y-1 text-left",
-          isStudy ? "w-full space-y-1.5" : "text-base leading-relaxed",
+          "w-full space-y-2 text-left",
+          isStudy ? "space-y-2" : "text-base leading-relaxed",
           className,
         )}
       >
@@ -62,9 +62,10 @@ export function FormattedCardAnswer({
               className={cn(
                 isStudy && "animate-magic-line-reveal break-words",
                 isStudy
-                  ? hasGradient
-                    ? "text-white/90"
-                    : "text-foreground"
+                  ? cn(
+                      "text-sm font-normal leading-relaxed sm:text-base md:text-lg",
+                      hasGradient ? "text-white/90" : "text-foreground/90",
+                    )
                   : "font-medium text-foreground break-words",
               )}
               style={isStudy ? { animationDelay: lineDelay(i) } : undefined}

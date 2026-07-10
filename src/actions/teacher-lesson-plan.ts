@@ -30,7 +30,11 @@ import {
   reconcileWeeklySchedule,
   weeklySchedulePromptBlock,
 } from "@/lib/lesson-plan-weekly-schedule";
-import { saveLessonPlan } from "@/db/queries/saved-lesson-plans";
+import {
+  resolveSavedLessonPlanForViewer,
+  saveLessonPlan,
+  updateSavedLessonPlanById,
+} from "@/db/queries/saved-lesson-plans";
 import { createDeck, getDeckRowById } from "@/db/queries/decks";
 import { linkDeckToTeamWorkspace, resolveDeckViewerAccess } from "@/db/queries/teams";
 import {
@@ -41,7 +45,7 @@ import {
   generateLessonPlanPdfBuffer,
   lessonPlanPdfSafeFileName,
 } from "@/lib/lesson-plan-pdf-build";
-import { uploadLessonPlanPdfBufferToS3 } from "@/lib/s3";
+import { uploadLessonPlanPdfBufferToS3, deleteFromS3 } from "@/lib/s3";
 import {
   extractTextFromFile,
   extractTextFromUrl,
@@ -357,9 +361,9 @@ export async function generateAllDaysVocabularyDetailAction(
 const saveLessonPlanSchema = z.object({
   input: lessonPlanInputSchema.omit({
     regenerationSeed: true,
-    referenceMaterials: true,
     referenceMaterialText: true,
     referenceSourceSummary: true,
+    vocabularyTeachingApproach: true,
   }),
   result: lessonPlanResultSchema,
   deckId: z.number().int().positive().optional(),
@@ -539,6 +543,7 @@ export async function saveLessonPlanAction(data: {
   });
 
   revalidatePath("/teacher/resources");
+  revalidatePath("/teacher/lesson-builder");
   revalidatePath("/teacher/quizzes");
   revalidatePath("/teacher/classes");
   revalidatePath("/dashboard");
@@ -547,6 +552,106 @@ export async function saveLessonPlanAction(data: {
     id: saved.id,
     lessonTitle: saved.lessonTitle,
     pdfUrl: saved.pdfUrl,
+    deckId: deckTarget.deckId,
+    sourceDeckName: deckTarget.sourceDeckName,
+  };
+}
+
+const updateLessonPlanSchema = saveLessonPlanSchema.extend({
+  lessonPlanId: z.number().int().positive(),
+});
+
+export async function updateLessonPlanAction(data: {
+  lessonPlanId: number;
+  input: LessonPlanInput;
+  result: LessonPlanResult;
+  deckId?: number;
+  teamId?: number;
+}): Promise<{
+  id: number;
+  lessonTitle: string;
+  pdfUrl: string | null;
+  deckId: number;
+  sourceDeckName: string;
+}> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+
+  const parsed = updateLessonPlanSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid lesson plan data");
+  }
+
+  const existing = await resolveSavedLessonPlanForViewer(
+    userId,
+    parsed.data.lessonPlanId,
+    parsed.data.teamId,
+  );
+  if (!existing) {
+    throw new Error("Lesson plan not found.");
+  }
+
+  const deckTarget = await resolveLessonPlanDeckTarget(userId, parsed.data);
+
+  let pdfUrl: string | null = existing.pdfUrl;
+  let pdfFileName: string | null = existing.pdfFileName;
+
+  try {
+    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, {
+      planPeriodDays: clampPlanPeriodDays(
+        parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+      ),
+      lessonDuration: parsed.data.input.lessonDuration,
+    });
+    pdfFileName = `${lessonPlanPdfSafeFileName(parsed.data.result.lessonTitle)}.pdf`;
+    const uploadedUrl = await uploadLessonPlanPdfBufferToS3({
+      userId: existing.userId,
+      fileName: pdfFileName,
+      buffer: pdfBuffer,
+    });
+    if (uploadedUrl && existing.pdfUrl && existing.pdfUrl !== uploadedUrl) {
+      try {
+        await deleteFromS3(existing.pdfUrl);
+      } catch {
+        // proceed even if old PDF removal fails
+      }
+    }
+    pdfUrl = uploadedUrl;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[updateLessonPlanAction] PDF upload skipped or failed; keeping prior PDF if any.",
+        error,
+      );
+    }
+  }
+
+  const updated = await updateSavedLessonPlanById(parsed.data.lessonPlanId, {
+    input: parsed.data.input,
+    result: parsed.data.result,
+    pdfUrl,
+    pdfFileName,
+    deckId: deckTarget.deckId,
+    sourceDeckName: deckTarget.sourceDeckName,
+  });
+
+  if (!updated) {
+    throw new Error("Could not update lesson plan.");
+  }
+
+  revalidatePath("/teacher/resources");
+  revalidatePath("/teacher/lesson-builder");
+  revalidatePath("/teacher/quizzes");
+  revalidatePath("/teacher/classes");
+  revalidatePath("/dashboard");
+
+  return {
+    id: updated.id,
+    lessonTitle: updated.lessonTitle,
+    pdfUrl: updated.pdfUrl,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
   };

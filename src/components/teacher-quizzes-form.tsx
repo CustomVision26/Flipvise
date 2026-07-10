@@ -43,6 +43,8 @@ import { buildTeacherSubPath } from "@/lib/teacher-url";
 import type { TeacherWorkspaceContext } from "@/lib/teacher-url";
 import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
+import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
+import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
 import {
   TEACHER_QUIZ_DEFAULT_QUESTION_COUNT,
   TEACHER_QUIZ_DEFAULT_QUESTION_TYPE,
@@ -689,6 +691,11 @@ export function TeacherQuizzesForm({
                 <ExternalLink className="size-3" aria-hidden />
               </a>
             </p>
+          ) : null}
+          {selectedPlan ? (
+            <LessonPlanSavedReferenceSummary
+              references={getLessonPlanReferenceMaterials(selectedPlan.input)}
+            />
           ) : null}
         </div>
         <div className="space-y-2">

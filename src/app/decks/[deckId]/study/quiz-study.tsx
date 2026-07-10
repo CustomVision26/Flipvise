@@ -84,7 +84,10 @@ import {
   secondsUntilQuizStart,
   type ResolvedQuizStartSchedule,
 } from "@/lib/quiz-start-schedule";
-import type { QuizResultInboxTarget } from "@/lib/quiz-result-inbox-targets";
+import {
+  resolveSecuredEducationQuizInboxTargets,
+  type QuizResultInboxTarget,
+} from "@/lib/quiz-result-inbox-targets";
 import { Input } from "@/components/ui/input";
 import type { QuizFormatKey, QuizFormatsSettings } from "@/lib/quiz-formats";
 import {
@@ -98,6 +101,7 @@ import {
   questionPromptText,
   questionTypeLabel,
   summarizeSessionQuestionFormats,
+  summarizeQuizFormatDistribution,
   type QuizCardInput,
   type QuizQuestion,
   type QuizQuestionType,
@@ -117,6 +121,10 @@ type SubmitQuizOptions = {
 };
 
 import { cn } from "@/lib/utils";
+import type { DeckQuizFormatAssignments } from "@/lib/quiz-format-assignments";
+import { distributionFromQuestionTypes } from "@/lib/quiz-format-assignments";
+import { FormattedCardFront } from "@/components/formatted-card-front";
+import { polishCardText } from "@/lib/format-card-content";
 
 const QUIZ_FORMAT_ICONS: Record<QuizFormatKey, typeof CircleHelp> = {
   multipleChoice: CircleHelp,
@@ -158,8 +166,10 @@ interface QuizStudyProps {
   };
   /** Enabled quiz question formats (workspace/deck resolved). */
   quizFormats?: QuizFormatsSettings;
-  /** Admin-assigned format per card; overrides random format selection. */
-  quizFormatAssignments?: Record<number, QuizQuestionType> | null;
+  /** Admin-applied per-card format map and target distribution. */
+  quizFormatAssignmentPlan?: DeckQuizFormatAssignments | null;
+  /** Education Gold / Enterprise — secured quizzes auto-save to user, owner, and team admins. */
+  isEducationTeamPlan?: boolean;
 }
 
 type QuizSecurityStatus = NonNullable<QuizStudyProps["quizSecurity"]>["initialSession"] extends infer S
@@ -258,13 +268,20 @@ export function QuizStudy({
   quizSchedule,
   quizSecurity,
   quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
-  quizFormatAssignments = null,
+  quizFormatAssignmentPlan = null,
+  isEducationTeamPlan = false,
 }: QuizStudyProps) {
+  const quizFormatAssignments = quizFormatAssignmentPlan?.byCardId ?? null;
   const router = useRouter();
   const preparedCards = useMemo(() => prepareCardsForQuiz(cards), [cards]);
   const leaveStudy = useCallback(() => router.push(exitHref), [router, exitHref]);
   const securityEnabled = Boolean(quizSecurity?.enabled);
   const resultTeamId = quizSecurity?.teamId ?? teamId;
+  const securedEducationInboxTargets = useMemo(
+    () => resolveSecuredEducationQuizInboxTargets(securityEnabled, isEducationTeamPlan),
+    [securityEnabled, isEducationTeamPlan],
+  );
+  const securedEducationSave = securedEducationInboxTargets != null;
   const shouldAutoSaveResult = autoSaveQuizResult || securityEnabled;
   const initialSession = quizSecurity?.initialSession ?? null;
   const restoredState =
@@ -423,10 +440,20 @@ export function QuizStudy({
 
   const totalQuestions = questions.length;
   const enabledFormats = useMemo(() => enabledQuizFormatKeys(quizFormats), [quizFormats]);
-  const sessionFormatSummary = useMemo(
-    () => summarizeSessionQuestionFormats(questions),
-    [questions],
-  );
+  const sessionFormatSummary = useMemo(() => {
+    const actual = summarizeSessionQuestionFormats(questions);
+    if (actual) return actual;
+    if (quizFormatAssignmentPlan?.distribution) {
+      return summarizeQuizFormatDistribution(quizFormatAssignmentPlan.distribution);
+    }
+    if (quizFormatAssignmentPlan?.byCardId) {
+      const derived = distributionFromQuestionTypes(
+        Object.values(quizFormatAssignmentPlan.byCardId),
+      );
+      return summarizeQuizFormatDistribution(derived);
+    }
+    return null;
+  }, [quizFormatAssignmentPlan, questions]);
   const answeredCount = questions.filter((q, i) =>
     isQuizQuestionAnswered(q, selectedByIndex[i] ?? null, typedAnswersByIndex[i] ?? null),
   ).length;
@@ -504,7 +531,7 @@ export function QuizStudy({
                 deckId,
                 deckName,
                 teamId: resultTeamId,
-                savedFromTeamWorkspace: autoSaveQuizResult,
+                savedFromTeamWorkspace: autoSaveQuizResult || securedEducationSave,
                 correct: res.correct,
                 incorrect: res.incorrect,
                 unanswered: res.unanswered,
@@ -512,7 +539,10 @@ export function QuizStudy({
                 percent: res.percent,
                 elapsedSeconds: res.elapsedSeconds,
                 perCard,
-                inboxTargets: shouldAutoSaveResult ? undefined : reason.inboxTargets,
+                inboxTargets:
+                  securedEducationInboxTargets ??
+                  (shouldAutoSaveResult ? undefined : reason.inboxTargets),
+                inboxOnly: securedEducationSave,
               });
               setAutoPersisted(true);
               setAutoPersistError(null);
@@ -546,6 +576,8 @@ export function QuizStudy({
       deckId,
       shouldAutoSaveResult,
       autoSaveQuizResult,
+      securedEducationSave,
+      securedEducationInboxTargets,
       deckName,
       resultTeamId,
       securityEnabled,
@@ -813,6 +845,9 @@ export function QuizStudy({
             <AlertDialogDescription className="text-xs sm:text-sm">
               Unanswered questions will be counted as incorrect. You can go
               back and answer them first, or submit now to see your score.
+              {securedEducationSave
+                ? " Your result will be saved to the in-app inbox for you, the workspace owner, and team admins."
+                : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
@@ -1354,23 +1389,17 @@ export function QuizStudy({
               )}
             </div>
           ) : current.type === "true_false" ? (
-            <p
-              className={cn(
-                "text-center text-base sm:text-xl font-semibold leading-relaxed break-words",
-                deckAccent.hasDeckAccent && "text-white",
-              )}
-            >
-              {current.statement}
-            </p>
+            <FormattedCardFront
+              text={current.statement}
+              variant="quiz"
+              hasGradient={deckAccent.hasDeckAccent}
+            />
           ) : current.question ? (
-            <p
-              className={cn(
-                "text-center text-base sm:text-xl font-semibold leading-relaxed break-words",
-                deckAccent.hasDeckAccent && "text-white",
-              )}
-            >
-              {current.question}
-            </p>
+            <FormattedCardFront
+              text={current.question}
+              variant="quiz"
+              hasGradient={deckAccent.hasDeckAccent}
+            />
           ) : (
             <p
               className={cn(
@@ -1437,7 +1466,9 @@ export function QuizStudy({
                       </span>
                     ) : null}
                     {hasOptionText ? (
-                      <span className="break-words">{displayText}</span>
+                      <span className="break-words font-normal text-sm sm:text-base leading-relaxed">
+                        {polishCardText(displayText)}
+                      </span>
                     ) : optionImageUrl ? (
                       <span className="text-xs text-muted-foreground">(Image answer)</span>
                     ) : null}
@@ -1817,9 +1848,11 @@ function QuizResultCard({
                     <p className="text-xs text-muted-foreground">
                       {formatQuestionWithTypeLabel(i + 1, questions[i]?.type)}
                     </p>
-                    <p className="text-sm font-medium break-words">
-                      {row.question ?? "(Image only)"}
-                    </p>
+                    <FormattedCardFront
+                      text={row.question ?? "(Image only)"}
+                      variant="quiz"
+                      className="text-sm"
+                    />
                     <p className="text-xs break-words">
                       <span className="text-muted-foreground">Your answer: </span>
                       <span

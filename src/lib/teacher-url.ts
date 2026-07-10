@@ -45,6 +45,67 @@ export function buildTeacherQuizzesPath(
   return qs ? `${TEACHER_QUIZZES_PATH}?${qs}` : TEACHER_QUIZZES_PATH;
 }
 
+export function buildTeacherLessonBuilderPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+  extra?: URLSearchParams,
+): string {
+  const p = new URLSearchParams(buildTeacherQueryString(teamId, teamMemberId));
+  if (extra) {
+    extra.forEach((value, key) => {
+      if (!p.has(key)) {
+        p.set(key, value);
+      }
+    });
+  }
+  const qs = p.toString();
+  return qs ? `${TEACHER_PATH}/lesson-builder?${qs}` : `${TEACHER_PATH}/lesson-builder`;
+}
+
+function buildTeacherToolPath(
+  suffix: string,
+  teamId?: number | null,
+  teamMemberId?: number | null,
+  extra?: URLSearchParams,
+): string {
+  const normalized = suffix.startsWith("/") ? suffix : `/${suffix}`;
+  const path = `${TEACHER_PATH}${normalized}`;
+  const p = new URLSearchParams(buildTeacherQueryString(teamId, teamMemberId));
+  if (extra) {
+    extra.forEach((value, key) => {
+      if (!p.has(key)) {
+        p.set(key, value);
+      }
+    });
+  }
+  const qs = p.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+export function buildTeacherHomeworkPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+  extra?: URLSearchParams,
+): string {
+  return buildTeacherToolPath("/homework", teamId, teamMemberId, extra);
+}
+
+export function buildTeacherWorksheetsPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+  extra?: URLSearchParams,
+): string {
+  return buildTeacherToolPath("/worksheets", teamId, teamMemberId, extra);
+}
+
+export function buildTeacherStudyGuidesPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+  extra?: URLSearchParams,
+): string {
+  return buildTeacherToolPath("/study-guides", teamId, teamMemberId, extra);
+}
+
 export function buildTeacherSubPath(
   suffix: string,
   teamId?: number | null,

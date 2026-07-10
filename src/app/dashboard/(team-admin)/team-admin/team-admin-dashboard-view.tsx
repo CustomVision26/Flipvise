@@ -114,6 +114,7 @@ export default async function TeamAdminDashboardView({
             teamId: t.id,
             teamName: t.name,
             ownerUserId: t.ownerUserId,
+            planSlug: t.planSlug,
             members: allMembers,
             results,
           };

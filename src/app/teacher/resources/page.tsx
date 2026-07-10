@@ -5,6 +5,10 @@ import { cn } from "@/lib/utils";
 import { loadTeacherResourceLibrary } from "@/db/queries/teacher-resource-library";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import {
+  buildTeacherLessonBuilderPath,
+  buildTeacherHomeworkPath,
+  buildTeacherWorksheetsPath,
+  buildTeacherStudyGuidesPath,
   buildTeacherQuizzesPath,
   buildTeacherSubPath,
 } from "@/lib/teacher-url";
@@ -38,6 +42,38 @@ export default async function TeacherResourcesPage({
               workspace.teamId,
               workspace.teamMemberId,
               new URLSearchParams({ lessonPlanId: String(item.lessonPlanId) }),
+            )
+          : null,
+      lessonPlanEditHref:
+        item.lessonPlanId != null && !item.isPlaceholder
+          ? buildTeacherLessonBuilderPath(
+              workspace.teamId,
+              workspace.teamMemberId,
+              new URLSearchParams({ lessonPlanId: String(item.lessonPlanId) }),
+            )
+          : null,
+      homeworkEditHref:
+        item.homeworkId != null && !item.isPlaceholder
+          ? buildTeacherHomeworkPath(
+              workspace.teamId,
+              workspace.teamMemberId,
+              new URLSearchParams({ homeworkId: String(item.homeworkId) }),
+            )
+          : null,
+      worksheetEditHref:
+        item.worksheetId != null && !item.isPlaceholder
+          ? buildTeacherWorksheetsPath(
+              workspace.teamId,
+              workspace.teamMemberId,
+              new URLSearchParams({ worksheetId: String(item.worksheetId) }),
+            )
+          : null,
+      studyGuideEditHref:
+        item.studyGuideId != null && !item.isPlaceholder
+          ? buildTeacherStudyGuidesPath(
+              workspace.teamId,
+              workspace.teamMemberId,
+              new URLSearchParams({ studyGuideId: String(item.studyGuideId) }),
             )
           : null,
     })),

@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TeacherRegisterStudentPanel } from "@/components/teacher-register-student-panel";
-import { TeacherManualGradesPanel } from "@/components/teacher-manual-grades-panel";
 import { TeacherStudentReportsPanel } from "@/components/teacher-student-reports-panel";
 import {
   Table,
@@ -23,6 +22,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ViewQuizResultDialog } from "@/components/view-quiz-result-dialog";
+import {
+  QuizResultSheetsDialog,
+  type QuizResultSheetsDialogRow,
+} from "@/components/quiz-result-sheets-dialog";
 import { deleteQuizResultAction } from "@/actions/quiz-results";
 import type { QuizResultSummary } from "@/components/quiz-result-detail-view";
 import type {
@@ -34,6 +37,9 @@ import type {
 } from "@/db/schema";
 import type { TeacherClassWithDeck } from "@/db/queries/teacher-classes";
 import type { TeacherRegisteredStudentWithClass } from "@/db/queries/teacher-registered-students";
+import type { WorkspaceStudentInvitee } from "@/db/queries/teacher-workspace-student-invitees";
+import type { SavedHomeworkAssignmentOption } from "@/db/queries/saved-homework";
+import type { TeacherManualGradeQuizOption } from "@/db/queries/teacher-manual-grades";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import {
   AlertDialog,
@@ -453,18 +459,27 @@ function ProgressResultDeleteButton({
 function ProgressResultRows({
   rows,
   teamId,
+  workspacePlanSlug,
   canDeleteResults,
   onResultDeleted,
+  onOpenSheets,
 }: {
   rows: TeacherStudentProgressRow[];
   teamId: number | null;
+  workspacePlanSlug: string | null;
   canDeleteResults: boolean;
   onResultDeleted: (resultId: number) => void;
+  onOpenSheets: (row: TeacherStudentProgressRow) => void;
 }) {
   return (
     <>
       {rows.map((row) => (
-        <TableRow key={row.resultId} className="hover:bg-muted/10">
+        <TableRow
+          key={row.resultId}
+          className="cursor-pointer hover:bg-muted/10"
+          onDoubleClick={() => onOpenSheets(row)}
+          title="Double-click to open quiz question sheet and answer key"
+        >
           <TableCell className="max-w-[14rem]">
             <MemberCell row={row} />
           </TableCell>
@@ -486,7 +501,7 @@ function ProgressResultRows({
               {row.percent}%
             </span>
           </TableCell>
-          <TableCell className="text-right">
+          <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <ViewQuizResultDialog
                 result={row.summary}
@@ -512,38 +527,52 @@ function ProgressResultRows({
 type TeacherStudentProgressViewProps = {
   rows: TeacherStudentProgressRow[];
   teamId: number | null;
+  teamMemberId: number | null;
   canDeleteResults: boolean;
   ownerUserId: string;
   ownerName: string | null;
   ownerEmail: string | null;
   memberMetaByUserId: Record<string, TeacherStudentProgressMemberMeta>;
   workspaceLabel: string | null;
+  workspacePlanSlug: string | null;
   backHref: string;
   isWorkspaceOwner: boolean;
   showRegisterStudentTab: boolean;
+  isPersonalEducation: boolean;
+  isEducationTeamWorkspace: boolean;
+  workspaceInvitees: WorkspaceStudentInvitee[];
   showQuizResultsTab: boolean;
   showGradesAndReportsTabs: boolean;
   registeredStudents: TeacherRegisteredStudentWithClass[];
   personalClasses: TeacherClassWithDeck[];
+  savedHomeworkAssignments: SavedHomeworkAssignmentOption[];
+  savedQuizOptions: TeacherManualGradeQuizOption[];
   manualGrades: TeacherManualGradeRow[];
 };
 
 export function TeacherStudentProgressView({
   rows: initialRows,
   teamId,
+  teamMemberId,
   canDeleteResults,
   ownerUserId,
   ownerName,
   ownerEmail,
   memberMetaByUserId,
   workspaceLabel,
+  workspacePlanSlug,
   backHref,
   isWorkspaceOwner,
   showRegisterStudentTab,
+  isPersonalEducation,
+  isEducationTeamWorkspace,
+  workspaceInvitees,
   showQuizResultsTab,
   showGradesAndReportsTabs,
   registeredStudents,
   personalClasses,
+  savedHomeworkAssignments,
+  savedQuizOptions,
   manualGrades,
 }: TeacherStudentProgressViewProps) {
   const router = useRouter();
@@ -560,6 +589,8 @@ export function TeacherStudentProgressView({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<TeacherPageSize>(DEFAULT_TEACHER_PAGE_SIZE);
+  const [sheetsDialogRow, setSheetsDialogRow] = useState<QuizResultSheetsDialogRow | null>(null);
+  const [sheetsDialogOpen, setSheetsDialogOpen] = useState(false);
   const [collapsedAdminIds, setCollapsedAdminIds] = useState<Set<string>>(() => new Set());
   const [collapsedMemberKeys, setCollapsedMemberKeys] = useState<Set<string>>(() => new Set());
 
@@ -689,18 +720,34 @@ export function TeacherStudentProgressView({
     router.refresh();
   }
 
+  function openQuizSheets(row: TeacherStudentProgressRow) {
+    if (teamId == null) return;
+    const memberLabel = row.memberName ?? row.memberEmail ?? "Unknown member";
+    setSheetsDialogRow({
+      resultId: row.resultId,
+      teamId,
+      workspacePlanSlug: workspacePlanSlug ?? "",
+      deckName: row.summary.deckName,
+      memberLabel,
+      memberEmail: row.memberEmail,
+    });
+    setSheetsDialogOpen(true);
+  }
+
   const progressRowProps = {
     teamId,
+    workspacePlanSlug,
     canDeleteResults,
     onResultDeleted: handleResultDeleted,
+    onOpenSheets: openQuizSheets,
   };
 
-  const defaultTab = showRegisterStudentTab
+  const defaultTab = showRegisterStudentTab && isPersonalEducation
     ? "register-student"
     : showQuizResultsTab
       ? "quiz-results"
       : showGradesAndReportsTabs
-        ? "manual-grades"
+        ? "reports-and-grades"
         : "quiz-results";
 
   const quizResultsCard = (
@@ -717,7 +764,8 @@ export function TeacherStudentProgressView({
                     {adminLedGroups.length === 1 ? "" : "s"}).
                   </>
                 ) : null}{" "}
-                Click a team admin or member group to show or hide results.
+                Click a team admin or member group to show or hide results. Double-click a row to
+                open the quiz question sheet and answer key.
               </CardDescription>
             </div>
             <Button
@@ -1049,9 +1097,11 @@ export function TeacherStudentProgressView({
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Student Progress</h1>
             <p className="text-sm text-muted-foreground">
-              {showRegisterStudentTab
-                ? "Register students, record assignment grades, and generate progress reports."
-                : `Track quiz performance and assignment grades in ${workspaceLabel ?? "your workspace"}.`}
+              {isEducationTeamWorkspace
+                ? "Register invited workspace students, record assignment grades, and generate progress reports."
+                : showRegisterStudentTab
+                  ? "Register students, record assignment grades, and generate progress reports."
+                  : `Track quiz performance and assignment grades in ${workspaceLabel ?? "your workspace"}.`}
             </p>
           </div>
         </div>
@@ -1070,14 +1120,9 @@ export function TeacherStudentProgressView({
             </TabsTrigger>
           ) : null}
           {showGradesAndReportsTabs ? (
-            <>
-              <TabsTrigger value="manual-grades" className="px-3 py-2">
-                Manual grades
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="px-3 py-2">
-                Reports
-              </TabsTrigger>
-            </>
+            <TabsTrigger value="reports-and-grades" className="px-3 py-2">
+              Reports & Grades
+            </TabsTrigger>
           ) : null}
         </TabsList>
 
@@ -1086,6 +1131,9 @@ export function TeacherStudentProgressView({
             <TeacherRegisterStudentPanel
               students={registeredStudents}
               classes={personalClasses}
+              teamId={teamId}
+              isEducationTeamWorkspace={isEducationTeamWorkspace}
+              workspaceInvitees={workspaceInvitees}
             />
           </TabsContent>
         ) : null}
@@ -1097,23 +1145,28 @@ export function TeacherStudentProgressView({
         ) : null}
 
         {showGradesAndReportsTabs ? (
-          <>
-            <TabsContent value="manual-grades" className="mt-0">
-              <TeacherManualGradesPanel
-                grades={manualGrades}
-                teamId={teamId}
-                isPersonalEducation={showRegisterStudentTab}
-              />
-            </TabsContent>
-            <TabsContent value="reports" className="mt-0">
-              <TeacherStudentReportsPanel
-                quizRows={rows}
-                manualGrades={manualGrades}
-              />
-            </TabsContent>
-          </>
+          <TabsContent value="reports-and-grades" className="mt-0">
+            <TeacherStudentReportsPanel
+              manualGrades={manualGrades}
+              teamId={teamId}
+              teamMemberId={teamMemberId}
+              isPersonalEducation={isPersonalEducation}
+              isEducationTeamWorkspace={isEducationTeamWorkspace}
+              registeredStudents={registeredStudents}
+              personalClasses={personalClasses}
+              savedHomeworkAssignments={savedHomeworkAssignments}
+              savedQuizOptions={savedQuizOptions}
+              quizResultRows={rows}
+            />
+          </TabsContent>
         ) : null}
       </Tabs>
+
+      <QuizResultSheetsDialog
+        open={sheetsDialogOpen}
+        onOpenChange={setSheetsDialogOpen}
+        row={sheetsDialogRow}
+      />
     </div>
   );
 }

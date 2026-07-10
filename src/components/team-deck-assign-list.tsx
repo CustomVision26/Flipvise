@@ -40,6 +40,7 @@ import {
   TEAM_MEMBER_STUDY_PRIVILEGES,
   TEAM_MEMBER_STUDY_PRIVILEGE_LABELS,
   defaultTeamMemberStudyPrivilege,
+  memberRoleQualifiesForStudyPrivileges,
   type TeamMemberStudyPrivilege,
 } from "@/lib/team-study-privilege";
 
@@ -65,6 +66,7 @@ type AssignmentTableDisplayRow = {
 export type TeamAssignWorkspaceSnapshot = {
   id: number;
   name: string;
+  planSlug: string;
   /** Subscriber who owns this workspace. */
   ownerUserId: string;
   /** All rows in `team_members` for this workspace (includes team admins). */
@@ -168,7 +170,7 @@ const CAPTION_DECK =
   "Only decks linked to this workspace appear here — create on your Personal Dashboard, then link deck to this workspace below, or create a deck directly scoped to this workspace.";
 
 const CAPTION_STUDY_PRIVILEGE =
-  "For regular team members — choose whether they may use Standard Review, Quiz, or both on the study page for this deck. Team admins always have full study access.";
+  "Choose whether the assignee may use Standard Review, Quiz, or both on the study page for this deck. Team admins on Education Gold / Enterprise can be limited here; on other plans team admins always have full study access.";
 
 const CAPTION_LINK_PERSONAL =
   "Lists every deck from your Personal Dashboard. Decks already tied to this workspace stay selectable — linking again simply confirms they remain attached (no duplicate).";
@@ -279,7 +281,12 @@ export function TeamDeckAssignList({
     memberUserId !== NO_MEMBER
       ? normalMembers.find((m) => m.userId === memberUserId)
       : undefined;
-  const selectedMemberIsRegular = selectedMember?.role === "team_member";
+  const selectedMemberQualifiesForStudyPrivileges =
+    selectedMember != null &&
+    memberRoleQualifiesForStudyPrivileges(
+      selectedMember.role,
+      workspace?.planSlug ?? "",
+    );
 
   const assignmentTableWorkspaces = React.useMemo(() => {
     if (viewerIsSubscriberOwner) return workspaces;
@@ -514,12 +521,12 @@ export function TeamDeckAssignList({
     existingAssignment?.studyPrivilege ?? defaultTeamMemberStudyPrivilege();
 
   const studyPrivilegeChanged =
-    selectedMemberIsRegular && studyPrivilege !== savedStudyPrivilege;
+    selectedMemberQualifiesForStudyPrivileges && studyPrivilege !== savedStudyPrivilege;
 
   async function onAssign() {
     if (!canSubmit) return;
-    if (assigned && !selectedMemberIsRegular) return;
-    if (assigned && selectedMemberIsRegular && !studyPrivilegeChanged) return;
+    if (assigned && !selectedMemberQualifiesForStudyPrivileges) return;
+    if (assigned && selectedMemberQualifiesForStudyPrivileges && !studyPrivilegeChanged) return;
     setError(null);
     setBusy("assign");
     try {
@@ -527,7 +534,9 @@ export function TeamDeckAssignList({
         teamId: teamIdNum,
         deckId: deckIdNum,
         memberUserId,
-        studyPrivilege: selectedMemberIsRegular ? studyPrivilege : defaultTeamMemberStudyPrivilege(),
+        studyPrivilege: selectedMemberQualifiesForStudyPrivileges
+          ? studyPrivilege
+          : defaultTeamMemberStudyPrivilege(),
       });
       router.refresh();
     } catch (e) {
@@ -899,7 +908,7 @@ export function TeamDeckAssignList({
                 </Select>
               </div>
 
-              {selectedMemberIsRegular ? (
+              {selectedMemberQualifiesForStudyPrivileges ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-1">
                     <Label htmlFor="assign-deck-study-privilege">Study modes</Label>
@@ -935,7 +944,7 @@ export function TeamDeckAssignList({
               {assigned && (
                 <p className="text-sm text-muted-foreground">
                   This deck is already assigned to this member for their workspace Study view.
-                  {selectedMemberIsRegular
+                  {selectedMemberQualifiesForStudyPrivileges
                     ? " Re-assign to update study modes, or edit on the Study privileges tab."
                     : null}
                 </p>
@@ -948,14 +957,14 @@ export function TeamDeckAssignList({
                   disabled={
                     !canSubmit ||
                     busy !== null ||
-                    (assigned && !selectedMemberIsRegular) ||
-                    (assigned && selectedMemberIsRegular && !studyPrivilegeChanged)
+                    (assigned && !selectedMemberQualifiesForStudyPrivileges) ||
+                    (assigned && selectedMemberQualifiesForStudyPrivileges && !studyPrivilegeChanged)
                   }
                   onClick={onAssign}
                 >
                   {busy === "assign"
                     ? "Saving…"
-                    : assigned && selectedMemberIsRegular
+                    : assigned && selectedMemberQualifiesForStudyPrivileges
                       ? "Update assignment"
                       : assigned
                         ? "Already assigned"
