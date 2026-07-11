@@ -40,6 +40,7 @@ import {
   labelForTeamPlanSlug,
   limitsForPlan,
 } from "@/lib/team-plans";
+import { resolveWorkspaceOwnerDisplayName } from "@/lib/workspace-owner-display";
 
 /**
  * Server-side push/pull helpers for the offline mobile Study database.
@@ -517,6 +518,10 @@ export async function buildOfflineSyncContext(
       const ownerResolved =
         ownerFields[team.ownerUserId] ??
         (team.ownerUserId === userId ? viewerField : null);
+      const ownerIdentity = resolveWorkspaceOwnerDisplayName({
+        navOwnerDisplayName: nav.ownerDisplayName,
+        ownerResolved,
+      });
       const workspaceDeckServerIds =
         role === "team_member" || role === "team_admin"
           ? (await getAssignedDecksForMember(team.id, userId)).map((d) => d.id)
@@ -535,8 +540,8 @@ export async function buildOfflineSyncContext(
         maxDecksPerWorkspace: limits.maxDecksPerWorkspace,
         maxCardsPerDeck: CARDS_PER_DECK_LIMIT_PRO_PLUS,
         canCreateDeck: role === "owner" || role === "team_admin",
-        ownerDisplayName: nav.ownerDisplayName,
-        ownerEmail: ownerResolved?.primaryEmail ?? null,
+        ownerDisplayName: ownerIdentity.ownerDisplayName,
+        ownerEmail: ownerIdentity.ownerEmail,
         isSubscriberOwned: nav.isSubscriberOwned,
         workspaceDeckServerIds,
       };

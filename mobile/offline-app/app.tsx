@@ -455,6 +455,7 @@ export function App() {
 
   const handleWorkspaceChange = useCallback(
     async (scope: SavedWorkspaceScope) => {
+      if (scope === workspaceScope) return;
       setWorkspaceScope(scope);
       await saveWorkspaceScope(scope);
       if (!userId) return;
@@ -466,7 +467,7 @@ export function App() {
         setScopeLoading(false);
       }
     },
-    [userId, loadDecks, ensureAccessContextFresh],
+    [userId, workspaceScope, loadDecks, ensureAccessContextFresh],
   );
 
   const canCreateDeck = useMemo(

@@ -88,6 +88,7 @@ interface SyncResponse {
       maxCardsPerDeck: number;
       canCreateDeck: boolean;
       ownerDisplayName?: string;
+      ownerEmail?: string | null;
       isSubscriberOwned?: boolean;
       workspaceDeckServerIds?: number[];
     }[];

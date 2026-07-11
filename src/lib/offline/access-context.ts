@@ -11,10 +11,11 @@ import {
   FREE_PERSONAL_DECK_LIMIT,
   PRO_PLUS_PERSONAL_DECK_LIMIT,
 } from "@/lib/personal-plan-limits";
+import { resolveWorkspaceOwnerDisplayName } from "@/lib/workspace-owner-display";
 
 const ACCESS_CONTEXT_KEY = "flipvise.offline.accessContext";
 /** Bump when offline deck visibility rules change — triggers manifest reset + full re-sync on native. */
-export const OFFLINE_LIBRARY_REVISION = 3;
+export const OFFLINE_LIBRARY_REVISION = 4;
 const LIBRARY_MIGRATION_PENDING_SYNC_KEY =
   "flipvise.offline.libraryMigrationPendingSync";
 
@@ -117,7 +118,7 @@ export async function getOfflineAccessContext(): Promise<OfflineAccessContext | 
         teamMemberId: w.teamMemberId ?? 0,
         canAccessTeamAdmin:
           w.canAccessTeamAdmin ?? (w.role === "owner" || w.role === "team_admin"),
-        ownerDisplayName: w.ownerDisplayName ?? "Subscriber",
+        ownerDisplayName: w.ownerDisplayName ?? "",
         ownerEmail: w.ownerEmail ?? null,
         isSubscriberOwned: w.isSubscriberOwned ?? w.role === "owner",
         workspaceDeckServerIds: Array.isArray(w.workspaceDeckServerIds)
@@ -169,13 +170,10 @@ export function formatOfflineWorkspaceOwnerLabel(
     if (selfEmail) return selfEmail;
   }
 
-  const name = workspace.ownerDisplayName?.trim();
-  if (name && name !== "Subscriber") return name;
-
-  const email = workspace.ownerEmail?.trim();
-  if (email) return email;
-
-  return name || "Subscriber";
+  return resolveWorkspaceOwnerDisplayName({
+    navOwnerDisplayName: workspace.ownerDisplayName,
+    ownerEmail: workspace.ownerEmail,
+  }).ownerDisplayName;
 }
 
 export function defaultOfflineAccessContext(): OfflineAccessContext {
