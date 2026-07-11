@@ -4,6 +4,9 @@ import {
   SOURCE_IMPORT_MAX_EXTRACTED_CHARS,
   SOURCE_IMPORT_MAX_FILE_BYTES,
   truncateSourceImportText,
+  isProPlusFormatEnabled,
+  isProPlusSourceFormat,
+  mimeToSourceFormat,
   type SourceFormat,
 } from "@/lib/source-import-formats";
 import { getUnsupportedImportUrlReason, isPrivateChatImportUrl } from "@/lib/source-import-url-validation";

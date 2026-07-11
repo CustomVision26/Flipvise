@@ -266,6 +266,85 @@ export async function buildLessonPlanPdfDocument(
   return doc;
 }
 
+export function lessonPlanHasVocabularyDetails(plan: LessonPlanResult): boolean {
+  return (plan.weeklySchedule ?? []).some((day) => day.vocabularyDetail != null);
+}
+
+export function lessonPlanVocabularyDetailPdfSafeFileName(title: string): string {
+  return `${lessonPlanPdfSafeFileName(title)}_vocabulary_detail`;
+}
+
+export async function buildLessonPlanVocabularyDetailPdfDocument(
+  plan: LessonPlanResult,
+  unitContext?: LessonPlanPdfUnitContext,
+) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 45;
+  const contentW = pageW - margin * 2;
+  const yRef = { y: margin };
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(20);
+  doc.text("Vocabulary Detail", margin, yRef.y);
+  yRef.y += 24;
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(40);
+  const titleWrapped = doc.splitTextToSize(plan.lessonTitle, contentW);
+  doc.text(titleWrapped, margin, yRef.y);
+  yRef.y += titleWrapped.length * 15 + 8;
+
+  const unitLabel =
+    unitContext && unitContext.planPeriodDays > 1
+      ? formatUnitPacingLabel(unitContext.planPeriodDays, unitContext.lessonDuration)
+      : null;
+  if (unitLabel) {
+    doc.setFontSize(10);
+    doc.setTextColor(80);
+    doc.text(unitLabel, margin, yRef.y);
+    yRef.y += 14;
+  }
+
+  doc.setDrawColor(220);
+  doc.line(margin, yRef.y, margin + contentW, yRef.y);
+  yRef.y += 16;
+
+  const daysWithDetail =
+    plan.weeklySchedule?.filter((day) => day.vocabularyDetail != null) ?? [];
+
+  for (const day of daysWithDetail) {
+    addSection(
+      doc,
+      margin,
+      contentW,
+      yRef,
+      pageH,
+      `${day.dayLabel} — Vocabulary detail`,
+      [day.dailyFocus, "", ...vocabularyDetailPdfLines(day.vocabularyDetail!)],
+    );
+  }
+
+  return doc;
+}
+
+export async function generateLessonPlanVocabularyDetailPdfBuffer(
+  plan: LessonPlanResult,
+  unitContext?: LessonPlanPdfUnitContext,
+): Promise<Buffer | null> {
+  if (!lessonPlanHasVocabularyDetails(plan)) {
+    return null;
+  }
+  const doc = await buildLessonPlanVocabularyDetailPdfDocument(plan, unitContext);
+  const arrayBuffer = doc.output("arraybuffer");
+  return Buffer.from(arrayBuffer);
+}
+
 export async function generateLessonPlanPdfBuffer(
   plan: LessonPlanResult,
   unitContext?: LessonPlanPdfUnitContext,

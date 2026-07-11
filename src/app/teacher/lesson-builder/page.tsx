@@ -134,6 +134,7 @@ export default async function TeacherLessonBuilderPage({
               deckId: savedPlan.deckId,
               sourceDeckName: savedPlan.sourceDeckName,
               lessonTitle: savedPlan.lessonTitle,
+              vocabularyDetailPdfUrl: savedPlan.vocabularyDetailPdfUrl,
             }
           : undefined
       }

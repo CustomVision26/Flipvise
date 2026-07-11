@@ -20,6 +20,8 @@ export type SaveLessonPlanInput = {
   result: LessonPlanResult;
   pdfUrl?: string | null;
   pdfFileName?: string | null;
+  vocabularyDetailPdfUrl?: string | null;
+  vocabularyDetailPdfFileName?: string | null;
   deckId?: number | null;
   sourceDeckName?: string | null;
 };
@@ -40,6 +42,8 @@ export async function saveLessonPlan(
       result: data.result,
       pdfUrl: data.pdfUrl ?? null,
       pdfFileName: data.pdfFileName ?? null,
+      vocabularyDetailPdfUrl: data.vocabularyDetailPdfUrl ?? null,
+      vocabularyDetailPdfFileName: data.vocabularyDetailPdfFileName ?? null,
       deckId: data.deckId ?? null,
       sourceDeckName: data.sourceDeckName ?? null,
     })
@@ -299,6 +303,8 @@ export async function updateSavedLessonPlanById(
     result: LessonPlanResult;
     pdfUrl?: string | null;
     pdfFileName?: string | null;
+    vocabularyDetailPdfUrl?: string | null;
+    vocabularyDetailPdfFileName?: string | null;
     deckId?: number | null;
     sourceDeckName?: string | null;
   },
@@ -315,6 +321,8 @@ export async function updateSavedLessonPlanById(
       result: data.result,
       pdfUrl: data.pdfUrl ?? null,
       pdfFileName: data.pdfFileName ?? null,
+      vocabularyDetailPdfUrl: data.vocabularyDetailPdfUrl ?? null,
+      vocabularyDetailPdfFileName: data.vocabularyDetailPdfFileName ?? null,
       deckId: data.deckId ?? null,
       sourceDeckName: data.sourceDeckName ?? null,
       updatedAt: new Date(),
@@ -333,6 +341,7 @@ export type SavedLessonPlanPickerItem = {
   topic: string;
   difficultyLevel: string;
   pdfUrl: string | null;
+  vocabularyDetailPdfUrl: string | null;
   deckId: number | null;
   sourceDeckName: string | null;
   input: LessonPlanInput;
@@ -357,6 +366,7 @@ export function mapSavedLessonPlanRowToPickerItem(
     topic: row.topic,
     difficultyLevel: row.difficultyLevel,
     pdfUrl: row.pdfUrl,
+    vocabularyDetailPdfUrl: row.vocabularyDetailPdfUrl,
     deckId: row.deckId,
     sourceDeckName: row.sourceDeckName,
     input: row.input,

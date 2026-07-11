@@ -4,9 +4,100 @@ import {
   PLAN_PERIOD_DAY_OPTIONS,
   type PlanPeriodDays,
 } from "@/lib/lesson-plan-ai-schema";
+import { TEACHER_CLASS_DAY_OPTIONS } from "@/lib/teacher-class-form";
 
 export { DEFAULT_PLAN_PERIOD_DAYS, PLAN_PERIOD_DAY_OPTIONS };
 export type { PlanPeriodDays };
+
+export const LESSON_PLAN_DAY_OF_WEEK_NONE = "__none__";
+
+export type LessonPlanDayOfWeek = (typeof TEACHER_CLASS_DAY_OPTIONS)[number];
+
+const WEEKDAY_NAME_SET = new Set<string>(TEACHER_CLASS_DAY_OPTIONS);
+
+export function coerceLessonPlanDayOfWeek(
+  value: string | null | undefined,
+): LessonPlanDayOfWeek | undefined {
+  if (!value || value === LESSON_PLAN_DAY_OF_WEEK_NONE) return undefined;
+  if (WEEKDAY_NAME_SET.has(value)) return value as LessonPlanDayOfWeek;
+  return undefined;
+}
+
+/** Stable day number from schedule position (1-based). */
+export function lessonPlanDayNumberFromIndex(index: number): number {
+  return index + 1;
+}
+
+/** Display label, e.g. "Day 1" or "Day 1 (Saturday)". */
+export function formatLessonPlanDayLabel(
+  dayNumber: number,
+  dayOfWeek?: string | null,
+): string {
+  const base = `Day ${dayNumber}`;
+  const weekday = dayOfWeek?.trim();
+  if (!weekday) return base;
+  return `${base} (${weekday})`;
+}
+
+export function parseLessonPlanDayLabel(dayLabel: string): {
+  dayNumber: number | null;
+  dayOfWeek: string | null;
+} {
+  const trimmed = dayLabel.trim();
+  const withWeekday = /^Day\s+(\d+)\s*\(([^)]+)\)\s*$/i.exec(trimmed);
+  if (withWeekday) {
+    return {
+      dayNumber: Number(withWeekday[1]),
+      dayOfWeek: withWeekday[2]!.trim(),
+    };
+  }
+
+  const dayOnly = /^Day\s+(\d+)\s*$/i.exec(trimmed);
+  if (dayOnly) {
+    return { dayNumber: Number(dayOnly[1]), dayOfWeek: null };
+  }
+
+  if (WEEKDAY_NAME_SET.has(trimmed)) {
+    return { dayNumber: null, dayOfWeek: trimmed };
+  }
+
+  return { dayNumber: null, dayOfWeek: null };
+}
+
+export function normalizeLessonPlanDayEntry(
+  day: LessonPlanDaySchedule,
+  index: number,
+): LessonPlanDaySchedule {
+  const dayNumber = lessonPlanDayNumberFromIndex(index);
+  const parsed = parseLessonPlanDayLabel(day.dayLabel);
+  const dayOfWeek =
+    day.dayOfWeek ??
+    coerceLessonPlanDayOfWeek(
+      parsed.dayNumber != null ? parsed.dayOfWeek : undefined,
+    );
+
+  return {
+    ...day,
+    dayOfWeek,
+    dayLabel: formatLessonPlanDayLabel(dayNumber, dayOfWeek),
+  };
+}
+
+export function normalizeWeeklyScheduleLabels(
+  schedule: LessonPlanDaySchedule[],
+): LessonPlanDaySchedule[] {
+  return schedule.map((day, index) => normalizeLessonPlanDayEntry(day, index));
+}
+
+export function normalizeLessonPlanResultDayLabels<
+  T extends { weeklySchedule?: LessonPlanDaySchedule[] },
+>(result: T): T {
+  if (!result.weeklySchedule?.length) return result;
+  return {
+    ...result,
+    weeklySchedule: normalizeWeeklyScheduleLabels(result.weeklySchedule),
+  };
+}
 
 export function isPlanPeriodDays(value: number): value is PlanPeriodDays {
   return (PLAN_PERIOD_DAY_OPTIONS as readonly number[]).includes(value);
@@ -91,24 +182,8 @@ export function distributeVocabularyAcrossDays(
   return buckets;
 }
 
-export function dayLabelForIndex(index: number, totalDays: number): string {
-  if (totalDays === 5) {
-    const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-    return weekdays[index] ?? `Day ${index + 1}`;
-  }
-  if (totalDays === 7) {
-    const weekdays = [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-      "Sunday",
-    ];
-    return weekdays[index] ?? `Day ${index + 1}`;
-  }
-  return `Day ${index + 1}`;
+export function dayLabelForIndex(index: number, _totalDays?: number): string {
+  return formatLessonPlanDayLabel(lessonPlanDayNumberFromIndex(index));
 }
 
 export function buildFallbackDayTimeline(
@@ -190,7 +265,7 @@ export function weeklySchedulePromptBlock(
   return `Plan period: ${planPeriodDays}-day unit. Each class period is ${lessonDuration} long (${formatUnitPacingLabel(planPeriodDays, lessonDuration)}).
 
 Weekly schedule requirements (mandatory):
-- Populate weeklySchedule with exactly ${planPeriodDays} entries (Day 1 … Day ${planPeriodDays}, or weekday names for 5- and 7-day plans).
+- Populate weeklySchedule with exactly ${planPeriodDays} entries labeled Day 1 through Day ${planPeriodDays} (use "Day 1", "Day 2", etc. — not weekday names like Monday).
 - Distribute ALL vocabulary terms across the ${planPeriodDays} days using PEDAGOGICAL pacing — counts per day must vary naturally (e.g. 12 terms over 7 days might be 2, 3, 1, 2, 2, 1, 1). Heavier introduction days may have more new terms; review or assessment days may have fewer. Never give every day the same number of terms unless the topic truly requires it.
 - Order terms logically: foundational concepts before dependent ones; pair related terms on the same day when helpful; reserve at least one lighter day for review or application.
 - Each day's vocabulary array lists only the terms introduced or heavily practiced that day (format: "Term — definition").
@@ -234,14 +309,16 @@ export function reconcileWeeklySchedule(input: {
       input.vocabulary.length,
     )
   ) {
-    return input.weeklySchedule!;
+    return normalizeWeeklyScheduleLabels(input.weeklySchedule!);
   }
 
-  return buildWeeklyScheduleFromVocabulary({
-    vocabulary: input.vocabulary,
-    planPeriodDays: days,
-    lessonDuration: input.lessonDuration,
-    topic: input.topic,
-    difficulty: input.difficulty,
-  });
+  return normalizeWeeklyScheduleLabels(
+    buildWeeklyScheduleFromVocabulary({
+      vocabulary: input.vocabulary,
+      planPeriodDays: days,
+      lessonDuration: input.lessonDuration,
+      topic: input.topic,
+      difficulty: input.difficulty,
+    }),
+  );
 }

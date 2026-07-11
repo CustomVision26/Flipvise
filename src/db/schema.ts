@@ -1008,6 +1008,8 @@ export const savedLessonPlans = pgTable(
     result: json().$type<LessonPlanResult>().notNull(),
     pdfUrl: text(),
     pdfFileName: varchar({ length: 255 }),
+    vocabularyDetailPdfUrl: text(),
+    vocabularyDetailPdfFileName: varchar({ length: 255 }),
     deckId: integer(),
     sourceDeckName: varchar({ length: 255 }),
     createdAt: timestamp().notNull().defaultNow(),

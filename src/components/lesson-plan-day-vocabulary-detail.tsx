@@ -7,6 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { TeacherHelpBalloon } from "@/components/teacher-field-label";
+import { TEACHER_CLASS_DAY_OPTIONS } from "@/lib/teacher-class-form";
+import {
+  formatLessonPlanDayLabel,
+  LESSON_PLAN_DAY_OF_WEEK_NONE,
+  coerceLessonPlanDayOfWeek,
+  lessonPlanDayNumberFromIndex,
+} from "@/lib/lesson-plan-weekly-schedule";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -250,6 +270,14 @@ export function LessonPlanWeeklySchedulePanel({
 
   const isBulkBusy = isGeneratingAll || isGeneratingAllDayDetails;
   const daysMissingDetail = schedule.filter((day) => !day.vocabularyDetail).length;
+  const expandAllButtonLabel =
+    daysMissingDetail === 0
+      ? "Re-expand all day vocabulary (AI)"
+      : "Expand all day vocabulary (AI)";
+  const expandAllButtonTooltip =
+    daysMissingDetail === 0
+      ? "Replace expanded definitions, examples, process steps, and learning goals on every day with fresh AI content."
+      : `Use AI to write full definitions, examples, process steps, and learning goals for ${daysMissingDetail} day${daysMissingDetail === 1 ? "" : "s"} that still need expanded vocabulary.`;
 
   const detailDay =
     detailDayIndex != null ? schedule[detailDayIndex] ?? null : null;
@@ -355,6 +383,20 @@ export function LessonPlanWeeklySchedulePanel({
     );
   }
 
+  function updateDayOfWeek(dayIndex: number, value: string | null) {
+    const day = schedule[dayIndex];
+    if (!day) return;
+
+    const dayOfWeek = coerceLessonPlanDayOfWeek(value);
+    updateDay(dayIndex, {
+      dayOfWeek,
+      dayLabel: formatLessonPlanDayLabel(
+        lessonPlanDayNumberFromIndex(dayIndex),
+        dayOfWeek,
+      ),
+    });
+  }
+
   function updateDayVocabularyTerms(
     dayIndex: number,
     terms: LessonPlanVocabularyTermDetail[],
@@ -386,6 +428,26 @@ export function LessonPlanWeeklySchedulePanel({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium text-foreground">Daily Schedule</p>
+            <TeacherHelpBalloon
+              label="Daily Schedule"
+              help={
+                <>
+                  <p className="mb-2">
+                    Each day is numbered (Day 1, Day 2, …). In edit mode you can optionally add a
+                    day of the week beside the number, e.g. Day 1 (Saturday).
+                  </p>
+                  <p className="mb-2">
+                    Click a day or <strong>View detail</strong> to open expanded AI vocabulary with
+                    definitions, examples, and learning goals.
+                  </p>
+                  <p>
+                    Use <strong>Expand all day vocabulary (AI)</strong> to generate or refresh
+                    expanded vocabulary for every day at once. Edits here are saved with your
+                    lesson plan.
+                  </p>
+                </>
+              }
+            />
             {unitLabel ? (
               <span className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
                 {unitLabel}
@@ -393,23 +455,28 @@ export function LessonPlanWeeklySchedulePanel({
             ) : null}
           </div>
           {lessonContext ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5"
-              disabled={isBulkBusy || generatingDayIndex != null}
-              onClick={() => void generateAllDaysDetail()}
-            >
-              {isBulkBusy ? (
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-              ) : (
-                <Sparkles className="size-3.5" aria-hidden />
-              )}
-              <span className="text-xs">
-                {daysMissingDetail === 0 ? "Regenerate all days" : "AI detail — all days"}
-              </span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger render={<span />}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  disabled={isBulkBusy || generatingDayIndex != null}
+                  onClick={() => void generateAllDaysDetail()}
+                >
+                  {isBulkBusy ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <Sparkles className="size-3.5" aria-hidden />
+                  )}
+                  <span className="text-xs">{expandAllButtonLabel}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                {expandAllButtonTooltip}
+              </TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
 
@@ -422,26 +489,68 @@ export function LessonPlanWeeklySchedulePanel({
         {schedule.map((day, dayIndex) => {
           const isGenerating = generatingDayIndex === dayIndex || isBulkBusy;
           const hasDetail = Boolean(day.vocabularyDetail);
+          const dayNumber = lessonPlanDayNumberFromIndex(dayIndex);
+          const displayDayLabel = formatLessonPlanDayLabel(dayNumber, day.dayOfWeek);
 
           return (
             <div
-              key={day.dayLabel}
+              key={`schedule-day-${dayIndex}`}
               className="space-y-3 rounded-md border border-border p-3"
             >
               <div className="flex items-start justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => openDayDetail(dayIndex)}
-                  className="group flex min-w-0 flex-1 items-center gap-1 text-left"
-                >
-                  <p className="font-medium text-foreground underline-offset-4 group-hover:underline">
-                    {day.dayLabel}
-                  </p>
-                  <ChevronRight
-                    className="size-4 shrink-0 text-muted-foreground"
-                    aria-hidden
-                  />
-                </button>
+                {editable ? (
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openDayDetail(dayIndex)}
+                      className="group flex items-center gap-1 text-left"
+                    >
+                      <p className="font-medium text-foreground underline-offset-4 group-hover:underline">
+                        {displayDayLabel}
+                      </p>
+                      <ChevronRight
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                    </button>
+                    <Select
+                      value={day.dayOfWeek ?? LESSON_PLAN_DAY_OF_WEEK_NONE}
+                      onValueChange={(value) => updateDayOfWeek(dayIndex, value)}
+                    >
+                      <SelectTrigger
+                        id={`day-${dayIndex}-weekday`}
+                        className="h-8 w-[190px] bg-background text-xs"
+                        aria-label={`Day of week for ${displayDayLabel}`}
+                      >
+                        <SelectValue placeholder="Day of week (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={LESSON_PLAN_DAY_OF_WEEK_NONE}>
+                          No day of week
+                        </SelectItem>
+                        {TEACHER_CLASS_DAY_OPTIONS.map((weekday) => (
+                          <SelectItem key={weekday} value={weekday}>
+                            {weekday}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openDayDetail(dayIndex)}
+                    className="group flex min-w-0 flex-1 items-center gap-1 text-left"
+                  >
+                    <p className="font-medium text-foreground underline-offset-4 group-hover:underline">
+                      {day.dayLabel}
+                    </p>
+                    <ChevronRight
+                      className="size-4 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                  </button>
+                )}
                 {lessonContext ? (
                   <Button
                     type="button"

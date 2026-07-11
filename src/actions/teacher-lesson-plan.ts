@@ -43,7 +43,11 @@ import {
 } from "@/lib/teacher-quiz-deck-save";
 import {
   generateLessonPlanPdfBuffer,
+  generateLessonPlanVocabularyDetailPdfBuffer,
+  lessonPlanHasVocabularyDetails,
   lessonPlanPdfSafeFileName,
+  lessonPlanVocabularyDetailPdfSafeFileName,
+  type LessonPlanPdfUnitContext,
 } from "@/lib/lesson-plan-pdf-build";
 import { uploadLessonPlanPdfBufferToS3, deleteFromS3 } from "@/lib/s3";
 import {
@@ -486,6 +490,46 @@ async function resolveLessonPlanDeckTarget(
   throw new Error("Select an existing deck or enter a name for a new deck.");
 }
 
+async function tryUploadLessonPlanVocabularyDetailPdf(
+  userId: string,
+  result: LessonPlanResult,
+  unitContext: LessonPlanPdfUnitContext,
+): Promise<{
+  vocabularyDetailPdfUrl: string | null;
+  vocabularyDetailPdfFileName: string | null;
+}> {
+  if (!lessonPlanHasVocabularyDetails(result)) {
+    return { vocabularyDetailPdfUrl: null, vocabularyDetailPdfFileName: null };
+  }
+
+  try {
+    const buffer = await generateLessonPlanVocabularyDetailPdfBuffer(
+      result,
+      unitContext,
+    );
+    if (!buffer) {
+      return { vocabularyDetailPdfUrl: null, vocabularyDetailPdfFileName: null };
+    }
+
+    const vocabularyDetailPdfFileName = `${lessonPlanVocabularyDetailPdfSafeFileName(result.lessonTitle)}.pdf`;
+    const vocabularyDetailPdfUrl = await uploadLessonPlanPdfBufferToS3({
+      userId,
+      fileName: vocabularyDetailPdfFileName,
+      buffer,
+    });
+
+    return { vocabularyDetailPdfUrl, vocabularyDetailPdfFileName };
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[teacher-lesson-plan] Vocabulary detail PDF upload skipped or failed.",
+        error,
+      );
+    }
+    return { vocabularyDetailPdfUrl: null, vocabularyDetailPdfFileName: null };
+  }
+}
+
 export async function extractLessonPlanReferenceAction(
   formData: FormData,
 ): Promise<{ text: string; summary: string }> {
@@ -548,6 +592,7 @@ export async function saveLessonPlanAction(data: {
   id: number;
   lessonTitle: string;
   pdfUrl: string | null;
+  vocabularyDetailPdfUrl: string | null;
   deckId: number;
   sourceDeckName: string;
 }> {
@@ -566,14 +611,15 @@ export async function saveLessonPlanAction(data: {
 
   let pdfUrl: string | null = null;
   let pdfFileName: string | null = null;
+  const unitContext: LessonPlanPdfUnitContext = {
+    planPeriodDays: clampPlanPeriodDays(
+      parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+    ),
+    lessonDuration: parsed.data.input.lessonDuration,
+  };
 
   try {
-    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, {
-      planPeriodDays: clampPlanPeriodDays(
-        parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
-      ),
-      lessonDuration: parsed.data.input.lessonDuration,
-    });
+    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, unitContext);
     pdfFileName = `${lessonPlanPdfSafeFileName(parsed.data.result.lessonTitle)}.pdf`;
     pdfUrl = await uploadLessonPlanPdfBufferToS3({
       userId,
@@ -589,12 +635,20 @@ export async function saveLessonPlanAction(data: {
     }
   }
 
+  const vocabularyDetailPdf = await tryUploadLessonPlanVocabularyDetailPdf(
+    userId,
+    parsed.data.result,
+    unitContext,
+  );
+
   const saved = await saveLessonPlan({
     userId,
     input: parsed.data.input,
     result: parsed.data.result,
     pdfUrl,
     pdfFileName,
+    vocabularyDetailPdfUrl: vocabularyDetailPdf.vocabularyDetailPdfUrl,
+    vocabularyDetailPdfFileName: vocabularyDetailPdf.vocabularyDetailPdfFileName,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
   });
@@ -609,6 +663,7 @@ export async function saveLessonPlanAction(data: {
     id: saved.id,
     lessonTitle: saved.lessonTitle,
     pdfUrl: saved.pdfUrl,
+    vocabularyDetailPdfUrl: saved.vocabularyDetailPdfUrl,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
   };
@@ -628,6 +683,7 @@ export async function updateLessonPlanAction(data: {
   id: number;
   lessonTitle: string;
   pdfUrl: string | null;
+  vocabularyDetailPdfUrl: string | null;
   deckId: number;
   sourceDeckName: string;
 }> {
@@ -655,14 +711,17 @@ export async function updateLessonPlanAction(data: {
 
   let pdfUrl: string | null = existing.pdfUrl;
   let pdfFileName: string | null = existing.pdfFileName;
+  let vocabularyDetailPdfUrl: string | null = existing.vocabularyDetailPdfUrl;
+  let vocabularyDetailPdfFileName: string | null = existing.vocabularyDetailPdfFileName;
+  const unitContext: LessonPlanPdfUnitContext = {
+    planPeriodDays: clampPlanPeriodDays(
+      parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+    ),
+    lessonDuration: parsed.data.input.lessonDuration,
+  };
 
   try {
-    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, {
-      planPeriodDays: clampPlanPeriodDays(
-        parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
-      ),
-      lessonDuration: parsed.data.input.lessonDuration,
-    });
+    const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, unitContext);
     pdfFileName = `${lessonPlanPdfSafeFileName(parsed.data.result.lessonTitle)}.pdf`;
     const uploadedUrl = await uploadLessonPlanPdfBufferToS3({
       userId: existing.userId,
@@ -686,11 +745,36 @@ export async function updateLessonPlanAction(data: {
     }
   }
 
+  const vocabularyDetailPdf = await tryUploadLessonPlanVocabularyDetailPdf(
+    existing.userId,
+    parsed.data.result,
+    unitContext,
+  );
+  if (vocabularyDetailPdf.vocabularyDetailPdfUrl) {
+    if (
+      existing.vocabularyDetailPdfUrl &&
+      existing.vocabularyDetailPdfUrl !== vocabularyDetailPdf.vocabularyDetailPdfUrl
+    ) {
+      try {
+        await deleteFromS3(existing.vocabularyDetailPdfUrl);
+      } catch {
+        // proceed even if old vocabulary detail PDF removal fails
+      }
+    }
+    vocabularyDetailPdfUrl = vocabularyDetailPdf.vocabularyDetailPdfUrl;
+    vocabularyDetailPdfFileName = vocabularyDetailPdf.vocabularyDetailPdfFileName;
+  } else if (!lessonPlanHasVocabularyDetails(parsed.data.result)) {
+    vocabularyDetailPdfUrl = null;
+    vocabularyDetailPdfFileName = null;
+  }
+
   const updated = await updateSavedLessonPlanById(parsed.data.lessonPlanId, {
     input: parsed.data.input,
     result: parsed.data.result,
     pdfUrl,
     pdfFileName,
+    vocabularyDetailPdfUrl,
+    vocabularyDetailPdfFileName,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
   });
@@ -709,6 +793,7 @@ export async function updateLessonPlanAction(data: {
     id: updated.id,
     lessonTitle: updated.lessonTitle,
     pdfUrl: updated.pdfUrl,
+    vocabularyDetailPdfUrl: updated.vocabularyDetailPdfUrl,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
   };

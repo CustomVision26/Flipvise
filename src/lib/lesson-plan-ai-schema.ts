@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SOURCE_IMPORT_MAX_EXTRACTED_CHARS } from "@/lib/source-import-formats";
 import { MAX_LESSON_PLAN_REFERENCES } from "@/lib/lesson-plan-reference-material";
+import { TEACHER_CLASS_DAY_OPTIONS } from "@/lib/teacher-class-form";
 
 export const PLAN_PERIOD_DAY_OPTIONS = [1, 3, 5, 7] as const;
 export type PlanPeriodDays = (typeof PLAN_PERIOD_DAY_OPTIONS)[number];
@@ -76,6 +77,7 @@ export type LessonPlanDayVocabularyDetail = z.infer<
 
 export const lessonPlanDaySchema = z.object({
   dayLabel: z.string().min(1),
+  dayOfWeek: z.enum(TEACHER_CLASS_DAY_OPTIONS).optional(),
   dailyFocus: z.string().min(1),
   vocabulary: z.array(z.string().min(1)).min(1).max(8),
   lessonTimeline: z.array(z.string().min(1)).min(3).max(10),

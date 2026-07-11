@@ -53,8 +53,13 @@ import { VOCABULARY_TEACHING_APPROACH_OPTIONS } from "@/lib/lesson-plan-vocabula
 import {
   DEFAULT_PLAN_PERIOD_DAYS,
   PLAN_PERIOD_DAY_OPTIONS,
+  normalizeLessonPlanResultDayLabels,
 } from "@/lib/lesson-plan-weekly-schedule";
-import { downloadLessonPlanPdf } from "@/lib/lesson-plan-pdf";
+import {
+  downloadLessonPlanPdf,
+  downloadLessonPlanVocabularyDetailPdf,
+  lessonPlanHasVocabularyDetails,
+} from "@/lib/lesson-plan-pdf";
 import { attachVocabularyDetailsToSchedule, mergeVocabularyDetailsByDayLabel, scheduleDaysEligibleForVocabularyDetail } from "@/lib/lesson-plan-vocabulary-detail";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
 import { toast } from "sonner";
@@ -154,6 +159,7 @@ type InitialSavedLessonPlan = {
   deckId: number | null;
   sourceDeckName: string | null;
   lessonTitle: string;
+  vocabularyDetailPdfUrl?: string | null;
 };
 
 type TeacherLessonBuilderFormProps = {
@@ -217,12 +223,18 @@ export function TeacherLessonBuilderForm({
     },
   );
   const [result, setResult] = useState<LessonPlanResult | null>(
-    initialSavedPlan?.result ?? null,
+    initialSavedPlan?.result
+      ? normalizeLessonPlanResultDayLabels(initialSavedPlan.result)
+      : null,
   );
   const [showResult, setShowResult] = useState(isEditingExistingPlan);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingDayDetails, setIsGeneratingDayDetails] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingVocabularyDetail, setIsDownloadingVocabularyDetail] = useState(false);
+  const [savedVocabularyDetailPdfUrl, setSavedVocabularyDetailPdfUrl] = useState<string | null>(
+    initialSavedPlan?.vocabularyDetailPdfUrl ?? null,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [savedPlanId, setSavedPlanId] = useState<number | null>(
     isEditingExistingPlan ? initialSavedPlan.id : null,
@@ -234,7 +246,9 @@ export function TeacherLessonBuilderForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(isEditingExistingPlan);
   const [editDraft, setEditDraft] = useState<LessonPlanResult | null>(
-    initialSavedPlan ? cloneLessonPlanResult(initialSavedPlan.result) : null,
+    initialSavedPlan
+      ? cloneLessonPlanResult(normalizeLessonPlanResultDayLabels(initialSavedPlan.result))
+      : null,
   );
   const [regenerateDialogOpen, setRegenerateDialogOpen] = useState(false);
   const [regenerateApproach, setRegenerateApproach] =
@@ -349,6 +363,7 @@ export function TeacherLessonBuilderForm({
     afterOverlayDismiss(() => {
       setDeckTargetMode(mode);
       setSavedPlanId(null);
+      setSavedVocabularyDetailPdfUrl(null);
       if (mode === "new") {
         setSelectedDeckKey(DECK_NONE);
         setDeckId(undefined);
@@ -404,6 +419,7 @@ export function TeacherLessonBuilderForm({
             resolvedReferences.length > 0 ? resolvedReferences : undefined,
         });
         setSavedPlanId(null);
+        setSavedVocabularyDetailPdfUrl(null);
 
         if (planPeriodDays > 1 && plan.weeklySchedule?.length) {
           setResult(plan);
@@ -440,7 +456,7 @@ export function TeacherLessonBuilderForm({
             setResult(plan);
             toast.warning("Lesson plan ready", {
               description:
-                "Could not auto-generate vocabulary detail for every day. Use 'AI detail — all days' in the Daily Schedule.",
+                "Could not auto-generate vocabulary detail for every day. Use Expand all day vocabulary (AI) in the Daily Schedule.",
             });
           } finally {
             setIsGeneratingDayDetails(false);
@@ -514,7 +530,7 @@ export function TeacherLessonBuilderForm({
         );
         toast.warning("Edits saved locally", {
           description:
-            "Could not auto-refresh AI vocabulary details. Use 'AI detail — all days' in the Daily Schedule.",
+            "Could not auto-refresh AI vocabulary details. Use Expand all day vocabulary (AI) in the Daily Schedule.",
         });
         return plan;
       } finally {
@@ -546,6 +562,7 @@ export function TeacherLessonBuilderForm({
     setResult(updated);
     if (editingPlanId == null) {
       setSavedPlanId(null);
+      setSavedVocabularyDetailPdfUrl(null);
     }
     setIsEditing(false);
     setEditDraft(null);
@@ -619,6 +636,7 @@ export function TeacherLessonBuilderForm({
 
       setSavedPlanId(saved.id);
       setEditingPlanId(saved.id);
+      setSavedVocabularyDetailPdfUrl(saved.vocabularyDetailPdfUrl ?? null);
       if (deckTargetMode === "new") {
         setDeckTargetMode("existing");
         setDeckId(saved.deckId);
@@ -649,7 +667,8 @@ export function TeacherLessonBuilderForm({
             <Link href={`/decks/${saved.deckId}`} className="underline underline-offset-2">
               {saved.sourceDeckName}
             </Link>
-            {saved.pdfUrl ? " with PDF" : ""}. Use it in the{" "}
+            {saved.pdfUrl ? " with lesson PDF" : ""}
+            {saved.vocabularyDetailPdfUrl ? " and vocabulary detail PDF" : ""}. Use it in the{" "}
             <Link href={quizzesHref} className="underline underline-offset-2">
               Quiz Generator
             </Link>{" "}
@@ -683,6 +702,35 @@ export function TeacherLessonBuilderForm({
       setIsDownloading(false);
     }
   }
+
+  async function handleDownloadVocabularyDetailPdf() {
+    if (!result) return;
+    if (!lessonPlanHasVocabularyDetails(result)) {
+      toast.error("No expanded vocabulary yet", {
+        description:
+          "Use Expand all day vocabulary (AI) in the Daily Schedule before downloading the vocabulary detail PDF.",
+      });
+      return;
+    }
+
+    setIsDownloadingVocabularyDetail(true);
+    try {
+      await downloadLessonPlanVocabularyDetailPdf(result, {
+        planPeriodDays: form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+        lessonDuration: form.lessonDuration,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not download the vocabulary detail PDF.",
+      );
+    } finally {
+      setIsDownloadingVocabularyDetail(false);
+    }
+  }
+
+  const hasVocabularyDetails = result != null && lessonPlanHasVocabularyDetails(result);
 
   return (
     <>
@@ -821,7 +869,7 @@ export function TeacherLessonBuilderForm({
                     variant="outline"
                     size="sm"
                     disabled={isDownloading}
-                    onClick={handleDownloadPdf}
+                    onClick={() => void handleDownloadPdf()}
                   >
                     {isDownloading ? (
                       <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -830,6 +878,31 @@ export function TeacherLessonBuilderForm({
                     )}
                     Download PDF
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasVocabularyDetails || isDownloadingVocabularyDetail}
+                    onClick={() => void handleDownloadVocabularyDetailPdf()}
+                  >
+                    {isDownloadingVocabularyDetail ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Download className="size-4" aria-hidden />
+                    )}
+                    Download vocabulary PDF
+                  </Button>
+                  {savedVocabularyDetailPdfUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(savedVocabularyDetailPdfUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      <ExternalLink className="size-4" aria-hidden />
+                      Saved vocabulary PDF
+                    </Button>
+                  ) : null}
                 </>
               )}
             </>
