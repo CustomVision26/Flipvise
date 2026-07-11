@@ -34,6 +34,9 @@ type DeckData = {
   cardCount: number;
   createdAt: Date;
   updatedAt: Date;
+  gradeLevel?: string | null;
+  difficultyLevel?: string | null;
+  teamId?: number | null;
   /** Team workspace deck cover (dashboard card hero). */
   coverImageUrl?: string | null;
   /** First card in preview order (latest `updatedAt`) — front image for team-tier preview promo. */
@@ -119,6 +122,8 @@ interface DeckGridProps {
   initialView?: ViewMode;
   workspaceQueryString?: string;
   deckPopoverVariant?: "full" | "team-preview";
+  /** Team-tier subscriber — deck cover upload in edit dialog. */
+  allowCoverUpload?: boolean;
   /** Team Clerk plan — richer “preview cards” entry with first-card image + CTA. */
   teamTierPreviewPromo?: boolean;
   hasAiReading?: boolean;
@@ -129,6 +134,7 @@ export function DeckGrid({
   initialView = "grid",
   workspaceQueryString,
   deckPopoverVariant = "full",
+  allowCoverUpload = false,
   teamTierPreviewPromo = false,
   hasAiReading = false,
 }: DeckGridProps) {
@@ -231,6 +237,7 @@ export function DeckGrid({
             workspaceQueryString={workspaceQueryString}
             variant={resolveDeckPopoverVariant(deck, deckPopoverVariant)}
             canEditContent={deck.canEditContent}
+            allowCoverUpload={allowCoverUpload}
             teamTierPreviewPromo={teamTierPreviewPromo}
             hasAiReading={hasAiReading}
           />

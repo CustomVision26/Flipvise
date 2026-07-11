@@ -368,6 +368,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             initialView={initialView}
             workspaceQueryString={workspaceQueryString}
             deckPopoverVariant={isSubscriberOwner ? undefined : "team-preview"}
+            allowCoverUpload={teamWorkspaceTierExtras}
             teamTierPreviewPromo={teamWorkspaceTierExtras}
             hasAiReading={hasAiReading}
           />
@@ -444,6 +445,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             initialView={initialView}
             workspaceQueryString={workspaceQueryString}
             deckPopoverVariant="team-preview"
+            allowCoverUpload={teamWorkspaceTierExtras}
             teamTierPreviewPromo={teamWorkspaceTierExtras}
             hasAiReading={hasAiReading}
           />
@@ -822,6 +824,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <DeckGrid
                 decks={personalOnlyDecks}
                 initialView={initialView}
+                allowCoverUpload={ownSubscriberTeamTierExtras}
                 teamTierPreviewPromo={ownSubscriberTeamTierExtras}
                 hasAiReading={hasAiReading}
               />
@@ -835,6 +838,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <DeckGrid
                 decks={sectionDecks}
                 initialView={initialView}
+                allowCoverUpload={ownSubscriberTeamTierExtras}
                 teamTierPreviewPromo={ownSubscriberTeamTierExtras}
                 hasAiReading={hasAiReading}
               />
@@ -845,6 +849,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <DeckGrid
           decks={decks}
           initialView={initialView}
+          allowCoverUpload={ownSubscriberTeamTierExtras}
           teamTierPreviewPromo={ownSubscriberTeamTierExtras}
           hasAiReading={hasAiReading}
         />

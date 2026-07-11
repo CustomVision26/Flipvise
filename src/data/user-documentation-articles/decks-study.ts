@@ -20,7 +20,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Editor features",
         bullets: [
           "Add, edit, reorder, and delete cards.",
-          "AI card generation on Pro Plus and team-tier workspaces.",
+          "AI card generation on Pro, Pro Plus, Education Plus, and team-tier / education team workspaces.",
           "Deck cover image upload when your plan allows (Pro personal, team-tier workspace).",
           "Open Study to launch flashcard review or quiz mode.",
           "AI generation requires a connection — the Generate button is disabled and explains why when you are offline.",

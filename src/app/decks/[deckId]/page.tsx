@@ -22,7 +22,6 @@ import {
 } from "@/lib/resolve-team-workspace-url";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
-import { EditDeckDialog } from "./edit-deck-dialog";
 import { DeleteAllCardsDialogLoader } from "./delete-all-cards-dialog-loader";
 import { StudyLink } from "./study-link";
 import { GenerateCardsButtonLoader } from "./generate-cards-button-loader";
@@ -215,7 +214,6 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                 hasGradient ? "border-white/10" : "border-border/60",
               )}
             >
-              <EditDeckDialog deck={deck} allowCoverUpload={teamTierPro} />
               {cards.length > 0 ? (
                 <DeleteAllCardsDialogLoader deckId={id} cardCount={cards.length} />
               ) : null}

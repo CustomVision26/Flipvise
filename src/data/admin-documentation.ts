@@ -262,6 +262,51 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not forward single-use accept tokens.",
         ],
       },
+      {
+        id: "plan-trials",
+        title: "Plan Trials",
+        route: "/admin/plan-trials",
+        purpose: "Configure free-trial length and pricing-page visibility per paid tier.",
+        howItWorks: [
+          "Set trial days (0–90) and Published on pricing toggle for each paid plan.",
+          "Published trials appear as Start free trial on /pricing (monthly checkout only).",
+          "Each user may start a published trial only once — tracked in user_plan_trials.",
+          "Trial checkouts use noPromoCheckoutDiscount — no coupons, affiliate codes, or allow_promotion_codes.",
+          "Trial ending and expired notices appear in the user's dashboard inbox.",
+        ],
+        requirements: ["Platform admin access.", "Matching Stripe price IDs for trial-eligible plans."],
+        doNots: [
+          "Do not publish trials with 0 days — the toggle is disabled until days > 0.",
+          "Do not expect yearly checkout to offer trials — monthly only.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "platform-documentation",
+    title: "Platform Documentation",
+    description: "Edit, search, and AI-update user and admin product guides.",
+    pages: [
+      {
+        id: "documentation-manager",
+        title: "Documentation Manager",
+        route: "/admin/documentation",
+        purpose:
+          "Maintain user (/docs) and admin guides with manual edits, search, and the documentation AI agent.",
+        howItWorks: [
+          "Switch between Admin documentation and User documentation tabs.",
+          "Edit mode toggles inline edit buttons on quick reference and in-depth guides.",
+          "Manual edits save to documentation_overrides in the database — visible immediately at /docs and /admin/documentation.",
+          "Documentation AI agent proposes add/update/remove operations from natural-language instructions and UI screenshots.",
+          "Enable Auto-apply changes to save agent operations without a separate confirmation step.",
+          "Cross-guide search finds topics across quick reference and in-depth articles.",
+        ],
+        requirements: ["Platform admin access."],
+        doNots: [
+          "DB overrides do not update src/data source files or documentation-sync-baseline.json — developers must sync source files for CI stale-doc checks.",
+          "Do not invent features in docs that are not implemented in code.",
+        ],
+      },
     ],
   },
 ];

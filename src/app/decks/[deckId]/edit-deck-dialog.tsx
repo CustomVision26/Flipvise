@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect } from "react";
+import { useState, useTransition, useRef, useEffect, type ComponentProps, type ReactNode } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff, ImagePlus, X, Loader2, HelpCircle } from "lucide-react";
@@ -62,19 +62,41 @@ interface EditDeckDialogProps {
     id: number;
     name: string;
     description: string | null;
-    gradeLevel: string | null;
-    difficultyLevel: string | null;
-    teamId: number | null;
+    gradeLevel?: string | null;
+    difficultyLevel?: string | null;
+    teamId?: number | null;
     coverImageUrl?: string | null;
     gradient?: string | null;
   };
   /** Team-tier subscriber decks (scoped or migrated) may upload covers. */
   allowCoverUpload: boolean;
+  triggerLabel?: string;
+  triggerVariant?: ComponentProps<typeof Button>["variant"];
+  triggerSize?: ComponentProps<typeof Button>["size"];
+  triggerClassName?: string;
+  triggerIcon?: ReactNode;
+  /** Controlled open state — use with `hideTrigger` when opening from another menu. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
-export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) {
+export function EditDeckDialog({
+  deck,
+  allowCoverUpload,
+  triggerLabel = "Edit deck",
+  triggerVariant = "outline",
+  triggerSize = "sm",
+  triggerClassName = "h-9 gap-2",
+  triggerIcon,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: EditDeckDialogProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
   const [name, setName] = useState(deck.name);
   const [description, setDescription] = useState(deck.description ?? "");
   const [gradeLevel, setGradeLevel] = useState(deck.gradeLevel ?? "");
@@ -118,7 +140,10 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
       setCoverUploadError(null);
       setError(null);
     }
-    setOpen(next);
+    if (!isControlled) {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
   }
 
   async function handleCoverFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -180,7 +205,7 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
           difficultyLevel: difficultyLevel.trim() || undefined,
           gradient: gradient !== "none" ? gradient : undefined,
         });
-        setOpen(false);
+        handleOpenChange(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
       }
@@ -189,9 +214,20 @@ export function EditDeckDialog({ deck, allowCoverUpload }: EditDeckDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="outline" size="sm" className="h-9 gap-2" />}>
-        Edit deck
-      </DialogTrigger>
+      {!hideTrigger ? (
+        <DialogTrigger
+          render={
+            <Button
+              variant={triggerVariant}
+              size={triggerSize}
+              className={triggerClassName}
+            />
+          }
+        >
+          {triggerIcon}
+          {triggerLabel}
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="w-[calc(100vw-1.25rem)] max-w-md max-h-[min(92dvh,40rem)] overflow-y-auto overflow-x-hidden p-4 sm:p-6 sm:mx-auto sm:w-full">
         <DialogHeader className="text-left sm:text-left">
           <DialogTitle className="text-base leading-snug sm:text-lg sm:text-xl">

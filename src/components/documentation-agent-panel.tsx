@@ -62,6 +62,7 @@ export function DocumentationAgentPanel({ onApplied }: DocumentationAgentPanelPr
   const [instruction, setInstruction] = useState("");
   const [updateAdmin, setUpdateAdmin] = useState(true);
   const [updateUser, setUpdateUser] = useState(true);
+  const [autoApply, setAutoApply] = useState(true);
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [running, setRunning] = useState(false);
@@ -121,13 +122,34 @@ export function DocumentationAgentPanel({ onApplied }: DocumentationAgentPanelPr
         updateUser,
         imageUrls: images.map((image) => image.url),
       });
-      setResult(agentResult);
-      if (agentResult.operations.length === 0) {
-        toast.message("Agent finished with no changes", {
-          description: agentResult.summary,
-        });
+      if (autoApply && agentResult.operations.length > 0) {
+        setApplying(true);
+        try {
+          const { appliedCount } = await applyDocumentationAgentOperationsAction({
+            operations: agentResult.operations,
+          });
+          toast.success(`Auto-applied ${appliedCount} documentation change(s).`);
+          setResult(null);
+          onApplied();
+        } catch (applyError) {
+          setResult(agentResult);
+          toast.error(
+            applyError instanceof Error
+              ? applyError.message
+              : "Auto-apply failed — review the plan and apply manually.",
+          );
+        } finally {
+          setApplying(false);
+        }
       } else {
-        toast.success(`Agent proposed ${agentResult.operations.length} change(s).`);
+        setResult(agentResult);
+        if (agentResult.operations.length === 0) {
+          toast.message("Agent finished with no changes", {
+            description: agentResult.summary,
+          });
+        } else {
+          toast.success(`Agent proposed ${agentResult.operations.length} change(s).`);
+        }
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Documentation agent failed.");
@@ -222,6 +244,14 @@ export function DocumentationAgentPanel({ onApplied }: DocumentationAgentPanelPr
               onCheckedChange={(checked) => setUpdateUser(checked === true)}
             />
             <Label htmlFor="documentation-agent-user">User documentation</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="documentation-agent-auto-apply"
+              checked={autoApply}
+              onCheckedChange={(checked) => setAutoApply(checked === true)}
+            />
+            <Label htmlFor="documentation-agent-auto-apply">Auto-apply changes</Label>
           </div>
         </div>
 

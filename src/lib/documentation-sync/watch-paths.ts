@@ -103,6 +103,31 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-schedule/page.tsx",
   ],
   "affiliate-dashboard": ["src/components/affiliate-portal-view.tsx", "src/components/affiliate-invite-inbox-section.tsx"],
+  "education-plans": [
+    "src/data/plans-config.json",
+    "src/components/pricing-content.tsx",
+    "src/lib/education-plans.ts",
+  ],
+  "teacher-dashboard": [
+    "src/app/teacher/page.tsx",
+    "src/components/teacher-dashboard-home.tsx",
+    "src/components/teacher-dashboard-shell.tsx",
+    "src/lib/teacher-dashboard-nav.ts",
+    "src/lib/teacher-access.ts",
+  ],
+  "teacher-ai-content-tools": [
+    "src/app/teacher/lesson-builder/page.tsx",
+    "src/app/teacher/quizzes/page.tsx",
+    "src/app/teacher/homework/page.tsx",
+    "src/app/teacher/study-guides/page.tsx",
+    "src/app/teacher/worksheets/page.tsx",
+    "src/lib/teacher-dashboard-nav.ts",
+  ],
+  "teacher-classroom": [
+    "src/app/teacher/classes/page.tsx",
+    "src/app/teacher/students/page.tsx",
+  ],
+  "teacher-resources": ["src/app/teacher/resources/page.tsx"],
 };
 
 export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly string[]>> = {
@@ -130,6 +155,20 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/components/admin-affiliates-panel.tsx",
     "src/components/admin-affiliate-quota-panel.tsx",
     "src/db/queries/affiliates.ts",
+  ],
+  "plan-trials": [
+    "src/components/admin-plan-trial-settings.tsx",
+    "src/lib/plan-trial.ts",
+    "src/data/plans-config.json",
+    "src/db/queries/user-plan-trials.ts",
+  ],
+  "documentation-manager": [
+    "src/components/platform-documentation-manager.tsx",
+    "src/components/documentation-agent-panel.tsx",
+    "src/components/documentation-edit-sheet.tsx",
+    "src/actions/documentation-agent.ts",
+    "src/actions/documentation-admin.ts",
+    "src/db/queries/documentation-overrides.ts",
   ],
 };
 

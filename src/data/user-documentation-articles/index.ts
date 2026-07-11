@@ -11,6 +11,7 @@ import { TEAM_ADMIN_ARTICLES } from "@/data/user-documentation-articles/team-adm
 import { INVITES_ONBOARDING_ARTICLES } from "@/data/user-documentation-articles/invites-onboarding";
 import { AFFILIATE_PORTAL_ARTICLES } from "@/data/user-documentation-articles/affiliate-portal";
 import { OFFLINE_MOBILE_ARTICLES } from "@/data/user-documentation-articles/offline-mobile";
+import { TEACHER_TOOLS_ARTICLES } from "@/data/user-documentation-articles/teacher-tools";
 
 const ALL_ARTICLES: DocArticle[] = [
   ...GETTING_STARTED_ARTICLES,
@@ -25,6 +26,7 @@ const ALL_ARTICLES: DocArticle[] = [
   ...INVITES_ONBOARDING_ARTICLES,
   ...AFFILIATE_PORTAL_ARTICLES,
   ...OFFLINE_MOBILE_ARTICLES,
+  ...TEACHER_TOOLS_ARTICLES,
 ];
 
 export const USER_DOCUMENTATION_ARTICLES_BY_PAGE_ID: Readonly<Record<string, DocArticle>> =

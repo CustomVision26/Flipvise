@@ -4,10 +4,7 @@ import * as React from "react";
 import { useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { unwrapNativeSignInRetryUrl } from "@/lib/native-live-navigation";
-import {
-  isFlipviseNativeApp,
-  isFlipviseNativeShell,
-} from "@/lib/offline/is-flipvise-native-app";
+import { isFlipviseNativeShell } from "@/lib/offline/is-flipvise-native-app";
 
 /**
  * Persists a native-app marker (Capacitor Preferences) when the live site loads
@@ -22,12 +19,15 @@ export function NativeAppBootstrap() {
   React.useEffect(() => {
     const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
       .Capacitor;
-    const likelyNative =
-      isFlipviseNativeApp() ||
-      Boolean(cap?.isNativePlatform?.()) ||
-      Boolean(cap);
 
-    if (!likelyNative) return;
+    if (!isFlipviseNativeShell()) {
+      // Older builds treated any `window.Capacitor` stub (present in the web bundle) as
+      // native and set these flags — clear them so PWA/browser tabs never show native UI.
+      delete document.documentElement.dataset.flipviseNativeShell;
+      delete document.documentElement.dataset.nativeShell;
+      delete document.documentElement.dataset.platform;
+      return;
+    }
 
     document.documentElement.dataset.flipviseNativeShell = "1";
     document.documentElement.dataset.nativeShell = "1";
@@ -95,13 +95,7 @@ export function NativeAppBootstrap() {
 
   // Persist Clerk user id for the offline shell on any authenticated native page.
   React.useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
-      .Capacitor;
-    const likelyNative =
-      isFlipviseNativeApp() ||
-      Boolean(cap?.isNativePlatform?.()) ||
-      Boolean(cap);
-    if (!likelyNative || !isSignedIn || !userId) return;
+    if (!isFlipviseNativeShell() || !isSignedIn || !userId) return;
 
     void import("@/lib/offline/session")
       .then(async (s) => {
@@ -112,13 +106,7 @@ export function NativeAppBootstrap() {
   }, [isSignedIn, userId]);
 
   React.useEffect(() => {
-    const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean } })
-      .Capacitor;
-    const likelyNative =
-      isFlipviseNativeApp() ||
-      Boolean(cap?.isNativePlatform?.()) ||
-      Boolean(cap);
-    if (!likelyNative) return;
+    if (!isFlipviseNativeShell()) return;
 
     void import("@/lib/offline/session")
       .then((s) =>

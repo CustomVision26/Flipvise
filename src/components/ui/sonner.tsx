@@ -19,12 +19,7 @@ function useNativeToastInset(): NonNullable<ToasterProps["offset"]> | undefined 
   const mounted = useClientMounted()
   return React.useMemo(() => {
     if (!mounted || typeof document === "undefined") return undefined
-    const root = document.documentElement
-    const inNativeShell =
-      isFlipviseNativeShell() ||
-      root.dataset.flipviseNativeShell === "1" ||
-      root.dataset.nativeShell === "1"
-    return inNativeShell ? NATIVE_TOAST_INSET : undefined
+    return isFlipviseNativeShell() ? NATIVE_TOAST_INSET : undefined
   }, [mounted])
 }
 

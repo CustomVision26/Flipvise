@@ -21,8 +21,6 @@ export const FLIPVISE_OFFLINE_SHELL_URL = FLIPVISE_OFFLINE_SHELL_ANDROID_URL;
 
 /** Synchronous native-shell check — safe during first client render in Capacitor. */
 export function detectNativeShellNow(): boolean {
-  if (typeof window === "undefined") return false;
-  if (document.documentElement.dataset.flipviseNativeShell === "1") return true;
   return isFlipviseNativeShell();
 }
 

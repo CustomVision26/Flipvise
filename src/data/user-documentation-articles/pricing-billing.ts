@@ -21,6 +21,8 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "Toggle monthly vs yearly billing — yearly shows effective monthly rate.",
           "View plans dropdown filters the grid or show all tiers.",
+          "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, Enterprise.",
+          "Education tiers: Education Plus, Education Gold, Education Enterprise.",
           "Each card lists features, price, and active promo badge when a sale runs.",
           "Promotion code field above plan cards — optional; ?promo= in URL can pre-fill.",
           "Active public codes appear as quick-fill chips during sales.",
@@ -223,6 +225,57 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         paragraphs: [
           "Do not assume one site-wide coupon works on every tier. Check each plan card for badges before sharing codes from old emails.",
         ],
+      },
+    ],
+  ),
+  a(
+    "education-plans",
+    "Education Plans — In-Depth Guide",
+    "Teacher-focused tiers that extend Pro Plus or team workspace features with AI classroom tools.",
+    [
+      {
+        id: "tiers",
+        title: "Education tier comparison",
+        table: {
+          headers: ["Slug", "Display name", "Key additions"],
+          rows: [
+            ["education_plus", "Education Plus", "Pro Plus + Teacher Dashboard AI tools"],
+            ["education_gold", "Education Gold", "Team Gold + Education Plus + teacher collaboration"],
+            ["education_enterprise", "Education Enterprise", "Enterprise + Education Gold + school admin"],
+          ],
+        },
+      },
+      {
+        id: "teacher-tools",
+        title: "Teacher Dashboard tools (Education Plus+)",
+        bullets: [
+          "AI Lesson Builder, Quiz/Test Generator, Homework, Study Guides, Worksheets.",
+          "Classes, Student Progress, Teacher Resource Library.",
+          "Education Gold: shared lesson library, department workspace, teacher analytics.",
+          "Education Enterprise: school administration, multi-campus, curriculum management, school branding.",
+        ],
+      },
+      {
+        id: "deck-ownership",
+        title: "Deck ownership on education team plans",
+        bullets: [
+          "Education Plus: create decks on personal dashboard; link in teacher tools.",
+          "Education Gold/Enterprise team admins: create decks for assigned workspaces.",
+          "Team-owned decks appear on the plan owner's personal dashboard grouped by workspace.",
+          "Only the deck creator can edit or delete team dashboard decks.",
+        ],
+      },
+      {
+        id: "limits",
+        title: "Workspace limits",
+        table: {
+          headers: ["Plan", "Workspaces", "Members per workspace"],
+          rows: [
+            ["Education Plus", "Personal only", "N/A"],
+            ["Education Gold", "10", "25"],
+            ["Education Enterprise", "30", "45"],
+          ],
+        },
       },
     ],
   ),

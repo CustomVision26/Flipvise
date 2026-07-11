@@ -67,7 +67,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Signed-in account.",
           "Free: up to 2 decks, 5 cards per deck.",
           "Pro: up to 10 decks, 30 cards per deck.",
-          "Pro Plus / team-tier personal: up to 15 decks, 52 cards per deck.",
+          "Pro Plus / Education Plus / team-tier personal: up to 15 decks, 52 cards per deck.",
         ],
         doNots: [
           "Do not create decks beyond your plan limit — the Add Deck action is blocked at the cap.",
@@ -108,7 +108,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Workspace history shows create/rename/delete audit events.",
         ],
         requirements: [
-          "Active team-tier plan (Team Basic, Team Gold, Platinum, or Enterprise).",
+          "Active team-tier or education team plan (Team Basic, Team Gold, Platinum, Enterprise, Education Gold, or Education Enterprise).",
           "At least one owned team workspace.",
         ],
         doNots: [
@@ -142,8 +142,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         requirements: [
           "Deck owner or team admin/co-admin with edit access.",
-          "AI generation: Pro Plus or team-tier workspace.",
-          "Cover images: Pro on personal workspace, or team-tier workspace.",
+          "AI generation: Pro, Pro Plus, Education Plus, or team-tier / education team workspace.",
+          "Cover images: Pro on personal workspace, or team-tier / education team workspace.",
         ],
         doNots: [
           "Plain team members are redirected to study — they cannot edit deck content.",
@@ -431,10 +431,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Standard Pro subscribers do not see this tab — use Support or email support instead.",
         ],
         requirements: [
-          "Pro Plus personal subscription, active team-tier plan (Team Basic, Team Gold, Platinum, or Enterprise), or platform administrator role.",
+          "Pro Plus or Education Plus personal subscription, active team-tier or education team plan (Team Basic, Team Gold, Platinum, Enterprise, Education Gold, or Education Enterprise), or platform administrator role.",
         ],
         doNots: [
-          "Do not expect Priority Support on the standard Pro plan — upgrade to Pro Plus or a team tier.",
+          "Do not expect Priority Support on the standard Pro plan — upgrade to Pro Plus, Education Plus, or a team/education tier.",
           "Do not assume Priority Support replaces in-app tickets — use My tickets to track formal requests.",
           "Do not omit your account email in priority email requests.",
         ],
@@ -563,7 +563,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
+          "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",
+          "Education tiers: Education Plus (individual teachers), Education Gold (teaching teams), and Education Enterprise (schools).",
           "Each card lists features, price, and — during a sale — a promo badge and code for that tier only.",
+          "Published free trials (monthly checkout only) show Start free trial on eligible plans — one trial per account.",
           "Enter a promotion code in the field above the plan cards (optional). Codes can also pre-fill from ?promo= in the URL.",
           "Active public codes appear as quick-fill chips under the promo field when a tier’s general sale is running.",
           "Signed-in users see a Current plan badge; active subscribers also get Manage subscription.",
@@ -635,6 +638,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Opens Stripe Customer Portal in a new page — update card, download invoices, cancel at period end.",
           "Plan upgrades/downgrades can also start from /pricing (Change to …) which uses in-app proration checkout.",
           "Billing tab shows plan history (past plan slugs and dates) synced from your account.",
+          "If a renewal payment fails, paid features remain for 12 hours while Stripe retries — update your card before grace ends.",
         ],
         requirements: ["Active or manageable Stripe subscription on your account."],
         doNots: [
@@ -729,6 +733,27 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not assume one site-wide coupon works on every tier.",
           "Do not copy a code from a tier that is not displaying an active promo badge.",
           "Do not expect expired seasons to honor old marketing emails — verify on the pricing page first.",
+        ],
+      },
+      {
+        id: "education-plans",
+        title: "Education Plans",
+        purpose:
+          "Teacher-focused tiers that add AI lesson tools on top of Pro Plus or team workspace features.",
+        howItWorks: [
+          "Education Plus — everything in Pro Plus plus the Teacher Dashboard (/teacher): AI Lesson Builder, Quiz/Test Generator, Homework, Study Guides, Worksheets, Classes, Student Progress, and Teacher Resource Library.",
+          "Education Gold — everything in Team Gold plus Education Plus teacher tools, teacher collaboration, shared lesson library, and higher workspace limits (10 workspaces, 25 members).",
+          "Education Enterprise — everything in Enterprise plus Education Gold, school administration dashboard, multi-campus support, curriculum management, and school branding (30 workspaces, 45 members).",
+          "Education Plus teachers create decks on the personal dashboard and link them in teacher tools.",
+          "Education Gold/Enterprise team admins can create decks for assigned workspaces — decks appear on the plan owner's personal dashboard grouped by workspace.",
+          "Teacher Dashboard link appears in the header when you have an education plan or education team membership.",
+        ],
+        requirements: [
+          "Education Plus personal subscription, or membership in an Education Gold / Education Enterprise workspace.",
+        ],
+        doNots: [
+          "Do not expect teacher tools on standard Pro, Pro Plus, or consumer team tiers — upgrade to an education plan.",
+          "Do not create classroom materials without linking at least one deck — AI tools use your flashcard content as context.",
         ],
       },
     ],
@@ -834,7 +859,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         requirements: [
           "Team owner or invited team_admin role.",
-          "Active team-tier subscription on the workspace.",
+          "Active team-tier or education team subscription on the workspace.",
         ],
         doNots: [
           "Plain team members cannot access Team Admin.",
@@ -875,7 +900,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         requirements: [
           "Team owner or team_admin.",
           "Decks authored on personal dashboard.",
-          "AI quiz generation: Pro Plus, team-tier workspace, or platform admin; OpenAI API key configured in production.",
+          "AI quiz generation: Pro Plus, team-tier or education team workspace, or platform admin; OpenAI API key configured in production.",
           "Question counts must sum to eligible cards (front and back filled) before Generate or Reshuffle.",
           "Reshuffle requires at least two formats with a count greater than zero and AI content where true/false or fill-in-the-blank counts require it.",
         ],
@@ -977,6 +1002,90 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         requirements: ["Valid affiliate token.", "Matching invited email."],
         doNots: [
           "Do not forward invite links — they are single-use and email-bound.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "teacher-tools",
+    title: "Teacher Dashboard",
+    description:
+      "AI-powered classroom tools for Education Plus, Education Gold, and Education Enterprise subscribers.",
+    pages: [
+      {
+        id: "teacher-dashboard",
+        title: "Teacher Dashboard Overview",
+        route: "/teacher",
+        purpose:
+          "Central hub for AI lesson tools, classroom management, and saved teacher resources.",
+        howItWorks: [
+          "Open from the header Teacher link when you have Education Plus or education team access.",
+          "Welcome card shows your plan badge (Education Plus, Education Gold, or Education Enterprise).",
+          "Sidebar groups tools: AI content tools, Classroom management, and Resources.",
+          "Education Gold/Enterprise subscribers with team admin access see a Team Admin Dashboard shortcut.",
+          "Workspace selector in the sidebar scopes tools to personal or team context when applicable.",
+        ],
+        requirements: [
+          "Education Plus personal plan, or membership in an Education Gold / Education Enterprise workspace.",
+        ],
+        doNots: [
+          "Do not expect teacher routes without an education plan — you are redirected to /pricing.",
+          "Do not confuse Teacher Dashboard with Team Admin — team admin manages members and deck assignments; teacher tools generate classroom materials.",
+        ],
+      },
+      {
+        id: "teacher-ai-content-tools",
+        title: "AI Content Tools",
+        purpose:
+          "Generate lesson plans, quizzes, homework, study guides, and worksheets from your linked flashcard decks.",
+        howItWorks: [
+          "AI Lesson Builder (/teacher/lesson-builder) — multi-day lesson plans with objectives, activities, and vocabulary from deck cards.",
+          "AI Quiz/Test Generator (/teacher/quizzes) — classroom assessments with review before saving to a deck.",
+          "Homework Generator (/teacher/homework) — take-home assignments aligned to deck content.",
+          "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export.",
+          "Worksheet Generator (/teacher/worksheets) — printable practice sheets with answer keys.",
+          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage.",
+          "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library.",
+        ],
+        requirements: [
+          "Education plan access.",
+          "At least one deck with cards linked as source material.",
+          "Internet connection for AI generation.",
+        ],
+        doNots: [
+          "Do not run AI tools offline — generation requires a connection.",
+          "Do not skip deck linking — AI output quality depends on your flashcard content.",
+        ],
+      },
+      {
+        id: "teacher-classroom",
+        title: "Classes & Student Progress",
+        purpose:
+          "Organize classes and review how students are performing on assigned materials.",
+        howItWorks: [
+          "Classes (/teacher/classes) — create and manage classroom groups.",
+          "Student Progress (/teacher/students) — track student activity and quiz performance.",
+          "Education Gold and Education Enterprise add shared quizzes, shared flashcards, and department workspace features via team workspaces.",
+        ],
+        requirements: ["Education plan access."],
+        doNots: [
+          "Do not share student progress data outside your institution's policies.",
+        ],
+      },
+      {
+        id: "teacher-resources",
+        title: "Teacher Resource Library",
+        route: "/teacher/resources",
+        purpose:
+          "Browse, reopen, and reuse saved lesson plans, quizzes, homework, study guides, and worksheets.",
+        howItWorks: [
+          "Saved materials from each AI tool appear here for quick access.",
+          "Reopen saved items to edit, regenerate, or export (PDF where supported).",
+          "Education Gold/Enterprise teams can share resources via the shared lesson library.",
+        ],
+        requirements: ["Education plan access.", "At least one previously saved resource to see a list."],
+        doNots: [
+          "Do not delete saved resources you still need for active classes — exports are your backup.",
         ],
       },
     ],

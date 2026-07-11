@@ -71,7 +71,7 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "User roster",
         bullets: [
           "Search by display name or email address.",
-          "Filter by plan type (Free, Pro, Pro Plus, team tiers, Paid, Admin-granted, etc.).",
+          "Filter by plan type (Free, Pro, Pro Plus, education tiers, team tiers, Paid, Admin-granted, etc.).",
           "Filter by role: admin, superadmin, or regular user.",
           "Filter by status: online, offline, or banned.",
           "Double-click a row to open the profile dialog with plan, billing, and metadata details.",
@@ -405,6 +405,7 @@ const ALL_ARTICLES: DocArticle[] = [
           rows: [
             ["Free / Pro", "No — standard Support categories only"],
             ["Pro Plus", "Yes"],
+            ["Education Plus / Gold / Enterprise", "Yes"],
             ["Team tiers", "Yes"],
             ["Platform admin", "Yes (complimentary)"],
           ],
@@ -487,10 +488,13 @@ const ALL_ARTICLES: DocArticle[] = [
           rows: [
             ["pro", "Pro"],
             ["pro_plus", "Pro Plus"],
+            ["education_plus", "Education Plus"],
             ["pro_plus_team_basic", "Team Basic"],
             ["pro_plus_team_gold", "Team Gold"],
+            ["education_gold", "Education Gold"],
             ["pro_plus_platinum_plan", "Platinum"],
             ["pro_plus_enterprise", "Enterprise"],
+            ["education_enterprise", "Education Enterprise"],
           ],
         },
       },
@@ -611,6 +615,93 @@ const ALL_ARTICLES: DocArticle[] = [
           "Do not change active plan/end without expecting inbox confirmation from the affiliate.",
           "Do not forward single-use accept tokens — they expire after configured days (AFFILIATE_INVITE_EXPIRY_DAYS / per-invite override).",
           "Accept links use NEXT_PUBLIC_APP_URL — ensure production origin is set correctly on Render.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "plan-trials",
+    "Plan Trials — In-Depth Guide",
+    "Configure per-plan free trials and pricing-page visibility at /admin/plan-trials.",
+    [
+      {
+        id: "settings",
+        title: "Trial settings per plan",
+        bullets: [
+          "Trial days — 0 to 90; must be > 0 before Published on pricing can be enabled.",
+          "Published on pricing — when on, eligible users see Start free trial on /pricing (monthly checkout only).",
+          "Save per plan — writes trial config to plans-config.json.",
+        ],
+      },
+      {
+        id: "checkout",
+        title: "Checkout behavior",
+        bullets: [
+          "One trial per account — user_plan_trials table tracks consumption.",
+          "Trial checkout sets trial_period_days on Stripe subscription — $0 today, card on file for renewal.",
+          "Trials use noPromoCheckoutDiscount — no general coupon, affiliate code, or allow_promotion_codes.",
+          "Yearly billing period does not offer trials — monthly only.",
+          "Trial ending and expired inbox notices remind users before and after trial ends.",
+        ],
+      },
+      {
+        id: "stripe-env",
+        title: "Stripe environment",
+        bullets: [
+          "Education plans use STRIPE_EDUCATION_* price env vars (see stripe-plan-price-env.ts).",
+          "Trial-eligible plans need valid monthly Stripe price IDs in environment.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "documentation-manager",
+    "Documentation Manager — In-Depth Guide",
+    "Maintain user and admin product guides at /admin/documentation.",
+    [
+      {
+        id: "tabs",
+        title: "Admin and user guides",
+        bullets: [
+          "Admin documentation tab mirrors /admin/documentation for platform admins.",
+          "User documentation tab mirrors public /docs for customers.",
+          "Each topic has Quick reference (purpose, how it works, requirements, do-nots) and In-depth guide.",
+        ],
+      },
+      {
+        id: "edit-mode",
+        title: "Manual edit mode",
+        bullets: [
+          "Toggle Edit mode to show edit buttons on each topic.",
+          "Quick reference edits update purpose, howItWorks, requirements, and doNots.",
+          "In-depth edits update intro and section content (paragraphs, bullets, tables).",
+          "Overrides persist in documentation_overrides — effective content merges source + DB overrides.",
+        ],
+      },
+      {
+        id: "ai-agent",
+        title: "Documentation AI agent",
+        bullets: [
+          "Describe add/update/remove instructions in natural language.",
+          "Attach up to 6 UI screenshots for accurate step-by-step writing.",
+          "Select Admin documentation, User documentation, or both.",
+          "Run agent → review proposed operations → Apply changes (or enable Auto-apply to save immediately).",
+          "Operations: update_page, update_article, add_page, add_section, remove_page, update_section.",
+        ],
+      },
+      {
+        id: "sync",
+        title: "Source files vs runtime overrides",
+        paragraphs: [
+          "Built-in source files live in src/data/*-documentation*. DB overrides from the manager or AI agent are runtime-only. Developers updating product UI must also edit source files and run npm run docs:baseline for documentation-sync CI checks. The fingerprint system does not hash DB overrides.",
+        ],
+      },
+      {
+        id: "search",
+        title: "Cross-guide search",
+        bullets: [
+          "Search panel finds matches across quick reference and in-depth content for both audiences.",
+          "Useful for verifying coverage before shipping a feature change.",
         ],
       },
     ],

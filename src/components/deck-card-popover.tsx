@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Eye, BookOpen, GraduationCap, Trash2, Loader2 } from "lucide-react";
+import { Eye, BookOpen, GraduationCap, Trash2, Loader2, Pencil } from "lucide-react";
 import {
   Card,
   CardDescription,
@@ -49,6 +49,7 @@ import {
 } from "@/actions/cards";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { DeckPreviewCarousel } from "./deck-preview-carousel";
+import { EditDeckDialog } from "@/app/decks/[deckId]/edit-deck-dialog";
 import {
   ItemWatermark,
   itemCardContainerClass,
@@ -74,6 +75,9 @@ interface DeckCardPopoverProps {
     description: string | null;
     cardCount: number;
     updatedAt: Date;
+    gradeLevel?: string | null;
+    difficultyLevel?: string | null;
+    teamId?: number | null;
     /** Team deck cover — shown on dashboard cards only. */
     coverImageUrl?: string | null;
     firstPreviewCardFrontImageUrl?: string | null;
@@ -86,6 +90,8 @@ interface DeckCardPopoverProps {
   variant?: "full" | "team-preview";
   /** Education co-admin — true when this admin created the deck in the workspace. */
   canEditContent?: boolean;
+  /** Team-tier subscriber — deck cover upload in edit dialog. */
+  allowCoverUpload?: boolean;
   /** Main dashboard — team-tier subscribers: preview row shows first-card image + CTA. */
   teamTierPreviewPromo?: boolean;
   /** Listen-to-card in deck preview — Pro Plus / team / platform admin only. */
@@ -98,6 +104,7 @@ export function DeckCardPopover({
   workspaceQueryString,
   variant = "full",
   canEditContent,
+  allowCoverUpload = false,
   teamTierPreviewPromo = false,
   hasAiReading = false,
 }: DeckCardPopoverProps) {
@@ -106,6 +113,7 @@ export function DeckCardPopover({
     React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [previewCards, setPreviewCards] = React.useState<PreviewCard[]>([]);
   const [loadingPreview, setLoadingPreview] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -320,6 +328,51 @@ export function DeckCardPopover({
   }
 
   const hasCover = Boolean(deck.coverImageUrl);
+  const showDeckEdit = variant === "full" || canEditContent === true;
+  const deckGradient = getGradientBySlug(deck.gradient);
+  const hasGradient = deckGradient.slug !== "none";
+
+  function deckEditMenuButton(
+    compact: boolean,
+    onMenuClose: () => void,
+  ) {
+    if (!showDeckEdit) return null;
+    return (
+      <button
+        type="button"
+        className={cn(
+          buttonVariants({ variant: "ghost", size: compact ? "xs" : "sm" }),
+          compact
+            ? "w-full justify-start gap-2 px-2 font-normal rounded-md"
+            : "w-full justify-start gap-2.5 h-9 px-2.5 font-normal",
+        )}
+        onClick={() => {
+          onMenuClose();
+          setEditDialogOpen(true);
+        }}
+      >
+        <Pencil
+          className={cn(
+            "text-muted-foreground shrink-0",
+            compact ? "size-3.5" : "size-4",
+          )}
+          aria-hidden
+        />
+        Edit deck
+      </button>
+    );
+  }
+
+  const editDeckPayload = {
+    id: deck.id,
+    name: deck.name,
+    description: deck.description,
+    gradeLevel: deck.gradeLevel ?? null,
+    difficultyLevel: deck.difficultyLevel ?? null,
+    teamId: deck.teamId ?? null,
+    coverImageUrl: deck.coverImageUrl,
+    gradient: deck.gradient,
+  };
 
   const coverBanner = deck.coverImageUrl ? (
     <div className="relative aspect-[5/2] w-full max-h-[4.75rem] shrink-0 border-b border-border bg-muted/40 sm:aspect-[3/1] sm:max-h-[6.5rem]">
@@ -345,8 +398,6 @@ export function DeckCardPopover({
     </div>
   ) : null;
 
-  const deckGradient = getGradientBySlug(deck.gradient);
-  const hasGradient = deckGradient.slug !== "none";
   const deckTextClass = itemPrimaryTextClass(hasGradient);
   const deckMetaClass = hasGradient ? "text-white/80" : "text-foreground/70";
   const deckDescriptionClass = hasGradient ? "text-white/80" : "text-foreground/75";
@@ -535,6 +586,7 @@ export function DeckCardPopover({
                   Study
                 </Link>
                 {previewControlsFor(false)}
+                {deckEditMenuButton(false, () => setTeamWorkspaceDialogOpen(false))}
                 {canEditContent ? (
                   <button
                     type="button"
@@ -615,6 +667,8 @@ export function DeckCardPopover({
 
               {previewControlsFor(true)}
 
+              {deckEditMenuButton(true, () => setPopoverOpen(false))}
+
               <div className="my-0.5 h-px bg-border" />
 
               <button
@@ -652,6 +706,17 @@ export function DeckCardPopover({
         onClose={() => setPreviewOpen(false)}
         hasAiReading={hasAiReading}
       />
+
+      {/* Edit deck — rendered outside popover so it stays mounted when the menu closes */}
+      {showDeckEdit ? (
+        <EditDeckDialog
+          deck={editDeckPayload}
+          allowCoverUpload={allowCoverUpload}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          hideTrigger
+        />
+      ) : null}
 
       {/* Delete confirmation dialog — full variant only */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
