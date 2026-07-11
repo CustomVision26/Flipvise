@@ -130,6 +130,8 @@ export function NativeAppBootstrap() {
         await session.setStoredApiBaseUrl(window.location.origin).catch(() => {});
       }
 
+      await session.markLastLiveDashboardVisit().catch(() => {});
+
       if (syncTokenEnsuredRef.current) return;
       syncTokenEnsuredRef.current = true;
 

@@ -21,7 +21,11 @@ import {
 } from "@/lib/personal-workspace-plan-label";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { CARDS_PER_DECK_LIMIT_PRO_PLUS } from "@/lib/deck-limits";
-import { hasEducationPlan } from "@/lib/education-plans";
+import {
+  hasEducationPlan,
+  isWorkspaceSubscriptionPlanSlug,
+  labelForEducationPlanSlug,
+} from "@/lib/education-plans";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import {
   FREE_CARDS_PER_DECK_LIMIT,
@@ -491,7 +495,9 @@ export async function buildOfflineSyncContext(
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m] as const));
 
   const teamPlanById = new Map(
-    workspaces.filter((t) => isTeamPlanId(t.planSlug)).map((t) => [t.id, t] as const),
+    workspaces
+      .filter((t) => isWorkspaceSubscriptionPlanSlug(t.planSlug))
+      .map((t) => [t.id, t] as const),
   );
   const ownerIds = [...new Set(navPayload.teams.map((t) => t.ownerUserId))];
   const ownerFields = await getClerkUserFieldDisplaysByIds(ownerIds);
@@ -519,7 +525,10 @@ export async function buildOfflineSyncContext(
         teamId: team.id,
         name: team.name,
         planSlug: team.planSlug,
-        planLabel: labelForTeamPlanSlug(team.planSlug) ?? team.planSlug,
+        planLabel:
+          labelForTeamPlanSlug(team.planSlug) ??
+          labelForEducationPlanSlug(team.planSlug) ??
+          team.planSlug,
         role,
         teamMemberId: nav.teamMemberUrlParam,
         canAccessTeamAdmin: nav.canAccessTeamAdmin,

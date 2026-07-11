@@ -115,9 +115,6 @@ export function OfflineAvailabilityButton() {
       variant="secondary"
       className={NATIVE_BTN_CLASS}
       disabled={busy}
-      onPointerDown={() => {
-        if (!busy) setBusy(true);
-      }}
       onClick={handleClick}
     >
       <Download className="size-4" />

@@ -253,7 +253,8 @@ export async function resolvePersonalWorkspaceLabelsForUserId(userId: string): P
     personalHasTeamTierPlan:
       (loaded.ctx.activeTeamPlan != null &&
         isTeamPlanId(loaded.ctx.activeTeamPlan)) ||
-      (await getAccessContext()).activeEducationTeamPlan != null,
+      (loaded.ctx.effectivePlanSlug != null &&
+        isEducationTeamPlanId(loaded.ctx.effectivePlanSlug)),
     viewerIsSuperadmin: loaded.ctx.isSuperadmin,
     viewerIsPlatformAdmin: loaded.ctx.isAdmin,
   };

@@ -62,10 +62,16 @@ export function resolveOfflineShellUrl(): string {
  */
 export function navigateToOfflineShellFast(): void {
   if (typeof window === "undefined") return;
+  void navigateToOfflineShellWithVisitMark();
+}
 
-  void import("@/lib/offline/session")
-    .then((s) => s.markLastLiveDashboardVisit())
-    .catch(() => {});
+async function navigateToOfflineShellWithVisitMark(): Promise<void> {
+  try {
+    const session = await import("@/lib/offline/session");
+    await session.markLastLiveDashboardVisit();
+  } catch {
+    // Non-fatal — offline shell may skip a workspace refresh this once.
+  }
 
   if (isFlipviseNativeShell()) {
     try {
