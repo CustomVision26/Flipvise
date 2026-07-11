@@ -17,6 +17,18 @@ export const SOURCE_IMPORT_MAX_FILE_BYTES = 15 * 1024 * 1024;
 
 export const SOURCE_IMPORT_MAX_EXTRACTED_CHARS = 50_000;
 
+export const SOURCE_IMPORT_TRUNCATION_NOTICE =
+  "\n\n[Content truncated for processing.]";
+
+/** Keep extracted reference text within SOURCE_IMPORT_MAX_EXTRACTED_CHARS including any notice. */
+export function truncateSourceImportText(text: string): string {
+  const trimmed = text.replace(/\r\n/g, "\n").trim();
+  if (trimmed.length <= SOURCE_IMPORT_MAX_EXTRACTED_CHARS) return trimmed;
+  const maxBody =
+    SOURCE_IMPORT_MAX_EXTRACTED_CHARS - SOURCE_IMPORT_TRUNCATION_NOTICE.length;
+  return `${trimmed.slice(0, maxBody)}${SOURCE_IMPORT_TRUNCATION_NOTICE}`;
+}
+
 /** Formats available on Pro (and team-tier deck editors with basic AI). */
 export const PRO_SOURCE_FORMATS: SourceFormat[] = ["url", "txt"];
 

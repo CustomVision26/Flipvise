@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, Loader2, Pencil, RefreshCw, Save, X } from "lucide-react";
 import { generateLessonPlanAction, saveLessonPlanAction, updateLessonPlanAction, generateAllDaysVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,6 @@ import {
 } from "@/components/lesson-plan-preview-editor";
 import {
   LessonPlanReferenceMaterialFields,
-  type LessonPlanReferenceMaterial,
   type LessonPlanReferenceMaterialFieldsHandle,
 } from "@/components/lesson-plan-reference-material-fields";
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
@@ -66,11 +65,80 @@ import {
   buildTeacherSubPath,
   type TeacherWorkspaceContext,
 } from "@/lib/teacher-url";
+import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
+import { resolveDeckSubjectAndTopic } from "@/lib/deck-subject-topic";
+import { afterOverlayDismiss, dismissOpenOverlays } from "@/lib/dismiss-open-overlays";
+import {
+  normalizeLessonPlanReferenceMaterial,
+  type LessonPlanReferenceMaterial,
+} from "@/lib/lesson-plan-reference-material";
 
 const DIFFICULTY_LEVEL_OPTIONS = LESSON_DIFFICULTY_LEVELS;
 const DECK_NONE = "__none__";
 
 type DeckTargetMode = "existing" | "new";
+
+function lessonDifficultyFromDeck(
+  deckDefaults: ReturnType<typeof deckToHomeworkDefaults>,
+): string {
+  if (
+    LESSON_DIFFICULTY_LEVELS.includes(
+      deckDefaults.difficultyLevel as (typeof LESSON_DIFFICULTY_LEVELS)[number],
+    )
+  ) {
+    return deckDefaults.difficultyLevel;
+  }
+  return deckDefaults.difficultyLevel === "On-level" ? "Intermediate" : "Intermediate";
+}
+
+function lessonFormDefaultsFromDeck(deck: DeckRow): Pick<
+  LessonPlanInput,
+  "subject" | "gradeLevel" | "topic" | "difficultyLevel"
+> {
+  const base = deckToHomeworkDefaults(deck);
+  const { subject, topic } = resolveDeckSubjectAndTopic(deck);
+  return {
+    subject: subject || base.subject,
+    gradeLevel: base.gradeLevel,
+    topic: topic || base.topic,
+    difficultyLevel: lessonDifficultyFromDeck(base),
+  };
+}
+
+function validateLessonPlanFormForGeneration(
+  form: LessonPlanInput,
+  references: LessonPlanReferenceMaterial[],
+): string | null {
+  if (!form.subject.trim()) return "Enter a subject.";
+  if (!form.gradeLevel.trim()) return "Enter a grade level.";
+  if (!form.topic.trim()) return "Enter a topic.";
+  if (!form.lessonDuration.trim()) return "Enter a lesson duration.";
+  if (
+    !DIFFICULTY_LEVEL_OPTIONS.includes(
+      form.difficultyLevel as (typeof DIFFICULTY_LEVEL_OPTIONS)[number],
+    )
+  ) {
+    return "Select a difficulty level.";
+  }
+
+  for (let index = 0; index < references.length; index += 1) {
+    const reference = references[index];
+    if (!reference.text.trim()) {
+      return `Reference ${index + 1} is empty. Remove it and add the source again.`;
+    }
+    if (!reference.summary.trim()) {
+      return `Reference ${index + 1} is missing a label. Remove it and add the source again.`;
+    }
+  }
+
+  return null;
+}
+
+function normalizeLessonPlanReferences(
+  references: LessonPlanReferenceMaterial[],
+): LessonPlanReferenceMaterial[] {
+  return references.map(normalizeLessonPlanReferenceMaterial);
+}
 
 function defaultNewDeckName(subject: string, topic: string): string {
   const subjectTrim = subject.trim();
@@ -207,26 +275,85 @@ export function TeacherLessonBuilderForm({
     setSelectedDeckAdminUserId(adminUserId);
     setSelectedDeckKey(DECK_NONE);
     setDeckId(undefined);
+    if (!isEditingExistingPlan) {
+      setForm((prev) => ({
+        ...prev,
+        subject: "",
+        gradeLevel: "",
+        topic: "",
+        difficultyLevel: "Intermediate",
+      }));
+    }
+  }
+
+  function applyDeckDefaults(deck: DeckRow) {
+    const defaults = lessonFormDefaultsFromDeck(deck);
+    setForm((prev) => ({
+      ...prev,
+      subject: defaults.subject,
+      gradeLevel: defaults.gradeLevel,
+      topic: defaults.topic,
+      difficultyLevel: defaults.difficultyLevel,
+    }));
   }
 
   function handleDeckChange(value: string | null) {
     const next = value ?? DECK_NONE;
-    setSelectedDeckKey(next);
-    if (next === DECK_NONE) {
-      setDeckId(undefined);
-      return;
-    }
-    const parsed = Number(next);
-    setDeckId(Number.isFinite(parsed) ? parsed : undefined);
+    dismissOpenOverlays();
+    afterOverlayDismiss(() => {
+      setSelectedDeckKey(next);
+      if (next === DECK_NONE) {
+        setDeckId(undefined);
+        if (!isEditingExistingPlan) {
+          setForm((prev) => ({
+            ...prev,
+            subject: "",
+            gradeLevel: "",
+            topic: "",
+            difficultyLevel: "Intermediate",
+          }));
+        }
+        return;
+      }
+      const parsed = Number(next);
+      const id = Number.isFinite(parsed) ? parsed : undefined;
+      setDeckId(id);
+      if (isEditingExistingPlan || id == null) return;
+
+      const deck = activeDecks.find((item) => item.id === id);
+      if (!deck) return;
+
+      applyDeckDefaults(deck);
+    });
   }
 
+  useEffect(() => {
+    if (isEditingExistingPlan || initialSavedPlan) return;
+    if (resolvedInitialDeckId == null) return;
+
+    const deck =
+      decks.find((item) => item.id === resolvedInitialDeckId) ??
+      Object.values(ownerDeckPicker.itemsByAdminUserId)
+        .flat()
+        .find((item) => item.id === resolvedInitialDeckId);
+    if (!deck) return;
+
+    afterOverlayDismiss(() => {
+      applyDeckDefaults(deck);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed form once from server-provided deck id
+  }, []);
+
   function handleDeckTargetModeChange(mode: DeckTargetMode) {
-    setDeckTargetMode(mode);
-    setSavedPlanId(null);
-    if (mode === "new") {
-      setSelectedDeckKey(DECK_NONE);
-      setDeckId(undefined);
-    }
+    dismissOpenOverlays();
+    afterOverlayDismiss(() => {
+      setDeckTargetMode(mode);
+      setSavedPlanId(null);
+      if (mode === "new") {
+        setSelectedDeckKey(DECK_NONE);
+        setDeckId(undefined);
+      }
+    });
   }
 
   const runGeneration = useCallback(
@@ -234,6 +361,7 @@ export function TeacherLessonBuilderForm({
       isRegenerate: boolean,
       vocabularyTeachingApproach?: VocabularyTeachingApproach,
     ) => {
+      dismissOpenOverlays();
       setIsGenerating(true);
       setErrorMessage(null);
       setIsEditing(false);
@@ -247,8 +375,18 @@ export function TeacherLessonBuilderForm({
       }
 
       try {
-        const resolvedReferences =
-          (await referenceFieldsRef.current?.resolveReferences()) ?? referenceMaterials;
+        const resolvedReferences = normalizeLessonPlanReferences(
+          (await referenceFieldsRef.current?.resolveReferences()) ?? referenceMaterials,
+        );
+
+        const validationError = validateLessonPlanFormForGeneration(
+          form,
+          resolvedReferences,
+        );
+        if (validationError) {
+          setErrorMessage(validationError);
+          return;
+        }
 
         const planPeriodDays = form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
         let plan = await generateLessonPlanAction({
@@ -265,11 +403,11 @@ export function TeacherLessonBuilderForm({
           referenceMaterials:
             resolvedReferences.length > 0 ? resolvedReferences : undefined,
         });
-        setShowResult(true);
         setSavedPlanId(null);
 
         if (planPeriodDays > 1 && plan.weeklySchedule?.length) {
           setResult(plan);
+          setShowResult(true);
           setIsGeneratingDayDetails(true);
           try {
             const details = await generateAllDaysVocabularyDetailAction({
@@ -309,6 +447,7 @@ export function TeacherLessonBuilderForm({
           }
         } else {
           setResult(plan);
+          setShowResult(true);
         }
       } catch (error) {
         const message =
@@ -555,7 +694,7 @@ export function TeacherLessonBuilderForm({
             : "Generate a structured lesson plan for review before saving."
         }
         backHref={backHref}
-        showResult={showResult}
+        showResult={showResult && result != null}
         isGenerating={isGenerating}
         errorMessage={errorMessage ?? referenceError}
         onGenerate={() => runGeneration(false)}

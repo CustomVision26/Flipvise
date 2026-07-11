@@ -55,14 +55,52 @@ import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import {
   formatLessonPlanReferenceForPrompt,
   formatMultipleLessonPlanReferencesForPrompt,
+  normalizeLessonPlanReferenceMaterial,
   referenceSourceSummaryLabel,
 } from "@/lib/lesson-plan-reference-material";
 import { isYouTubeUrl, youTubeReferenceSummary } from "@/lib/youtube-url";
+import { truncateSourceImportText } from "@/lib/source-import-formats";
 import {
   generateLessonPlan,
   type LessonPlanInput,
   type LessonPlanResult,
 } from "@/lib/teacher-generators";
+
+const LESSON_PLAN_FIELD_LABELS: Record<string, string> = {
+  subject: "Enter a subject.",
+  gradeLevel: "Enter a grade level.",
+  topic: "Enter a topic.",
+  lessonDuration: "Enter a lesson duration.",
+  difficultyLevel: "Select a difficulty level.",
+};
+
+function lessonPlanValidationError(error: z.ZodError): string {
+  const issue = error.issues[0];
+  if (!issue) return "Invalid input";
+
+  const field = issue.path[0];
+  if (typeof field === "string" && LESSON_PLAN_FIELD_LABELS[field]) {
+    return LESSON_PLAN_FIELD_LABELS[field];
+  }
+
+  if (issue.path[0] === "referenceMaterials") {
+    const index = issue.path[1];
+    if (issue.path[2] === "summary") {
+      return `Reference ${typeof index === "number" ? index + 1 : ""} has a summary that is too long. Remove it and add it again.`.trim();
+    }
+    if (issue.path[2] === "text") {
+      return `Reference ${typeof index === "number" ? index + 1 : ""} is too large. Remove it and add a shorter source.`.trim();
+    }
+  }
+
+  return issue.message || "Invalid input";
+}
+
+function truncateReferenceSummary(summary: string, max = 200): string {
+  const trimmed = summary.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max - 1)}…`;
+}
 
 function buildLessonPlanPrompt(
   input: LessonPlanActionInput,
@@ -147,6 +185,18 @@ function normalizeLessonPlanResult(
   return { ...filtered, weeklySchedule: schedule };
 }
 
+function normalizeLessonPlanActionInput(
+  data: LessonPlanActionInput,
+): LessonPlanActionInput {
+  return {
+    ...data,
+    referenceMaterials: data.referenceMaterials?.map(normalizeLessonPlanReferenceMaterial),
+    referenceMaterialText: data.referenceMaterialText
+      ? truncateSourceImportText(data.referenceMaterialText)
+      : data.referenceMaterialText,
+  };
+}
+
 export async function generateLessonPlanAction(
   data: LessonPlanActionInput,
 ): Promise<LessonPlanResult> {
@@ -156,9 +206,9 @@ export async function generateLessonPlanAction(
     "Lesson Builder requires an education plan.",
   );
 
-  const parsed = lessonPlanInputSchema.safeParse(data);
+  const parsed = lessonPlanInputSchema.safeParse(normalizeLessonPlanActionInput(data));
   if (!parsed.success) {
-    throw new Error("Invalid input");
+    throw new Error(lessonPlanValidationError(parsed.error));
   }
 
   const input = parsed.data;
@@ -305,7 +355,7 @@ export async function generateDayVocabularyDetailAction(
 
   const parsed = generateDayVocabularyDetailSchema.safeParse(data);
   if (!parsed.success) {
-    throw new Error("Invalid input");
+    throw new Error(lessonPlanValidationError(parsed.error));
   }
 
   return generateDayVocabularyDetailCore(parsed.data);
@@ -341,7 +391,7 @@ export async function generateAllDaysVocabularyDetailAction(
 
   const parsed = generateAllDaysVocabularyDetailSchema.safeParse(data);
   if (!parsed.success) {
-    throw new Error("Invalid input");
+    throw new Error(lessonPlanValidationError(parsed.error));
   }
 
   const { days, ...lessonContext } = parsed.data;
@@ -464,11 +514,16 @@ export async function extractLessonPlanReferenceAction(
   if (url) {
     assertFormatAllowedForPlan("url", advancedImport);
     const extracted = await extractTextFromUrl(url);
-    return {
-      text: extracted.text,
-      summary: isYouTubeUrl(url)
+    const summary = truncateReferenceSummary(
+      isYouTubeUrl(url)
         ? youTubeReferenceSummary(url, extracted.sourceTitle)
-        : referenceSourceSummaryLabel("url", { url }),
+        : extracted.sourceTitle
+          ? `${extracted.sourceTitle} (website)`
+          : referenceSourceSummaryLabel("url", { url }),
+    );
+    return {
+      text: truncateSourceImportText(extracted.text),
+      summary,
     };
   }
 
@@ -476,8 +531,10 @@ export async function extractLessonPlanReferenceAction(
   const extracted = await extractTextFromFile(file);
   assertFormatAllowedForPlan(extracted.format, advancedImport);
   return {
-    text: extracted.text,
-    summary: referenceSourceSummaryLabel(extracted.format, { fileName: file.name }),
+    text: truncateSourceImportText(extracted.text),
+    summary: truncateReferenceSummary(
+      referenceSourceSummaryLabel(extracted.format, { fileName: file.name }),
+    ),
   };
 }
 

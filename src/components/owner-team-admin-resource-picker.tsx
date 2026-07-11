@@ -16,6 +16,7 @@ import {
   adminDisplayLabel,
   type OwnerTeamAdminPickerBase,
 } from "@/lib/owner-team-admin-picker";
+import { afterOverlayDismiss, dismissOpenOverlays } from "@/lib/dismiss-open-overlays";
 
 type OwnerTeamAdminResourcePickerProps<T> = {
   ownerPicker: OwnerTeamAdminPickerBase;
@@ -86,14 +87,24 @@ export function OwnerTeamAdminResourcePicker<T>({
     (admin) => admin.userId === selectedAdminUserId,
   );
 
-  const selectedItemLabel =
+  const selectedItem =
     selectedItemKey === noneValue
       ? null
       : activeItems.find((item) => getItemKey(item) === selectedItemKey);
 
   function handleAdminChange(value: string | null) {
     setSearchQuery("");
-    onAdminChange(value ?? ADMIN_NONE);
+    dismissOpenOverlays();
+    afterOverlayDismiss(() => {
+      onAdminChange(value ?? ADMIN_NONE);
+    });
+  }
+
+  function handleItemChange(value: string | null) {
+    dismissOpenOverlays();
+    afterOverlayDismiss(() => {
+      onItemChange(value ?? noneValue);
+    });
   }
 
   if (!isWorkspaceOwner) {
@@ -121,7 +132,9 @@ export function OwnerTeamAdminResourcePicker<T>({
         <Select value={selectedAdminUserId} onValueChange={handleAdminChange}>
           <SelectTrigger id={adminSelectId} className="h-10 w-full bg-background">
             <SelectValue placeholder="Select workspace owner or team admin">
-              {selectedAdmin ? adminDisplayLabel(selectedAdmin) : "Select workspace owner or team admin"}
+              {selectedAdmin
+                ? adminDisplayLabel(selectedAdmin)
+                : "Select workspace owner or team admin"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -165,12 +178,12 @@ export function OwnerTeamAdminResourcePicker<T>({
             ) : null}
             <Select
               value={selectedItemKey}
-              onValueChange={(value) => onItemChange(value ?? noneValue)}
+              onValueChange={handleItemChange}
               disabled={disableResourceSelect || selectedAdminUserId === ADMIN_NONE}
             >
               <SelectTrigger id={resourceSelectId} className="h-10 w-full bg-background">
                 <SelectValue placeholder={placeholder}>
-                  {selectedItemLabel ? getItemLabel(selectedItemLabel) : placeholder}
+                  {selectedItem ? getItemLabel(selectedItem) : placeholder}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>

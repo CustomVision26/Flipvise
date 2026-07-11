@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { generateAllDaysVocabularyDetailAction, generateDayVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -26,6 +28,17 @@ export type LessonPlanDetailLessonContext = Pick<
   lessonTitle: string;
 };
 
+function linesToArray(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function arrayToLines(items: string[]): string {
+  return items.join("\n");
+}
+
 function VocabularySummaryBox({ terms }: { terms: LessonPlanVocabularyTermDetail[] }) {
   return (
     <div className="rounded-md border border-border bg-muted/40 p-3">
@@ -39,6 +52,83 @@ function VocabularySummaryBox({ terms }: { terms: LessonPlanVocabularyTermDetail
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function formatVocabularyEntry(term: LessonPlanVocabularyTermDetail): string {
+  const name = term.term.trim();
+  const definition = term.shortDefinition.trim();
+  if (!name) return definition;
+  if (!definition) return name;
+  return `${name} — ${definition}`;
+}
+
+function parseVocabularyEntry(
+  line: string,
+): Pick<LessonPlanVocabularyTermDetail, "term" | "shortDefinition"> {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return { term: "", shortDefinition: "" };
+  }
+
+  const separators = [" — ", " – ", " - "] as const;
+  for (const separator of separators) {
+    const index = trimmed.indexOf(separator);
+    if (index > 0) {
+      return {
+        term: trimmed.slice(0, index).trim(),
+        shortDefinition: trimmed.slice(index + separator.length).trim(),
+      };
+    }
+  }
+
+  return { term: trimmed, shortDefinition: trimmed };
+}
+
+function EditableVocabularySummaryBox({
+  terms,
+  onChange,
+  idPrefix,
+}: {
+  terms: LessonPlanVocabularyTermDetail[];
+  onChange: (next: LessonPlanVocabularyTermDetail[]) => void;
+  idPrefix: string;
+}) {
+  function updateEntry(termIndex: number, line: string) {
+    const parsed = parseVocabularyEntry(line);
+    onChange(
+      terms.map((term, index) =>
+        index === termIndex
+          ? {
+              ...term,
+              term: parsed.term,
+              shortDefinition: parsed.shortDefinition,
+              definition: parsed.shortDefinition || term.definition,
+            }
+          : term,
+      ),
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/40 p-3">
+      <p className="text-sm font-medium text-foreground">Vocabulary</p>
+      {terms.map((term, termIndex) => (
+        <div key={`${idPrefix}-term-${termIndex}`} className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-term-${termIndex}`} className="sr-only">
+            Vocabulary entry {termIndex + 1}
+          </Label>
+          <Textarea
+            id={`${idPrefix}-term-${termIndex}`}
+            value={formatVocabularyEntry(term)}
+            onChange={(event) => updateEntry(termIndex, event.target.value)}
+            rows={2}
+            placeholder="Term — short definition"
+            className="bg-background text-sm text-foreground"
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -145,12 +235,14 @@ export function LessonPlanWeeklySchedulePanel({
   lessonContext,
   onScheduleChange,
   isGeneratingAllDayDetails = false,
+  editable = Boolean(onScheduleChange),
 }: {
   schedule: LessonPlanDaySchedule[];
   unitLabel?: string;
   lessonContext?: LessonPlanDetailLessonContext;
   onScheduleChange?: (next: LessonPlanDaySchedule[]) => void;
   isGeneratingAllDayDetails?: boolean;
+  editable?: boolean;
 }) {
   const [detailDayIndex, setDetailDayIndex] = useState<number | null>(null);
   const [generatingDayIndex, setGeneratingDayIndex] = useState<number | null>(null);
@@ -253,6 +345,41 @@ export function LessonPlanWeeklySchedulePanel({
     void generateDetailForDay(dayIndex, true);
   }
 
+  function updateSchedule(next: LessonPlanDaySchedule[]) {
+    onScheduleChange?.(next);
+  }
+
+  function updateDay(dayIndex: number, patch: Partial<LessonPlanDaySchedule>) {
+    updateSchedule(
+      schedule.map((day, index) => (index === dayIndex ? { ...day, ...patch } : day)),
+    );
+  }
+
+  function updateDayVocabularyTerms(
+    dayIndex: number,
+    terms: LessonPlanVocabularyTermDetail[],
+  ) {
+    const day = schedule[dayIndex];
+    if (!day) return;
+
+    const vocabulary = terms
+      .map((term) => term.term.trim())
+      .filter(Boolean);
+
+    updateDay(dayIndex, {
+      vocabulary: vocabulary.length > 0 ? vocabulary : day.vocabulary,
+      vocabularyDetail: day.vocabularyDetail
+        ? {
+            ...day.vocabularyDetail,
+            terms: terms.map((term) => ({
+              ...term,
+              definition: term.definition.trim() || term.shortDefinition,
+            })),
+          }
+        : day.vocabularyDetail,
+    });
+  }
+
   return (
     <>
       <div className="space-y-4">
@@ -329,12 +456,52 @@ export function LessonPlanWeeklySchedulePanel({
                 ) : null}
               </div>
 
-              <p className="text-sm text-muted-foreground">{day.dailyFocus}</p>
+              {editable ? (
+                <div className="space-y-2">
+                  <Label htmlFor={`day-${dayIndex}-focus`} className="text-sm text-foreground">
+                    Daily focus
+                  </Label>
+                  <Textarea
+                    id={`day-${dayIndex}-focus`}
+                    value={day.dailyFocus}
+                    onChange={(event) =>
+                      updateDay(dayIndex, { dailyFocus: event.target.value })
+                    }
+                    rows={2}
+                    className="bg-background text-sm text-foreground"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">{day.dailyFocus}</p>
+              )}
 
-              <div>
+              <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">Vocabulary</p>
 
-                {day.vocabularyDetail ? (
+                {editable ? (
+                  day.vocabularyDetail ? (
+                    <EditableVocabularySummaryBox
+                      idPrefix={`day-${dayIndex}`}
+                      terms={day.vocabularyDetail.terms}
+                      onChange={(terms) => updateDayVocabularyTerms(dayIndex, terms)}
+                    />
+                  ) : (
+                    <>
+                      <Textarea
+                        id={`day-${dayIndex}-vocabulary`}
+                        value={arrayToLines(day.vocabulary)}
+                        onChange={(event) =>
+                          updateDay(dayIndex, {
+                            vocabulary: linesToArray(event.target.value),
+                          })
+                        }
+                        rows={4}
+                        className="bg-background text-sm text-foreground"
+                      />
+                      <p className="text-xs text-muted-foreground">One term per line</p>
+                    </>
+                  )
+                ) : day.vocabularyDetail ? (
                   <div className="mt-2">
                     <VocabularySummaryBox terms={day.vocabularyDetail.terms} />
                   </div>
@@ -347,13 +514,30 @@ export function LessonPlanWeeklySchedulePanel({
                 )}
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">Class timeline</p>
-                <ul className="mt-1 list-disc pl-5 text-sm">
-                  {day.lessonTimeline.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
+                {editable ? (
+                  <>
+                    <Textarea
+                      id={`day-${dayIndex}-timeline`}
+                      value={arrayToLines(day.lessonTimeline)}
+                      onChange={(event) =>
+                        updateDay(dayIndex, {
+                          lessonTimeline: linesToArray(event.target.value),
+                        })
+                      }
+                      rows={5}
+                      className="bg-background text-sm text-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground">One activity per line</p>
+                  </>
+                ) : (
+                  <ul className="mt-1 list-disc pl-5 text-sm">
+                    {day.lessonTimeline.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           );

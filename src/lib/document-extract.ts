@@ -1,11 +1,9 @@
 import "server-only";
 
 import {
-  isProPlusFormatEnabled,
-  isProPlusSourceFormat,
-  mimeToSourceFormat,
   SOURCE_IMPORT_MAX_EXTRACTED_CHARS,
   SOURCE_IMPORT_MAX_FILE_BYTES,
+  truncateSourceImportText,
   type SourceFormat,
 } from "@/lib/source-import-formats";
 import { getUnsupportedImportUrlReason, isPrivateChatImportUrl } from "@/lib/source-import-url-validation";
@@ -19,9 +17,7 @@ export type ExtractedSource = {
 };
 
 function truncateExtractedText(text: string): string {
-  const trimmed = text.replace(/\r\n/g, "\n").trim();
-  if (trimmed.length <= SOURCE_IMPORT_MAX_EXTRACTED_CHARS) return trimmed;
-  return `${trimmed.slice(0, SOURCE_IMPORT_MAX_EXTRACTED_CHARS)}\n\n[Content truncated for processing.]`;
+  return truncateSourceImportText(text);
 }
 
 function stripHtml(html: string): string {
@@ -101,10 +97,55 @@ function fetchErrorMessage(status: number, parsed: URL): string {
 
 const URL_FETCH_HEADERS = {
   "User-Agent":
-    "Mozilla/5.0 (compatible; Flipvise/1.0; +https://flipvise.com) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
   "Accept-Language": "en-US,en;q=0.9",
+  "Cache-Control": "no-cache",
+  Pragma: "no-cache",
 } as const;
+
+const URL_READER_FALLBACK_STATUSES = new Set([401, 403, 429, 503]);
+
+function parseJinaReaderResponse(body: string): { title?: string; text: string } {
+  const titleMatch = body.match(/^Title:\s*(.+)$/m);
+  const title = titleMatch?.[1]?.trim();
+  const marker = "Markdown Content:\n";
+  const markerIndex = body.indexOf(marker);
+  const text =
+    markerIndex >= 0 ? body.slice(markerIndex + marker.length).trim() : body.trim();
+  return { title, text };
+}
+
+async function fetchUrlViaReaderProxy(
+  parsed: URL,
+  signal: AbortSignal,
+): Promise<ExtractedSource> {
+  const readerUrl = `https://r.jina.ai/${parsed.toString()}`;
+  const response = await fetch(readerUrl, {
+    headers: {
+      Accept: "text/plain",
+      "User-Agent": URL_FETCH_HEADERS["User-Agent"],
+    },
+    signal,
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    throw new Error(fetchErrorMessage(response.status, parsed));
+  }
+
+  const body = await response.text();
+  const { title, text } = parseJinaReaderResponse(body);
+  if (!text.trim()) {
+    throw new Error("No readable text was found at that URL.");
+  }
+
+  return {
+    format: "url",
+    text: truncateExtractedText(text),
+    sourceTitle: title,
+  };
+}
 
 export async function extractTextFromUrl(url: string): Promise<ExtractedSource> {
   const trimmed = url.trim();
@@ -120,16 +161,21 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
 
   const parsed = parsePublicHttpUrl(trimmed);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 25_000);
   try {
     const response = await fetch(parsed.toString(), {
       headers: URL_FETCH_HEADERS,
       signal: controller.signal,
       redirect: "follow",
     });
+
     if (!response.ok) {
+      if (URL_READER_FALLBACK_STATUSES.has(response.status)) {
+        return await fetchUrlViaReaderProxy(parsed, controller.signal);
+      }
       throw new Error(fetchErrorMessage(response.status, parsed));
     }
+
     const contentType = response.headers.get("content-type") ?? "";
     const body = await response.text();
     const text =
@@ -137,12 +183,22 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
         ? stripHtml(body)
         : body;
     if (!text.trim()) {
-      throw new Error("No readable text was found at that URL.");
+      return await fetchUrlViaReaderProxy(parsed, controller.signal);
     }
     return { format: "url", text: truncateExtractedText(text) };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Fetching the URL timed out. Try a shorter page or upload a file instead.");
+    }
+    if (
+      err instanceof Error &&
+      /Access to that URL was denied|blocks automated access/i.test(err.message)
+    ) {
+      try {
+        return await fetchUrlViaReaderProxy(parsed, controller.signal);
+      } catch {
+        throw err;
+      }
     }
     throw err;
   } finally {

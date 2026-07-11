@@ -112,8 +112,31 @@ export async function resolveLessonPlanDeckUsage(
   }
 
   const plans = await getSavedLessonPlansByUserIds(uniqueUserIds);
+
+  const availableDeckIdList = availableDecks
+    .map((deck) => deck.id)
+    .filter((id) => id > 0);
+
+  if (availableDeckIdList.length > 0) {
+    const explicitRows = await db
+      .select({ deckId: savedLessonPlans.deckId })
+      .from(savedLessonPlans)
+      .where(
+        and(
+          inArray(savedLessonPlans.deckId, availableDeckIdList),
+          isNotNull(savedLessonPlans.deckId),
+        ),
+      );
+
+    for (const row of explicitRows) {
+      if (row.deckId != null) {
+        usedDeckIds.add(row.deckId);
+      }
+    }
+  }
+
   for (const plan of plans) {
-    const deckId = resolveDeckIdForSavedLessonPlan(plan, availableDecks);
+    const deckId = resolveDeckIdForLessonPlan(plan, availableDecks);
     if (deckId == null) continue;
 
     usedDeckIds.add(deckId);

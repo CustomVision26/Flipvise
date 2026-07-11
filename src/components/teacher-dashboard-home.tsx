@@ -41,11 +41,14 @@ export function TeacherDashboardHome({
   planLabel,
   workspaceNote,
   teamAdminHref = null,
+  personalDashboardHref = null,
   teacherQueryString = "",
 }: {
   planLabel: string;
   workspaceNote: string;
   teamAdminHref?: string | null;
+  /** Education Plus only — link to /dashboard for deck creation. */
+  personalDashboardHref?: string | null;
   teacherQueryString?: string;
 }) {
   const toolCount = TEACHER_DASHBOARD_NAV.reduce(
@@ -58,7 +61,7 @@ export function TeacherDashboardHome({
       <Card
         className={cn(
           teamAdminCardClass,
-          "overflow-hidden backdrop-blur-md animate-in fade-in-0 slide-in-from-top-3 duration-500 fill-mode-both",
+          "overflow-hidden backdrop-blur-md animate-in fade-in-0 duration-300",
         )}
       >
         <CardHeader className="gap-4 pb-4 sm:pb-5">
@@ -79,19 +82,34 @@ export function TeacherDashboardHome({
                 {workspaceNote}
               </CardDescription>
             </div>
-            {teamAdminHref ? (
-              <Link
-                href={teamAdminHref}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "default" }),
-                  "inline-flex h-9 shrink-0 items-center gap-2 self-start font-medium",
-                )}
-              >
-                <LayoutDashboard className="size-4" aria-hidden />
-                Team Admin Dashboard
-                <ArrowRight className="size-4 opacity-70" aria-hidden />
-              </Link>
-            ) : null}
+            <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row sm:flex-wrap">
+              {personalDashboardHref ? (
+                <Link
+                  href={personalDashboardHref}
+                  className={cn(
+                    buttonVariants({ variant: "default", size: "default" }),
+                    "inline-flex h-9 items-center gap-2 font-medium",
+                  )}
+                >
+                  <LayoutDashboard className="size-4" aria-hidden />
+                  Personal Dashboard
+                  <ArrowRight className="size-4 opacity-70" aria-hidden />
+                </Link>
+              ) : null}
+              {teamAdminHref ? (
+                <Link
+                  href={teamAdminHref}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "default" }),
+                    "inline-flex h-9 items-center gap-2 font-medium",
+                  )}
+                >
+                  <LayoutDashboard className="size-4" aria-hidden />
+                  Team Admin Dashboard
+                  <ArrowRight className="size-4 opacity-70" aria-hidden />
+                </Link>
+              ) : null}
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -99,7 +117,7 @@ export function TeacherDashboardHome({
       <Card
         className={cn(
           teamAdminCardClass,
-          "backdrop-blur-sm animate-in fade-in-0 slide-in-from-bottom-3 duration-500 delay-100 fill-mode-both",
+          "backdrop-blur-sm animate-in fade-in-0 duration-300",
         )}
       >
         <CardHeader className="gap-3 pb-2">
@@ -129,11 +147,7 @@ export function TeacherDashboardHome({
             {WORKFLOW_STEPS.map((step, index) => (
               <div
                 key={step.title}
-                className={cn(
-                  "rounded-lg border border-border/70 bg-muted/20 px-4 py-3.5",
-                  "animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both",
-                )}
-                style={{ animationDelay: `${150 + index * 80}ms` }}
+                className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3.5"
               >
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
                   Step {index + 1}
@@ -149,10 +163,7 @@ export function TeacherDashboardHome({
           <div className="grid gap-6 lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] lg:items-start">
             <aside
               aria-hidden
-              className={cn(
-                "hidden rounded-xl border border-border/80 bg-card/60 p-3 lg:block",
-                "animate-in fade-in-0 slide-in-from-left-3 duration-500 delay-200 fill-mode-both",
-              )}
+              className="hidden rounded-xl border border-border/80 bg-card/60 p-3 lg:block"
             >
               <p className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Sidebar
@@ -187,13 +198,7 @@ export function TeacherDashboardHome({
 
             <div className="space-y-5">
               {TEACHER_DASHBOARD_NAV.map((section, sectionIndex) => (
-                <section
-                  key={section.title}
-                  className={cn(
-                    "animate-in fade-in-0 slide-in-from-right-3 duration-500 fill-mode-both",
-                  )}
-                  style={{ animationDelay: `${250 + sectionIndex * 100}ms` }}
-                >
+                <section key={section.title} className="space-y-5">
                   <div className="mb-3 space-y-1">
                     <h3 className="text-sm font-semibold text-foreground">{section.title}</h3>
                     <p className="text-xs leading-relaxed text-muted-foreground">
@@ -244,10 +249,7 @@ export function TeacherDashboardHome({
           </div>
 
           <div
-            className={cn(
-              "flex items-start gap-3 rounded-lg border border-border/60 bg-muted/15 px-4 py-3.5",
-              "animate-in fade-in-0 duration-500 delay-500 fill-mode-both",
-            )}
+            className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/15 px-4 py-3.5"
           >
             <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
             <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">

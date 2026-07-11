@@ -64,6 +64,7 @@ export default async function TeacherDashboardPage({
       planLabel={planLabel}
       workspaceNote={workspaceNote}
       teamAdminHref={teamAdminHref}
+      personalDashboardHref={planSlug === "education_plus" ? "/dashboard" : null}
       teacherQueryString={workspace.queryString}
     />
   );

@@ -1,4 +1,9 @@
-import { fileSourcePickerLabel, SOURCE_IMPORT_MAX_EXTRACTED_CHARS, type SourceFormat } from "@/lib/source-import-formats";
+import {
+  fileSourcePickerLabel,
+  SOURCE_IMPORT_MAX_EXTRACTED_CHARS,
+  truncateSourceImportText,
+  type SourceFormat,
+} from "@/lib/source-import-formats";
 import { isYouTubeUrl, youTubeReferenceSummary } from "@/lib/youtube-url";
 
 export type LessonPlanReferenceMaterial = {
@@ -7,6 +12,15 @@ export type LessonPlanReferenceMaterial = {
 };
 
 export const MAX_LESSON_PLAN_REFERENCES = 5;
+
+export function normalizeLessonPlanReferenceMaterial(
+  reference: LessonPlanReferenceMaterial,
+): LessonPlanReferenceMaterial {
+  return {
+    text: truncateSourceImportText(reference.text),
+    summary: reference.summary.trim().slice(0, 200),
+  };
+}
 
 export function referenceSourceSummaryLabel(
   format: SourceFormat,
@@ -69,7 +83,7 @@ export function combineLessonPlanReferenceMaterials(
 
   return {
     summary: `${references.length} sources (truncated)`,
-    text: `${text.slice(0, SOURCE_IMPORT_MAX_EXTRACTED_CHARS)}\n\n[Content truncated for processing.]`,
+    text: truncateSourceImportText(text),
   };
 }
 

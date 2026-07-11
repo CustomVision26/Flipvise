@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
+import { dismissOpenOverlays } from "@/lib/dismiss-open-overlays";
 import { cn } from "@/lib/utils";
 
 export function TeacherToolPageShell({
@@ -54,6 +55,7 @@ export function TeacherToolPageShell({
 }) {
   const [internalShowResult, setInternalShowResult] = useState(false);
   const showResult = controlledShowResult ?? internalShowResult;
+  const shouldShowPreview = showResult && result != null;
   const lastErrorToast = useRef<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +70,7 @@ export function TeacherToolPageShell({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    dismissOpenOverlays();
     if (onGenerate) {
       await onGenerate();
     }
@@ -166,19 +169,24 @@ export function TeacherToolPageShell({
 
       {footer}
 
-      {showResult && result ? (
-        <Card className={cn(teamAdminCardClass, "backdrop-blur-sm")}>
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base">Preview</CardTitle>
-            {previewActions ? (
-              <div className="flex flex-wrap gap-2">{previewActions}</div>
-            ) : null}
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-            {result}
-          </CardContent>
-        </Card>
-      ) : null}
+      <Card
+        className={cn(
+          teamAdminCardClass,
+          "backdrop-blur-sm",
+          !shouldShowPreview && "hidden",
+        )}
+        aria-hidden={!shouldShowPreview}
+      >
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base">Preview</CardTitle>
+          {previewActions ? (
+            <div className="flex flex-wrap gap-2">{previewActions}</div>
+          ) : null}
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+          {result}
+        </CardContent>
+      </Card>
     </div>
   );
 }

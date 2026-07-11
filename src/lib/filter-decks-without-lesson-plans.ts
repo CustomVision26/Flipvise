@@ -26,8 +26,9 @@ export function filterOwnerDeckPickerWithoutLessonPlans(
   for (const [adminUserId, adminDecks] of Object.entries(
     picker.itemsByAdminUserId,
   )) {
-    const usedForAdmin =
+    const perUser =
       deckUsage.usedDeckIdsByUserId.get(adminUserId) ?? new Set<number>();
+    const usedForAdmin = new Set([...perUser, ...deckUsage.usedDeckIds]);
     itemsByAdminUserId[adminUserId] = filterDecksWithoutLessonPlans(
       adminDecks,
       usedForAdmin,

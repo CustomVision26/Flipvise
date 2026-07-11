@@ -20,6 +20,7 @@ import {
 import { getUnsupportedImportUrlReason } from "@/lib/source-import-url-validation";
 import {
   MAX_LESSON_PLAN_REFERENCES,
+  normalizeLessonPlanReferenceMaterial,
   type LessonPlanReferenceMaterial,
 } from "@/lib/lesson-plan-reference-material";
 import { isYouTubeUrl } from "@/lib/youtube-url";
@@ -125,7 +126,10 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
       }
 
       const extracted = await extractLessonPlanReferenceAction(formData);
-      const material = { text: extracted.text, summary: extracted.summary };
+      const material = normalizeLessonPlanReferenceMaterial({
+        text: extracted.text,
+        summary: extracted.summary,
+      });
       onChange([...value, material]);
       resetSourcePickerState(setSourceMode, setUrl, setSelectedFile, fileInputRef);
       return material;
@@ -135,6 +139,8 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
           ? error.message
           : "Could not read that reference material. Try another source.",
       );
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return null;
     } finally {
       setIsExtracting(false);
@@ -148,7 +154,9 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
       if (url.trim() || selectedFile) {
         const material = await extractAndAppendReference(url, selectedFile);
         if (!material) {
-          throw new Error("Could not read reference material.");
+          throw new Error(
+            "Finish adding the pending reference, or clear the URL/file before generating.",
+          );
         }
         references.push(material);
       }
@@ -223,7 +231,7 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
           <ul className="space-y-2">
             {value.map((reference, index) => (
               <li
-                key={`${reference.summary}-${index}`}
+                key={`reference-${index}`}
                 className="flex items-start justify-between gap-2 rounded-md border border-border bg-background/80 px-3 py-2"
               >
                 <div className="min-w-0 space-y-0.5">
