@@ -61,7 +61,8 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
           "First-time or manual sign-in: enter your email and request a sign-in code (this is the default in the app).",
           "Password sign-in works only if you created a password on the website (Clerk profile → Security). Many accounts use Google or email code only — password will fail with a strategy error; switch to “Email me a code”.",
           "If your account is Google-only and email code is unavailable, sign in once in Safari or Chrome on your phone, then open the online dashboard again inside the app.",
-          "You need a connection for any sign-in attempt — use “Back to offline study” to return to downloaded decks without signing in.",
+          "You need a connection for any sign-in attempt — use “Back to offline study” at the bottom to return to downloaded decks without signing in.",
+          "If sign-in stalls, tap the refresh icon in the top-left corner to clear a stuck session and try again.",
         ],
       },
       {

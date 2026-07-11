@@ -264,7 +264,7 @@ export function NativeSignInClient({
         title="Sign-in is taking too long"
         description={
           isNativeContext
-            ? "Sign-in could not connect. Use Try again or Back to offline study at the bottom of the screen."
+            ? "Sign-in could not connect. Tap the refresh icon in the top-left corner, or use Back to offline study at the bottom."
             : "Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
         }
         showSignOut={false}
@@ -277,7 +277,7 @@ export function NativeSignInClient({
     return (
       <SignInRecovery
         title="Could not open the dashboard"
-        description="Sign-in synced slowly. Try again or sign in manually."
+        description="Sign-in synced slowly. Tap the refresh icon in the top-left corner to try again."
         showSignOut
         isNativeContext={isNativeContext}
       />
@@ -288,7 +288,7 @@ export function NativeSignInClient({
     return (
       <SignInRecovery
         title="Automatic sign-in timed out"
-        description="Your saved device sign-in did not finish in time. Try again or sign in manually below."
+        description="Your saved device sign-in did not finish in time. Tap the refresh icon in the top-left corner, or sign in manually below."
         showSignOut={false}
         isNativeContext={isNativeContext}
         onContinue={() =>
@@ -354,7 +354,7 @@ function CenteredSpinner({
           <CardTitle>{label ?? "Loading…"}</CardTitle>
           <CardDescription>
             {isNativeContext
-              ? "If this takes more than a few seconds, use the buttons at the bottom of the screen."
+              ? "If this takes more than a few seconds, tap the refresh icon in the top-left corner."
               : "This only takes a moment."}
           </CardDescription>
         </CardHeader>
