@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { OfflineWorkspaceContext } from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceOwnerLabel } from "../../src/lib/offline/access-context";
 import { formatOfflineWorkspaceContextAge } from "../../src/lib/offline/access-context-freshness";
@@ -43,7 +44,10 @@ export function WorkspaceSelector({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const subscriberOwnsTeamTierWorkspace =
     personalHasTeamTierPlan &&
@@ -110,26 +114,61 @@ export function WorkspaceSelector({
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
+    const onDoc = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
+      setQuery("");
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc);
+    return () => document.removeEventListener("pointerdown", onDoc);
   }, [open]);
 
-  if (workspaces.length === 0) {
-    return (
-      <div className="workspace-scope">
-        <span className="workspace-scope__trigger workspace-scope__trigger--static">
-          <span className="workspace-scope__trigger-text">
-            {PERSONAL_PRIMARY_LABEL} · {personalPlanLabel}
-          </span>
-        </span>
-      </div>
+  useEffect(() => {
+    if (!open) return;
+
+    const updateMenuPosition = () => {
+      positionMenu();
+    };
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open]);
+
+  function positionMenu() {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.min(320, window.innerWidth - 24);
+    const left = Math.max(
+      12,
+      Math.min(rect.right - width, window.innerWidth - width - 12),
     );
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 6,
+      left,
+      width,
+      zIndex: 1000,
+    });
+  }
+
+  function toggleOpen() {
+    setOpen((v) => {
+      const next = !v;
+      if (next) {
+        notifyOfflineOverlayOpen("workspace");
+        positionMenu();
+      }
+      return next;
+    });
   }
 
   function selectPersonal() {
@@ -203,14 +242,13 @@ export function WorkspaceSelector({
   return (
     <div className="workspace-scope" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="workspace-scope__trigger"
-        onClick={() => {
-          setOpen((v) => {
-            const next = !v;
-            if (next) notifyOfflineOverlayOpen("workspace");
-            return next;
-          });
+        onPointerDown={(e) => {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          e.preventDefault();
+          toggleOpen();
         }}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -222,121 +260,137 @@ export function WorkspaceSelector({
         </span>
       </button>
 
-      {open && (
-        <div className="workspace-scope__menu" role="listbox">
+      {open &&
+        createPortal(
           <div
-            className="workspace-scope__search-wrap"
-            onPointerDown={(e) => e.stopPropagation()}
+            ref={menuRef}
+            className="workspace-scope__menu workspace-scope__menu--portaled"
+            style={menuStyle}
+            role="listbox"
           >
-            <span className="workspace-scope__search-icon" aria-hidden>
-              ⌕
-            </span>
-            <input
-              type="search"
-              className="workspace-scope__search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search workspaces…"
-              autoComplete="off"
-              aria-label="Search workspaces"
-            />
-          </div>
+            <div
+              className="workspace-scope__search-wrap"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <span className="workspace-scope__search-icon" aria-hidden>
+                ⌕
+              </span>
+              <input
+                type="search"
+                className="workspace-scope__search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search workspaces…"
+                autoComplete="off"
+                aria-label="Search workspaces"
+              />
+            </div>
 
-          <div className="workspace-scope__scroll">
-            {workspaceContextStale && !online ? (
-              <p className="workspace-scope__stale-hint">
-                Workspaces may be out of date
-                {workspaceAgeLabel ? ` (${workspaceAgeLabel})` : ""}. Connect to refresh.
-              </p>
-            ) : workspaceAgeLabel && online ? (
-              <p className="workspace-scope__stale-hint workspace-scope__stale-hint--muted">
-                Workspaces updated {workspaceAgeLabel}
-              </p>
-            ) : null}
+            <div className="workspace-scope__scroll">
+              {workspaceContextStale && !online ? (
+                <p className="workspace-scope__stale-hint">
+                  Workspaces may be out of date
+                  {workspaceAgeLabel ? ` (${workspaceAgeLabel})` : ""}. Connect to refresh.
+                </p>
+              ) : workspaceAgeLabel && online ? (
+                <p className="workspace-scope__stale-hint workspace-scope__stale-hint--muted">
+                  Workspaces updated {workspaceAgeLabel}
+                </p>
+              ) : null}
 
-            <div className="workspace-scope__section-label">Workspace</div>
+              <div className="workspace-scope__section-label">Workspace</div>
 
-            {personalMatches && (
-              <button
-                type="button"
-                role="option"
-                aria-selected={scope === "personal"}
-                className="workspace-scope__item"
-                onClick={selectPersonal}
-              >
-                <span
-                  className={`workspace-scope__check${scope === "personal" ? " visible" : ""}`}
-                  aria-hidden
+              {personalMatches && (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={scope === "personal"}
+                  className="workspace-scope__item"
+                  onClick={selectPersonal}
                 >
-                  ✓
-                </span>
-                <span className="workspace-scope__item-line">
-                  <span className="workspace-scope__item-title">{PERSONAL_PRIMARY_LABEL}</span>
-                  <span className="workspace-scope__dot" aria-hidden>
-                    ·
+                  <span
+                    className={`workspace-scope__check${scope === "personal" ? " visible" : ""}`}
+                    aria-hidden
+                  >
+                    ✓
                   </span>
-                  <span className="workspace-scope__item-muted">{personalPlanLabel}</span>
-                </span>
-              </button>
-            )}
+                  <span className="workspace-scope__item-line">
+                    <span className="workspace-scope__item-title">{PERSONAL_PRIMARY_LABEL}</span>
+                    <span className="workspace-scope__dot" aria-hidden>
+                      ·
+                    </span>
+                    <span className="workspace-scope__item-muted">{personalPlanLabel}</span>
+                  </span>
+                </button>
+              )}
 
-            {online && personalMatches && (showTeacherDashboard || (personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash)) && (
-              <div className="workspace-scope__admin-row">
-                {showTeacherDashboard && onTeacherDash ? (
-                  <button
-                    type="button"
-                    className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => {
-                      onTeacherDash();
-                      setOpen(false);
-                      setQuery("");
-                    }}
-                  >
-                    Teacher Dash
-                  </button>
-                ) : null}
-                {personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash ? (
-                  <button
-                    type="button"
-                    className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => {
-                      onTeamAdminDash();
-                      setOpen(false);
-                      setQuery("");
-                    }}
-                  >
-                    Team Admin Dash
-                  </button>
-                ) : null}
-              </div>
-            )}
+              {online &&
+                personalMatches &&
+                (showTeacherDashboard ||
+                  (personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash)) && (
+                  <div className="workspace-scope__admin-row">
+                    {showTeacherDashboard && onTeacherDash ? (
+                      <button
+                        type="button"
+                        className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                          onTeacherDash();
+                          setOpen(false);
+                          setQuery("");
+                        }}
+                      >
+                        Teacher Dash
+                      </button>
+                    ) : null}
+                    {personalHasTeamTierPlan && ownerWorkspace && onTeamAdminDash ? (
+                      <button
+                        type="button"
+                        className="workspace-scope__admin-btn workspace-scope__admin-btn--wide"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => {
+                          onTeamAdminDash();
+                          setOpen(false);
+                          setQuery("");
+                        }}
+                      >
+                        Team Admin Dash
+                      </button>
+                    ) : null}
+                  </div>
+                )}
 
-            {showInvitedDivider && (
-              <>
-                <div className="workspace-scope__divider" role="separator" />
-                <div className="workspace-scope__section-label">Invited workspaces</div>
-              </>
-            )}
-
-            {!subscriberOwnsTeamTierWorkspace &&
-              personalMatches &&
-              invitedTeams.length > 0 && (
+              {showInvitedDivider && (
                 <>
                   <div className="workspace-scope__divider" role="separator" />
                   <div className="workspace-scope__section-label">Invited workspaces</div>
                 </>
               )}
 
-            {invitedTeams.map((w) => teamRow(w))}
+              {!subscriberOwnsTeamTierWorkspace &&
+                personalMatches &&
+                invitedTeams.length > 0 && (
+                  <>
+                    <div className="workspace-scope__divider" role="separator" />
+                    <div className="workspace-scope__section-label">Invited workspaces</div>
+                  </>
+                )}
 
-            {!personalMatches && filteredWorkspaces.length === 0 && (
-              <p className="workspace-scope__empty">No matching workspaces.</p>
-            )}
-          </div>
-        </div>
-      )}
+              {invitedTeams.map((w) => teamRow(w))}
+
+              {!personalMatches && filteredWorkspaces.length === 0 && (
+                <p className="workspace-scope__empty">No matching workspaces.</p>
+              )}
+
+              {workspaces.length === 0 && invitedTeams.length === 0 && (
+                <p className="workspace-scope__empty">
+                  Team workspaces appear here after you sync from the online dashboard.
+                </p>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
