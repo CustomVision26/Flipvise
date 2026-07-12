@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +23,7 @@ import {
   isFlipviseNativeApp,
   navigateToOfflineShellFast,
 } from "@/lib/offline/is-flipvise-native-app";
+import { useOnlineStatus } from "@/lib/use-online-status";
 
 const CLERK_LOAD_TIMEOUT_MS = 6_000;
 const REDIRECT_STALL_TIMEOUT_MS = 12_000;
@@ -257,7 +258,7 @@ export function NativeSignInClient({
   if (manualOnly && isLoaded) {
     return (
       <main
-        className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+        className={`relative z-10 flex min-h-dvh items-center justify-center bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
       >
         <NativeAuthForm
           redirectTo={postAuthTarget}
@@ -337,7 +338,7 @@ export function NativeSignInClient({
 
   return (
     <main
-      className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+      className={`relative z-10 flex min-h-dvh items-center justify-center bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
     >
       <NativeAuthForm
         redirectTo={postAuthTarget}
@@ -360,7 +361,7 @@ function CenteredSpinner({
 }) {
   return (
     <main
-      className={`flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+      className={`relative z-10 flex min-h-dvh flex-col items-center justify-center gap-4 bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
     >
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
@@ -422,7 +423,7 @@ function SignInRecovery({
 
   return (
     <main
-      className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
+      className={`relative z-10 flex min-h-dvh items-center justify-center bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
     >
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
@@ -466,6 +467,26 @@ function SignInRecovery({
         ) : null}
       </Card>
     </main>
+  );
+}
+
+function useNativeAuthOnlineGate(isNativeContext: boolean) {
+  const online = useOnlineStatus();
+  const offlineMessage = isNativeContext
+    ? "No internet connection. Reconnect to sign in or create an account, or tap Back to offline study."
+    : "No internet connection. Reconnect and try again.";
+  return { online, offlineMessage };
+}
+
+function NativeAuthOfflineNotice({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5 text-sm text-amber-200"
+    >
+      <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{message}</span>
+    </div>
   );
 }
 
@@ -548,6 +569,7 @@ function SignInForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
   const [accountNotFound, setAccountNotFound] = useState(false);
+  const { online, offlineMessage } = useNativeAuthOnlineGate(isNativeContext);
 
   useEffect(() => {
     if (initialEmail) setEmail(initialEmail);
@@ -615,6 +637,10 @@ function SignInForm({
   async function onPasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !password || busy || !signIn) return;
+    if (!online) {
+      setError(offlineMessage);
+      return;
+    }
     setBusy(true);
     setError(null);
     setAccountNotFound(false);
@@ -658,6 +684,10 @@ function SignInForm({
   async function onSendCode(e: React.FormEvent) {
     e.preventDefault();
     if (!email || busy || !signIn) return;
+    if (!online) {
+      setError(offlineMessage);
+      return;
+    }
     setBusy(true);
     setError(null);
     setAccountNotFound(false);
@@ -674,6 +704,10 @@ function SignInForm({
   async function onVerifyCode(e: React.FormEvent) {
     e.preventDefault();
     if (!code || busy || !signIn) return;
+    if (!online) {
+      setError(offlineMessage);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -705,6 +739,7 @@ function SignInForm({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {!online ? <NativeAuthOfflineNotice message={offlineMessage} /> : null}
         {error ? (
           <div className="flex flex-col gap-2">
             <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
@@ -750,7 +785,7 @@ function SignInForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy} className="mt-1">
+            <Button type="submit" disabled={busy || !online} className="mt-1">
               {busy ? "Signing in…" : "Sign in"}
             </Button>
             <Button
@@ -791,7 +826,7 @@ function SignInForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy} className="mt-1">
+            <Button type="submit" disabled={busy || !online} className="mt-1">
               {busy ? "Sending…" : "Email me a code"}
             </Button>
             <Button
@@ -830,7 +865,7 @@ function SignInForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy} className="mt-1">
+            <Button type="submit" disabled={busy || !online} className="mt-1">
               {busy ? "Verifying…" : "Verify & sign in"}
             </Button>
             <Button
@@ -868,10 +903,14 @@ function SignUpForm({
 }) {
   const { signUp } = useSignUp();
   const [step, setStep] = useState<Step>("identify");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
+  const { online, offlineMessage } = useNativeAuthOnlineGate(isNativeContext);
 
   useEffect(() => {
     if (initialEmail) setEmail(initialEmail);
@@ -902,12 +941,29 @@ function SignUpForm({
   async function onSendCode(e: React.FormEvent) {
     e.preventDefault();
     if (!email || busy || !signUp) return;
+    if (!online) {
+      setError(offlineMessage);
+      return;
+    }
+    if (isNativeContext && (!firstName.trim() || !lastName.trim() || !password)) {
+      setError("Please enter your first name, last name, and password.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const { error: createErr } = await signUp.create({
-        emailAddress: email.trim(),
-      });
+      const { error: createErr } = await signUp.create(
+        isNativeContext
+          ? {
+              emailAddress: email.trim(),
+              firstName: firstName.trim(),
+              lastName: lastName.trim(),
+              password,
+            }
+          : {
+              emailAddress: email.trim(),
+            },
+      );
       if (createErr) {
         fail("Couldn't start sign-up", createErr);
         return;
@@ -928,6 +984,10 @@ function SignUpForm({
   async function onVerifyCode(e: React.FormEvent) {
     e.preventDefault();
     if (!code || busy || !signUp) return;
+    if (!online) {
+      setError(offlineMessage);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -958,11 +1018,12 @@ function SignUpForm({
           {step === "code"
             ? `Enter the code we emailed to ${email}.`
             : isNativeContext
-              ? "Enter your email and we'll send a verification code to create your account."
+              ? "Enter your name, email, and password. We'll email you a verification code to finish creating your account."
               : "Use your email to create an account and open the dashboard."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {!online ? <NativeAuthOfflineNotice message={offlineMessage} /> : null}
         {error ? (
           <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
             <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -972,6 +1033,32 @@ function SignUpForm({
 
         {step === "identify" ? (
           <form onSubmit={onSendCode} className="flex flex-col gap-3">
+            {isNativeContext ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="signup-first-name">First name</Label>
+                  <Input
+                    id="signup-first-name"
+                    type="text"
+                    autoComplete="given-name"
+                    value={firstName}
+                    onChange={(ev) => setFirstName(ev.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="signup-last-name">Last name</Label>
+                  <Input
+                    id="signup-last-name"
+                    type="text"
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(ev) => setLastName(ev.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="signup-email">Email</Label>
               <Input
@@ -984,9 +1071,28 @@ function SignUpForm({
                 required
               />
             </div>
+            {isNativeContext ? (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="signup-password">Password</Label>
+                <Input
+                  id="signup-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(ev) => setPassword(ev.target.value)}
+                  required
+                />
+              </div>
+            ) : null}
             <div id="clerk-captcha" />
-            <Button type="submit" disabled={busy} className="mt-1">
-              {busy ? "Sending…" : "Email me a code"}
+            <Button type="submit" disabled={busy || !online} className="mt-1">
+              {busy
+                ? isNativeContext
+                  ? "Creating account…"
+                  : "Sending…"
+                : isNativeContext
+                  ? "Create account"
+                  : "Email me a code"}
             </Button>
             <Button
               type="button"
@@ -1011,7 +1117,7 @@ function SignUpForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy} className="mt-1">
+            <Button type="submit" disabled={busy || !online} className="mt-1">
               {busy ? "Verifying…" : "Verify & create account"}
             </Button>
             <Button
