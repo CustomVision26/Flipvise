@@ -149,8 +149,9 @@ function DeletionProrationRefundStatus({
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Refund details</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm text-muted-foreground">
+            <AlertDialogDescription
+              render={<div className="space-y-3 text-sm text-muted-foreground" />}
+            >
                 <p>
                   <span className="font-medium text-foreground">{row.userName}</span>
                   {row.email ? (
@@ -180,7 +181,6 @@ function DeletionProrationRefundStatus({
                   Stripe may also send its own refund email if Refunds is enabled under
                   Settings → Business → Customer emails.
                 </p>
-              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -257,8 +257,9 @@ function ProrationActions({
             <AlertDialogContent className="sm:max-w-md">
               <AlertDialogHeader>
                 <AlertDialogTitle>Receipt sent</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="space-y-3 text-sm text-muted-foreground">
+                <AlertDialogDescription
+                  render={<div className="space-y-3 text-sm text-muted-foreground" />}
+                >
                     <p>
                       A Flipvise-branded proration receipt was emailed via Loops to{" "}
                       <span className="font-medium text-foreground">
@@ -285,7 +286,6 @@ function ProrationActions({
                       Stripe Customer email logs if you need to confirm whether Stripe also
                       notified the customer.
                     </p>
-                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

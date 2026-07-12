@@ -32,6 +32,7 @@
   ],
   "exclude": [
     "node_modules",
+    "scripts",
     "drizzle.config.ts",
     "drizzle.config.local.ts",
     "mobile/offline-app",

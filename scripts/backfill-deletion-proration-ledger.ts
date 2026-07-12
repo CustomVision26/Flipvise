@@ -85,6 +85,24 @@ function subscriptionPeriodEndSec(sub: Stripe.Subscription): number | null {
   return typeof item?.current_period_end === "number" ? item.current_period_end : null;
 }
 
+function stripeExpandableId(
+  value: string | { id: string } | null | undefined,
+): string | null {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof value.id === "string") {
+    return value.id;
+  }
+  return null;
+}
+
+/** PaymentIntent.invoice is not on the pinned Stripe SDK type but may exist at runtime. */
+function invoiceIdFromPaymentIntent(pi: Stripe.PaymentIntent): string | null {
+  const invoice = (pi as Stripe.PaymentIntent & {
+    invoice?: string | { id: string } | null;
+  }).invoice;
+  return stripeExpandableId(invoice ?? null);
+}
+
 async function customerIdFromRefund(
   stripe: Stripe,
   refund: Stripe.Refund,
@@ -187,12 +205,7 @@ async function resolveSubscriptionIdFromRefund(
 
   if (paymentIntentId) {
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
-    const invoiceId =
-      typeof pi.invoice === "string"
-        ? pi.invoice
-        : pi.invoice && typeof pi.invoice === "object"
-          ? pi.invoice.id
-          : null;
+    const invoiceId = invoiceIdFromPaymentIntent(pi);
     if (invoiceId) {
       const invoice = await stripe.invoices.retrieve(invoiceId);
       const subId =
@@ -298,12 +311,7 @@ async function buildCandidateFromRefund(
         : null;
   if (paymentIntentId) {
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
-    stripeInvoiceId =
-      typeof pi.invoice === "string"
-        ? pi.invoice
-        : pi.invoice && typeof pi.invoice === "object"
-          ? pi.invoice.id
-          : null;
+    stripeInvoiceId = invoiceIdFromPaymentIntent(pi);
   }
   if (!stripeInvoiceId) {
     const chargeId =
