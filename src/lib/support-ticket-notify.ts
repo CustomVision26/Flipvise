@@ -2,6 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import { insertSupportTicketNotifications } from "@/db/queries/support-notifications";
 import { listPlatformAdminRecipientUserIds } from "@/lib/list-platform-admin-user-ids";
 import { supportTicketPreview } from "@/lib/support-ticket-dto";
+import { notifyNativeInboxPush, notifyNativeInboxPushMany } from "@/lib/notify-native-inbox-push";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -29,6 +30,8 @@ export async function notifyAdminsOfNewSupportTicket(input: {
       preview,
     })),
   );
+
+  notifyNativeInboxPushMany(adminIds, "support", preview);
 }
 
 export async function notifyAdminsOfUserTicketReply(input: {
@@ -51,6 +54,8 @@ export async function notifyAdminsOfUserTicketReply(input: {
       preview,
     })),
   );
+
+  notifyNativeInboxPushMany(adminIds, "support", preview);
 }
 
 export async function notifyUserOfAdminTicketReply(input: {
@@ -72,6 +77,12 @@ export async function notifyUserOfAdminTicketReply(input: {
       preview,
     },
   ]);
+
+  notifyNativeInboxPush({
+    recipientUserId: input.recipientUserId,
+    category: "support",
+    body: preview,
+  });
 }
 
 export async function notifyUserOfTicketResolved(input: {
@@ -92,4 +103,10 @@ export async function notifyUserOfTicketResolved(input: {
       preview,
     },
   ]);
+
+  notifyNativeInboxPush({
+    recipientUserId: input.recipientUserId,
+    category: "support",
+    body: preview,
+  });
 }

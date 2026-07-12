@@ -803,6 +803,27 @@ export const deviceSyncTokens = pgTable(
   (t) => [index('device_sync_tokens_user_idx').on(t.userId)],
 );
 
+/** FCM/APNs device tokens for native push notifications (Capacitor app). */
+export const nativePushTokens = pgTable(
+  'native_push_tokens',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    /** FCM registration token (works for both Android and iOS via Firebase). */
+    token: varchar({ length: 512 }).notNull().unique(),
+    platform: varchar({ length: 16 }).notNull(),
+    appVersion: varchar({ length: 32 }),
+    label: varchar({ length: 128 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    lastUsedAt: timestamp(),
+    revokedAt: timestamp(),
+  },
+  (t) => [
+    index('native_push_tokens_user_idx').on(t.userId),
+    index('native_push_tokens_token_idx').on(t.token),
+  ],
+);
+
 export type PerCardSnapshot = {
   cardId: number;
   /** Question / front text shown to the user. */

@@ -68,6 +68,7 @@ import {
 } from "@/lib/team-invite-expiry";
 import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
 import { loopsSendTeamInvitationEmail } from "@/lib/loops";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import type { InferSelectModel } from "drizzle-orm";
 import { teamInvitations } from "@/db/schema";
 
@@ -383,6 +384,23 @@ export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
     expiresInDays: TEAM_INVITE_EXPIRY_DAYS,
     subjectLine: `You're invited to ${team.name}`,
   });
+
+  try {
+    const inviteeLookup = await clerkClient.users.getUserList({
+      emailAddress: [normalizedEmail],
+      limit: 1,
+    });
+    const inviteeUserId = inviteeLookup.data[0]?.id;
+    if (inviteeUserId) {
+      notifyNativeInboxPush({
+        recipientUserId: inviteeUserId,
+        category: "team_invite",
+        body: `You're invited to ${team.name}`,
+      });
+    }
+  } catch {
+    // Non-fatal — email invite still sent.
+  }
 
   revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard");

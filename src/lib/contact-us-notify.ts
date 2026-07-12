@@ -2,6 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import { insertContactUsNotifications } from "@/db/queries/contact-us-notifications";
 import { contactUsPreview } from "@/db/queries/contact-us";
 import { listPlatformAdminRecipientUserIds } from "@/lib/list-platform-admin-user-ids";
+import { notifyNativeInboxPush, notifyNativeInboxPushMany } from "@/lib/notify-native-inbox-push";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -29,6 +30,8 @@ export async function notifyAdminsOfContactUsMessage(input: {
       preview,
     })),
   );
+
+  notifyNativeInboxPushMany(adminIds, "contact_us", preview);
 }
 
 export async function notifyAdminsOfContactUsUserReply(input: {
@@ -51,6 +54,8 @@ export async function notifyAdminsOfContactUsUserReply(input: {
       preview,
     })),
   );
+
+  notifyNativeInboxPushMany(adminIds, "contact_us", preview);
 }
 
 export async function notifyUserOfContactUsAdminReply(input: {
@@ -72,4 +77,10 @@ export async function notifyUserOfContactUsAdminReply(input: {
       preview,
     },
   ]);
+
+  notifyNativeInboxPush({
+    recipientUserId: input.recipientUserId,
+    category: "contact_us",
+    body: preview,
+  });
 }

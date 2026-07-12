@@ -23,6 +23,7 @@ import {
   listPlansWithGeneralDiscount,
   listPlansEligibleForAffiliateCodeBroadcast,
 } from "@/lib/affiliate-broadcast-messaging";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -71,6 +72,11 @@ async function deliverGeneralPromoToClerkUsers(opts: {
       pricingPageUrl: opts.pricingPageUrl,
     });
     if (id != null) inboxDelivered++;
+    notifyNativeInboxPush({
+      recipientUserId,
+      category: "affiliate_broadcast",
+      body: opts.subject,
+    });
   }
   return inboxDelivered;
 }
@@ -272,6 +278,11 @@ export async function broadcastAffiliateCodesAction(
       pricingPageUrl,
     });
     if (inserted != null) inboxDelivered++;
+    notifyNativeInboxPush({
+      recipientUserId: clerkId,
+      category: "affiliate_broadcast",
+      body: subject,
+    });
   }
 
   assertAtLeastOneInboxDelivery(inboxDelivered);

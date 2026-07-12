@@ -23,6 +23,7 @@ import {
   insertAdminPlanAssignmentInvite,
   supersedePendingAdminPlanInvitesForUser,
 } from "@/db/queries/admin-plan-invites";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import {
   loopsSendAccountStatusEmail,
   type AccountStatusEmailResult,
@@ -132,6 +133,12 @@ export async function createAdminPlanAssignmentInviteAction(data: ApplyPlanAssig
     targetUserName: targetName,
     assignment,
     previousPlanSlug: previousSlug,
+  });
+
+  notifyNativeInboxPush({
+    recipientUserId: targetUserId,
+    category: "admin_plan_invite",
+    body: "An administrator assigned you a new plan — review in your inbox.",
   });
 
   revalidatePath("/admin");

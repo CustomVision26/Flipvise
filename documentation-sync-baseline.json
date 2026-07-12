@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-11T00:30:53.351Z",
+  "updatedAt": "2026-07-12T02:47:51.975Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "00c084a6f2569d89bce7ff204e0368efde39d2586b5c325a9f81dac8d14f50c1",
@@ -11,7 +11,7 @@
       "docFingerprint": "7b48bf51a054f4825e8c3fad95bc5565e7697068fefffd1175ad1deae6bff43b"
     },
     "personal-dashboard": {
-      "watchFingerprint": "2ef30a644572d20cf8ef649afe5a88cad7257cad3d46e4289b94afb208bf30dd",
+      "watchFingerprint": "9cdc1bf506c5967a05d8818e9bbb9723ed0de7486316dae38412764b547c936d",
       "docFingerprint": "06a4a0a6ec30c641daabadeb7d2aaa30ae9c2a93e8e4a12b911836ff2a354e87"
     },
     "team-workspace-dashboard": {
@@ -35,8 +35,8 @@
       "docFingerprint": "3ea0c3de962ce007b376358c0449dd99744c08f3bb56fc992c7f347688552868"
     },
     "offline-mobile": {
-      "watchFingerprint": "8e1758b0b41b4d2012a5630697b96094dff858247f1cdfc58351b08b257e0893",
-      "docFingerprint": "dbda96c37d48f352f715913eb62980642038647f58ff32dd4675f1a74156cd25"
+      "watchFingerprint": "3b3fd6681e746f055d6bd7e210d3917955f54285941d598a2efbb17f04dae390",
+      "docFingerprint": "3e1682a312295f89cbf439d8d9a92f882c5393330234bee717ffb13639e51070"
     },
     "inbox": {
       "watchFingerprint": "263f99e888e36926abd4c6a64caa8a720d9709da5b54d2bded9fc59ebb7908c8",
@@ -151,7 +151,7 @@
       "docFingerprint": "98312e60f86f345fc37f1b467e5aa60687735958c0d6a437363ea70d391ea9b0"
     },
     "members": {
-      "watchFingerprint": "4b8b1a3a7a3089111a7564986f828bb81aadec9db7a7ff331f55a4f636b5b524",
+      "watchFingerprint": "79550b2712a99dd20bd6c112a5ad3ba7770169c6d3e73046a0ffef062692ab51",
       "docFingerprint": "d37c76f2c4f05e3c6d67040d395d96ce2e331e328e4c5c90de33757ec5eda055"
     },
     "deck-manager": {
@@ -183,11 +183,11 @@
       "docFingerprint": "0325848a9c3641aa350e056cb65370115fee8f51c2ae042a1a9eb84574f8295b"
     },
     "teacher-dashboard": {
-      "watchFingerprint": "bc7d74540436fe0673456d41cac1e572a8f0d0fc3919cceb62a3688ddac78548",
+      "watchFingerprint": "26549b78a86d979fcbfaf5b91564334d326dceac58283b66a1f94ca88f1c27f5",
       "docFingerprint": "5abfc9ed8a86a087b76478cefe5c10c158ef30e9f6816009b0405a33061e68ef"
     },
     "teacher-ai-content-tools": {
-      "watchFingerprint": "bbfd1063f030444e31cff5a566849bce9919cbdb6452de114868cfb95890a8cc",
+      "watchFingerprint": "b4e44f15a0871f87683bb00c69f9e34294deb9103581110a9141593325afa9d2",
       "docFingerprint": "e630521604ac5dda164ec008f89d8a83d6ad8e3d6fa2806215475b8970d2fba8"
     },
     "teacher-classroom": {
@@ -207,7 +207,7 @@
       "docFingerprint": "cc5a4ba8a940d51473fe3a994544844d49fc3bf32850b28b3b127696519f820c"
     },
     "all-users": {
-      "watchFingerprint": "f625136f7c2f42e977950f0f1a4f56b6e4a06711e9e4d9f438cbf519d7a33cb6",
+      "watchFingerprint": "32ab08d2fa4bb4400b47bf3934759170056709b9a24b0d501fcd8254920e351b",
       "docFingerprint": "47fce810d1cba62885c09ba1da38151741b67e218fd8fb00a51aec4e1e30a6ce"
     },
     "subscription": {
@@ -227,7 +227,7 @@
       "docFingerprint": "1da59bdf10d4018d0fea3a7b2c3942df30188a8cd753304aa211d43dd1928342"
     },
     "admin-roles": {
-      "watchFingerprint": "8a6d9724cc6322f68efb6d99872f51c1cf8f84fb77c553fe8be1c649680633ae",
+      "watchFingerprint": "48fee1350b05484f3c7bd30bd478587145b3be1f3ad4136fbe04ef9bfb102b51",
       "docFingerprint": "7ddeb471aa87e3af7cf21c8270a599268cee0f3af0549145db01d3ca56986fb9"
     },
     "audit-log": {

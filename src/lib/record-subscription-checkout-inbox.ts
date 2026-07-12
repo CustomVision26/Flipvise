@@ -9,6 +9,7 @@ import { stripe } from "@/lib/stripe";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { resolveCheckoutSessionChargeReceiptUrl } from "@/lib/stripe-invoice-receipt-url";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -71,6 +72,12 @@ export async function recordSubscriptionCheckoutInboxForSession(
     currency,
     promoDisplay,
     receiptUrl,
+  });
+
+  notifyNativeInboxPush({
+    recipientUserId: userId,
+    category: "subscription_checkout",
+    body: `${planLabel} subscription confirmed`,
   });
 }
 

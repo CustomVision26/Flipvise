@@ -3,6 +3,7 @@ import {
   type BillingNoticeKind,
 } from "@/db/queries/billing-notice-inbox";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 
 function formatLongDate(d: Date): string {
   return d.toLocaleDateString(undefined, { dateStyle: "long" });
@@ -81,5 +82,11 @@ export async function recordBillingNoticeInboxMessage(input: {
     description: copy.description,
     eventAt: input.eventAt,
     requiresAction: copy.requiresAction,
+  });
+
+  notifyNativeInboxPush({
+    recipientUserId: input.recipientUserId,
+    category: "billing_notice",
+    body: copy.title,
   });
 }

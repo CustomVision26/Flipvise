@@ -118,6 +118,20 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         },
       },
       {
+        id: "notifications",
+        title: "Notifications & app updates",
+        paragraphs: [
+          "The native iOS/Android app can alert you about new inbox messages and when a newer version is available.",
+        ],
+        bullets: [
+          "When you allow notifications, Flipvise can show OS alerts for inbox items (team invites, billing notices, support replies, and similar) while the app is in the background.",
+          "While the app is open, new inbox items also appear as in-app popups — tap them to open your inbox.",
+          "If the live website is updated on the server, the app may prompt you to refresh so you get the latest features without reinstalling.",
+          "When a new version is published to the App Store or Google Play, the app can prompt you to update from the store.",
+          "Notifications require permission in your device settings. If you deny permission, inbox badges still update when you open the online dashboard.",
+        ],
+      },
+      {
         id: "tips",
         title: "Tips & cautions",
         bullets: [

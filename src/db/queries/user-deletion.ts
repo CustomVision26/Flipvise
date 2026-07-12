@@ -12,6 +12,7 @@ import {
   decks,
   deviceSyncTokens,
   inboxReads,
+  nativePushTokens,
   quizResultInboxMessages,
   quizResults,
   quizSecurityInboxMessages,
@@ -194,6 +195,7 @@ export async function purgeAllUserData(
     .where(eq(quizSecurityInboxMessages.recipientUserId, userId));
   await db.delete(inboxReads).where(eq(inboxReads.userId, userId));
   await db.delete(deviceSyncTokens).where(eq(deviceSyncTokens.userId, userId));
+  await db.delete(nativePushTokens).where(eq(nativePushTokens.userId, userId));
   await db
     .delete(affiliateBroadcastInboxMessages)
     .where(eq(affiliateBroadcastInboxMessages.recipientUserId, userId));

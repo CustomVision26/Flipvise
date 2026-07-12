@@ -13,6 +13,7 @@ import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-h
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { NativeAppBootstrap } from "@/components/native-app-bootstrap";
+import { NativeNotificationBootstrap } from "@/components/native-notification-bootstrap";
 import { OfflineBanner } from "@/components/offline-banner";
 import { useClientMounted } from "@/lib/use-client-mounted";
 
@@ -61,6 +62,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <ThemeStorageNormalize>
         <ClerkWithTheme>
           <NativeAppBootstrap />
+          <NativeNotificationBootstrap />
           <OfflineBanner />
           {children}
           <Toaster richColors closeButton position="top-right" />

@@ -4,13 +4,9 @@ import {
   type RootLayoutTeamAdminHeaderTeam,
 } from "@/db/queries/teams";
 import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
-import { countUnreadAffiliateBroadcastInboxForUser } from "@/db/queries/affiliate-broadcast-inbox";
-import { countUnreadSubscriptionCheckoutConfirmationsForUser } from "@/db/queries/subscription-checkout-inbox";
-import { countUnreadBillingNoticeInboxForUser } from "@/db/queries/billing-notice-inbox";
-import { countUnreadSupportNotificationsForInboxBadge } from "@/db/queries/support-notifications";
-import { countUnreadContactUsNotificationsForRecipient } from "@/db/queries/contact-us-notifications";
 import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import type { AccessContext } from "@/lib/access";
+import { getInboxUnreadCountForUser } from "@/lib/inbox-unread-count";
 import {
   getPersonalWorkspaceAccessLabel,
   getPersonalWorkspaceAccountPlanLabel,
@@ -187,35 +183,11 @@ export async function loadRootLayoutShellData(input: {
         : Promise.resolve(false),
 
       needsInbox
-        ? Promise.all([
-            primaryEmail != null && primaryEmail !== ""
-              ? tryTeamQuery(
-                  () =>
-                    countUnreadTeamInvitationsForInboxBadge(primaryEmail, userId),
-                  0,
-                )
-              : Promise.resolve(0),
-            tryTeamQuery(
-              () => countUnreadAffiliateBroadcastInboxForUser(userId),
-              0,
-            ),
-            countUnreadSubscriptionCheckoutConfirmationsForUser(userId).catch(
-              () => 0,
-            ),
-            countUnreadBillingNoticeInboxForUser(userId).catch(() => 0),
-            countUnreadSupportNotificationsForInboxBadge(userId).catch(() => 0),
-            isAdmin
-              ? countUnreadContactUsNotificationsForRecipient(userId).catch(() => 0)
-              : Promise.resolve(0),
-          ]).then(
-            ([invites, affiliateBroadcasts, subscriptionConfirmations, billingNotices, supportAlerts, contactUsAlerts]) =>
-              invites +
-              affiliateBroadcasts +
-              subscriptionConfirmations +
-              billingNotices +
-              supportAlerts +
-              contactUsAlerts,
-          )
+        ? getInboxUnreadCountForUser({
+            userId,
+            primaryEmail,
+            isAdmin,
+          })
         : Promise.resolve(0),
 
       needsAffiliate

@@ -3,6 +3,7 @@ package com.flipvise.app;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
@@ -13,6 +14,9 @@ import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 
 public class MainActivity extends BridgeActivity {
 
@@ -28,6 +32,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ensureDefaultNotificationChannel();
 
         WebView webView = getBridge().getWebView();
         if (webView != null) {
@@ -112,6 +117,24 @@ public class MainActivity extends BridgeActivity {
         }
         view.loadUrl(target.build().toString());
         return true;
+    }
+
+    /** FCM payloads use channel id flipvise_default (see AndroidManifest.xml). */
+    private void ensureDefaultNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return;
+        }
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) {
+            return;
+        }
+        NotificationChannel channel = new NotificationChannel(
+            "flipvise_default",
+            "Flipvise",
+            NotificationManager.IMPORTANCE_DEFAULT
+        );
+        channel.setDescription("Inbox messages and app updates");
+        manager.createNotificationChannel(channel);
     }
 
     /** Drop cached live-site assets after each store/app upgrade so Team Admin UI updates ship. */
