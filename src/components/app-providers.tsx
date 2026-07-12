@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveLogoImageUrl } from "@/lib/branding";
 import { LoginWelcomeToast } from "@/components/login-welcome-toast";
+import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
 import { ClerkChunkLoadRecovery } from "@/components/clerk-chunk-load-recovery";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
