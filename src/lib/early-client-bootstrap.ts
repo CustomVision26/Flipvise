@@ -14,22 +14,29 @@ function runEarlyClientBootstrap(): void {
     isLocal &&
     "serviceWorker" in navigator
   ) {
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    const reloadKey = "flipvise-dev-sw-reset";
+
     navigator.serviceWorker
       .getRegistrations()
-      .then((registrations) => {
-        registrations.forEach((registration) => registration.unregister());
+      .then(async (registrations) => {
+        await Promise.all(
+          registrations.map((registration) => registration.unregister()),
+        );
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(
+            keys
+              .filter((key) => key.indexOf("flipvise") === 0)
+              .map((key) => caches.delete(key)),
+          );
+        }
+        if (hadController && !sessionStorage.getItem(reloadKey)) {
+          sessionStorage.setItem(reloadKey, "1");
+          window.location.reload();
+        }
       })
       .catch(() => {});
-    if ("caches" in window) {
-      caches
-        .keys()
-        .then((keys) =>
-          keys
-            .filter((key) => key.indexOf("flipvise") === 0)
-            .forEach((key) => caches.delete(key)),
-        )
-        .catch(() => {});
-    }
   }
 
   try {

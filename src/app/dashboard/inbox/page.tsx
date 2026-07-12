@@ -30,6 +30,7 @@ import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { billingNoticeRowsToInboxItems } from "@/lib/billing-inbox-notices";
 import { welcomeInboxRowsToInboxItems } from "@/lib/welcome-inbox";
+import { ensureWelcomeInboxForUserIfMissing } from "@/lib/record-welcome-inbox";
 import { listBillingNoticeInboxMessagesForUser } from "@/db/queries/billing-notice-inbox";
 import { listWelcomeInboxMessagesForUser } from "@/db/queries/welcome-inbox";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
@@ -63,6 +64,16 @@ export default async function DashboardInboxPage() {
 
   const access = await getAccessContext();
   const isPlatformAdmin = access.isAdmin;
+
+  try {
+    await ensureWelcomeInboxForUserIfMissing({
+      recipientUserId: userId,
+      firstName: sessionUser.firstName,
+      notify: false,
+    });
+  } catch (error) {
+    console.error("[dashboard/inbox] ensure welcome message:", error);
+  }
 
   // ── Fetch everything in parallel ──────────────────────────────────────────
   const [

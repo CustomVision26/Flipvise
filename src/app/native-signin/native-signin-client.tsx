@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
-import { ensureWelcomeInboxMessageAction } from "@/actions/inbox";
+import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

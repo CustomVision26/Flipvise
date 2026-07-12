@@ -1,4 +1,7 @@
-import { insertWelcomeInboxMessage } from "@/db/queries/welcome-inbox";
+import {
+  insertWelcomeInboxMessage,
+  listWelcomeInboxMessagesForUser,
+} from "@/db/queries/welcome-inbox";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 
 function welcomeCopy(firstName?: string | null): {
@@ -28,6 +31,7 @@ function welcomeCopy(firstName?: string | null): {
 export async function recordWelcomeInboxMessage(input: {
   recipientUserId: string;
   firstName?: string | null;
+  notify?: boolean;
 }): Promise<void> {
   const copy = welcomeCopy(input.firstName);
 
@@ -37,9 +41,27 @@ export async function recordWelcomeInboxMessage(input: {
     description: copy.description,
   });
 
-  notifyNativeInboxPush({
-    recipientUserId: input.recipientUserId,
-    category: "welcome",
-    body: copy.title,
-  });
+  if (input.notify !== false) {
+    notifyNativeInboxPush({
+      recipientUserId: input.recipientUserId,
+      category: "welcome",
+      body: copy.title,
+    });
+  }
+}
+
+/** Creates the welcome inbox row when missing (webhook fallback for local dev and web sign-up). */
+export async function ensureWelcomeInboxForUserIfMissing(input: {
+  recipientUserId: string;
+  firstName?: string | null;
+  notify?: boolean;
+}): Promise<boolean> {
+  const existing = await listWelcomeInboxMessagesForUser(
+    input.recipientUserId,
+    1,
+  );
+  if (existing.length > 0) return false;
+
+  await recordWelcomeInboxMessage(input);
+  return true;
 }

@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
 import {
   clearClerkAuthHandoff,
   hasClerkAuthHandoff,
@@ -49,6 +50,12 @@ export function LoginWelcomeToast() {
     const isNewAccount = isRecentlyCreatedAccount(user?.createdAt);
 
     if (isNewAccount) {
+      void ensureWelcomeInboxMessageAction()
+        .then(() => {
+          router.refresh();
+        })
+        .catch(() => {});
+
       toast.success(`Welcome to Flipvise${nameSuffix}!`, {
         description:
           "Thank you for joining us. Open your Inbox for a welcome message with ways to get started.",
@@ -57,6 +64,7 @@ export function LoginWelcomeToast() {
           label: "Open Inbox",
           onClick: () => {
             router.push("/dashboard/inbox");
+            router.refresh();
           },
         },
       });

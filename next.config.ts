@@ -13,6 +13,22 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  ...(process.env.NODE_ENV === "development"
+    ? {
+        headers: async () => [
+          {
+            source: "/_next/:path*",
+            headers: [
+              {
+                key: "Cache-Control",
+                value: "no-store, must-revalidate",
+              },
+            ],
+          },
+        ],
+      }
+    : {}),
+
   images: {
     // Serve AVIF first (smaller), fall back to WebP — both are smaller than PNG/JPEG
     formats: ["image/avif", "image/webp"],

@@ -1,10 +1,8 @@
 "use server";
 
 import { z } from "zod";
-import { currentUser } from "@/lib/clerk-auth";
 import { getAccessContext } from "@/lib/access";
 import { markInboxItemRead, markAllInboxItemsRead } from "@/db/queries/inbox-reads";
-import { recordWelcomeInboxMessage } from "@/lib/record-welcome-inbox";
 
 const markReadSchema = z.object({
   itemType: z.string().min(1).max(64),
@@ -37,16 +35,4 @@ export async function markAllInboxItemsReadAction(
   if (!parsed.success) throw new Error("Invalid input");
 
   await markAllInboxItemsRead(userId, parsed.data.items);
-}
-
-/** Idempotent — ensures a one-time welcome inbox row exists for the signed-in user. */
-export async function ensureWelcomeInboxMessageAction(): Promise<void> {
-  const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
-
-  const user = await currentUser();
-  await recordWelcomeInboxMessage({
-    recipientUserId: userId,
-    firstName: user?.firstName,
-  });
 }
