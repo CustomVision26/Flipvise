@@ -15,7 +15,8 @@ export type InboxItemType =
   | "admin_plan_invite"
   | "quiz_security_notice"
   | "support_ticket"
-  | "contact_us_message";
+  | "contact_us_message"
+  | "welcome";
 
 // ── Type-specific payload shapes ──────────────────────────────────────────────
 
@@ -153,6 +154,10 @@ export type ContactUsMessagePayload = {
   forAdmin: boolean;
 };
 
+export type WelcomePayload = {
+  messageId: number;
+};
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type UnifiedInboxItem =
@@ -249,6 +254,16 @@ export type UnifiedInboxItem =
       isRead: boolean;
       requiresAction: boolean;
       payload: ContactUsMessagePayload;
+    }
+  | {
+      type: "welcome";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: false;
+      payload: WelcomePayload;
     };
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
@@ -265,4 +280,5 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   quiz_security_notice: "Quiz security",
   support_ticket: "Support ticket",
   contact_us_message: "Contact Us",
+  welcome: "Welcome",
 };

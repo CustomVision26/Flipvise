@@ -152,6 +152,72 @@ const ALL_ARTICLES: DocArticle[] = [
     ],
   ),
   a(
+    "subscription-monitor",
+    "Billing Monitor — In-Depth Guide",
+    "At /admin/subscription-monitor, review billing lifecycle alerts for trials, expirations, and payment failures.",
+    [
+      {
+        id: "billing-alerts",
+        title: "Billing monitor alerts",
+        bullets: [
+          "Summary cards: active trial, trial ending soon, subscription expiring, payment failed (grace), grace expired.",
+          "Grace window is 12 hours after the first past_due webhook before paid access reverts to Free.",
+          "Search, category filter, and CSV export for operational follow-up.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "subscription-deletion-proration",
+    "Account Deletion Proration — In-Depth Guide",
+    "At /admin/subscription-deletion-proration, manage prorated refunds and receipts for paid users who deleted before the billing period ended.",
+    [
+      {
+        id: "deletion-proration",
+        title: "Account deletion proration ledger",
+        bullets: [
+          "Written when a paid subscriber deletes their account — cancels Stripe immediately and prorates unused time.",
+          "Proration still owed tally: rows where auto-refund failed or was never issued (pending_manual / auto_failed).",
+          "Refund via Stripe: admin action when Flipvise automation did not complete the refund.",
+          "Send receipt: optional Flipvise-branded email via Loops (LOOPS_DELETION_PRORATION_RECEIPT_TRANSACTIONAL_ID).",
+          "Sample Loops template copy: src/data/admin-documentation-articles/deletion-proration-receipt-loops-sample.md",
+        ],
+      },
+      {
+        id: "stripe-refund-email",
+        title: "Stripe automatic refund emails",
+        paragraphs: [
+          "Flipvise issues the refund in code (stripe.refunds.create with metadata account_deletion_proration). Whether the customer receives an email is controlled in Stripe, not in app code.",
+        ],
+        bullets: [
+          "Stripe Dashboard → Settings → Customer emails → enable Refunds.",
+          "Configure separately in Test mode and Live mode (toggle top-right in Dashboard).",
+          "Email goes to the address on the Stripe Customer record; ask users to check spam.",
+          "Successful payments can be enabled separately for subscription invoice/receipt emails.",
+        ],
+      },
+      {
+        id: "backfill",
+        title: "Backfill historical deletions",
+        bullets: [
+          "npm run db:ensure-account-deletion-proration-ledger — create ledger table if missing.",
+          "npm run db:backfill-deletion-proration-ledger — dry-run from Stripe refund + canceled-sub history.",
+          "npm run db:backfill-deletion-proration-ledger -- --execute — insert rows (add --allow-live for sk_live_*).",
+          "Rows with existing Stripe deletion refunds import as auto_issued; others may be pending_manual for review.",
+        ],
+      },
+      {
+        id: "cautions",
+        title: "Admin cautions",
+        bullets: [
+          "Verify refund status in Stripe before clicking Refund via Stripe to avoid double refunds.",
+          "Send receipt requires a completed refund and a stored email on the ledger row.",
+          "Canceled mid-period subs in backfill are heuristic — confirm amounts before manual refund.",
+        ],
+      },
+    ],
+  ),
+  a(
     "invoices",
     "Invoices — In-Depth Guide",
     "Review persisted Stripe invoice history with promo attribution at /admin/invoices.",
@@ -587,6 +653,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Invite by email with plan grant slug, arrangement end date, and accept-link expiry (days).",
           "Pending invite — no Clerk plan change until the affiliate accepts via inbox or accept URL.",
           "Loops transactional email sends only when the email has no matching Clerk account at invite time (LOOPS_API_KEY + LOOPS_AFFILIATE_INVITATION_TRANSACTIONAL_ID required).",
+          "Sample Loops template copy: src/data/admin-documentation-articles/affiliate-invitation-loops-sample.md",
           "Registered invitees receive dashboard inbox notification only — use Copy invite link for manual delivery when Loops is skipped.",
         ],
       },

@@ -38,6 +38,7 @@ export async function AdminTabsPanel({
       affiliates={data.affiliates}
       affiliateInviteDefaultExpiresInDays={getAffiliateInviteExpiryDays()}
       billingMonitorRows={data.billingMonitorRows}
+      deletionProrationRows={data.deletionProrationRows ?? []}
     />
   );
 }

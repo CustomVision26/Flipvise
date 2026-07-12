@@ -13,7 +13,7 @@ import * as React from "react";
  * because dev chunk filenames are stable but their contents change.
  */
 export function ServiceWorkerRegister() {
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
     const host = window.location.hostname;

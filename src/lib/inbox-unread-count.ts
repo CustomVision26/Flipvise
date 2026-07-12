@@ -4,6 +4,8 @@ import { countUnreadSubscriptionCheckoutConfirmationsForUser } from "@/db/querie
 import { countUnreadBillingNoticeInboxForUser } from "@/db/queries/billing-notice-inbox";
 import { countUnreadSupportNotificationsForInboxBadge } from "@/db/queries/support-notifications";
 import { countUnreadContactUsNotificationsForRecipient } from "@/db/queries/contact-us-notifications";
+import { countUnreadQuizResultInboxForUser } from "@/db/queries/quiz-results";
+import { countUnreadWelcomeInboxForUser } from "@/db/queries/welcome-inbox";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 
 export async function getInboxUnreadCountForUser(input: {
@@ -20,6 +22,8 @@ export async function getInboxUnreadCountForUser(input: {
     billingNotices,
     supportAlerts,
     contactUsAlerts,
+    quizResults,
+    welcomeMessages,
   ] = await Promise.all([
     primaryEmail != null && primaryEmail !== ""
       ? tryTeamQuery(
@@ -34,6 +38,8 @@ export async function getInboxUnreadCountForUser(input: {
     isAdmin
       ? countUnreadContactUsNotificationsForRecipient(userId).catch(() => 0)
       : Promise.resolve(0),
+    countUnreadQuizResultInboxForUser(userId).catch(() => 0),
+    countUnreadWelcomeInboxForUser(userId).catch(() => 0),
   ]);
 
   return (
@@ -42,6 +48,8 @@ export async function getInboxUnreadCountForUser(input: {
     subscriptionConfirmations +
     billingNotices +
     supportAlerts +
-    contactUsAlerts
+    contactUsAlerts +
+    quizResults +
+    welcomeMessages
   );
 }

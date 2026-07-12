@@ -27,7 +27,13 @@ import {
   resolveFreeUiThemeDataAttribute,
   resolveFreeUiThemeSelection,
 } from "@/lib/free-ui-theme";
-import { LOGO_PUBLIC_URL } from "@/lib/branding";
+import {
+  LOGO_PUBLIC_URL,
+  FAVICON_ICO_URL,
+  FAVICON_32_URL,
+  FAVICON_16_URL,
+  APPLE_TOUCH_ICON_URL,
+} from "@/lib/branding";
 import { cn } from "@/lib/utils";
 import {
   parseSearchParamsRecordFromSearchString,
@@ -62,6 +68,15 @@ export const metadata: Metadata = {
       "Create AI-powered flashcard decks, study with flashcards or quizzes, and collaborate with your team.",
     type: "website",
   },
+  icons: {
+    icon: [
+      { url: FAVICON_ICO_URL, sizes: "48x48", type: "image/x-icon" },
+      { url: FAVICON_32_URL, sizes: "32x32", type: "image/png" },
+      { url: FAVICON_16_URL, sizes: "16x16", type: "image/png" },
+    ],
+    shortcut: FAVICON_ICO_URL,
+    apple: [{ url: APPLE_TOUCH_ICON_URL, sizes: "180x180", type: "image/png" }],
+  },
 };
 
 /** Lets `env(safe-area-inset-*)` apply under the iOS status bar / home indicator in Capacitor. */
@@ -70,11 +85,6 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
 };
-
-const NATIVE_SHELL_EARLY_SCRIPT = `try{var c=window.Capacitor;var ua=navigator.userAgent;if(/FlipviseNative\\//.test(ua)||(c&&c.isNativePlatform&&c.isNativePlatform())){var r=document.documentElement;r.dataset.flipviseNativeShell="1";r.dataset.nativeShell="1";var p=c&&c.getPlatform?c.getPlatform():"";if(p)r.dataset.platform=p;else if(/Android/i.test(ua))r.dataset.platform="android";else if(/iPhone|iPad|iPod/i.test(ua))r.dataset.platform="ios"}}catch(e){}`;
-
-/** Unregister PWA SW + flipvise caches on localhost before React/Turbopack load (avoids stale chunk SSR errors). */
-const DEV_SW_CLEANUP_EARLY_SCRIPT = `try{var h=location.hostname;var isLocal=h==="localhost"||h==="127.0.0.1"||h==="::1";if(isLocal&&"serviceWorker"in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister()})}).catch(function(){});if("caches"in window){caches.keys().then(function(ks){ks.filter(function(k){return k.indexOf("flipvise")===0}).forEach(function(k){caches.delete(k)})}).catch(function(){})}}}catch(e){}`;
 
 export default async function RootLayout({
   children,
@@ -195,18 +205,6 @@ export default async function RootLayout({
       data-native-shell={nativeShell.isNativeShell ? "1" : undefined}
       data-platform={nativeShell.platform}
     >
-      <head>
-        {process.env.NODE_ENV === "development" ? (
-          <script
-            id="flipvise-dev-sw-cleanup-early"
-            dangerouslySetInnerHTML={{ __html: DEV_SW_CLEANUP_EARLY_SCRIPT }}
-          />
-        ) : null}
-        <script
-          id="flipvise-native-shell-early"
-          dangerouslySetInnerHTML={{ __html: NATIVE_SHELL_EARLY_SCRIPT }}
-        />
-      </head>
       <body className="min-h-full flex flex-col relative">
         <AppProviders>
             {showHeaderChrome && (

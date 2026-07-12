@@ -1,6 +1,30 @@
 {
   "version": 1,
   "skills": {
+    "loops-api": {
+      "source": "loops-so/skills",
+      "sourceType": "github",
+      "skillPath": "skills/loops-api/SKILL.md",
+      "computedHash": "3e5f71050c749e0c8a1878ebd0127b83dd6bf5ecbab8679ab77a88bece232f09"
+    },
+    "loops-cli": {
+      "source": "loops-so/skills",
+      "sourceType": "github",
+      "skillPath": "skills/loops-cli/SKILL.md",
+      "computedHash": "fe61557edb8926df94e38465967fdd2cda364239f2346a01b13f15cdc06f56f8"
+    },
+    "loops-email-sending-best-practices": {
+      "source": "loops-so/skills",
+      "sourceType": "github",
+      "skillPath": "skills/loops-email-sending-best-practices/SKILL.md",
+      "computedHash": "35c69e60480165e8083edecd881809121d05e21e9229cc0c2d51eb056789c38f"
+    },
+    "loops-lmx": {
+      "source": "loops-so/skills",
+      "sourceType": "github",
+      "skillPath": "skills/loops-lmx/SKILL.md",
+      "computedHash": "41bb90b51f53384a389d231c0fa4f1728f52d6c0e3a87d385a347874b117b050"
+    },
     "stripe-best-practices": {
       "source": "docs.stripe.com",
       "sourceType": "well-known",

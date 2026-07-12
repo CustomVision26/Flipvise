@@ -57,7 +57,12 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/quiz-result-detail-view.tsx",
     "src/lib/quiz-pdf-server.ts",
   ],
-  inbox: ["src/components/inbox-unified-client.tsx"],
+  inbox: [
+    "src/components/inbox-unified-client.tsx",
+    "src/app/dashboard/inbox/page.tsx",
+    "src/lib/record-welcome-inbox.ts",
+    "src/components/login-welcome-toast.tsx",
+  ],
   "help-center-overview": ["src/components/help-center.tsx"],
   "help-center-support": ["src/components/help-center.tsx", "src/components/contact-support-view.tsx"],
   "help-center-bug-report": ["src/components/help-center.tsx"],

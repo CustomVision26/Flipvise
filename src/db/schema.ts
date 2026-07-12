@@ -740,6 +740,43 @@ export const stripeSubscriptions = pgTable('stripe_subscriptions', {
 });
 
 /**
+ * Audit ledger when a paid subscriber deletes their account before period end.
+ * Survives user purge — used by admin Billing monitor for manual refunds/receipts.
+ */
+export const accountDeletionProrationLedger = pgTable(
+  'account_deletion_proration_ledger',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    clerkUserId: varchar({ length: 255 }).notNull(),
+    userEmail: varchar({ length: 320 }),
+    userDisplayName: varchar({ length: 255 }),
+    stripeCustomerId: varchar({ length: 255 }).notNull(),
+    stripeSubscriptionId: varchar({ length: 255 }).notNull(),
+    stripeInvoiceId: varchar({ length: 255 }),
+    planSlug: varchar({ length: 64 }),
+    subscriptionPeriodEnd: timestamp(),
+    deletedAt: timestamp().notNull().defaultNow(),
+    estimatedRefundCents: integer().notNull().default(0),
+    refundedCents: integer(),
+    currency: varchar({ length: 8 }).notNull().default('usd'),
+    /** auto_issued | auto_failed | pending_manual | manual_issued | not_applicable */
+    refundStatus: varchar({ length: 32 }).notNull(),
+    stripeRefundId: varchar({ length: 255 }),
+    refundError: text(),
+    receiptSentAt: timestamp(),
+    receiptSentByAdminUserId: varchar({ length: 255 }),
+    manualRefundByAdminUserId: varchar({ length: 255 }),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('account_deletion_proration_sub_uidx').on(t.stripeSubscriptionId),
+    index('account_deletion_proration_status_idx').on(t.refundStatus),
+    index('account_deletion_proration_deleted_at_idx').on(t.deletedAt),
+  ],
+);
+
+/**
  * Records each user's one-time plan trial (enforced at checkout).
  * A user may only start a published trial once across all plans.
  */
@@ -778,6 +815,22 @@ export const billingNoticeInboxMessages = pgTable(
       t.noticeKind,
       t.stripeSubscriptionId,
     ),
+  ],
+);
+
+/** One-time welcome message delivered to new accounts in the dashboard inbox. */
+export const welcomeInboxMessages = pgTable(
+  'welcome_inbox_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    title: varchar({ length: 200 }).notNull(),
+    description: text().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('welcome_inbox_recipient_uidx').on(t.recipientUserId),
+    index('welcome_inbox_recipient_idx').on(t.recipientUserId),
   ],
 );
 

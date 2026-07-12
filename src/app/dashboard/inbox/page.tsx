@@ -29,7 +29,9 @@ import { contactUsNotificationsToInboxItems } from "@/lib/contact-us-inbox";
 import { isAffiliateInviteExpired } from "@/lib/affiliate-invite-expiry";
 import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { billingNoticeRowsToInboxItems } from "@/lib/billing-inbox-notices";
+import { welcomeInboxRowsToInboxItems } from "@/lib/welcome-inbox";
 import { listBillingNoticeInboxMessagesForUser } from "@/db/queries/billing-notice-inbox";
+import { listWelcomeInboxMessagesForUser } from "@/db/queries/welcome-inbox";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
@@ -77,6 +79,7 @@ export default async function DashboardInboxPage() {
     contactUsNotificationRows,
     readSet,
     billingNoticeRows,
+    welcomeInboxRows,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
     tryTeamQuery(() => listTeamInvitationsForInviteeEmail(inboxEmail), []),
@@ -93,6 +96,7 @@ export default async function DashboardInboxPage() {
       : listContactUsNotificationsForRecipient(userId, 50).catch(() => []),
     getInboxReadsForUser(userId),
     listBillingNoticeInboxMessagesForUser(userId),
+    listWelcomeInboxMessagesForUser(userId),
   ]);
 
   // ── Resolve team context for quiz results ─────────────────────────────────
@@ -459,6 +463,7 @@ export default async function DashboardInboxPage() {
 
   items.push(...buildAffiliateNoticeInboxItems(affiliateRows, readSet));
   items.push(...billingNoticeRowsToInboxItems(billingNoticeRows, readSet));
+  items.push(...welcomeInboxRowsToInboxItems(welcomeInboxRows, readSet));
 
   for (const row of adminPlanInviteRows) {
     if (row.status === "accepted") continue;
@@ -535,7 +540,7 @@ export default async function DashboardInboxPage() {
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
             Quiz results, team invitations, subscription confirmations, billing, affiliate invites and notices, affiliate admin
-            broadcasts, administrator plan requests, completed plan changes, and support replies.
+            broadcasts, administrator plan requests, completed plan changes, support replies, and your welcome message.
           </p>
         </div>
         <Link

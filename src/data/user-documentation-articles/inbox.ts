@@ -37,6 +37,7 @@ export const INBOX_ARTICLES: DocArticle[] = [
             ["Affiliate broadcast", "Read promo announcements from admin"],
             ["Contact Us reply", "Open live chat thread"],
             ["Plan assignment invite", "Accept admin-granted plan change"],
+            ["Welcome message", "Read your one-time getting-started guide"],
           ],
         },
       },

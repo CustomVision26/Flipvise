@@ -47,6 +47,7 @@ export const INVITES_ONBOARDING_ARTICLES: DocArticle[] = [
           "Page shows team name and assigned role before you accept.",
           "Sign in with the invited email address.",
           "Accept joins the workspace and redirects to dashboard in team context.",
+          "If you already have a Flipvise account, the invite appears in dashboard inbox; email is sent only when you are not registered yet.",
         ],
       },
       {

@@ -19,6 +19,11 @@ import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptio
 import { listUserPlanTrialsForAdmin } from "@/db/queries/user-plan-trials";
 import { buildAdminBillingMonitorRows } from "@/lib/admin/billing-monitor-snapshot";
 import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
+import { listAccountDeletionProrationLedgerForAdmin } from "@/db/queries/account-deletion-proration";
+import {
+  serializeDeletionProrationRows,
+  type SerializedDeletionProrationRow,
+} from "@/lib/admin/deletion-proration-admin-dto";
 import { getAllSupportTickets, getSupportTicketStats } from "@/db/queries/support";
 import {
   getContactUsStats,
@@ -177,6 +182,7 @@ export type AdminTabsData = {
   plansConfig: PlanConfig[];
   affiliates: SerializedAffiliate[];
   billingMonitorRows: AdminBillingMonitorRow[];
+  deletionProrationRows: SerializedDeletionProrationRow[];
 };
 
 const EMPTY_CONTACT_SETTINGS: SerializedContactSettings = {
@@ -218,6 +224,7 @@ export async function loadAdminTabsData(
     plansConfig: [],
     affiliates: [],
     billingMonitorRows: [],
+    deletionProrationRows: [],
   };
 
   switch (section) {
@@ -396,7 +403,7 @@ export async function loadAdminTabsData(
 
       if (section === "subscription") {
         const userIds = clerkUsers.map((u) => u.id);
-        const [deckStatsByUser, teamOwnerPlanByUserId, teamOwnerPlanSlugsByUserId, teamPlanByUserId] =
+        const [deckStatsByUser, teamOwnerPlanByUserId, teamOwnerPlanSlugsByUserId, teamPlanByUserId, deletionProrationLedger] =
           await runDbTasksWithConcurrencyLimit(
             [
               () => getDeckStatsByUser(),
@@ -412,6 +419,7 @@ export async function loadAdminTabsData(
                     return { userId: u.id, email: primary };
                   }),
                 ),
+              () => listAccountDeletionProrationLedgerForAdmin(),
             ] as const,
             ADMIN_DASHBOARD_DB_CONCURRENCY,
           );
@@ -440,8 +448,11 @@ export async function loadAdminTabsData(
           trialRows,
           usersById,
         });
+        const deletionProrationRows = serializeDeletionProrationRows(
+          deletionProrationLedger ?? [],
+        );
 
-        return { ...empty, users, subscriptions, invoices, billingMonitorRows };
+        return { ...empty, users, subscriptions, invoices, billingMonitorRows, deletionProrationRows };
       }
 
       return { ...empty, subscriptions, invoices };

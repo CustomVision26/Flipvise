@@ -219,6 +219,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Invites expire in 3 days — expired invites must be resent.",
           "Cannot invite subscriber’s own primary email.",
           "Blocked when members + pending invites reach plan capacity.",
+          "New users without a Flipvise account may receive a Loops invitation email; registered users see the invite in dashboard inbox only.",
         ],
       },
       {

@@ -58,7 +58,10 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         ],
         bullets: [
           "Returning users: if you already used “Make available offline”, the app can often sign you in automatically when you open the online dashboard.",
-          "First-time or manual sign-in: enter your email and request a sign-in code (this is the default in the app).",
+          "New accounts receive a formal Welcome to Flipvise inbox message thanking you for joining and outlining key opportunities (decks, mobile offline study, documentation, and plans).",
+          "After every fresh sign-in on web, PWA, or the native app, a short welcome toast appears — with signup-specific copy for brand-new accounts.",
+          "New users: tap “New to Flipvise? Create an account” to register with an email verification code — the same lightweight screen, no Clerk modal.",
+          "If sign-in reports that no account exists for your email, use “Create an account with this email” to switch straight to registration.",
           "Password sign-in works only if you created a password on the website (Clerk profile → Security). Many accounts use Google or email code only — password will fail with a strategy error; switch to “Email me a code”.",
           "If your account is Google-only and email code is unavailable, sign in once in Safari or Chrome on your phone, then open the online dashboard again inside the app.",
           "You need a connection for any sign-in attempt — use “Back to offline study” at the bottom to return to downloaded decks without signing in.",
@@ -126,6 +129,7 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         bullets: [
           "When you allow notifications, Flipvise can show OS alerts for inbox items (team invites, billing notices, support replies, and similar) while the app is in the background.",
           "While the app is open, new inbox items also appear as in-app popups — tap them to open your inbox.",
+          "Saved quiz results sent to your inbox (your own scores, or a team member’s result if you own the workspace) trigger the same alerts.",
           "If the live website is updated on the server, the app may prompt you to refresh so you get the latest features without reinstalling.",
           "When a new version is published to the App Store or Google Play, the app can prompt you to update from the store.",
           "Notifications require permission in your device settings. If you deny permission, inbox badges still update when you open the online dashboard.",

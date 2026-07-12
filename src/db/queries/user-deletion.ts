@@ -22,6 +22,7 @@ import {
   stripeSubscriptions,
   userPlanTrials,
   billingNoticeInboxMessages,
+  welcomeInboxMessages,
   supportTickets,
   teamDeckAssignments,
   teamMembers,
@@ -30,7 +31,8 @@ import {
   teams,
 } from "@/db/schema";
 import { deleteFromS3 } from "@/lib/s3";
-import { cancelSubscriptionWithProratedRefund } from "@/lib/stripe-account-deletion";
+import { recordDeletionProrationAndCancel } from "@/lib/account-deletion-proration-ledger";
+import type { DeletedUserSnapshot } from "@/lib/account-deletion-proration-ledger";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { eq, inArray, or } from "drizzle-orm";
 
@@ -128,6 +130,8 @@ async function deleteUserMedia(urls: string[]) {
 export type PurgeAllUserDataOptions = {
   /** Set when Stripe was already canceled/refunded (e.g. delete-account action). */
   skipStripeCancellation?: boolean;
+  /** Snapshot for proration ledger when user is already removed from Clerk. */
+  deletedUserSnapshot?: DeletedUserSnapshot;
 };
 
 /**
@@ -143,7 +147,14 @@ export async function purgeAllUserData(
     const activeSub = await getActiveStripeSubscription(userId);
     if (activeSub) {
       try {
-        await cancelSubscriptionWithProratedRefund(activeSub.stripeSubscriptionId);
+        await recordDeletionProrationAndCancel({
+          clerkUserId: userId,
+          stripeCustomerId: activeSub.stripeCustomerId,
+          stripeSubscriptionId: activeSub.stripeSubscriptionId,
+          planSlug: activeSub.planSlug,
+          subscriptionPeriodEnd: activeSub.currentPeriodEnd,
+          userSnapshot: options?.deletedUserSnapshot,
+        });
       } catch (error) {
         console.error("[purgeAllUserData] Stripe cancel/refund failed:", error);
       }
@@ -185,6 +196,9 @@ export async function purgeAllUserData(
   await db
     .delete(billingNoticeInboxMessages)
     .where(eq(billingNoticeInboxMessages.recipientUserId, userId));
+  await db
+    .delete(welcomeInboxMessages)
+    .where(eq(welcomeInboxMessages.recipientUserId, userId));
   await db.delete(quizResults).where(eq(quizResults.userId, userId));
   await db.delete(quizSecuritySessions).where(eq(quizSecuritySessions.userId, userId));
   await db

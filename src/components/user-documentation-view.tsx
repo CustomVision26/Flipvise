@@ -369,7 +369,12 @@ function PlanLimitsCard() {
     { name: "Free", decks: "2 decks", cards: "5 cards / deck" },
     { name: "Pro", decks: "10 decks", cards: "30 cards / deck" },
     {
-      name: "Pro Plus / team",
+      name: "Pro Plus / team-tier",
+      decks: "15 decks",
+      cards: "52 cards / deck",
+    },
+    {
+      name: "Education Plus",
       decks: "15 decks",
       cards: "52 cards / deck",
     },
@@ -386,9 +391,9 @@ function PlanLimitsCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-border/60">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-border/60">
           {tiers.map((tier) => (
-            <div key={tier.name} className="space-y-1 px-0 sm:px-4 sm:first:pl-0 sm:last:pr-0">
+            <div key={tier.name} className="space-y-1 px-0 lg:px-4 lg:first:pl-0 lg:last:pr-0">
               <p className="text-sm font-medium text-foreground">{tier.name}</p>
               <p className="text-sm text-muted-foreground">{tier.decks}</p>
               <p className="text-xs text-muted-foreground">{tier.cards}</p>

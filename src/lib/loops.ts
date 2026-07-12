@@ -254,6 +254,10 @@ export async function loopsSendQuizResultEmail(
  * Data variables sent to Loops for `LOOPS_TEAM_INVITATION_TRANSACTIONAL_ID`.
  * Use the same keys in your transactional template (case-sensitive).
  *
+ * **When it sends:** `inviteTeamMemberAction` calls this only when the invitee email has
+ * **no** matching Clerk account at invite time. Registered users receive the invitation in
+ * **dashboard inbox** (and optional native push) — no Loops email.
+ *
  * | Variable | Purpose |
  * |----------|---------|
  * | `subjectLine` | Full subject line (set Subject in Loops to `{DATA_VARIABLE:subjectLine}`). |
@@ -689,5 +693,77 @@ export async function loopsSendTransactional(
     } else {
       console.error(`[Loops] sendTransactionalEmail(${transactionalId}) failed:`, reportErr);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Account deletion proration receipt (transactional)
+// ---------------------------------------------------------------------------
+
+/**
+ * Data variables for `LOOPS_DELETION_PRORATION_RECEIPT_TRANSACTIONAL_ID`.
+ * Keys are case-sensitive in Loops — use `{DATA_VARIABLE:key}` in the template.
+ *
+ * | Variable | Example | Purpose |
+ * |----------|---------|---------|
+ * | `subjectLine` | Your Flipvise refund receipt | Email subject (`{DATA_VARIABLE:subjectLine}`). |
+ * | `statusHeadline` | Prorated refund confirmation | Short heading in the body. |
+ * | `bodyMessage` | Full explanatory paragraph | Pre-written summary; edit in Loops if desired. |
+ * | `userDisplayName` | Jane Doe | Greeting name (or "Flipvise customer"). |
+ * | `userEmail` | jane@example.com | Account email the refund applies to. |
+ * | `planLabel` | Pro Plus | Plan they had when they deleted. |
+ * | `refundAmount` | $12.34 USD | Formatted refund total (Intl currency). |
+ * | `deletedAt` | April 10, 2026 | Date account was deleted (long locale format). |
+ * | `stripeRefundId` | re_abc123 or Pending | Stripe refund reference for support. |
+ * | `homeUrl` | https://flipvise… | App origin (`NEXT_PUBLIC_APP_URL`). |
+ * | `contactUrl` | https://flipvise…/contact | Contact/support page. |
+ */
+export type DeletionProrationReceiptPayload = {
+  recipientEmail: string;
+  userDisplayName: string;
+  planLabel: string;
+  refundAmount: string;
+  deletedAt: string;
+  stripeRefundId: string | null;
+};
+
+export async function sendDeletionProrationReceiptEmail(
+  payload: DeletionProrationReceiptPayload,
+): Promise<{ sent: boolean; reason?: string }> {
+  const transactionalId =
+    process.env.LOOPS_DELETION_PRORATION_RECEIPT_TRANSACTIONAL_ID?.trim();
+  if (!transactionalId) {
+    return {
+      sent: false,
+      reason:
+        "LOOPS_DELETION_PRORATION_RECEIPT_TRANSACTIONAL_ID is not set — configure a Loops transactional template or rely on Stripe refund emails.",
+    };
+  }
+
+  const appUrl = resolveAppUrl();
+  const refundRef = payload.stripeRefundId?.trim() || "Pending";
+  const subjectLine = `Your Flipvise refund receipt — ${payload.refundAmount}`;
+  const statusHeadline = "Prorated refund confirmation";
+  const bodyMessage = `You deleted your Flipvise account on ${payload.deletedAt} while your ${payload.planLabel} subscription still had unused paid time. We issued a prorated refund of ${payload.refundAmount} to your original payment method. Banks typically post refunds within 5–10 business days. Reference: ${refundRef}.`;
+
+  try {
+    await loopsSendTransactional(payload.recipientEmail, transactionalId, {
+      subjectLine,
+      statusHeadline,
+      bodyMessage,
+      userDisplayName: payload.userDisplayName,
+      userEmail: payload.recipientEmail,
+      planLabel: payload.planLabel,
+      refundAmount: payload.refundAmount,
+      deletedAt: payload.deletedAt,
+      stripeRefundId: refundRef,
+      homeUrl: appUrl,
+      contactUrl: `${appUrl}/contact`,
+    });
+    return { sent: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "Loops send failed.";
+    console.error("[DeletionProrationReceipt] send failed:", err);
+    return { sent: false, reason };
   }
 }

@@ -3,6 +3,7 @@ import {
   quizResults,
   quizResultInboxMessages,
   teams,
+  inboxReads,
   type PerCardSnapshot,
 } from "@/db/schema";
 import {
@@ -10,6 +11,7 @@ import {
   type QuizResultInboxTarget,
 } from "@/lib/quiz-result-inbox-targets";
 import { listTeamMembers } from "@/db/queries/teams";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -102,6 +104,21 @@ export async function saveQuizResult(input: SaveQuizResultInput): Promise<SaveQu
         quizResultId: saved.id,
       })),
     );
+
+    const pushBodyFor = (recipientUserId: string): string => {
+      if (recipientUserId !== input.userId) {
+        return `New quiz result for ${input.deckName}: ${input.percent}%`;
+      }
+      return `Quiz saved — ${input.deckName}: ${input.percent}%`;
+    };
+
+    for (const recipientUserId of inboxRecipients) {
+      notifyNativeInboxPush({
+        recipientUserId,
+        category: "quiz_result",
+        body: pushBodyFor(recipientUserId),
+      });
+    }
   }
 
   return { result: saved, ownerUserId, teamName, teamAdminUserIds };
@@ -244,6 +261,38 @@ async function backfillMissingQuizResultInboxMessages(
       quizResultId,
     })),
   );
+}
+
+/** Inbox messages addressed to a recipient, joined with the full result row. */
+export async function countUnreadQuizResultInboxForUser(
+  recipientUserId: string,
+): Promise<number> {
+  const rows = await db
+    .select({
+      id: quizResultInboxMessages.id,
+      read: quizResultInboxMessages.read,
+    })
+    .from(quizResultInboxMessages)
+    .where(eq(quizResultInboxMessages.recipientUserId, recipientUserId));
+
+  if (rows.length === 0) return 0;
+
+  const readRows = await db
+    .select({ itemId: inboxReads.itemId })
+    .from(inboxReads)
+    .where(
+      and(
+        eq(inboxReads.userId, recipientUserId),
+        eq(inboxReads.itemType, "quiz_result"),
+        inArray(
+          inboxReads.itemId,
+          rows.map((r) => String(r.id)),
+        ),
+      ),
+    );
+
+  const readIds = new Set(readRows.map((r) => r.itemId));
+  return rows.filter((r) => !r.read && !readIds.has(String(r.id))).length;
 }
 
 /** Inbox messages addressed to a recipient, joined with the full result row. */

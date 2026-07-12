@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/early-client-bootstrap";
 import * as React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
@@ -7,7 +8,7 @@ import { useTheme } from "next-themes";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveLogoImageUrl } from "@/lib/branding";
-import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
+import { LoginWelcomeToast } from "@/components/login-welcome-toast";
 import { ClerkChunkLoadRecovery } from "@/components/clerk-chunk-load-recovery";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
 import { ClerkSessionRouterSync } from "@/components/clerk-session-router-sync";
@@ -44,6 +45,7 @@ function ClerkWithTheme({ children }: { children: React.ReactNode }) {
     <ClerkProvider appearance={clerkAppearance} telemetry={false}>
       <ClerkChunkLoadRecovery />
       <ClerkAuthHandoffMarker />
+      <LoginWelcomeToast />
       <ClerkPostSignInHardNavigation />
       <ClerkSessionRouterSync />
       {children}

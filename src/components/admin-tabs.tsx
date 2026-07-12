@@ -54,8 +54,11 @@ import {
   BookOpen,
   Timer,
   Activity,
+  UserRoundX,
 } from "lucide-react";
 import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
+import type { SerializedDeletionProrationRow } from "@/lib/admin/deletion-proration-admin-dto";
+import { countDeletionProrationOwedFromSerialized } from "@/lib/admin/deletion-proration-admin-dto";
 import {
   AdminSupportPanel,
   type SerializedTicket,
@@ -63,7 +66,10 @@ import {
 } from "@/components/admin-support-panel";
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
 import { AdminPlanTrialSettings } from "@/components/admin-plan-trial-settings";
-import { AdminSubscriptionMonitor } from "@/components/admin-subscription-monitor";
+import {
+  AdminBillingMonitor,
+  AdminDeletionProrationMonitor,
+} from "@/components/admin-subscription-monitor";
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
 import { PlatformDocumentationManager } from "@/components/platform-documentation-manager";
@@ -153,6 +159,7 @@ export interface AdminTabsProps {
   /** Server default (env) — used as the initial value for “accept link” days in the invite form. */
   affiliateInviteDefaultExpiresInDays: number;
   billingMonitorRows: AdminBillingMonitorRow[];
+  deletionProrationRows?: SerializedDeletionProrationRow[];
 }
 
 function formatDate(dateStr: string | null | undefined) {
@@ -262,6 +269,7 @@ export function AdminTabs({
   affiliates,
   affiliateInviteDefaultExpiresInDays,
   billingMonitorRows,
+  deletionProrationRows = [],
 }: AdminTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -299,7 +307,8 @@ export function AdminTabs({
     pathname === "/admin/team-workspaces"
       ? "workspace-admin"
       : pathname === "/admin/subscription" ||
-          pathname === "/admin/subscription-monitor"
+          pathname === "/admin/subscription-monitor" ||
+          pathname === "/admin/subscription-deletion-proration"
         ? "subscription"
         : pathname === "/admin/invoices"
           ? "invoices"
@@ -329,7 +338,16 @@ export function AdminTabs({
           : "pricing-plans";
 
   const subscriptionSubTab =
-    pathname === "/admin/subscription-monitor" ? "billing-monitor" : "subscriptions";
+    pathname === "/admin/subscription-monitor"
+      ? "billing-monitor"
+      : pathname === "/admin/subscription-deletion-proration"
+        ? "deletion-proration"
+        : "subscriptions";
+
+  const deletionProrationOwedCount = useMemo(
+    () => countDeletionProrationOwedFromSerialized(deletionProrationRows),
+    [deletionProrationRows],
+  );
 
   const supportSubTab =
     pathname === "/admin/support-center/contact-us" ? "contact-us" : "tickets";
@@ -1234,7 +1252,9 @@ export function AdminTabs({
                 router.push(
                   v === "billing-monitor"
                     ? "/admin/subscription-monitor"
-                    : "/admin/subscription",
+                    : v === "deletion-proration"
+                      ? "/admin/subscription-deletion-proration"
+                      : "/admin/subscription",
                 )
               }
               className="w-full gap-4"
@@ -1250,6 +1270,15 @@ export function AdminTabs({
                   {billingMonitorRows.length > 0 ? (
                     <Badge className="text-[0.6875rem] tabular-nums" variant="secondary">
                       {billingMonitorRows.length}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="deletion-proration" className="gap-1.5">
+                  <UserRoundX className="h-4 w-4 shrink-0" />
+                  Account deletion proration
+                  {deletionProrationOwedCount > 0 ? (
+                    <Badge className="text-[0.6875rem] tabular-nums" variant="destructive">
+                      {deletionProrationOwedCount}
                     </Badge>
                   ) : null}
                 </TabsTrigger>
@@ -1408,7 +1437,14 @@ export function AdminTabs({
                 value="billing-monitor"
                 className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
               >
-                <AdminSubscriptionMonitor rows={billingMonitorRows} />
+                <AdminBillingMonitor rows={billingMonitorRows} />
+              </TabsContent>
+
+              <TabsContent
+                value="deletion-proration"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
+                <AdminDeletionProrationMonitor rows={deletionProrationRows} />
               </TabsContent>
             </Tabs>
           </CardContent>

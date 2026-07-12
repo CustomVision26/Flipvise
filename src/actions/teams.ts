@@ -305,6 +305,19 @@ async function clerkUserHasNormalizedEmail(
   }
 }
 
+/** Look up a Clerk user ID by email address (best-effort, returns null if not found). */
+async function findClerkUserIdByEmail(normalizedEmail: string): Promise<string | null> {
+  try {
+    const result = await clerkClient.users.getUserList({
+      emailAddress: [normalizedEmail],
+      limit: 1,
+    });
+    return result.data[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
@@ -373,33 +386,27 @@ export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
   const inviteeLabel =
     trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : "";
 
-  await loopsSendTeamInvitationEmail({
-    inviteeEmail: normalizedEmail,
-    inviteeDisplayName: inviteeLabel,
-    workspaceName: team.name,
-    roleLabel,
-    inviterName,
-    acceptInvitationUrl: inviteUrl,
-    dashboardInboxUrl,
-    expiresInDays: TEAM_INVITE_EXPIRY_DAYS,
-    subjectLine: `You're invited to ${team.name}`,
-  });
+  /** Registered Clerk user → dashboard inbox (+ push); no Loops transactional email. */
+  const registeredClerkInvitee = await findClerkUserIdByEmail(normalizedEmail);
 
-  try {
-    const inviteeLookup = await clerkClient.users.getUserList({
-      emailAddress: [normalizedEmail],
-      limit: 1,
+  if (!registeredClerkInvitee) {
+    await loopsSendTeamInvitationEmail({
+      inviteeEmail: normalizedEmail,
+      inviteeDisplayName: inviteeLabel,
+      workspaceName: team.name,
+      roleLabel,
+      inviterName,
+      acceptInvitationUrl: inviteUrl,
+      dashboardInboxUrl,
+      expiresInDays: TEAM_INVITE_EXPIRY_DAYS,
+      subjectLine: `You're invited to ${team.name}`,
     });
-    const inviteeUserId = inviteeLookup.data[0]?.id;
-    if (inviteeUserId) {
-      notifyNativeInboxPush({
-        recipientUserId: inviteeUserId,
-        category: "team_invite",
-        body: `You're invited to ${team.name}`,
-      });
-    }
-  } catch {
-    // Non-fatal — email invite still sent.
+  } else {
+    notifyNativeInboxPush({
+      recipientUserId: registeredClerkInvitee,
+      category: "team_invite",
+      body: `You're invited to ${team.name}`,
+    });
   }
 
   revalidatePath("/dashboard/team-admin", "layout");

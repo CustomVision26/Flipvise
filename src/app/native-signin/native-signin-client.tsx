@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
+import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { ensureWelcomeInboxMessageAction } from "@/actions/inbox";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
+import { markClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
 import { waitForServerSession } from "@/lib/native-session-probe";
 import {
   isFlipviseNativeApp,
@@ -67,6 +69,16 @@ function isUnsupportedPasswordStrategy(err: unknown): boolean {
     msg.includes("verification strategy") ||
     code === "strategy_for_user_invalid" ||
     code === "form_password_not_supported"
+  );
+}
+
+function isAccountNotFoundError(err: unknown): boolean {
+  const code = clerkErrorCode(err)?.toLowerCase() ?? "";
+  const msg = describeClerkError(err).toLowerCase();
+  return (
+    code === "form_identifier_not_found" ||
+    msg.includes("couldn't find your account") ||
+    msg.includes("could not find your account")
   );
 }
 
@@ -162,6 +174,8 @@ export function NativeSignInClient({
       // Non-fatal
     }
 
+    markClerkAuthHandoff();
+
     window.location.replace(postAuthTarget);
   }, [postAuthTarget, signOut]);
 
@@ -245,13 +259,13 @@ export function NativeSignInClient({
       <main
         className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
       >
-        <SignInForm
+        <NativeAuthForm
           redirectTo={postAuthTarget}
           notice={
             ticketError ??
             "Please sign in to open the online dashboard."
           }
-          onFinishSignIn={finishSignIn}
+          onFinishAuth={finishSignIn}
           isNativeContext={isNativeContext}
         />
       </main>
@@ -325,10 +339,10 @@ export function NativeSignInClient({
     <main
       className={`flex min-h-dvh items-center justify-center bg-background p-6${isNativeContext ? " pb-36" : ""}`}
     >
-      <SignInForm
+      <NativeAuthForm
         redirectTo={postAuthTarget}
         notice={ticketError}
-        onFinishSignIn={finishSignIn}
+        onFinishAuth={finishSignIn}
         isNativeContext={isNativeContext}
       />
     </main>
@@ -456,26 +470,88 @@ function SignInRecovery({
 }
 
 type Step = "identify" | "code";
+type AuthMode = "sign-in" | "sign-up";
 
-function SignInForm({
+function NativeAuthForm({
   redirectTo,
   notice,
-  onFinishSignIn,
+  onFinishAuth,
   isNativeContext,
 }: {
   redirectTo: string;
   notice: string | null;
+  onFinishAuth: () => Promise<void>;
+  isNativeContext: boolean;
+}) {
+  const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
+  const [prefillEmail, setPrefillEmail] = useState("");
+
+  const switchToSignUp = useCallback((email?: string) => {
+    void signIn?.reset?.();
+    if (email) setPrefillEmail(email);
+    setAuthMode("sign-up");
+  }, [signIn]);
+
+  const switchToSignIn = useCallback((email?: string) => {
+    void signUp?.reset?.();
+    if (email) setPrefillEmail(email);
+    setAuthMode("sign-in");
+  }, [signUp]);
+
+  if (authMode === "sign-up") {
+    return (
+      <SignUpForm
+        notice={notice}
+        initialEmail={prefillEmail}
+        onFinishSignUp={onFinishAuth}
+        onSwitchToSignIn={switchToSignIn}
+        isNativeContext={isNativeContext}
+      />
+    );
+  }
+
+  return (
+    <SignInForm
+      redirectTo={redirectTo}
+      notice={notice}
+      initialEmail={prefillEmail}
+      onFinishSignIn={onFinishAuth}
+      onSwitchToSignUp={switchToSignUp}
+      isNativeContext={isNativeContext}
+    />
+  );
+}
+
+function SignInForm({
+  redirectTo,
+  notice,
+  initialEmail = "",
+  onFinishSignIn,
+  onSwitchToSignUp,
+  isNativeContext,
+}: {
+  redirectTo: string;
+  notice: string | null;
+  initialEmail?: string;
   onFinishSignIn: () => Promise<void>;
+  onSwitchToSignUp: (email?: string) => void;
   isNativeContext: boolean;
 }) {
   const { signIn } = useSignIn();
   const [mode, setMode] = useState<"password" | "code">("code");
   const [step, setStep] = useState<Step>("identify");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
+  const [accountNotFound, setAccountNotFound] = useState(false);
+
+  useEffect(() => {
+    if (initialEmail) setEmail(initialEmail);
+  }, [initialEmail]);
 
   useEffect(() => {
     if (isNativeContext) {
@@ -490,6 +566,7 @@ function SignInForm({
   const fail = (label: string, raw: unknown) => {
     const detail = describeClerkError(raw);
     console.error(`[native-signin] ${label}:`, raw);
+    setAccountNotFound(isAccountNotFoundError(raw));
     setError(detail ? `${label}: ${detail}` : label);
   };
 
@@ -540,6 +617,7 @@ function SignInForm({
     if (!email || !password || busy || !signIn) return;
     setBusy(true);
     setError(null);
+    setAccountNotFound(false);
     try {
       const { error: createErr } = await signIn.create({
         identifier: email.trim(),
@@ -582,6 +660,7 @@ function SignInForm({
     if (!email || busy || !signIn) return;
     setBusy(true);
     setError(null);
+    setAccountNotFound(false);
     try {
       const ok = await beginEmailCodeFlow();
       if (!ok) return;
@@ -627,10 +706,23 @@ function SignInForm({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {error ? (
-          <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
-            <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-            <span>{error}</span>
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>{error}</span>
+            </p>
+            {accountNotFound ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className={NATIVE_BTN_CLASS}
+                disabled={busy}
+                onClick={() => onSwitchToSignUp(email.trim())}
+              >
+                Create an account with this email
+              </Button>
+            ) : null}
+          </div>
         ) : null}
 
         {mode === "password" ? (
@@ -670,9 +762,19 @@ function SignInForm({
                 setMode("code");
                 setStep("identify");
                 setError(null);
+                setAccountNotFound(false);
               }}
             >
               Email me a code instead
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => onSwitchToSignUp(email.trim())}
+            >
+              New to Flipvise? Create an account
             </Button>
           </form>
         ) : step === "identify" ? (
@@ -700,9 +802,19 @@ function SignInForm({
               onClick={() => {
                 setMode("password");
                 setError(null);
+                setAccountNotFound(false);
               }}
             >
               Use a password instead
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => onSwitchToSignUp(email.trim())}
+            >
+              New to Flipvise? Create an account
             </Button>
           </form>
         ) : (
@@ -720,6 +832,187 @@ function SignInForm({
             </div>
             <Button type="submit" disabled={busy} className="mt-1">
               {busy ? "Verifying…" : "Verify & sign in"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setStep("identify");
+                setCode("");
+                setError(null);
+              }}
+            >
+              Use a different email
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SignUpForm({
+  notice,
+  initialEmail = "",
+  onFinishSignUp,
+  onSwitchToSignIn,
+  isNativeContext,
+}: {
+  notice: string | null;
+  initialEmail?: string;
+  onFinishSignUp: () => Promise<void>;
+  onSwitchToSignIn: (email?: string) => void;
+  isNativeContext: boolean;
+}) {
+  const { signUp } = useSignUp();
+  const [step, setStep] = useState<Step>("identify");
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(notice);
+
+  useEffect(() => {
+    if (initialEmail) setEmail(initialEmail);
+  }, [initialEmail]);
+
+  useEffect(() => {
+    setError(notice);
+  }, [notice]);
+
+  const fail = (label: string, raw: unknown) => {
+    const detail = describeClerkError(raw);
+    console.error(`[native-signup] ${label}:`, raw);
+    setError(detail ? `${label}: ${detail}` : label);
+  };
+
+  async function complete(): Promise<boolean> {
+    if (!signUp) return false;
+    const { error: finalizeErr } = await signUp.finalize();
+    if (finalizeErr) {
+      fail("Couldn't finish sign-up", finalizeErr);
+      return false;
+    }
+    void ensureWelcomeInboxMessageAction().catch(() => {});
+    await onFinishSignUp();
+    return true;
+  }
+
+  async function onSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || busy || !signUp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: createErr } = await signUp.create({
+        emailAddress: email.trim(),
+      });
+      if (createErr) {
+        fail("Couldn't start sign-up", createErr);
+        return;
+      }
+      const { error: sendErr } = await signUp.verifications.sendEmailCode();
+      if (sendErr) {
+        fail("Couldn't send code", sendErr);
+        return;
+      }
+      setStep("code");
+    } catch (err) {
+      fail("Couldn't send code", err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code || busy || !signUp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: verifyErr } = await signUp.verifications.verifyEmailCode({
+        code: code.trim(),
+      });
+      if (verifyErr) {
+        fail("Code verification failed", verifyErr);
+        return;
+      }
+      if (signUp.status !== "complete") {
+        fail("Sign-up incomplete", { message: "Please try again." });
+        return;
+      }
+      await complete();
+    } catch (err) {
+      fail("Verification error", err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-sm">
+      <CardHeader className="text-center">
+        <CardTitle>Create your Flipvise account</CardTitle>
+        <CardDescription>
+          {step === "code"
+            ? `Enter the code we emailed to ${email}.`
+            : isNativeContext
+              ? "Enter your email and we'll send a verification code to create your account."
+              : "Use your email to create an account and open the dashboard."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {error ? (
+          <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>{error}</span>
+          </p>
+        ) : null}
+
+        {step === "identify" ? (
+          <form onSubmit={onSendCode} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="signup-email">Email</Label>
+              <Input
+                id="signup-email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+                required
+              />
+            </div>
+            <div id="clerk-captcha" />
+            <Button type="submit" disabled={busy} className="mt-1">
+              {busy ? "Sending…" : "Email me a code"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => onSwitchToSignIn(email.trim())}
+            >
+              Already have an account? Sign in
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={onVerifyCode} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="signup-code">Verification code</Label>
+              <Input
+                id="signup-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(ev) => setCode(ev.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={busy} className="mt-1">
+              {busy ? "Verifying…" : "Verify & create account"}
             </Button>
             <Button
               type="button"

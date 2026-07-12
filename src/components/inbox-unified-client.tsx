@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Mail,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import {
   Dialog,
@@ -97,6 +98,7 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   quiz_security_notice: <ShieldAlert className="size-4 text-rose-400" aria-hidden />,
   support_ticket: <LifeBuoy className="size-4 text-sky-400" aria-hidden />,
   contact_us_message: <Mail className="size-4 text-orange-400" aria-hidden />,
+  welcome: <Sparkles className="size-4 text-primary" aria-hidden />,
 };
 
 type SortKey = "newest" | "oldest" | "type";
@@ -118,6 +120,7 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         quiz_security_notice: 10,
         support_ticket: 11,
         contact_us_message: 12,
+        welcome: 13,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -603,9 +606,24 @@ function InboxItemRow({
                 Contact Us
               </Badge>
             )}
+            {item.type === "welcome" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-primary/35 text-xs text-primary"
+              >
+                Getting started
+              </Badge>
+            )}
           </div>
 
-          <p className="text-xs text-muted-foreground">{item.description}</p>
+          <p
+            className={cn(
+              "text-xs text-muted-foreground",
+              item.type === "welcome" && "whitespace-pre-line",
+            )}
+          >
+            {item.description}
+          </p>
           <p className="text-xs text-muted-foreground/70" suppressHydrationWarning>
             {formatDate(item.dateIso)}
           </p>

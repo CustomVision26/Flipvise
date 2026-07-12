@@ -7,13 +7,23 @@
  *    stale or cross-user authenticated data.
  */
 
-const CACHE_VERSION = "flipvise-v1";
+const CACHE_VERSION = "flipvise-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll([OFFLINE_URL, "/logo.png"])),
+    caches.open(STATIC_CACHE).then((cache) =>
+      cache.addAll([
+        OFFLINE_URL,
+        "/logo.png",
+        "/favicon.ico",
+        "/favicon-32x32.png",
+        "/apple-touch-icon.png",
+        "/pwa-icon.png",
+        "/pwa-icon-192.png",
+      ]),
+    ),
   );
   self.skipWaiting();
 });

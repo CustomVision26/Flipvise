@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { PWA_ICON_URL, PWA_ICON_192_URL } from "@/lib/branding";
 
 /**
  * Web App Manifest — makes Flipvise installable as a PWA on Android (and iOS via
@@ -18,16 +19,22 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0a0a0b",
     icons: [
       {
-        src: "/logo.png",
+        src: PWA_ICON_URL,
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/logo.png",
+        src: PWA_ICON_URL,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
+      },
+      {
+        src: PWA_ICON_192_URL,
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
       },
     ],
   };

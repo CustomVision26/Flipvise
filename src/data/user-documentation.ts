@@ -67,7 +67,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Signed-in account.",
           "Free: up to 2 decks, 5 cards per deck.",
           "Pro: up to 10 decks, 30 cards per deck.",
-          "Pro Plus / Education Plus / team-tier personal: up to 15 decks, 52 cards per deck.",
+          "Pro Plus / team-tier personal: up to 15 decks, 52 cards per deck.",
+          "Education Plus: up to 15 decks, 52 cards per deck (same personal limits as Pro Plus, plus Teacher Dashboard tools).",
         ],
         doNots: [
           "Do not create decks beyond your plan limit — the Add Deck action is blocked at the cap.",
@@ -214,6 +215,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "While offline, the sign-in screen is replaced by a notice plus an “Offline study” button — because sign-in needs a connection, this takes you straight to your downloaded decks.",
           "Signing out inside the mobile app returns you to offline study (your downloaded decks) rather than the online sign-in page.",
           "Opening the online dashboard in the native app uses an in-app sign-in screen (not the website modal): email sign-in code is the default; password works only if you set one on the web.",
+          "New users can tap “New to Flipvise? Create an account” on the sign-in screen to register with an email verification code — no separate sign-up page.",
+          "If sign-in says the account was not found, tap “Create an account with this email” to switch to registration.",
           "If password sign-in fails, use “Email me a code” — accounts created with Google or email code on the website often have no password.",
           "Google-only accounts may need to sign in once in your mobile browser, then return to the app.",
           "The offline view matches the light/dark mode and interface color from your online dashboard (saved on the device), shows a faded Flipvise logo watermark, and pages through long deck and card lists.",
@@ -242,10 +245,12 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Inbox",
         route: "/dashboard/inbox",
         purpose:
-          "Unified notification center for invites, billing, quiz results, affiliate messages, and support tickets.",
+          "Unified notification center for invites, billing, quiz results, affiliate messages, support tickets, and your one-time welcome message.",
         howItWorks: [
           "Inbox tab shows unread and actionable items.",
           "History tab shows completed or read items.",
+          "New accounts receive a formal Welcome to Flipvise message with getting-started tips.",
+          "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
           "Accept team invites, review billing receipts, open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",
@@ -918,7 +923,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/team-admin/invite-members/send-invite",
         purpose: "Send, track, and revoke team invitations.",
         howItWorks: [
-          "Send Invite emails a 3-day expiring link.",
+          "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only.",
           "Pending Invitations lists revocable open invites.",
           "Invite History shows past invitations.",
         ],

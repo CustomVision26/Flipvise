@@ -68,6 +68,38 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
       },
       {
+        id: "subscription-monitor",
+        title: "Billing Monitor",
+        route: "/admin/subscription-monitor",
+        purpose: "Track billing alerts: trials, expirations, payment grace, and past-due users.",
+        howItWorks: [
+          "Billing monitor tab: trial ending, subscription expiring, payment grace, and past-due users.",
+          "Search, category filter, and CSV export for operational follow-up.",
+        ],
+        requirements: ["Platform admin access."],
+        doNots: [],
+      },
+      {
+        id: "subscription-deletion-proration",
+        title: "Account Deletion Proration",
+        route: "/admin/subscription-deletion-proration",
+        purpose: "Manage prorated refunds and receipts for paid users who deleted before period end.",
+        howItWorks: [
+          "Proration still owed tally: rows where auto-refund failed or was never issued.",
+          "Refund via Stripe when auto-refund failed; Send receipt for optional Flipvise-branded email (Loops).",
+          "Stripe auto-refund email: Dashboard → Settings → Customer emails → enable Refunds (test + live).",
+          "Backfill past deletions: npm run db:backfill-deletion-proration-ledger (--execute).",
+        ],
+        requirements: [
+          "Platform admin access.",
+          "Stripe Refunds customer email enabled for automatic refund notices.",
+        ],
+        doNots: [
+          "Do not assume Stripe emailed the user — verify Refunds is enabled in the correct test/live mode.",
+          "Do not refund twice — check Stripe refund status before using manual Refund via Stripe.",
+        ],
+      },
+      {
         id: "invoices",
         title: "Invoices",
         route: "/admin/invoices",

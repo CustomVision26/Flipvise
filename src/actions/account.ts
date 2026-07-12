@@ -5,10 +5,8 @@ import { createClerkClient } from "@clerk/backend";
 import { z } from "zod";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { purgeAllUserData } from "@/db/queries/user-deletion";
-import {
-  cancelSubscriptionWithProratedRefund,
-  estimateProratedRefundForSubscription,
-} from "@/lib/stripe-account-deletion";
+import { estimateProratedRefundForSubscription } from "@/lib/stripe-account-deletion";
+import { recordDeletionProrationAndCancel } from "@/lib/account-deletion-proration-ledger";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { loopsDeleteContact } from "@/lib/loops";
 
@@ -86,9 +84,21 @@ export async function deleteAccountAction(
 
   const activeSub = await getActiveStripeSubscription(userId);
   if (activeSub) {
-    const refund = await cancelSubscriptionWithProratedRefund(
-      activeSub.stripeSubscriptionId,
-    );
+    const displayName =
+      [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+      user?.username ||
+      null;
+    const refund = await recordDeletionProrationAndCancel({
+      clerkUserId: userId,
+      stripeCustomerId: activeSub.stripeCustomerId,
+      stripeSubscriptionId: activeSub.stripeSubscriptionId,
+      planSlug: activeSub.planSlug,
+      subscriptionPeriodEnd: activeSub.currentPeriodEnd,
+      userSnapshot: {
+        email,
+        displayName,
+      },
+    });
     refundCents = refund.refundCents;
     currency = refund.currency;
   }

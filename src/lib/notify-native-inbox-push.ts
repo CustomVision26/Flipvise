@@ -7,7 +7,9 @@ export type NativeInboxPushCategory =
   | "billing_notice"
   | "support"
   | "contact_us"
-  | "admin_plan_invite";
+  | "admin_plan_invite"
+  | "quiz_result"
+  | "welcome";
 
 const CATEGORY_TITLES: Record<NativeInboxPushCategory, string> = {
   team_invite: "Team invitation",
@@ -17,6 +19,8 @@ const CATEGORY_TITLES: Record<NativeInboxPushCategory, string> = {
   support: "Support update",
   contact_us: "Contact Us update",
   admin_plan_invite: "Plan assignment request",
+  quiz_result: "Quiz result",
+  welcome: "Welcome to Flipvise",
 };
 
 /** Fire-and-forget native push for a single inbox recipient. */

@@ -33,7 +33,8 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           rows: [
             ["Free", "2", "5"],
             ["Pro", "10", "30"],
-            ["Pro Plus / Education Plus / team-tier personal", "15", "52"],
+            ["Pro Plus / team-tier personal", "15", "52"],
+            ["Education Plus", "15", "52"],
           ],
         },
       },

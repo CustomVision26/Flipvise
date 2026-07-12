@@ -18,6 +18,7 @@ import {
   loopsSendEvent,
   loopsUpdateContact,
 } from "@/lib/loops";
+import { recordWelcomeInboxMessage } from "@/lib/record-welcome-inbox";
 
 export const dynamic = "force-dynamic";
 
@@ -206,6 +207,10 @@ export async function POST(req: NextRequest) {
           lastName: data.last_name,
           userGroup: "free",
         });
+        await recordWelcomeInboxMessage({
+          recipientUserId: userId,
+          firstName: data.first_name,
+        });
       })();
     }
 
@@ -220,8 +225,15 @@ export async function POST(req: NextRequest) {
     const userId = data?.id;
     const email = extractPrimaryEmail(data);
     if (userId) {
+      const displayName =
+        [data.first_name, data.last_name].filter(Boolean).join(" ") || null;
       try {
-        await purgeAllUserData(userId, { skipStripeCancellation: true });
+        await purgeAllUserData(userId, {
+          deletedUserSnapshot: {
+            email,
+            displayName,
+          },
+        });
       } catch (error) {
         console.error("[clerk webhook] purgeAllUserData failed:", error);
       }
