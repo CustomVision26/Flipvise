@@ -11,7 +11,7 @@ export function NativeSignInEscapeChrome() {
   return (
     <>
       <div
-        className="fixed left-0 top-0 z-[200] p-3 pt-[calc(0.75rem+var(--flipvise-safe-top,28px))]"
+        className="fixed left-0 top-0 z-[200] p-3 pt-[calc(0.75rem+var(--flipvise-safe-top,48px))]"
         aria-label="Sign-in recovery"
       >
         <Button

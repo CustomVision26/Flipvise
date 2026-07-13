@@ -60,6 +60,22 @@ export function NativeAppBootstrap() {
       }
     }
 
+    // Prevent live-site UI from drawing under the system status / signal bar.
+    void import("@capacitor/status-bar")
+      .then(async ({ StatusBar, Style }) => {
+        try {
+          await StatusBar.setOverlaysWebView({ overlay: false });
+          document.documentElement.dataset.flipviseStatusOverlay = "0";
+          const dark =
+            document.documentElement.classList.contains("dark") ||
+            !document.documentElement.classList.contains("light");
+          await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
+        } catch {
+          // Plugin may be unavailable on web or older native builds.
+        }
+      })
+      .catch(() => {});
+
     void import("@/lib/offline/session")
       .then(async (s) => {
         await s.setNativeAppFlag();

@@ -29,9 +29,10 @@
     );
   }
 
-  /* Capacitor WebViews often report safe-area-inset-top as 0 — enforce status-bar floors. */
+  /* Capacitor: StatusBar often reports env(safe-area-inset-*) as 0 while overlaying.
+   * Floor insets protect all pages on older/native shells; dropped when overlay is off. */
   html[data-flipvise-native-shell] {
-    --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+    --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 48px);
     --flipvise-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
   }
 
@@ -39,13 +40,28 @@
     --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
   }
 
+  html[data-flipvise-native-shell][data-platform="android"] {
+    --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 48px);
+  }
+
+  html[data-flipvise-native-shell][data-flipvise-status-overlay="0"] {
+    --flipvise-safe-top: env(safe-area-inset-top, 0px);
+    --flipvise-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Site-wide inset — covers every page even when header chrome is deferred/hidden. */
+  html[data-flipvise-native-shell] body {
+    padding-top: var(--flipvise-safe-top, 48px);
+    padding-bottom: var(--flipvise-safe-bottom, 16px);
+  }
+
   html[data-flipvise-native-shell] [data-app-header] {
-    padding-top: calc(0.75rem + var(--flipvise-safe-top, 28px));
+    padding-top: 0.75rem;
   }
 
   @media (orientation: portrait) {
     html[data-flipvise-native-shell][data-platform="ios"] [data-app-header] {
-      padding-top: calc(0.75rem + var(--flipvise-safe-top, 47px));
+      padding-top: 0.75rem;
     }
   }
 
@@ -1752,12 +1768,21 @@
  * status-bar clearance on [data-app-header] (safe-area env() is often 0 in WKWebView).
  */
 html[data-flipvise-native-shell] {
-  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 48px);
   --flipvise-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
 
 html[data-flipvise-native-shell][data-platform="ios"] {
   --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 47px);
+}
+
+html[data-flipvise-native-shell][data-platform="android"] {
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 48px);
+}
+
+html[data-flipvise-native-shell][data-flipvise-status-overlay="0"] {
+  --flipvise-safe-top: env(safe-area-inset-top, 0px);
+  --flipvise-safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Instant tap response in Capacitor WebViews — avoids 300ms click delay. */
@@ -1773,8 +1798,21 @@ html[data-flipvise-native-shell] #native-signin-escape a.native-touch-btn:active
   transform: scale(0.98);
 }
 
+/*
+ * Body inset clears the signal bar for every route. Header stays sticky so
+ * scrolling never tucks ← Dashboard / titles under the status icons.
+ */
+html[data-flipvise-native-shell] body {
+  padding-top: var(--flipvise-safe-top, 48px);
+  padding-bottom: var(--flipvise-safe-bottom, 16px);
+}
+
 html[data-flipvise-native-shell] [data-app-header] {
-  padding-top: calc(0.75rem + var(--flipvise-safe-top, 28px)) !important;
+  position: sticky;
+  top: var(--flipvise-safe-top, 48px);
+  z-index: 40;
+  padding-top: 0.75rem !important;
+  background-color: var(--background);
 }
 
 /*
@@ -1783,15 +1821,22 @@ html[data-flipvise-native-shell] [data-app-header] {
  */
 html[data-flipvise-native-shell] [data-sonner-toaster],
 html[data-native-shell] [data-sonner-toaster] {
-  --offset-top: calc(var(--flipvise-safe-top, 28px) + 12px) !important;
-  --mobile-offset-top: calc(var(--flipvise-safe-top, 28px) + 12px) !important;
+  --offset-top: calc(var(--flipvise-safe-top, 48px) + 12px) !important;
+  --mobile-offset-top: calc(var(--flipvise-safe-top, 48px) + 12px) !important;
   --offset-bottom: calc(var(--flipvise-safe-bottom, 16px) + 12px) !important;
   --mobile-offset-bottom: calc(var(--flipvise-safe-bottom, 16px) + 12px) !important;
 }
 
 html[data-flipvise-native-shell] [data-offline-banner],
 html[data-native-shell] [data-offline-banner] {
-  padding-top: var(--flipvise-safe-top, 28px);
+  top: 0;
+  padding-top: 0.5rem;
+}
+
+/* Fixed dialogs — leave room for status + home-indicator insets. */
+html[data-flipvise-native-shell] [data-slot="dialog-content"],
+html[data-flipvise-native-shell] [role="dialog"][data-state="open"] {
+  max-height: calc(100dvh - var(--flipvise-safe-top, 48px) - var(--flipvise-safe-bottom, 16px));
 }
 
 /* Native WebView — logo left; account/docs/help/inbox icons flush right (row 1). */

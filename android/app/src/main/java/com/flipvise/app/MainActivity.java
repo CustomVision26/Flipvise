@@ -12,6 +12,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 
+import androidx.core.view.WindowCompat;
+
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
@@ -32,6 +34,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Keep the WebView below the status / navigation bars so live-site UI
+        // (← Dashboard, headers, sticky panels) never draws under the signal bar.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         ensureDefaultNotificationChannel();
 
         WebView webView = getBridge().getWebView();

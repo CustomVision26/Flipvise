@@ -27,7 +27,7 @@
 
 /* Capacitor WebViews often report env(safe-area-inset-*) as 0 — set floors in index.html. */
 html[data-native-shell] {
-  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 28px);
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 48px);
   --flipvise-safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
 
@@ -36,7 +36,12 @@ html[data-native-shell][data-platform="ios"] {
 }
 
 html[data-native-shell][data-platform="android"] {
-  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 36px);
+  --flipvise-safe-top: max(env(safe-area-inset-top, 0px), 48px);
+}
+
+html[data-native-shell][data-flipvise-status-overlay="0"] {
+  --flipvise-safe-top: env(safe-area-inset-top, 0px);
+  --flipvise-safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Light mode carried from the live dashboard. Captured interface colors are

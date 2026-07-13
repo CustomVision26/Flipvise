@@ -9,7 +9,7 @@ import { useClientMounted } from "@/lib/use-client-mounted"
 
 /** Clears Capacitor status bar / notch on iOS and Android WebViews. */
 const NATIVE_TOAST_INSET: NonNullable<ToasterProps["offset"]> = {
-  top: "calc(var(--flipvise-safe-top, 28px) + 12px)",
+  top: "calc(var(--flipvise-safe-top, 48px) + 12px)",
   right: "16px",
   bottom: "calc(var(--flipvise-safe-bottom, 16px) + 12px)",
   left: "16px",

@@ -94,6 +94,12 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
     },
+    StatusBar: {
+      // Keep web content below the status bar on all pages (deck back links, headers, etc.).
+      overlaysWebView: false,
+      style: "DARK",
+      backgroundColor: "#0a0a0a",
+    },
   },
 };
 
