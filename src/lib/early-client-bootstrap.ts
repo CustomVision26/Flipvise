@@ -42,12 +42,10 @@ function runEarlyClientBootstrap(): void {
           registrations.map((registration) => registration.unregister()),
         );
         if ("caches" in window) {
+          // Wipe all Cache Storage — Turbopack HMR leaves stale module factories
+          // when only flipvise* caches are cleared.
           const keys = await caches.keys();
-          await Promise.all(
-            keys
-              .filter((key) => key.indexOf("flipvise") === 0)
-              .map((key) => caches.delete(key)),
-          );
+          await Promise.all(keys.map((key) => caches.delete(key)));
         }
         if (hadController && !sessionStorage.getItem(reloadKey)) {
           sessionStorage.setItem(reloadKey, "1");

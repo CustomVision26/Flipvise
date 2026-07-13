@@ -64,6 +64,9 @@ const config: CapacitorConfig = {
   appName: "Flipvise",
   // Bundled offline Study app. `npm run mobile:build` populates this folder.
   webDir: "mobile/www",
+  // Quiet empty plugin rejects (`console.error({})`) in the live WebView overlay.
+  // Native Logcat still shows app logs; set to "debug" when diagnosing bridge calls.
+  loggingBehavior: "none",
   android: {
     // Detectable on the live site when Capacitor bridge is not injected after navigation.
     appendUserAgent: "FlipviseNative/1",

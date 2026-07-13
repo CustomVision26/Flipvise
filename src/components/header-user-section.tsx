@@ -26,8 +26,10 @@ import { isClerkPlatformAdminRole } from "@/lib/clerk-platform-admin-role";
 import { clerkAuthHandoffDelayMs } from "@/lib/clerk-auth-handoff";
 import {
   isFlipviseNativeApp,
+  isFlipviseNativeShell,
   navigateToOfflineShell,
 } from "@/lib/offline/is-flipvise-native-app";
+import { useClientMounted } from "@/lib/use-client-mounted";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
 
@@ -94,8 +96,9 @@ export function HeaderUserSection({
   showTeacherDashboard = false,
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
-  const { userId } = useAuth();
+  const { userId, isLoaded: authLoaded } = useAuth();
   const { user } = useUser();
+  const clientMounted = useClientMounted();
 
   /**
    * Sign-out teardown guard. Clerk's `<UserButton>` flips `userId` to null the
@@ -167,6 +170,24 @@ export function HeaderUserSection({
       return;
     }
 
+    // Native WebView: wait until the page is hydrated + Clerk auth is loaded
+    // before mounting UserButton — otherwise Clerk UI chunks time out at 10s.
+    if (!clientMounted || !authLoaded) {
+      setPortalsReady(false);
+      return;
+    }
+
+    const nativeShell =
+      typeof document !== "undefined" &&
+      (document.documentElement.dataset.flipviseNativeShell === "1" ||
+        isFlipviseNativeShell());
+
+    if (nativeShell) {
+      setPortalsReady(false);
+      const timer = window.setTimeout(() => setPortalsReady(true), 400);
+      return () => window.clearTimeout(timer);
+    }
+
     if (process.env.NODE_ENV === "development") {
       setPortalsReady(true);
       return;
@@ -184,7 +205,7 @@ export function HeaderUserSection({
       window.clearTimeout(timer);
       setPortalsReady(true);
     };
-  }, [userId]);
+  }, [userId, clientMounted, authLoaded]);
 
   // Never signed in on this page → nothing to render. When signing out we keep
   // the tree (and the Clerk UserButton) mounted until `window.location.replace`

@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
-import { Eye, EyeOff, Loader2, ShieldAlert, WifiOff } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -15,7 +16,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
+import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
 import { markClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
 import { waitForServerSession } from "@/lib/native-session-probe";
@@ -33,9 +40,97 @@ const TICKET_FLOW_TIMEOUT_MS = 25_000;
 const SERVER_SESSION_PROBE_MS = 5_000;
 /** Show escape actions immediately in the native app (server escape bar is the fallback). */
 const LOADING_ESCAPE_UI_MS = 0;
+/** Clerk email verification codes are 6 digits. */
+const VERIFICATION_CODE_LENGTH = 6;
 
 const NATIVE_BTN_CLASS =
   "min-h-11 w-full touch-manipulation active:scale-[0.98] transition-transform";
+
+/**
+ * Highly translucent glass so flowing background cards stay visible;
+ * in-card logo mark sits behind form content.
+ */
+const NATIVE_AUTH_CARD_CLASS =
+  "relative w-full max-w-sm overflow-hidden border-border/25 bg-card/10 shadow-lg shadow-black/10 ring-1 ring-foreground/8 backdrop-blur-[6px]";
+
+const NATIVE_AUTH_FOOTER_CLASS =
+  "relative z-10 flex flex-col gap-2 border-border/20 bg-transparent";
+
+const NATIVE_AUTH_INPUT_CLASS =
+  "border-border/40 bg-background/35 backdrop-blur-sm";
+
+const NATIVE_OTP_SLOT_CLASS =
+  "size-12 grow rounded-lg border-2 border-foreground/45 bg-background/55 text-lg font-semibold text-foreground shadow-md shadow-black/20 first:rounded-lg first:border-l-2 last:rounded-lg data-[active=true]:border-primary data-[active=true]:ring-2 data-[active=true]:ring-primary/40";
+
+/** Soft logo mark inside the auth card — does not cover the page atmosphere. */
+function NativeAuthCardLogoMark() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={LOGO_PUBLIC_URL}
+        alt=""
+        className="h-auto w-[72%] max-w-[210px] opacity-[0.11] grayscale"
+      />
+    </div>
+  );
+}
+
+function NativeVerificationCodeField({
+  id,
+  value,
+  onChange,
+  onComplete,
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  onComplete: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const completedRef = useRef<string | null>(null);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>Verification code</Label>
+      <InputOTP
+        id={id}
+        maxLength={VERIFICATION_CODE_LENGTH}
+        value={value}
+        disabled={disabled}
+        autoComplete="one-time-code"
+        inputMode="numeric"
+        pattern="\d*"
+        containerClassName="w-full justify-between gap-1.5"
+        onChange={(next) => {
+          const digits = next.replace(/\D/g, "").slice(0, VERIFICATION_CODE_LENGTH);
+          onChange(digits);
+          if (digits.length < VERIFICATION_CODE_LENGTH) {
+            completedRef.current = null;
+            return;
+          }
+          if (completedRef.current === digits) return;
+          completedRef.current = digits;
+          onComplete(digits);
+        }}
+      >
+        <InputOTPGroup className="flex w-full items-center justify-between gap-1.5 rounded-none">
+          {Array.from({ length: VERIFICATION_CODE_LENGTH }, (_, index) => (
+            <InputOTPSlot
+              key={index}
+              index={index}
+              className={NATIVE_OTP_SLOT_CLASS}
+            />
+          ))}
+        </InputOTPGroup>
+      </InputOTP>
+    </div>
+  );
+}
 
 function describeClerkError(err: unknown): string {
   if (!err) return "";
@@ -124,20 +219,20 @@ export function NativeSignInClient({
   isNativeContext?: boolean;
 }) {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
-  const { signIn, isLoaded: signInLoaded } = useSignIn();
-  const { signUp, isLoaded: signUpLoaded } = useSignUp();
+  // Clerk's useSignIn no longer exposes `isLoaded` (SignInSignalValue).
+  const { signIn } = useSignIn();
   const clerk = useClerk();
   const { signOut } = clerk;
   /**
-   * Clerk logs show "Clerk has been loaded with development keys" while our old
-   * check still required `signIn` — after session_retry signOut that resource can
-   * lag or be null, so the form stayed locked and the 12s auto-clear looped forever.
+   * Clerk often reports loaded=true on the very first client paint while SSR still
+   * saw unloaded — that toggled the status notice off and caused a hydration mismatch
+   * (server: Connecting div, client: form). Gate on mount so both trees match.
    */
-  const clerkFormReady =
-    authLoaded ||
-    clerk.loaded ||
-    (signInLoaded && Boolean(signIn)) ||
-    (signUpLoaded && Boolean(signUp));
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+  const clerkFormReady = hasMounted && (authLoaded || clerk.loaded);
   const hostDiagnosis = diagnoseNativeClerkHost();
   const searchParams = useSearchParams();
   const ticket = searchParams.get("ticket");
@@ -295,7 +390,7 @@ export function NativeSignInClient({
     );
   }
 
-  if (continuing || (isSignedIn && !manualOnly)) {
+  if (continuing || (hasMounted && isSignedIn && !manualOnly)) {
     if (redirectStalled && continuing) {
       return (
         <SignInRecovery
@@ -316,7 +411,7 @@ export function NativeSignInClient({
     );
   }
 
-  if (ticket && !ticketError && !manualOnly && authLoaded) {
+  if (ticket && !ticketError && !manualOnly && hasMounted && authLoaded) {
     return (
       <CenteredSpinner
         label="Signing you in…"
@@ -392,10 +487,13 @@ function CenteredSpinner({
     <main
       className={`relative z-10 flex min-h-dvh flex-col items-center justify-center gap-4 bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
     >
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
+      <Card className={NATIVE_AUTH_CARD_CLASS}>
+        <NativeAuthCardLogoMark />
+        <CardHeader className="relative z-10 items-center text-center">
           <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-          <CardTitle>{label ?? "Loading…"}</CardTitle>
+          <CardTitle className="text-lg font-semibold tracking-tight">
+            {label ?? "Loading…"}
+          </CardTitle>
           <CardDescription>
             {isNativeContext
               ? "If this takes more than a few seconds, tap the refresh icon in the top-left corner."
@@ -403,7 +501,7 @@ function CenteredSpinner({
           </CardDescription>
         </CardHeader>
         {showEscapeActions ? (
-          <CardFooter className="flex flex-col gap-2">
+          <CardFooter className={NATIVE_AUTH_FOOTER_CLASS}>
             <Button
               type="button"
               variant="secondary"
@@ -454,13 +552,16 @@ function SignInRecovery({
     <main
       className={`relative z-10 flex min-h-dvh items-center justify-center bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
     >
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle>{title}</CardTitle>
+      <Card className={NATIVE_AUTH_CARD_CLASS}>
+        <NativeAuthCardLogoMark />
+        <CardHeader className="relative z-10 text-center">
+          <CardTitle className="text-lg font-semibold tracking-tight">
+            {title}
+          </CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         {!isNativeContext || onContinue || showSignOut ? (
-        <CardFooter className="flex flex-col gap-2">
+        <CardFooter className={NATIVE_AUTH_FOOTER_CLASS}>
           {onContinue ? (
             <Button
               type="button"
@@ -507,6 +608,27 @@ function useNativeAuthOnlineGate(isNativeContext: boolean) {
   return { online, offlineMessage };
 }
 
+function NativeConnectionStatus({ online }: { online: boolean }) {
+  return (
+    <Badge
+      variant="outline"
+      className={
+        online
+          ? "mx-auto border-emerald-500/35 bg-emerald-500/15 text-emerald-200"
+          : "mx-auto border-amber-500/35 bg-amber-500/15 text-amber-200"
+      }
+      aria-live="polite"
+    >
+      {online ? (
+        <Wifi data-icon="inline-start" aria-hidden />
+      ) : (
+        <WifiOff data-icon="inline-start" aria-hidden />
+      )}
+      {online ? "Online" : "Offline"}
+    </Badge>
+  );
+}
+
 function NativeAuthOfflineNotice({ message }: { message: string }) {
   return (
     <div
@@ -544,7 +666,7 @@ function PasswordInput({
         onChange={(ev) => onChange(ev.target.value)}
         disabled={disabled}
         required
-        className="pr-10"
+        className={`pr-10 ${NATIVE_AUTH_INPUT_CLASS}`}
       />
       <Button
         type="button"
@@ -576,29 +698,33 @@ function NativeAuthStatusNotice({
   clerkLoadTimedOut: boolean;
   isNativeContext: boolean;
 }) {
-  if (!statusNotice) return null;
-
+  // Always render the wrapper so SSR/client trees stay aligned when the notice
+  // appears or clears after hydration (inner content can still update).
   return (
-    <div className="flex flex-col gap-2">
-      <p className="flex items-start gap-2 rounded-md bg-muted/60 p-2.5 text-sm text-muted-foreground">
-        {!clerkReady && !clerkLoadTimedOut ? (
-          <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden />
-        ) : (
-          <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-        )}
-        <span>{statusNotice}</span>
-      </p>
-      {clerkLoadTimedOut && isNativeContext ? (
-        <Button
-          type="button"
-          variant="secondary"
-          className={NATIVE_BTN_CLASS}
-          onClick={() => {
-            window.location.href = "/api/auth/clear-stale-session";
-          }}
-        >
-          Try again
-        </Button>
+    <div className="flex flex-col gap-2" aria-live="polite">
+      {statusNotice ? (
+        <>
+          <p className="flex items-start gap-2 rounded-md bg-muted/60 p-2.5 text-sm text-muted-foreground">
+            {!clerkReady && !clerkLoadTimedOut ? (
+              <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden />
+            ) : (
+              <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            )}
+            <span>{statusNotice}</span>
+          </p>
+          {clerkLoadTimedOut && isNativeContext ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className={NATIVE_BTN_CLASS}
+              onClick={() => {
+                window.location.href = "/api/auth/clear-stale-session";
+              }}
+            >
+              Try again
+            </Button>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
@@ -851,9 +977,9 @@ function SignInForm({
     }
   }
 
-  async function onVerifyCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code || busy || !canSubmit) return;
+  async function verifyWithCode(codeValue: string) {
+    const trimmed = codeValue.trim();
+    if (!trimmed || busy || !canSubmit) return;
     if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
@@ -863,7 +989,7 @@ function SignInForm({
     setError(null);
     try {
       const { error: verifyErr } = await signIn.emailCode.verifyCode({
-        code: code.trim(),
+        code: trimmed,
       });
       if (verifyErr) {
         fail("Code verification failed", verifyErr);
@@ -877,19 +1003,30 @@ function SignInForm({
     }
   }
 
+  async function onVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    await verifyWithCode(code);
+  }
+
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="text-center">
-        <CardTitle>Sign in to Flipvise</CardTitle>
-        <CardDescription>
-          {mode === "code" && step === "code"
-            ? `Enter the code we emailed to ${email}.`
-            : isNativeContext
-              ? "Most accounts use an email sign-in code. Password sign-in works only if you created one on the web."
-              : "Use your email to continue to the dashboard."}
-        </CardDescription>
+    <Card className={NATIVE_AUTH_CARD_CLASS}>
+      <NativeAuthCardLogoMark />
+      <CardHeader className="relative z-10 space-y-3 text-center">
+        <NativeConnectionStatus online={online} />
+        <div className="space-y-1.5">
+          <CardTitle className="text-xl font-semibold tracking-tight">
+            Welcome back
+          </CardTitle>
+          <CardDescription className="text-pretty leading-relaxed">
+            {mode === "code" && step === "code"
+              ? `Enter the verification code we sent to ${email}.`
+              : isNativeContext
+                ? "Sign in with your email to open the online dashboard. Most accounts use a one-time code."
+                : "Sign in with your email to continue to the dashboard."}
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="relative z-10 flex flex-col gap-4">
         {!online ? <NativeAuthOfflineNotice message={offlineMessage} /> : null}
         <NativeAuthStatusNotice
           statusNotice={statusNotice}
@@ -928,6 +1065,7 @@ function SignInForm({
                 inputMode="email"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
+                className={NATIVE_AUTH_INPUT_CLASS}
                 required
               />
             </div>
@@ -979,6 +1117,7 @@ function SignInForm({
                 inputMode="email"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
+                className={NATIVE_AUTH_INPUT_CLASS}
                 required
               />
             </div>
@@ -1010,18 +1149,25 @@ function SignInForm({
           </form>
         ) : (
           <form onSubmit={onVerifyCode} className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="code">Verification code</Label>
-              <Input
-                id="code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(ev) => setCode(ev.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
+            <NativeVerificationCodeField
+              id="code"
+              value={code}
+              onChange={setCode}
+              onComplete={(value) => {
+                void verifyWithCode(value);
+              }}
+              disabled={busy || !clerkReady}
+            />
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !online ||
+                !canSubmit ||
+                code.length < VERIFICATION_CODE_LENGTH
+              }
+              className="mt-1"
+            >
               {busy ? "Verifying…" : "Verify & sign in"}
             </Button>
             <Button
@@ -1153,9 +1299,9 @@ function SignUpForm({
     }
   }
 
-  async function onVerifyCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code || busy || !canSubmit) return;
+  async function verifyWithCode(codeValue: string) {
+    const trimmed = codeValue.trim();
+    if (!trimmed || busy || !canSubmit) return;
     if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
@@ -1165,7 +1311,7 @@ function SignUpForm({
     setError(null);
     try {
       const { error: verifyErr } = await signUp.verifications.verifyEmailCode({
-        code: code.trim(),
+        code: trimmed,
       });
       if (verifyErr) {
         fail("Code verification failed", verifyErr);
@@ -1183,19 +1329,30 @@ function SignUpForm({
     }
   }
 
+  async function onVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    await verifyWithCode(code);
+  }
+
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="text-center">
-        <CardTitle>Create your Flipvise account</CardTitle>
-        <CardDescription>
-          {step === "code"
-            ? `Enter the code we emailed to ${email}.`
-            : isNativeContext
-              ? "Enter your name, email, and password. We'll email you a verification code to finish creating your account."
-              : "Use your email to create an account and open the dashboard."}
-        </CardDescription>
+    <Card className={NATIVE_AUTH_CARD_CLASS}>
+      <NativeAuthCardLogoMark />
+      <CardHeader className="relative z-10 space-y-3 text-center">
+        <NativeConnectionStatus online={online} />
+        <div className="space-y-1.5">
+          <CardTitle className="text-xl font-semibold tracking-tight">
+            Create your account
+          </CardTitle>
+          <CardDescription className="text-pretty leading-relaxed">
+            {step === "code"
+              ? `Enter the verification code we sent to ${email}.`
+              : isNativeContext
+                ? "Add your name, email, and password. We’ll email a verification code to finish setup."
+                : "Use your email to create an account and open the dashboard."}
+          </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="relative z-10 flex flex-col gap-4">
         {!online ? <NativeAuthOfflineNotice message={offlineMessage} /> : null}
         <NativeAuthStatusNotice
           statusNotice={statusNotice}
@@ -1222,6 +1379,7 @@ function SignUpForm({
                     autoComplete="given-name"
                     value={firstName}
                     onChange={(ev) => setFirstName(ev.target.value)}
+                    className={NATIVE_AUTH_INPUT_CLASS}
                     required
                   />
                 </div>
@@ -1233,6 +1391,7 @@ function SignUpForm({
                     autoComplete="family-name"
                     value={lastName}
                     onChange={(ev) => setLastName(ev.target.value)}
+                    className={NATIVE_AUTH_INPUT_CLASS}
                     required
                   />
                 </div>
@@ -1247,6 +1406,7 @@ function SignUpForm({
                 inputMode="email"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
+                className={NATIVE_AUTH_INPUT_CLASS}
                 required
               />
             </div>
@@ -1284,18 +1444,25 @@ function SignUpForm({
           </form>
         ) : (
           <form onSubmit={onVerifyCode} className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="signup-code">Verification code</Label>
-              <Input
-                id="signup-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(ev) => setCode(ev.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
+            <NativeVerificationCodeField
+              id="signup-code"
+              value={code}
+              onChange={setCode}
+              onComplete={(value) => {
+                void verifyWithCode(value);
+              }}
+              disabled={busy || !clerkReady}
+            />
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !online ||
+                !canSubmit ||
+                code.length < VERIFICATION_CODE_LENGTH
+              }
+              className="mt-1"
+            >
               {busy ? "Verifying…" : "Verify & create account"}
             </Button>
             <Button

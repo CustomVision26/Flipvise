@@ -14,6 +14,7 @@ import {
   runNativeUpdateChecks,
   type StoreUpdatePrompt,
 } from "@/lib/native-notifications/update-checker";
+import { useClientMounted } from "@/lib/use-client-mounted";
 
 /**
  * Registers push notifications, polls inbox unread count, and checks for
@@ -21,13 +22,28 @@ import {
  */
 export function NativeNotificationBootstrap() {
   const { isSignedIn } = useAuth();
+  const mounted = useClientMounted();
+  const [isNativeShell, setIsNativeShell] = React.useState(false);
   const [storePrompt, setStorePrompt] = React.useState<StoreUpdatePrompt | null>(
     null,
   );
   const wasSignedInRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (!isFlipviseNativeShell()) return;
+    if (!mounted) return;
+    setIsNativeShell(isFlipviseNativeShell());
+  }, [mounted]);
+
+  React.useEffect(() => {
+    if (!mounted || !isNativeShell) return;
+
+    // Auth screens only need Preferences (via NativeAppBootstrap). Push + store
+    // probes hit plugins that often reject with empty errors on emulators and
+    // spam the Next.js overlay via Capacitor logFromNative.
+    const path = window.location.pathname;
+    if (path.startsWith("/native-signin") || path.startsWith("/auth/")) {
+      return;
+    }
 
     let detachPushHandlers: (() => void) | undefined;
     let stopInboxPoller: (() => void) | undefined;
@@ -42,13 +58,13 @@ export function NativeNotificationBootstrap() {
     };
 
     void (async () => {
-      try {
-        detachPushHandlers = await attachNativePushHandlers();
-      } catch {
-        // Push plugin unavailable — polling still works.
-      }
-
       if (isSignedIn) {
+        try {
+          detachPushHandlers = await attachNativePushHandlers();
+        } catch {
+          // Push plugin unavailable — polling still works.
+        }
+
         try {
           await registerNativePushNotifications();
         } catch {
@@ -79,18 +95,18 @@ export function NativeNotificationBootstrap() {
       stopInboxPoller?.();
       void appStateListener?.remove();
     };
-  }, [isSignedIn]);
+  }, [mounted, isNativeShell, isSignedIn]);
 
   React.useEffect(() => {
-    if (!isFlipviseNativeShell()) return;
+    if (!mounted || !isNativeShell) return;
 
     if (wasSignedInRef.current && !isSignedIn) {
       void revokeStoredPushToken();
     }
     wasSignedInRef.current = !!isSignedIn;
-  }, [isSignedIn]);
+  }, [mounted, isNativeShell, isSignedIn]);
 
-  if (!isFlipviseNativeShell()) {
+  if (!mounted || !isNativeShell) {
     return null;
   }
 

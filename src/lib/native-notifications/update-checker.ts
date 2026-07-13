@@ -60,28 +60,10 @@ export async function checkNativeStoreUpdate(): Promise<StoreUpdatePrompt | null
     const belowLatest = isSemverBelow(currentVersion, latestVersion);
 
     if (!belowMin && !belowLatest) {
-      try {
-        const { AppUpdate, AppUpdateAvailability } = await import(
-          "@capawesome/capacitor-app-update"
-        );
-        const updateInfo = await AppUpdate.getAppUpdateInfo();
-        if (updateInfo.updateAvailability !== AppUpdateAvailability.UPDATE_AVAILABLE) {
-          return null;
-        }
-        const storeLatest =
-          updateInfo.availableVersionName?.trim() || latestVersion;
-        if (!isSemverBelow(currentVersion, storeLatest)) {
-          return null;
-        }
-        return {
-          currentVersion,
-          latestVersion: storeLatest,
-          storeUrl,
-          required: belowMin,
-        };
-      } catch {
-        return null;
-      }
+      // Do NOT call AppUpdate.getAppUpdateInfo() here. On emulators / sideloaded
+      // builds without Play Store it rejects with an empty error object, and
+      // Capacitor's bridge still console.error({}) even when we catch the promise.
+      return null;
     }
 
     return {

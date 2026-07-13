@@ -56,6 +56,12 @@ export async function revokeStoredPushToken(): Promise<void> {
 }
 
 export async function registerNativePushNotifications(): Promise<void> {
+  const { Capacitor } = await import("@capacitor/core");
+  // Without a real native bridge (or without Firebase on the emulator),
+  // PushNotifications rejects with `{}` and Capacitor logs it via console.error.
+  if (!Capacitor.isNativePlatform()) return;
+  if (!Capacitor.isPluginAvailable("PushNotifications")) return;
+
   const { PushNotifications } = await import("@capacitor/push-notifications");
   const { App } = await import("@capacitor/app");
 
@@ -85,5 +91,9 @@ export async function registerNativePushNotifications(): Promise<void> {
     // Permission denied or Firebase misconfigured — polling still works.
   });
 
-  await PushNotifications.register();
+  try {
+    await PushNotifications.register();
+  } catch {
+    // Emulator / missing google-services — Capacitor may still log `{}`; ignore.
+  }
 }

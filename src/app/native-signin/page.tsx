@@ -11,7 +11,7 @@ import {
 } from "@/lib/safe-redirect-path";
 import { NativeSignInClient } from "./native-signin-client";
 import { NativeSignInEscapeChrome } from "./native-signin-escape-chrome";
-import { FlipviseLogoWatermark } from "@/components/flipvise-logo-watermark";
+import { NativeSignInAtmosphere } from "./native-signin-atmosphere";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +53,8 @@ export default async function NativeSignInPage({
   }
 
   return (
-    <div className="relative min-h-dvh bg-background">
-      <FlipviseLogoWatermark />
+    <div className="relative min-h-dvh overflow-hidden bg-background">
+      <NativeSignInAtmosphere />
       {isNativeContext ? <NativeSignInEscapeChrome /> : null}
       <div className="relative z-10">
         <Suspense

@@ -2,6 +2,41 @@
 
 import * as React from "react";
 
+function isDevOrLocalOrNativeHost(): boolean {
+  const host = window.location.hostname;
+  const isLocalhost =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "10.0.2.2";
+  const isProd = process.env.NODE_ENV === "production";
+  const ua = navigator.userAgent;
+  const isNativeShell =
+    /FlipviseNative\//.test(ua) ||
+    Boolean(
+      (window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+        ?.isNativePlatform?.(),
+    );
+
+  return !isProd || isLocalhost || isNativeShell;
+}
+
+async function clearControllingServiceWorkersAndCaches(): Promise<boolean> {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(registrations.map((registration) => registration.unregister()));
+
+  if ("caches" in window) {
+    // Clear every Cache Storage entry — not only flipvise* — so Turbopack
+    // / Next chunk caches cannot leave "module factory is not available".
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  }
+
+  return hadController;
+}
+
 /**
  * Registers the PWA service worker (`/sw.js`) on real production hosts only, and renders
  * nothing.
@@ -16,33 +51,16 @@ export function ServiceWorkerRegister() {
   React.useLayoutEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
-    const host = window.location.hostname;
-    const isLocalhost =
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host === "::1" ||
-      host === "10.0.2.2";
-    const isProd = process.env.NODE_ENV === "production";
-    const isCapacitor = Boolean((window as { Capacitor?: unknown }).Capacitor);
-
-    // Dev / localhost / native: ensure no service worker is controlling the page.
-    if (!isProd || isLocalhost || isCapacitor) {
-      navigator.serviceWorker
-        .getRegistrations?.()
-        .then((registrations) => {
-          registrations.forEach((registration) => registration.unregister());
+    if (isDevOrLocalOrNativeHost()) {
+      const reloadKey = "flipvise-dev-sw-reset";
+      void clearControllingServiceWorkersAndCaches()
+        .then((hadController) => {
+          if (hadController && !sessionStorage.getItem(reloadKey)) {
+            sessionStorage.setItem(reloadKey, "1");
+            window.location.reload();
+          }
         })
         .catch(() => {});
-      if (typeof caches !== "undefined") {
-        caches
-          .keys?.()
-          .then((keys) =>
-            keys
-              .filter((key) => key.startsWith("flipvise"))
-              .forEach((key) => caches.delete(key)),
-          )
-          .catch(() => {});
-      }
       return;
     }
 

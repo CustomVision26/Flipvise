@@ -31,6 +31,15 @@ function messageFromUnknown(error: unknown): string {
 function isClerkChunkLoadFailure(error: unknown): boolean {
   const message = messageFromUnknown(error);
 
+  // Clerk logs this when @clerk/ui never finishes mounting (common in Capacitor
+  // WebViews after a stalled CDN chunk or pre-hydration mount).
+  if (
+    /\[Clerk UI\]/i.test(message) &&
+    /renderer did not mount|failed chunk load|within \d+s/i.test(message)
+  ) {
+    return true;
+  }
+
   if (!message.includes("clerk.accounts.dev") && !message.includes("@clerk/ui")) {
     return false;
   }
@@ -131,9 +140,20 @@ export function ClerkChunkLoadRecovery() {
       recoverChunk(event.reason);
     }
 
+    // Clerk often console.error's the 10s renderer timeout without throwing.
+    const originalError = console.error.bind(console);
+    console.error = (...args: unknown[]) => {
+      const flat = args.map((a) => messageFromUnknown(a)).join(" ");
+      if (isClerkChunkLoadFailure(flat) || isClerkChunkLoadFailure(args[0])) {
+        recoverChunk(flat || args[0]);
+      }
+      originalError(...args);
+    };
+
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
     return () => {
+      console.error = originalError;
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
     };

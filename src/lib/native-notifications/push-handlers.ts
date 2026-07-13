@@ -26,6 +26,10 @@ function navigateToRoute(route: string): void {
 }
 
 export async function attachNativePushHandlers(): Promise<() => void> {
+  const { Capacitor } = await import("@capacitor/core");
+  if (!Capacitor.isNativePlatform()) return () => {};
+  if (!Capacitor.isPluginAvailable("PushNotifications")) return () => {};
+
   const { PushNotifications } = await import("@capacitor/push-notifications");
 
   const receivedHandle = await PushNotifications.addListener(

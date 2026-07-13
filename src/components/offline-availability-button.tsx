@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   detectNativeShellNow,
 } from "@/lib/offline/is-flipvise-native-app";
+import { useClientMounted } from "@/lib/use-client-mounted";
 
 const NATIVE_BTN_CLASS =
   "min-h-11 touch-manipulation active:scale-[0.98] transition-transform";
@@ -23,19 +24,23 @@ const NATIVE_BTN_CLASS =
  */
 export function OfflineAvailabilityButton() {
   const { userId, isSignedIn } = useAuth();
-  const [isNative] = React.useState(detectNativeShellNow);
+  const mounted = useClientMounted();
+  const [isNative, setIsNative] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
-    if (!isNative) return;
+    if (!mounted) return;
+    const native = detectNativeShellNow();
+    setIsNative(native);
+    if (!native) return;
     try {
       sessionStorage.setItem("flipvise.native", "1");
     } catch {
       // ignore
     }
-  }, [isNative]);
+  }, [mounted]);
 
-  if (!isNative || !isSignedIn || !userId) return null;
+  if (!mounted || !isNative || !isSignedIn || !userId) return null;
 
   const handleClick = async () => {
     setBusy(true);
