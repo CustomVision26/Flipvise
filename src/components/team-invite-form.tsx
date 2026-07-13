@@ -167,6 +167,10 @@ export function TeamInviteForm({
         role,
         ...(trimmedName.length > 0 ? { inviteeDisplayName: trimmedName } : {}),
       });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
       setInviteUrl(res.inviteUrl);
       setEmail("");
       setInviteeDisplayName("");

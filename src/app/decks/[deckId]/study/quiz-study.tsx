@@ -140,6 +140,7 @@ interface QuizStudyProps {
   cards: CardData[];
   deckId: number;
   deckName: string;
+  deckDescription?: string | null;
   teamId: number | null;
   /** Same gradient slug as deck detail / flashcards — tints quiz chrome and question card. */
   deckGradient?: string | null;
@@ -261,6 +262,7 @@ export function QuizStudy({
   cards,
   deckId,
   deckName,
+  deckDescription = null,
   teamId,
   deckGradient = null,
   autoSaveQuizResult = false,
@@ -1082,8 +1084,11 @@ export function QuizStudy({
             <CardTitle className="text-xl">
               {grantedResume ? "Resume quiz" : grantedFreshStart ? "Start over" : "Timed quiz"}
             </CardTitle>
-            <CardDescription className="text-balance">
-              <span className="font-medium text-foreground">{deckName}</span>
+            <CardDescription className="text-balance space-y-1">
+              <span className="block font-medium text-foreground">{deckName}</span>
+              {deckDescription?.trim() ? (
+                <span className="block text-muted-foreground">{deckDescription.trim()}</span>
+              ) : null}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-center text-sm text-muted-foreground">
@@ -1175,6 +1180,7 @@ export function QuizStudy({
               <FormatQuizQuestionButton
                 deckId={deckId}
                 deckName={deckName}
+                deckDescription={deckDescription}
                 snapshot={quizFormatEditorSnapshot}
                 cards={preparedCards}
                 onPublished={() => router.refresh()}

@@ -33,6 +33,8 @@ export interface StudySessionProps {
   cards: CardData[];
   deckId: number;
   deckName: string;
+  /** Deck topic / description shown under the name in quiz lobby and format dialog. */
+  deckDescription?: string | null;
   teamId: number | null;
   /** Paid tiers — Free users cannot open Quiz mode in the UI. */
   allowsQuizStudy?: boolean;
@@ -82,6 +84,7 @@ export function StudySession({
   cards,
   deckId,
   deckName,
+  deckDescription = null,
   teamId,
   allowsQuizStudy = true,
   memberAllowReview = true,
@@ -220,6 +223,7 @@ export function StudySession({
               cards={cards}
               deckId={deckId}
               deckName={deckName}
+              deckDescription={deckDescription}
               teamId={teamId}
               deckGradient={deckGradient ?? null}
               autoSaveQuizResult={autoSaveQuizResult}

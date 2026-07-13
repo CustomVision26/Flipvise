@@ -318,19 +318,39 @@ async function findClerkUserIdByEmail(normalizedEmail: string): Promise<string |
   }
 }
 
-export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
+export type InviteTeamMemberResult =
+  | { ok: true; inviteUrl: string }
+  | { ok: false; error: string };
+
+/**
+ * Sends a team invitation. Returns `{ ok, error }` for expected failures so production
+ * clients can show the real message (thrown Errors are redacted by Next.js).
+ */
+export async function inviteTeamMemberAction(
+  data: input<typeof inviteSchema>,
+): Promise<InviteTeamMemberResult> {
   const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  if (!userId) return { ok: false, error: "Unauthorized" };
 
   const parsed = inviteSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid input");
+  if (!parsed.success) return { ok: false, error: "Invalid input" };
 
-  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  let team;
+  try {
+    team = await assertCanManageTeam(userId, parsed.data.teamId);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Forbidden",
+    };
+  }
+
   const capacity = await teamMemberInviteCapacity(team.planSlug, team.id);
   if (capacity.atCapacity) {
-    throw new Error(
-      `Member limit reached for this team (${capacity.maxMembersPerTeam} on your plan).`,
-    );
+    return {
+      ok: false,
+      error: `Member limit reached for this team (${capacity.maxMembersPerTeam} on your plan).`,
+    };
   }
 
   const normalizedEmail = parsed.data.email.toLowerCase();
@@ -340,21 +360,25 @@ export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
     normalizedEmail,
   );
   if (duplicatePending) {
-    throw new Error(
-      "An invitation is already pending for this email on this workspace. Wait for it to be accepted or expire, or ask the invitee to respond from their inbox.",
-    );
+    return {
+      ok: false,
+      error:
+        "An invitation is already pending for this email on this workspace. Open Pending invitations to copy the link, revoke it and send again, or wait for the invitee to accept.",
+    };
   }
 
   if (await clerkUserHasNormalizedEmail(team.ownerUserId, normalizedEmail)) {
-    throw new Error("You cannot invite the team owner by email.");
+    return { ok: false, error: "You cannot invite the team owner by email." };
   }
 
   const memberRows = await listTeamMembers(team.id);
   for (const row of memberRows) {
     if (await clerkUserHasNormalizedEmail(row.userId, normalizedEmail)) {
-      throw new Error(
-        "This email already belongs to a member of this team. Go to Member Tab to remove user or change their role.",
-      );
+      return {
+        ok: false,
+        error:
+          "This email already belongs to a member of this team. Go to Member Tab to remove user or change their role.",
+      };
     }
   }
 
@@ -364,15 +388,24 @@ export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
   );
 
   const trimmedInviteName = parsed.data.inviteeDisplayName?.trim();
-  await insertTeamInvitation(
-    team.id,
-    normalizedEmail,
-    parsed.data.role,
-    token,
-    expiresAt,
-    userId,
-    trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : null,
-  );
+  try {
+    await insertTeamInvitation(
+      team.id,
+      normalizedEmail,
+      parsed.data.role,
+      token,
+      expiresAt,
+      userId,
+      trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : null,
+    );
+  } catch (err) {
+    console.error("[inviteTeamMemberAction] insert failed:", err);
+    return {
+      ok: false,
+      error:
+        "Could not save the invitation. Please try again, or contact support if the problem continues.",
+    };
+  }
 
   const base =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
@@ -412,7 +445,7 @@ export async function inviteTeamMemberAction(data: input<typeof inviteSchema>) {
   revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/inbox");
-  return { inviteUrl };
+  return { ok: true, inviteUrl };
 }
 
 const acceptSchema = z.object({

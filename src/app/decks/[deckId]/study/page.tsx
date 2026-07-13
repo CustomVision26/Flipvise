@@ -266,6 +266,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
               deck.name
             )}
           </h1>
+          {deck.description?.trim() ? (
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
+              {deck.description.trim()}
+            </p>
+          ) : null}
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-muted-foreground">Study Session</span>
             <span className="text-muted-foreground text-xs" aria-hidden>·</span>
@@ -280,6 +285,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         cards={cards}
         deckId={id}
         deckName={deck.name}
+        deckDescription={deck.description ?? null}
         teamId={studyTeamId ?? deck.teamId ?? null}
         allowsQuizStudy={allowsQuizStudy}
         memberAllowReview={memberAllowReview}

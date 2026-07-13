@@ -84,6 +84,7 @@ type FormatQuizQuestionDialogProps = {
   onOpenChange: (open: boolean) => void;
   deckId: number;
   deckName: string;
+  deckDescription?: string | null;
   initialSnapshot: QuizFormatsDeckSnapshot;
   /** Live deck cards — used to detect when T/F and FIB compete for the same cards. */
   cards: QuizCardInput[];
@@ -96,6 +97,7 @@ export function FormatQuizQuestionDialog({
   onOpenChange,
   deckId,
   deckName,
+  deckDescription = null,
   initialSnapshot,
   cards,
   onPublished,
@@ -295,16 +297,31 @@ export function FormatQuizQuestionDialog({
             <ListChecks className="size-5 shrink-0 text-muted-foreground" aria-hidden />
             Format Quiz Question
           </DialogTitle>
-          <DialogDescription className="text-left">
-            Choose question types and how many of each for{" "}
-            <span className="font-medium text-foreground">{deckName}</span>. Formats are added to
-            the quiz only when you click Publish to quiz.
+          <DialogDescription className="text-left space-y-1.5">
+            <span className="block">
+              Choose question types and how many of each for{" "}
+              <span className="font-medium text-foreground">{deckName}</span>
+              {deckDescription?.trim() ? (
+                <>
+                  {" "}
+                  (<span className="text-foreground/90">{deckDescription.trim()}</span>)
+                </>
+              ) : null}
+              . Formats are added to the quiz only when you click Publish to quiz.
+            </span>
           </DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
           <div className="space-y-3 rounded-lg border border-border/80 p-4">
-            <p className="font-medium text-foreground">{deckName}</p>
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">{deckName}</p>
+              {deckDescription?.trim() ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {deckDescription.trim()}
+                </p>
+              ) : null}
+            </div>
             <div className="space-y-2">
               <FormatCheckboxRow
                 id={`study-mc-${deckId}`}
@@ -546,12 +563,14 @@ function FormatCountRow({
 export function FormatQuizQuestionButton({
   deckId,
   deckName,
+  deckDescription = null,
   snapshot,
   cards,
   onPublished,
 }: {
   deckId: number;
   deckName: string;
+  deckDescription?: string | null;
   snapshot: QuizFormatsDeckSnapshot;
   cards: QuizCardInput[];
   onPublished?: () => void;
@@ -575,6 +594,7 @@ export function FormatQuizQuestionButton({
         onOpenChange={setOpen}
         deckId={deckId}
         deckName={deckName}
+        deckDescription={deckDescription}
         initialSnapshot={snapshot}
         cards={cards}
         onPublished={onPublished}
