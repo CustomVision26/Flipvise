@@ -74,6 +74,8 @@ export interface StudySessionProps {
   quizFormatAssignmentPlan?: DeckQuizFormatAssignments | null;
   /** Education Gold / Enterprise — secured quizzes auto-save to user, owner, and team admins. */
   isEducationTeamPlan?: boolean;
+  /** Pro Plus / Education Plus — Format Quiz Question dialog on the quiz lobby. */
+  quizFormatEditorSnapshot?: import("@/db/queries/quiz-formats").QuizFormatsDeckSnapshot | null;
 }
 
 export function StudySession({
@@ -96,6 +98,7 @@ export function StudySession({
   quizFormats,
   quizFormatAssignmentPlan,
   isEducationTeamPlan = false,
+  quizFormatEditorSnapshot = null,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
   const showQuizTab = memberAllowQuiz && allowsQuizStudy;
@@ -230,6 +233,7 @@ export function StudySession({
               quizFormats={quizFormats}
               quizFormatAssignmentPlan={quizFormatAssignmentPlan}
               isEducationTeamPlan={isEducationTeamPlan}
+              quizFormatEditorSnapshot={quizFormatEditorSnapshot}
             />
           </TabsContent>
         ) : null}

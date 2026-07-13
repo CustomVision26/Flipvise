@@ -104,7 +104,8 @@ export async function generateQuizVariantsForCard(input: {
 
   if (includeTrueFalse) {
     parts.push(
-      "TRUE/FALSE: Write one grammatically correct declarative sentence that is either true or false based on the fact.",
+      "TRUE/FALSE: You MUST include a trueFalse object.",
+      "Write one grammatically correct declarative sentence that is either true or false based on the fact.",
       mcqContext?.distractors.length
         ? "When correctAnswer is false, the statement MUST use one of the stored wrong options as the claimed value (not a new invented number or fact)."
         : "About half the time make the statement true (correctAnswer: true), half false (correctAnswer: false).",
@@ -117,54 +118,98 @@ export async function generateQuizVariantsForCard(input: {
 
   if (includeFillInBlank) {
     parts.push(
-      "FILL IN THE BLANK: Build a single grammatically correct sentence with exactly one blank.",
+      "FILL IN THE BLANK: You MUST include a fillInBlank object with segments.",
+      "Build a single grammatically correct sentence with exactly one blank.",
       mcqContext
         ? "The blank's primary accepted answer must be the stored correct answer."
-        : "Use segments with type 'text' or 'blank'.",
-      "Use segments with type 'text' or 'blank'.",
+        : "The blank's primary accepted answer must be the flashcard correct answer / fact.",
+      "Use segments with type 'text' or 'blank' only.",
       "For text segments: set text to the visible words and answers to [].",
-      "For the blank segment: set text to '' and answers to 1–3 acceptable spellings.",
+      "For the blank segment: set text to '' and answers to 1–3 acceptable spellings of the correct answer.",
+      "Example shape: [{ type: 'text', text: 'The capital of France is ', answers: [] }, { type: 'blank', text: '', answers: ['Paris'] }].",
       "Alternate text and blank segments so the sentence reads naturally with one blank.",
     );
   }
 
+  if (includeTrueFalse && includeFillInBlank) {
+    parts.push(
+      "IMPORTANT: Return BOTH trueFalse and fillInBlank in the same response. Do not omit either field.",
+    );
+  }
+
   const schema = buildAiOutputSchema(includeTrueFalse, includeFillInBlank);
+  const maxAttempts = 3;
 
-  const { output } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({ schema }),
-    prompt: parts.join("\n"),
-  });
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const attemptParts =
+      attempt === 1
+        ? parts
+        : [
+            ...parts,
+            "",
+            `Attempt ${attempt}/${maxAttempts}: Previous output was missing required quiz formats.`,
+            includeTrueFalse && includeFillInBlank
+              ? "You must return both trueFalse and a valid fillInBlank.segments array with exactly one blank."
+              : includeFillInBlank
+                ? "You must return a valid fillInBlank.segments array with exactly one blank and non-empty answers."
+                : "You must return a valid trueFalse statement and correctAnswer.",
+          ];
 
-  const parsed = schema.safeParse(output);
-  if (!parsed.success) {
-    throw new Error("AI returned invalid quiz variants");
-  }
+    const { output } = await generateText({
+      model: openai("gpt-4o"),
+      output: Output.object({ schema }),
+      prompt: attemptParts.join("\n"),
+    });
 
-  const result: CardQuizVariants = {};
-  const data = parsed.data as {
-    trueFalse?: { statement: string; correctAnswer: boolean };
-    fillInBlank?: { segments: z.infer<typeof aiFillInBlankSegmentSchema>[] };
-  };
-  if (includeTrueFalse && data.trueFalse?.statement?.trim()) {
-    result.trueFalse = {
-      statement: data.trueFalse.statement.trim(),
-      correctAnswer: data.trueFalse.correctAnswer,
-    };
-  }
-
-  if (includeFillInBlank && data.fillInBlank?.segments?.length) {
-    const segments = normalizeAiFillInBlankSegments(data.fillInBlank.segments);
-    if (segments) {
-      result.fillInBlank = { segments };
+    const parsed = schema.safeParse(output);
+    if (!parsed.success) {
+      if (attempt === maxAttempts) {
+        throw new Error("AI returned invalid quiz variants");
+      }
+      continue;
     }
+
+    const result: CardQuizVariants = {};
+    const data = parsed.data as {
+      trueFalse?: { statement: string; correctAnswer: boolean };
+      fillInBlank?: { segments: z.infer<typeof aiFillInBlankSegmentSchema>[] };
+    };
+
+    if (includeTrueFalse && data.trueFalse?.statement?.trim()) {
+      result.trueFalse = {
+        statement: data.trueFalse.statement.trim(),
+        correctAnswer: data.trueFalse.correctAnswer,
+      };
+    }
+
+    if (includeFillInBlank && data.fillInBlank?.segments?.length) {
+      const segments = normalizeAiFillInBlankSegments(data.fillInBlank.segments);
+      if (segments) {
+        result.fillInBlank = { segments };
+      }
+    }
+
+    const missingTf = includeTrueFalse && !result.trueFalse;
+    const missingFib = includeFillInBlank && !result.fillInBlank;
+    if (missingTf || missingFib) {
+      if (attempt === maxAttempts) {
+        throw new Error(
+          missingFib
+            ? "AI did not create a valid fill-in-the-blank question. Try Generate again."
+            : "AI did not create a valid true/false question. Try Generate again.",
+        );
+      }
+      continue;
+    }
+
+    if (mcqContext && (result.trueFalse || result.fillInBlank)) {
+      result.sourceMcq = mcqSnapshotFromContext(mcqContext);
+    }
+
+    return result;
   }
 
-  if (mcqContext && (result.trueFalse || result.fillInBlank)) {
-    result.sourceMcq = mcqSnapshotFromContext(mcqContext);
-  }
-
-  return result;
+  throw new Error("AI could not create the requested quiz formats.");
 }
 
 export async function generateQuizVariantsBatch(

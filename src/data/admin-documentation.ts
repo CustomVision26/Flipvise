@@ -16,9 +16,9 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Central platform administration hub for monitoring users, billing, support, plans, and affiliates.",
         howItWorks: [
           "Overview metrics show total users, decks, cards, admin-granted Pro Plus, and paid subscriber counts.",
-          "Left Admin Menu switches between sections without leaving the dashboard.",
+          "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, Access & support, Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
-          "Support notifications bell surfaces unread ticket and contact alerts.",
+          "Support notifications bell in the header surfaces unread ticket and contact alerts.",
         ],
         requirements: [
           "Clerk publicMetadata role admin or superadmin, or PLATFORM_SUPERADMIN_USER_IDS allow-list.",

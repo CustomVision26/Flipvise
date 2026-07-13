@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ForceDarkTheme } from "@/components/force-dark-theme";
+import { NativeHomeSignOutGuard } from "@/components/native-home-sign-out-guard";
 import { Brain, Sparkles, Users } from "lucide-react";
 
 function parseInviteEmailFromSearchParams(inviteEmail: unknown): string | null {
@@ -72,6 +73,7 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   return (
     <ForceDarkTheme>
+      <NativeHomeSignOutGuard />
       <div className="relative flex min-h-screen flex-1 flex-col">
         <div className="relative z-30 border-b border-white/10 bg-black/20 backdrop-blur-sm">
           <div className="mx-auto flex max-w-7xl justify-center px-4 py-3 sm:px-6">

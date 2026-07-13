@@ -98,6 +98,19 @@ export function hasProPlusFeatures(
   );
 }
 
+/**
+ * Personal deck quiz format configuration from Study → Quiz
+ * (Format Quiz Question dialog). Pro Plus and Education Plus only —
+ * not Education Gold/Enterprise (those use Team Admin Study Privileges).
+ */
+export function canConfigurePersonalDeckQuizFormats(
+  plan: string | null | undefined,
+): boolean {
+  if (!plan) return false;
+  const p = plan.trim();
+  return p === "pro_plus" || p === "education_plus";
+}
+
 export function hasTeamGoldFeatures(
   plan: string | null | undefined,
 ): boolean {

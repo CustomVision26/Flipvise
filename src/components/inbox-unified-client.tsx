@@ -25,6 +25,10 @@ import {
   Mail,
   CheckCircle2,
   Sparkles,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Dialog,
@@ -33,6 +37,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "@/components/ui/pagination";
 import { markInboxItemReadAction, markAllInboxItemsReadAction } from "@/actions/inbox";
 import { markContactUsInboxNotificationReadAction } from "@/actions/contact-us";
 import {
@@ -51,7 +60,7 @@ import {
   normalizeBroadcastDetailsForDisplay,
   normalizeBroadcastMessageForDisplay,
 } from "@/lib/affiliate-broadcast-messaging";
-const INBOX_PAGE_SIZE = 10;
+const INBOX_PAGE_SIZE = 5;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -441,6 +450,9 @@ function InboxItemRow({
   onMarkRead: (item: UnifiedInboxItem) => void;
   onMutate: () => void;
 }) {
+  const [messageOpen, setMessageOpen] = useState(false);
+  const hasMessageBody = Boolean(item.description?.trim());
+
   const inviteOutcomeBadge = (outcome: string) => {
     switch (outcome) {
       case "needs_response": return <Badge variant="secondary" className="text-xs">Pending</Badge>;
@@ -616,20 +628,41 @@ function InboxItemRow({
             )}
           </div>
 
-          <p
-            className={cn(
-              "text-xs text-muted-foreground",
-              item.type === "welcome" && "whitespace-pre-line",
-            )}
-          >
-            {item.description}
-          </p>
           <p className="text-xs text-muted-foreground/70" suppressHydrationWarning>
             {formatDate(item.dateIso)}
           </p>
 
-          {/* Type-specific inline content */}
-          {item.type === "team_invite" && item.payload.outcome === "needs_response" && (
+          {hasMessageBody && !messageOpen ? (
+            <p className="line-clamp-2 text-xs text-muted-foreground">
+              {item.description}
+            </p>
+          ) : null}
+
+          {hasMessageBody && messageOpen ? (
+            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+              <p
+                className={cn(
+                  "text-sm leading-relaxed text-foreground",
+                  item.type === "welcome" && "whitespace-pre-line",
+                )}
+              >
+                {item.description}
+              </p>
+              {item.type === "team_invite" && item.payload.outcome === "needs_response" && (
+                <p className="text-xs text-muted-foreground">
+                  From <span className="text-foreground">{item.payload.inviterName}</span> ·{" "}
+                  Role:{" "}
+                  <span className="text-foreground capitalize">
+                    {item.payload.role === "team_admin" ? "Team Admin" : "Member"}
+                  </span>
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          {!hasMessageBody &&
+            item.type === "team_invite" &&
+            item.payload.outcome === "needs_response" && (
             <p className="text-xs text-muted-foreground">
               From <span className="text-foreground">{item.payload.inviterName}</span> ·{" "}
               Role: <span className="text-foreground capitalize">{item.payload.role === "team_admin" ? "Team Admin" : "Member"}</span>
@@ -640,6 +673,29 @@ function InboxItemRow({
 
       {/* ── Right: actions ── */}
       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+        {hasMessageBody ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => setMessageOpen((open) => !open)}
+            aria-expanded={messageOpen}
+          >
+            {messageOpen ? (
+              <>
+                <ChevronUp className="size-3.5" aria-hidden />
+                Close
+              </>
+            ) : (
+              <>
+                <ChevronDown className="size-3.5" aria-hidden />
+                Open
+              </>
+            )}
+          </Button>
+        ) : null}
+
         {/* Type-specific primary actions */}
         {item.type === "quiz_result" && (
           <ViewQuizResultDialog result={item.payload} triggerLabel="View" />
@@ -671,7 +727,7 @@ function InboxItemRow({
                 className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
               >
                 <ExternalLink className="size-3" aria-hidden />
-                Open
+                Open invoice
               </a>
             )}
             {item.payload.invoicePdfUrl && (
@@ -840,41 +896,54 @@ function ItemList({
               </li>
             ))}
           </ol>
-          {showPagination && (
+          {sorted.length > 0 ? (
             <nav
               className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"
               aria-label={paginationAriaLabel}
             >
               <p className="text-xs text-muted-foreground tabular-nums text-center sm:text-left">
                 Showing {showingFrom}–{showingTo} of {sorted.length}
+                {showPagination ? ` · ${INBOX_PAGE_SIZE} per page` : null}
               </p>
-              <div className="flex items-center justify-center gap-2 sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1 text-xs min-w-[5.25rem]"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground tabular-nums px-2 min-w-[5.5rem] text-center">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1 text-xs min-w-[5.25rem]"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
+              {showPagination ? (
+                <Pagination className="mx-0 w-auto justify-center sm:justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 text-xs"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="size-3.5" aria-hidden />
+                        Previous
+                      </Button>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <span className="px-2 text-xs text-muted-foreground tabular-nums">
+                        Page {page} of {totalPages}
+                      </span>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 text-xs"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      >
+                        Next
+                        <ChevronRight className="size-3.5" aria-hidden />
+                      </Button>
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              ) : null}
             </nav>
-          )}
+          ) : null}
         </>
       )}
     </div>

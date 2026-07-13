@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -47,31 +48,33 @@ export function AdminSupportNotificationsMenu({ unreadCount, notifications }: Pr
         ) : null}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-2rem))]">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Support ticket notifications
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {notifications.length === 0 ? (
-          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-            No support notifications yet.
-          </div>
-        ) : (
-          notifications.slice(0, 12).map((n) => (
-            <DropdownMenuItem
-              key={n.id}
-              className="flex cursor-pointer flex-col items-start gap-1 py-2"
-              onClick={() => openTicket(n.ticketId)}
-            >
-              <span className="text-sm font-medium leading-snug">{n.title}</span>
-              <span className="line-clamp-2 text-xs text-muted-foreground">{n.preview}</span>
-              {!n.readAt ? (
-                <Badge variant="secondary" className="mt-0.5 text-[10px]">
-                  New
-                </Badge>
-              ) : null}
-            </DropdownMenuItem>
-          ))
-        )}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs text-muted-foreground">
+            Support ticket notifications
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {notifications.length === 0 ? (
+            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+              No support notifications yet.
+            </div>
+          ) : (
+            notifications.slice(0, 12).map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className="flex cursor-pointer flex-col items-start gap-1 py-2"
+                onClick={() => openTicket(n.ticketId)}
+              >
+                <span className="text-sm font-medium leading-snug">{n.title}</span>
+                <span className="line-clamp-2 text-xs text-muted-foreground">{n.preview}</span>
+                {!n.readAt ? (
+                  <Badge variant="secondary" className="mt-0.5 text-[10px]">
+                    New
+                  </Badge>
+                ) : null}
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="gap-2"

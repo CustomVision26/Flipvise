@@ -48,6 +48,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "study-session": [
     "src/app/decks/[deckId]/study/page.tsx",
     "src/app/decks/[deckId]/study/quiz-study.tsx",
+    "src/components/format-quiz-question-dialog.tsx",
+    "src/actions/quiz-formats.ts",
     "src/lib/quiz-formats.ts",
     "src/lib/quiz-questions.ts",
     "src/lib/quiz-format-assignments.ts",
@@ -151,6 +153,10 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
   "admin-dashboard-overview": [
     "src/components/admin-overview-stats-collapsible.tsx",
     "src/lib/admin/load-admin-dashboard-data.ts",
+    "src/components/admin-dashboard-shell.tsx",
+    "src/components/admin-dashboard-nav.tsx",
+    "src/lib/admin-dashboard-nav.ts",
+    "src/app/admin/layout.tsx",
   ],
   "all-users": ["src/lib/admin/serialize-admin-users.ts", "src/actions/admin.ts"],
   subscription: ["src/lib/admin/admin-billing-snapshot.ts", "src/db/queries/stripe-subscriptions.ts"],
@@ -193,4 +199,6 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
 export const ADMIN_DOC_SHARED_WATCH_PATHS: readonly string[] = [
   "src/components/admin-tabs.tsx",
   "src/lib/admin-dashboard-section.ts",
+  "src/components/admin-dashboard-shell.tsx",
+  "src/lib/admin-dashboard-nav.ts",
 ];

@@ -42,6 +42,8 @@ const SERVER_SESSION_PROBE_MS = 5_000;
 const LOADING_ESCAPE_UI_MS = 0;
 /** Clerk email verification codes are 6 digits. */
 const VERIFICATION_CODE_LENGTH = 6;
+/** Wait before allowing another Clerk email code send. */
+const RESEND_CODE_COOLDOWN_SEC = 30;
 
 const NATIVE_BTN_CLASS =
   "min-h-11 w-full touch-manipulation active:scale-[0.98] transition-transform";
@@ -129,6 +131,61 @@ function NativeVerificationCodeField({
         </InputOTPGroup>
       </InputOTP>
     </div>
+  );
+}
+
+/** 30s cooldown then a Resend link that calls Clerk to send a fresh email code. */
+function NativeResendCodeControl({
+  onResend,
+  disabled,
+}: {
+  onResend: () => Promise<void>;
+  disabled?: boolean;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_CODE_COOLDOWN_SEC);
+  const [resending, setResending] = useState(false);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = window.setTimeout(
+      () => setSecondsLeft((prev) => Math.max(0, prev - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [secondsLeft]);
+
+  async function handleResend() {
+    if (secondsLeft > 0 || resending || disabled) return;
+    setResending(true);
+    try {
+      await onResend();
+      setSecondsLeft(RESEND_CODE_COOLDOWN_SEC);
+    } finally {
+      setResending(false);
+    }
+  }
+
+  if (secondsLeft > 0) {
+    return (
+      <p className="text-center text-sm text-muted-foreground" aria-live="polite">
+        Didn’t get the email? Resend code in {secondsLeft}s
+      </p>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="w-full"
+      disabled={resending || disabled}
+      onClick={() => {
+        void handleResend();
+      }}
+    >
+      {resending ? "Sending code…" : "Resend verification code"}
+    </Button>
   );
 }
 
@@ -1008,6 +1065,22 @@ function SignInForm({
     await verifyWithCode(code);
   }
 
+  async function resendVerificationCode() {
+    if (!signIn || busy) return;
+    if (!requireClerkReady()) return;
+    if (!online) {
+      setError(offlineMessage);
+      throw new Error(offlineMessage);
+    }
+    setError(null);
+    const { error: sendErr } = await signIn.emailCode.sendCode();
+    if (sendErr) {
+      fail("Couldn't resend code", sendErr);
+      throw sendErr;
+    }
+    setCode("");
+  }
+
   return (
     <Card className={NATIVE_AUTH_CARD_CLASS}>
       <NativeAuthCardLogoMark />
@@ -1157,6 +1230,10 @@ function SignInForm({
                 void verifyWithCode(value);
               }}
               disabled={busy || !clerkReady}
+            />
+            <NativeResendCodeControl
+              disabled={busy || !online || !clerkReady}
+              onResend={resendVerificationCode}
             />
             <Button
               type="submit"
@@ -1334,6 +1411,22 @@ function SignUpForm({
     await verifyWithCode(code);
   }
 
+  async function resendVerificationCode() {
+    if (!signUp || busy) return;
+    if (!requireClerkReady()) return;
+    if (!online) {
+      setError(offlineMessage);
+      throw new Error(offlineMessage);
+    }
+    setError(null);
+    const { error: sendErr } = await signUp.verifications.sendEmailCode();
+    if (sendErr) {
+      fail("Couldn't resend code", sendErr);
+      throw sendErr;
+    }
+    setCode("");
+  }
+
   return (
     <Card className={NATIVE_AUTH_CARD_CLASS}>
       <NativeAuthCardLogoMark />
@@ -1452,6 +1545,10 @@ function SignUpForm({
                 void verifyWithCode(value);
               }}
               disabled={busy || !clerkReady}
+            />
+            <NativeResendCodeControl
+              disabled={busy || !online || !clerkReady}
+              onResend={resendVerificationCode}
             />
             <Button
               type="submit"

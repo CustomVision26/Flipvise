@@ -21,7 +21,7 @@ import {
 } from "@/db/queries/quiz-schedule";
 import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
-import { isEducationTeamPlanId } from "@/lib/education-plans";
+import { isEducationTeamPlanId, canConfigurePersonalDeckQuizFormats } from "@/lib/education-plans";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   teamWorkspaceDeckTitleLinkClass,
@@ -43,7 +43,7 @@ import {
   CARDS_PER_DECK_LIMIT_FREE,
   resolveDeckCardCap,
 } from "@/lib/deck-limits";
-import { resolveQuizFormatsForStudy, getDeckQuizFormatAssignmentsForStudy } from "@/db/queries/quiz-formats";
+import { resolveQuizFormatsForStudy, getDeckQuizFormatAssignmentsForStudy, getQuizFormatsDeckSnapshotForOwner } from "@/db/queries/quiz-formats";
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -51,7 +51,7 @@ interface StudyPageProps {
 }
 
 export default async function StudyPage({ params, searchParams }: StudyPageProps) {
-  const { userId, maxCardsPerDeck, hasAiReading } = await getAccessContext();
+  const { userId, maxCardsPerDeck, hasAiReading, effectivePlanSlug } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -118,6 +118,8 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   if (studyTeamId != null) {
     const minutes = await getTeamQuizDurationMinutes(studyTeamId);
     quizDurationSeconds = teamQuizDurationSeconds(minutes);
+  } else if (deck.quizDurationMinutes != null) {
+    quizDurationSeconds = teamQuizDurationSeconds(deck.quizDurationMinutes);
   }
 
   let quizSecurity: QuizSecurityStudyContext | undefined;
@@ -200,6 +202,14 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   );
   const quizFormatAssignmentPlan = await getDeckQuizFormatAssignmentsForStudy(id);
 
+  const canEditFormats =
+    canEditDeckContent(access) &&
+    deck.userId === userId &&
+    canConfigurePersonalDeckQuizFormats(effectivePlanSlug);
+  const quizFormatEditorSnapshot = canEditFormats
+    ? await getQuizFormatsDeckSnapshotForOwner(id, userId)
+    : null;
+
   return (
     <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -271,6 +281,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         isEducationTeamPlan={isEducationTeamPlan}
         quizFormats={quizFormats}
         quizFormatAssignmentPlan={quizFormatAssignmentPlan}
+        quizFormatEditorSnapshot={quizFormatEditorSnapshot}
       />
     </div>
   );

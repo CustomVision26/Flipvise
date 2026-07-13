@@ -31,7 +31,7 @@ type QuizFormatPreviewDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deckId: number;
-  teamId: number;
+  teamId?: number;
   deckName: string;
   distribution: QuizFormatDistribution;
 };
@@ -95,7 +95,7 @@ function PreviewItemCard({
 }: {
   item: QuizFormatPreviewItem;
   deckId: number;
-  teamId: number;
+  teamId?: number;
   onSaved: () => void;
 }) {
   const [editing, setEditing] = React.useState(false);
@@ -120,7 +120,7 @@ function PreviewItemCard({
     try {
       const payload: Parameters<typeof saveQuizFormatVariantEditAction>[0] = {
         deckId,
-        teamId,
+        ...(teamId != null ? { teamId } : {}),
         cardId: item.cardId,
       };
 
@@ -333,7 +333,7 @@ export function QuizFormatPreviewDialog({
     try {
       const result = await previewDeckQuizFormatsAction({
         deckId,
-        teamId,
+        ...(teamId != null ? { teamId } : {}),
         distribution,
       });
       setItems(result.items);
@@ -412,7 +412,7 @@ export function QuizFormatPreviewButton({
   disabled,
 }: {
   deckId: number;
-  teamId: number;
+  teamId?: number;
   deckName: string;
   distribution: QuizFormatDistribution;
   disabled?: boolean;

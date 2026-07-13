@@ -3,7 +3,7 @@ import { decks, cards, type DeckRow } from "@/db/schema";
 import { and, count, eq, isNull } from "drizzle-orm";
 export type { DeckRow };
 
-/** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` columns). */
+/** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` / `quizDurationMinutes` columns). */
 export const deckRowSelectWithoutCover = {
   id: decks.id,
   userId: decks.userId,
@@ -54,11 +54,30 @@ export function isMissingDeckCoverColumnError(error: unknown): boolean {
   return false;
 }
 
-export function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient">>(row: T): DeckRow {
+export function isMissingDeckQuizDurationColumnError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /quizDurationMinutes|quiz_duration_minutes/i.test(msg);
+}
+
+function isMissingDeckSchemaColumnError(error: unknown): boolean {
+  return (
+    isMissingDeckCoverColumnError(error) ||
+    isMissingDeckQuizDurationColumnError(error)
+  );
+}
+
+export function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient" | "quizDurationMinutes">>(
+  row: T,
+): DeckRow {
   return {
     ...row,
     coverImageUrl: null,
     gradient: null,
+    quizDurationMinutes:
+      "quizDurationMinutes" in row
+        ? ((row as { quizDurationMinutes?: number | null }).quizDurationMinutes ?? null)
+        : null,
     inactiveAt: "inactiveAt" in row ? (row.inactiveAt ?? null) : null,
     quizSecurityEnabled:
       "quizSecurityEnabled" in row ? (row.quizSecurityEnabled ?? null) : null,
@@ -69,7 +88,7 @@ export async function getDecksByUser(userId: string): Promise<DeckRow[]> {
   try {
     return await db.select().from(decks).where(eq(decks.userId, userId));
   } catch (e) {
-    if (!isMissingDeckCoverColumnError(e)) throw e;
+    if (!isMissingDeckSchemaColumnError(e)) throw e;
     const rows = await db
       .select(deckRowSelectWithoutCover)
       .from(decks)
@@ -179,7 +198,7 @@ export async function getDeckById(deckId: number, userId: string): Promise<DeckR
       .where(and(eq(decks.id, deckId), eq(decks.userId, userId)));
     return rows[0] ?? null;
   } catch (e) {
-    if (!isMissingDeckCoverColumnError(e)) throw e;
+    if (!isMissingDeckSchemaColumnError(e)) throw e;
     const rows = await db
       .select(deckRowSelectWithoutCover)
       .from(decks)
@@ -195,7 +214,7 @@ export async function getDeckRowById(deckId: number): Promise<DeckRow | null> {
     const rows = await db.select().from(decks).where(eq(decks.id, deckId));
     return rows[0] ?? null;
   } catch (e) {
-    if (!isMissingDeckCoverColumnError(e)) throw e;
+    if (!isMissingDeckSchemaColumnError(e)) throw e;
     const rows = await db
       .select(deckRowSelectWithoutCover)
       .from(decks)

@@ -219,6 +219,8 @@ export const decks = pgTable('decks', {
   quizFormatFillInBlank: boolean(),
   /** Admin-reshuffled per-card quiz format assignments (see DeckQuizFormatAssignments). */
   quizFormatAssignments: json().$type<import("@/lib/quiz-format-assignments").DeckQuizFormatAssignments>(),
+  /** Personal timed-quiz length in minutes. Null uses auto duration from card count. */
+  quizDurationMinutes: integer(),
   /** Clerk user id of who created the deck row (co-admin on education workspaces; owner on personal/owner-created). */
   createdByUserId: varchar({ length: 255 }),
   /** Set when owner marks deck inactive during plan reconciliation. */

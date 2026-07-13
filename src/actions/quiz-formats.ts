@@ -8,6 +8,7 @@ import {
   getDeckQuizFormatAssignmentsForStudy,
   resolveQuizFormatsForStudy,
   reshuffleDeckQuizFormatAssignments,
+  updateDeckQuizDurationMinutes,
   updateDeckQuizFormats,
   updateTeamQuizFormats,
 } from "@/db/queries/quiz-formats";
@@ -31,6 +32,12 @@ import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { canEditDeckContent } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import { canUseDeckAiFeatures, DECK_AI_PLAN_REQUIREMENT } from "@/lib/deck-ai-access";
+import { canConfigurePersonalDeckQuizFormats } from "@/lib/education-plans";
+import {
+  MAX_TEAM_QUIZ_DURATION_MINUTES,
+  MIN_TEAM_QUIZ_DURATION_MINUTES,
+  resolveTeamQuizDurationMinutes,
+} from "@/lib/team-quiz-duration";
 
 async function assertCanManageTeam(userId: string, teamId: number) {
   const { getTeamById, getMemberRecord } = await import("@/db/queries/teams");
@@ -40,6 +47,36 @@ async function assertCanManageTeam(userId: string, teamId: number) {
   const member = await getMemberRecord(teamId, userId);
   if (member?.role === "team_admin") return team;
   throw new Error("Forbidden");
+}
+
+/** Team admin path, or personal Pro Plus / Education Plus deck owner. */
+async function assertCanManageDeckQuizFormats(
+  userId: string,
+  deckId: number,
+  teamId: number | undefined,
+  effectivePlanSlug: string | null,
+): Promise<{ ownerUserId: string; teamId: number | null }> {
+  if (teamId != null) {
+    const team = await assertCanManageTeam(userId, teamId);
+    await assertDeckInWorkspaceForFormats(teamId, team.ownerUserId, deckId);
+    return { ownerUserId: team.ownerUserId, teamId };
+  }
+
+  if (!canConfigurePersonalDeckQuizFormats(effectivePlanSlug)) {
+    throw new Error(
+      "Pro Plus or Education Plus is required to configure quiz question formats.",
+    );
+  }
+
+  const bundle = await getDeckWithViewerAccess(deckId, userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+  if (bundle.deck.userId !== userId) {
+    throw new Error("Only the deck owner can configure quiz formats for this deck.");
+  }
+
+  return { ownerUserId: userId, teamId: null };
 }
 
 const quizFormatsSchema = z.object({
@@ -54,9 +91,9 @@ const updateTeamQuizFormatsSchema = z.object({
 });
 
 const updateDeckQuizFormatsSchema = z.object({
-  teamId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
   deckId: z.number().int().positive(),
-  /** null clears per-deck override (inherit workspace). */
+  /** null clears per-deck override (inherit workspace). Personal decks must pass settings. */
   formats: quizFormatsSchema.nullable(),
 });
 
@@ -70,23 +107,38 @@ const generateDeckQuizVariantsSchema = z.object({
   deckId: z.number().int().positive(),
   teamId: z.number().int().positive().optional(),
   distribution: quizFormatDistributionSchema,
+  /** Draft formats for personal Format Quiz Question — not written until Publish. */
+  formats: quizFormatsSchema.optional(),
 });
 
 const reshuffleDeckQuizFormatsSchema = z.object({
   deckId: z.number().int().positive(),
-  teamId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
   distribution: quizFormatDistributionSchema,
+});
+
+const publishDeckQuizFormatsSchema = z.object({
+  deckId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
+  formats: quizFormatsSchema,
+  distribution: quizFormatDistributionSchema,
+  /** Timed quiz length in minutes. Required for personal Format Quiz Question publish. */
+  durationMinutes: z
+    .number()
+    .int()
+    .min(MIN_TEAM_QUIZ_DURATION_MINUTES)
+    .max(MAX_TEAM_QUIZ_DURATION_MINUTES),
 });
 
 const previewDeckQuizFormatsSchema = z.object({
   deckId: z.number().int().positive(),
-  teamId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
   distribution: quizFormatDistributionSchema,
 });
 
 const saveQuizFormatVariantEditSchema = z.object({
   deckId: z.number().int().positive(),
-  teamId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
   cardId: z.number().int().positive(),
   trueFalse: z
     .object({
@@ -126,18 +178,22 @@ export async function updateTeamQuizFormatsAction(
 export async function updateDeckQuizFormatsAction(
   data: z.infer<typeof updateDeckQuizFormatsSchema>,
 ) {
-  const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
 
   const parsed = updateDeckQuizFormatsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  await assertDeckInWorkspaceForFormats(
-    parsed.data.teamId,
-    team.ownerUserId,
+  const { ownerUserId, teamId } = await assertCanManageDeckQuizFormats(
+    access.userId,
     parsed.data.deckId,
+    parsed.data.teamId,
+    access.effectivePlanSlug,
   );
+
+  if (teamId == null && parsed.data.formats == null) {
+    throw new Error("Enable at least one quiz question format.");
+  }
 
   if (
     parsed.data.formats &&
@@ -150,9 +206,10 @@ export async function updateDeckQuizFormatsAction(
 
   await updateDeckQuizFormats(
     parsed.data.deckId,
-    team.ownerUserId,
+    ownerUserId,
     parsed.data.formats,
   );
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
   revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
 }
 
@@ -177,10 +234,12 @@ export async function generateDeckQuizVariantsAction(
     throw new Error(DECK_AI_PLAN_REQUIREMENT);
   }
 
-  const formats = await resolveQuizFormatsForStudy(
-    parsed.data.deckId,
-    parsed.data.teamId ?? bundle.deck.teamId,
-  );
+  const formats =
+    parsed.data.formats ??
+    (await resolveQuizFormatsForStudy(
+      parsed.data.deckId,
+      parsed.data.teamId ?? bundle.deck.teamId,
+    ));
 
   if (!formats.trueFalse && !formats.fillInBlank) {
     throw new Error("Enable true/false or fill-in-the-blank formats first.");
@@ -214,13 +273,40 @@ export async function generateDeckQuizVariantsAction(
   const cardSupportsFillInBlank = (card: (typeof prepared)[number]) =>
     getAvailableQuestionTypesForCard(card, prepared, formats).includes("fill_in_blank");
 
+  const syncPreparedVariants = (
+    cardId: number,
+    variants: import("@/lib/card-quiz-variants").CardQuizVariants,
+  ) => {
+    const idx = prepared.findIndex((c) => c.id === cardId);
+    if (idx < 0) return;
+    const current = prepared[idx]!;
+    prepared[idx] = {
+      ...current,
+      quizVariants: {
+        ...(current.quizVariants ?? {}),
+        ...variants,
+      },
+    };
+    const eligibleIdx = eligible.findIndex((c) => c.id === cardId);
+    if (eligibleIdx >= 0) {
+      eligible[eligibleIdx] = prepared[idx]!;
+    }
+  };
+
   let generated = 0;
   let failed = 0;
   let skipped = 0;
-  let trueFalseReady = eligible.filter((c) => cardSupportsTrueFalse(c)).length;
-  let fillInBlankReady = eligible.filter((c) => cardSupportsFillInBlank(c)).length;
 
+  // Keep generating until the mix can actually be assigned to distinct cards
+  // (count thresholds alone are not enough when T/F and FIB share the same cards).
   for (const card of eligible) {
+    const readyCounts = countCardsReadyForQuizFormats(prepared, formats);
+    if (
+      explainQuizFormatContentBlock(formats, readyCounts, distribution, prepared) === null
+    ) {
+      break;
+    }
+
     const front = (card.front ?? "").trim();
     const back = (card.back ?? "").trim();
     if (!front || !back) {
@@ -231,23 +317,13 @@ export async function generateDeckQuizVariantsAction(
     const needsTf =
       formats.trueFalse &&
       distribution.trueFalse > 0 &&
-      trueFalseReady < distribution.trueFalse &&
       !cardSupportsTrueFalse(card);
     const needsFib =
       formats.fillInBlank &&
       distribution.fillInBlank > 0 &&
-      fillInBlankReady < distribution.fillInBlank &&
       !cardSupportsFillInBlank(card);
 
     if (!needsTf && !needsFib) {
-      skipped++;
-      continue;
-    }
-
-    if (
-      trueFalseReady >= distribution.trueFalse &&
-      fillInBlankReady >= distribution.fillInBlank
-    ) {
       skipped++;
       continue;
     }
@@ -261,20 +337,23 @@ export async function generateDeckQuizVariantsAction(
         includeFillInBlank: needsFib,
         mcqContext,
       });
-      if (variants.trueFalse || variants.fillInBlank) {
-        await mergeCardQuizVariants(card.id, parsed.data.deckId, variants);
-        generated++;
-        if (variants.trueFalse?.statement?.trim()) trueFalseReady++;
-        if (variants.fillInBlank?.segments?.length) fillInBlankReady++;
-      } else {
+      if (
+        (needsTf && !variants.trueFalse) ||
+        (needsFib && !variants.fillInBlank)
+      ) {
         failed++;
+        continue;
       }
+      await mergeCardQuizVariants(card.id, parsed.data.deckId, variants);
+      syncPreparedVariants(card.id, variants);
+      generated++;
     } catch {
       failed++;
     }
   }
 
   revalidatePath(`/decks/${parsed.data.deckId}`);
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
   revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
 
   const afterCards = await getCardsByDeckUnscoped(parsed.data.deckId);
@@ -313,36 +392,97 @@ function shuffleInPlace<T>(arr: T[]): void {
   }
 }
 
-/** Reshuffle which question format each card uses in team quizzes for this deck. */
+/** Reshuffle which question format each card uses in quizzes for this deck. */
 export async function reshuffleDeckQuizFormatAssignmentsAction(
   data: z.infer<typeof reshuffleDeckQuizFormatsSchema>,
 ) {
-  const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
 
   const parsed = reshuffleDeckQuizFormatsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  await assertDeckInWorkspaceForFormats(
-    parsed.data.teamId,
-    team.ownerUserId,
+  const { ownerUserId, teamId } = await assertCanManageDeckQuizFormats(
+    access.userId,
     parsed.data.deckId,
+    parsed.data.teamId,
+    access.effectivePlanSlug,
   );
 
-  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
   if (!bundle || !canEditDeckContent(bundle.access)) {
     throw new Error("Deck not found");
   }
 
   const payload = await reshuffleDeckQuizFormatAssignments(
     parsed.data.deckId,
-    team.ownerUserId,
-    parsed.data.teamId,
+    ownerUserId,
+    teamId,
     parsed.data.distribution,
   );
 
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
+  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  return {
+    cardCount: Object.keys(payload.byCardId).length,
+    shuffledAt: payload.shuffledAt,
+  };
+}
+
+/**
+ * Persist format settings and publish the question mix to quiz in one step.
+ * Personal Format Quiz Question drafts are not applied to the lobby until this runs.
+ */
+export async function publishDeckQuizFormatsAction(
+  data: z.infer<typeof publishDeckQuizFormatsSchema>,
+) {
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+
+  const parsed = publishDeckQuizFormatsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  if (
+    !parsed.data.formats.multipleChoice &&
+    !parsed.data.formats.trueFalse &&
+    !parsed.data.formats.fillInBlank
+  ) {
+    throw new Error("Enable at least one quiz question format.");
+  }
+
+  const { ownerUserId, teamId } = await assertCanManageDeckQuizFormats(
+    access.userId,
+    parsed.data.deckId,
+    parsed.data.teamId,
+    access.effectivePlanSlug,
+  );
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+
+  await updateDeckQuizFormats(
+    parsed.data.deckId,
+    ownerUserId,
+    parsed.data.formats,
+  );
+
+  await updateDeckQuizDurationMinutes(
+    parsed.data.deckId,
+    ownerUserId,
+    resolveTeamQuizDurationMinutes(parsed.data.durationMinutes),
+  );
+
+  const payload = await reshuffleDeckQuizFormatAssignments(
+    parsed.data.deckId,
+    ownerUserId,
+    teamId,
+    parsed.data.distribution,
+  );
+
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
+  revalidatePath(`/decks/${parsed.data.deckId}`);
   revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
   return {
     cardCount: Object.keys(payload.byCardId).length,
@@ -357,28 +497,25 @@ export async function previewDeckQuizFormatsAction(
   items: QuizFormatPreviewItem[];
   usesPublishedAssignments: boolean;
 }> {
-  const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
 
   const parsed = previewDeckQuizFormatsSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  await assertDeckInWorkspaceForFormats(
-    parsed.data.teamId,
-    team.ownerUserId,
+  const { teamId } = await assertCanManageDeckQuizFormats(
+    access.userId,
     parsed.data.deckId,
+    parsed.data.teamId,
+    access.effectivePlanSlug,
   );
 
-  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
   if (!bundle || !canEditDeckContent(bundle.access)) {
     throw new Error("Deck not found");
   }
 
-  const formats = await resolveQuizFormatsForStudy(
-    parsed.data.deckId,
-    parsed.data.teamId,
-  );
+  const formats = await resolveQuizFormatsForStudy(parsed.data.deckId, teamId);
   const cardRows = await getCardsByDeckUnscoped(parsed.data.deckId);
   const prepared = cardRows.map((c) => ({
     id: c.id,
@@ -416,8 +553,8 @@ export async function previewDeckQuizFormatsAction(
 export async function saveQuizFormatVariantEditAction(
   data: z.infer<typeof saveQuizFormatVariantEditSchema>,
 ): Promise<{ ok: true }> {
-  const { userId } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
 
   const parsed = saveQuizFormatVariantEditSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
@@ -426,14 +563,14 @@ export async function saveQuizFormatVariantEditAction(
     throw new Error("Nothing to save.");
   }
 
-  const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  await assertDeckInWorkspaceForFormats(
-    parsed.data.teamId,
-    team.ownerUserId,
+  await assertCanManageDeckQuizFormats(
+    access.userId,
     parsed.data.deckId,
+    parsed.data.teamId,
+    access.effectivePlanSlug,
   );
 
-  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
   if (!bundle || !canEditDeckContent(bundle.access)) {
     throw new Error("Deck not found");
   }

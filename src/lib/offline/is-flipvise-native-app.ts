@@ -59,9 +59,16 @@ export function resolveOfflineShellUrl(): string {
 /**
  * Navigate back to the bundled offline Study shell — no async work before navigation.
  * Use from button handlers so taps feel instant even when Clerk is still loading.
+ *
+ * `immediate: true` skips Preferences visit-mark (sign-out path) so Clerk cannot
+ * paint `/` before the WebView leaves the live site.
  */
-export function navigateToOfflineShellFast(): void {
+export function navigateToOfflineShellFast(opts?: { immediate?: boolean }): void {
   if (typeof window === "undefined") return;
+  if (opts?.immediate) {
+    leaveLiveSiteForOfflineShell();
+    return;
+  }
   void navigateToOfflineShellWithVisitMark();
 }
 
@@ -73,6 +80,10 @@ async function navigateToOfflineShellWithVisitMark(): Promise<void> {
     // Non-fatal — offline shell may skip a workspace refresh this once.
   }
 
+  leaveLiveSiteForOfflineShell();
+}
+
+function leaveLiveSiteForOfflineShell(): void {
   if (isFlipviseNativeShell()) {
     try {
       if (Capacitor.getPlatform() === "ios") {

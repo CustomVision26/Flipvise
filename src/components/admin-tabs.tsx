@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo, useEffect } from "react";
+import { Fragment, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -44,8 +44,6 @@ import {
   ReceiptText,
   WalletCards,
   Download,
-  PanelLeftClose,
-  PanelLeftOpen,
   LayoutList,
   Megaphone,
   History,
@@ -73,8 +71,6 @@ import {
 import { AdminAffiliatePromoBroadcast } from "@/components/admin-affiliate-promo-broadcast";
 import { AdminAffiliatesPanel } from "@/components/admin-affiliates-panel";
 import { PlatformDocumentationManager } from "@/components/platform-documentation-manager";
-import { AdminSupportNotificationsMenu } from "@/components/admin-support-notifications-menu";
-import type { SerializedSupportNotification } from "@/lib/support-ticket-dto";
 import type {
   SerializedAdminInvoice,
   SerializedAdminSubscription,
@@ -95,18 +91,11 @@ import type {
 } from "@/lib/contact-us-admin-dto";
 import {
   adminFilterInputClass,
-  adminMenuCardClass,
-  adminMenuContentClass,
-  adminMenuHeaderClass,
-  adminMenuIconButtonClass,
-  adminMenuTabClass,
-  adminMenuTitleClass,
   adminPlanHistoryTableShellClass,
   adminPlansSubTabPanelClass,
   adminSectionCardClass,
   adminSectionTitleClass,
   adminSupportSectionLabelClass,
-  adminShowMenuButtonClass,
 } from "@/components/admin-panel-styles";
 import { cn } from "@/lib/utils";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
@@ -152,8 +141,6 @@ export interface AdminTabsProps {
   contactSettings: SerializedContactSettings;
   contactMessages: SerializedContactMessage[];
   contactUsStats: ContactUsStats;
-  supportNotifications: SerializedSupportNotification[];
-  supportUnreadCount: number;
   plansConfig: PlanConfig[];
   affiliates: SerializedAffiliate[];
   /** Server default (env) — used as the initial value for “accept link” days in the invite form. */
@@ -263,8 +250,6 @@ export function AdminTabs({
   contactSettings,
   contactMessages,
   contactUsStats,
-  supportNotifications,
-  supportUnreadCount,
   plansConfig,
   affiliates,
   affiliateInviteDefaultExpiresInDays,
@@ -284,13 +269,6 @@ export function AdminTabs({
     useState<BillingInvoiceStatusFilter>("all");
   const [invoiceDateFrom, setInvoiceDateFrom] = useState("");
   const [invoiceDateTo, setInvoiceDateTo] = useState("");
-  const [sidebarHidden, setSidebarHidden] = useState(false);
-
-  useEffect(() => {
-    if (window.matchMedia("(max-width: 1023px)").matches) {
-      setSidebarHidden(true);
-    }
-  }, []);
   const [profileDialogUser, setProfileDialogUser] = useState<SerializedUser | null>(null);
   const [expandedWorkspaceUserId, setExpandedWorkspaceUserId] = useState<string | null>(null);
   const [workspaceDialog, setWorkspaceDialog] = useState<SerializedAdminWorkspace | null>(null);
@@ -381,7 +359,6 @@ export function AdminTabs({
     });
   }, [users, search, planFilter, roleFilter, statusFilter]);
 
-  const bannedCount = users.filter((u) => u.isBanned).length;
   const subscriptionRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return subscriptions.filter((row) => {
@@ -454,179 +431,7 @@ export function AdminTabs({
   });
 
   return (
-    <div
-      className={`grid gap-4 sm:gap-6 ${sidebarHidden ? "grid-cols-1" : "lg:grid-cols-[15rem_minmax(0,1fr)]"}`}
-    >
-      {sidebarHidden ? null : (
-        <Card className={adminMenuCardClass}>
-          <CardHeader className={adminMenuHeaderClass}>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className={adminMenuTitleClass}>Admin Menu</CardTitle>
-              <div className="flex items-center gap-1">
-                <AdminSupportNotificationsMenu
-                  unreadCount={supportUnreadCount}
-                  notifications={supportNotifications}
-                />
-                <button
-                  type="button"
-                  onClick={() => setSidebarHidden(true)}
-                  className={adminMenuIconButtonClass}
-                  aria-label="Hide admin menu"
-                  title="Hide admin menu"
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className={adminMenuContentClass}>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/all-users")}
-              className={adminMenuTabClass(activeSection === "all-users")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <Users className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">All Users</span>
-                {bannedCount > 0 ? (
-                  <Badge variant="destructive" className="ml-auto text-xs">
-                    {bannedCount}
-                  </Badge>
-                ) : null}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/team-workspaces")}
-              className={adminMenuTabClass(activeSection === "workspace-admin")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <Building2 className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Team Workspaces</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/subscription")}
-              className={adminMenuTabClass(activeSection === "subscription")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <WalletCards className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Subscription</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/invoices")}
-              className={adminMenuTabClass(activeSection === "invoices")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <ReceiptText className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Invoices</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/admin-roles")}
-              className={adminMenuTabClass(activeSection === "admin-roles")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <ShieldCheck className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Admin Roles</span>
-                {logs.length > 0 ? (
-                  <Badge className="ml-auto text-xs" variant="secondary">
-                    {logs.length}
-                  </Badge>
-                ) : null}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/support-center")}
-              className={adminMenuTabClass(activeSection === "support-center")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <LifeBuoy className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Support Center</span>
-                {supportUnreadCount > 0 ? (
-                  <Badge className="ml-auto text-xs" variant="destructive">
-                    {supportUnreadCount}
-                  </Badge>
-                ) : supportStats.totals.openCount > 0 ? (
-                  <Badge className="ml-auto text-xs" variant="secondary">
-                    {supportStats.totals.openCount}
-                  </Badge>
-                ) : null}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/plans")}
-              className={adminMenuTabClass(activeSection === "plans")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <LayoutList className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Plans</span>
-                {planAssignmentLogs.length > 0 ? (
-                  <Badge className="ml-auto text-xs" variant="secondary">
-                    {planAssignmentLogs.length}
-                  </Badge>
-                ) : null}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/marketing-affiliates")}
-              className={adminMenuTabClass(activeSection === "marketing-affiliates")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <Megaphone className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Marketing Affiliates</span>
-                {(() => {
-                  const active = affiliates.filter((a) => a.status === "active").length;
-                  const pending = affiliates.filter((a) => a.status === "pending").length;
-                  const total = active + pending;
-                  return total > 0 ? (
-                    <span className="ml-auto flex items-center gap-1">
-                      {active > 0 && (
-                        <Badge className="text-xs" variant="secondary">{active}</Badge>
-                      )}
-                      {pending > 0 && (
-                        <Badge className="text-xs border-amber-500 text-amber-500" variant="outline">{pending} pending</Badge>
-                      )}
-                    </span>
-                  ) : null;
-                })()}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/documentation")}
-              className={adminMenuTabClass(activeSection === "documentation")}
-            >
-              <span className="flex w-full items-center gap-2.5">
-                <BookOpen className="h-4 w-4 shrink-0 opacity-80" />
-                <span className="truncate">Documentation</span>
-              </span>
-            </button>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="min-w-0">
-      {sidebarHidden ? (
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => setSidebarHidden(false)}
-            className={adminShowMenuButtonClass}
-            aria-label="Show admin menu"
-          >
-            <PanelLeftOpen className="h-4 w-4 shrink-0 opacity-80" />
-            Admin Menu
-          </button>
-        </div>
-      ) : null}
+    <div className="min-w-0">
       {activeSection === "all-users" ? (
         <Card className={adminSectionCardClass}>
           <CardHeader className="space-y-4 border-b border-border/50 pb-4">
@@ -2094,7 +1899,6 @@ export function AdminTabs({
           }
         />
       ) : null}
-      </div>
     </div>
   );
 }

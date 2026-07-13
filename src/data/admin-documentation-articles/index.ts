@@ -45,9 +45,10 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "navigation",
         title: "Shell and navigation",
         bullets: [
-          "Left Admin Menu switches sections (Users & Billing, Team Workspaces, Platform Access, Support Center, Plans & Affiliates) without leaving the dashboard.",
+          "Sticky left sidebar (same layout pattern as Teacher Dashboard) switches sections without leaving the admin shell.",
+          "Overview → Dashboard opens All Users; other groups cover Billing, Access & support, Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
-          "Support notifications bell surfaces unread Help Center tickets and Contact Us thread alerts.",
+          "Support notifications bell in the page header surfaces unread Help Center tickets and Contact Us thread alerts.",
           "Section routes map to dedicated URLs (e.g. /admin/all-users, /admin/plans) for deep linking.",
         ],
       },

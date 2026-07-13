@@ -76,6 +76,8 @@ import {
 } from "@/actions/quiz-security";
 import type { QuizSecuritySessionState } from "@/db/schema";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
+import { FormatQuizQuestionButton } from "@/components/format-quiz-question-dialog";
+import type { QuizFormatsDeckSnapshot } from "@/db/queries/quiz-formats";
 import { getDeckQuizAccent } from "@/lib/deck-quiz-accent";
 import {
   formatCountdown,
@@ -170,6 +172,8 @@ interface QuizStudyProps {
   quizFormatAssignmentPlan?: DeckQuizFormatAssignments | null;
   /** Education Gold / Enterprise — secured quizzes auto-save to user, owner, and team admins. */
   isEducationTeamPlan?: boolean;
+  /** Pro Plus / Education Plus personal deck — Format Quiz Question dialog. */
+  quizFormatEditorSnapshot?: QuizFormatsDeckSnapshot | null;
 }
 
 type QuizSecurityStatus = NonNullable<QuizStudyProps["quizSecurity"]>["initialSession"] extends infer S
@@ -270,6 +274,7 @@ export function QuizStudy({
   quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
   quizFormatAssignmentPlan = null,
   isEducationTeamPlan = false,
+  quizFormatEditorSnapshot = null,
 }: QuizStudyProps) {
   const quizFormatAssignments = quizFormatAssignmentPlan?.byCardId ?? null;
   const router = useRouter();
@@ -1165,6 +1170,15 @@ export function QuizStudy({
                 <Play className="h-4 w-4" />
                 {grantedFreshStart ? "Start over" : "Start quiz"}
               </Button>
+            ) : null}
+            {quizFormatEditorSnapshot ? (
+              <FormatQuizQuestionButton
+                deckId={deckId}
+                deckName={deckName}
+                snapshot={quizFormatEditorSnapshot}
+                cards={preparedCards}
+                onPublished={() => router.refresh()}
+              />
             ) : null}
             <Button
               variant="outline"

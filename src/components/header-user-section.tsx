@@ -27,11 +27,14 @@ import { clerkAuthHandoffDelayMs } from "@/lib/clerk-auth-handoff";
 import {
   isFlipviseNativeApp,
   isFlipviseNativeShell,
-  navigateToOfflineShell,
+  navigateToOfflineShellFast,
 } from "@/lib/offline/is-flipvise-native-app";
 import { useClientMounted } from "@/lib/use-client-mounted";
+import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
+
+const NATIVE_AFTER_SIGN_OUT_URL = "/native-signout";
 
 interface HeaderUserSectionProps {
   currentProTheme?: ProUiThemeId;
@@ -118,20 +121,27 @@ export function HeaderUserSection({
     void (async () => {
       if (isFlipviseNativeApp()) {
         try {
+          sessionStorage.setItem(NATIVE_SIGNING_OUT_KEY, "1");
+        } catch {
+          // ignore
+        }
+        try {
           const session = await import("@/lib/offline/session");
           await session.setRequireManualSignIn(true);
+          // Leave the live site immediately — do not await network revoke (that
+          // race let Clerk paint `/` before offline study opened).
+          navigateToOfflineShellFast({ immediate: true });
           const token = await session.getStoredSyncToken().catch(() => null);
           if (token) {
-            await fetch(`${window.location.origin}/api/native/revoke-sync-token`, {
+            void fetch(`${window.location.origin}/api/native/revoke-sync-token`, {
               method: "POST",
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => {});
           }
-          await session.clearStoredSyncCredentials();
+          void session.clearStoredSyncCredentials().catch(() => {});
         } catch {
-          // Non-fatal — offline shell still opens; user may need to sign in manually.
+          navigateToOfflineShellFast({ immediate: true });
         }
-        await navigateToOfflineShell();
       } else {
         window.location.replace("/");
       }
@@ -299,12 +309,34 @@ export function HeaderUserSection({
           className="flex shrink-0 items-center gap-0.5 sm:gap-1"
         >
         {portalsReady ? (
+          <HeaderNavTooltip label={`${personalAccountPlanLabel} plan — view pricing`}>
+            <Link
+              href="/pricing"
+              className={cn(
+                "mr-0.5 inline-block max-w-[5.5rem] shrink-0 truncate text-xs font-medium text-muted-foreground transition-colors hover:text-foreground min-[380px]:max-w-[7rem] sm:mr-1 sm:max-w-[9rem] sm:text-sm lg:max-w-[11rem]",
+                isPro && "text-foreground",
+              )}
+              aria-label={`${personalAccountPlanLabel} plan — view pricing`}
+            >
+              {personalAccountPlanLabel}
+            </Link>
+          </HeaderNavTooltip>
+        ) : null}
+        {portalsReady ? (
           <>
             <span
               className="inline-flex shrink-0 items-center"
               title="Account — profile, appearance, and billing"
             >
-              <UserButton>
+              <UserButton
+                afterSignOutUrl={
+                  clientMounted &&
+                  (document.documentElement.dataset.flipviseNativeShell === "1" ||
+                    isFlipviseNativeShell())
+                    ? NATIVE_AFTER_SIGN_OUT_URL
+                    : "/"
+                }
+              >
                 <UserButton.UserProfilePage
                   label="Appearance"
                   url="appearance"
@@ -352,18 +384,6 @@ export function HeaderUserSection({
           data-header-workspace
           className="col-span-2 row-start-2 flex w-full min-w-0 items-center gap-2 lg:order-2 lg:w-auto"
         >
-          <HeaderNavTooltip label={`${personalAccountPlanLabel} plan — view pricing`}>
-            <Link
-              href="/pricing"
-              className={cn(
-                "inline-block shrink-0 truncate text-sm font-medium text-muted-foreground transition-colors hover:text-foreground max-w-[6rem] min-[380px]:max-w-[8rem] sm:max-w-[9rem] lg:max-w-[11rem] xl:max-w-[14rem]",
-                isPro && "text-foreground",
-              )}
-              aria-label={`${personalAccountPlanLabel} plan — view pricing`}
-            >
-              {personalAccountPlanLabel}
-            </Link>
-          </HeaderNavTooltip>
           <span className="inline-flex min-w-0 flex-1 lg:flex-initial">
             <WorkspaceContextDropdown
               teams={workspaceTeams}

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 /** Admin sections where the dashboard overview stat row can be folded away. */
 const STATS_TOGGLE_ROUTES = new Set([
+  "/admin",
   "/admin/marketing-affiliates",
   "/admin/plans",
   "/admin/support-center",

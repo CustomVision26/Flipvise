@@ -2,7 +2,6 @@ import { AdminTabs } from "@/components/admin-tabs";
 import type { AdminDashboardSection } from "@/lib/admin-dashboard-section";
 import { loadAdminTabsData } from "@/lib/admin/load-admin-dashboard-data";
 import { getAffiliateInviteExpiryDays } from "@/lib/affiliate-invite-expiry";
-import { getAdminSupportNotificationsAction } from "@/actions/support-admin";
 
 type Props = {
   section: AdminDashboardSection;
@@ -16,7 +15,6 @@ export async function AdminTabsPanel({
   callerIsSuperadmin,
 }: Props) {
   const data = await loadAdminTabsData(section);
-  const supportAlerts = await getAdminSupportNotificationsAction();
 
   return (
     <AdminTabs
@@ -32,8 +30,6 @@ export async function AdminTabsPanel({
       contactSettings={data.contactSettings}
       contactMessages={data.contactMessages}
       contactUsStats={data.contactUsStats}
-      supportNotifications={supportAlerts.notifications}
-      supportUnreadCount={supportAlerts.unreadCount}
       plansConfig={data.plansConfig}
       affiliates={data.affiliates}
       affiliateInviteDefaultExpiresInDays={getAffiliateInviteExpiryDays()}

@@ -93,7 +93,8 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Multiple choice — pick the best answer from several options (uses card front/back or stored choices).",
           "True / false — decide whether an AI-generated statement is true or false.",
           "Fill in the blank — type the missing word or phrase in an AI-generated sentence.",
-          "Admins enable formats and set how many questions of each type per deck in Team Admin → Deck Manager → Study privileges.",
+          "Pro Plus and Education Plus: on your personal deck’s quiz lobby, use Format Quiz Question to enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz.",
+          "Education Gold / Enterprise team admins also configure formats in Team Admin → Deck Manager → Study privileges.",
         ],
       },
       {
@@ -101,10 +102,10 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Quiz lobby and session mix",
         bullets: [
           "Before you start a quiz, the lobby lists which formats are enabled and how many questions of each type you will see (e.g. 5 multiple choice, 2 true/false, 3 fill in the blank).",
-          "When a team admin has entered question counts and used Reshuffle format questions, the lobby reflects that exact distribution.",
-          "Without an admin reshuffle, the lobby estimates a random mix across enabled formats.",
+          "When question counts have been entered and Publish to quiz used (personal Format Quiz Question or team Study privileges), the lobby reflects that exact distribution.",
+          "Without a publish/reshuffle, the lobby estimates a random mix across enabled formats.",
           "Each question shows a format badge while you answer (Multiple choice, True / false, or Fill in the blank).",
-          "When reshuffled, each card keeps its assigned format for every member until the admin reshuffles again.",
+          "When published, each card keeps its assigned format until formats are published again.",
         ],
       },
       {
@@ -120,7 +121,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "team-policies",
         title: "Team quiz policies",
         bullets: [
-          "Quiz timer — time limit per attempt set by team admin.",
+          "Quiz timer — time limit per attempt set by team admin (or by you via Format Quiz Question on personal Pro Plus / Education Plus decks).",
           "Quiz schedule — quizzes cannot start before the configured date/time.",
           "Quiz security — session locking, admin grant to resume/restart, one controlled attempt per deck.",
         ],
