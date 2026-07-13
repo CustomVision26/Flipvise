@@ -102,6 +102,9 @@ export function hasProPlusFeatures(
  * Personal deck quiz format configuration from Study → Quiz
  * (Format Quiz Question dialog). Pro Plus and Education Plus only —
  * not Education Gold/Enterprise (those use Team Admin Study Privileges).
+ *
+ * Applies for any entitlement source: Stripe paid, admin-assigned, affiliate
+ * grant, Clerk JWT plan claim, or platform-admin complimentary Pro Plus.
  */
 export function canConfigurePersonalDeckQuizFormats(
   plan: string | null | undefined,
@@ -109,6 +112,33 @@ export function canConfigurePersonalDeckQuizFormats(
   if (!plan) return false;
   const p = plan.trim();
   return p === "pro_plus" || p === "education_plus";
+}
+
+/** Access-context form — covers slug plus JWT/complimentary flags when metadata is stale. */
+export function canConfigurePersonalDeckQuizFormatsFromAccess(access: {
+  effectivePlanSlug: string | null;
+  hasClerkPersonalProPlus: boolean;
+  canAccessTeacherTools: boolean;
+  activeTeamPlan: string | null;
+  activeEducationTeamPlan: string | null;
+}): boolean {
+  if (canConfigurePersonalDeckQuizFormats(access.effectivePlanSlug)) return true;
+
+  // Personal Pro Plus via JWT / complimentary unlock / affiliate when slug was not stamped.
+  if (
+    access.hasClerkPersonalProPlus &&
+    access.activeTeamPlan == null &&
+    access.activeEducationTeamPlan == null
+  ) {
+    return true;
+  }
+
+  // Education Plus: teacher tools without an Education Gold/Enterprise workspace tier.
+  if (access.canAccessTeacherTools && access.activeEducationTeamPlan == null) {
+    return true;
+  }
+
+  return false;
 }
 
 export function hasTeamGoldFeatures(

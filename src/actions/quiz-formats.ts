@@ -32,7 +32,7 @@ import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { canEditDeckContent } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import { canUseDeckAiFeatures, DECK_AI_PLAN_REQUIREMENT } from "@/lib/deck-ai-access";
-import { canConfigurePersonalDeckQuizFormats } from "@/lib/education-plans";
+import { canConfigurePersonalDeckQuizFormatsFromAccess } from "@/lib/education-plans";
 import {
   MAX_TEAM_QUIZ_DURATION_MINUTES,
   MIN_TEAM_QUIZ_DURATION_MINUTES,
@@ -54,7 +54,13 @@ async function assertCanManageDeckQuizFormats(
   userId: string,
   deckId: number,
   teamId: number | undefined,
-  effectivePlanSlug: string | null,
+  access: {
+    effectivePlanSlug: string | null;
+    hasClerkPersonalProPlus: boolean;
+    canAccessTeacherTools: boolean;
+    activeTeamPlan: string | null;
+    activeEducationTeamPlan: string | null;
+  },
 ): Promise<{ ownerUserId: string; teamId: number | null }> {
   if (teamId != null) {
     const team = await assertCanManageTeam(userId, teamId);
@@ -62,7 +68,7 @@ async function assertCanManageDeckQuizFormats(
     return { ownerUserId: team.ownerUserId, teamId };
   }
 
-  if (!canConfigurePersonalDeckQuizFormats(effectivePlanSlug)) {
+  if (!canConfigurePersonalDeckQuizFormatsFromAccess(access)) {
     throw new Error(
       "Pro Plus or Education Plus is required to configure quiz question formats.",
     );
@@ -188,7 +194,7 @@ export async function updateDeckQuizFormatsAction(
     access.userId,
     parsed.data.deckId,
     parsed.data.teamId,
-    access.effectivePlanSlug,
+    access,
   );
 
   if (teamId == null && parsed.data.formats == null) {
@@ -406,7 +412,7 @@ export async function reshuffleDeckQuizFormatAssignmentsAction(
     access.userId,
     parsed.data.deckId,
     parsed.data.teamId,
-    access.effectivePlanSlug,
+    access,
   );
 
   const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
@@ -454,7 +460,7 @@ export async function publishDeckQuizFormatsAction(
     access.userId,
     parsed.data.deckId,
     parsed.data.teamId,
-    access.effectivePlanSlug,
+    access,
   );
 
   const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
@@ -507,7 +513,7 @@ export async function previewDeckQuizFormatsAction(
     access.userId,
     parsed.data.deckId,
     parsed.data.teamId,
-    access.effectivePlanSlug,
+    access,
   );
 
   const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
@@ -567,7 +573,7 @@ export async function saveQuizFormatVariantEditAction(
     access.userId,
     parsed.data.deckId,
     parsed.data.teamId,
-    access.effectivePlanSlug,
+    access,
   );
 
   const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);

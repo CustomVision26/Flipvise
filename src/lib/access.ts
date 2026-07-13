@@ -313,16 +313,67 @@ async function accessContextFromActiveAffiliateGrant(input: {
           isPlatformAdmin: false,
           activeTeamPlan: null,
           personalPlanSlug: planSlug,
-          hasClerkProPlusPlan: input.paidProPlusFromHas,
+          hasClerkProPlusPlan:
+            planSlug === "pro_plus" || input.paidProPlusFromHas,
         }),
         hasCustomColors: true,
-        hasProPlusInterfacePalette: planSlug === "pro_plus" || input.paidCustomColors,
+        hasProPlusInterfacePalette:
+          planSlug === "pro_plus" || input.paidCustomColors,
+        adminGranted: false,
+        isAdmin: false,
+        isSuperadmin: false,
+        activeTeamPlan: null,
+        hasClerkPersonalPro: input.paidProFromHas || planSlug === "pro",
+        hasClerkPersonalProPlus:
+          planSlug === "pro_plus" || input.paidProPlusFromHas,
+        primaryEmail: input.primaryEmail,
+      },
+      educationAccessFieldsFromPlanSlug(planSlug),
+    );
+  }
+
+  if (isEducationTeamPlanId(planSlug)) {
+    const eduFields = educationAccessFieldsFromPlanSlug(planSlug);
+    return educationTeamTierAccessContext({
+      userId: input.userId,
+      activeEducationTeamPlan: planSlug,
+      education: eduFields,
+      paidProFromHas: input.paidProFromHas,
+      paidProPlusFromHas: input.paidProPlusFromHas,
+      primaryEmail: input.primaryEmail,
+    });
+  }
+
+  if (planSlug === "education_plus" || isEducationPlanId(planSlug)) {
+    const lim = personalWorkspaceLimits({
+      unlocked: false,
+      activeTeamPlan: null,
+      stripeSlug: "education_plus",
+    });
+    return withEducationFields(
+      {
+        userId: input.userId,
+        isPro: true,
+        maxPersonalDecks: lim.maxPersonalDecks,
+        maxCardsPerDeck: lim.maxCardsPerDeck,
+        hasUnlimitedDecks: lim.maxPersonalDecks > FREE_PERSONAL_DECK_LIMIT,
+        has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
+        hasAI: true,
+        hasAiReading: true,
+        hasPrioritySupport: prioritySupportForAccess({
+          isPlatformAdmin: false,
+          activeTeamPlan: null,
+          personalPlanSlug: "education_plus",
+          hasClerkProPlusPlan: true,
+        }),
+        hasCustomColors: true,
+        hasProPlusInterfacePalette: true,
         adminGranted: false,
         isAdmin: false,
         isSuperadmin: false,
         activeTeamPlan: null,
         hasClerkPersonalPro: input.paidProFromHas,
-        hasClerkPersonalProPlus: input.paidProPlusFromHas,
+        hasClerkPersonalProPlus: true,
         primaryEmail: input.primaryEmail,
       },
       educationAccessFieldsFromPlanSlug(planSlug),
@@ -729,7 +780,9 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
       aiReadingForTier,
     });
     if (affiliateAccess) {
-      return withEducationFields(affiliateAccess, educationFields);
+      // Affiliate context already carries effectivePlanSlug from the grant.
+      // Do not overwrite with meta/stripe education fields (often Free).
+      return affiliateAccess;
     }
   }
 

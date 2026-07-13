@@ -239,8 +239,8 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         table: {
           headers: ["Slug", "Display name", "Key additions"],
           rows: [
-            ["education_plus", "Education Plus", "Pro Plus + Teacher Dashboard AI tools"],
-            ["education_gold", "Education Gold", "Team Gold + Education Plus + teacher collaboration"],
+            ["education_plus", "Education Plus", "Pro Plus + Teacher Dashboard AI tools + Format Quiz Question on personal decks"],
+            ["education_gold", "Education Gold", "Team Gold + Education Plus + teacher collaboration (formats via Team Admin Study Privileges)"],
             ["education_enterprise", "Education Enterprise", "Enterprise + Education Gold + school admin"],
           ],
         },
@@ -251,6 +251,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "AI Lesson Builder, Quiz/Test Generator, Homework, Study Guides, Worksheets.",
           "Classes, Student Progress, Teacher Resource Library.",
+          "Education Plus personal Study → Quiz: Format Quiz Question (formats, counts, time limit, publish) — same as Pro Plus personal decks.",
           "Education Gold: shared lesson library, department workspace, teacher analytics.",
           "Education Enterprise: school administration, multi-campus, curriculum management, school branding.",
         ],

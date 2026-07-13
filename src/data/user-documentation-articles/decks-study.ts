@@ -93,8 +93,20 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Multiple choice — pick the best answer from several options (uses card front/back or stored choices).",
           "True / false — decide whether an AI-generated statement is true or false.",
           "Fill in the blank — type the missing word or phrase in an AI-generated sentence.",
-          "Pro Plus and Education Plus: on your personal deck’s quiz lobby, use Format Quiz Question to enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz.",
-          "Education Gold / Enterprise team admins also configure formats in Team Admin → Deck Manager → Study privileges.",
+          "Pro Plus and Education Plus (Stripe paid, admin-assigned, or affiliate grant): on your personal deck’s quiz lobby, use Format Quiz Question to enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz (or Republish to quiz).",
+          "Eligibility follows your effective Pro Plus / Education Plus entitlement — the same plan shown in Billing and the header plan badge.",
+          "Education Gold / Enterprise team admins configure formats in Team Admin → Deck Manager → Study privileges (not via Format Quiz Question on personal decks).",
+        ],
+      },
+      {
+        id: "format-quiz-question",
+        title: "Format Quiz Question (personal decks)",
+        bullets: [
+          "Shown on the Timed quiz lobby when you own the deck and hold Pro Plus or Education Plus.",
+          "Draft formats and counts stay in the dialog until you click Publish to quiz — then the lobby, timer, and question mix update.",
+          "Questions per format counts must add up to the deck’s eligible card total before Generate or Publish.",
+          "Quiz time limit is 1–180 minutes; Publish saves it for this deck’s personal timed quiz clock.",
+          "Team workspace quizzes still use the team admin Quiz Timer when you study from a workplace assignment.",
         ],
       },
       {
@@ -102,7 +114,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Quiz lobby and session mix",
         bullets: [
           "Before you start a quiz, the lobby lists which formats are enabled and how many questions of each type you will see (e.g. 5 multiple choice, 2 true/false, 3 fill in the blank).",
-          "When question counts have been entered and Publish to quiz used (personal Format Quiz Question or team Study privileges), the lobby reflects that exact distribution.",
+          "When question counts have been entered and Publish to quiz used (personal Format Quiz Question or team Study privileges reshuffle), the lobby reflects that exact distribution.",
           "Without a publish/reshuffle, the lobby estimates a random mix across enabled formats.",
           "Each question shows a format badge while you answer (Multiple choice, True / false, or Fill in the blank).",
           "When published, each card keeps its assigned format until formats are published again.",

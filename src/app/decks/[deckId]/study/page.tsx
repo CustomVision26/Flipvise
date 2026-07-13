@@ -21,7 +21,7 @@ import {
 } from "@/db/queries/quiz-schedule";
 import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
-import { isEducationTeamPlanId, canConfigurePersonalDeckQuizFormats } from "@/lib/education-plans";
+import { isEducationTeamPlanId, canConfigurePersonalDeckQuizFormatsFromAccess } from "@/lib/education-plans";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   teamWorkspaceDeckTitleLinkClass,
@@ -51,7 +51,16 @@ interface StudyPageProps {
 }
 
 export default async function StudyPage({ params, searchParams }: StudyPageProps) {
-  const { userId, maxCardsPerDeck, hasAiReading, effectivePlanSlug } = await getAccessContext();
+  const {
+    userId,
+    maxCardsPerDeck,
+    hasAiReading,
+    effectivePlanSlug,
+    hasClerkPersonalProPlus,
+    canAccessTeacherTools,
+    activeTeamPlan,
+    activeEducationTeamPlan,
+  } = await getAccessContext();
   if (!userId) redirect("/");
 
   const { deckId } = await params;
@@ -205,7 +214,13 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   const canEditFormats =
     canEditDeckContent(access) &&
     deck.userId === userId &&
-    canConfigurePersonalDeckQuizFormats(effectivePlanSlug);
+    canConfigurePersonalDeckQuizFormatsFromAccess({
+      effectivePlanSlug,
+      hasClerkPersonalProPlus,
+      canAccessTeacherTools,
+      activeTeamPlan,
+      activeEducationTeamPlan,
+    });
   const quizFormatEditorSnapshot = canEditFormats
     ? await getQuizFormatsDeckSnapshotForOwner(id, userId)
     : null;

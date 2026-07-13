@@ -150,6 +150,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
           "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
           "Multiple choice works from card content; true/false and fill-in-the-blank need AI-generated quiz sentences.",
+          "Personal Pro Plus / Education Plus (paid, admin-assigned, or affiliate) use Format Quiz Question on /decks/[deckId]/study instead of this Team Admin panel.",
         ],
       },
       {

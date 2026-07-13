@@ -349,7 +349,8 @@ const ALL_ARTICLES: DocArticle[] = [
           "Team owners and co-admins configure quiz question formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
           "Formats: multiple choice (from card content), true/false, and fill-in-the-blank (AI-generated sentences).",
           "After setup, admins can Reshuffle format questions to change which format each card uses in team quizzes.",
-          "Platform admins troubleshooting missing formats should verify settings are saved, AI generation completed, and reshuffle was run when multiple formats are enabled.",
+          "Personal Pro Plus and Education Plus (paid, admin-assigned, or affiliate) configure formats on the study quiz lobby via Format Quiz Question — including Questions per format, Quiz time limit, Generate AI, and Publish to quiz.",
+          "Platform admins troubleshooting missing formats should verify settings are saved, AI generation completed, and publish/reshuffle was run when multiple formats are enabled.",
         ],
       },
       {

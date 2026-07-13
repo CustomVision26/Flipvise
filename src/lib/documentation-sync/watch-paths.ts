@@ -53,6 +53,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/quiz-formats.ts",
     "src/lib/quiz-questions.ts",
     "src/lib/quiz-format-assignments.ts",
+    "src/lib/education-plans.ts",
   ],
   "quiz-result-detail": [
     "src/app/dashboard/quiz-results/[resultId]/page.tsx",
