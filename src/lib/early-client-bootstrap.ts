@@ -7,11 +7,29 @@ function runEarlyClientBootstrap(): void {
 
   const host = window.location.hostname;
   const isLocal =
-    host === "localhost" || host === "127.0.0.1" || host === "::1";
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "10.0.2.2";
+  const isNativeShell = (() => {
+    try {
+      const cap = (
+        window as {
+          Capacitor?: { isNativePlatform?: () => boolean };
+        }
+      ).Capacitor;
+      return (
+        /FlipviseNative\//.test(navigator.userAgent) ||
+        Boolean(cap?.isNativePlatform?.())
+      );
+    } catch {
+      return /FlipviseNative\//.test(navigator.userAgent);
+    }
+  })();
 
   if (
     process.env.NODE_ENV === "development" &&
-    isLocal &&
+    (isLocal || isNativeShell) &&
     "serviceWorker" in navigator
   ) {
     const hadController = Boolean(navigator.serviceWorker.controller);

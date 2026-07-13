@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
-import { Loader2, ShieldAlert, WifiOff } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldAlert, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -96,13 +96,10 @@ function useTimeoutFlag(active: boolean, ms: number): boolean {
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (!active) {
-      setTimedOut(false);
-      return;
-    }
+    if (!active || timedOut) return;
     const timer = window.setTimeout(() => setTimedOut(true), ms);
     return () => window.clearTimeout(timer);
-  }, [active, ms]);
+  }, [active, ms, timedOut]);
 
   return timedOut;
 }
@@ -122,9 +119,13 @@ export function NativeSignInClient({
 }: {
   isNativeContext?: boolean;
 }) {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { signIn } = useSignIn();
-  const { signOut } = useClerk();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { signIn, isLoaded: signInLoaded } = useSignIn();
+  const { isLoaded: signUpLoaded } = useSignUp();
+  const clerk = useClerk();
+  const { signOut } = clerk;
+  const clerkFormReady =
+    clerk.loaded && signInLoaded && signUpLoaded && Boolean(signIn);
   const searchParams = useSearchParams();
   const ticket = searchParams.get("ticket");
   const sessionRetry = searchParams.get("session_retry") === "1";
@@ -137,9 +138,12 @@ export function NativeSignInClient({
   const startedRef = useRef(false);
   const continueRef = useRef(false);
 
-  const clerkLoadTimedOut = useTimeoutFlag(!isLoaded, CLERK_LOAD_TIMEOUT_MS);
+  const clerkLoadTimedOut = useTimeoutFlag(
+    !clerkFormReady,
+    isNativeContext ? 12_000 : CLERK_LOAD_TIMEOUT_MS,
+  );
   const loadingEscapeDue = useTimeoutFlag(
-    !isLoaded && !manualOnly && !continuing,
+    !clerkFormReady && !manualOnly && !continuing,
     LOADING_ESCAPE_UI_MS,
   );
   const redirectStalled = useTimeoutFlag(
@@ -147,7 +151,7 @@ export function NativeSignInClient({
     REDIRECT_STALL_TIMEOUT_MS,
   );
   const ticketTimedOut = useTimeoutFlag(
-    Boolean(isLoaded && ticket && !ticketError && !isSignedIn && !manualOnly),
+    Boolean(authLoaded && ticket && !ticketError && !isSignedIn && !manualOnly),
     TICKET_FLOW_TIMEOUT_MS,
   );
 
@@ -200,7 +204,7 @@ export function NativeSignInClient({
 
   // Server rejected a prior session — clear client state and show the form.
   useEffect(() => {
-    if (!sessionRetry || !isLoaded) return;
+    if (!sessionRetry || !authLoaded) return;
     void signOut().then(() => {
       setManualOnly(true);
       try {
@@ -211,20 +215,20 @@ export function NativeSignInClient({
         // ignore
       }
     });
-  }, [sessionRetry, isLoaded, signOut]);
+  }, [sessionRetry, authLoaded, signOut]);
 
   // Returning visit: Clerk JS says signed-in — verify server cookies before redirect.
   // Do not block on `ticket`: handoff URLs can arrive while a stale client session exists.
   // Skip when `session_retry` / manual-only — user signed out and must re-authenticate.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || manualOnly || continuing || sessionRetry) return;
+    if (!authLoaded || !isSignedIn || manualOnly || continuing || sessionRetry) return;
     void finishSignIn();
-  }, [isLoaded, isSignedIn, manualOnly, continuing, sessionRetry, finishSignIn]);
+  }, [authLoaded, isSignedIn, manualOnly, continuing, sessionRetry, finishSignIn]);
 
   // Ticket handoff from offline device sync token.
   useEffect(() => {
     if (
-      !isLoaded ||
+      !authLoaded ||
       isSignedIn ||
       !ticket ||
       !signIn ||
@@ -253,9 +257,9 @@ export function NativeSignInClient({
         setTicketError(expired);
       }
     })();
-  }, [isLoaded, isSignedIn, ticket, signIn, manualOnly, finishSignIn]);
+  }, [authLoaded, isSignedIn, ticket, signIn, manualOnly, finishSignIn]);
 
-  if (manualOnly && isLoaded) {
+  if (manualOnly && (authLoaded || isNativeContext)) {
     return (
       <main
         className={`relative z-10 flex min-h-dvh items-center justify-center bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
@@ -268,33 +272,61 @@ export function NativeSignInClient({
           }
           onFinishAuth={finishSignIn}
           isNativeContext={isNativeContext}
+          clerkReady={clerkFormReady}
+          clerkLoadTimedOut={clerkLoadTimedOut && !clerkFormReady}
         />
       </main>
     );
   }
 
-  if (clerkLoadTimedOut && !isLoaded) {
+  if (continuing || (isSignedIn && !manualOnly)) {
+    if (redirectStalled && continuing) {
+      return (
+        <SignInRecovery
+          title="Could not open the dashboard"
+          description="Sign-in synced slowly. Tap the refresh icon in the top-left corner to try again."
+          showSignOut
+          isNativeContext={isNativeContext}
+        />
+      );
+    }
+
     return (
-      <SignInRecovery
-        title="Sign-in is taking too long"
-        description={
-          isNativeContext
-            ? "Sign-in could not connect. Tap the refresh icon in the top-left corner, or use Back to offline study at the bottom."
-            : "Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
-        }
-        showSignOut={false}
+      <CenteredSpinner
+        label="Opening dashboard…"
         isNativeContext={isNativeContext}
+        showEscapeActions={!isNativeContext && (loadingEscapeDue || false)}
       />
     );
   }
 
-  if (redirectStalled && continuing) {
+  if (ticket && !ticketError && !manualOnly && authLoaded) {
     return (
-      <SignInRecovery
-        title="Could not open the dashboard"
-        description="Sign-in synced slowly. Tap the refresh icon in the top-left corner to try again."
-        showSignOut
+      <CenteredSpinner
+        label="Signing you in…"
         isNativeContext={isNativeContext}
+        showEscapeActions={!isNativeContext && (loadingEscapeDue || false)}
+      />
+    );
+  }
+
+  if (!isNativeContext && !clerkFormReady) {
+    if (clerkLoadTimedOut) {
+      return (
+        <SignInRecovery
+          title="Sign-in is taking too long"
+          description="Clerk could not finish loading inside the app. Check your connection, make sure the dev server is running, then try again — or return to offline study."
+          showSignOut={false}
+          isNativeContext={isNativeContext}
+        />
+      );
+    }
+
+    return (
+      <CenteredSpinner
+        label="Connecting to sign-in…"
+        isNativeContext={isNativeContext}
+        showEscapeActions={loadingEscapeDue}
       />
     );
   }
@@ -314,28 +346,6 @@ export function NativeSignInClient({
     );
   }
 
-  if (continuing || !isLoaded || isSignedIn) {
-    return (
-      <CenteredSpinner
-        label={
-          continuing || isSignedIn ? "Opening dashboard…" : "Connecting to sign-in…"
-        }
-        isNativeContext={isNativeContext}
-        showEscapeActions={!isNativeContext && (loadingEscapeDue || false)}
-      />
-    );
-  }
-
-  if (ticket && !ticketError) {
-    return (
-      <CenteredSpinner
-        label="Signing you in…"
-        isNativeContext={isNativeContext}
-        showEscapeActions={!isNativeContext && (loadingEscapeDue || false)}
-      />
-    );
-  }
-
   return (
     <main
       className={`relative z-10 flex min-h-dvh items-center justify-center bg-transparent p-6${isNativeContext ? " pb-36" : ""}`}
@@ -345,6 +355,8 @@ export function NativeSignInClient({
         notice={ticketError}
         onFinishAuth={finishSignIn}
         isNativeContext={isNativeContext}
+        clerkReady={clerkFormReady}
+        clerkLoadTimedOut={clerkLoadTimedOut && !clerkFormReady}
       />
     </main>
   );
@@ -490,6 +502,91 @@ function NativeAuthOfflineNotice({ message }: { message: string }) {
   );
 }
 
+function PasswordInput({
+  id,
+  value,
+  onChange,
+  autoComplete,
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: "new-password" | "current-password";
+  disabled?: boolean;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type={visible ? "text" : "password"}
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(ev) => onChange(ev.target.value)}
+        disabled={disabled}
+        required
+        className="pr-10"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="absolute top-0 right-0 size-8 text-muted-foreground hover:text-foreground"
+        disabled={disabled}
+        aria-label={visible ? "Hide password" : "Show password"}
+        onClick={() => setVisible((current) => !current)}
+      >
+        {visible ? (
+          <EyeOff className="size-4" aria-hidden />
+        ) : (
+          <Eye className="size-4" aria-hidden />
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function NativeAuthStatusNotice({
+  statusNotice,
+  clerkReady,
+  clerkLoadTimedOut,
+  isNativeContext,
+}: {
+  statusNotice: string | null;
+  clerkReady: boolean;
+  clerkLoadTimedOut: boolean;
+  isNativeContext: boolean;
+}) {
+  if (!statusNotice) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="flex items-start gap-2 rounded-md bg-muted/60 p-2.5 text-sm text-muted-foreground">
+        {!clerkReady && !clerkLoadTimedOut ? (
+          <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden />
+        ) : (
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+        )}
+        <span>{statusNotice}</span>
+      </p>
+      {clerkLoadTimedOut && isNativeContext ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className={NATIVE_BTN_CLASS}
+          onClick={() => {
+            window.location.href = "/api/auth/clear-stale-session";
+          }}
+        >
+          Try again
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 type Step = "identify" | "code";
 type AuthMode = "sign-in" | "sign-up";
 
@@ -498,16 +595,26 @@ function NativeAuthForm({
   notice,
   onFinishAuth,
   isNativeContext,
+  clerkReady,
+  clerkLoadTimedOut = false,
 }: {
   redirectTo: string;
   notice: string | null;
   onFinishAuth: () => Promise<void>;
   isNativeContext: boolean;
+  clerkReady: boolean;
+  clerkLoadTimedOut?: boolean;
 }) {
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [prefillEmail, setPrefillEmail] = useState("");
+
+  const statusNotice = !clerkReady
+    ? clerkLoadTimedOut
+      ? "Sign-in could not connect. Tap the refresh icon in the top-left corner, or use Back to offline study at the bottom."
+      : "Connecting to sign-in services…"
+    : null;
 
   const switchToSignUp = useCallback((email?: string) => {
     void signIn?.reset?.();
@@ -525,10 +632,13 @@ function NativeAuthForm({
     return (
       <SignUpForm
         notice={notice}
+        statusNotice={statusNotice}
+        clerkLoadTimedOut={clerkLoadTimedOut}
         initialEmail={prefillEmail}
         onFinishSignUp={onFinishAuth}
         onSwitchToSignIn={switchToSignIn}
         isNativeContext={isNativeContext}
+        clerkReady={clerkReady}
       />
     );
   }
@@ -537,10 +647,13 @@ function NativeAuthForm({
     <SignInForm
       redirectTo={redirectTo}
       notice={notice}
+      statusNotice={statusNotice}
+      clerkLoadTimedOut={clerkLoadTimedOut}
       initialEmail={prefillEmail}
       onFinishSignIn={onFinishAuth}
       onSwitchToSignUp={switchToSignUp}
       isNativeContext={isNativeContext}
+      clerkReady={clerkReady}
     />
   );
 }
@@ -548,19 +661,26 @@ function NativeAuthForm({
 function SignInForm({
   redirectTo,
   notice,
+  statusNotice,
+  clerkLoadTimedOut,
   initialEmail = "",
   onFinishSignIn,
   onSwitchToSignUp,
   isNativeContext,
+  clerkReady,
 }: {
   redirectTo: string;
   notice: string | null;
+  statusNotice: string | null;
+  clerkLoadTimedOut: boolean;
   initialEmail?: string;
   onFinishSignIn: () => Promise<void>;
   onSwitchToSignUp: (email?: string) => void;
   isNativeContext: boolean;
+  clerkReady: boolean;
 }) {
   const { signIn } = useSignIn();
+  const canSubmit = clerkReady || clerkLoadTimedOut;
   const [mode, setMode] = useState<"password" | "code">("code");
   const [step, setStep] = useState<Step>("identify");
   const [email, setEmail] = useState(initialEmail);
@@ -591,6 +711,14 @@ function SignInForm({
     setAccountNotFound(isAccountNotFoundError(raw));
     setError(detail ? `${label}: ${detail}` : label);
   };
+
+  function requireClerkReady(): boolean {
+    if (clerkReady && signIn) return true;
+    setError(
+      "Sign-in is still starting. Tap Try again or the refresh icon in the top-left corner.",
+    );
+    return false;
+  }
 
   async function complete(): Promise<boolean> {
     if (!signIn) return false;
@@ -636,7 +764,8 @@ function SignInForm({
 
   async function onPasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password || busy || !signIn) return;
+    if (!email || !password || busy || !canSubmit) return;
+    if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
       return;
@@ -683,7 +812,8 @@ function SignInForm({
 
   async function onSendCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || busy || !signIn) return;
+    if (!email || busy || !canSubmit) return;
+    if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
       return;
@@ -703,7 +833,8 @@ function SignInForm({
 
   async function onVerifyCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!code || busy || !signIn) return;
+    if (!code || busy || !canSubmit) return;
+    if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
       return;
@@ -740,6 +871,12 @@ function SignInForm({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {!online ? <NativeAuthOfflineNotice message={offlineMessage} /> : null}
+        <NativeAuthStatusNotice
+          statusNotice={statusNotice}
+          clerkReady={clerkReady}
+          clerkLoadTimedOut={clerkLoadTimedOut}
+          isNativeContext={isNativeContext}
+        />
         {error ? (
           <div className="flex flex-col gap-2">
             <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
@@ -776,16 +913,15 @@ function SignInForm({
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 value={password}
-                onChange={(ev) => setPassword(ev.target.value)}
-                required
+                onChange={setPassword}
+                disabled={busy || !clerkReady}
               />
             </div>
-            <Button type="submit" disabled={busy || !online} className="mt-1">
+            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
               {busy ? "Signing in…" : "Sign in"}
             </Button>
             <Button
@@ -826,7 +962,7 @@ function SignInForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy || !online} className="mt-1">
+            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
               {busy ? "Sending…" : "Email me a code"}
             </Button>
             <Button
@@ -865,7 +1001,7 @@ function SignInForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy || !online} className="mt-1">
+            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
               {busy ? "Verifying…" : "Verify & sign in"}
             </Button>
             <Button
@@ -890,18 +1026,25 @@ function SignInForm({
 
 function SignUpForm({
   notice,
+  statusNotice,
+  clerkLoadTimedOut,
   initialEmail = "",
   onFinishSignUp,
   onSwitchToSignIn,
   isNativeContext,
+  clerkReady,
 }: {
   notice: string | null;
+  statusNotice: string | null;
+  clerkLoadTimedOut: boolean;
   initialEmail?: string;
   onFinishSignUp: () => Promise<void>;
   onSwitchToSignIn: (email?: string) => void;
   isNativeContext: boolean;
+  clerkReady: boolean;
 }) {
   const { signUp } = useSignUp();
+  const canSubmit = clerkReady || clerkLoadTimedOut;
   const [step, setStep] = useState<Step>("identify");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -926,6 +1069,14 @@ function SignUpForm({
     setError(detail ? `${label}: ${detail}` : label);
   };
 
+  function requireClerkReady(): boolean {
+    if (clerkReady && signUp) return true;
+    setError(
+      "Sign-in is still starting. Tap Try again or the refresh icon in the top-left corner.",
+    );
+    return false;
+  }
+
   async function complete(): Promise<boolean> {
     if (!signUp) return false;
     const { error: finalizeErr } = await signUp.finalize();
@@ -940,7 +1091,8 @@ function SignUpForm({
 
   async function onSendCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || busy || !signUp) return;
+    if (!email || busy || !canSubmit) return;
+    if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
       return;
@@ -983,7 +1135,8 @@ function SignUpForm({
 
   async function onVerifyCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!code || busy || !signUp) return;
+    if (!code || busy || !canSubmit) return;
+    if (!requireClerkReady()) return;
     if (!online) {
       setError(offlineMessage);
       return;
@@ -1024,6 +1177,12 @@ function SignUpForm({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {!online ? <NativeAuthOfflineNotice message={offlineMessage} /> : null}
+        <NativeAuthStatusNotice
+          statusNotice={statusNotice}
+          clerkReady={clerkReady}
+          clerkLoadTimedOut={clerkLoadTimedOut}
+          isNativeContext={isNativeContext}
+        />
         {error ? (
           <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-2.5 text-sm text-destructive">
             <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -1074,18 +1233,17 @@ function SignUpForm({
             {isNativeContext ? (
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input
+                <PasswordInput
                   id="signup-password"
-                  type="password"
                   autoComplete="new-password"
                   value={password}
-                  onChange={(ev) => setPassword(ev.target.value)}
-                  required
+                  onChange={setPassword}
+                  disabled={busy || !clerkReady}
                 />
               </div>
             ) : null}
             <div id="clerk-captcha" />
-            <Button type="submit" disabled={busy || !online} className="mt-1">
+            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
               {busy
                 ? isNativeContext
                   ? "Creating account…"
@@ -1117,7 +1275,7 @@ function SignUpForm({
                 required
               />
             </div>
-            <Button type="submit" disabled={busy || !online} className="mt-1">
+            <Button type="submit" disabled={busy || !online || !canSubmit} className="mt-1">
               {busy ? "Verifying…" : "Verify & create account"}
             </Button>
             <Button

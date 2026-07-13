@@ -23,7 +23,9 @@ function welcomeCopy(firstName?: string | null): {
       "• Install Flipvise on your phone (iOS/Android app or Add to Home Screen) and use Make available offline to study without an internet connection.\n" +
       "• Open Documentation for guides on decks, study sessions, team workspaces, and the mobile app.\n" +
       "• Visit Pricing to compare plans if you would like higher deck limits, AI Reading, or team collaboration.\n\n" +
-      "If you have questions, open Help Center or Contact Us at any time. Welcome aboard — we are glad you are here.",
+      "If you have questions, open Help Center or Contact Us at any time. Welcome aboard — we are glad you are here.\n\n" +
+      "Regards,\n" +
+      "Flipvise Team by Flipvise Studio LLC",
   };
 }
 

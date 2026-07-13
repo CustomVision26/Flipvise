@@ -18,7 +18,10 @@ export function ServiceWorkerRegister() {
 
     const host = window.location.hostname;
     const isLocalhost =
-      host === "localhost" || host === "127.0.0.1" || host === "::1";
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host === "10.0.2.2";
     const isProd = process.env.NODE_ENV === "production";
     const isCapacitor = Boolean((window as { Capacitor?: unknown }).Capacitor);
 
