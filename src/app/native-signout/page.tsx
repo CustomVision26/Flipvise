@@ -6,7 +6,7 @@ import { NativeSignOutHandoff } from "./native-signout-handoff";
 export const dynamic = "force-dynamic";
 
 /**
- * Clerk `afterSignOutUrl` for the Capacitor WebView.
+ * Post–sign-out landing for the Capacitor WebView (see header sign-out navigation).
  * Avoids flashing the marketing homepage (`/`) before the offline Study shell.
  */
 export default async function NativeSignOutPage() {

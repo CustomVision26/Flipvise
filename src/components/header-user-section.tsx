@@ -142,6 +142,13 @@ export function HeaderUserSection({
         } catch {
           navigateToOfflineShellFast({ immediate: true });
         }
+      } else if (
+        document.documentElement.dataset.flipviseNativeShell === "1" ||
+        isFlipviseNativeShell()
+      ) {
+        // Clerk UserButton no longer accepts afterSignOutUrl — send native shell
+        // here so we skip flashing the marketing homepage.
+        window.location.replace(NATIVE_AFTER_SIGN_OUT_URL);
       } else {
         window.location.replace("/");
       }
@@ -328,15 +335,7 @@ export function HeaderUserSection({
               className="inline-flex shrink-0 items-center"
               title="Account — profile, appearance, and billing"
             >
-              <UserButton
-                afterSignOutUrl={
-                  clientMounted &&
-                  (document.documentElement.dataset.flipviseNativeShell === "1" ||
-                    isFlipviseNativeShell())
-                    ? NATIVE_AFTER_SIGN_OUT_URL
-                    : "/"
-                }
-              >
+              <UserButton>
                 <UserButton.UserProfilePage
                   label="Appearance"
                   url="appearance"
