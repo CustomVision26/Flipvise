@@ -35,55 +35,64 @@ async function fetchAppVersionConfig(): Promise<AppVersionResponse | null> {
 }
 
 export async function checkNativeStoreUpdate(): Promise<StoreUpdatePrompt | null> {
-  const { App } = await import("@capacitor/app");
-  const info = await App.getInfo();
-  const currentVersion = info.version?.trim() || "0.0.0";
-  const platform = resolvePlatform();
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    // Live-site WebViews often keep the FlipviseNative UA marker after allowNavigation,
+    // but the Capacitor bridge is not injected — App web stubs throw "Not implemented on web".
+    if (!Capacitor.isNativePlatform()) return null;
 
-  const config = await fetchAppVersionConfig();
-  if (!config) return null;
+    const { App } = await import("@capacitor/app");
+    const info = await App.getInfo();
+    const currentVersion = info.version?.trim() || "0.0.0";
+    const platform = resolvePlatform();
 
-  const minVersion =
-    platform === "ios" ? config.ios.min : config.android.min;
-  const latestVersion =
-    platform === "ios" ? config.ios.latest : config.android.latest;
-  const storeUrl =
-    platform === "ios" ? config.storeUrls.ios : config.storeUrls.android;
+    const config = await fetchAppVersionConfig();
+    if (!config) return null;
 
-  const belowMin = isSemverBelow(currentVersion, minVersion);
-  const belowLatest = isSemverBelow(currentVersion, latestVersion);
+    const minVersion =
+      platform === "ios" ? config.ios.min : config.android.min;
+    const latestVersion =
+      platform === "ios" ? config.ios.latest : config.android.latest;
+    const storeUrl =
+      platform === "ios" ? config.storeUrls.ios : config.storeUrls.android;
 
-  if (!belowMin && !belowLatest) {
-    try {
-      const { AppUpdate, AppUpdateAvailability } = await import(
-        "@capawesome/capacitor-app-update"
-      );
-      const updateInfo = await AppUpdate.getAppUpdateInfo();
-      if (updateInfo.updateAvailability !== AppUpdateAvailability.UPDATE_AVAILABLE) {
+    const belowMin = isSemverBelow(currentVersion, minVersion);
+    const belowLatest = isSemverBelow(currentVersion, latestVersion);
+
+    if (!belowMin && !belowLatest) {
+      try {
+        const { AppUpdate, AppUpdateAvailability } = await import(
+          "@capawesome/capacitor-app-update"
+        );
+        const updateInfo = await AppUpdate.getAppUpdateInfo();
+        if (updateInfo.updateAvailability !== AppUpdateAvailability.UPDATE_AVAILABLE) {
+          return null;
+        }
+        const storeLatest =
+          updateInfo.availableVersionName?.trim() || latestVersion;
+        if (!isSemverBelow(currentVersion, storeLatest)) {
+          return null;
+        }
+        return {
+          currentVersion,
+          latestVersion: storeLatest,
+          storeUrl,
+          required: belowMin,
+        };
+      } catch {
         return null;
       }
-      const storeLatest =
-        updateInfo.availableVersionName?.trim() || latestVersion;
-      if (!isSemverBelow(currentVersion, storeLatest)) {
-        return null;
-      }
-      return {
-        currentVersion,
-        latestVersion: storeLatest,
-        storeUrl,
-        required: belowMin,
-      };
-    } catch {
-      return null;
     }
-  }
 
-  return {
-    currentVersion,
-    latestVersion,
-    storeUrl,
-    required: belowMin,
-  };
+    return {
+      currentVersion,
+      latestVersion,
+      storeUrl,
+      required: belowMin,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function openNativeStoreUpdate(storeUrl: string): Promise<void> {
@@ -168,6 +177,20 @@ export function showDeployRefreshToast(version: string): void {
 export async function runNativeUpdateChecks(input: {
   onStoreUpdate: (prompt: StoreUpdatePrompt) => void;
 }): Promise<void> {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (!Capacitor.isNativePlatform()) {
+      // Still allow deploy-version toasts when only the UA marker is present.
+      const deployVersion = await checkDeployVersionUpdate();
+      if (deployVersion) {
+        showDeployRefreshToast(deployVersion);
+      }
+      return;
+    }
+  } catch {
+    return;
+  }
+
   const storePrompt = await checkNativeStoreUpdate();
   if (storePrompt) {
     input.onStoreUpdate(storePrompt);

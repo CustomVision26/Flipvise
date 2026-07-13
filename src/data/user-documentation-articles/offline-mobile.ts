@@ -65,6 +65,7 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
           "Password sign-in works only if you created a password on the website (Clerk profile → Security). Many accounts use Google or email code only — password will fail with a strategy error; switch to “Email me a code”.",
           "If your account is Google-only and email code is unavailable, sign in once in Safari or Chrome on your phone, then open the online dashboard again inside the app.",
           "You need a connection for any sign-in or sign-up attempt — an offline notice appears on the form, and you can use “Back to offline study” at the bottom to return to downloaded decks without signing in.",
+          "Android emulator local testing: run adb reverse tcp:3000 tcp:3000, then npm run mobile:sync:dev so Online Dashboard opens http://127.0.0.1:3000. Do not use bare localhost (collides with the offline shell) or 10.0.2.2 unless that origin is allowlisted in Clerk.",
           "If sign-in stalls, tap the refresh icon in the top-left corner to clear a stuck session and try again.",
         ],
       },

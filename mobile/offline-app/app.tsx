@@ -67,9 +67,36 @@ const LIVE_URL =
   (import.meta.env.VITE_LIVE_URL as string | undefined) ??
   "https://flipvise-sjgw.onrender.com";
 
-/** Live origin from this native build — not a stale value from Preferences. */
+/**
+ * Live origin from this native build — not a stale value from Preferences.
+ *
+ * Capacitor’s offline shell owns https://localhost/. Opening http://localhost:3000
+ * collides with that hostname and loops back to Offline study. On Android, rewrite
+ * bare `localhost` to `127.0.0.1` (use with `adb reverse tcp:3000 tcp:3000`) so Clerk
+ * sees a localhost-equivalent origin without hitting Capacitor’s shell host.
+ */
 function bundledLiveUrl(): string {
-  return LIVE_URL.replace(/\/$/, "");
+  const raw = LIVE_URL.replace(/\/$/, "");
+  try {
+    const u = new URL(raw);
+    if (u.hostname !== "localhost") return raw;
+
+    let platform: string | undefined;
+    try {
+      platform = (
+        window as { Capacitor?: { getPlatform?: () => string } }
+      ).Capacitor?.getPlatform?.();
+    } catch {
+      platform = undefined;
+    }
+    if (platform === "android" || /Android/i.test(navigator.userAgent)) {
+      u.hostname = "127.0.0.1";
+      return u.origin;
+    }
+  } catch {
+    // keep raw
+  }
+  return raw;
 }
 
 function maxCardsForDeck(

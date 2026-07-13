@@ -24,6 +24,7 @@ import {
   navigateToOfflineShellFast,
 } from "@/lib/offline/is-flipvise-native-app";
 import { useOnlineStatus } from "@/lib/use-online-status";
+import { diagnoseNativeClerkHost } from "@/lib/native-clerk-host-diagnosis";
 
 const CLERK_LOAD_TIMEOUT_MS = 6_000;
 const REDIRECT_STALL_TIMEOUT_MS = 12_000;
@@ -96,10 +97,13 @@ function useTimeoutFlag(active: boolean, ms: number): boolean {
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (!active || timedOut) return;
+    if (!active) {
+      setTimedOut(false);
+      return;
+    }
     const timer = window.setTimeout(() => setTimedOut(true), ms);
     return () => window.clearTimeout(timer);
-  }, [active, ms, timedOut]);
+  }, [active, ms]);
 
   return timedOut;
 }
@@ -121,11 +125,20 @@ export function NativeSignInClient({
 }) {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { signIn, isLoaded: signInLoaded } = useSignIn();
-  const { isLoaded: signUpLoaded } = useSignUp();
+  const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const clerk = useClerk();
   const { signOut } = clerk;
+  /**
+   * Clerk logs show "Clerk has been loaded with development keys" while our old
+   * check still required `signIn` — after session_retry signOut that resource can
+   * lag or be null, so the form stayed locked and the 12s auto-clear looped forever.
+   */
   const clerkFormReady =
-    clerk.loaded && signInLoaded && signUpLoaded && Boolean(signIn);
+    authLoaded ||
+    clerk.loaded ||
+    (signInLoaded && Boolean(signIn)) ||
+    (signUpLoaded && Boolean(signUp));
+  const hostDiagnosis = diagnoseNativeClerkHost();
   const searchParams = useSearchParams();
   const ticket = searchParams.get("ticket");
   const sessionRetry = searchParams.get("session_retry") === "1";
@@ -142,6 +155,8 @@ export function NativeSignInClient({
     !clerkFormReady,
     isNativeContext ? 12_000 : CLERK_LOAD_TIMEOUT_MS,
   );
+  // Do NOT auto-hit clear-stale-session on timeout — that caused a reload loop
+  // (clear → session_retry → signOut → SignIn lag → timeout → clear again).
   const loadingEscapeDue = useTimeoutFlag(
     !clerkFormReady && !manualOnly && !continuing,
     LOADING_ESCAPE_UI_MS,
@@ -202,20 +217,21 @@ export function NativeSignInClient({
     };
   }, [manualOnly, postAuthTarget, sessionRetry]);
 
-  // Server rejected a prior session — clear client state and show the form.
+  // Server rejected a prior session — cookies already cleared by clear-stale-session.
+  // Only signOut if Clerk still thinks we're signed in; always show the form.
   useEffect(() => {
-    if (!sessionRetry || !authLoaded) return;
-    void signOut().then(() => {
-      setManualOnly(true);
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete("session_retry");
-        window.history.replaceState(null, "", url.toString());
-      } catch {
-        // ignore
-      }
-    });
-  }, [sessionRetry, authLoaded, signOut]);
+    if (!sessionRetry) return;
+    setManualOnly(true);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("session_retry");
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      // ignore
+    }
+    if (!authLoaded || !isSignedIn) return;
+    void signOut().catch(() => {});
+  }, [sessionRetry, authLoaded, isSignedIn, signOut]);
 
   // Returning visit: Clerk JS says signed-in — verify server cookies before redirect.
   // Do not block on `ticket`: handoff URLs can arrive while a stale client session exists.
@@ -266,14 +282,14 @@ export function NativeSignInClient({
       >
         <NativeAuthForm
           redirectTo={postAuthTarget}
-          notice={
-            ticketError ??
-            "Please sign in to open the online dashboard."
-          }
+          notice={ticketError}
           onFinishAuth={finishSignIn}
           isNativeContext={isNativeContext}
           clerkReady={clerkFormReady}
           clerkLoadTimedOut={clerkLoadTimedOut && !clerkFormReady}
+          clerkHostGuidance={
+            !clerkFormReady ? hostDiagnosis.guidance : null
+          }
         />
       </main>
     );
@@ -357,6 +373,7 @@ export function NativeSignInClient({
         isNativeContext={isNativeContext}
         clerkReady={clerkFormReady}
         clerkLoadTimedOut={clerkLoadTimedOut && !clerkFormReady}
+        clerkHostGuidance={!clerkFormReady ? hostDiagnosis.guidance : null}
       />
     </main>
   );
@@ -597,6 +614,7 @@ function NativeAuthForm({
   isNativeContext,
   clerkReady,
   clerkLoadTimedOut = false,
+  clerkHostGuidance = null,
 }: {
   redirectTo: string;
   notice: string | null;
@@ -604,6 +622,7 @@ function NativeAuthForm({
   isNativeContext: boolean;
   clerkReady: boolean;
   clerkLoadTimedOut?: boolean;
+  clerkHostGuidance?: string | null;
 }) {
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
@@ -612,7 +631,8 @@ function NativeAuthForm({
 
   const statusNotice = !clerkReady
     ? clerkLoadTimedOut
-      ? "Sign-in could not connect. Tap the refresh icon in the top-left corner, or use Back to offline study at the bottom."
+      ? clerkHostGuidance ??
+        "Sign-in is taking longer than usual. Tap Try again to clear stuck cookies, then wait for the form to unlock."
       : "Connecting to sign-in services…"
     : null;
 

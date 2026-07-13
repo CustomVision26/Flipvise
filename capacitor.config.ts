@@ -35,7 +35,9 @@ const allowNavigation = new Set([
   // Bundled offline shell (`server.hostname`); without this iOS opens Safari for
   // "Offline study" / sign-out navigation to https://localhost/.
   "localhost",
-  // Android emulator → host machine (`npm run mobile:sync:dev`).
+  // Android emulator → host via adb reverse (preferred; Clerk allows 127.0.0.1).
+  "127.0.0.1",
+  // Android emulator host alias (fallback without adb reverse; needs Clerk origin allowlist).
   "10.0.2.2",
   LIVE_HOST,
   PROD_HOST,

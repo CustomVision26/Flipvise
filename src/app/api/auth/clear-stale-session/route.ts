@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const url = request.nextUrl.clone();
   if (detectNativeShellFromUserAgent(ua).isNativeShell) {
     const nativeTarget = new URL(
-      nativeSignInPath("/dashboard"),
+      nativeSignInPath("/dashboard", { session_retry: "1" }),
       request.nextUrl.origin,
     );
     url.pathname = nativeTarget.pathname;

@@ -59,12 +59,15 @@ export function NativeNotificationBootstrap() {
       }
 
       try {
-        const { App } = await import("@capacitor/app");
-        appStateListener = await App.addListener("appStateChange", ({ isActive }) => {
-          if (isActive) runUpdates();
-        });
+        const { Capacitor } = await import("@capacitor/core");
+        if (Capacitor.isNativePlatform()) {
+          const { App } = await import("@capacitor/app");
+          appStateListener = await App.addListener("appStateChange", ({ isActive }) => {
+            if (isActive) runUpdates();
+          });
+        }
       } catch {
-        // ignore
+        // Bridge unavailable on live-site WebView — update checks still run once below.
       }
 
       runUpdates();

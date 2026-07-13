@@ -3,28 +3,9 @@
 import { useEffect } from "react";
 
 const RELOAD_KEY = "flipvise-clerk-chunk-reload";
+const STALE_CLEAR_KEY = "flipvise-clerk-stale-clear";
 
-function isClerkChunkLoadFailure(error: unknown): boolean {
-  const message =
-    error instanceof Error
-      ? `${error.name} ${error.message}`
-      : typeof error === "string"
-        ? error
-        : "";
-
-  if (!message.includes("clerk.accounts.dev") && !message.includes("@clerk/ui")) {
-    return false;
-  }
-
-  return (
-    message.includes("ChunkLoadError") ||
-    message.includes("Loading chunk") ||
-    message.includes("timeout") ||
-    message.includes("Failed to fetch dynamically imported module")
-  );
-}
-
-function isClerkSessionNetworkError(error: unknown): boolean {
+function messageFromUnknown(error: unknown): string {
   const parts: string[] = [];
 
   function collect(value: unknown, depth = 0) {
@@ -44,7 +25,26 @@ function isClerkSessionNetworkError(error: unknown): boolean {
   }
 
   collect(error);
-  const flat = parts.join(" ");
+  return parts.join(" ");
+}
+
+function isClerkChunkLoadFailure(error: unknown): boolean {
+  const message = messageFromUnknown(error);
+
+  if (!message.includes("clerk.accounts.dev") && !message.includes("@clerk/ui")) {
+    return false;
+  }
+
+  return (
+    message.includes("ChunkLoadError") ||
+    message.includes("Loading chunk") ||
+    message.includes("timeout") ||
+    message.includes("Failed to fetch dynamically imported module")
+  );
+}
+
+function isClerkSessionNetworkError(error: unknown): boolean {
+  const flat = messageFromUnknown(error);
   return (
     flat.includes("clerk.accounts.dev") &&
     (flat.includes("ClerkJS: Network error") ||
@@ -55,16 +55,49 @@ function isClerkSessionNetworkError(error: unknown): boolean {
 }
 
 /**
+ * Stale WebView cookies (common after account delete) make Clerk spin forever:
+ * "infinite redirect loop" / "keys do not match" / "No session was found".
+ */
+function isClerkStaleSessionFailure(error: unknown): boolean {
+  const flat = messageFromUnknown(error);
+  return (
+    /infinite redirect loop/i.test(flat) ||
+    /keys do not match/i.test(flat) ||
+    /no session was found/i.test(flat) ||
+    /no user was found/i.test(flat)
+  );
+}
+
+function clearStaleClerkSessionOnce() {
+  if (sessionStorage.getItem(STALE_CLEAR_KEY) === "1") return;
+  sessionStorage.setItem(STALE_CLEAR_KEY, "1");
+  window.location.href = "/api/auth/clear-stale-session";
+}
+
+/**
  * Clerk loads UI sub-chunks from *.clerk.accounts.dev. Slow networks, ad blockers,
  * or CDN hiccups can throw ChunkLoadError. One automatic hard reload usually fixes it.
+ *
+ * Also recovers from stale Android WebView cookies that leave Sign-In stuck on
+ * "Connecting to sign-in services…".
  */
 export function ClerkChunkLoadRecovery() {
   useEffect(() => {
     if (sessionStorage.getItem(RELOAD_KEY) === "1") {
       sessionStorage.removeItem(RELOAD_KEY);
     }
+    if (sessionStorage.getItem(STALE_CLEAR_KEY) === "1") {
+      // Cleared once this tab — allow a future clear after a successful sign-in later.
+      window.setTimeout(() => {
+        try {
+          sessionStorage.removeItem(STALE_CLEAR_KEY);
+        } catch {
+          // ignore
+        }
+      }, 15_000);
+    }
 
-    function recover(error: unknown) {
+    function recoverChunk(error: unknown) {
       if (!isClerkChunkLoadFailure(error)) return;
       if (sessionStorage.getItem(RELOAD_KEY) === "1") return;
 
@@ -73,10 +106,21 @@ export function ClerkChunkLoadRecovery() {
     }
 
     function onError(event: ErrorEvent) {
-      recover(event.error ?? event.message);
+      const payload = event.error ?? event.message;
+      if (isClerkStaleSessionFailure(payload)) {
+        event.preventDefault();
+        clearStaleClerkSessionOnce();
+        return;
+      }
+      recoverChunk(payload);
     }
 
     function onRejection(event: PromiseRejectionEvent) {
+      if (isClerkStaleSessionFailure(event.reason)) {
+        event.preventDefault();
+        clearStaleClerkSessionOnce();
+        return;
+      }
       if (isClerkSessionNetworkError(event.reason)) {
         event.preventDefault();
         console.warn(
@@ -84,7 +128,7 @@ export function ClerkChunkLoadRecovery() {
         );
         return;
       }
-      recover(event.reason);
+      recoverChunk(event.reason);
     }
 
     window.addEventListener("error", onError);

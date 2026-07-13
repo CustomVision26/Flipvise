@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Android emulator reaches the Next dev server via 10.0.2.2. Without this,
+  // Next 16 blocks cross-origin /_next assets and Clerk never finishes loading.
+  // Include host and full origin forms — Next 16 matching varies by version.
+  allowedDevOrigins: [
+    "10.0.2.2",
+    "127.0.0.1",
+    "localhost",
+    "http://10.0.2.2:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+  ],
+
   // pdf-parse / pdfjs must run natively on the server (not bundled for edge).
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
 
