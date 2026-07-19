@@ -1,6 +1,7 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useReverification, useUser } from "@clerk/nextjs";
+import { isReverificationCancelledError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -55,7 +56,8 @@ function isClerkDeleteAccountClick(target: EventTarget | null): boolean {
 
 /**
  * Intercepts Clerk Security → "Delete account" and shows Flipvise confirmation
- * (consequences, prorated refund for paid users, type DELETE).
+ * (consequences, prorated refund for paid users, type DELETE, then credential
+ * reverification via Clerk).
  */
 export function AccountDeleteDialog() {
   const router = useRouter();
@@ -66,6 +68,7 @@ export function AccountDeleteDialog() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [confirmPhrase, setConfirmPhrase] = useState("");
   const [isPending, startTransition] = useTransition();
+  const deleteWithReverification = useReverification(deleteAccountAction);
 
   const loadPreview = useCallback(() => {
     if (!isLoaded) return;
@@ -100,10 +103,13 @@ export function AccountDeleteDialog() {
 
   function handleDelete() {
     if (!confirmReady) return;
+    // Close so Clerk's credential prompt is not stacked under this dialog.
     setDialogOpen(false);
     startTransition(async () => {
       try {
-        const result = await deleteAccountAction({ confirmPhrase: "DELETE" });
+        const result = await deleteWithReverification({
+          confirmPhrase: "DELETE",
+        });
         if (result.refundCents > 0) {
           toast.success("Account deleted", {
             description: `A prorated refund of ${formatRefund(result.refundCents, result.currency)} will be issued to your original payment method (typically 5–10 business days).`,
@@ -114,6 +120,7 @@ export function AccountDeleteDialog() {
         router.replace("/");
         router.refresh();
       } catch (err) {
+        if (isReverificationCancelledError(err)) return;
         toast.error("Could not delete account", {
           description:
             err instanceof Error ? err.message : "Please try again or contact support.",
@@ -190,6 +197,10 @@ export function AccountDeleteDialog() {
               autoComplete="off"
               disabled={isPending}
             />
+            <p className="text-xs text-muted-foreground">
+              Next you will be asked to re-enter your sign-in credentials before the
+              account is deleted.
+            </p>
           </div>
         </AlertDialogHeader>
         <AlertDialogFooter data-flipvise-delete-dialog>

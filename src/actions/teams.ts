@@ -38,6 +38,7 @@ import {
   getTeamInvitationRowForInviteeEmail,
   insertTeam,
   insertTeamInvitation,
+  deleteSupersededTeamInvitationsForEmail,
   insertTeamMember,
   insertDeckAssignment,
   updateDeckAssignmentStudyPrivilege,
@@ -194,7 +195,11 @@ const inviteSchema = z.object({
     .pipe(z.number().int().positive()),
   email: z.string().email(),
   role: z.enum(["team_admin", "team_member"]),
-  inviteeDisplayName: z.string().max(255).optional(),
+  inviteeDisplayName: z
+    .string()
+    .trim()
+    .min(1, "Invitee name is required")
+    .max(255),
 });
 
 async function assertCanManageTeam(userId: string, teamId: number) {
@@ -333,7 +338,15 @@ export async function inviteTeamMemberAction(
   if (!userId) return { ok: false, error: "Unauthorized" };
 
   const parsed = inviteSchema.safeParse(data);
-  if (!parsed.success) return { ok: false, error: "Invalid input" };
+  if (!parsed.success) {
+    const nameIssue = parsed.error.issues.find((i) =>
+      i.path.includes("inviteeDisplayName"),
+    );
+    return {
+      ok: false,
+      error: nameIssue?.message ?? "Invalid input",
+    };
+  }
 
   let team;
   try {
@@ -382,12 +395,14 @@ export async function inviteTeamMemberAction(
     }
   }
 
+  await deleteSupersededTeamInvitationsForEmail(team.id, normalizedEmail);
+
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(
     Date.now() + 1000 * 60 * 60 * 24 * TEAM_INVITE_EXPIRY_DAYS,
   );
 
-  const trimmedInviteName = parsed.data.inviteeDisplayName?.trim();
+  const trimmedInviteName = parsed.data.inviteeDisplayName.trim();
   try {
     await insertTeamInvitation(
       team.id,
@@ -396,7 +411,7 @@ export async function inviteTeamMemberAction(
       token,
       expiresAt,
       userId,
-      trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : null,
+      trimmedInviteName,
     );
   } catch (err) {
     console.error("[inviteTeamMemberAction] insert failed:", err);
@@ -416,8 +431,6 @@ export async function inviteTeamMemberAction(
 
   const inviterName = await getClerkUserDisplayNameById(userId);
   const roleLabel = parsed.data.role === "team_admin" ? "Team admin" : "Member";
-  const inviteeLabel =
-    trimmedInviteName && trimmedInviteName.length > 0 ? trimmedInviteName : "";
 
   /** Registered Clerk user → dashboard inbox (+ push); no Loops transactional email. */
   const registeredClerkInvitee = await findClerkUserIdByEmail(normalizedEmail);
@@ -425,7 +438,7 @@ export async function inviteTeamMemberAction(
   if (!registeredClerkInvitee) {
     await loopsSendTeamInvitationEmail({
       inviteeEmail: normalizedEmail,
-      inviteeDisplayName: inviteeLabel,
+      inviteeDisplayName: trimmedInviteName,
       workspaceName: team.name,
       roleLabel,
       inviterName,

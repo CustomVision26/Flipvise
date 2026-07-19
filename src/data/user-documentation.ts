@@ -839,7 +839,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Clerk Security → Delete account is intercepted by Flipvise.",
           "A confirmation dialog explains consequences and any prorated refund.",
-          "Type DELETE to confirm permanent deletion.",
+          "Type DELETE, then re-enter your sign-in credentials to permanently delete.",
         ],
         requirements: ["Signed-in account."],
         doNots: [

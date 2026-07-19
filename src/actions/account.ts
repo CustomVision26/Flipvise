@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
+import { reverificationError } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { purgeAllUserData } from "@/db/queries/user-deletion";
@@ -13,6 +14,12 @@ import { loopsDeleteContact } from "@/lib/loops";
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
 });
+
+/** Require fresh first-factor credentials before permanent account deletion. */
+const DELETE_ACCOUNT_REVERIFICATION = {
+  level: "first_factor",
+  afterMinutes: 1,
+} as const;
 
 const deleteAccountSchema = z.object({
   confirmPhrase: z
@@ -64,14 +71,18 @@ export type DeleteAccountResult = {
 
 export async function deleteAccountAction(
   data: z.infer<typeof deleteAccountSchema>,
-): Promise<DeleteAccountResult> {
+): Promise<DeleteAccountResult | ReturnType<typeof reverificationError>> {
   const parsed = deleteAccountSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
-  const { userId } = await auth();
+  const { userId, has } = await auth();
   if (!userId) throw new Error("Unauthorized");
+
+  if (!has({ reverification: DELETE_ACCOUNT_REVERIFICATION })) {
+    return reverificationError(DELETE_ACCOUNT_REVERIFICATION);
+  }
 
   const user = await currentUser();
   const email =

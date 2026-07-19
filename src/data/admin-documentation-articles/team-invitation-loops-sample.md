@@ -26,7 +26,7 @@ Use this when creating a **Transactional email** in [Loops](https://app.loops.so
 | `acceptInvitationUrl` | Yes | Primary accept button — `/invite/team/{token}` |
 | `dashboardInboxUrl` | Yes | Sent by app but not needed in body for no-account recipients |
 | `inviteeEmail` | Yes | Recipient email |
-| `inviteeName` | Yes | Optional display name from invite form (may be empty) |
+| `inviteeName` | Yes | Invitee name from the form (required; email local-part used as fallback if somehow empty) |
 | `workspaceName` | Yes | Team workspace name |
 | `roleLabel` | Yes | `Member` or `Team admin` |
 | `inviterName` | Yes | Person who sent the invite |

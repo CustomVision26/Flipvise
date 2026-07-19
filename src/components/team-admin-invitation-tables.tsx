@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { Check, Copy, Link2 } from "lucide-react";
 import type { TeamInvitationRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
 import { revokeTeamInvitationAction } from "@/actions/teams";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -24,6 +26,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { teamAdminTableWrapClass } from "@/components/team-admin-panel-styles";
 
 type InvitationRow = TeamInvitationRow;
@@ -69,6 +78,14 @@ function roleLabel(role: "team_admin" | "team_member") {
   return role === "team_admin" ? "Team admin" : "Member";
 }
 
+function teamInviteAcceptUrl(token: string) {
+  const origin =
+    typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "";
+  return `${origin}/invite/team/${token}`;
+}
+
 export function TeamActiveInvitationsTable({
   teamId,
   ownerUserId,
@@ -89,6 +106,15 @@ export function TeamActiveInvitationsTable({
   const [revokeSaving, setRevokeSaving] = React.useState(false);
   const [busyId, setBusyId] = React.useState<number | null>(null);
   const revokeTargetIdRef = React.useRef<number | null>(null);
+  const [viewInviteId, setViewInviteId] = React.useState<number | null>(null);
+  const [copiedInviteId, setCopiedInviteId] = React.useState<number | null>(null);
+  const copyResetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current);
+    };
+  }, []);
 
   async function confirmRevoke() {
     const invitationId = revokeTargetIdRef.current;
@@ -109,10 +135,27 @@ export function TeamActiveInvitationsTable({
     }
   }
 
+  async function copyInviteUrl(invitationId: number, url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedInviteId(invitationId);
+      if (copyResetTimerRef.current) clearTimeout(copyResetTimerRef.current);
+      copyResetTimerRef.current = setTimeout(() => setCopiedInviteId(null), 2000);
+    } catch {
+      setError("Could not copy the invitation URL.");
+    }
+  }
+
   const revokeTargetEmail =
     revokeDialogId != null
       ? (invitations.find((i) => i.id === revokeDialogId)?.email ?? null)
       : null;
+
+  const viewTarget =
+    viewInviteId != null
+      ? (invitations.find((i) => i.id === viewInviteId) ?? null)
+      : null;
+  const viewInviteUrl = viewTarget ? teamInviteAcceptUrl(viewTarget.token) : "";
 
   return (
     <div className="space-y-3">
@@ -154,25 +197,92 @@ export function TeamActiveInvitationsTable({
                 </span>
               </TableCell>
               <TableCell className="text-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busyId === inv.id}
-                  onClick={() => {
-                    setError(null);
-                    revokeTargetIdRef.current = inv.id;
-                    setRevokeDialogId(inv.id);
-                  }}
-                >
-                  Revoke
-                </Button>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busyId === inv.id}
+                    onClick={() => {
+                      setError(null);
+                      setViewInviteId(inv.id);
+                    }}
+                  >
+                    <Link2 className="size-3.5" aria-hidden />
+                    View URL
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busyId === inv.id}
+                    onClick={() => {
+                      setError(null);
+                      revokeTargetIdRef.current = inv.id;
+                      setRevokeDialogId(inv.id);
+                    }}
+                  >
+                    Revoke
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
       </div>
+
+      <Dialog
+        open={viewInviteId != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewInviteId(null);
+            setCopiedInviteId(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Invitation URL</DialogTitle>
+            <DialogDescription>
+              {viewTarget
+                ? `Share this link with ${viewTarget.email} so they can accept the invite.`
+                : "Share this link with the invitee so they can accept."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={viewInviteUrl}
+              aria-label="Invitation URL"
+              className="min-w-0 flex-1 font-mono text-xs"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              disabled={!viewInviteUrl || viewTarget == null}
+              aria-label={
+                viewTarget != null && copiedInviteId === viewTarget.id
+                  ? "Copied"
+                  : "Copy invitation URL"
+              }
+              onClick={() => {
+                if (viewTarget == null || !viewInviteUrl) return;
+                void copyInviteUrl(viewTarget.id, viewInviteUrl);
+              }}
+            >
+              {viewTarget != null && copiedInviteId === viewTarget.id ? (
+                <Check className="size-4 text-emerald-400" aria-hidden />
+              ) : (
+                <Copy className="size-4" aria-hidden />
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={revokeDialogId != null}

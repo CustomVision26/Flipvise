@@ -409,7 +409,7 @@ export function TeamAdminManageTabs({
               <div className={cn(teamAdminSubTabPanelClass, "space-y-4")}>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   Active invites for <span className="font-medium text-foreground">{teamName}</span>.
-                  Revoke to withdraw a link before it is accepted or before it expires.
+                  Use View URL to copy the invite link, or Revoke to withdraw it before it is accepted or expires.
                 </p>
                 {pendingInvitations.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No pending invitations.</p>

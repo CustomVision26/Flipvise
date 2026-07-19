@@ -545,7 +545,9 @@ export async function getLatestInviteeDisplayNamesForTeamIds(teamIds: number[]) 
   }
 }
 
-/** Past invitations for this team: terminal statuses, or pending but already expired. */
+/** Past invitations for this team: terminal statuses, or pending but already expired.
+ *  One row per invitee email — the most recent invitation (avoids revoked/resend clutter).
+ */
 export async function listTeamInvitationHistoryForTeam(teamId: number) {
   const now = new Date();
   const whereClause = and(
@@ -555,8 +557,9 @@ export async function listTeamInvitationHistoryForTeam(teamId: number) {
       and(eq(teamInvitations.status, "pending"), lte(teamInvitations.expiresAt, now)),
     ),
   );
+  let rows: TeamInvitationRow[];
   try {
-    return await db
+    rows = await db
       .select()
       .from(teamInvitations)
       .where(whereClause)
@@ -564,13 +567,55 @@ export async function listTeamInvitationHistoryForTeam(teamId: number) {
   } catch (e) {
     if (!isMissingTeamInvitationInviteeDisplayNameColumnError(e)) throw e;
     warnMissingInviteeDisplayNameColumnOnce();
-    const rows = await db
+    const legacy = await db
       .select(teamInvitationRowSelectLegacy)
       .from(teamInvitations)
       .where(whereClause)
       .orderBy(desc(teamInvitations.createdAt));
-    return rows.map(withDefaultInviteeDisplayName);
+    rows = legacy.map(withDefaultInviteeDisplayName);
   }
+  return latestTeamInvitationPerEmail(rows);
+}
+
+/** Keeps the newest invitation when the same email was invited more than once. */
+function latestTeamInvitationPerEmail(rows: TeamInvitationRow[]): TeamInvitationRow[] {
+  const seen = new Set<string>();
+  const out: TeamInvitationRow[] = [];
+  for (const row of rows) {
+    const key = row.email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
+
+/**
+ * Removes prior revoked / expired invites for this email so a resend does not
+ * stack duplicate history rows. Keeps accepted/rejected outcomes.
+ */
+export async function deleteSupersededTeamInvitationsForEmail(
+  teamId: number,
+  email: string,
+) {
+  const normalized = email.toLowerCase();
+  const now = new Date();
+  await db
+    .delete(teamInvitations)
+    .where(
+      and(
+        eq(teamInvitations.teamId, teamId),
+        eq(teamInvitations.email, normalized),
+        or(
+          eq(teamInvitations.status, "revoked"),
+          eq(teamInvitations.status, "expired"),
+          and(
+            eq(teamInvitations.status, "pending"),
+            lte(teamInvitations.expiresAt, now),
+          ),
+        ),
+      ),
+    );
 }
 
 /** Pending invite for this workspace and email that has not yet expired. */

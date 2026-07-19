@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-13T19:18:23.623Z",
+  "updatedAt": "2026-07-17T05:12:02.351Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "9ca5dfaf70c89c8891d693797de9715d871130b97642de5138402f7f391b7528",
@@ -27,7 +27,7 @@
       "docFingerprint": "ed2845d4df45ca0c2991fa7b75c086d3d852aa51ce24891df400b6e27e88fdae"
     },
     "study-session": {
-      "watchFingerprint": "9d4a57982c56cb8bc4cb71978933ba6168a60f3b2aa61a2ef8f870d51ce09777",
+      "watchFingerprint": "96274dd2909d16d8a39e7cf18a7b928fadfa0d34c1c265058730e106d7b8ad85",
       "docFingerprint": "f3763b6bec2ae0a57dc1be35e547c20bda649e4e67a4b4c29b2ba52e9f15e57a"
     },
     "quiz-result-detail": {
@@ -35,7 +35,7 @@
       "docFingerprint": "3ea0c3de962ce007b376358c0449dd99744c08f3bb56fc992c7f347688552868"
     },
     "offline-mobile": {
-      "watchFingerprint": "82e91bc3800cb823e235b09d4a0f9b756ba11c3ec9ee6681ebeac042d434c204",
+      "watchFingerprint": "9c858a6a8d056e1bbaccf593d5555a3710ac53d4a751b21922363502135c638a",
       "docFingerprint": "87c7fe5cbb576ffc81e3fcc831273a6870110c194e1f98230e9b11d460892de0"
     },
     "inbox": {
@@ -143,15 +143,15 @@
       "docFingerprint": "e541b5319aebf90f6b0a13321115afcf813aacaed34fe92f2f96d8229b430085"
     },
     "account-delete": {
-      "watchFingerprint": "7be9a06bc00ee1236f28467696d5c93bb9224bb8346d852daab2d25534284fdb",
-      "docFingerprint": "5e4f901f87b539cd6465dd1ad2b712ff7ca73208b0944c30ec861d2d70ffe2c6"
+      "watchFingerprint": "8237211751a54516df3135926d8a3df9f9ab545d792cb386edad4d53d47297ab",
+      "docFingerprint": "7566f9ba03902c638d1c395233e8c8dce2300b147a75f73df1fb06464dfbf88a"
     },
     "team-admin-overview": {
-      "watchFingerprint": "af8d61e748cf139d6c4cbf101d9f5043fe9a7c10802e1d4850dadeb8d4f718a3",
+      "watchFingerprint": "8887acd4a31a542bde25cb13727313e561f8df869140410b4c1dc7cee4b29720",
       "docFingerprint": "98312e60f86f345fc37f1b467e5aa60687735958c0d6a437363ea70d391ea9b0"
     },
     "members": {
-      "watchFingerprint": "3efbfa0fe04b7eb447fabacbf3d4f6ef3d126f0b1deb315b9694affc7fa467c1",
+      "watchFingerprint": "df6cfb2bd0e7472a0c1d31542bcf5caddcfb81c73c3dc22d9be86d16b3675e9b",
       "docFingerprint": "d37c76f2c4f05e3c6d67040d395d96ce2e331e328e4c5c90de33757ec5eda055"
     },
     "deck-manager": {
@@ -160,7 +160,7 @@
     },
     "invite-members": {
       "watchFingerprint": "9a20466556919b3ef919b9bb70a6d26e977efd6799efacae62ce0cfafe3eeecf",
-      "docFingerprint": "5fcafb4296b99a42f5d1af412329d9374f1417255a56173f65bd44eea9531713"
+      "docFingerprint": "5b368997cc34c595fb9149947c1bc5f9798c7cab0e392d3db0fbffe965bf24fb"
     },
     "quiz-results-admin": {
       "watchFingerprint": "5db3a0441ebd9e5536f7a6e0d1ae48d66ff7402e253cbb511b4e74ac02c77a81",

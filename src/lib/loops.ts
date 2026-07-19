@@ -264,7 +264,7 @@ export async function loopsSendQuizResultEmail(
  * | `acceptInvitationUrl` | **Primary link** — opens the invite landing page; signing in with the invited email lets them accept (`/invite/team/{token}`). |
  * | `dashboardInboxUrl` | Link to `/dashboard/inbox` when they already have an account (invitation also appears in-app). |
  * | `inviteeEmail` | Normalized recipient email. |
- * | `inviteeName` | Optional label from the invite form; empty string if omitted. |
+ * | `inviteeName` | Invitee name from the form (required). Falls back to email local-part if empty. |
  * | `workspaceName` | Team workspace display name. |
  * | `roleLabel` | `"Member"` or `"Team admin"`. |
  * | `inviterName` | Display name of the person who sent the invite. |
@@ -284,6 +284,13 @@ export type TeamInvitationEmailPayload = {
   expiresInDays: number;
   subjectLine: string;
 };
+
+function loopsInviteeNameFallback(email: string, displayName: string): string {
+  const trimmed = displayName.trim();
+  if (trimmed.length > 0) return trimmed;
+  const local = email.split("@")[0]?.trim();
+  return local && local.length > 0 ? local : email;
+}
 
 export async function loopsSendTeamInvitationEmail(
   payload: TeamInvitationEmailPayload,
@@ -306,7 +313,10 @@ export async function loopsSendTeamInvitationEmail(
     acceptInvitationUrl: payload.acceptInvitationUrl,
     dashboardInboxUrl: payload.dashboardInboxUrl,
     inviteeEmail: payload.inviteeEmail,
-    inviteeName: payload.inviteeDisplayName,
+    inviteeName: loopsInviteeNameFallback(
+      payload.inviteeEmail,
+      payload.inviteeDisplayName,
+    ),
     workspaceName: payload.workspaceName,
     roleLabel: payload.roleLabel,
     inviterName: payload.inviterName,

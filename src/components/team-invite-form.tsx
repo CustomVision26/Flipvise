@@ -114,10 +114,18 @@ export function TeamInviteForm({
     subscriberOwnerPrimaryEmail !== "" &&
     normalizedTypedEmail === subscriberOwnerPrimaryEmail;
 
-  const submitDisabled = formDisabled || selectedAtCapacity || invitesSubscriberOwnerEmail;
+  const submitDisabled =
+    formDisabled ||
+    selectedAtCapacity ||
+    invitesSubscriberOwnerEmail ||
+    inviteeDisplayName.trim().length === 0;
   const emailFilled = email.trim().length > 0;
+  const nameFilled = inviteeDisplayName.trim().length > 0;
   const disabledSubmitExplanation = React.useMemo(() => {
     if (!emailFilled) return null;
+    if (!nameFilled) {
+      return "Enter an invitee name.";
+    }
     if (invitesSubscriberOwnerEmail) {
       return "You cannot invite the workspace subscriber using their own email address.";
     }
@@ -133,6 +141,7 @@ export function TeamInviteForm({
     return null;
   }, [
     emailFilled,
+    nameFilled,
     invitesSubscriberOwnerEmail,
     pending,
     allAtCapacity,
@@ -152,6 +161,11 @@ export function TeamInviteForm({
       setError("You cannot invite the workspace subscriber using their own email address.");
       return;
     }
+    const trimmedName = inviteeDisplayName.trim();
+    if (!trimmedName) {
+      setError("Invitee name is required.");
+      return;
+    }
     setPending(true);
     try {
       const parsedWorkspaceId = Number.parseInt(String(teamId), 10);
@@ -159,13 +173,12 @@ export function TeamInviteForm({
         setError("Choose a valid workspace.");
         return;
       }
-      const trimmedName = inviteeDisplayName.trim();
       const res = await inviteTeamMemberAction({
         // Decimal string keeps RSC / dev traces JSON-serializable (avoids bigint wire encoding for ids).
         teamId: String(parsedWorkspaceId),
         email: email.trim(),
         role,
-        ...(trimmedName.length > 0 ? { inviteeDisplayName: trimmedName } : {}),
+        inviteeDisplayName: trimmedName,
       });
       if (!res.ok) {
         setError(res.error);
@@ -322,15 +335,16 @@ export function TeamInviteForm({
           id="team-invite-invitee-name"
           type="text"
           autoComplete="name"
+          required
           value={inviteeDisplayName}
           onChange={(e) => setInviteeDisplayName(e.target.value)}
           disabled={formDisabled}
-          placeholder="Optional display name"
+          placeholder="Full name or preferred name"
           maxLength={255}
           className="h-10 w-full"
         />
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Optional. Auto-filled when the email matches an existing member or prior invite.
+          Required. Auto-filled when the email matches an existing member or prior invite.
         </p>
       </div>
       <div className="space-y-2">

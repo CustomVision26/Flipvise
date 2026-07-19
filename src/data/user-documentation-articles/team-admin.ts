@@ -215,7 +215,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "send",
         title: "Send invite",
         bullets: [
-          "Choose workspace, email, display name (optional), and role (Member or Team admin).",
+          "Choose workspace, email, invitee name (required), and role (Member or Team admin).",
           "Email must match the address they will sign in with.",
           "Invites expire in 3 days — expired invites must be resent.",
           "Cannot invite subscriber’s own primary email.",
@@ -235,7 +235,8 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "history",
         title: "Invite history",
         bullets: [
-          "Accepted, declined, expired, and revoked invitations.",
+          "Accepted, declined, expired, and revoked invitations — latest outcome per email.",
+          "Resending after revoke replaces the earlier revoked/expired row for that address.",
           "Recipients accept at /invite/team/[token].",
         ],
       },
