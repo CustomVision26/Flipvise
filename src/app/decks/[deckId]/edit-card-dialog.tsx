@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  Popover,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   generateAnswerAction,
   generateMultipleChoiceAction,
   updateCardAction,
@@ -38,6 +42,13 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
+import { buildMathDiagramPngFile } from "@/lib/math-diagrams/build-diagram-file";
+import {
+  AiGeneratePopoverContent,
+  type AiGenerateMode,
+  type AiImageSide,
+} from "./ai-generate-popover";
 import {
   AnswerChoiceImageControl,
   buildChoiceImageTuple,
@@ -193,6 +204,12 @@ function ImageUploadSection({
   altText: string;
   compact?: boolean;
 }) {
+  const [enlargeOpen, setEnlargeOpen] = useState(false);
+
+  useEffect(() => {
+    if (!imagePreview) setEnlargeOpen(false);
+  }, [imagePreview]);
+
   return (
     <div className="flex flex-col gap-2">
       <Label className="text-muted-foreground text-xs">{label}</Label>
@@ -201,14 +218,23 @@ function ImageUploadSection({
           className={cn(
             "relative w-full rounded-lg overflow-hidden border border-border bg-muted/30",
             compact ? "h-24 sm:h-28" : "h-32 sm:h-48",
+            !isUploading && "cursor-zoom-in",
           )}
+          title="Double-click to enlarge"
+          aria-label={`Double-click to enlarge ${altText}`}
+          onDoubleClick={(event) => {
+            if (isUploading) return;
+            event.preventDefault();
+            setEnlargeOpen(true);
+          }}
         >
           <Image
             src={imagePreview}
             alt={altText}
             fill
-            className="object-contain"
-            unoptimized={imagePreview.startsWith("blob:")}
+            className="object-contain pointer-events-none"
+            unoptimized={imagePreview.startsWith("blob:") || imagePreview.startsWith("data:")}
+            draggable={false}
           />
           {isUploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-xs sm:text-sm text-muted-foreground">
@@ -247,6 +273,15 @@ function ImageUploadSection({
         className="hidden"
         onChange={onFileChange}
       />
+      {imagePreview ? (
+        <ImageEnlargeOverlay
+          open={enlargeOpen}
+          onClose={() => setEnlargeOpen(false)}
+          src={imagePreview}
+          alt={altText}
+          title={altText}
+        />
+      ) : null}
     </div>
   );
 }
@@ -377,8 +412,12 @@ function StandardEditForm({
   );
   const [isUploadingBack, setIsUploadingBack] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiWarning, setAiWarning] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [aiChoiceOpen, setAiChoiceOpen] = useState(false);
+  const [aiImageSide, setAiImageSide] = useState<AiImageSide>("back");
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const correctIdx = card.correctChoiceIndex ?? 0;
   const initialDistractors = extractDistractorsFromChoices(card.choices, correctIdx);
@@ -415,7 +454,12 @@ function StandardEditForm({
 
   const isUploading =
     isUploadingFront || isUploadingBack || uploadingWrongImageIndex !== null;
-  const isBusy = isPending || isUploading || isGeneratingAnswer || isRegeneratingDistractors;
+  const isBusy =
+    isPending ||
+    isUploading ||
+    isGeneratingAnswer ||
+    isGeneratingDiagram ||
+    isRegeneratingDistractors;
   const frontHasContent = front.trim().length > 0 || !!frontImageUrl;
   const backHasContent = back.trim().length > 0 || !!backImageUrl;
   const allDistractorsFilled = distractors.every(
@@ -554,20 +598,31 @@ function StandardEditForm({
     }
   }
 
-  async function handleGenerateAnswer() {
+  async function handleGenerateAnswer(mode: AiGenerateMode) {
     if (!front.trim()) {
       setError("Please enter a question or term in the front field first.");
       return;
     }
+    setAiChoiceOpen(false);
     setError(null);
+    setAiWarning(null);
     frontSpeech.stop();
     backSpeech.stop();
     setIsGeneratingAnswer(true);
     try {
-      const { answer, distractors } = await generateAnswerAction({
+      const {
+        answer,
+        distractors,
+        frontDiagram,
+        backDiagram,
+        distractorDiagrams,
+        relevanceWarning,
+      } = await generateAnswerAction({
         deckId,
         question: front.trim(),
+        includeDiagram: mode === "diagram",
       });
+      if (relevanceWarning) setAiWarning(relevanceWarning);
       setBack(answer);
       const hasValidDistractors =
         distractors.length === 3 && distractors.every((d) => d.trim().length > 0);
@@ -579,10 +634,68 @@ function StandardEditForm({
         setAiDistractors(null);
         setAiDistractorsFor(null);
       }
+      setIsGeneratingAnswer(false);
+
+      if (mode === "text" || mode === "illustration") return;
+
+      if (!frontDiagram && !backDiagram) {
+        setAiWarning(
+          "Could not create a diagram for this question. The text answer was still updated.",
+        );
+        return;
+      }
+
+      setIsGeneratingDiagram(true);
+      try {
+        async function uploadDiagram(diagram: NonNullable<typeof frontDiagram>) {
+          const { file } = await buildMathDiagramPngFile(diagram);
+          const formData = new FormData();
+          formData.append("image", file);
+          const url = await uploadCardImageAction({ deckId }, formData);
+          return { url, preview: URL.createObjectURL(file) };
+        }
+
+        if (frontDiagram) {
+          const uploaded = await uploadDiagram(frontDiagram);
+          setFrontImageUrl(uploaded.url);
+          setFrontImagePreview(uploaded.preview);
+        }
+        if (backDiagram) {
+          const uploaded = await uploadDiagram(backDiagram);
+          setBackImageUrl(uploaded.url);
+          setBackImagePreview(uploaded.preview);
+        }
+
+        if (showWrongAnswers && hasValidDistractors) {
+          const nextUrls: [string | null, string | null, string | null] = [
+            null,
+            null,
+            null,
+          ];
+          const nextPreviews: [string | null, string | null, string | null] = [
+            null,
+            null,
+            null,
+          ];
+          for (let i = 0; i < 3; i++) {
+            const d = distractorDiagrams[i];
+            if (!d) continue;
+            const uploaded = await uploadDiagram(d);
+            nextUrls[i] = uploaded.url;
+            nextPreviews[i] = uploaded.preview;
+          }
+          setWrongImageUrls(nextUrls);
+          setWrongImagePreviews(nextPreviews);
+        }
+      } catch {
+        setError("Could not render the math diagram. The text answer is still available.");
+      } finally {
+        setIsGeneratingDiagram(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate answer.");
-    } finally {
       setIsGeneratingAnswer(false);
+      setIsGeneratingDiagram(false);
     }
   }
 
@@ -699,30 +812,40 @@ function StandardEditForm({
             </Label>
             <div className="flex items-center gap-1.5 shrink-0">
               {hasAI && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger render={<span />}>
+                <Popover open={aiChoiceOpen} onOpenChange={setAiChoiceOpen}>
+                  <PopoverTrigger
+                    render={
                       <Button
                         type="button"
                         variant="default"
                         size="icon"
                         className="h-7 w-7"
-                        onClick={handleGenerateAnswer}
                         disabled={!front.trim() || isBusy}
-                        aria-label="Generate answer with AI"
-                      >
-                        <Sparkles
-                          className={`h-3.5 w-3.5 ${isGeneratingAnswer ? "animate-pulse" : ""}`}
-                        />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-64 text-center">
-                      {!front.trim()
-                        ? "Enter a question or term on the front first"
-                        : "Generate answer with AI. Uses your deck name, description, and existing cards so the answer matches your deck's style and scope."}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                        aria-label={
+                          !front.trim()
+                            ? "Enter a question or term first"
+                            : "Generate an answer with AI"
+                        }
+                        title={
+                          !front.trim()
+                            ? "Enter a question or term first"
+                            : "Generate an answer with AI"
+                        }
+                      />
+                    }
+                  >
+                    <Sparkles
+                      className={`h-3.5 w-3.5 ${isGeneratingAnswer || isGeneratingDiagram ? "animate-pulse" : ""}`}
+                    />
+                  </PopoverTrigger>
+                  <AiGeneratePopoverContent
+                    imageSide={aiImageSide}
+                    onImageSideChange={setAiImageSide}
+                    onGenerate={handleGenerateAnswer}
+                    disabled={isBusy}
+                    showIllustrationOption={false}
+                  />
+                </Popover>
               )}
               {backSpeech.supported && (
                 <TooltipProvider>
@@ -826,6 +949,11 @@ function StandardEditForm({
         </div>
       )}
 
+      {aiWarning && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200 text-xs sm:text-sm">
+          {aiWarning}
+        </p>
+      )}
       {error && <p className="text-destructive text-xs sm:text-sm">{error}</p>}
 
       <EditCardDialogFooter

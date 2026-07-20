@@ -39,6 +39,11 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "AI generates new material within the deck topic and does not copy or trivially rephrase cards you already have.",
           "If the deck is still empty, AI has only the name and description to work from, so the first batch may vary more until you edit results or add sample cards.",
           "Math and problem-solving decks receive step-by-step worked answers; vocabulary and fact decks receive concise term-and-definition pairs.",
+          "Choose Answer with diagram for graphs, geometry figures, stats charts, measurement figures, or simple 3D shapes — Flipvise draws labeled diagrams from a structured spec (not a freehand AI doodle).",
+          "Answer with diagram: front gets a question figure without the correct answer; back gets a solution figure with the correct answer labeled; quiz wrong answers get their own incorrect figures when those slots are shown.",
+          "If a diagram cannot be built, the text answer still updates and you can retry or switch to Answer with image.",
+          "Answer with image adds a decorative illustration on the selected Front or Back side only.",
+          "While editing a card, double-click a front, back, or wrong-answer image thumbnail to open a full-size preview.",
         ],
       },
       {
@@ -82,6 +87,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Study modes",
         bullets: [
           "Flashcard review — flip cards and track familiarity.",
+          "Double-click the front or back image on a flashcard to open a full-size preview; Escape or click outside closes it.",
           "Quiz mode — timed session with scoring and optional team policies.",
           "Team members may be restricted to review only, quiz only, or both per assignment.",
         ],

@@ -39,6 +39,7 @@ import {
   CircleDashed,
 } from "lucide-react";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
+import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
 import { cn } from "@/lib/utils";
 
@@ -129,6 +130,11 @@ export function FlashcardStudy({
   const [enableSlideTransition, setEnableSlideTransition] = useState(false);
   const [dragOffsetX, setDragOffsetX] = useState(0);
   const [isDragSnapBack, setIsDragSnapBack] = useState(false);
+  const [enlargedImage, setEnlargedImage] = useState<{
+    src: string;
+    title: string;
+    alt: string;
+  } | null>(null);
   const dragStartXRef = useRef<number | null>(null);
   const hasDraggedRef = useRef(false);
   const pendingNavRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,6 +182,10 @@ export function FlashcardStudy({
       if (snapBackTimerRef.current) clearTimeout(snapBackTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    setEnlargedImage(null);
+  }, [visibleIndex]);
 
   function handleFlip() {
     setIsFlipped((prev) => {
@@ -536,14 +546,31 @@ export function FlashcardStudy({
             </div>
             {currentCard.frontImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2">
-                <div className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+                <button
+                  type="button"
+                  className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner cursor-zoom-in transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Double-click to enlarge"
+                  aria-label="Double-click to enlarge front image"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setEnlargedImage({
+                      src: currentCard.frontImageUrl!,
+                      title: "Front image",
+                      alt: "Card front image",
+                    });
+                  }}
+                >
                   <Image
                     src={currentCard.frontImageUrl}
                     alt="Card front image"
                     fill
-                    className="object-contain p-2 sm:p-3"
+                    className="object-contain p-2 sm:p-3 pointer-events-none"
+                    draggable={false}
                   />
-                </div>
+                </button>
               </div>
             )}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-3 flex flex-col justify-start">
@@ -577,15 +604,32 @@ export function FlashcardStudy({
               <span className={cn("text-xs hidden sm:inline", hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
             </div>
             {currentCard.backImageUrl && (
-              <div className="shrink-0 px-3 sm:px-6 pb-2">
-                <div className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner">
+              <div className="shrink-0 px-3 sm:px-6 pb-2 relative z-10">
+                <button
+                  type="button"
+                  className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner cursor-zoom-in transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Double-click to enlarge"
+                  aria-label="Double-click to enlarge back image"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setEnlargedImage({
+                      src: currentCard.backImageUrl!,
+                      title: "Back image",
+                      alt: "Card back image",
+                    });
+                  }}
+                >
                   <Image
                     src={currentCard.backImageUrl}
                     alt="Card back image"
                     fill
-                    className="object-contain p-2 sm:p-3"
+                    className="object-contain p-2 sm:p-3 pointer-events-none"
+                    draggable={false}
                   />
-                </div>
+                </button>
               </div>
             )}
             <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-start overflow-y-auto px-4 py-3 sm:px-8">
@@ -748,6 +792,16 @@ export function FlashcardStudy({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {enlargedImage ? (
+        <ImageEnlargeOverlay
+          open
+          onClose={() => setEnlargedImage(null)}
+          src={enlargedImage.src}
+          alt={enlargedImage.alt}
+          title={enlargedImage.title}
+        />
+      ) : null}
     </div>
   );
 }

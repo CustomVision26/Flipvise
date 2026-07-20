@@ -38,6 +38,13 @@ import {
 } from "@/lib/source-import-types";
 import type { ExtractedSource } from "@/lib/document-extract";
 import { cleanReadingPassageFront, READING_PASSAGE_MC_GENERATION_PROMPT } from "@/lib/source-import-reading-passage";
+import {
+  isRenderableMathDiagram,
+  mathDiagramRequiredAiOutputSchema,
+  normalizeMathDiagram,
+  parseMathDiagramAi,
+  type MathDiagram,
+} from "@/lib/math-diagrams";
 
 async function requireDeckEditor(userId: string, deckId: number) {
   const bundle = await getDeckWithViewerAccess(deckId, userId);
@@ -47,15 +54,30 @@ async function requireDeckEditor(userId: string, deckId: number) {
   return bundle.deck;
 }
 
-const nullableImageUrl = z.union([z.string().url(), z.null()]);
+/** Empty string → null so saves never fail Zod with "Invalid URL". */
+const nullableImageUrl = z.preprocess(
+  (value) => (value === "" || value === undefined ? null : value),
+  z.union([z.string().url(), z.null()]),
+);
+
+const optionalPersistedImageUrl = z.preprocess(
+  (value) => {
+    if (value === "" || value === undefined) return null;
+    if (typeof value === "string" && (value.startsWith("blob:") || value.startsWith("data:"))) {
+      return null;
+    }
+    return value;
+  },
+  z.union([z.string().url(), z.null()]).optional(),
+);
 
 const createCardSchema = z
   .object({
     deckId: z.number().int().positive(),
     front: z.string(),
-    frontImageUrl: z.string().url().nullable().optional(),
+    frontImageUrl: optionalPersistedImageUrl,
     back: z.string(),
-    backImageUrl: z.string().url().nullable().optional(),
+    backImageUrl: optionalPersistedImageUrl,
     /**
      * Optional 3 AI-generated wrong answers captured during the AI "generate
      * answer" flow. If provided, they are stored on the card but never shown
@@ -81,11 +103,11 @@ const updateCardSchema = z
     cardId: z.number().int().positive(),
     deckId: z.number().int().positive(),
     front: z.string(),
-    frontImageUrl: z.string().url().nullable().optional(),
+    frontImageUrl: optionalPersistedImageUrl,
     back: z.string(),
-    backImageUrl: z.string().url().nullable().optional(),
-    oldFrontImageUrl: z.string().url().nullable().optional(),
-    oldBackImageUrl: z.string().url().nullable().optional(),
+    backImageUrl: optionalPersistedImageUrl,
+    oldFrontImageUrl: optionalPersistedImageUrl,
+    oldBackImageUrl: optionalPersistedImageUrl,
     distractors: z
       .array(z.string())
       .length(3)
@@ -142,12 +164,38 @@ const generateCardsSchema = z.object({
 const generateAnswerSchema = z.object({
   deckId: z.number().int().positive(),
   question: z.string().min(1),
+  /** When true, also return a structured math diagram spec (retry if omitted). */
+  includeDiagram: z.boolean().optional(),
+  /**
+   * Which card side will receive the diagram.
+   * front → question figure (no answer values); back → solution figure (with answers).
+   */
+  diagramSide: z.enum(["front", "back"]).optional(),
 });
 
 const validateQuestionRelevanceSchema = z.object({
   isRelevant: z.boolean(),
   warning: z.string().nullable(),
 });
+
+/**
+ * Shared relevance gate for Generate answer / MC AI.
+ * Intentionally lenient — only block clearly wrong subjects (same bar as From source).
+ */
+const QUESTION_RELEVANCE_SYSTEM = `You are a flashcard validation assistant. Decide whether a user question belongs in a deck.
+
+Use the deck name, description, and existing cards for scope.
+
+Return isRelevant=true when the question is reasonably related, including neighboring subtopics of the same subject. Examples:
+- A Math or Geometry deck may include geometry, measurement, coordinate graphs, statistics/charts, and 3D shapes.
+- An Algebra deck may include equations, graphs, and word problems.
+- A Science deck may include adjacent lab or quantitative skills for that science.
+
+Return isRelevant=false ONLY when the question is clearly a different subject (for example Spanish vocabulary in a Geometry deck, or history in a Biology deck).
+
+Return:
+- isRelevant: boolean
+- warning: a brief helpful message (1-2 sentences) only when isRelevant is false; otherwise null`;
 
 /**
  * Maximum number of existing cards to feed back into the AI as context.
@@ -761,9 +809,154 @@ export async function getCardsForDeckViewerPreviewAction(
   return getCardsByDeckUnscoped(parsed.data.deckId);
 }
 
+const DIAGRAM_TYPE_RULES = `diagram.type must be one of: geometry_2d, coordinate_graph, stats_chart, measurement, shape_3d — never "none".
+Set unused payload fields (geometry, coordinateGraph, statsChart, measurement, shape3d) to null.
+Fill only the payload that matches type:
+- geometry_2d → geometry: points/polygons/segments/circles/angles on a 0–100 canvas (x right, y down).
+- coordinate_graph → coordinateGraph: xMin/xMax/yMin/yMax plus points, lines (slope/intercept), segments.
+- stats_chart → statsChart: chart (bar|line|pie), categories, values.
+- measurement → measurement: shape (rectangle|triangle|line_segment), dimensions (e.g. "8 cm").
+- shape_3d → shape3d: solid (cube|rectangular_prism|cylinder|sphere|cone|pyramid), labels.`;
+
+const FRONT_DIAGRAM_RULES = `This is a FRONT-OF-CARD question figure (learner has not seen the answer yet):
+- Show the figure needed to solve the problem.
+- Include ONLY given information from the question (vertex labels, given lengths/angles, raw data categories/values stated in the question).
+- For pie/bar charts: include EVERY category from the question with its given value (e.g. Rent 40, Food 25, Transport 15, Other 20). Do not collapse categories.
+- title must be null or a neutral title like "Budget" — NEVER put the computed answer (e.g. "65%", "x = 110") in title or on any label.
+- Do NOT reveal the unknown, computed result, or final answer.
+- Set diagram.side to "front".`;
+
+const BACK_DIAGRAM_RULES = `This is a BACK-OF-CARD / correct-answer solution figure:
+- Use the same figure geometry as the question figure when possible.
+- Include the correct answer values/labels on the figure (e.g. title or label "65%", CD = 8 cm, highlighted combined sector).
+- For pie/bar charts: keep all given categories; you may also emphasize the answered quantity.
+- Set diagram.side to "back".`;
+
+/** Strip answer-like titles from question figures (common AI leak, e.g. title "65%"). */
+function sanitizeFrontDiagram(diagram: MathDiagram): MathDiagram {
+  const title = diagram.title?.trim();
+  if (!title) return { ...diagram, side: "front", title: undefined };
+  const looksLikeAnswer =
+    /^\d+(\.\d+)?\s*%?$/.test(title) ||
+    /^(answer|result|solution)\b/i.test(title) ||
+    /=\s*\d/.test(title) ||
+    /^\d+(\.\d+)?\s*(cm|m|°|degrees)?$/i.test(title);
+  if (looksLikeAnswer) {
+    return { ...diagram, side: "front", title: undefined };
+  }
+  return { ...diagram, side: "front" };
+}
+
+function parseRenderableDiagram(
+  raw: unknown,
+  side: "front" | "back",
+): MathDiagram | null {
+  const parsed = parseMathDiagramAi(raw);
+  if (!isRenderableMathDiagram(parsed)) return null;
+  const normalized = normalizeMathDiagram(parsed);
+  if (!normalized) return null;
+  const withSide = { ...normalized, side };
+  return side === "front" ? sanitizeFrontDiagram(withSide) : withSide;
+}
+
+async function generateDiagramPairOnly(args: {
+  fullContext: string;
+  question: string;
+  answer: string;
+}): Promise<{ front: MathDiagram | null; back: MathDiagram | null }> {
+  const { output } = await generateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: z.object({
+        frontDiagram: mathDiagramRequiredAiOutputSchema,
+        backDiagram: mathDiagramRequiredAiOutputSchema,
+      }),
+    }),
+    system: `You create paired math diagrams for flashcards.
+${DIAGRAM_TYPE_RULES}
+Return frontDiagram and backDiagram (never type "none").
+${FRONT_DIAGRAM_RULES}
+${BACK_DIAGRAM_RULES}
+Never invent numbers that contradict the question or answer.`,
+    prompt: `${args.fullContext}
+
+Question/Term: ${args.question}
+
+Answer:
+${args.answer}
+
+Produce:
+1) frontDiagram — full question figure with NO correct-answer labels (title null or neutral).
+2) backDiagram — same figure WITH the correct answer labeled (e.g. 65%).`,
+  });
+
+  return {
+    front: parseRenderableDiagram(output?.frontDiagram, "front"),
+    back: parseRenderableDiagram(output?.backDiagram, "back"),
+  };
+}
+
+async function generateDistractorDiagramsOnly(args: {
+  fullContext: string;
+  question: string;
+  correctAnswer: string;
+  distractors: [string, string, string];
+}): Promise<[MathDiagram | null, MathDiagram | null, MathDiagram | null]> {
+  const { output } = await generateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: z.object({
+        distractorDiagrams: z.tuple([
+          mathDiagramRequiredAiOutputSchema,
+          mathDiagramRequiredAiOutputSchema,
+          mathDiagramRequiredAiOutputSchema,
+        ]),
+      }),
+    }),
+    system: `You create three wrong-answer diagrams for a quiz flashcard.
+${DIAGRAM_TYPE_RULES}
+Each diagram illustrates one incorrect answer (not the correct answer).
+Keep the same chart/figure style as the question when possible.
+Put the wrong answer value in the title or on a clear label.
+Set each diagram.side to "back".
+Never invent numbers that contradict the given wrong-answer texts.`,
+    prompt: `${args.fullContext}
+
+Question/Term: ${args.question}
+
+Correct answer (do NOT use): ${args.correctAnswer}
+
+Wrong answer 1: ${args.distractors[0]}
+Wrong answer 2: ${args.distractors[1]}
+Wrong answer 3: ${args.distractors[2]}
+
+Return distractorDiagrams[0..2] matching those three wrong answers.`,
+  });
+
+  const raw = output?.distractorDiagrams;
+  return [
+    parseRenderableDiagram(raw?.[0], "back"),
+    parseRenderableDiagram(raw?.[1], "back"),
+    parseRenderableDiagram(raw?.[2], "back"),
+  ];
+}
+
 export async function generateAnswerAction(
   data: GenerateAnswerInput,
-): Promise<{ answer: string; distractors: [string, string, string] }> {
+): Promise<{
+  answer: string;
+  distractors: [string, string, string];
+  /** @deprecated Prefer frontDiagram / backDiagram. Kept as the solution figure when present. */
+  diagram: MathDiagram | null;
+  /** Question figure (no answer values) for the front of the card. */
+  frontDiagram: MathDiagram | null;
+  /** Solution figure (with answer labels) for the back / correct answer. */
+  backDiagram: MathDiagram | null;
+  /** Optional figures illustrating each wrong answer (quiz distractors). */
+  distractorDiagrams: [MathDiagram | null, MathDiagram | null, MathDiagram | null];
+  /** Soft tip when the question may be outside the deck focus — generation still runs. */
+  relevanceWarning: string | null;
+}> {
   const access = await getAccessContext();
   if (!access.userId) throw new Error("Unauthorized");
   const { userId } = access;
@@ -771,7 +964,7 @@ export async function generateAnswerAction(
   const parsed = generateAnswerSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const { deckId, question } = parsed.data;
+  const { deckId, question, includeDiagram } = parsed.data;
 
   const deck = await requireDeckEditor(userId, deckId);
   const teamTierPro = await deckHasTeamTierProFeatures(deck);
@@ -787,34 +980,46 @@ export async function generateAnswerAction(
     output: Output.object({
       schema: validateQuestionRelevanceSchema,
     }),
-    system: `You are a flashcard validation assistant. Determine if a given question matches the topic and scope of a flashcard deck.
-
-Analyze the deck's name, description, and existing cards to understand its topic and scope. Then determine if the user's question is relevant to this deck.
-
-Return:
-- isRelevant: true if the question fits the deck's topic, false if it seems off-topic
-- warning: If isRelevant is false, provide a brief, helpful message (1-2 sentences) explaining why the question seems unrelated and suggesting the user verify they're in the right deck. If isRelevant is true, omit this field.`,
+    system: QUESTION_RELEVANCE_SYSTEM,
     prompt: `${fullContext}
 
 User's Question: ${question}
 
-Does this question match the deck's topic and scope?`,
+Is this question clearly off-topic for this deck, or reasonably related (including neighboring math/science subtopics)?`,
   });
 
-  if (
+  // Soft warning only — do not block AI generation (user can still save the card).
+  const relevanceWarning =
     validationOutput &&
     !validationOutput.isRelevant &&
-    validationOutput.warning
-  ) {
-    throw new Error(`${validationOutput.warning} You can still add this card manually if you'd like.`);
-  }
+    validationOutput.warning?.trim()
+      ? validationOutput.warning.trim()
+      : null;
+
+  const diagramAddendum = includeDiagram
+    ? `
+
+Also return frontDiagram and backDiagram (never type "none").
+${DIAGRAM_TYPE_RULES}
+${FRONT_DIAGRAM_RULES}
+${BACK_DIAGRAM_RULES}
+Never invent numeric data that contradicts the question or answer.`
+    : "";
+
+  const answerSchema = includeDiagram
+    ? z.object({
+        answer: z.string(),
+        frontDiagram: mathDiagramRequiredAiOutputSchema,
+        backDiagram: mathDiagramRequiredAiOutputSchema,
+      })
+    : z.object({
+        answer: z.string(),
+      });
 
   const { output } = await generateText({
     model: openai("gpt-4o"),
     output: Output.object({
-      schema: z.object({
-        answer: z.string(),
-      }),
+      schema: answerSchema,
     }),
     system: `You are a flashcard assistant helping users complete flashcards. Given a question or term on the front of a flashcard, generate an appropriate answer or definition for the back.
 
@@ -839,12 +1044,16 @@ Rules:
 - NEVER use bullet points or dashes in step-by-step solutions
 - Use plain newlines between steps
 - When existing cards are provided, treat them as the source of truth for tone, length, and format
-- Stay strictly within the subject matter and scope established by the deck`,
+- Stay strictly within the subject matter and scope established by the deck${diagramAddendum}`,
     prompt: `${fullContext}
 
 Question/Term: ${question}
 
-Generate an appropriate answer for the back of this flashcard, matching the style of the existing cards.`,
+Generate an appropriate answer for the back of this flashcard, matching the style of the existing cards.${
+      includeDiagram
+        ? " Also include frontDiagram (question figure, NO answer labels) and backDiagram (solution figure WITH the correct answer labeled)."
+        : ""
+    }`,
   });
 
   if (!output?.answer?.trim()) {
@@ -853,8 +1062,36 @@ Generate an appropriate answer for the back of this flashcard, matching the styl
 
   const answer = cleanAiText(output.answer);
 
-  // Back illustration is fetched separately via /api/ai/card-back-image so the
-  // binary payload is not limited by server-action response size.
+  let frontDiagram: MathDiagram | null = null;
+  let backDiagram: MathDiagram | null = null;
+  if (includeDiagram) {
+    if (output && "frontDiagram" in output) {
+      frontDiagram = parseRenderableDiagram(
+        (output as { frontDiagram?: unknown }).frontDiagram,
+        "front",
+      );
+    }
+    if (output && "backDiagram" in output) {
+      backDiagram = parseRenderableDiagram(
+        (output as { backDiagram?: unknown }).backDiagram,
+        "back",
+      );
+    }
+    if (!frontDiagram || !backDiagram) {
+      try {
+        const pair = await generateDiagramPairOnly({ fullContext, question, answer });
+        frontDiagram = frontDiagram ?? pair.front;
+        backDiagram = backDiagram ?? pair.back;
+      } catch {
+        // Keep whatever we already parsed.
+      }
+    }
+  }
+
+  const diagram = backDiagram ?? frontDiagram;
+
+  // Decorative back illustration is fetched separately via /api/ai/card-back-image
+  // so the binary payload is not limited by server-action response size.
   let distractors: [string, string, string];
   try {
     distractors = await generateStandardDistractors(
@@ -867,7 +1104,36 @@ Generate an appropriate answer for the back of this flashcard, matching the styl
     distractors = ["", "", ""];
   }
 
-  return { answer, distractors };
+  let distractorDiagrams: [MathDiagram | null, MathDiagram | null, MathDiagram | null] = [
+    null,
+    null,
+    null,
+  ];
+  if (
+    includeDiagram &&
+    distractors.every((d) => d.trim().length > 0)
+  ) {
+    try {
+      distractorDiagrams = await generateDistractorDiagramsOnly({
+        fullContext,
+        question,
+        correctAnswer: answer,
+        distractors,
+      });
+    } catch {
+      distractorDiagrams = [null, null, null];
+    }
+  }
+
+  return {
+    answer,
+    distractors,
+    diagram,
+    frontDiagram,
+    backDiagram,
+    distractorDiagrams,
+    relevanceWarning,
+  };
 }
 
 const multipleChoiceAnswerRefine = (data: {
@@ -1078,7 +1344,12 @@ export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceC
 
 export async function generateMultipleChoiceAction(
   data: GenerateMultipleChoiceInput,
-): Promise<{ correctAnswer: string; distractors: [string, string, string] }> {
+): Promise<{
+  correctAnswer: string;
+  distractors: [string, string, string];
+  /** Soft tip when the question may be outside the deck focus — generation still runs. */
+  relevanceWarning: string | null;
+}> {
   const access = await getAccessContext();
   if (!access.userId) throw new Error("Unauthorized");
   const { maxCardsPerDeck } = access;
@@ -1113,27 +1384,21 @@ export async function generateMultipleChoiceAction(
     output: Output.object({
       schema: validateQuestionRelevanceSchema,
     }),
-    system: `You are a flashcard validation assistant. Determine if a given question matches the topic and scope of a flashcard deck.
-
-Analyze the deck's name, description, and existing cards to understand its topic and scope. Then determine if the user's question is relevant to this deck.
-
-Return:
-- isRelevant: true if the question fits the deck's topic, false if it seems off-topic
-- warning: If isRelevant is false, provide a brief, helpful message (1-2 sentences) explaining why the question seems unrelated and suggesting the user verify they're in the right deck. If isRelevant is true, omit this field.`,
+    system: QUESTION_RELEVANCE_SYSTEM,
     prompt: `${fullContext}
 
 User's Question: ${question}
 
-Does this question match the deck's topic and scope?`,
+Is this question clearly off-topic for this deck, or reasonably related (including neighboring math/science subtopics)?`,
   });
 
-  if (
+  // Soft warning only — do not block AI generation (user can still save the card).
+  const relevanceWarning =
     validationOutput &&
     !validationOutput.isRelevant &&
-    validationOutput.warning
-  ) {
-    throw new Error(`${validationOutput.warning} You can still add this card manually if you'd like.`);
-  }
+    validationOutput.warning?.trim()
+      ? validationOutput.warning.trim()
+      : null;
 
   const hasCorrect = !!correctAnswer && correctAnswer.trim().length > 0;
 
@@ -1209,6 +1474,7 @@ Generate the correct answer and 3 plausible wrong answers that match the deck's 
   return {
     correctAnswer: finalCorrect,
     distractors: [d1, d2, d3],
+    relevanceWarning,
   };
 }
 

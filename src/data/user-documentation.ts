@@ -135,6 +135,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "AI reads your deck name, description, and existing cards to match topic, tone, and format — add a few representative cards first for the most consistent results.",
           "Empty decks have only the name and description to guide AI, so the first generated batch may be less predictable until you refine cards or add manual examples.",
           "Batch generate, From source import, and Generate answer all use the same deck context and avoid duplicating cards already in the deck.",
+          "Generate answer can add structured math diagrams (geometry, graph, chart, measurement, or 3D shape) rendered from a precise figure spec — better for labeled math than a decorative image.",
+          "Answer with diagram fills the front with a question figure (no correct answer), the back with a solution figure (correct answer labeled), and wrong-answer slots with incorrect figures when quiz wrong answers are shown.",
+          "For Answer with image, choose Front or Back in the AI generate menu to place the decorative illustration on that side only.",
+          "Double-click a front, back, or wrong-answer image thumbnail while editing a card to enlarge it.",
           "From source review: Swap flips front and back before save; choose whether quiz wrong answers match the original answer (default) or original question/term.",
           "From source review: preview and edit three quiz wrong answers per card before saving; Regenerate refreshes them from AI.",
           "Upload a deck cover image when your plan allows.",
@@ -160,6 +164,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Review flashcards and take quizzes with progress tracking.",
         howItWorks: [
           "Flashcard review flips cards and tracks familiarity.",
+          "Double-click a front or back card image during flashcard review to enlarge it; press Escape or click outside to close.",
           "Quiz mode supports multiple question formats: multiple choice, true/false, and fill-in-the-blank.",
           "The quiz start screen lists enabled formats and shows how many of each type appear in this session (e.g. 5 MCQ, 2 True/False, 3 Fill in the blank).",
           "Pro Plus and Education Plus deck owners (paid, admin-assigned, or affiliate) see Format Quiz Question on the quiz lobby — enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz (or Republish to quiz).",

@@ -36,18 +36,9 @@ export function parseStepAnswer(text: string): AnswerBlock[] {
 
       while (i < lines.length) {
         const next = lines[i]!;
-        if (STEP_LINE_RE.test(next)) break;
-
-        const finalMatch = next.match(FINAL_LINE_RE);
-        if (finalMatch) {
-          blocks.push({
-            kind: "final",
-            label: finalMatch[1]!,
-            value: finalMatch[2]?.trim() || next,
-          });
-          i += 1;
-          break;
-        }
+        // Stop at the next step or the final answer — leave those lines for
+        // the outer loop so the step is emitted before Answer/Result.
+        if (STEP_LINE_RE.test(next) || FINAL_LINE_RE.test(next)) break;
 
         work.push(next);
         i += 1;
@@ -72,5 +63,8 @@ export function parseStepAnswer(text: string): AnswerBlock[] {
     i += 1;
   }
 
-  return blocks;
+  // Always show the marked final answer after all steps / body lines.
+  const finals = blocks.filter((b) => b.kind === "final");
+  if (finals.length === 0) return blocks;
+  return [...blocks.filter((b) => b.kind !== "final"), ...finals];
 }

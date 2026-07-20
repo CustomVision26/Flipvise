@@ -32,8 +32,8 @@ export function StudyLink({
               href={href}
               {...props}
               className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "h-9 gap-2",
+                buttonVariants({ variant: "default", size: "sm" }),
+                "h-9 gap-2 font-bold",
                 props.className,
               )}
             >

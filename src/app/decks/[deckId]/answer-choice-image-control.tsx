@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,16 +26,36 @@ export function AnswerChoiceImageControl({
   altText: string;
   className?: string;
 }) {
+  const [enlargeOpen, setEnlargeOpen] = useState(false);
+
+  useEffect(() => {
+    if (!imagePreview) setEnlargeOpen(false);
+  }, [imagePreview]);
+
   return (
     <div className={cn("flex shrink-0 flex-col items-center", className)}>
       {imagePreview ? (
-        <div className="relative h-9 w-9 overflow-hidden rounded-md border border-border bg-muted/30 sm:h-10 sm:w-10">
+        <div
+          className={cn(
+            "relative h-9 w-9 overflow-hidden rounded-md border border-border bg-muted/30 sm:h-10 sm:w-10",
+            !isUploading && "cursor-zoom-in",
+          )}
+          title="Double-click to enlarge"
+          aria-label={`Double-click to enlarge ${altText}`}
+          onDoubleClick={(event) => {
+            if (isUploading) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setEnlargeOpen(true);
+          }}
+        >
           <Image
             src={imagePreview}
             alt={altText}
             fill
-            className="object-cover"
+            className="object-cover pointer-events-none"
             unoptimized={imagePreview.startsWith("blob:") || imagePreview.startsWith("data:")}
+            draggable={false}
           />
           {isUploading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-[10px] text-muted-foreground">
@@ -45,7 +67,10 @@ export function AnswerChoiceImageControl({
               variant="destructive"
               size="icon"
               className="absolute -right-1 -top-1 h-4 w-4 rounded-full"
-              onClick={onRemove}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove();
+              }}
               disabled={isBusy}
               aria-label={`Remove ${altText}`}
             >
@@ -74,6 +99,16 @@ export function AnswerChoiceImageControl({
         className="hidden"
         onChange={onFileChange}
       />
+
+      {imagePreview ? (
+        <ImageEnlargeOverlay
+          open={enlargeOpen}
+          onClose={() => setEnlargeOpen(false)}
+          src={imagePreview}
+          alt={altText}
+          title={altText}
+        />
+      ) : null}
     </div>
   );
 }

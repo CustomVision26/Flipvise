@@ -23,7 +23,7 @@ import {
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
 import { DeleteAllCardsDialogLoader } from "./delete-all-cards-dialog-loader";
-import { StudyLink } from "./study-link";
+import { StudyLink } from "@/components/study-link";
 import { GenerateCardsButtonLoader } from "./generate-cards-button-loader";
 import { CardGrid } from "./card-grid";
 import {
@@ -228,8 +228,8 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                     <TooltipTrigger render={<span tabIndex={0} className="cursor-not-allowed" />}>
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="pointer-events-none gap-2"
+                        variant="default"
+                        className="pointer-events-none gap-2 font-bold"
                         disabled
                         aria-disabled
                       >

@@ -12,11 +12,17 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "deck-editor": [
     "src/app/decks/[deckId]/page.tsx",
     "src/app/decks/[deckId]/card-grid.tsx",
-    "src/app/decks/[deckId]/edit-deck-dialog.tsx",
+    "src/components/edit-deck-dialog.tsx",
     "src/app/decks/[deckId]/generate-cards-button.tsx",
     "src/app/decks/[deckId]/add-card-dialog.tsx",
+    "src/app/decks/[deckId]/edit-card-dialog.tsx",
+    "src/app/decks/[deckId]/answer-choice-image-control.tsx",
+    "src/app/decks/[deckId]/ai-generate-popover.tsx",
     "src/app/decks/[deckId]/from-source-card-form.tsx",
     "src/actions/cards.ts",
+    "src/lib/math-diagrams/schema.ts",
+    "src/lib/math-diagrams/render.ts",
+    "src/app/api/ai/card-diagram/route.ts",
   ],
   "personal-dashboard": ["src/components/offline-availability-button.tsx"],
   "offline-mobile": [
@@ -47,6 +53,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   ],
   "study-session": [
     "src/app/decks/[deckId]/study/page.tsx",
+    "src/app/decks/[deckId]/study/flashcard-study.tsx",
     "src/app/decks/[deckId]/study/quiz-study.tsx",
     "src/components/format-quiz-question-dialog.tsx",
     "src/actions/quiz-formats.ts",

@@ -35,9 +35,8 @@ export function DeleteAllCardsDialog({ deckId, cardCount }: DeleteAllCardsDialog
       <AlertDialogTrigger
         render={
           <Button
-            variant="outline"
             size="sm"
-            className="h-9 gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="h-9 gap-2 font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90"
           />
         }
       >

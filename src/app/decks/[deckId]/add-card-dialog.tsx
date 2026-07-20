@@ -40,6 +40,11 @@ import {
   buildChoiceImageTuple,
 } from "./answer-choice-image-control";
 import {
+  AiGeneratePopoverContent,
+  type AiGenerateMode,
+  type AiImageSide,
+} from "./ai-generate-popover";
+import {
   createCardAction,
   createMultipleChoiceCardAction,
   generateAnswerAction,
@@ -65,6 +70,7 @@ import {
   Type,
   X,
 } from "lucide-react";
+import { buildMathDiagramPngFile } from "@/lib/math-diagrams/build-diagram-file";
 
 interface AddCardDialogProps {
   deckId: number;
@@ -378,6 +384,7 @@ function StandardCardForm({
   const [front, setFront] = useState("");
   const [frontImageUrl, setFrontImageUrl] = useState<string | null>(null);
   const [frontImagePreview, setFrontImagePreview] = useState<string | null>(null);
+  const [frontPendingFile, setFrontPendingFile] = useState<File | null>(null);
   const [isUploadingFront, setIsUploadingFront] = useState(false);
   const [back, setBack] = useState("");
   const [backImageUrl, setBackImageUrl] = useState<string | null>(null);
@@ -385,10 +392,14 @@ function StandardCardForm({
   const [backPendingFile, setBackPendingFile] = useState<File | null>(null);
   const [isUploadingBack, setIsUploadingBack] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiWarning, setAiWarning] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [aiChoiceOpen, setAiChoiceOpen] = useState(false);
+  /** Where AI diagram / illustration is attached on the card. */
+  const [aiImageSide, setAiImageSide] = useState<AiImageSide>("back");
   const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
   const [isGeneratingBackImage, setIsGeneratingBackImage] = useState(false);
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
   // AI-generated wrong answers paired with the current back text. Hidden from
   // the UI — only sent along with createCardAction so they are persisted on
   // the card for later use.
@@ -402,8 +413,14 @@ function StandardCardForm({
   const backSpeech = useSpeechRecognition((t) => setBack((prev) => prev + t));
 
   const isUploading = isUploadingFront || isUploadingBack;
-  const isBusy = isPending || isUploading || isGeneratingAnswer || isGeneratingBackImage;
-  const frontHasContent = front.trim().length > 0 || !!frontImageUrl;
+  const isBusy =
+    isPending ||
+    isUploading ||
+    isGeneratingAnswer ||
+    isGeneratingBackImage ||
+    isGeneratingDiagram;
+  const frontHasContent =
+    front.trim().length > 0 || !!frontImageUrl || !!frontImagePreview;
   const backHasContent =
     back.trim().length > 0 || !!backImageUrl || !!backImagePreview;
 
@@ -452,6 +469,18 @@ function StandardCardForm({
         : null;
     startTransition(async () => {
       try {
+        let resolvedFrontImageUrl = frontImageUrl;
+        if (frontPendingFile && !frontImageUrl) {
+          setIsUploadingFront(true);
+          try {
+            const formData = new FormData();
+            formData.append("image", frontPendingFile);
+            resolvedFrontImageUrl = await uploadCardImageAction({ deckId }, formData);
+          } finally {
+            setIsUploadingFront(false);
+          }
+        }
+
         let resolvedBackImageUrl = backImageUrl;
         if (backPendingFile && !backImageUrl) {
           setIsUploadingBack(true);
@@ -467,7 +496,7 @@ function StandardCardForm({
         await createCardAction({
           deckId,
           front,
-          frontImageUrl,
+          frontImageUrl: resolvedFrontImageUrl,
           back,
           backImageUrl: resolvedBackImageUrl,
           distractors: distractorsToSend,
@@ -475,6 +504,7 @@ function StandardCardForm({
         setFront("");
         setFrontImageUrl(null);
         setFrontImagePreview(null);
+        setFrontPendingFile(null);
         setBack("");
         setBackImageUrl(null);
         setBackImagePreview(null);
@@ -488,20 +518,60 @@ function StandardCardForm({
     });
   }
 
-  async function runAiGeneration(includeImage: boolean) {
+  function clearPendingImageSide(side: AiImageSide) {
+    if (side === "front") {
+      if (frontImagePreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(frontImagePreview);
+      }
+      setFrontPendingFile(null);
+      setFrontImageUrl(null);
+      setFrontImagePreview(null);
+      return;
+    }
+    if (backImagePreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(backImagePreview);
+    }
+    setBackPendingFile(null);
+    setBackImageUrl(null);
+    setBackImagePreview(null);
+  }
+
+  function applyPendingImage(side: AiImageSide, file: File) {
+    clearPendingImageSide(side);
+    const previewUrl = URL.createObjectURL(file);
+    if (side === "front") {
+      setFrontPendingFile(file);
+      setFrontImagePreview(previewUrl);
+    } else {
+      setBackPendingFile(file);
+      setBackImagePreview(previewUrl);
+    }
+  }
+
+  async function runAiGeneration(mode: AiGenerateMode) {
     if (!front.trim()) {
       setError("Please enter a question or term in the front field first.");
       return;
     }
+    const imageSide = aiImageSide;
     setAiChoiceOpen(false);
     setError(null);
+    setAiWarning(null);
     setIsGeneratingAnswer(true);
     try {
       const question = front.trim();
-      const { answer, distractors } = await generateAnswerAction({
+      const {
+        answer,
+        distractors,
+        frontDiagram,
+        backDiagram,
+        relevanceWarning,
+      } = await generateAnswerAction({
         deckId,
         question,
+        includeDiagram: mode === "diagram",
       });
+      if (relevanceWarning) setAiWarning(relevanceWarning);
       setBack(answer);
       // Stash distractors keyed to the exact answer the user is about to see.
       // If they later edit the back, we drop these at submit time.
@@ -515,23 +585,41 @@ function StandardCardForm({
         setAiDistractorsFor(null);
       }
 
-      if (backImagePreview?.startsWith("blob:")) {
-        URL.revokeObjectURL(backImagePreview);
-      }
-      setBackPendingFile(null);
-      setBackImageUrl(null);
-      setBackImagePreview(null);
       setIsGeneratingAnswer(false);
 
-      if (!includeImage) return;
+      if (mode === "text") return;
+
+      if (mode === "diagram") {
+        if (!frontDiagram && !backDiagram) {
+          setAiWarning(
+            "Could not create a diagram for this question. Try Answer with image, or rephrase as a visual problem.",
+          );
+          return;
+        }
+        setIsGeneratingDiagram(true);
+        try {
+          // Front = question (no answer); back = solution (with answer).
+          if (frontDiagram) {
+            const { file } = await buildMathDiagramPngFile(frontDiagram);
+            applyPendingImage("front", file);
+          }
+          if (backDiagram) {
+            const { file } = await buildMathDiagramPngFile(backDiagram);
+            applyPendingImage("back", file);
+          }
+        } catch {
+          setError("Could not render the math diagram. The text answer is still available.");
+        } finally {
+          setIsGeneratingDiagram(false);
+        }
+        return;
+      }
 
       setIsGeneratingBackImage(true);
       try {
         const imageBlob = await fetchAiBackImage(deckId, question, answer);
         if (imageBlob) {
-          const pendingFile = blobToPendingFile(imageBlob);
-          setBackPendingFile(pendingFile);
-          setBackImagePreview(URL.createObjectURL(pendingFile));
+          applyPendingImage(imageSide, blobToPendingFile(imageBlob));
         }
       } catch {
         // Answer text is still usable when image generation fails.
@@ -542,6 +630,7 @@ function StandardCardForm({
       setError(err instanceof Error ? err.message : "Failed to generate answer.");
       setIsGeneratingAnswer(false);
       setIsGeneratingBackImage(false);
+      setIsGeneratingDiagram(false);
     }
   }
 
@@ -582,50 +671,15 @@ function StandardCardForm({
                     }
                   >
                     <Sparkles
-                      className={`h-3.5 w-3.5 ${isGeneratingAnswer || isGeneratingBackImage ? "animate-pulse" : ""}`}
+                      className={`h-3.5 w-3.5 ${isGeneratingAnswer || isGeneratingBackImage || isGeneratingDiagram ? "animate-pulse" : ""}`}
                     />
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="z-[60] w-64 gap-3 p-3">
-                    <PopoverHeader className="gap-1">
-                      <PopoverTitle className="text-sm">AI generate</PopoverTitle>
-                      <PopoverDescription className="text-xs leading-relaxed">
-                        Uses your deck name, description, and existing cards for style and scope.
-                      </PopoverDescription>
-                    </PopoverHeader>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-auto justify-start gap-2 px-3 py-2.5 text-left whitespace-normal"
-                        onClick={() => runAiGeneration(true)}
-                        disabled={isBusy}
-                      >
-                        <ImagePlus className="h-4 w-4 shrink-0" />
-                        <span>
-                          <span className="block font-medium">Text answer + image</span>
-                          <span className="block text-[11px] font-normal text-primary-foreground/80">
-                            Image is saved only when you click Add Card.
-                          </span>
-                        </span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-auto justify-start gap-2 px-3 py-2.5 text-left whitespace-normal"
-                        onClick={() => runAiGeneration(false)}
-                        disabled={isBusy}
-                      >
-                        <Type className="h-4 w-4 shrink-0" />
-                        <span>
-                          <span className="block font-medium">Text answer only</span>
-                          <span className="block text-[11px] font-normal text-muted-foreground">
-                            Faster — no back illustration.
-                          </span>
-                        </span>
-                      </Button>
-                    </div>
-                  </PopoverContent>
+                  <AiGeneratePopoverContent
+                    imageSide={aiImageSide}
+                    onImageSideChange={setAiImageSide}
+                    onGenerate={runAiGeneration}
+                    disabled={isBusy}
+                  />
                 </Popover>
               )}
               {frontSpeech.supported && (
@@ -677,22 +731,33 @@ function StandardCardForm({
           isUploading={isUploadingFront}
           isBusy={isBusy}
           fileInputRef={frontFileInputRef}
-          onFileChange={(e) =>
+          onFileChange={(e) => {
+            setFrontPendingFile(null);
             handleImageChange(
               e,
               setFrontImageUrl,
               setFrontImagePreview,
               setIsUploadingFront,
               frontFileInputRef,
-            )
-          }
+            );
+          }}
           onRemove={() => {
+            if (frontImagePreview?.startsWith("blob:")) {
+              URL.revokeObjectURL(frontImagePreview);
+            }
             setFrontImageUrl(null);
             setFrontImagePreview(null);
+            setFrontPendingFile(null);
             if (frontFileInputRef.current) frontFileInputRef.current.value = "";
           }}
           altText="Front image preview"
+          enableEnlarge
         />
+        {isGeneratingDiagram && !frontImagePreview && !backImagePreview ? (
+          <p className="text-xs text-muted-foreground animate-pulse">
+            Generating math diagram…
+          </p>
+        ) : null}
       </div>
 
       {/* Back */}
@@ -785,6 +850,11 @@ function StandardCardForm({
         ) : null}
       </div>
 
+      {aiWarning && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="text-amber-200 text-xs sm:text-sm">{aiWarning}</p>
+        </div>
+      )}
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
           <p className="text-destructive text-xs sm:text-sm">{error}</p>
@@ -809,7 +879,7 @@ function StandardCardForm({
             ? "Adding…"
             : isUploading
               ? "Uploading…"
-              : isGeneratingAnswer || isGeneratingBackImage
+              : isGeneratingAnswer || isGeneratingBackImage || isGeneratingDiagram
                 ? "Generating…"
                 : "Add Card"}
         </Button>
@@ -856,6 +926,7 @@ function MultipleChoiceCardForm({
   const [showDistractors, setShowDistractors] = useState(true);
   const [isRegeneratingDistractors, setIsRegeneratingDistractors] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiWarning, setAiWarning] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [aiChoiceOpen, setAiChoiceOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -1008,6 +1079,7 @@ function MultipleChoiceCardForm({
     }
     setAiChoiceOpen(false);
     setError(null);
+    setAiWarning(null);
     setIsGenerating(true);
     let resolvedCorrect = correctAnswer.trim();
     try {
@@ -1016,6 +1088,7 @@ function MultipleChoiceCardForm({
         question: question.trim(),
         correctAnswer: correctFilled ? resolvedCorrect : null,
       });
+      if (result.relevanceWarning) setAiWarning(result.relevanceWarning);
       if (!correctFilled) {
         setCorrectAnswer(result.correctAnswer);
         resolvedCorrect = result.correctAnswer.trim();
@@ -1067,6 +1140,7 @@ function MultipleChoiceCardForm({
       return;
     }
     setError(null);
+    setAiWarning(null);
     setIsRegeneratingDistractors(true);
     try {
       const result = await generateMultipleChoiceAction({
@@ -1074,6 +1148,7 @@ function MultipleChoiceCardForm({
         question: question.trim(),
         correctAnswer: correctAnswer.trim(),
       });
+      if (result.relevanceWarning) setAiWarning(result.relevanceWarning);
       setDistractors([...result.distractors]);
       setShowDistractors(true);
     } catch (err) {
@@ -1426,6 +1501,11 @@ function MultipleChoiceCardForm({
         )}
       </div>
 
+      {aiWarning && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="text-amber-200 text-xs sm:text-sm">{aiWarning}</p>
+        </div>
+      )}
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
           <p className="text-destructive text-xs sm:text-sm">{error}</p>
@@ -1495,10 +1575,10 @@ export function AddCardDialog({
         <Tooltip>
           <TooltipTrigger render={<span tabIndex={0} />}>
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               disabled
-              className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+              className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 font-bold"
             >
               + Add Card
             </Button>
@@ -1530,8 +1610,8 @@ export function AddCardDialog({
         <DialogTrigger
           render={
             <Button
-              variant="outline"
-              className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+              variant="default"
+              className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 font-bold"
             />
           }
         >

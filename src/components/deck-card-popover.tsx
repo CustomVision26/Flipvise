@@ -49,7 +49,7 @@ import {
 } from "@/actions/cards";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { DeckPreviewCarousel } from "./deck-preview-carousel";
-import { EditDeckDialog } from "@/app/decks/[deckId]/edit-deck-dialog";
+import { EditDeckDialog } from "@/components/edit-deck-dialog";
 import {
   ItemWatermark,
   itemCardContainerClass,

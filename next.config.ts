@@ -25,21 +25,10 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  ...(process.env.NODE_ENV === "development"
-    ? {
-        headers: async () => [
-          {
-            source: "/_next/:path*",
-            headers: [
-              {
-                key: "Cache-Control",
-                value: "no-store, must-revalidate",
-              },
-            ],
-          },
-        ],
-      }
-    : {}),
+  // Do not set Cache-Control on /_next/* in development — Next/Turbopack warn that
+  // custom headers there break HMR and cause "module factory is not available".
+  // Dev SW unregister (ServiceWorkerRegister + early-client-bootstrap) already
+  // prevents stale PWA caches of /_next/static chunks.
 
   images: {
     // Serve AVIF first (smaller), fall back to WebP — both are smaller than PNG/JPEG
