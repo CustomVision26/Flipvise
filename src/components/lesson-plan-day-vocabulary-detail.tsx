@@ -55,8 +55,8 @@ function linesToArray(text: string): string[] {
     .filter(Boolean);
 }
 
-function arrayToLines(items: string[]): string {
-  return items.join("\n");
+function arrayToLines(items: string[] | undefined | null): string {
+  return (items ?? []).join("\n");
 }
 
 function DayListTextarea({

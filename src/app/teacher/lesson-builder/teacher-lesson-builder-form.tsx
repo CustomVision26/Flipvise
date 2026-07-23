@@ -466,10 +466,14 @@ export function TeacherLessonBuilderForm({
           setShowResult(true);
         }
       } catch (error) {
-        const message =
+        const raw =
           error instanceof Error
             ? error.message
             : "Lesson generation failed. Please try again.";
+        const message =
+          raw.includes("Server Components render") || raw.includes("digest property")
+            ? "Lesson generation failed. Refresh the page and try again. If it keeps happening, restart the dev server."
+            : raw;
         setErrorMessage(message);
       } finally {
         setIsGenerating(false);

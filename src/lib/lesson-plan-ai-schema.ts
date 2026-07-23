@@ -41,7 +41,8 @@ export type LessonPlanVocabularyTermDetail = z.infer<
 >;
 
 export const lessonPlanProcessStepSchema = z.object({
-  stepNumber: z.coerce.number().int().min(1).max(12),
+  // Prefer plain number for OpenAI structured output (avoid z.coerce).
+  stepNumber: z.number().int().min(1).max(12),
   title: z.string().min(1),
   bullets: z.array(z.string().min(1)).min(1).max(8),
 });
@@ -75,6 +76,85 @@ export type LessonPlanDayVocabularyDetail = z.infer<
   typeof lessonPlanDayVocabularyDetailSchema
 >;
 
+/**
+ * OpenAI structured outputs require every property in `required`.
+ * Use `.nullable()` (not `.optional()`) for AI Output.object schemas.
+ */
+export const lessonPlanVocabularyTermDetailAiSchema = z.object({
+  term: z.string().min(1),
+  shortDefinition: z.string().min(1),
+  definition: z.string().min(1),
+  example: z.string().nullable(),
+});
+
+export const lessonPlanDayVocabularyDetailAiSchema = z.object({
+  contextIntro: z.string().min(1),
+  terms: z.array(lessonPlanVocabularyTermDetailAiSchema).min(1).max(12),
+  mainConcept: z
+    .object({
+      heading: z.string().min(1),
+      body: z.string().min(1),
+    })
+    .nullable(),
+  process: z
+    .object({
+      heading: z.string().min(1),
+      steps: z.array(lessonPlanProcessStepSchema).min(1).max(10),
+    })
+    .nullable(),
+  learningGoal: z
+    .object({
+      heading: z.string().min(1),
+      intro: z.string().nullable(),
+      objectives: z.array(z.string().min(1)).min(1).max(10),
+    })
+    .nullable(),
+  additionalVocabulary: z
+    .array(lessonPlanVocabularyTermDetailAiSchema)
+    .max(20)
+    .nullable(),
+});
+
+export function coerceLessonPlanVocabularyTermDetail(
+  term: z.infer<typeof lessonPlanVocabularyTermDetailAiSchema>,
+): LessonPlanVocabularyTermDetail {
+  return {
+    term: term.term,
+    shortDefinition: term.shortDefinition,
+    definition: term.definition,
+    ...(term.example ? { example: term.example } : {}),
+  };
+}
+
+export function coerceLessonPlanDayVocabularyDetail(
+  detail: z.infer<typeof lessonPlanDayVocabularyDetailAiSchema>,
+): LessonPlanDayVocabularyDetail {
+  return {
+    contextIntro: detail.contextIntro,
+    terms: detail.terms.map(coerceLessonPlanVocabularyTermDetail),
+    ...(detail.mainConcept ? { mainConcept: detail.mainConcept } : {}),
+    ...(detail.process ? { process: detail.process } : {}),
+    ...(detail.learningGoal
+      ? {
+          learningGoal: {
+            heading: detail.learningGoal.heading,
+            objectives: detail.learningGoal.objectives,
+            ...(detail.learningGoal.intro
+              ? { intro: detail.learningGoal.intro }
+              : {}),
+          },
+        }
+      : {}),
+    ...(detail.additionalVocabulary?.length
+      ? {
+          additionalVocabulary: detail.additionalVocabulary.map(
+            coerceLessonPlanVocabularyTermDetail,
+          ),
+        }
+      : {}),
+  };
+}
+
 export const lessonPlanDaySchema = z.object({
   dayLabel: z.string().min(1),
   dayOfWeek: z.enum(TEACHER_CLASS_DAY_OPTIONS).optional(),
@@ -85,6 +165,15 @@ export const lessonPlanDaySchema = z.object({
 });
 
 export type LessonPlanDaySchedule = z.infer<typeof lessonPlanDaySchema>;
+
+/** Day shape for OpenAI lesson-plan generation (no nested vocabularyDetail). */
+export const lessonPlanDayAiSchema = z.object({
+  dayLabel: z.string().min(1),
+  dayOfWeek: z.enum(TEACHER_CLASS_DAY_OPTIONS).nullable(),
+  dailyFocus: z.string().min(1),
+  vocabulary: z.array(z.string().min(1)).min(1).max(8),
+  lessonTimeline: z.array(z.string().min(1)).min(3).max(10),
+});
 
 export const lessonPlanInputSchema = z.object({
   subject: z.string().min(1),
@@ -124,3 +213,50 @@ export const lessonPlanResultSchema = z.object({
   differentiatedInstruction: z.array(z.string().min(1)).min(1).max(6),
   teacherNotes: z.string().min(1),
 });
+
+/** Result shape for OpenAI Output.object — nullable instead of optional. */
+export const lessonPlanResultAiSchema = z.object({
+  lessonTitle: z.string().min(1),
+  learningObjectives: z.array(z.string().min(1)).min(3).max(8),
+  materialsNeeded: z.array(z.string().min(1)).min(4).max(12),
+  vocabulary: z.array(z.string().min(1)).min(6).max(20),
+  lessonTimeline: z.array(z.string().min(1)).min(2).max(10),
+  weeklySchedule: z.array(lessonPlanDayAiSchema).max(7).nullable(),
+  warmUpActivity: z.string().min(1),
+  mainTeachingSteps: z.array(z.string().min(1)).min(5).max(10),
+  classroomActivity: z.string().min(1),
+  assessmentQuestions: z.array(z.string().min(1)).min(4).max(8),
+  homework: z.string().min(1),
+  differentiatedInstruction: z.array(z.string().min(1)).min(1).max(6),
+  teacherNotes: z.string().min(1),
+});
+
+export function coerceLessonPlanResultAi(
+  output: z.infer<typeof lessonPlanResultAiSchema>,
+): z.infer<typeof lessonPlanResultSchema> {
+  return {
+    lessonTitle: output.lessonTitle,
+    learningObjectives: output.learningObjectives,
+    materialsNeeded: output.materialsNeeded,
+    vocabulary: output.vocabulary,
+    lessonTimeline: output.lessonTimeline,
+    ...(output.weeklySchedule
+      ? {
+          weeklySchedule: output.weeklySchedule.map((day) => ({
+            dayLabel: day.dayLabel,
+            dailyFocus: day.dailyFocus,
+            vocabulary: day.vocabulary,
+            lessonTimeline: day.lessonTimeline,
+            ...(day.dayOfWeek ? { dayOfWeek: day.dayOfWeek } : {}),
+          })),
+        }
+      : {}),
+    warmUpActivity: output.warmUpActivity,
+    mainTeachingSteps: output.mainTeachingSteps,
+    classroomActivity: output.classroomActivity,
+    assessmentQuestions: output.assessmentQuestions,
+    homework: output.homework,
+    differentiatedInstruction: output.differentiatedInstruction,
+    teacherNotes: output.teacherNotes,
+  };
+}

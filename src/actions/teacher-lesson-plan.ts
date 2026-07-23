@@ -7,10 +7,14 @@ import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import {
-  lessonPlanDayVocabularyDetailSchema,
+  coerceLessonPlanDayVocabularyDetail,
+  coerceLessonPlanResultAi,
+  lessonPlanDayVocabularyDetailAiSchema,
   lessonPlanInputSchema,
+  lessonPlanResultAiSchema,
   lessonPlanResultSchema,
   type LessonPlanActionInput,
+  type LessonPlanDayVocabularyDetail,
 } from "@/lib/lesson-plan-ai-schema";
 import { differentiatedInstructionAiRules, difficultyRigorAiRules, filterDifferentiatedInstruction } from "@/lib/lesson-plan-difficulty";
 import {
@@ -244,9 +248,20 @@ export async function generateLessonPlanAction(
 
   const input = parsed.data;
 
-  const curriculumContext = input.learningStandard?.trim()
-    ? await fetchCurriculumContextForLessonPlan(input)
-    : null;
+  let curriculumContext: CurriculumResearchContext | null = null;
+  if (input.learningStandard?.trim()) {
+    try {
+      curriculumContext = await fetchCurriculumContextForLessonPlan(input);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[generateLessonPlanAction] Curriculum research failed; continuing without it.",
+          error,
+        );
+      }
+      curriculumContext = null;
+    }
+  }
 
   if (!process.env.OPENAI_API_KEY?.trim()) {
     return generateLessonPlan(input);
@@ -256,7 +271,7 @@ export async function generateLessonPlanAction(
     const { output } = await generateText({
       model: openai("gpt-4o"),
       output: Output.object({
-        schema: lessonPlanResultSchema,
+        schema: lessonPlanResultAiSchema,
       }),
       system: `You are an expert K–12 curriculum designer. Create detailed, classroom-ready lesson plans teachers can use immediately.
 
@@ -286,7 +301,7 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
       throw new Error("AI lesson generation returned no output.");
     }
 
-    return normalizeLessonPlanResult(output, input);
+    return normalizeLessonPlanResult(coerceLessonPlanResultAi(output), input);
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
@@ -313,7 +328,7 @@ const generateDayVocabularyDetailSchema = z.object({
 async function generateDayVocabularyDetailCore(
   input: z.infer<typeof generateDayVocabularyDetailSchema>,
 ) {
-  const finalize = (detail: z.infer<typeof lessonPlanDayVocabularyDetailSchema>) =>
+  const finalize = (detail: LessonPlanDayVocabularyDetail) =>
     sanitizeDayVocabularyDetail(detail, input);
 
   if (!process.env.OPENAI_API_KEY?.trim()) {
@@ -331,7 +346,7 @@ async function generateDayVocabularyDetailCore(
     const { output } = await generateText({
       model: openai("gpt-4o"),
       output: Output.object({
-        schema: lessonPlanDayVocabularyDetailSchema,
+        schema: lessonPlanDayVocabularyDetailAiSchema,
       }),
       system: `You are an expert K–12 curriculum writer. Expand a lesson day's vocabulary into classroom-ready teacher reference material.
 
@@ -369,7 +384,7 @@ Requirements:
       throw new Error("AI vocabulary detail generation returned no output.");
     }
 
-    return finalize(output);
+    return finalize(coerceLessonPlanDayVocabularyDetail(output));
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
