@@ -180,9 +180,10 @@ export async function parseAccountRecoveryFieldsValue(
     );
     return {
       success: false as const,
-      error:
-        addressCheck.error.issues[0]?.message ??
-        "Complete every mailing address field.",
+      error: !addressCheck.success
+        ? (addressCheck.error.issues[0]?.message ??
+          "Complete every mailing address field.")
+        : "Complete every mailing address field.",
     };
   }
 

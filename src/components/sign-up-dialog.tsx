@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSignUp } from "@clerk/nextjs";
+import { useAuth, useSignUp } from "@clerk/nextjs";
 import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
 import { saveAccountRecoveryProfileAction } from "@/actions/account-recovery-profile";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
@@ -112,7 +112,9 @@ export function SignUpDialog({
   triggerLabel?: string;
   redirectPath?: string;
 }) {
-  const { isLoaded, signUp } = useSignUp();
+  // Clerk's useSignUp no longer exposes `isLoaded` (SignUpSignalValue).
+  const { isLoaded } = useAuth();
+  const { signUp } = useSignUp();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"details" | "code">("details");
   const [firstName, setFirstName] = useState("");
