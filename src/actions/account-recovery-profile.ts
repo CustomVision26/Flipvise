@@ -2,7 +2,6 @@
 
 import { createClerkClient } from "@clerk/backend";
 import { auth } from "@/lib/clerk-auth";
-import { mailingAddressSubdivisionError } from "@/data/world-country-subdivisions";
 import { isAccountRecoveryProfileFullyComplete } from "@/lib/account-recovery-completeness";
 import {
   accountRecoveryProfileSchema,
@@ -35,6 +34,9 @@ export async function saveAccountRecoveryProfileAction(
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
+  const { mailingAddressSubdivisionError } = await import(
+    "@/data/world-country-subdivisions"
+  );
   const subdivisionError = await mailingAddressSubdivisionError(
     parsed.data.mailingAddress.country,
     parsed.data.mailingAddress.stateProvince,

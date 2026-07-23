@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-23T20:55:04.341Z",
+  "updatedAt": "2026-07-23T21:52:10.792Z",
   "pages": {
     "homepage": {
-      "watchFingerprint": "0ef06a2ad9fe3fd37066d45b1f9270d5c626c77dced5a8adf3b405ea7bfa3865",
+      "watchFingerprint": "4ed94b0a52e731b14a2833c5398c6d85db4adc0b92abc026e020689b5a6692f2",
       "docFingerprint": "c8e9ce640088e298e04ef1f30f49e7b233dae8ec51710deb79da6c03a5b55599"
     },
     "header-navigation": {
@@ -35,7 +35,7 @@
       "docFingerprint": "3ea0c3de962ce007b376358c0449dd99744c08f3bb56fc992c7f347688552868"
     },
     "offline-mobile": {
-      "watchFingerprint": "8fd064c334c665cd19d09eda291dab03bdcf96bb19eaa2584b6ce9e00386b52d",
+      "watchFingerprint": "87602c71e7644c0bda7101d8f3fb72ea4062c2bbb8978ecdefdce6aa8005a5dc",
       "docFingerprint": "0a6b3c730bb8d1c67347ef185447f369519c1807d4b5a1a80902e3822b0fe890"
     },
     "inbox": {
@@ -131,12 +131,12 @@
       "docFingerprint": "03f954a04bbd1f3ffc58482c75edacd7f8c81401fba934f584f637c5f19d2874"
     },
     "clerk-profile": {
-      "watchFingerprint": "0538ec4970569bea73ed3a57f2463f23c9b966a4e884025be2542fa0a692c364",
-      "docFingerprint": "05994e27813a4770a024bc0fa5b6f926d7d3f48f25995272134ddd2bbdfed1cf"
+      "watchFingerprint": "49a20f5b6eccb628b1456bdb7fbd74cd215db1f24ce5e40e5e8deb390eb7555b",
+      "docFingerprint": "43a04492b29f1d4875cf70621a45c85dca79b4141d66271af0f78f840551e44d"
     },
     "account-details-settings": {
-      "watchFingerprint": "3af49f075499f1d120c2b5c9477477439a0a154277ba78076aed864222a53870",
-      "docFingerprint": "ed6e01d2e1c905f2bb0e97954a6d919420471e4af78f5d34f86bc2ee01fd5972"
+      "watchFingerprint": "9ff55fb03ec1dd35972c9db7d7f09b901c03e3bfbc9174343efed4b661132781",
+      "docFingerprint": "56629806ebc6b4383214d37f72ad9f58d66a67970573689558947597a5e11c7a"
     },
     "appearance-settings": {
       "watchFingerprint": "5faff30269cece919353220fd81bfa835b908ddc8f41e0e12dab403e59a5c264",

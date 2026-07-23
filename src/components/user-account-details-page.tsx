@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useReverification, useUser } from "@clerk/nextjs";
+import { isReverificationCancelledError } from "@clerk/nextjs/errors";
 import { Loader2, Pencil, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { unlockAccountDetailsEditAction } from "@/actions/account-details-edit";
 import {
   getAccountRecoveryProfileForEditAction,
   saveAccountRecoveryProfileAction,
@@ -30,6 +32,11 @@ import {
   type SecurityQuestionId,
 } from "@/lib/account-recovery-profile";
 import { Separator } from "@/components/ui/separator";
+
+function maskWithAsterisks(value: string, min = 8, max = 24): string {
+  const length = Math.max(min, Math.min(value.trim().length || min, max));
+  return "*".repeat(length);
+}
 
 function SummaryRow({
   label,
@@ -90,19 +97,23 @@ function AccountDetailsSummary({
         ) : null}
         <SummaryRow label="Security Q&A">
           {questions.length > 0 ? (
-            <ul className="space-y-3">
-              {questions.map((slot) => (
-                <li key={slot.questionId}>
-                  <p className="font-medium leading-snug">
-                    {SECURITY_QUESTION_LABELS[
-                      slot.questionId as SecurityQuestionId
-                    ] ?? slot.questionId}
-                  </p>
-                  <p className="mt-0.5 break-words text-muted-foreground">
-                    {slot.answer}
-                  </p>
-                </li>
-              ))}
+            <ul className="space-y-3" aria-label="Security questions hidden">
+              {questions.map((slot) => {
+                const questionLabel =
+                  SECURITY_QUESTION_LABELS[
+                    slot.questionId as SecurityQuestionId
+                  ] ?? slot.questionId;
+                return (
+                  <li key={slot.questionId}>
+                    <p className="font-medium leading-snug tracking-wide">
+                      {maskWithAsterisks(questionLabel, 12, 32)}
+                    </p>
+                    <p className="mt-0.5 break-words tracking-wide text-muted-foreground">
+                      {maskWithAsterisks(slot.answer, 8, 24)}
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             "—"
@@ -115,6 +126,9 @@ function AccountDetailsSummary({
 
 export function UserAccountDetailsPage() {
   const { user, isLoaded } = useUser();
+  const unlockEditWithReverification = useReverification(
+    unlockAccountDetailsEditAction,
+  );
   const [profile, setProfile] = useState<AccountRecoveryFieldsValue>(
     emptyAccountRecoveryFieldsValue,
   );
@@ -123,6 +137,7 @@ export function UserAccountDetailsPage() {
   );
   const [editing, setEditing] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [unlockingEdit, setUnlockingEdit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,10 +166,32 @@ export function UserAccountDetailsPage() {
     };
   }, [user?.id]);
 
-  function startEditing() {
-    setDraft(profile);
+  async function startEditing() {
+    if (unlockingEdit || busy) return;
+    setUnlockingEdit(true);
     setError(null);
-    setEditing(true);
+    try {
+      const result = await unlockEditWithReverification();
+      if (!result || !("ok" in result) || !result.ok) {
+        return;
+      }
+      const fresh = await getAccountRecoveryProfileForEditAction();
+      setProfile(fresh);
+      setDraft(fresh);
+      setEditing(true);
+    } catch (err) {
+      if (isReverificationCancelledError(err)) {
+        return;
+      }
+      toast.error("Could not unlock editing", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Verify your login and try again.",
+      });
+    } finally {
+      setUnlockingEdit(false);
+    }
   }
 
   function cancelEditing() {
@@ -203,7 +240,8 @@ export function UserAccountDetailsPage() {
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
             Phone number, mailing address, account type, and security questions
-            are used to verify your identity if you lose access.
+            are used to verify your identity if you lose access. Security Q&amp;A
+            stays hidden until you verify your login to edit.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-5">
@@ -264,11 +302,21 @@ export function UserAccountDetailsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={startEditing}
+                  onClick={() => void startEditing()}
+                  disabled={unlockingEdit}
                   className="h-9"
                 >
-                  <Pencil className="size-3.5" aria-hidden />
-                  Edit details
+                  {unlockingEdit ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      Verifying…
+                    </>
+                  ) : (
+                    <>
+                      <Pencil className="size-3.5" aria-hidden />
+                      Edit details
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

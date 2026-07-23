@@ -52,8 +52,8 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         id: "fields",
         title: "Displayed and editable fields",
         bullets: [
-          "Current details summary shows phone number, mailing address, type/status, organization (if any), and security Q&A (read-only until you edit).",
-          "Click Edit details to change phone, mailing address, type/status, and security questions; Cancel discards unsaved changes.",
+          "Current details summary shows phone number, mailing address, type/status, organization (if any), and security Q&A masked with asterisks until you edit.",
+          "Click Edit details — you must re-verify your login (Clerk step-up) before the form unlocks; Cancel discards unsaved changes.",
           "Mailing address: street address, country from the full country list, state/province filtered by country, city, and optional postal code.",
           "Type / status: Student, Teacher, Parent, Education Institution, Corporation.",
           "Name of institution or corporation appears when those types are selected.",

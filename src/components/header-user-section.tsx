@@ -2,12 +2,12 @@
 
 import { UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { UserBillingPage } from "@/components/user-billing-page";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
-import { UserAccountDetailsPage } from "@/components/user-account-details-page";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
@@ -34,6 +34,20 @@ import { useClientMounted } from "@/lib/use-client-mounted";
 import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, IdCard, Megaphone, Palette, Shield } from "lucide-react";
+
+/** Lazy-load so Turbopack server-action chunk glitches cannot take down the whole shell. */
+const UserAccountDetailsPage = dynamic(
+  () =>
+    import("@/components/user-account-details-page").then(
+      (mod) => mod.UserAccountDetailsPage,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="px-1 py-4 text-sm text-muted-foreground">Loading…</p>
+    ),
+  },
+);
 
 const NATIVE_AFTER_SIGN_OUT_URL = "/native-signout";
 

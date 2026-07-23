@@ -117,6 +117,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/header-user-section.tsx",
     "src/components/user-account-details-page.tsx",
     "src/components/account-recovery-fields.tsx",
+    "src/actions/account-details-edit.ts",
     "src/actions/account-recovery-profile.ts",
   ],
   "appearance-settings": ["src/components/header-user-section.tsx"],

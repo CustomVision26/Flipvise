@@ -1,4 +1,3 @@
-import { mailingAddressSubdivisionError } from "@/data/world-country-subdivisions";
 import {
   ACCOUNT_TYPE_VALUES,
   SECURITY_QUESTION_IDS,
@@ -14,6 +13,14 @@ import {
   type AccountType,
   type SecurityQuestionId,
 } from "@/lib/account-recovery-profile";
+
+async function mailingAddressSubdivisionError(
+  country: string,
+  stateProvince: string,
+): Promise<string | null> {
+  const mod = await import("@/data/world-country-subdivisions");
+  return mod.mailingAddressSubdivisionError(country, stateProvince);
+}
 
 export type { AccountRecoveryFieldsValue };
 export { emptyAccountRecoveryFieldsValue };

@@ -788,7 +788,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Profile: update display name and profile image.",
           "Email addresses: add, verify, or set primary email.",
           "Security: change password, enable 2FA, review active sessions.",
-          "Account details (custom tab): view phone, mailing address, type/status, and security Q&A; use Edit to change them.",
+          "Account details (custom tab): view phone, mailing address, type/status, and masked security Q&A; Edit requires login verification.",
         ],
         requirements: ["Signed-in account."],
         doNots: [
@@ -804,8 +804,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "View and edit phone number, mailing address, type/status, and 3 security questions required for account verification.",
         howItWorks: [
           "Open Manage account — Account details is the first tab (before Profile / Security).",
-          "The page shows your current phone, mailing address, type/status, and security Q&A in a read-only summary.",
-          "Click Edit details to change phone, mailing address, type/status, and security questions; Save or Cancel when finished.",
+          "The page shows your current phone, mailing address, type/status, and security Q&A in a read-only summary (questions and answers are masked with asterisks).",
+          "Click Edit details — Clerk prompts you to verify your login before the editable form unlocks; Save or Cancel when finished.",
           "Education Institution and Corporation show a name sub-field.",
           "Save writes phone, mailing address, and type to public profile metadata and security answers to private metadata via a Server Action.",
           "New accounts (and incomplete profiles) complete Account details in three slides — contact, account type, then security questions — before the personal dashboard unlocks.",
