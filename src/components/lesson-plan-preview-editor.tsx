@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,7 @@ export type LessonPlanUnitContext = {
 
 export type { LessonPlanDetailLessonContext };
 
-function linesToArray(text: string): string[] {
+function compactLines(text: string): string[] {
   return text
     .split("\n")
     .map((line) => line.trim())
@@ -41,6 +42,16 @@ function ArrayFieldEditor({
   onChange: (next: string[]) => void;
   rows?: number;
 }) {
+  const formatted = arrayToLines(value);
+  const [text, setText] = useState(formatted);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setText(formatted);
+    }
+  }, [formatted, focused]);
+
   return (
     <div className="space-y-2">
       <Label htmlFor={id} className="text-foreground">
@@ -48,10 +59,23 @@ function ArrayFieldEditor({
       </Label>
       <Textarea
         id={id}
-        value={arrayToLines(value)}
-        onChange={(event) => onChange(linesToArray(event.target.value))}
+        value={focused ? text : formatted}
+        onFocus={() => {
+          setFocused(true);
+          setText(formatted);
+        }}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={() => {
+          setFocused(false);
+          onChange(compactLines(text));
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.stopPropagation();
+          }
+        }}
         rows={rows}
-        className="bg-background text-foreground"
+        className="bg-background text-foreground whitespace-pre-wrap"
       />
       <p className="text-xs text-muted-foreground">One item per line</p>
     </div>

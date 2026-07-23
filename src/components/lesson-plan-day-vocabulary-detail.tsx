@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { generateAllDaysVocabularyDetailAction, generateDayVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,57 @@ function arrayToLines(items: string[]): string {
   return items.join("\n");
 }
 
+function DayListTextarea({
+  id,
+  value,
+  onCommit,
+  rows,
+  hint,
+}: {
+  id: string;
+  value: string[];
+  onCommit: (next: string[]) => void;
+  rows: number;
+  hint: string;
+}) {
+  const formatted = arrayToLines(value);
+  const [text, setText] = useState(formatted);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setText(formatted);
+    }
+  }, [formatted, focused]);
+
+  return (
+    <>
+      <Textarea
+        id={id}
+        value={focused ? text : formatted}
+        onFocus={() => {
+          setFocused(true);
+          setText(formatted);
+        }}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={() => {
+          setFocused(false);
+          onCommit(linesToArray(text));
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.stopPropagation();
+          }
+        }}
+        rows={rows}
+        className="bg-background text-sm text-foreground whitespace-pre-wrap"
+      />
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    </>
+  );
+}
+
+
 function VocabularySummaryBox({ terms }: { terms: LessonPlanVocabularyTermDetail[] }) {
   return (
     <div className="rounded-md border border-border bg-muted/40 p-3">
@@ -78,32 +129,91 @@ function VocabularySummaryBox({ terms }: { terms: LessonPlanVocabularyTermDetail
 
 function formatVocabularyEntry(term: LessonPlanVocabularyTermDetail): string {
   const name = term.term.trim();
-  const definition = term.shortDefinition.trim();
+  const definition = term.shortDefinition.replace(/^\s+/u, "").replace(/\s+$/u, "");
   if (!name) return definition;
   if (!definition) return name;
+  // Multi-line definitions: term on the first line, details below.
+  if (definition.includes("\n")) {
+    return `${name}\n${definition}`;
+  }
   return `${name} — ${definition}`;
 }
 
 function parseVocabularyEntry(
   line: string,
 ): Pick<LessonPlanVocabularyTermDetail, "term" | "shortDefinition"> {
-  const trimmed = line.trim();
-  if (!trimmed) {
+  // Preserve intentional newlines inside the definition; only trim the ends.
+  const normalized = line.replace(/^\s+/u, "").replace(/\s+$/u, "");
+  if (!normalized) {
     return { term: "", shortDefinition: "" };
   }
 
   const separators = [" — ", " – ", " - "] as const;
   for (const separator of separators) {
-    const index = trimmed.indexOf(separator);
+    const index = normalized.indexOf(separator);
     if (index > 0) {
       return {
-        term: trimmed.slice(0, index).trim(),
-        shortDefinition: trimmed.slice(index + separator.length).trim(),
+        term: normalized.slice(0, index).trim(),
+        shortDefinition: normalized.slice(index + separator.length).replace(/^\s+/u, ""),
       };
     }
   }
 
-  return { term: trimmed, shortDefinition: trimmed };
+  // First line = term, remaining lines = definition (Enter after the term name).
+  const [firstLine = "", ...rest] = normalized.split("\n");
+  if (rest.length > 0) {
+    return {
+      term: firstLine.trim(),
+      shortDefinition: rest.join("\n").replace(/^\s+/u, ""),
+    };
+  }
+
+  return { term: normalized.trim(), shortDefinition: normalized.trim() };
+}
+
+function VocabularyEntryTextarea({
+  id,
+  term,
+  onCommit,
+}: {
+  id: string;
+  term: LessonPlanVocabularyTermDetail;
+  onCommit: (line: string) => void;
+}) {
+  const formatted = formatVocabularyEntry(term);
+  const [text, setText] = useState(formatted);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setText(formatted);
+    }
+  }, [formatted, focused]);
+
+  return (
+    <Textarea
+      id={id}
+      value={focused ? text : formatted}
+      onFocus={() => {
+        setFocused(true);
+        setText(formatted);
+      }}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={() => {
+        setFocused(false);
+        onCommit(text);
+      }}
+      onKeyDown={(event) => {
+        // Ensure Enter inserts a newline (never treated as a form submit).
+        if (event.key === "Enter") {
+          event.stopPropagation();
+        }
+      }}
+      rows={4}
+      placeholder={"Term — short definition\nMore detail on the next line…"}
+      className="bg-background text-sm text-foreground whitespace-pre-wrap"
+    />
+  );
 }
 
 function EditableVocabularySummaryBox({
@@ -134,18 +244,19 @@ function EditableVocabularySummaryBox({
   return (
     <div className="space-y-3 rounded-md border border-border bg-muted/40 p-3">
       <p className="text-sm font-medium text-foreground">Vocabulary</p>
+      <p className="text-xs text-muted-foreground">
+        Press Enter for a new line. Use <span className="font-medium">Term — definition</span>{" "}
+        on the first line, or put the definition on the lines below the term.
+      </p>
       {terms.map((term, termIndex) => (
         <div key={`${idPrefix}-term-${termIndex}`} className="space-y-1.5">
           <Label htmlFor={`${idPrefix}-term-${termIndex}`} className="sr-only">
             Vocabulary entry {termIndex + 1}
           </Label>
-          <Textarea
+          <VocabularyEntryTextarea
             id={`${idPrefix}-term-${termIndex}`}
-            value={formatVocabularyEntry(term)}
-            onChange={(event) => updateEntry(termIndex, event.target.value)}
-            rows={2}
-            placeholder="Term — short definition"
-            className="bg-background text-sm text-foreground"
+            term={term}
+            onCommit={(line) => updateEntry(termIndex, line)}
           />
         </div>
       ))}
@@ -603,18 +714,13 @@ export function LessonPlanWeeklySchedulePanel({
                     />
                   ) : (
                     <>
-                      <Textarea
+                      <DayListTextarea
                         id={`day-${dayIndex}-vocabulary`}
-                        value={arrayToLines(day.vocabulary)}
-                        onChange={(event) =>
-                          updateDay(dayIndex, {
-                            vocabulary: linesToArray(event.target.value),
-                          })
-                        }
+                        value={day.vocabulary}
+                        onCommit={(vocabulary) => updateDay(dayIndex, { vocabulary })}
                         rows={4}
-                        className="bg-background text-sm text-foreground"
+                        hint="One term per line"
                       />
-                      <p className="text-xs text-muted-foreground">One term per line</p>
                     </>
                   )
                 ) : day.vocabularyDetail ? (
@@ -633,20 +739,13 @@ export function LessonPlanWeeklySchedulePanel({
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">Class timeline</p>
                 {editable ? (
-                  <>
-                    <Textarea
-                      id={`day-${dayIndex}-timeline`}
-                      value={arrayToLines(day.lessonTimeline)}
-                      onChange={(event) =>
-                        updateDay(dayIndex, {
-                          lessonTimeline: linesToArray(event.target.value),
-                        })
-                      }
-                      rows={5}
-                      className="bg-background text-sm text-foreground"
-                    />
-                    <p className="text-xs text-muted-foreground">One activity per line</p>
-                  </>
+                  <DayListTextarea
+                    id={`day-${dayIndex}-timeline`}
+                    value={day.lessonTimeline}
+                    onCommit={(lessonTimeline) => updateDay(dayIndex, { lessonTimeline })}
+                    rows={5}
+                    hint="One activity per line"
+                  />
                 ) : (
                   <ul className="mt-1 list-disc pl-5 text-sm">
                     {day.lessonTimeline.map((item) => (
