@@ -170,9 +170,16 @@ function VocabularyTermBlock({ term }: { term: LessonPlanVocabularyTermDetail })
 
 export function LessonPlanDayVocabularyDetailContent({
   detail,
+  learningStandard,
 }: {
   detail: LessonPlanDayVocabularyDetail;
+  learningStandard?: string;
 }) {
+  const pepAligned = Boolean(learningStandard?.trim() && /pep/i.test(learningStandard));
+  const additionalHeading = pepAligned
+    ? "Vocabulary (PEP-Aligned)"
+    : "Additional Vocabulary";
+
   return (
     <div className="space-y-6 text-foreground">
       <VocabularySummaryBox terms={detail.terms} />
@@ -236,7 +243,7 @@ export function LessonPlanDayVocabularyDetailContent({
       {detail.additionalVocabulary && detail.additionalVocabulary.length > 0 ? (
         <div className="space-y-3">
           <p className="text-base font-semibold text-foreground">
-            Additional Vocabulary
+            {additionalHeading}
           </p>
           <ul className="list-disc space-y-3 pl-5">
             {detail.additionalVocabulary.map((term) => (
@@ -669,7 +676,10 @@ export function LessonPlanWeeklySchedulePanel({
                 <SheetDescription>{detailDay.dailyFocus}</SheetDescription>
               </SheetHeader>
               <div className="overflow-y-auto px-6 py-5">
-                <LessonPlanDayVocabularyDetailContent detail={detailDay.vocabularyDetail} />
+                <LessonPlanDayVocabularyDetailContent
+                  detail={detailDay.vocabularyDetail}
+                  learningStandard={lessonContext?.learningStandard}
+                />
               </div>
             </>
           ) : null}

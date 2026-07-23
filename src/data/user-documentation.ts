@@ -15,9 +15,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Landing page for guests. Sign in or create an account to reach your dashboard.",
         howItWorks: [
-          "Use Sign In or Sign Up to open the Clerk authentication modal.",
+          "Use Sign In to open the Clerk authentication modal.",
+          "Use Sign Up to open the Flipvise account form (name, email, phone, account type, password, and password confirmation).",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
-          "After sign-in you are redirected to your personal dashboard automatically.",
+          "After sign-in you are redirected to your personal dashboard automatically (or to account details if phone, mailing address, or type are still missing).",
         ],
         requirements: ["None — guests can browse pricing and documentation."],
         doNots: [
@@ -223,7 +224,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "While offline, the native sign-in screen shows a notice that sign-in and sign-up need a connection, plus “Back to offline study” at the bottom.",
           "Signing out inside the mobile app returns you to offline study (your downloaded decks) rather than the online sign-in page.",
           "Opening the online dashboard in the native app uses an in-app sign-in screen (not the website modal): email sign-in code is the default; password works only if you set one on the web.",
-          "New users can tap “New to Flipvise? Create an account” on the sign-in screen to register with first name, last name, email, and password, then verify with an email code — no separate sign-up page.",
+          "New users can tap “New to Flipvise? Create an account” on the sign-in screen to register with first name, last name, phone, account type, email, password, and password confirmation, then verify with an email code — no separate sign-up page.",
           "If sign-in says the account was not found, tap “Create an account with this email” to switch to registration.",
           "If password sign-in fails, use “Email me a code” — accounts created with Google or email code on the website often have no password.",
           "Google-only accounts may need to sign in once in your mobile browser, then return to the app.",
@@ -787,11 +788,31 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Profile: update display name and profile image.",
           "Email addresses: add, verify, or set primary email.",
           "Security: change password, enable 2FA, review active sessions.",
+          "Account details (custom tab): view phone, mailing address, type/status, and security Q&A; use Edit to change them.",
         ],
         requirements: ["Signed-in account."],
         doNots: [
           "Do not remove your primary email if you rely on team or affiliate invites tied to it.",
           "Do not delete your account from Clerk Security without reading Flipvise’s delete confirmation first.",
+        ],
+      },
+      {
+        id: "account-details-settings",
+        title: "Account Details (Custom Tab)",
+        clerkTab: "account-details",
+        purpose:
+          "View and edit phone number, mailing address, type/status, and 3 security questions required for account verification.",
+        howItWorks: [
+          "Open Manage account — Account details is the first tab (before Profile / Security).",
+          "The page shows your current phone, mailing address, type/status, and security Q&A in a read-only summary.",
+          "Click Edit details to change phone, mailing address, type/status, and security questions; Save or Cancel when finished.",
+          "Education Institution and Corporation show a name sub-field.",
+          "Save writes phone, mailing address, and type to public profile metadata and security answers to private metadata via a Server Action.",
+          "New accounts (and incomplete profiles) complete Account details in three slides — contact, account type, then security questions — before the personal dashboard unlocks.",
+        ],
+        requirements: ["Signed-in account."],
+        doNots: [
+          "Do not leave phone, mailing address, type, or security answers blank — the personal dashboard stays locked until they are saved.",
         ],
       },
       {

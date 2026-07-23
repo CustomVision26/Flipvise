@@ -1,8 +1,9 @@
 "use client";
 
-import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
+import { SignInButton, useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { SignUpDialog } from "@/components/sign-up-dialog";
 import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 import { cn } from "@/lib/utils";
 
@@ -42,9 +43,7 @@ export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
           Sign In
         </Button>
       </SignInButton>
-      <SignUpButton mode="modal" initialValues={{ emailAddress: email }}>
-        <Button size="lg">Sign Up</Button>
-      </SignUpButton>
+      <SignUpDialog size="lg" initialEmail={email} />
       </div>
     </div>
   );

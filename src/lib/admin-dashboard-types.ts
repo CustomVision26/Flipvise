@@ -50,6 +50,21 @@ export type SerializedUser = {
   planSetAt: string | null;
   createdAt: string;
   lastSignInAt: string | null;
+  /** Phone from account details (`publicMetadata.recoveryPhone`). */
+  phoneNumber: string | null;
+  /** Mailing address from account details (`publicMetadata.mailingAddress`). */
+  mailingAddress: string | null;
+  /** Account type/status slug (`publicMetadata.accountType`). */
+  accountType: string | null;
+  /** Institution or corporation name when applicable. */
+  organizationName: string | null;
+  /** Security questions + answers from privateMetadata (admin support). */
+  securityQuestions: Array<{ question: string; answer: string }> | null;
+  /**
+   * ISO timestamp of the most recent time a platform admin opened this user's
+   * profile dialog (double-click on All Users). Null if never opened.
+   */
+  lastAdminProfileAccessAt: string | null;
   /** Stripe-sourced plan slug (billingPlan metadata key). */
   billingPlan: string | null;
   /** Stripe subscription status (billingStatus metadata key). */

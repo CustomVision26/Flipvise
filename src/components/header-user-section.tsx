@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
+import { UserAccountDetailsPage } from "@/components/user-account-details-page";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
@@ -32,7 +33,7 @@ import {
 import { useClientMounted } from "@/lib/use-client-mounted";
 import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
 import { AccountDeleteDialog } from "@/components/account-delete-dialog";
-import { CreditCard, Megaphone, Palette, Shield } from "lucide-react";
+import { CreditCard, IdCard, Megaphone, Palette, Shield } from "lucide-react";
 
 const NATIVE_AFTER_SIGN_OUT_URL = "/native-signout";
 
@@ -333,9 +334,19 @@ export function HeaderUserSection({
           <>
             <span
               className="inline-flex shrink-0 items-center"
-              title="Account — profile, appearance, and billing"
+              title="Account — profile, account details, appearance, and billing"
             >
               <UserButton>
+                {/* Custom pages first so Manage account opens on phone / type / security Q&A */}
+                <UserButton.UserProfilePage
+                  label="Account details"
+                  url="account-details"
+                  labelIcon={<IdCard className="size-4" />}
+                >
+                  <UserAccountDetailsPage />
+                </UserButton.UserProfilePage>
+                <UserButton.UserProfilePage label="account" />
+                <UserButton.UserProfilePage label="security" />
                 <UserButton.UserProfilePage
                   label="Appearance"
                   url="appearance"

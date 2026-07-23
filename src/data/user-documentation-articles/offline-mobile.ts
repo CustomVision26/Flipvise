@@ -60,7 +60,7 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
           "Returning users: if you already used “Make available offline”, the app can often sign you in automatically when you open the online dashboard.",
           "New accounts receive a formal Welcome to Flipvise inbox message thanking you for joining and outlining key opportunities (decks, mobile offline study, documentation, and plans).",
           "After every fresh sign-in on web, PWA, or the native app, a short welcome toast appears — with signup-specific copy for brand-new accounts.",
-          "New users: tap “New to Flipvise? Create an account” to register with your first name, last name, email, and password — then enter the verification code we email you.",
+          "New users: tap “New to Flipvise? Create an account” to register with your first name, last name, phone, account type, email, password, and password confirmation — then enter the verification code we email you.",
           "If sign-in reports that no account exists for your email, use “Create an account with this email” to switch straight to registration.",
           "Password sign-in works only if you created a password on the website (Clerk profile → Security). Many accounts use Google or email code only — password will fail with a strategy error; switch to “Email me a code”.",
           "If your account is Google-only and email code is unavailable, sign in once in Safari or Chrome on your phone, then open the online dashboard again inside the app.",

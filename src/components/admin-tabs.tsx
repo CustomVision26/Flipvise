@@ -1,8 +1,10 @@
 "use client";
 
-import { Fragment, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
+import { toast } from "sonner";
+import { openAdminUserProfileAction } from "@/actions/admin";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -99,6 +101,11 @@ import {
 } from "@/components/admin-panel-styles";
 import { cn } from "@/lib/utils";
 import { formatCurrencyFromCents } from "@/lib/format-currency";
+import {
+  ACCOUNT_TYPE_LABELS,
+  ACCOUNT_TYPE_VALUES,
+  type AccountType,
+} from "@/lib/account-recovery-profile";
 
 const AdminContactUsPanel = dynamic(
   () => import("@/components/admin-contact-us-panel").then((mod) => mod.AdminContactUsPanel),
@@ -158,7 +165,8 @@ function formatDate(dateStr: string | null | undefined) {
   });
 }
 
-function formatDateTime(dateStr: string) {
+function formatDateTime(dateStr: string | null | undefined) {
+  if (!dateStr) return "—";
   return new Date(dateStr).toLocaleString("en-US", {
     year: "numeric",
     month: "short",
@@ -269,9 +277,44 @@ export function AdminTabs({
     useState<BillingInvoiceStatusFilter>("all");
   const [invoiceDateFrom, setInvoiceDateFrom] = useState("");
   const [invoiceDateTo, setInvoiceDateTo] = useState("");
+  const [rosterUsers, setRosterUsers] = useState(users);
   const [profileDialogUser, setProfileDialogUser] = useState<SerializedUser | null>(null);
+  const [profileDetailsLoading, setProfileDetailsLoading] = useState(false);
   const [expandedWorkspaceUserId, setExpandedWorkspaceUserId] = useState<string | null>(null);
   const [workspaceDialog, setWorkspaceDialog] = useState<SerializedAdminWorkspace | null>(null);
+
+  useEffect(() => {
+    setRosterUsers(users);
+  }, [users]);
+
+  async function openUserProfileDialog(user: SerializedUser) {
+    setProfileDialogUser(user);
+    setProfileDetailsLoading(true);
+    try {
+      const fresh = await openAdminUserProfileAction({ targetUserId: user.id });
+      const merged: SerializedUser = {
+        ...user,
+        phoneNumber: fresh.phoneNumber,
+        mailingAddress: fresh.mailingAddress,
+        accountType: fresh.accountType,
+        organizationName: fresh.organizationName,
+        securityQuestions: fresh.securityQuestions,
+        lastAdminProfileAccessAt: fresh.lastAdminProfileAccessAt,
+      };
+      setProfileDialogUser(merged);
+      setRosterUsers((prev) =>
+        prev.map((row) => (row.id === user.id ? { ...row, ...merged } : row)),
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Could not load user account details.",
+      );
+    } finally {
+      setProfileDetailsLoading(false);
+    }
+  }
   const activeSection:
     | "all-users"
     | "workspace-admin"
@@ -342,7 +385,7 @@ export function AdminTabs({
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return users.filter((u) => {
+    return rosterUsers.filter((u) => {
       if (q) {
         const nameMatch = u.fullName.toLowerCase().includes(q);
         const emailMatch = (u.email ?? "").toLowerCase().includes(q);
@@ -357,7 +400,7 @@ export function AdminTabs({
       if (statusFilter === "banned" && !u.isBanned) return false;
       return true;
     });
-  }, [users, search, planFilter, roleFilter, statusFilter]);
+  }, [rosterUsers, search, planFilter, roleFilter, statusFilter]);
 
   const subscriptionRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -439,10 +482,10 @@ export function AdminTabs({
               <div className="min-w-0 space-y-1">
                 <CardTitle className={adminSectionTitleClass}>All Users</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {filteredUsers.length} of {users.length} users
+                  {filteredUsers.length} of {rosterUsers.length} users
                   <span className="hidden sm:inline"> · </span>
                   <span className="block sm:inline text-xs sm:text-sm">
-                    Double-click a row to view profile and plan details
+                    Double-click a row to view profile, security Q&A, and plan details
                   </span>
                 </p>
               </div>
@@ -511,9 +554,12 @@ export function AdminTabs({
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Type / status</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Plan type</TableHead>
                   <TableHead>Associate plan</TableHead>
+                  <TableHead>Admin accessed</TableHead>
                   <TableHead>Updated</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead>Last Sign-in</TableHead>
@@ -524,7 +570,7 @@ export function AdminTabs({
                 {filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={12}
                       className="text-center text-muted-foreground py-10"
                     >
                       No users match your search or filters.
@@ -534,7 +580,7 @@ export function AdminTabs({
                   filteredUsers.map((user) => (
                     <TableRow
                       key={user.id}
-                      onDoubleClick={() => setProfileDialogUser(user)}
+                      onDoubleClick={() => void openUserProfileDialog(user)}
                       className={`cursor-pointer ${user.isBanned ? "opacity-60" : ""}`}
                     >
                           <TableCell className="font-medium whitespace-nowrap">
@@ -560,6 +606,15 @@ export function AdminTabs({
                           <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                             {user.email ?? "—"}
                           </TableCell>
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                            {user.phoneNumber ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                            {user.accountType &&
+                            ACCOUNT_TYPE_VALUES.includes(user.accountType as AccountType)
+                              ? ACCOUNT_TYPE_LABELS[user.accountType as AccountType]
+                              : (user.accountType ?? "—")}
+                          </TableCell>
                           <TableCell className="max-w-[11rem]">
                             <Badge
                               className="text-xs font-normal whitespace-normal text-left h-auto min-h-7 max-w-full py-1 leading-snug"
@@ -582,6 +637,9 @@ export function AdminTabs({
                             ) : (
                               "—"
                             )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                            {formatDateTime(user.lastAdminProfileAccessAt)}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                             {formatDate(user.planSetAt)}
@@ -699,6 +757,79 @@ export function AdminTabs({
                             {profileDialogUser.lastSignInAt
                               ? formatDate(profileDialogUser.lastSignInAt)
                               : "Never"}
+                          </dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Phone</dt>
+                          <dd className="break-all font-medium">
+                            {profileDetailsLoading && !profileDialogUser.phoneNumber ? (
+                              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                Loading…
+                              </span>
+                            ) : (
+                              (profileDialogUser.phoneNumber ?? "—")
+                            )}
+                          </dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Mailing address</dt>
+                          <dd className="whitespace-pre-wrap break-words font-medium">
+                            {profileDialogUser.mailingAddress ?? "—"}
+                          </dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Type / status</dt>
+                          <dd className="font-medium">
+                            {profileDialogUser.accountType &&
+                            ACCOUNT_TYPE_VALUES.includes(
+                              profileDialogUser.accountType as AccountType,
+                            )
+                              ? ACCOUNT_TYPE_LABELS[
+                                  profileDialogUser.accountType as AccountType
+                                ]
+                              : (profileDialogUser.accountType ?? "—")}
+                          </dd>
+                        </div>
+                        {profileDialogUser.organizationName ? (
+                          <div className="grid grid-cols-[7rem_1fr] gap-2">
+                            <dt className="text-muted-foreground">Organization</dt>
+                            <dd className="break-words font-medium">
+                              {profileDialogUser.organizationName}
+                            </dd>
+                          </div>
+                        ) : null}
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Security Q&A</dt>
+                          <dd>
+                            {profileDetailsLoading &&
+                            !profileDialogUser.securityQuestions?.length ? (
+                              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                Loading…
+                              </span>
+                            ) : profileDialogUser.securityQuestions?.length ? (
+                              <ul className="space-y-2">
+                                {profileDialogUser.securityQuestions.map((item) => (
+                                  <li key={item.question} className="text-sm">
+                                    <p className="font-medium leading-snug">
+                                      {item.question}
+                                    </p>
+                                    <p className="text-muted-foreground break-words">
+                                      {item.answer}
+                                    </p>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              "—"
+                            )}
+                          </dd>
+                        </div>
+                        <div className="grid grid-cols-[7rem_1fr] gap-2">
+                          <dt className="text-muted-foreground">Admin accessed</dt>
+                          <dd>
+                            {formatDateTime(profileDialogUser.lastAdminProfileAccessAt)}
                           </dd>
                         </div>
                         {profileDialogUser.associatePlan ? (

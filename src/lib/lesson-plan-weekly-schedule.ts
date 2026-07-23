@@ -237,7 +237,10 @@ export function buildWeeklyScheduleFromVocabulary(input: {
       terms.length > 0
         ? `Introduce and practice ${terms.length} vocabulary term${terms.length === 1 ? "" : "s"} for ${input.topic}.`
         : `Review and consolidate ${input.topic} from earlier in the unit.`,
-    vocabulary: terms.length > 0 ? terms : [`Review — key ideas from ${input.topic}`],
+    vocabulary:
+      terms.length > 0
+        ? terms
+        : [`Consolidation — revisit and connect earlier concepts from ${input.topic}`],
     lessonTimeline: buildFallbackDayTimeline(
       input.topic,
       input.lessonDuration,

@@ -8,6 +8,7 @@ import {
   clampPlanPeriodDays,
   DEFAULT_PLAN_PERIOD_DAYS,
 } from "@/lib/lesson-plan-weekly-schedule";
+import { buildTopicVocabularyLines } from "@/lib/lesson-plan-vocabulary-banks";
 import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-material";
 import { PRO_PLUS_CARDS_PER_DECK_LIMIT } from "@/lib/personal-plan-limits";
 
@@ -127,7 +128,7 @@ export function generateLessonPlan(input: LessonPlanInput): LessonPlanResult {
   const standard = input.learningStandard?.trim();
   const accommodations = input.specialInstructions?.trim();
 
-  const vocabulary = buildTopicVocabulary(topic, subject, difficulty);
+  const vocabulary = buildTopicVocabularyLines(topic, subject, difficulty);
   const weeklySchedule =
     planPeriodDays > 1
       ? buildWeeklyScheduleFromVocabulary({
@@ -450,58 +451,6 @@ function buildDifferentiatedInstruction(
     tiers.Intermediate;
 
   return [...(accommodationLine ? [tierLine, accommodationLine] : [tierLine])];
-}
-
-function buildTopicVocabulary(
-  topic: string,
-  subject: string,
-  difficulty: string,
-): string[] {
-  const normalized = topic.toLowerCase().replace(/\s+/g, " ").trim();
-
-  const topicBanks: Record<string, string[]> = {
-    "water cycle": [
-      "Evaporation — liquid water changing into water vapor, often from oceans, lakes, or soil",
-      "Condensation — water vapor cooling and forming tiny droplets that create clouds",
-      "Precipitation — water falling from clouds as rain, snow, sleet, or hail",
-      "Collection — water gathering in rivers, lakes, oceans, and underground aquifers",
-      "Transpiration — water vapor released by plants through their leaves",
-      "Runoff — water flowing over land into streams and rivers after precipitation",
-      "Infiltration — water soaking into the ground to replenish groundwater",
-      "Water vapor — water in gas form in the atmosphere",
-    ],
-    "jamaican independence": [
-      "Colony — a territory controlled by another country",
-      "Self-government — local leaders making decisions for their own people",
-      "Nationalism — pride and political desire for an independent nation",
-      "Constitution — a document defining how a country is governed",
-      "Sovereignty — full authority of a state to govern itself",
-      "Referendum — a public vote on an important political decision",
-      "Legacy — long-term impact of historical events on present society",
-    ],
-  };
-
-  const bank = topicBanks[normalized];
-  const terms = bank ?? [
-    `${topic} — the main concept studied in this ${subject} lesson`,
-    `Process — a series of steps or changes related to ${topic}`,
-    `Cause and effect — how one event or action leads to another in ${topic}`,
-    `Evidence — facts, observations, or data that support claims about ${topic}`,
-    `Model — a simplified representation used to explain ${topic}`,
-    `Application — using knowledge of ${topic} in a real-world or new context`,
-    `Vocabulary — subject-specific words needed to discuss ${topic} accurately`,
-    `Analysis — breaking ${topic} into parts to understand how they work together`,
-  ];
-
-  if (difficulty === "Beginner") {
-    return terms.slice(0, 5);
-  }
-
-  if (difficulty === "Advanced" || difficulty === "Honors/Gifted") {
-    return terms;
-  }
-
-  return terms.slice(0, Math.min(7, terms.length));
 }
 
 export function generateTeacherQuiz(input: TeacherQuizInput): TeacherQuizResult {

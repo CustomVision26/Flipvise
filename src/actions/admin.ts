@@ -4,7 +4,12 @@ import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { logAdminPrivilegeChange, logAdminPlanAssignment } from "@/db/queries/admin";
+import {
+  logAdminPrivilegeChange,
+  logAdminPlanAssignment,
+  logAdminUserProfileAccess,
+} from "@/db/queries/admin";
+import { adminUserAccountDetailsFromClerkUser } from "@/lib/admin-user-account-details";
 import {
   buildPublicMetadataPatchForAdminRoleGrant,
   buildPublicMetadataPatchForAdminRoleRevoke,
@@ -307,6 +312,49 @@ function readTeamPlanFromPublicMetadata(
     return meta.plan.trim();
   }
   return null;
+}
+
+const openAdminUserProfileSchema = z.object({
+  targetUserId: z.string().min(1),
+});
+
+type OpenAdminUserProfileInput = z.infer<typeof openAdminUserProfileSchema>;
+
+/**
+ * Called when an admin double-clicks an All Users row: logs access time and
+ * returns fresh phone / type / security Q&A from Clerk (including privateMetadata).
+ */
+export async function openAdminUserProfileAction(
+  data: OpenAdminUserProfileInput,
+) {
+  const { userId, caller } = await requirePlatformAdminActor();
+
+  const parsed = openAdminUserProfileSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { targetUserId } = parsed.data;
+  const target = await clerkClient.users.getUser(targetUserId);
+  const accountDetails = adminUserAccountDetailsFromClerkUser(target);
+
+  const accessedByName =
+    [caller.firstName, caller.lastName].filter(Boolean).join(" ") ||
+    caller.username ||
+    userId;
+
+  const accessedAt = await logAdminUserProfileAccess({
+    targetUserId,
+    accessedByUserId: userId,
+    accessedByName,
+  });
+
+  return {
+    phoneNumber: accountDetails.phoneNumber,
+    mailingAddress: accountDetails.mailingAddress,
+    accountType: accountDetails.accountType,
+    organizationName: accountDetails.organizationName,
+    securityQuestions: accountDetails.securityQuestions,
+    lastAdminProfileAccessAt: accessedAt.toISOString(),
+  };
 }
 
 export async function createTeamWorkspaceForUserAction(

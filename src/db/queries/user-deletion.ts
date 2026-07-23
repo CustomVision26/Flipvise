@@ -3,6 +3,7 @@ import {
   adminPlanAssignmentInvites,
   adminPlanAssignmentLogs,
   adminPrivilegeLogs,
+  adminUserProfileAccessLogs,
   affiliateBroadcastInboxMessages,
   affiliates,
   billingInvoices,
@@ -246,6 +247,14 @@ export async function purgeAllUserData(
       or(
         eq(adminPrivilegeLogs.targetUserId, userId),
         eq(adminPrivilegeLogs.grantedByUserId, userId),
+      ),
+    );
+  await db
+    .delete(adminUserProfileAccessLogs)
+    .where(
+      or(
+        eq(adminUserProfileAccessLogs.targetUserId, userId),
+        eq(adminUserProfileAccessLogs.accessedByUserId, userId),
       ),
     );
 

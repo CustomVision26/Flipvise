@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAccessContext } from "@/lib/access";
+import { redirectIfAccountRecoveryIncomplete } from "@/lib/account-recovery-gate";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import {
   nativeSignInPath,
@@ -50,6 +51,8 @@ export default async function AuthContinuePage({
     }
     redirect("/");
   }
+
+  await redirectIfAccountRecoveryIncomplete(ctx.userId, requestedPath);
 
   if (requestedPath !== DEFAULT_AUTH_REDIRECT) {
     redirect(requestedPath);

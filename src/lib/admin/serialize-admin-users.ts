@@ -12,6 +12,13 @@ import {
   parsePlanSourceUpdatedAtMs,
   type PlanPublicMetadata,
 } from "@/lib/plan-metadata-billing-resolution";
+import {
+  SECURITY_QUESTION_LABELS,
+  formatMailingAddress,
+  parseMailingAddressFromPublicMetadata,
+  parseSecurityQuestionsFromPrivateMetadata,
+  type SecurityQuestionId,
+} from "@/lib/account-recovery-profile";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
@@ -23,7 +30,12 @@ type ClerkUserMeta = PlanPublicMetadata & {
   role?: string;
   stripe_subscription_status?: string;
   adminGranted?: boolean;
+  recoveryPhone?: string;
+  mailingAddress?: unknown;
+  accountType?: string;
+  organizationName?: string;
 };
+
 
 function adminPlanLabelFromSlug(slug: string | undefined): string {
   return displayNameForBillingPlanSlug(slug ?? null);
@@ -109,6 +121,8 @@ export type SerializeAdminUsersContext = {
   includeWorkspaceDetails: boolean;
   /** Active marketing-affiliate user ids (Clerk user id or email-linked). */
   activeAffiliateUserIds?: Set<string>;
+  /** Latest admin profile-dialog access time by Clerk user id. */
+  lastAdminProfileAccessByUserId?: Map<string, Date>;
 };
 
 export function serializeAdminUsers(ctx: SerializeAdminUsersContext): SerializedUser[] {
@@ -125,6 +139,16 @@ export function serializeAdminUsers(ctx: SerializeAdminUsersContext): Serialized
       "—";
 
     const meta = user.publicMetadata as ClerkUserMeta;
+    const privateMeta = user.privateMetadata as Record<string, unknown>;
+    const securityEntries = parseSecurityQuestionsFromPrivateMetadata(privateMeta);
+    const securityQuestions = securityEntries
+      ? securityEntries.map((entry) => ({
+          question:
+            SECURITY_QUESTION_LABELS[entry.questionId as SecurityQuestionId] ??
+            entry.questionId,
+          answer: entry.answer,
+        }))
+      : null;
 
     const isSuperadmin =
       meta?.role === "superadmin" || isPlatformSuperadminAllowListed(user.id);
@@ -305,6 +329,27 @@ export function serializeAdminUsers(ctx: SerializeAdminUsersContext): Serialized
       lastSignInAt: user.lastSignInAt
         ? new Date(user.lastSignInAt).toISOString()
         : null,
+      phoneNumber:
+        typeof meta.recoveryPhone === "string" && meta.recoveryPhone.trim()
+          ? meta.recoveryPhone.trim()
+          : null,
+      mailingAddress:
+        formatMailingAddress(
+          parseMailingAddressFromPublicMetadata(
+            meta as Record<string, unknown>,
+          ),
+        ) || null,
+      accountType:
+        typeof meta.accountType === "string" && meta.accountType.trim()
+          ? meta.accountType.trim()
+          : null,
+      organizationName:
+        typeof meta.organizationName === "string" && meta.organizationName.trim()
+          ? meta.organizationName.trim()
+          : null,
+      securityQuestions,
+      lastAdminProfileAccessAt:
+        ctx.lastAdminProfileAccessByUserId?.get(user.id)?.toISOString() ?? null,
       billingPlan:
         typeof meta.billingPlan === "string" ? meta.billingPlan : null,
       billingStatus:

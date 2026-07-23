@@ -3,7 +3,14 @@
  * When these files change, quick-reference + in-depth guides for that page must be reviewed.
  */
 export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly string[]>> = {
-  homepage: ["src/components/app-top-nav.tsx"],
+  homepage: [
+    "src/components/app-top-nav.tsx",
+    "src/components/auth-buttons.tsx",
+    "src/components/sign-up-dialog.tsx",
+    "src/components/account-recovery-fields.tsx",
+    "src/actions/account-recovery-profile.ts",
+    "src/app/onboarding/account-recovery/page.tsx",
+  ],
   "header-navigation": [
     "src/components/app-top-nav.tsx",
     "src/components/header-user-section.tsx",
@@ -50,6 +57,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/native-signin/native-signin-client.tsx",
     "src/app/native-signin/page.tsx",
     "src/app/api/native/clerk-handoff/route.ts",
+    "src/components/account-recovery-fields.tsx",
+    "src/actions/account-recovery-profile.ts",
   ],
   "study-session": [
     "src/app/decks/[deckId]/study/page.tsx",
@@ -98,7 +107,18 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "promo-general": ["src/data/plans-config.json", "src/components/pricing-content.tsx"],
   "promo-affiliate": ["src/components/affiliate-portal-view.tsx", "src/data/plans-config.json"],
   "promo-seasonal-by-plan": ["src/data/plans-config.json"],
-  "clerk-profile": ["src/components/header-user-section.tsx"],
+  "clerk-profile": [
+    "src/components/header-user-section.tsx",
+    "src/actions/account-recovery-profile.ts",
+    "src/lib/account-recovery-profile.ts",
+    "src/app/onboarding/account-recovery/page.tsx",
+  ],
+  "account-details-settings": [
+    "src/components/header-user-section.tsx",
+    "src/components/user-account-details-page.tsx",
+    "src/components/account-recovery-fields.tsx",
+    "src/actions/account-recovery-profile.ts",
+  ],
   "appearance-settings": ["src/components/header-user-section.tsx"],
   "billing-tab": ["src/components/user-billing-page.tsx", "src/actions/stripe.ts"],
   "account-delete": ["src/components/account-delete-dialog.tsx"],
@@ -166,7 +186,13 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/lib/admin-dashboard-nav.ts",
     "src/app/admin/layout.tsx",
   ],
-  "all-users": ["src/lib/admin/serialize-admin-users.ts", "src/actions/admin.ts"],
+  "all-users": [
+    "src/lib/admin/serialize-admin-users.ts",
+    "src/lib/admin-user-account-details.ts",
+    "src/actions/admin.ts",
+    "src/components/admin-tabs.tsx",
+    "src/db/queries/admin.ts",
+  ],
   subscription: ["src/lib/admin/admin-billing-snapshot.ts", "src/db/queries/stripe-subscriptions.ts"],
   invoices: ["src/db/queries/billing.ts"],
   "paid-subscribers": ["src/lib/admin-user-plan-label.ts", "src/db/queries/billing.ts"],

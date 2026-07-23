@@ -218,6 +218,13 @@
       "when": 1778600000000,
       "tag": "0040_quiz_question_formats",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1778700000000,
+      "tag": "0060_admin_user_profile_access_logs",
+      "breakpoints": true
     }
   ]
 }

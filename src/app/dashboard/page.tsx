@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { currentUser } from "@/lib/clerk-auth";
 import { getAccessContext } from "@/lib/access";
+import { redirectIfAccountRecoveryIncomplete } from "@/lib/account-recovery-gate";
 import {
   formatSessionUserDisplayName,
   getClerkUserDisplayNameById,
@@ -215,6 +216,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect("/");
   }
 
+  await redirectIfAccountRecoveryIncomplete(userId, "/dashboard");
   await redirectIfPlanReconciliationPending(userId);
 
   const sp = await searchParams;

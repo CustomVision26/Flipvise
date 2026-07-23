@@ -91,7 +91,11 @@ export function vocabularyDetailPdfLines(
   }
 
   if (detail.additionalVocabulary?.length) {
-    lines.push("", "Additional Vocabulary:");
+    const pepAligned = /pep/i.test(detail.contextIntro);
+    lines.push(
+      "",
+      pepAligned ? "Vocabulary (PEP-Aligned):" : "Additional Vocabulary:",
+    );
     for (const term of detail.additionalVocabulary) {
       lines.push(`• ${term.term} — ${term.definition}`);
       if (term.example) {

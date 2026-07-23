@@ -2,6 +2,7 @@ import { db } from "@/db";
 import {
   adminPrivilegeLogs,
   adminPlanAssignmentLogs,
+  adminUserProfileAccessLogs,
   cards,
   decks,
   teamDeckAssignments,
@@ -9,7 +10,7 @@ import {
   teamMembers,
   teams,
 } from "@/db/schema";
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, max, sql } from "drizzle-orm";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 
 function teamPlanLabelForAdmin(slug: string): string {
@@ -644,4 +645,40 @@ export async function logAdminPrivilegeChange(data: {
   action: AdminPrivilegeLogAction;
 }) {
   return db.insert(adminPrivilegeLogs).values(data);
+}
+
+export async function logAdminUserProfileAccess(data: {
+  targetUserId: string;
+  accessedByUserId: string;
+  accessedByName: string;
+}) {
+  const [row] = await db
+    .insert(adminUserProfileAccessLogs)
+    .values(data)
+    .returning({ accessedAt: adminUserProfileAccessLogs.accessedAt });
+  return row?.accessedAt ?? new Date();
+}
+
+/** Latest admin profile-dialog open time per target user id. */
+export async function getLatestAdminUserProfileAccessByUserIds(
+  userIds: string[],
+): Promise<Map<string, Date>> {
+  const map = new Map<string, Date>();
+  if (userIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      targetUserId: adminUserProfileAccessLogs.targetUserId,
+      accessedAt: max(adminUserProfileAccessLogs.accessedAt),
+    })
+    .from(adminUserProfileAccessLogs)
+    .where(inArray(adminUserProfileAccessLogs.targetUserId, userIds))
+    .groupBy(adminUserProfileAccessLogs.targetUserId);
+
+  for (const row of rows) {
+    if (row.accessedAt) {
+      map.set(row.targetUserId, row.accessedAt);
+    }
+  }
+  return map;
 }

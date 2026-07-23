@@ -75,7 +75,9 @@ const ALL_ARTICLES: DocArticle[] = [
           "Filter by plan type (Free, Pro, Pro Plus, education tiers, team tiers, Paid, Admin-granted, etc.).",
           "Filter by role: admin, superadmin, or regular user.",
           "Filter by status: online, offline, or banned.",
-          "Double-click a row to open the profile dialog with plan, billing, and metadata details.",
+          "Phone and Type/status columns show account details from Clerk public metadata when set.",
+          "Admin accessed shows the last date/time a platform admin opened that user's profile dialog.",
+          "Double-click a row to open the profile dialog with plan, billing, phone, mailing address, type/status, security Q&A, and metadata; opening the dialog refreshes private security answers and logs Admin accessed.",
         ],
       },
       {

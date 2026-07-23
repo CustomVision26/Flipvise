@@ -9,6 +9,7 @@ import {
   getTeamWorkspaceCountsByOwnerUserIds,
   getTeamInviteeTotalsByOwnerUserIds,
   getWorkspaceDetailsByOwnerUserIds,
+  getLatestAdminUserProfileAccessByUserIds,
 } from "@/db/queries/admin";
 import { countPaidSubscribersFromDB, listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import { listAffiliates } from "@/db/queries/affiliates";
@@ -489,6 +490,7 @@ export async function loadAdminTabsData(
       if (section === "all-users") {
         factories.push(() => getActiveSessionData());
         factories.push(() => listAffiliates());
+        factories.push(() => getLatestAdminUserProfileAccessByUserIds(userIds));
       }
 
       const results = await runDbTasksWithConcurrencyLimit(
@@ -524,6 +526,12 @@ export async function loadAdminTabsData(
         section === "all-users"
           ? (results[idx++] as Awaited<ReturnType<typeof listAffiliates>>)
           : [];
+      const lastAdminProfileAccessByUserId =
+        section === "all-users"
+          ? (results[idx++] as Awaited<
+              ReturnType<typeof getLatestAdminUserProfileAccessByUserIds>
+            >)
+          : undefined;
       const activeAffiliateUserIds =
         section === "all-users"
           ? buildActiveAffiliateUserIds(
@@ -552,6 +560,7 @@ export async function loadAdminTabsData(
         activeSessionData,
         includeWorkspaceDetails,
         activeAffiliateUserIds,
+        lastAdminProfileAccessByUserId,
       });
 
       return { ...empty, users };

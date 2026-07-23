@@ -361,6 +361,25 @@ export const adminPrivilegeLogs = pgTable('admin_privilege_logs', {
   createdAt: timestamp().notNull().defaultNow(),
 });
 
+/**
+ * Records when a platform admin opens a user's profile dialog (double-click on All Users)
+ * to view phone, type/status, and security Q&A.
+ */
+export const adminUserProfileAccessLogs = pgTable(
+  'admin_user_profile_access_logs',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    targetUserId: varchar({ length: 255 }).notNull(),
+    accessedByUserId: varchar({ length: 255 }).notNull(),
+    accessedByName: varchar({ length: 255 }).notNull(),
+    accessedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('admin_user_profile_access_target_idx').on(t.targetUserId),
+    index('admin_user_profile_access_accessed_at_idx').on(t.accessedAt),
+  ],
+);
+
 export const adminPlanAssignmentLogs = pgTable('admin_plan_assignment_logs', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   targetUserId: varchar({ length: 255 }).notNull(),

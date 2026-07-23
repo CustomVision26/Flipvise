@@ -21,7 +21,12 @@ import {
 import {
   buildTemplateDayVocabularyDetail,
   parseVocabularyLine,
+  sanitizeDayVocabularyDetail,
 } from "@/lib/lesson-plan-vocabulary-detail";
+import {
+  buildTopicVocabularyLines,
+  isNonConceptVocabularyTerm,
+} from "@/lib/lesson-plan-vocabulary-banks";
 import { vocabularyApproachPromptLine } from "@/lib/lesson-plan-vocabulary-approach";
 import {
   clampPlanPeriodDays,
@@ -160,13 +165,35 @@ function buildLessonPlanPrompt(
   return lines.join("\n");
 }
 
+function sanitizeUnitVocabulary(
+  vocabulary: string[],
+  input: LessonPlanActionInput,
+): string[] {
+  const usable = vocabulary.filter((line) => {
+    const { term } = parseVocabularyLine(line);
+    return !isNonConceptVocabularyTerm(term, input.topic, undefined);
+  });
+
+  if (usable.length >= 4) {
+    return usable;
+  }
+
+  return buildTopicVocabularyLines(
+    input.topic,
+    input.subject,
+    input.difficultyLevel,
+  );
+}
+
 function normalizeLessonPlanResult(
   output: LessonPlanResult,
   input: LessonPlanActionInput,
 ): LessonPlanResult {
   const planPeriodDays = clampPlanPeriodDays(input.planPeriodDays);
+  const vocabulary = sanitizeUnitVocabulary(output.vocabulary, input);
   const filtered = {
     ...output,
+    vocabulary,
     differentiatedInstruction: filterDifferentiatedInstruction(
       output.differentiatedInstruction,
       input.difficultyLevel,
@@ -235,7 +262,8 @@ export async function generateLessonPlanAction(
 
 Requirements:
 - Write specific, in-depth content — never generic placeholders like "term A", "key concept 1", or "sample problem".
-- Vocabulary must list real subject-specific terms for the topic. Format each entry as "Term — concise student-friendly definition" (6–10 terms).
+- Vocabulary must list real subject-specific concepts students will learn for the topic (e.g. for Algebra 1: Variable, Equation, Coefficient — not the lesson title). Format each entry as "Term — concise student-friendly definition" (6–10 terms).
+- Never use the lesson topic, lesson title, or generic labels like "Process", "Cause and effect", or "Vocabulary" as vocabulary terms.
 - Learning objectives must be measurable and grade-appropriate (use action verbs: explain, analyze, model, compare, evaluate).
 - Materials must be practical and specific to the lesson activities.
 - Main teaching steps must be detailed procedural steps a teacher can follow (5–8 steps).
@@ -285,8 +313,11 @@ const generateDayVocabularyDetailSchema = z.object({
 async function generateDayVocabularyDetailCore(
   input: z.infer<typeof generateDayVocabularyDetailSchema>,
 ) {
+  const finalize = (detail: z.infer<typeof lessonPlanDayVocabularyDetailSchema>) =>
+    sanitizeDayVocabularyDetail(detail, input);
+
   if (!process.env.OPENAI_API_KEY?.trim()) {
-    return buildTemplateDayVocabularyDetail(input);
+    return finalize(buildTemplateDayVocabularyDetail(input));
   }
 
   const vocabularyLines = input.vocabulary
@@ -306,11 +337,13 @@ async function generateDayVocabularyDetailCore(
 
 Requirements:
 - Write specific, accurate content for the subject, grade, topic, and learning standard (when provided).
-- terms: one entry per assigned vocabulary line for this day. shortDefinition is the concise student-friendly meaning; definition is a fuller classroom explanation (2–4 sentences); example is a concrete italic-ready classroom example starting with "Example:".
+- terms: prefer real subject-domain concepts students will be taught (e.g. Variable, Equation, Coefficient for Algebra). shortDefinition is the concise student-friendly meaning; definition is a fuller classroom explanation (2–4 sentences); example is a concrete italic-ready classroom example starting with "Example:".
+- If an assigned vocabulary line is the lesson topic/title or a generic meta-term (Process, Cause and effect, Evidence-as-filler, "main concept"), REPLACE it with authentic domain vocabulary for the topic instead of echoing it.
+- Keep roughly the same number of day terms as assigned (typically 1–6), but every term must be a teachable subject concept.
 - mainConcept: a "Main Concept" section explaining how the day's terms connect to the topic (like a study guide overview).
 - process: numbered instructional steps (Collect, Organize, Display, Analyze, Interpret, etc. when appropriate) with bullet sub-points — match the rigor of ${input.difficultyLevel}.
 - learningGoal: "By the end of this class period, students should be able to:" plus measurable objectives.
-- additionalVocabulary: 6–12 related terms students should know for this topic/day (PEP/exam-aligned when learning standard mentions Jamaica PEP or similar).
+- additionalVocabulary: 6–12 related subject concepts students should know for this topic/day (PEP/exam-aligned when learning standard mentions Jamaica PEP or similar) — list real terms with definitions like a study guide vocabulary list, not the lesson title.
 - contextIntro: one sentence framing the detail section for teachers.
 - Never use markdown. Use plain text only.`,
       prompt: [
@@ -336,7 +369,7 @@ Requirements:
       throw new Error("AI vocabulary detail generation returned no output.");
     }
 
-    return output;
+    return finalize(output);
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
@@ -344,7 +377,7 @@ Requirements:
         error,
       );
     }
-    return buildTemplateDayVocabularyDetail(input);
+    return finalize(buildTemplateDayVocabularyDetail(input));
   }
 }
 
