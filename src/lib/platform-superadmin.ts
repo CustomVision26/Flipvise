@@ -26,34 +26,39 @@ export async function reconcilePlatformSuperadminClerkMetadata(
 
   const user = await clerkClient.users.getUser(userId);
   const role = (user.publicMetadata as { role?: string })?.role;
-  if (role === "superadmin") return false;
+  let grantedNow = false;
 
-  const prev = user.publicMetadata as Record<string, unknown> | undefined;
-  const publicMetadata: Record<string, unknown> =
-    role === "admin" ? { role: "superadmin" } : buildPublicMetadataPatchForSuperadminRoleGrant(prev);
+  if (role !== "superadmin") {
+    const prev = user.publicMetadata as Record<string, unknown> | undefined;
+    const publicMetadata: Record<string, unknown> =
+      role === "admin"
+        ? { role: "superadmin" }
+        : buildPublicMetadataPatchForSuperadminRoleGrant(prev);
 
-  await clerkClient.users.updateUserMetadata(userId, {
-    publicMetadata,
-  });
+    await clerkClient.users.updateUserMetadata(userId, {
+      publicMetadata,
+    });
 
-  try {
-    await syncPlatformAdminTeamTierInvitedMetadata(clerkClient, userId);
-  } catch {
-    // best-effort
+    try {
+      await syncPlatformAdminTeamTierInvitedMetadata(clerkClient, userId);
+    } catch {
+      // best-effort
+    }
+
+    const targetUserName =
+      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      user.username ||
+      user.id;
+
+    await logAdminPrivilegeChange({
+      targetUserId: userId,
+      targetUserName,
+      grantedByUserId: userId,
+      grantedByName: `${targetUserName} (PLATFORM_SUPERADMIN_USER_IDS)`,
+      action: "superadmin_granted",
+    });
+    grantedNow = true;
   }
 
-  const targetUserName =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-    user.username ||
-    user.id;
-
-  await logAdminPrivilegeChange({
-    targetUserId: userId,
-    targetUserName,
-    grantedByUserId: userId,
-    grantedByName: `${targetUserName} (PLATFORM_SUPERADMIN_USER_IDS)`,
-    action: "superadmin_granted",
-  });
-
-  return true;
+  return grantedNow;
 }

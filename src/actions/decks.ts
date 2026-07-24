@@ -21,6 +21,8 @@ const createDeckSchema = z
   .object({
     name: z.string().min(1, "Name is required"),
     description: z.string().optional(),
+    gradeLevel: z.string().optional(),
+    difficultyLevel: z.string().optional(),
     gradient: z.string().optional(),
     teamId: z.number().int().positive().optional(),
     /** When true, always create a personal deck for the session user (`teamId` ignored). */
@@ -42,70 +44,124 @@ const createDeckSchema = z
 
 type CreateDeckInput = z.infer<typeof createDeckSchema>;
 
+export type CreateDeckActionResult =
+  | { ok: true; deckId: number }
+  | { ok: false; error: string };
+
+/**
+ * Create a deck. Returns `{ ok, error }` for expected failures — do not throw
+ * user-facing errors (production masks thrown Server Action errors as a generic
+ * "Server Components render" message).
+ */
 export async function createDeckAction(
   data: CreateDeckInput,
-): Promise<{ deckId: number }> {
-  const { userId, maxPersonalDecks } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
-
-  const parsed = createDeckSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid input");
-
-  const sessionUserId = userId;
-  const { name, description, gradient, teamId, personalOnly, teamWorkspaceOnly } = parsed.data;
-
-  async function insertPersonalDeckForSessionUser(): Promise<number> {
-    const personalCount = await countPersonalDecksForUser(sessionUserId);
-    if (personalCount >= maxPersonalDecks) {
-      throw new Error(
-        `Deck limit reached — up to ${maxPersonalDecks} personal deck(s) on your plan. See Pricing to upgrade.`,
-      );
+): Promise<CreateDeckActionResult> {
+  try {
+    const { userId, maxPersonalDecks } = await getAccessContext();
+    if (!userId) {
+      return { ok: false, error: "You must be signed in to create a deck." };
     }
-    return createDeck(sessionUserId, name, description, null, gradient, null, null, sessionUserId);
-  }
 
-  async function insertTeamDeckForTeamId(tid: number): Promise<number> {
-    const team = await getTeamById(tid);
-    if (!team) throw new Error("Invalid team");
-    if (team.ownerUserId !== sessionUserId) throw new Error("Forbidden");
-    if (isTeamPlanId(team.planSlug)) {
-      const limits = limitsForPlan(team.planSlug);
-      const inWorkspace = await getDecksForTeam(team.id, team.ownerUserId);
-      if (inWorkspace.length >= limits.maxDecksPerWorkspace) {
-        throw new Error(
-          `Workspace deck limit reached — up to ${limits.maxDecksPerWorkspace} decks in this workspace on your plan. See Pricing to upgrade.`,
-        );
-      }
+    const parsed = createDeckSchema.safeParse(data);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid deck details.",
+      };
     }
-    return createDeck(
-      team.ownerUserId,
+
+    const sessionUserId = userId;
+    const {
       name,
       description,
-      tid,
+      gradeLevel,
+      difficultyLevel,
       gradient,
-      null,
-      null,
-      sessionUserId,
-    );
-  }
+      teamId,
+      personalOnly,
+      teamWorkspaceOnly,
+    } = parsed.data;
 
-  let deckId: number;
-  if (teamWorkspaceOnly === true && teamId !== undefined) {
-    deckId = await insertTeamDeckForTeamId(teamId);
-  } else if (personalOnly === true) {
-    deckId = await insertPersonalDeckForSessionUser();
-  } else if (teamId !== undefined) {
-    deckId = await insertTeamDeckForTeamId(teamId);
-  } else {
-    deckId = await insertPersonalDeckForSessionUser();
-  }
+    async function insertPersonalDeckForSessionUser(): Promise<
+      CreateDeckActionResult
+    > {
+      const personalCount = await countPersonalDecksForUser(sessionUserId);
+      if (personalCount >= maxPersonalDecks) {
+        return {
+          ok: false,
+          error: `Deck limit reached — up to ${maxPersonalDecks} personal deck(s) on your plan. See Pricing to upgrade.`,
+        };
+      }
+      const deckId = await createDeck(
+        sessionUserId,
+        name,
+        description,
+        null,
+        gradient,
+        gradeLevel,
+        difficultyLevel,
+        sessionUserId,
+      );
+      return { ok: true, deckId };
+    }
 
-  revalidatePath("/dashboard");
-  if (teamId !== undefined || teamWorkspaceOnly === true) {
-    revalidatePath("/dashboard/team-admin", "layout");
-  }
+    async function insertTeamDeckForTeamId(
+      tid: number,
+    ): Promise<CreateDeckActionResult> {
+      const team = await getTeamById(tid);
+      if (!team) return { ok: false, error: "Invalid team." };
+      if (team.ownerUserId !== sessionUserId) {
+        return { ok: false, error: "You don't have permission to create a team deck." };
+      }
+      if (isTeamPlanId(team.planSlug)) {
+        const limits = limitsForPlan(team.planSlug);
+        const inWorkspace = await getDecksForTeam(team.id, team.ownerUserId);
+        if (inWorkspace.length >= limits.maxDecksPerWorkspace) {
+          return {
+            ok: false,
+            error: `Workspace deck limit reached — up to ${limits.maxDecksPerWorkspace} decks in this workspace on your plan. See Pricing to upgrade.`,
+          };
+        }
+      }
+      const deckId = await createDeck(
+        team.ownerUserId,
+        name,
+        description,
+        tid,
+        gradient,
+        gradeLevel,
+        difficultyLevel,
+        sessionUserId,
+      );
+      return { ok: true, deckId };
+    }
 
-  return { deckId };
+    let result: CreateDeckActionResult;
+    if (teamWorkspaceOnly === true && teamId !== undefined) {
+      result = await insertTeamDeckForTeamId(teamId);
+    } else if (personalOnly === true) {
+      result = await insertPersonalDeckForSessionUser();
+    } else if (teamId !== undefined) {
+      result = await insertTeamDeckForTeamId(teamId);
+    } else {
+      result = await insertPersonalDeckForSessionUser();
+    }
+
+    if (!result.ok) return result;
+
+    revalidatePath("/dashboard");
+    if (teamId !== undefined || teamWorkspaceOnly === true) {
+      revalidatePath("/dashboard/team-admin", "layout");
+    }
+
+    return result;
+  } catch (error) {
+    console.error("[createDeckAction]", error);
+    return {
+      ok: false,
+      error: "Couldn't create the deck. Please try again.",
+    };
+  }
 }
 
 const updateDeckSchema = z.object({

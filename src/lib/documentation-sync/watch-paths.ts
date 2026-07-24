@@ -99,9 +99,17 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "stripe-billing-payment": [
     "src/actions/stripe.ts",
     "src/components/stripe-checkout-button.tsx",
+    "src/components/pricing-checkout-payment.tsx",
+    "src/app/pricing/checkout/pay/page.tsx",
+    "src/lib/stripe-invoice-addresses.ts",
     "src/app/api/webhooks/stripe/route.ts",
   ],
-  checkout: ["src/app/pricing/checkout/page.tsx", "src/actions/stripe.ts"],
+  checkout: [
+    "src/app/pricing/checkout/page.tsx",
+    "src/app/pricing/checkout/pay/page.tsx",
+    "src/components/pricing-checkout-payment.tsx",
+    "src/actions/stripe.ts",
+  ],
   "manage-subscription": ["src/components/user-billing-page.tsx", "src/components/manage-billing-button.tsx"],
   "prorations-plan-changes": ["src/actions/stripe.ts", "src/app/pricing/checkout/plan-change/pay/page.tsx"],
   "promo-general": ["src/data/plans-config.json", "src/components/pricing-content.tsx"],
@@ -144,11 +152,15 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "invite-members": [
     "src/app/dashboard/(team-admin)/team-admin/invite-members/pending-invitations/page.tsx",
     "src/app/dashboard/(team-admin)/team-admin/invite-members/invitation-history/page.tsx",
+    "src/components/team-invite-form.tsx",
+    "src/actions/teams.ts",
   ],
   "quiz-results-admin": [
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-security/page.tsx",
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-timer/page.tsx",
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-schedule/page.tsx",
+    "src/components/team-quiz-timer-settings.tsx",
+    "src/actions/teams.ts",
   ],
   "affiliate-dashboard": ["src/components/affiliate-portal-view.tsx", "src/components/affiliate-invite-inbox-section.tsx"],
   "education-plans": [
@@ -165,6 +177,13 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   ],
   "teacher-ai-content-tools": [
     "src/app/teacher/lesson-builder/page.tsx",
+    "src/app/teacher/lesson-builder/teacher-lesson-builder-form.tsx",
+    "src/components/lesson-plan-day-vocabulary-detail.tsx",
+    "src/lib/lesson-plan-vocabulary-detail.ts",
+    "src/lib/lesson-plan-ai-schema.ts",
+    "src/actions/teacher-lesson-plan.ts",
+    "src/data/jamaica-nsc-lesson-guidelines.ts",
+    "src/lib/jamaica-nsc-lesson-guidelines.ts",
     "src/app/teacher/quizzes/page.tsx",
     "src/app/teacher/homework/page.tsx",
     "src/app/teacher/study-guides/page.tsx",

@@ -201,8 +201,12 @@ function envVarForPlan(plan: PaidPlanId, period: BillingPeriod): string {
 type CheckoutCustomerSessionParams =
   | {
       customer: string;
-      /** Required when `tax_id_collection` + `billing_address_collection` use an existing customer. */
-      customer_update: { name: "auto"; address: "auto" };
+      /**
+       * Required when `tax_id_collection` + `billing_address_collection` use an existing customer.
+       * Do not set `address: "auto"` — that overwrites Bill-to with the card billing address.
+       * Mailing address for invoices is synced from Account details separately.
+       */
+      customer_update: { name: "auto" };
     }
   | { customer_email: string };
 
@@ -226,11 +230,21 @@ async function resolveCheckoutCustomerParams(
   if (sub?.stripeCustomerId) {
     const reachable = await isStripeCustomerReachable(sub.stripeCustomerId);
     if (reachable) {
+      try {
+        const { syncStripeCustomerBillToFromClerkUser } = await import(
+          "@/lib/stripe-invoice-addresses"
+        );
+        await syncStripeCustomerBillToFromClerkUser(sub.stripeCustomerId, userId);
+      } catch (error) {
+        console.error(
+          "[createStripeCheckoutSessionAction] sync Bill-to address:",
+          error,
+        );
+      }
       return {
         customer: sub.stripeCustomerId,
         customer_update: {
           name: "auto",
-          address: "auto",
         },
       };
     }

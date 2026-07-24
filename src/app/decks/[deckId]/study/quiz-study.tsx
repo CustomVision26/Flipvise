@@ -60,10 +60,12 @@ import {
   ListChecks,
   BookCheck,
   ShieldAlert,
+  Shield,
   Lock,
   PenLine,
   ToggleLeft,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   submitQuizResultAction,
   saveQuizResultAction,
@@ -153,6 +155,8 @@ interface QuizStudyProps {
   exitLabel: string;
   /** Team member quiz — owner inbox can be chosen when saving after timeout. */
   ownerInboxAvailable?: boolean;
+  /** Workspace owner / team admin — Cancel exits the quiz without submitting. */
+  allowQuizCancelExit?: boolean;
   quizSchedule?: {
     enabled: boolean;
     startAtIso: string;
@@ -271,6 +275,7 @@ export function QuizStudy({
   exitHref,
   exitLabel,
   ownerInboxAvailable = false,
+  allowQuizCancelExit = false,
   quizSchedule,
   quizSecurity,
   quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
@@ -342,9 +347,8 @@ export function QuizStudy({
     () => restoredState?.remainingSeconds ?? totalSeconds,
   );
   const startTimeRef = useRef<number>(0);
-  const [quizStarted, setQuizStarted] = useState(
-    () => securityEnabled && initialSession?.status === "active",
-  );
+  // Always show the Timed quiz intro first; never auto-skip into an in-progress session.
+  const [quizStarted, setQuizStarted] = useState(false);
   const [securitySessionId, setSecuritySessionId] = useState<number | null>(
     () => initialSession?.id ?? null,
   );
@@ -353,6 +357,8 @@ export function QuizStudy({
   );
   const [securityLocking, setSecurityLocking] = useState(false);
   const lockingRef = useRef(false);
+  /** Owner/admin Cancel exit — skip security lock on intentional leave. */
+  const skipSecurityLockOnExitRef = useRef(false);
 
   const grantedFreshStart = useMemo(
     () =>
@@ -361,13 +367,11 @@ export function QuizStudy({
       restoredState == null,
     [securityEnabled, securityStatus, initialSession?.status, restoredState],
   );
-  const grantedResume = useMemo(
-    () =>
-      securityEnabled &&
-      (securityStatus === "granted_resume" || initialSession?.status === "granted_resume") &&
-      restoredState != null,
-    [securityEnabled, securityStatus, initialSession?.status, restoredState],
-  );
+  const grantedResume = useMemo(() => {
+    if (!securityEnabled || restoredState == null) return false;
+    const status = securityStatus ?? initialSession?.status;
+    return status === "granted_resume" || status === "active";
+  }, [securityEnabled, securityStatus, initialSession?.status, restoredState]);
   const isSecurityTerminated = useMemo(
     () =>
       securityEnabled &&
@@ -600,7 +604,8 @@ export function QuizStudy({
       !quizStarted ||
       result ||
       securityStatus === "locked" ||
-      lockingRef.current
+      lockingRef.current ||
+      skipSecurityLockOnExitRef.current
     ) {
       return;
     }
@@ -858,6 +863,21 @@ export function QuizStudy({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+            {allowQuizCancelExit ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full sm:w-auto"
+                disabled={submitting}
+                onClick={() => {
+                  setConfirmOpen(false);
+                  skipSecurityLockOnExitRef.current = true;
+                  leaveStudy();
+                }}
+              >
+                Cancel
+              </Button>
+            ) : null}
             <AlertDialogCancel className="w-full sm:w-auto">
               Keep answering
             </AlertDialogCancel>
@@ -1066,7 +1086,29 @@ export function QuizStudy({
         className="flex flex-1 items-center justify-center px-4 py-6"
         style={deckAccentCss}
       >
-        <Card className="w-full max-w-lg shadow-md">
+        <Card className="relative w-full max-w-lg shadow-md">
+          {securityEnabled ? (
+            <Tooltip>
+              <TooltipTrigger
+                type="button"
+                className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-1 text-emerald-400"
+                aria-label="Quiz security is on for members"
+              >
+                <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+                </span>
+                <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="text-[11px] font-medium leading-none tracking-wide">
+                  Security on
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs text-left">
+                Quiz security is on for normal members. Stay on this tab until you submit — leaving
+                will lock your session.
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
           <CardHeader className="text-center">
             <div
               className={cn(
@@ -1153,7 +1195,9 @@ export function QuizStudy({
             ) : null}
             <p className="text-xs">
               {grantedResume
-                ? "Your team admin granted access. Press start to continue where you left off."
+                ? securityStatus === "active" || initialSession?.status === "active"
+                  ? "You have an in-progress quiz. Press start to continue where you left off. The timer resumes after you start."
+                  : "Your team admin granted access. Press start to continue where you left off."
                 : grantedFreshStart
                   ? "Your team admin granted access to start this quiz over from the beginning."
                   : scheduleBlocksStart
@@ -1173,7 +1217,11 @@ export function QuizStudy({
                 onClick={handleStartQuiz}
               >
                 <Play className="h-4 w-4" />
-                {grantedFreshStart ? "Start over" : "Start quiz"}
+                {grantedResume
+                  ? "Resume quiz"
+                  : grantedFreshStart
+                    ? "Start over"
+                    : "Start quiz"}
               </Button>
             ) : null}
             {quizFormatEditorSnapshot ? (

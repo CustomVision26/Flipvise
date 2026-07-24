@@ -13,7 +13,6 @@ import {
   listAssignmentsForTeam,
   listTeamMembers,
 } from "@/db/queries/teams";
-import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { Separator } from "@/components/ui/separator";
 import {
   TEAM_ADMIN_STUDY_PRIVILEGES_PATH,
@@ -100,23 +99,11 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
     ...new Set(memberUserIds),
   ]);
 
-  const educationTeamIds = new Set(
-    teamsForSubscriber
-      .filter((t) => isEducationTeamPlanId(t.planSlug))
-      .map((t) => t.id),
-  );
-  const educationQuizWorkspaces = quizFormatWorkspaces.filter((w) =>
-    educationTeamIds.has(w.id),
-  );
-  const educationDecksByWorkspaceId = Object.fromEntries(
-    Object.entries(decksByWorkspaceId).filter(([id]) =>
-      educationTeamIds.has(Number(id)),
-    ),
-  );
-  const defaultQuizWorkspaceId = educationTeamIds.has(selected.id)
-    ? selected.id
-    : (educationQuizWorkspaces[0]?.id ?? selected.id);
-  const showQuizFormatSettings = educationQuizWorkspaces.length > 0;
+  const defaultQuizWorkspaceId =
+    quizFormatWorkspaces.some((w) => w.id === selected.id)
+      ? selected.id
+      : (quizFormatWorkspaces[0]?.id ?? selected.id);
+  const showQuizFormatSettings = quizFormatWorkspaces.length > 0;
 
   const quickNavDescription = isOwner
     ? "Return to your personal dashboard to create and edit decks."
@@ -157,8 +144,7 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
                 </p>
               </div>
               <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Control study modes per assignment and quiz question formats on Education Gold /
-                Enterprise workspaces.
+                Control study modes per assignment and quiz question formats for your workspaces.
               </p>
             </div>
             <TeamAdminQuickNavPanel
@@ -200,8 +186,8 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
             Member study modes
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Set Standard Review, Quiz, or both per assigned member or team admin. On Education Gold
-            and Enterprise you can also configure quiz question formats below. Changes apply on the
+            Set Standard Review, Quiz, or both per assigned member or team admin. Configure quiz
+            question formats below (workspace defaults and per-deck overrides). Changes apply on the
             next study session.
           </CardDescription>
         </CardHeader>
@@ -210,8 +196,8 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
             <>
               <TeamQuizFormatsSettings
                 embedded
-                workspaces={toClientJson(educationQuizWorkspaces)}
-                decksByWorkspaceId={toClientJson(educationDecksByWorkspaceId)}
+                workspaces={toClientJson(quizFormatWorkspaces)}
+                decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
                 defaultWorkspaceId={defaultQuizWorkspaceId}
               />
               <Separator />

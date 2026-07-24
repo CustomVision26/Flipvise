@@ -101,7 +101,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "Account email — your signed-in Flipvise address; receipts and billing notices go here.",
           "Payment method — card number, expiry, and CVC for whoever is paying.",
-          "Billing address — name and address on the card or bank account you are paying with (not your Flipvise account). Used to verify the payment method and calculate tax where applicable.",
+          "Billing address — name and address on the card or bank account you are paying with. If it matches your Flipvise mailing address from Account Details, check Same as my Flipvise mailing address to hide country/address fields and enter Card Name only. Used to verify the payment method and calculate tax where applicable.",
         ],
       },
     ],
@@ -240,7 +240,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           headers: ["Slug", "Display name", "Key additions"],
           rows: [
             ["education_plus", "Education Plus", "Pro Plus + Teacher Dashboard AI tools + Format Quiz Question on personal decks"],
-            ["education_gold", "Education Gold", "Team Gold + Education Plus + teacher collaboration (formats via Team Admin Study Privileges)"],
+            ["education_gold", "Education Gold", "Team Gold + Education Plus + teacher collaboration"],
             ["education_enterprise", "Education Enterprise", "Enterprise + Education Gold + school admin"],
           ],
         },

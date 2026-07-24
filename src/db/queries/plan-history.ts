@@ -293,6 +293,44 @@ function latestPaidInvoiceForPlan(
   return pool.sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a))[0];
 }
 
+/**
+ * Best paid invoice with a stored receipt for an Active plan row.
+ * Plan-change (`subscription_update`) invoices are often missing/wrong planSlug
+ * and are omitted from history rows — still use them for the Active receipt link.
+ */
+function latestReceiptInvoiceForActivePlan(
+  invoices: StoredBillingInvoice[],
+  planSlug: string,
+  activePeriodEndIso: string | null,
+): StoredBillingInvoice | undefined {
+  const paidWithReceipt = invoices
+    .filter(
+      (inv) =>
+        inv.status?.toLowerCase() === "paid" &&
+        !!receiptUrlFromStoredInvoice(inv),
+    )
+    .sort((a, b) => invoiceEventTime(b) - invoiceEventTime(a));
+
+  if (paidWithReceipt.length === 0) return undefined;
+
+  if (activePeriodEndIso) {
+    const samePeriod = paidWithReceipt.find(
+      (inv) => toIsoString(inv.periodEnd) === activePeriodEndIso,
+    );
+    if (samePeriod) return samePeriod;
+  }
+
+  const forPlan = paidWithReceipt.find(
+    (inv) => inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase(),
+  );
+  if (forPlan) return forPlan;
+
+  const upgrade = paidWithReceipt.find((inv) => isSubscriptionUpdateInvoice(inv));
+  if (upgrade) return upgrade;
+
+  return paidWithReceipt[0];
+}
+
 function rowCoversActiveSubscriptionPeriod(
   row: PlanHistoryRow,
   planSlug: string,
@@ -440,6 +478,17 @@ function latestUpgradeReceiptForPlanSlug(
     const receiptUrl = receiptUrlFromStoredInvoice(inv);
     if (!receiptUrl) continue;
 
+    return {
+      receiptUrl,
+      receiptLabel: inv.invoiceNumber?.trim() || null,
+    };
+  }
+
+  // Upgrade invoices sometimes keep the previous planSlug; still expose the
+  // newest paid subscription_update receipt when present.
+  for (const inv of updateInvoices) {
+    const receiptUrl = receiptUrlFromStoredInvoice(inv);
+    if (!receiptUrl) continue;
     return {
       receiptUrl,
       receiptLabel: inv.invoiceNumber?.trim() || null,
@@ -641,19 +690,42 @@ async function enrichActivePaidRowsWithBillingReceipts(
     prorationLines,
   );
 
+  const activePeriodEndIso =
+    activeRows.find((row) => row.endAt)?.endAt ??
+    (activeSub?.currentPeriodEnd
+      ? toIsoString(
+          activeSub.currentPeriodEnd instanceof Date
+            ? activeSub.currentPeriodEnd
+            : new Date(activeSub.currentPeriodEnd),
+        )
+      : null);
+
+  const fallbackReceiptInvoice = latestReceiptInvoiceForActivePlan(
+    invoices,
+    planSlug,
+    activePeriodEndIso,
+  );
+
   const receiptUrl =
     (paidInvoice ? receiptUrlFromStoredInvoice(paidInvoice) : null) ??
     siblingReceiptRow?.receiptUrl ??
     prorationReceipt?.receiptUrl ??
+    (fallbackReceiptInvoice
+      ? receiptUrlFromStoredInvoice(fallbackReceiptInvoice)
+      : null) ??
     null;
   const receiptLabel =
     paidInvoice?.invoiceNumber?.trim() ||
     siblingReceiptRow?.receiptLabel ||
     prorationReceipt?.receiptLabel ||
+    fallbackReceiptInvoice?.invoiceNumber?.trim() ||
     null;
   const promoDisplay =
     (paidInvoice ? promoDisplayForInvoice(paidInvoice) : null) ??
     siblingReceiptRow?.promoDisplay ??
+    (fallbackReceiptInvoice
+      ? promoDisplayForInvoice(fallbackReceiptInvoice)
+      : null) ??
     null;
 
   for (const row of activeRows) {
@@ -793,8 +865,17 @@ async function appendActiveStripeSubscriptionRow(
     return;
   }
 
+  const receiptInvoice =
+    (paidInvoice && receiptUrlFromStoredInvoice(paidInvoice)
+      ? paidInvoice
+      : null) ??
+    latestReceiptInvoiceForActivePlan(invoices, planSlug, activePeriodEndIso) ??
+    paidInvoice;
+
   const startIso = toIsoString(
-    paidInvoice?.periodStart ??
+    receiptInvoice?.periodStart ??
+      receiptInvoice?.paidAt ??
+      paidInvoice?.periodStart ??
       paidInvoice?.paidAt ??
       activeSub.updatedAt ??
       activeSub.createdAt,
@@ -808,20 +889,24 @@ async function appendActiveStripeSubscriptionRow(
     statusLabel:
       activeSub.status === "trialing"
         ? "Trialing"
-        : paidInvoice
-          ? invoiceStatusLabel(paidInvoice.status)
+        : receiptInvoice
+          ? invoiceStatusLabel(receiptInvoice.status)
           : "Active",
     startAt: startIso,
-    endAt: toIsoString(periodEnd ?? paidInvoice?.periodEnd),
+    endAt: toIsoString(periodEnd ?? receiptInvoice?.periodEnd ?? paidInvoice?.periodEnd),
     receiptUrl:
-      (paidInvoice ? receiptUrlFromStoredInvoice(paidInvoice) : null) ??
+      (receiptInvoice ? receiptUrlFromStoredInvoice(receiptInvoice) : null) ??
       prorationReceipt?.receiptUrl ??
       null,
     receiptLabel:
-      paidInvoice?.invoiceNumber?.trim() ||
+      receiptInvoice?.invoiceNumber?.trim() ||
       prorationReceipt?.receiptLabel ||
       null,
-    promoDisplay: paidInvoice ? promoDisplayForInvoice(paidInvoice) : null,
+    promoDisplay: receiptInvoice
+      ? promoDisplayForInvoice(receiptInvoice)
+      : paidInvoice
+        ? promoDisplayForInvoice(paidInvoice)
+        : null,
   });
 }
 

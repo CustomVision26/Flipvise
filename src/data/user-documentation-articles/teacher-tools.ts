@@ -76,8 +76,9 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         bullets: [
           "Multi-day lesson plans with objectives, warm-ups, activities, and assessments.",
           "Weekly schedule with configurable plan period (days per plan).",
-          "Vocabulary detail generation per schedule day.",
+          "Vocabulary detail expands definitions, examples, process steps, and learning goals per schedule day.",
           "Reference material fields for standards, textbook pages, or notes.",
+          "When Learning Standard is linked to Jamaica (confirmed by AI), generation follows stored Jamaica NSC guidelines — 5E class timelines (Engage → Evaluate), inquiry-based design, inclusive education, and culturally relevant examples. Non-Jamaica standards do not use Jamaica NSC or forced 5E outlines.",
           "Save and reopen from Teacher Resource Library; download PDF.",
         ],
       },

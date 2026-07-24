@@ -11,6 +11,7 @@ import {
   getDecksForTeamWithCardCount,
   getOwnerQuizDefaultSettings,
   getTeamsByOwner,
+  listQuizTimerDeckSnapshots,
   listQuizTimerWorkspaceSnapshots,
 } from "@/db/queries/teams";
 import {
@@ -52,13 +53,26 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
   const ctx = await loadTeamAdminPageContext(buildTeamAdminQuizTimerPath, searchParams);
   const { selected, teamsForSubscriber, viewerTeamMemberUrlParam, isOwner } = ctx;
 
-  const [workspaceSnapshots, ownerQuizSettings, teamDecksWithCardCounts, ownedWorkspaceCount] =
-    await Promise.all([
-      listQuizTimerWorkspaceSnapshots(teamsForSubscriber),
-      getOwnerQuizDefaultSettings(selected.ownerUserId),
-      getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
-      isOwner ? getTeamsByOwner(ctx.userId).then((rows) => rows.length) : Promise.resolve(0),
-    ]);
+  const [
+    workspaceSnapshots,
+    ownerQuizSettings,
+    teamDecksWithCardCounts,
+    ownedWorkspaceCount,
+    decksByWorkspaceEntries,
+  ] = await Promise.all([
+    listQuizTimerWorkspaceSnapshots(teamsForSubscriber),
+    getOwnerQuizDefaultSettings(selected.ownerUserId),
+    getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
+    isOwner ? getTeamsByOwner(ctx.userId).then((rows) => rows.length) : Promise.resolve(0),
+    Promise.all(
+      teamsForSubscriber.map(
+        async (team) =>
+          [team.id, await listQuizTimerDeckSnapshots(team.id, team.ownerUserId)] as const,
+      ),
+    ),
+  ]);
+
+  const decksByWorkspaceId = Object.fromEntries(decksByWorkspaceEntries);
 
   const selectedWorkspaceSnapshot =
     workspaceSnapshots.find((w) => w.id === selected.id) ?? workspaceSnapshots[0] ?? null;
@@ -103,8 +117,8 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
               </div>
               <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {isOwner
-                  ? "Set one quiz time for all workspaces, or allow custom presets per workspace."
-                  : "View workspace quiz times and set custom presets when the subscriber allows it."}
+                  ? "Set a general quiz time for linked decks, or choose a timed-quiz length for each deck in a workspace."
+                  : "Set a timed-quiz length for each deck in workspaces you manage when the subscriber allows it."}
               </p>
             </div>
             <TeamAdminQuickNavPanel
@@ -178,6 +192,7 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
           {workspaceSnapshots.length > 0 ? (
             <TeamQuizTimerSettings
               workspaces={toClientJson(workspaceSnapshots)}
+              decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
               defaultWorkspaceId={selected.id}
               isSubscriberOwner={isOwner}
               ownedWorkspaceCount={ownedWorkspaceCount}

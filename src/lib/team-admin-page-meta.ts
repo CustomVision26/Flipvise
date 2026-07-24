@@ -116,7 +116,7 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
       section: "Quiz administration",
       title: "Quiz timer",
       description:
-        "Set one quiz time for all workspaces, or allow custom presets per workspace.",
+        "Set a general quiz time for linked decks, or choose timed-quiz minutes for each deck.",
       isOverview: false,
     };
   }

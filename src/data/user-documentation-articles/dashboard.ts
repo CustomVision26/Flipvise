@@ -20,7 +20,8 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Screen layout",
         bullets: [
           "Deck grid or list toggle for browsing your library.",
-          "Add Deck opens creation (title, optional AI generation on eligible plans).",
+          "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional first card front image, and gradient.",
+          "Edit deck updates the same metadata and first card front image from a deck card menu.",
           "Each deck card links to the deck editor and study session.",
           "Usage banners show deck count and cards-per-deck limits for your plan.",
         ],

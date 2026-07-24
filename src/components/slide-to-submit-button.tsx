@@ -45,6 +45,8 @@ export function SlideToSubmitButton({
     setOffsetX(maxOffset());
     try {
       await onSubmit();
+    } catch {
+      // Caller surfaces errors; unlock the slider for retry.
     } finally {
       reset();
     }

@@ -46,6 +46,10 @@ import {
   updateOwnerQuizDefaultSettings,
   getOwnerQuizDefaultSettings,
   getTeamsByOwner,
+  syncQuizDurationMinutesToWorkspaceDecks,
+  syncOwnerQuizDurationToAllOwnedWorkspaceDecks,
+  isDeckLinkedToWorkspace,
+  getDecksForTeam,
   deleteDeckAssignment,
   attachPersonalDeckToOwnedTeamWorkspace,
   detachPersonalDeckFromOwnedTeamWorkspace,
@@ -53,7 +57,6 @@ import {
   markInvitationRejected,
   revokePendingTeamInvitation,
   updateTeamMemberRole,
-  getDecksForTeam,
   listTeamMembers,
   roleReceivesDeckAssignments,
   teamWorkspaceAllowsViewerAccess,
@@ -67,9 +70,14 @@ import {
   isTeamInviteExpired,
   TEAM_INVITE_EXPIRY_DAYS,
 } from "@/lib/team-invite-expiry";
-import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
+import {
+  getClerkUserDisplayNameById,
+  getClerkUserFieldDisplayById,
+} from "@/lib/clerk-user-display";
 import { loopsSendTeamInvitationEmail } from "@/lib/loops";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
+import { updateDeckQuizDurationMinutes } from "@/db/queries/quiz-formats";
+import { getDeckRowById } from "@/db/queries/decks";
 import type { InferSelectModel } from "drizzle-orm";
 import { teamInvitations } from "@/db/schema";
 
@@ -321,6 +329,58 @@ async function findClerkUserIdByEmail(normalizedEmail: string): Promise<string |
   } catch {
     return null;
   }
+}
+
+const lookupInviteeDisplayNameSchema = z.object({
+  teamId: z
+    .union([z.string(), z.number(), z.bigint()])
+    .transform(parseInviteTeamId)
+    .pipe(z.number().int().positive()),
+  email: z.string().email(),
+});
+
+export type LookupInviteeDisplayNameResult =
+  | { ok: true; name: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Resolve an invitee display name for the send-invite form when the email matches a
+ * registered Flipvise (Clerk) account. Local member/prior-invite hints are preferred
+ * on the client; this covers registered users who are not yet on the workspace.
+ */
+export async function lookupInviteeDisplayNameAction(
+  data: input<typeof lookupInviteeDisplayNameSchema>,
+): Promise<LookupInviteeDisplayNameResult> {
+  const { userId } = await getAccessContext();
+  if (!userId) return { ok: false, error: "Unauthorized" };
+
+  const parsed = lookupInviteeDisplayNameSchema.safeParse(data);
+  if (!parsed.success) return { ok: false, error: "Invalid input" };
+
+  try {
+    await assertCanManageTeam(userId, parsed.data.teamId);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Forbidden",
+    };
+  }
+
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
+  const clerkUserId = await findClerkUserIdByEmail(normalizedEmail);
+  if (!clerkUserId) return { ok: true, name: null };
+
+  const display = await getClerkUserFieldDisplayById(clerkUserId);
+  const name = display.primaryLine?.trim() ?? "";
+  if (
+    !name ||
+    name === clerkUserId ||
+    name === "You" ||
+    name.toLowerCase() === normalizedEmail
+  ) {
+    return { ok: true, name: null };
+  }
+  return { ok: true, name };
 }
 
 export type InviteTeamMemberResult =
@@ -718,14 +778,74 @@ export async function updateTeamQuizDurationAction(
   const ownerSettings = await getOwnerQuizDefaultSettings(team.ownerUserId);
   if (ownerSettings.enforceDefaultForAllWorkspaces) {
     throw new Error(
-      "The subscriber has locked one quiz time for all workspaces. Per-workspace times cannot be changed.",
+      "The subscriber has locked one quiz time for all decks linked to each workspace. Per-workspace times cannot be changed.",
     );
   }
 
   await updateTeamQuizDurationMinutes(parsed.data.teamId, parsed.data.durationMinutes);
+  const effectiveMinutes =
+    parsed.data.durationMinutes ?? ownerSettings.defaultQuizDurationMinutes;
+  await syncQuizDurationMinutesToWorkspaceDecks(
+    parsed.data.teamId,
+    team.ownerUserId,
+    effectiveMinutes,
+  );
 
   revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard/team-admin/quiz-results", "layout");
+  revalidatePath("/dashboard", "layout");
+}
+
+const updateTeamDeckQuizDurationSchema = z.object({
+  teamId: z.number().int().positive(),
+  deckId: z.number().int().positive(),
+  /** Null clears the deck override so workspace/subscriber effective minutes apply. */
+  durationMinutes: z.union([quizDurationMinutesSchema, z.null()]),
+});
+
+/** Owner / team admin: set timed-quiz minutes for one deck linked to a workspace. */
+export async function updateTeamDeckQuizDurationAction(
+  data: z.infer<typeof updateTeamDeckQuizDurationSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateTeamDeckQuizDurationSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  const ownerSettings = await getOwnerQuizDefaultSettings(team.ownerUserId);
+  if (ownerSettings.enforceDefaultForAllWorkspaces) {
+    throw new Error(
+      "The subscriber has locked one quiz time for all decks linked to each workspace. Per-deck times cannot be changed.",
+    );
+  }
+
+  const deck = await getDeckRowById(parsed.data.deckId);
+  if (!deck || deck.userId !== team.ownerUserId) {
+    throw new Error("Deck not found in this workspace.");
+  }
+  const linked =
+    deck.teamId === parsed.data.teamId ||
+    (await isDeckLinkedToWorkspace(parsed.data.teamId, parsed.data.deckId));
+  if (!linked) {
+    // Also allow decks returned by getDecksForTeam (assignments / links).
+    const workspaceDecks = await getDecksForTeam(parsed.data.teamId, team.ownerUserId);
+    if (!workspaceDecks.some((d) => d.id === parsed.data.deckId)) {
+      throw new Error("Deck is not linked to this workspace.");
+    }
+  }
+
+  await updateDeckQuizDurationMinutes(
+    parsed.data.deckId,
+    team.ownerUserId,
+    parsed.data.durationMinutes,
+  );
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard/team-admin/quiz-results", "layout");
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
+  revalidatePath("/dashboard", "layout");
 }
 
 const updateOwnerQuizDefaultSchema = z.object({
@@ -745,7 +865,9 @@ export async function updateOwnerQuizDefaultAction(
 
     const ownedTeams = await getTeamsByOwner(userId);
     if (ownedTeams.length === 0) {
-      throw new Error("Only the workspace subscriber can set a default for all workspaces.");
+      throw new Error(
+        "Only the workspace subscriber can set a default quiz time for decks linked to their workspaces.",
+      );
     }
 
     await updateOwnerQuizDefaultSettings(userId, {
@@ -753,8 +875,12 @@ export async function updateOwnerQuizDefaultAction(
       enforceDefaultForAllWorkspaces: parsed.data.enforceDefaultForAllWorkspaces,
     });
 
+    // Push the effective minutes onto every deck linked to each owned workspace.
+    await syncOwnerQuizDurationToAllOwnedWorkspaceDecks(userId);
+
     revalidatePath("/dashboard/team-admin", "layout");
     revalidatePath("/dashboard/team-admin/quiz-results", "layout");
+    revalidatePath("/dashboard", "layout");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not save default quiz timer.";
     throw new Error(msg);

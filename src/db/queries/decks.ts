@@ -67,9 +67,16 @@ function isMissingDeckSchemaColumnError(error: unknown): boolean {
   );
 }
 
-export function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradient" | "quizDurationMinutes">>(
-  row: T,
-): DeckRow {
+export function withNullCover<
+  T extends Omit<
+    DeckRow,
+    | "coverImageUrl"
+    | "gradient"
+    | "quizDurationMinutes"
+    | "quizSecurityApplyToMembers"
+    | "quizSecurityApplyToTeamAdmins"
+  >,
+>(row: T): DeckRow {
   return {
     ...row,
     coverImageUrl: null,
@@ -81,6 +88,16 @@ export function withNullCover<T extends Omit<DeckRow, "coverImageUrl" | "gradien
     inactiveAt: "inactiveAt" in row ? (row.inactiveAt ?? null) : null,
     quizSecurityEnabled:
       "quizSecurityEnabled" in row ? (row.quizSecurityEnabled ?? null) : null,
+    quizSecurityApplyToMembers:
+      "quizSecurityApplyToMembers" in row
+        ? ((row as { quizSecurityApplyToMembers?: boolean | null })
+            .quizSecurityApplyToMembers ?? null)
+        : null,
+    quizSecurityApplyToTeamAdmins:
+      "quizSecurityApplyToTeamAdmins" in row
+        ? ((row as { quizSecurityApplyToTeamAdmins?: boolean | null })
+            .quizSecurityApplyToTeamAdmins ?? null)
+        : null,
   };
 }
 

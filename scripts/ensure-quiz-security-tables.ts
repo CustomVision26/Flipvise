@@ -6,13 +6,25 @@
 
  */
 
-import "dotenv/config";
-
+import { config } from "dotenv";
+import { resolve } from "node:path";
 import { neon } from "@neondatabase/serverless";
 
+config({ path: resolve(process.cwd(), ".env") });
+config({ path: resolve(process.cwd(), ".env.local"), override: true });
 
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  process.env.POSTGRES_URL ??
+  process.env.POSTGRES_PRISMA_URL;
 
-const sql = neon(process.env.DATABASE_URL!);
+if (!databaseUrl) {
+  throw new Error(
+    "Database URL is not set. Use DATABASE_URL (or POSTGRES_URL / POSTGRES_PRISMA_URL) in .env / .env.local.",
+  );
+}
+
+const sql = neon(databaseUrl);
 
 
 
@@ -139,6 +151,23 @@ async function main() {
   `;
 
 
+
+  await sql`
+    ALTER TABLE "teams"
+    ADD COLUMN IF NOT EXISTS "quizSecurityApplyToMembers" boolean NOT NULL DEFAULT true
+  `;
+  await sql`
+    ALTER TABLE "teams"
+    ADD COLUMN IF NOT EXISTS "quizSecurityApplyToTeamAdmins" boolean NOT NULL DEFAULT false
+  `;
+  await sql`
+    ALTER TABLE "decks"
+    ADD COLUMN IF NOT EXISTS "quizSecurityApplyToMembers" boolean
+  `;
+  await sql`
+    ALTER TABLE "decks"
+    ADD COLUMN IF NOT EXISTS "quizSecurityApplyToTeamAdmins" boolean
+  `;
 
   console.log("Quiz security schema is present (created or already existed).");
 

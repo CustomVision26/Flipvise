@@ -434,10 +434,12 @@ export function TeacherLessonBuilderForm({
                 form.difficultyLevel as LessonPlanActionInput["difficultyLevel"],
               learningStandard: form.learningStandard,
               lessonTitle: plan.lessonTitle,
+              jamaicaNscGuidelinesApplied: plan.jamaicaNscGuidelinesApplied,
               days: plan.weeklySchedule.map((day) => ({
                 dayLabel: day.dayLabel,
                 dailyFocus: day.dailyFocus,
                 vocabulary: day.vocabulary,
+                lessonTimeline: day.lessonTimeline,
               })),
             });
             plan = {
@@ -512,10 +514,12 @@ export function TeacherLessonBuilderForm({
             form.difficultyLevel as LessonPlanActionInput["difficultyLevel"],
           learningStandard: form.learningStandard,
           lessonTitle: plan.lessonTitle,
+          jamaicaNscGuidelinesApplied: plan.jamaicaNscGuidelinesApplied,
           days: targetDays.map((day) => ({
             dayLabel: day.dayLabel,
             dailyFocus: day.dailyFocus,
             vocabulary: day.vocabulary,
+            lessonTimeline: day.lessonTimeline,
           })),
         });
 
@@ -1264,6 +1268,12 @@ export function TeacherLessonBuilderForm({
                     <li>Jamaica National Standards Curriculum (NSC)</li>
                     <li>CARICOM regional curriculum</li>
                   </ul>
+                  <p className="mt-2">
+                    When the standard is linked to Jamaica (for example Jamaica
+                    NSC), generation uses Jamaica NSC structure guidelines (5E
+                    model, inquiry-based design, and culturally relevant
+                    examples).
+                  </p>
                 </>
               }
             />

@@ -13,6 +13,7 @@ import {
   deleteCard,
   getCardById,
   getCardsByDeckUnscoped,
+  getOldestCardInDeck,
   bulkCreateCards,
   deleteAllCards,
   createMultipleChoiceCard,
@@ -636,6 +637,166 @@ export async function deleteCardAction(data: DeleteCardInput) {
   await deleteCard(cardId, deckId);
 
   revalidatePath(`/decks/${deckId}`);
+}
+
+const deckFirstCardFrontSchema = z.object({
+  deckId: z.number().int().positive(),
+});
+
+export type DeckFirstCardFrontState = {
+  cardId: number | null;
+  frontImageUrl: string | null;
+};
+
+/** Oldest card’s front image — for Edit deck “First card front image”. */
+export async function getDeckFirstCardFrontStateAction(
+  data: z.infer<typeof deckFirstCardFrontSchema>,
+): Promise<DeckFirstCardFrontState> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = deckFirstCardFrontSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { deckId } = parsed.data;
+  await requireDeckEditor(userId, deckId);
+
+  const card = await getOldestCardInDeck(deckId);
+  return {
+    cardId: card?.id ?? null,
+    frontImageUrl: card?.frontImageUrl ?? null,
+  };
+}
+
+/**
+ * Upload/replace the oldest card’s front image (creates a card if the deck is empty).
+ * Mirrors Create deck “First card front image”.
+ */
+export async function setDeckFirstCardFrontImageAction(
+  data: z.infer<typeof deckFirstCardFrontSchema>,
+  formData: FormData,
+): Promise<DeckFirstCardFrontState> {
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+  const { userId, maxCardsPerDeck } = access;
+
+  const parsed = deckFirstCardFrontSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { deckId } = parsed.data;
+  const deck = await requireDeckEditor(userId, deckId);
+
+  const file = formData.get("image");
+  if (!(file instanceof File)) throw new Error("No image file provided");
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Only JPEG, PNG, WebP, and GIF images are allowed");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image must be under 5 MB");
+  }
+
+  const url = await uploadToS3({
+    userId,
+    deckId,
+    file,
+    addRandomSuffix: true,
+  });
+
+  const existing = await getOldestCardInDeck(deckId);
+  if (existing) {
+    if (existing.frontImageUrl && existing.frontImageUrl !== url) {
+      try {
+        await deleteFromS3(existing.frontImageUrl);
+      } catch {
+        // keep going — card update should still succeed
+      }
+    }
+    await updateCard(
+      existing.id,
+      deckId,
+      existing.front,
+      url,
+      existing.back,
+      existing.backImageUrl,
+    );
+    revalidatePath(`/decks/${deckId}`);
+    revalidatePath("/dashboard");
+    return { cardId: existing.id, frontImageUrl: url };
+  }
+
+  const teamTierPro = await deckHasTeamTierProFeatures(deck);
+  const deckCardLimit = resolveDeckCardCap({
+    teamTierProWorkspace: teamTierPro,
+    personalMaxCardsPerDeck: maxCardsPerDeck,
+  });
+  const existingCards = await getCardsByDeckUnscoped(deckId);
+  if (existingCards.length >= deckCardLimit) {
+    try {
+      await deleteFromS3(url);
+    } catch {
+      // ignore
+    }
+    throw new Error(
+      `Card limit reached (${deckCardLimit} per deck). Delete a card before adding a front image.`,
+    );
+  }
+
+  const inserted = await createCard(
+    deckId,
+    null,
+    url,
+    "Add the answer on this side",
+    null,
+  );
+  if (!inserted) throw new Error("Failed to create first card");
+
+  revalidatePath(`/decks/${deckId}`);
+  revalidatePath("/dashboard");
+  return { cardId: inserted.id, frontImageUrl: url };
+}
+
+/** Clear the oldest card’s front image (keeps the card; adds placeholder text if needed). */
+export async function clearDeckFirstCardFrontImageAction(
+  data: z.infer<typeof deckFirstCardFrontSchema>,
+): Promise<DeckFirstCardFrontState> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = deckFirstCardFrontSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { deckId } = parsed.data;
+  await requireDeckEditor(userId, deckId);
+
+  const existing = await getOldestCardInDeck(deckId);
+  if (!existing?.frontImageUrl) {
+    return { cardId: existing?.id ?? null, frontImageUrl: null };
+  }
+
+  try {
+    await deleteFromS3(existing.frontImageUrl);
+  } catch {
+    // ignore
+  }
+
+  const front =
+    existing.front?.trim() ||
+    "Add a question on this side";
+
+  await updateCard(
+    existing.id,
+    deckId,
+    front,
+    null,
+    existing.back,
+    existing.backImageUrl,
+  );
+
+  revalidatePath(`/decks/${deckId}`);
+  revalidatePath("/dashboard");
+  return { cardId: existing.id, frontImageUrl: null };
 }
 
 const deleteAllCardsSchema = z.object({

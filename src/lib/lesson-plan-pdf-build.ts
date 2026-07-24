@@ -66,6 +66,29 @@ export function vocabularyDetailPdfLines(
     }
   }
 
+  if (detail.fiveEBreakdown) {
+    lines.push("", detail.fiveEBreakdown.heading);
+    if (detail.fiveEBreakdown.intro) {
+      lines.push(detail.fiveEBreakdown.intro);
+    }
+    for (const phase of detail.fiveEBreakdown.phases) {
+      lines.push(
+        "",
+        `${phase.timeRange}: ${phase.phase} — ${phase.activitySummary}`,
+        phase.detail,
+      );
+      if (phase.vocabularyFocus.length > 0) {
+        lines.push(`Vocabulary focus: ${phase.vocabularyFocus.join(", ")}`);
+      }
+      for (const move of phase.teacherMoves) {
+        lines.push(`  Teacher: ${move}`);
+      }
+      for (const move of phase.studentMoves) {
+        lines.push(`  Students: ${move}`);
+      }
+    }
+  }
+
   if (detail.mainConcept) {
     lines.push("", detail.mainConcept.heading, detail.mainConcept.body);
   }

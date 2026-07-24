@@ -25,11 +25,14 @@ export function teamQuizDurationSeconds(minutes: number): number {
 export type TeamQuizDurationContext = {
   /** Minutes used when a member starts a quiz in this workspace. */
   effectiveMinutes: number;
-  /** Subscriber default for all workspaces they own. */
+  /** Subscriber default quiz minutes for decks linked to owned workspaces. */
   globalDefaultMinutes: number;
   /** Non-null when this workspace has its own override. */
   workspaceOverrideMinutes: number | null;
-  /** When true, {@link effectiveMinutes} is always {@link globalDefaultMinutes}. */
+  /**
+   * When true, {@link effectiveMinutes} is always {@link globalDefaultMinutes}
+   * for every owned workspace (and synced onto all linked decks).
+   */
   enforceDefaultForAllWorkspaces: boolean;
   ownerUserId: string;
 };
@@ -44,4 +47,12 @@ export type QuizTimerWorkspaceSnapshot = {
   name: string;
   workspaceOverrideMinutes: number | null;
   effectiveMinutes: number;
+};
+
+/** Per-deck timed-quiz length for Team Admin Quiz Timer. */
+export type QuizTimerDeckSnapshot = {
+  id: number;
+  name: string;
+  /** Null means inherit the workspace/subscriber effective minutes. */
+  quizDurationMinutes: number | null;
 };

@@ -30,7 +30,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           "Sign In opens Clerk in modal mode — you stay on the homepage overlay.",
           "Sign Up opens the Flipvise account dialog: first/last name, email, phone number, mailing address, type/status (Student, Teacher, Parent, Education Institution, Corporation), security questions, password, and password confirmation. Institution and corporation selections show a name sub-field.",
           "Phone, mailing address, and account type are saved with a Server Action after verification so Flipvise can help recover your account later.",
-          "If you signed in with social auth and still need phone, mailing address, or type details, you are guided through a three-step Account details flow (/onboarding/account-recovery) once before the dashboard — not again after you save.",
+          "If you signed in with social auth and still need phone, mailing address, or type details, you are guided through a three-step Account details flow (/onboarding/account-recovery) once before the dashboard — not again after you save. That screen shows a logo-only header (no workspace switcher, plan label, or account icons).",
           "Use the same email address that appears on team or affiliate invites.",
           "If you arrived from an invite link, the flow may return you to that invite after authentication.",
         ],

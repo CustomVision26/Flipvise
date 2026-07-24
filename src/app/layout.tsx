@@ -34,6 +34,7 @@ import {
   FAVICON_16_URL,
   APPLE_TOUCH_ICON_URL,
 } from "@/lib/branding";
+import { ACCOUNT_RECOVERY_ONBOARDING_PATH } from "@/lib/account-recovery-profile";
 import { cn } from "@/lib/utils";
 import {
   parseSearchParamsRecordFromSearchString,
@@ -192,6 +193,12 @@ export default async function RootLayout({
   const freeUiThemeSelection = resolveFreeUiThemeSelection(freeCookieValue);
   const appliedTheme = isPro ? proUiTheme : freeUiTheme;
   const isTeamInviteRoute = pathnameHeader.startsWith("/invite/team");
+  const isAccountRecoveryOnboardingRoute = pathnameHeader.startsWith(
+    ACCOUNT_RECOVERY_ONBOARDING_PATH,
+  );
+  /** Logo-only chrome — hide workspace switcher, plan, account, docs, help, inbox. */
+  const isMinimalHeaderRoute =
+    isTeamInviteRoute || isAccountRecoveryOnboardingRoute;
   const isTeamAdminRoute = shell.profile === "team-admin";
   const showHeaderChrome = Boolean(userId) || isTeamInviteRoute;
 
@@ -212,7 +219,7 @@ export default async function RootLayout({
                 <header
                   data-app-header
                   className={
-                    isTeamInviteRoute
+                    isMinimalHeaderRoute
                       ? "flex items-center justify-start border-b border-border px-3 pb-2 sm:px-6 sm:pb-3 relative z-10"
                       : cn(
                           "relative z-10 border-b border-border px-3 pb-2 sm:px-6 sm:pb-3",
@@ -228,11 +235,11 @@ export default async function RootLayout({
                     className="col-start-1 row-start-1 flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start"
                   >
                     <HeaderLogo dashboardHref={dashboardHrefWithUserQuery} />
-                    {!isTeamInviteRoute && !userId && (
+                    {!isMinimalHeaderRoute && !userId && (
                       <AppTopNav homeHref={dashboardHrefWithUserQuery} />
                     )}
                   </div>
-                  {!isTeamInviteRoute &&
+                  {!isMinimalHeaderRoute &&
                     userId &&
                     shell.teamAdminHeaderTeams.length > 0 && (
                     <div
@@ -245,7 +252,7 @@ export default async function RootLayout({
                       />
                     </div>
                   )}
-                  {userId && !isTeamInviteRoute && (
+                  {userId && !isMinimalHeaderRoute && (
                     <div
                       data-header-user
                       className="contents lg:col-start-3 lg:flex lg:min-w-0 lg:max-w-full lg:items-center lg:justify-end lg:gap-2"
@@ -282,7 +289,7 @@ export default async function RootLayout({
                     </div>
                   )}
                 </header>
-                {userId && !isTeamInviteRoute && !shell.hideHelpCenter ? (
+                {userId && !isMinimalHeaderRoute && !shell.hideHelpCenter ? (
                   <HelpCenter
                     showPrioritySupport={hasPrioritySupport}
                     showTrigger={false}

@@ -54,6 +54,8 @@ export interface StudySessionProps {
   exitLabel: string;
   /** Team member quiz — owner inbox can be chosen when saving after timeout. */
   ownerInboxAvailable?: boolean;
+  /** Workspace owner / team admin — can cancel out of the unanswered-submit dialog. */
+  allowQuizCancelExit?: boolean;
   /** Scheduled quiz start — members cannot begin before this time. */
   quizSchedule?: {
     enabled: boolean;
@@ -96,6 +98,7 @@ export function StudySession({
   exitHref,
   exitLabel,
   ownerInboxAvailable = false,
+  allowQuizCancelExit = false,
   quizSchedule,
   quizSecurity,
   quizFormats,
@@ -232,6 +235,7 @@ export function StudySession({
               exitHref={exitHref}
               exitLabel={exitLabel}
               ownerInboxAvailable={ownerInboxAvailable}
+              allowQuizCancelExit={allowQuizCancelExit}
               quizSchedule={quizSchedule}
               quizSecurity={quizSecurity}
               quizFormats={quizFormats}

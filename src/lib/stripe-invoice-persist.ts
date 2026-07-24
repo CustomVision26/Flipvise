@@ -716,6 +716,13 @@ export async function syncBillingInvoicesForUser(userId: string): Promise<void> 
   });
 }
 
+function invoiceHasStoredReceipt(inv: {
+  hostedInvoiceUrl: string | null;
+  invoicePdfUrl: string | null;
+}): boolean {
+  return Boolean(inv.hostedInvoiceUrl?.trim() || inv.invoicePdfUrl?.trim());
+}
+
 /** Re-sync from Stripe and return the newest paid invoice row for plan history / receipts. */
 export async function refreshLatestPaidInvoiceForUser(
   userId: string,
@@ -731,12 +738,35 @@ export async function refreshLatestPaidInvoiceForUser(
       const bMs = b.paidAt?.getTime() ?? b.createdAt.getTime();
       return bMs - aMs;
     });
+  if (paid.length === 0) return null;
+
   const slug = planSlug?.trim().toLowerCase();
   if (slug) {
-    const forPlan = paid.find((inv) => inv.planSlug?.trim().toLowerCase() === slug);
+    const forPlanWithReceipt = paid.find(
+      (inv) =>
+        inv.planSlug?.trim().toLowerCase() === slug && invoiceHasStoredReceipt(inv),
+    );
+    if (forPlanWithReceipt) return forPlanWithReceipt;
+
+    const forPlan = paid.find(
+      (inv) => inv.planSlug?.trim().toLowerCase() === slug,
+    );
+    if (forPlan && invoiceHasStoredReceipt(forPlan)) return forPlan;
+  }
+
+  // Plan-change invoices may still carry the previous planSlug (or none). Prefer a
+  // recent paid invoice that already has a hosted receipt / PDF URL.
+  const withReceipt = paid.find((inv) => invoiceHasStoredReceipt(inv));
+  if (withReceipt) return withReceipt;
+
+  if (slug) {
+    const forPlan = paid.find(
+      (inv) => inv.planSlug?.trim().toLowerCase() === slug,
+    );
     if (forPlan) return forPlan;
   }
-  return null;
+
+  return paid[0] ?? null;
 }
 
 async function promoDisplayFromStripeInvoice(

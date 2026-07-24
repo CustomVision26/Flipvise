@@ -10,6 +10,10 @@ type CaptionTrack = {
 
 type PlayerResponse = {
   videoDetails?: { title?: string };
+  playabilityStatus?: {
+    status?: string;
+    reason?: string;
+  };
   captions?: {
     playerCaptionsTracklistRenderer?: {
       captionTracks?: CaptionTrack[];
@@ -260,6 +264,26 @@ async function fetchCaptionTranscript(baseUrl: string): Promise<string> {
 const NO_CAPTIONS_MESSAGE =
   "This YouTube video has no captions available. Turn on captions on the video, or upload a .txt transcript file instead.";
 
+function playabilityErrorMessage(player: PlayerResponse | null): string | null {
+  const status = player?.playabilityStatus?.status?.toUpperCase();
+  if (!status || status === "OK" || status === "LIVE_STREAM_OFFLINE") {
+    return null;
+  }
+
+  const reason = player?.playabilityStatus?.reason?.trim();
+  if (status === "LOGIN_REQUIRED") {
+    return "That YouTube video requires sign-in and cannot be read automatically. Upload a .txt transcript instead.";
+  }
+  if (status === "UNPLAYABLE" || status === "ERROR") {
+    return reason
+      ? `Could not read that YouTube video (${reason}). Use a public video with captions, or upload a .txt transcript.`
+      : "Could not read that YouTube video. Use a public video with captions, or upload a .txt transcript.";
+  }
+  return reason
+    ? `Could not read that YouTube video (${reason}). Try another public link with captions, or upload a .txt transcript.`
+    : null;
+}
+
 export async function extractYouTubeTranscript(
   sourceUrl: string,
 ): Promise<{ title: string; text: string }> {
@@ -280,6 +304,11 @@ export async function extractYouTubeTranscript(
   if (tracks.length === 0) {
     player = (await fetchPlayerResponseViaInnertube(videoId, watchHtml, "ANDROID")) ?? player;
     tracks = captionTracksFromPlayer(player);
+  }
+
+  const playabilityError = playabilityErrorMessage(player);
+  if (playabilityError && tracks.length === 0) {
+    throw new Error(playabilityError);
   }
 
   const track = pickCaptionTrack(tracks);

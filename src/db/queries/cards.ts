@@ -2,7 +2,7 @@ import type { CardQuizVariants } from "@/lib/card-quiz-variants";
 import { db } from "@/db";
 import { cards, decks, type DeckRow } from "@/db/schema";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
-import { and, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
 
 type CardRow = typeof cards.$inferSelect;
 
@@ -111,6 +111,31 @@ export async function getCardsByDeck(deckId: number, userId: string) {
 /** Call only after team/ownership access is verified elsewhere. */
 export async function getCardsByDeckUnscoped(deckId: number) {
   return selectCardsByDeck(deckId);
+}
+
+/**
+ * Oldest card in the deck (create order) — used for “first card front image”
+ * on create/edit deck.
+ */
+export async function getOldestCardInDeck(deckId: number) {
+  try {
+    const [row] = await db
+      .select(getTableColumns(cards))
+      .from(cards)
+      .where(eq(cards.deckId, deckId))
+      .orderBy(asc(cards.createdAt), asc(cards.id))
+      .limit(1);
+    return row ?? null;
+  } catch (e) {
+    if (!isMissingChoiceImageUrlsColumnError(e)) throw e;
+    const [row] = await db
+      .select(cardRowSelectWithoutChoiceImages)
+      .from(cards)
+      .where(eq(cards.deckId, deckId))
+      .orderBy(asc(cards.createdAt), asc(cards.id))
+      .limit(1);
+    return row ? withNullChoiceImages(row) : null;
+  }
 }
 
 /** Resolves team access then loads cards (owner, team admin, or assigned member). */

@@ -223,7 +223,7 @@ export function DeckGrid({
       <div
         className={
           view === "compact"
-            ? "grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            ? "grid grid-cols-2 items-stretch gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
             : view === "list"
               ? "flex flex-col gap-1"
               : "flex flex-col gap-3"

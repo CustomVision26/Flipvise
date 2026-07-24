@@ -701,7 +701,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             isAtLimit={isAtLimit}
             forPersonalWorkspace
             speechToTextEnabled={ownSubscriberTeamTierExtras}
-            deckFrontImageUploadEnabled={isPro}
           />
         </div>
       </div>
@@ -813,7 +812,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             isAtLimit={isAtLimit}
             forPersonalWorkspace
             speechToTextEnabled={ownSubscriberTeamTierExtras}
-            deckFrontImageUploadEnabled={isPro}
           />
         </div>
       ) : hasGroupedEducationDecks ? (

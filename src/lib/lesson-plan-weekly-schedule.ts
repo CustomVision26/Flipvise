@@ -191,12 +191,44 @@ export function buildFallbackDayTimeline(
   lessonDuration: string,
   termCount: number,
   difficulty: string,
+  options?: { useFiveEModel?: boolean },
 ): string[] {
   const duration = lessonDuration.trim() || "45 minutes";
+  const termPhrase =
+    termCount > 1 ? "today's vocabulary terms" : "today's vocabulary term";
+
+  if (options?.useFiveEModel) {
+    if (difficulty === "Beginner") {
+      return [
+        `0-5 min: Engage — Quick review and visuals to activate background on ${topic}`,
+        `5-15 min: Explore — Introduce ${termPhrase} with choral response and examples`,
+        `15-25 min: Explain — Guided practice applying ${termPhrase} to ${topic}`,
+        `25-35 min: Elaborate — Small-group activity using the new words in context`,
+        `35-45 min: Evaluate — Exit ticket and preview tomorrow's focus (${duration} total)`,
+      ];
+    }
+    if (difficulty === "Advanced" || difficulty === "Honors/Gifted") {
+      return [
+        `0-5 min: Engage — Challenge hook connecting prior learning to ${topic}`,
+        `5-15 min: Explore — Investigate today's vocabulary and concept links`,
+        `15-25 min: Explain — Formalize ${termPhrase} through discussion and modeling`,
+        `25-35 min: Elaborate — Independent or team application / error analysis`,
+        `35-45 min: Evaluate — Reflection and formative check (${duration} total)`,
+      ];
+    }
+    return [
+      `0-5 min: Engage — Activate prior knowledge for ${topic}`,
+      `5-15 min: Explore — Encounter ${termPhrase} through sources or examples`,
+      `15-25 min: Explain — Teach and clarify ${termPhrase} with checkpoints`,
+      `25-35 min: Elaborate — Collaborative application activity`,
+      `35-45 min: Evaluate — Summary and exit ticket (${duration} total)`,
+    ];
+  }
+
   if (difficulty === "Beginner") {
     return [
       `5 min — Warm-up: review prior terms and activate background on ${topic}`,
-      `10 min — Introduce ${termCount > 1 ? "new vocabulary" : "the vocabulary term"} with visuals and choral response`,
+      `10 min — Introduce ${termPhrase} with visuals and choral response`,
       `15 min — Guided practice applying today's terms to ${topic}`,
       `10 min — Small-group activity using the new words in context`,
       `5 min — Exit ticket and preview tomorrow's focus (${duration} total)`,
@@ -213,7 +245,7 @@ export function buildFallbackDayTimeline(
   }
   return [
     `5 min — Warm-up and quick review`,
-    `10 min — Teach ${termCount > 1 ? "today's vocabulary terms" : "today's vocabulary term"} for ${topic}`,
+    `10 min — Teach ${termPhrase} for ${topic}`,
     `15 min — Guided practice with checkpoints`,
     `10 min — Collaborative application activity`,
     `5 min — Summary and exit ticket (${duration} total)`,
@@ -226,6 +258,7 @@ export function buildWeeklyScheduleFromVocabulary(input: {
   lessonDuration: string;
   topic: string;
   difficulty: string;
+  useFiveEModel?: boolean;
 }): LessonPlanDaySchedule[] {
   const days = clampPlanPeriodDays(input.planPeriodDays);
   if (days <= 1) return [];
@@ -246,6 +279,7 @@ export function buildWeeklyScheduleFromVocabulary(input: {
       input.lessonDuration,
       terms.length,
       input.difficulty,
+      { useFiveEModel: input.useFiveEModel },
     ),
   }));
 }
@@ -260,10 +294,20 @@ export function flattenWeeklyVocabulary(
 export function weeklySchedulePromptBlock(
   planPeriodDays: number,
   lessonDuration: string,
+  options?: { useFiveEModel?: boolean },
 ): string {
+  const useFiveEModel = Boolean(options?.useFiveEModel);
+
   if (planPeriodDays <= 1) {
-    return `Plan period: single class session. Lesson duration (${lessonDuration}) is the full class period. Put all vocabulary in the main vocabulary list and break ${lessonDuration} into the lessonTimeline segments. Do not populate weeklySchedule.`;
+    if (useFiveEModel) {
+      return `Plan period: single class session. Lesson duration (${lessonDuration}) is the full class period. Put all vocabulary in the main vocabulary list. Because Jamaica NSC guidelines apply, the root lessonTimeline MUST use exactly the 5E model with five timed lines in this order and labeled format: "0-5 min: Engage — …", "5-15 min: Explore — …", "15-25 min: Explain — …", "25-35 min: Elaborate — …", "35-45 min: Evaluate — …" (adjust minute ranges to sum to ${lessonDuration}). Do not use Warm-up/Instruction/Activity/Closing labels. Do not populate weeklySchedule.`;
+    }
+    return `Plan period: single class session. Lesson duration (${lessonDuration}) is the full class period. Put all vocabulary in the main vocabulary list and break ${lessonDuration} into the lessonTimeline segments (warm-up, instruction, practice, assessment). Do not populate weeklySchedule.`;
   }
+
+  const dayTimelineRule = useFiveEModel
+    ? `- Each day's lessonTimeline (Class timeline outline) MUST use the 5E model with exactly five timed lines in order: Engage, Explore, Explain, Elaborate, Evaluate. Format each line as "0-5 min: Engage — …", "5-15 min: Explore — …", etc. (adjust minute ranges so they add up to ${lessonDuration}). Explicitly reference that day's vocabulary terms inside the phase descriptions. Never use Warm-up, Instruction, Activity, or Closing as phase labels.`
+    : `- Each day's lessonTimeline must break that single ${lessonDuration} class period into timed segments (warm-up, instruction, practice, assessment) that add up to ${lessonDuration}, explicitly referencing that day's vocabulary terms.`;
 
   return `Plan period: ${planPeriodDays}-day unit. Each class period is ${lessonDuration} long (${formatUnitPacingLabel(planPeriodDays, lessonDuration)}).
 
@@ -272,7 +316,7 @@ Weekly schedule requirements (mandatory):
 - Distribute ALL vocabulary terms across the ${planPeriodDays} days using PEDAGOGICAL pacing — counts per day must vary naturally (e.g. 12 terms over 7 days might be 2, 3, 1, 2, 2, 1, 1). Heavier introduction days may have more new terms; review or assessment days may have fewer. Never give every day the same number of terms unless the topic truly requires it.
 - Order terms logically: foundational concepts before dependent ones; pair related terms on the same day when helpful; reserve at least one lighter day for review or application.
 - Each day's vocabulary array lists only the terms introduced or heavily practiced that day (format: "Term — definition").
-- Each day's lessonTimeline must break that single ${lessonDuration} class period into timed segments (warm-up, instruction, practice, assessment) that add up to ${lessonDuration}, explicitly referencing that day's vocabulary terms.
+${dayTimelineRule}
 - dailyFocus must state what that day covers in one clear sentence.
 - The root vocabulary array must still list every term for the full unit (combined master list).
 - Root lessonTimeline must be a 2–4 bullet unit pacing overview (which themes land on which days); detailed timing lives only in weeklySchedule.
@@ -301,6 +345,7 @@ export function reconcileWeeklySchedule(input: {
   lessonDuration: string;
   topic: string;
   difficulty: string;
+  useFiveEModel?: boolean;
 }): LessonPlanDaySchedule[] {
   const days = clampPlanPeriodDays(input.planPeriodDays);
   if (days <= 1) return [];
@@ -322,6 +367,7 @@ export function reconcileWeeklySchedule(input: {
       lessonDuration: input.lessonDuration,
       topic: input.topic,
       difficulty: input.difficulty,
+      useFiveEModel: input.useFiveEModel,
     }),
   );
 }

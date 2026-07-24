@@ -20,7 +20,10 @@ import {
 } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { inviteTeamMemberAction } from "@/actions/teams";
+import {
+  inviteTeamMemberAction,
+  lookupInviteeDisplayNameAction,
+} from "@/actions/teams";
 
 export type TeamInviteWorkspaceOption = {
   id: number;
@@ -68,24 +71,90 @@ export function TeamInviteForm({
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
   const [emailPickerOpen, setEmailPickerOpen] = React.useState(false);
+  /** Email (lowercase) that last auto-filled the invitee name — used to avoid wiping manual edits. */
+  const autofilledFromEmailRef = React.useRef<string | null>(null);
+  const inviteeDisplayNameRef = React.useRef(inviteeDisplayName);
+  const lookupSeqRef = React.useRef(0);
+  inviteeDisplayNameRef.current = inviteeDisplayName;
 
   React.useEffect(() => {
     setTeamId(String(defaultWorkspaceId));
   }, [defaultWorkspaceId]);
 
-  function applyInviteDisplayHintForEmail(addr: string) {
+  function applyLocalInviteDisplayHint(addr: string): boolean {
     const key = addr.trim().toLowerCase();
     if (!key) {
-      setInviteeDisplayName("");
+      if (autofilledFromEmailRef.current != null) {
+        setInviteeDisplayName("");
+        autofilledFromEmailRef.current = null;
+      }
+      return false;
+    }
+    const hint = inviteDisplayHintsByEmail[key]?.trim();
+    if (hint) {
+      setInviteeDisplayName(hint);
+      autofilledFromEmailRef.current = key;
+      return true;
+    }
+    return false;
+  }
+
+  async function resolveInviteeDisplayNameForEmail(addr: string) {
+    const key = addr.trim().toLowerCase();
+    if (!key) {
+      applyLocalInviteDisplayHint(addr);
       return;
     }
-    const hint = inviteDisplayHintsByEmail[key];
-    setInviteeDisplayName(hint ?? "");
+    if (applyLocalInviteDisplayHint(addr)) return;
+
+    const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key);
+    if (!looksLikeEmail) return;
+
+    const currentName = inviteeDisplayNameRef.current.trim();
+    const autofilledFrom = autofilledFromEmailRef.current;
+
+    // Manual name (never autofilled) — keep it when the email changes.
+    if (currentName && autofilledFrom == null) return;
+    // Already filled for this email.
+    if (currentName && autofilledFrom === key) return;
+
+    if (autofilledFrom != null && autofilledFrom !== key) {
+      setInviteeDisplayName("");
+      autofilledFromEmailRef.current = null;
+    }
+
+    const seq = ++lookupSeqRef.current;
+    try {
+      const res = await lookupInviteeDisplayNameAction({
+        teamId: String(Number.parseInt(String(teamId), 10) || defaultWorkspaceId),
+        email: key,
+      });
+      if (seq !== lookupSeqRef.current) return;
+      if (!res.ok || !res.name?.trim()) return;
+      setInviteeDisplayName(res.name.trim());
+      autofilledFromEmailRef.current = key;
+    } catch {
+      // Best-effort autofill — manual entry still works.
+    }
   }
 
   React.useEffect(() => {
     setEmailPickerOpen(false);
   }, [teamId]);
+
+  // When a complete email is typed/pasted, resolve the name without waiting for blur.
+  React.useEffect(() => {
+    const key = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)) return;
+    if (inviteDisplayHintsByEmail[key]?.trim()) {
+      applyLocalInviteDisplayHint(email);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void resolveInviteeDisplayNameForEmail(email);
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [email]);
 
   const selectedWorkspace = workspaces.find((w) => w.id === Number(teamId));
   const selectedAtCapacity = selectedWorkspace?.atCapacity ?? false;
@@ -187,6 +256,7 @@ export function TeamInviteForm({
       setInviteUrl(res.inviteUrl);
       setEmail("");
       setInviteeDisplayName("");
+      autofilledFromEmailRef.current = null;
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong";
       setError(
@@ -261,8 +331,14 @@ export function TeamInviteForm({
             autoComplete="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onBlur={() => applyInviteDisplayHintForEmail(email)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setEmail(next);
+              applyLocalInviteDisplayHint(next);
+            }}
+            onBlur={() => {
+              void resolveInviteeDisplayNameForEmail(email);
+            }}
             disabled={formDisabled}
             placeholder="member@example.com"
             className="h-10 min-w-0 flex-1"
@@ -309,7 +385,7 @@ export function TeamInviteForm({
                       className="h-auto w-full justify-start whitespace-normal break-all px-2 py-1.5 text-left font-normal text-sm"
                       onClick={() => {
                         setEmail(addr);
-                        applyInviteDisplayHintForEmail(addr);
+                        void resolveInviteeDisplayNameForEmail(addr);
                         setEmailPickerOpen(false);
                       }}
                     >
@@ -337,14 +413,19 @@ export function TeamInviteForm({
           autoComplete="name"
           required
           value={inviteeDisplayName}
-          onChange={(e) => setInviteeDisplayName(e.target.value)}
+          onChange={(e) => {
+            setInviteeDisplayName(e.target.value);
+            // Treat edits as manual so a later email blur does not overwrite them.
+            autofilledFromEmailRef.current = null;
+          }}
           disabled={formDisabled}
           placeholder="Full name or preferred name"
           maxLength={255}
           className="h-10 w-full"
         />
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Required. Auto-filled when the email matches an existing member or prior invite.
+          Required. Auto-filled when the email matches a workspace member, a prior invite, or a
+          registered Flipvise account.
         </p>
       </div>
       <div className="space-y-2">

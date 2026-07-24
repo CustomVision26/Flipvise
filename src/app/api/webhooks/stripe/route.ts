@@ -137,6 +137,18 @@ export async function POST(req: NextRequest) {
             await stripe.customers.update(customerId, {
               metadata: { clerkUserId: userId, plan: selectedPlan },
             });
+            try {
+              const { syncStripeCustomerBillToFromClerkUser } = await import(
+                "@/lib/stripe-invoice-addresses"
+              );
+              await syncStripeCustomerBillToFromClerkUser(customerId, userId);
+            } catch (error) {
+              console.error(
+                "[stripe webhook] sync Bill-to mailing address",
+                session.id,
+                error,
+              );
+            }
           }
 
           if (customerId && subscriptionId) {

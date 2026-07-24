@@ -264,16 +264,39 @@ function teamWorkspaceIdentityQueryFromSearchParams(
 }
 
 /**
- * When workspace identity query fields are present but stale or partial, returns the
- * canonical query string. When the URL is already canonical, returns `null` (no redirect).
+ * When workspace identity query fields are missing, stale, or partial (e.g. only `team=`),
+ * returns the canonical `team` + `userid` + `plan` + `teamMemberId` query string.
+ * When the URL is already canonical, returns `null` (no redirect).
  */
 export async function resolveTeamWorkspaceCanonicalRedirectQueryString(
   viewerUserId: string,
   sp: Record<string, string | string[] | undefined>,
   tw: ResolvedTeamWorkspaceUrl,
 ): Promise<string | null> {
-  if (!teamWorkspaceSearchParamsHaveLegacyIdentityFields(sp)) return null;
   const canonical = await buildResolvedTeamWorkspaceQueryString(viewerUserId, tw);
   if (teamWorkspaceIdentityQueryFromSearchParams(sp) === canonical) return null;
   return canonical;
+}
+
+/**
+ * Team id for study/deck URLs when `team=` is absent: membership access first, else `decks.teamId`.
+ * Callers should also try `deck_workspace_links` when this returns null (linked-only decks).
+ */
+export function inferTeamIdForDeckStudyUrl(input: {
+  access: { kind: string; teamId?: number };
+  deckTeamId: number | null | undefined;
+}): number | null {
+  if (
+    (input.access.kind === "team_member" || input.access.kind === "team_admin") &&
+    typeof input.access.teamId === "number" &&
+    Number.isFinite(input.access.teamId) &&
+    input.access.teamId > 0
+  ) {
+    return input.access.teamId;
+  }
+  const deckTeamId = input.deckTeamId;
+  if (deckTeamId != null && Number.isFinite(deckTeamId) && deckTeamId > 0) {
+    return deckTeamId;
+  }
+  return null;
 }

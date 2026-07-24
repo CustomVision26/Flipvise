@@ -39,6 +39,8 @@ export type LessonPlanResult = {
   homework: string;
   differentiatedInstruction: string[];
   teacherNotes: string;
+  /** True when Learning Standard was confirmed Jamaica-linked at generation. */
+  jamaicaNscGuidelinesApplied?: boolean;
 };
 
 export type TeacherQuizInput = {

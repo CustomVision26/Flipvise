@@ -36,9 +36,16 @@ import {
 import type {
   LessonPlanDaySchedule,
   LessonPlanDayVocabularyDetail,
+  LessonPlanFiveEBreakdown,
   LessonPlanVocabularyTermDetail,
 } from "@/lib/lesson-plan-ai-schema";
 import type { LessonPlanActionInput } from "@/lib/lesson-plan-ai-schema";
+import {
+  buildFiveEBreakdownFromTimeline,
+  dayLessonTimelineLooksLikeFiveE,
+  parseVocabularyLine,
+  resolveFiveEClassTimelineOutline,
+} from "@/lib/lesson-plan-vocabulary-detail";
 import { toast } from "sonner";
 
 export type LessonPlanDetailLessonContext = Pick<
@@ -279,23 +286,106 @@ function VocabularyTermBlock({ term }: { term: LessonPlanVocabularyTermDetail })
   );
 }
 
+function FiveEBreakdownSection({
+  breakdown,
+}: {
+  breakdown: LessonPlanFiveEBreakdown;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-base font-semibold text-foreground">{breakdown.heading}</p>
+        {breakdown.intro ? (
+          <p className="text-sm text-muted-foreground">{breakdown.intro}</p>
+        ) : null}
+      </div>
+      <ol className="space-y-4">
+        {breakdown.phases.map((phase) => (
+          <li
+            key={phase.phase}
+            className="space-y-2 rounded-md border border-border bg-muted/30 p-3"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <p className="text-sm font-semibold text-foreground">
+                {phase.timeRange}: {phase.phase}
+              </p>
+              <p className="text-sm text-muted-foreground">{phase.activitySummary}</p>
+            </div>
+            <p className="text-sm leading-relaxed text-muted-foreground">{phase.detail}</p>
+            {phase.vocabularyFocus.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Vocabulary focus: </span>
+                {phase.vocabularyFocus.join(", ")}
+              </p>
+            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground">
+                  Teacher
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                  {phase.teacherMoves.map((move) => (
+                    <li key={move}>{move}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground">
+                  Students
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                  {phase.studentMoves.map((move) => (
+                    <li key={move}>{move}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function LessonPlanDayVocabularyDetailContent({
   detail,
   learningStandard,
+  dailyFocus,
+  lessonTimeline,
+  useFiveEModel = false,
 }: {
   detail: LessonPlanDayVocabularyDetail;
   learningStandard?: string;
+  dailyFocus?: string;
+  lessonTimeline?: string[];
+  /** True only when Learning Standard was confirmed Jamaica-linked. */
+  useFiveEModel?: boolean;
 }) {
-  const pepAligned = Boolean(learningStandard?.trim() && /pep/i.test(learningStandard));
+  const pepAligned = Boolean(
+    useFiveEModel && learningStandard?.trim() && /pep/i.test(learningStandard),
+  );
   const additionalHeading = pepAligned
     ? "Vocabulary (PEP-Aligned)"
     : "Additional Vocabulary";
+  const fiveEBreakdown = useFiveEModel
+    ? detail.fiveEBreakdown?.phases?.length === 5
+      ? detail.fiveEBreakdown
+      : buildFiveEBreakdownFromTimeline({
+          dailyFocus: dailyFocus?.trim() || detail.contextIntro,
+          vocabularyTerms: detail.terms,
+          lessonTimeline,
+        })
+    : detail.fiveEBreakdown?.phases?.length === 5
+      ? detail.fiveEBreakdown
+      : null;
 
   return (
     <div className="space-y-6 text-foreground">
       <VocabularySummaryBox terms={detail.terms} />
 
       <p className="text-sm leading-relaxed text-muted-foreground">{detail.contextIntro}</p>
+
+      {fiveEBreakdown ? <FiveEBreakdownSection breakdown={fiveEBreakdown} /> : null}
 
       <div className="space-y-3">
         <p className="text-base font-semibold text-foreground">Vocabulary</p>
@@ -374,6 +464,7 @@ export function LessonPlanWeeklySchedulePanel({
   onScheduleChange,
   isGeneratingAllDayDetails = false,
   editable = Boolean(onScheduleChange),
+  useFiveEModel = false,
 }: {
   schedule: LessonPlanDaySchedule[];
   unitLabel?: string;
@@ -381,12 +472,46 @@ export function LessonPlanWeeklySchedulePanel({
   onScheduleChange?: (next: LessonPlanDaySchedule[]) => void;
   isGeneratingAllDayDetails?: boolean;
   editable?: boolean;
+  /** True only when Learning Standard was confirmed Jamaica-linked at generation. */
+  useFiveEModel?: boolean;
 }) {
   const [detailDayIndex, setDetailDayIndex] = useState<number | null>(null);
   const [generatingDayIndex, setGeneratingDayIndex] = useState<number | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   const isBulkBusy = isGeneratingAll || isGeneratingAllDayDetails;
+
+  useEffect(() => {
+    if (!useFiveEModel || !editable || !onScheduleChange) return;
+    if (schedule.every((day) => dayLessonTimelineLooksLikeFiveE(day.lessonTimeline))) {
+      return;
+    }
+
+    onScheduleChange(
+      schedule.map((day) => {
+        if (dayLessonTimelineLooksLikeFiveE(day.lessonTimeline)) return day;
+        const vocabularyTerms =
+          day.vocabularyDetail?.terms ??
+          day.vocabulary.map((line) => {
+            const { term, shortDefinition } = parseVocabularyLine(line);
+            return {
+              term,
+              shortDefinition,
+              definition: shortDefinition,
+            };
+          });
+        return {
+          ...day,
+          lessonTimeline: resolveFiveEClassTimelineOutline({
+            dailyFocus: day.dailyFocus,
+            vocabularyTerms,
+            lessonTimeline: day.lessonTimeline,
+            fiveEBreakdown: day.vocabularyDetail?.fiveEBreakdown,
+          }),
+        };
+      }),
+    );
+  }, [editable, onScheduleChange, schedule, useFiveEModel]);
   const daysMissingDetail = schedule.filter((day) => !day.vocabularyDetail).length;
   const expandAllButtonLabel =
     daysMissingDetail === 0
@@ -394,8 +519,12 @@ export function LessonPlanWeeklySchedulePanel({
       : "Expand all day vocabulary (AI)";
   const expandAllButtonTooltip =
     daysMissingDetail === 0
-      ? "Replace expanded definitions, examples, process steps, and learning goals on every day with fresh AI content."
-      : `Use AI to write full definitions, examples, process steps, and learning goals for ${daysMissingDetail} day${daysMissingDetail === 1 ? "" : "s"} that still need expanded vocabulary.`;
+      ? useFiveEModel
+        ? "Replace expanded definitions, 5E timeline detail, examples, process steps, and learning goals on every day with fresh AI content."
+        : "Replace expanded definitions, examples, process steps, and learning goals on every day with fresh AI content."
+      : useFiveEModel
+        ? `Use AI to write full definitions, 5E timeline detail, examples, process steps, and learning goals for ${daysMissingDetail} day${daysMissingDetail === 1 ? "" : "s"} that still need expanded vocabulary.`
+        : `Use AI to write full definitions, examples, process steps, and learning goals for ${daysMissingDetail} day${daysMissingDetail === 1 ? "" : "s"} that still need expanded vocabulary.`;
 
   const detailDay =
     detailDayIndex != null ? schedule[detailDayIndex] ?? null : null;
@@ -413,23 +542,41 @@ export function LessonPlanWeeklySchedulePanel({
     try {
       const details = await generateAllDaysVocabularyDetailAction({
         ...lessonContext,
+        jamaicaNscGuidelinesApplied: useFiveEModel,
         days: targetDays.map((day) => ({
           dayLabel: day.dayLabel,
           dailyFocus: day.dailyFocus,
           vocabulary: day.vocabulary,
+          lessonTimeline: day.lessonTimeline,
         })),
       });
 
       const detailByLabel = new Map(
         targetDays.map((day, index) => [day.dayLabel, details[index]!]),
       );
-      const nextSchedule = schedule.map((day) => ({
-        ...day,
-        vocabularyDetail: detailByLabel.get(day.dayLabel) ?? day.vocabularyDetail,
-      }));
+      const nextSchedule = schedule.map((day) => {
+        const detail = detailByLabel.get(day.dayLabel);
+        if (!detail) return day;
+        if (
+          useFiveEModel &&
+          detail.fiveEBreakdown?.phases?.length === 5
+        ) {
+          return {
+            ...day,
+            vocabularyDetail: detail,
+            lessonTimeline: detail.fiveEBreakdown.phases.map(
+              (phase) =>
+                `${phase.timeRange}: ${phase.phase} — ${phase.activitySummary}`,
+            ),
+          };
+        }
+        return { ...day, vocabularyDetail: detail };
+      });
       onScheduleChange?.(nextSchedule);
       toast.success("Detailed vocabulary generated for all days", {
-        description: `Expanded vocabulary is ready for ${targetDays.length} day${targetDays.length === 1 ? "" : "s"}.`,
+        description: useFiveEModel
+          ? `Expanded vocabulary and 5E timeline detail are ready for ${targetDays.length} day${targetDays.length === 1 ? "" : "s"}.`
+          : `Expanded vocabulary is ready for ${targetDays.length} day${targetDays.length === 1 ? "" : "s"}.`,
       });
     } catch (error) {
       toast.error(
@@ -455,17 +602,29 @@ export function LessonPlanWeeklySchedulePanel({
     try {
       const detail = await generateDayVocabularyDetailAction({
         ...lessonContext,
+        jamaicaNscGuidelinesApplied: useFiveEModel,
         dayLabel: day.dayLabel,
         dailyFocus: day.dailyFocus,
         vocabulary: day.vocabulary,
+        lessonTimeline: day.lessonTimeline,
       });
 
-      const nextSchedule = schedule.map((entry, index) =>
-        index === dayIndex ? { ...entry, vocabularyDetail: detail } : entry,
-      );
+      const nextSchedule = schedule.map((entry, index) => {
+        if (index !== dayIndex) return entry;
+        const lessonTimeline =
+          useFiveEModel && detail.fiveEBreakdown?.phases?.length === 5
+            ? detail.fiveEBreakdown.phases.map(
+                (phase) =>
+                  `${phase.timeRange}: ${phase.phase} — ${phase.activitySummary}`,
+              )
+            : entry.lessonTimeline;
+        return { ...entry, vocabularyDetail: detail, lessonTimeline };
+      });
       onScheduleChange?.(nextSchedule);
       toast.success("Detailed vocabulary generated", {
-        description: `${day.dayLabel} now has expanded definitions, process steps, and learning goals.`,
+        description: useFiveEModel
+          ? `${day.dayLabel} now has expanded definitions, 5E timeline detail, process steps, and learning goals.`
+          : `${day.dayLabel} now has expanded definitions, process steps, and learning goals.`,
       });
       if (openAfter) {
         setDetailDayIndex(dayIndex);
@@ -556,7 +715,10 @@ export function LessonPlanWeeklySchedulePanel({
                   </p>
                   <p className="mb-2">
                     Click a day or <strong>View detail</strong> to open expanded AI vocabulary with
-                    definitions, examples, and learning goals.
+                    definitions, examples, and learning goals
+                    {useFiveEModel
+                      ? ", plus a detailed 5E class-timeline breakdown (Jamaica NSC)."
+                      : "."}
                   </p>
                   <p>
                     Use <strong>Expand all day vocabulary (AI)</strong> to generate or refresh
@@ -609,6 +771,24 @@ export function LessonPlanWeeklySchedulePanel({
           const hasDetail = Boolean(day.vocabularyDetail);
           const dayNumber = lessonPlanDayNumberFromIndex(dayIndex);
           const displayDayLabel = formatLessonPlanDayLabel(dayNumber, day.dayOfWeek);
+          const vocabularyTermsForOutline =
+            day.vocabularyDetail?.terms ??
+            day.vocabulary.map((line) => {
+              const { term, shortDefinition } = parseVocabularyLine(line);
+              return {
+                term,
+                shortDefinition,
+                definition: shortDefinition,
+              };
+            });
+          const classTimelineOutline = useFiveEModel
+            ? resolveFiveEClassTimelineOutline({
+                dailyFocus: day.dailyFocus,
+                vocabularyTerms: vocabularyTermsForOutline,
+                lessonTimeline: day.lessonTimeline,
+                fiveEBreakdown: day.vocabularyDetail?.fiveEBreakdown,
+              })
+            : day.lessonTimeline;
 
           return (
             <div
@@ -737,18 +917,29 @@ export function LessonPlanWeeklySchedulePanel({
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Class timeline</p>
+                <p className="text-sm font-medium text-foreground">
+                  {useFiveEModel ? "Class timeline (5E)" : "Class timeline"}
+                </p>
                 {editable ? (
                   <DayListTextarea
                     id={`day-${dayIndex}-timeline`}
-                    value={day.lessonTimeline}
+                    value={
+                      useFiveEModel &&
+                      !dayLessonTimelineLooksLikeFiveE(day.lessonTimeline)
+                        ? classTimelineOutline
+                        : day.lessonTimeline
+                    }
                     onCommit={(lessonTimeline) => updateDay(dayIndex, { lessonTimeline })}
                     rows={5}
-                    hint="One activity per line"
+                    hint={
+                      useFiveEModel
+                        ? "One 5E phase per line: Engage, Explore, Explain, Elaborate, Evaluate"
+                        : "One activity per line"
+                    }
                   />
                 ) : (
                   <ul className="mt-1 list-disc pl-5 text-sm">
-                    {day.lessonTimeline.map((item) => (
+                    {classTimelineOutline.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
@@ -770,7 +961,9 @@ export function LessonPlanWeeklySchedulePanel({
             <>
               <SheetHeader className="border-b border-border px-6 py-4 text-left">
                 <SheetTitle className="text-foreground">
-                  {detailDay.dayLabel} — Vocabulary detail
+                  {useFiveEModel
+                    ? `${detailDay.dayLabel} — Vocabulary & 5E detail`
+                    : `${detailDay.dayLabel} — Vocabulary detail`}
                 </SheetTitle>
                 <SheetDescription>{detailDay.dailyFocus}</SheetDescription>
               </SheetHeader>
@@ -778,6 +971,9 @@ export function LessonPlanWeeklySchedulePanel({
                 <LessonPlanDayVocabularyDetailContent
                   detail={detailDay.vocabularyDetail}
                   learningStandard={lessonContext?.learningStandard}
+                  dailyFocus={detailDay.dailyFocus}
+                  lessonTimeline={detailDay.lessonTimeline}
+                  useFiveEModel={useFiveEModel}
                 />
               </div>
             </>

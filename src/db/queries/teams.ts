@@ -53,6 +53,7 @@ import {
   DEFAULT_TEAM_QUIZ_DURATION_MINUTES,
   resolveTeamQuizDurationMinutes,
   type OwnerQuizDefaultSettings,
+  type QuizTimerDeckSnapshot,
   type QuizTimerWorkspaceSnapshot,
   type TeamQuizDurationContext,
 } from "@/lib/team-quiz-duration";
@@ -331,13 +332,24 @@ const teamRowSelectWithoutQuizSchedule = {
 } as const;
 
 function withDefaultTeamQuizSchedule(
-  row: Omit<TeamRow, "quizStartScheduleEnabled" | "quizStartAt">,
+  row: Omit<
+    TeamRow,
+    | "quizStartScheduleEnabled"
+    | "quizStartAt"
+    | "quizSecurityApplyToMembers"
+    | "quizSecurityApplyToTeamAdmins"
+  > &
+    Partial<
+      Pick<TeamRow, "quizSecurityApplyToMembers" | "quizSecurityApplyToTeamAdmins">
+    >,
 ): TeamRow {
   return {
     ...row,
     quizStartScheduleEnabled: false,
     quizStartAt: null,
     inactiveAt: row.inactiveAt ?? null,
+    quizSecurityApplyToMembers: row.quizSecurityApplyToMembers !== false,
+    quizSecurityApplyToTeamAdmins: Boolean(row.quizSecurityApplyToTeamAdmins),
   };
 }
 
@@ -927,6 +939,23 @@ export async function isDeckLinkedToWorkspace(
     return row != null;
   } catch (e) {
     if (isMissingDeckWorkspaceLinksTableError(e)) return false;
+    throw e;
+  }
+}
+
+/** Workspace ids linked to a deck via `deck_workspace_links` (newest first). */
+export async function listLinkedWorkspaceTeamIdsForDeck(
+  deckId: number,
+): Promise<number[]> {
+  try {
+    const rows = await db
+      .select({ teamId: deckWorkspaceLinks.teamId })
+      .from(deckWorkspaceLinks)
+      .where(eq(deckWorkspaceLinks.deckId, deckId))
+      .orderBy(desc(deckWorkspaceLinks.createdAt));
+    return rows.map((r) => r.teamId);
+  } catch (e) {
+    if (isMissingDeckWorkspaceLinksTableError(e)) return [];
     throw e;
   }
 }
@@ -2322,6 +2351,26 @@ export async function listQuizTimerWorkspaceSnapshots(
   return snapshots.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Per-deck quiz timer rows for a workspace (Team Admin Quiz Timer). */
+export async function listQuizTimerDeckSnapshots(
+  teamId: number,
+  ownerUserId: string,
+): Promise<QuizTimerDeckSnapshot[]> {
+  const teamDecks = await getDecksForTeam(teamId, ownerUserId);
+  if (teamDecks.length === 0) return [];
+
+  return teamDecks
+    .map((deck) => ({
+      id: deck.id,
+      name: deck.name,
+      quizDurationMinutes:
+        deck.quizDurationMinutes != null
+          ? resolveTeamQuizDurationMinutes(deck.quizDurationMinutes)
+          : null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function getTeamQuizDurationContext(
   teamId: number,
 ): Promise<TeamQuizDurationContext | null> {
@@ -2390,5 +2439,50 @@ export async function updateTeamQuizDurationMinutes(
     throw new Error(
       "Database is missing quiz duration support. Apply migration 0028_team_quiz_duration_minutes.sql.",
     );
+  }
+}
+
+/**
+ * Writes the workspace quiz length onto every deck linked to the workspace
+ * (`decks.teamId` and/or `deck_workspace_links`) so personal and team study share
+ * the same general timed-quiz minutes.
+ */
+export async function syncQuizDurationMinutesToWorkspaceDecks(
+  teamId: number,
+  ownerUserId: string,
+  minutes: number,
+): Promise<void> {
+  const normalized = resolveTeamQuizDurationMinutes(minutes);
+  const workspaceDecks = await getDecksForTeam(teamId, ownerUserId);
+  const deckIds = workspaceDecks.map((d) => d.id);
+  if (deckIds.length === 0) return;
+
+  try {
+    await db
+      .update(decks)
+      .set({ quizDurationMinutes: normalized, updatedAt: new Date() })
+      .where(and(eq(decks.userId, ownerUserId), inArray(decks.id, deckIds)));
+  } catch (e) {
+    if (isMissingDeckQuizDurationColumnError(e)) {
+      // Older DBs without per-deck duration still use workspace timer via studyTeamId.
+      return;
+    }
+    throw e;
+  }
+}
+
+function isMissingDeckQuizDurationColumnError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /quizDurationMinutes|quiz_duration_minutes/i.test(msg);
+}
+
+/** Sync effective quiz minutes to linked decks for every team the subscriber owns. */
+export async function syncOwnerQuizDurationToAllOwnedWorkspaceDecks(
+  ownerUserId: string,
+): Promise<void> {
+  const ownedTeams = await getTeamsByOwner(ownerUserId);
+  for (const team of ownedTeams) {
+    const minutes = await getTeamQuizDurationMinutes(team.id);
+    await syncQuizDurationMinutesToWorkspaceDecks(team.id, ownerUserId, minutes);
   }
 }

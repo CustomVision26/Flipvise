@@ -13,10 +13,11 @@ import {
   grantQuizSecuritySessionRestart,
   grantQuizSecuritySessionResume,
   isDeckQuizSecurityEnabled,
+  isQuizSecurityActiveForViewer,
   terminateQuizSecuritySession,
-  updateDeckQuizSecurityEnabled,
+  updateDeckQuizSecuritySettings,
   updateQuizSecuritySession,
-  updateTeamQuizSecurityEnabled,
+  updateTeamQuizSecuritySettings,
 } from "@/db/queries/quiz-security";
 import type { QuizSecuritySessionState } from "@/db/schema";
 
@@ -77,7 +78,11 @@ export async function startQuizSecuritySessionAction(data: z.infer<typeof startS
   const parsed = startSessionSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  const enabled = await isDeckQuizSecurityEnabled(parsed.data.teamId, parsed.data.deckId);
+  const enabled = await isQuizSecurityActiveForViewer(
+    userId,
+    parsed.data.teamId,
+    parsed.data.deckId,
+  );
   if (!enabled) throw new Error("Quiz security is not enabled for this quiz.");
 
   const existing = await getLatestQuizSecuritySessionForUserDeck(
@@ -196,6 +201,8 @@ export async function completeQuizSecuritySessionAction(
 const updateTeamSecuritySchema = z.object({
   teamId: z.number().int().positive(),
   enabled: z.boolean(),
+  applyToMembers: z.boolean(),
+  applyToTeamAdmins: z.boolean(),
 });
 
 export async function updateTeamQuizSecurityAction(data: z.infer<typeof updateTeamSecuritySchema>) {
@@ -206,7 +213,11 @@ export async function updateTeamQuizSecurityAction(data: z.infer<typeof updateTe
   if (!parsed.success) throw new Error("Invalid input");
 
   await assertCanManageTeam(userId, parsed.data.teamId);
-  await updateTeamQuizSecurityEnabled(parsed.data.teamId, parsed.data.enabled);
+  await updateTeamQuizSecuritySettings(parsed.data.teamId, {
+    enabled: parsed.data.enabled,
+    applyToMembers: parsed.data.applyToMembers,
+    applyToTeamAdmins: parsed.data.applyToTeamAdmins,
+  });
   if (!parsed.data.enabled) {
     await clearQuizSecuritySessionsOnDisable(parsed.data.teamId);
   }
@@ -220,6 +231,8 @@ const updateDeckSecuritySchema = z.object({
   teamId: z.number().int().positive(),
   deckId: z.number().int().positive(),
   enabled: z.boolean().nullable(),
+  applyToMembers: z.boolean().nullable(),
+  applyToTeamAdmins: z.boolean().nullable(),
 });
 
 export async function updateDeckQuizSecurityAction(
@@ -239,17 +252,16 @@ export async function updateDeckQuizSecurityAction(
   );
 
   const wasEnabled = await isDeckQuizSecurityEnabled(parsed.data.teamId, parsed.data.deckId);
-  await updateDeckQuizSecurityEnabled(
-    parsed.data.deckId,
-    team.ownerUserId,
-    parsed.data.enabled,
-  );
+
+  await updateDeckQuizSecuritySettings(parsed.data.deckId, team.ownerUserId, {
+    enabled: parsed.data.enabled,
+    applyToMembers: parsed.data.applyToMembers,
+    applyToTeamAdmins: parsed.data.applyToTeamAdmins,
+  });
 
   const workspaceEnabled = Boolean(team.quizSecurityEnabled);
   const nextEnabled =
-    parsed.data.enabled === null
-      ? workspaceEnabled
-      : parsed.data.enabled;
+    parsed.data.enabled === null ? workspaceEnabled : parsed.data.enabled;
   if (wasEnabled && !nextEnabled) {
     await clearQuizSecuritySessionsOnDeckDisable(parsed.data.teamId, parsed.data.deckId);
   }

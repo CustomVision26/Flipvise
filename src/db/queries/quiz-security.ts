@@ -6,8 +6,13 @@ import {
   teams,
   type QuizSecuritySessionState,
 } from "@/db/schema";
-import { getDecksForTeam } from "@/db/queries/teams";
-import { resolveQuizSecurityEnabled } from "@/lib/quiz-security-resolve";
+import { getDecksForTeam, getMemberRecord, getTeamById } from "@/db/queries/teams";
+import {
+  quizSecurityAppliesToViewer,
+  resolveQuizSecurityAudience,
+  resolveQuizSecurityEnabled,
+  type QuizSecurityViewerRole,
+} from "@/lib/quiz-security-resolve";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
@@ -18,6 +23,8 @@ export type QuizSecurityWorkspaceSnapshot = {
   id: number;
   name: string;
   quizSecurityEnabled: boolean;
+  quizSecurityApplyToMembers: boolean;
+  quizSecurityApplyToTeamAdmins: boolean;
 };
 
 export type QuizSecurityDeckSnapshot = {
@@ -25,6 +32,10 @@ export type QuizSecurityDeckSnapshot = {
   name: string;
   /** null = inherit workspace quiz security setting */
   quizSecurityEnabled: boolean | null;
+  /** null = inherit workspace audience setting */
+  quizSecurityApplyToMembers: boolean | null;
+  /** null = inherit workspace audience setting */
+  quizSecurityApplyToTeamAdmins: boolean | null;
 };
 
 export type QuizSecuritySessionAdminRow = QuizSecuritySessionRow & {
@@ -52,6 +63,8 @@ export async function listQuizSecurityWorkspaceSnapshots(
       id: team.id,
       name: team.name,
       quizSecurityEnabled: Boolean(team.quizSecurityEnabled),
+      quizSecurityApplyToMembers: team.quizSecurityApplyToMembers !== false,
+      quizSecurityApplyToTeamAdmins: Boolean(team.quizSecurityApplyToTeamAdmins),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -69,18 +82,86 @@ export async function isDeckQuizSecurityEnabled(
   deckId: number,
 ): Promise<boolean> {
   const [team] = await db
-    .select({ quizSecurityEnabled: teams.quizSecurityEnabled })
+    .select({
+      quizSecurityEnabled: teams.quizSecurityEnabled,
+      quizSecurityApplyToMembers: teams.quizSecurityApplyToMembers,
+      quizSecurityApplyToTeamAdmins: teams.quizSecurityApplyToTeamAdmins,
+    })
     .from(teams)
     .where(eq(teams.id, teamId));
   if (!team) return false;
 
   const [deck] = await db
-    .select({ quizSecurityEnabled: decks.quizSecurityEnabled })
+    .select({
+      quizSecurityEnabled: decks.quizSecurityEnabled,
+      quizSecurityApplyToMembers: decks.quizSecurityApplyToMembers,
+      quizSecurityApplyToTeamAdmins: decks.quizSecurityApplyToTeamAdmins,
+    })
     .from(decks)
     .where(eq(decks.id, deckId));
   if (!deck) return Boolean(team.quizSecurityEnabled);
 
   return resolveQuizSecurityEnabled(deck, team);
+}
+
+async function resolveQuizSecurityViewerRole(
+  userId: string,
+  teamId: number,
+): Promise<QuizSecurityViewerRole | null> {
+  const team = await getTeamById(teamId);
+  if (!team) return null;
+  if (team.ownerUserId === userId) return "owner";
+  const member = await getMemberRecord(teamId, userId);
+  if (member?.role === "team_admin") return "team_admin";
+  if (member?.role === "team_member") return "team_member";
+  return null;
+}
+
+/** True when security is on for the deck and applies to this viewer (owner always when on). */
+export async function isQuizSecurityActiveForViewer(
+  userId: string,
+  teamId: number,
+  deckId: number,
+): Promise<boolean> {
+  const [team] = await db
+    .select({
+      quizSecurityEnabled: teams.quizSecurityEnabled,
+      quizSecurityApplyToMembers: teams.quizSecurityApplyToMembers,
+      quizSecurityApplyToTeamAdmins: teams.quizSecurityApplyToTeamAdmins,
+    })
+    .from(teams)
+    .where(eq(teams.id, teamId));
+  if (!team) return false;
+
+  const [deck] = await db
+    .select({
+      quizSecurityEnabled: decks.quizSecurityEnabled,
+      quizSecurityApplyToMembers: decks.quizSecurityApplyToMembers,
+      quizSecurityApplyToTeamAdmins: decks.quizSecurityApplyToTeamAdmins,
+    })
+    .from(decks)
+    .where(eq(decks.id, deckId));
+
+  const enabled = deck
+    ? resolveQuizSecurityEnabled(deck, team)
+    : Boolean(team.quizSecurityEnabled);
+  if (!enabled) return false;
+
+  const viewerRole = await resolveQuizSecurityViewerRole(userId, teamId);
+  if (!viewerRole) return false;
+
+  const audience = resolveQuizSecurityAudience(
+    deck ?? {
+      quizSecurityApplyToMembers: null,
+      quizSecurityApplyToTeamAdmins: null,
+    },
+    {
+      quizSecurityApplyToMembers: team.quizSecurityApplyToMembers !== false,
+      quizSecurityApplyToTeamAdmins: Boolean(team.quizSecurityApplyToTeamAdmins),
+    },
+  );
+
+  return quizSecurityAppliesToViewer(viewerRole, audience);
 }
 
 export async function listQuizSecurityDeckSnapshots(
@@ -96,6 +177,8 @@ export async function listQuizSecurityDeckSnapshots(
       id: decks.id,
       name: decks.name,
       quizSecurityEnabled: decks.quizSecurityEnabled,
+      quizSecurityApplyToMembers: decks.quizSecurityApplyToMembers,
+      quizSecurityApplyToTeamAdmins: decks.quizSecurityApplyToTeamAdmins,
     })
     .from(decks)
     .where(eq(decks.userId, ownerUserId));
@@ -107,19 +190,27 @@ export async function listQuizSecurityDeckSnapshots(
       id: row.id,
       name: row.name,
       quizSecurityEnabled: row.quizSecurityEnabled ?? null,
+      quizSecurityApplyToMembers: row.quizSecurityApplyToMembers ?? null,
+      quizSecurityApplyToTeamAdmins: row.quizSecurityApplyToTeamAdmins ?? null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function updateDeckQuizSecurityEnabled(
+export async function updateDeckQuizSecuritySettings(
   deckId: number,
   ownerUserId: string,
-  enabled: boolean | null,
+  settings: {
+    enabled: boolean | null;
+    applyToMembers: boolean | null;
+    applyToTeamAdmins: boolean | null;
+  },
 ): Promise<void> {
   await db
     .update(decks)
     .set({
-      quizSecurityEnabled: enabled,
+      quizSecurityEnabled: settings.enabled,
+      quizSecurityApplyToMembers: settings.applyToMembers,
+      quizSecurityApplyToTeamAdmins: settings.applyToTeamAdmins,
       updatedAt: new Date(),
     })
     .where(and(eq(decks.id, deckId), eq(decks.userId, ownerUserId)));
@@ -152,13 +243,21 @@ export async function clearQuizSecuritySessionsOnDeckDisable(
     );
 }
 
-export async function updateTeamQuizSecurityEnabled(
+export async function updateTeamQuizSecuritySettings(
   teamId: number,
-  enabled: boolean,
+  settings: {
+    enabled: boolean;
+    applyToMembers: boolean;
+    applyToTeamAdmins: boolean;
+  },
 ): Promise<void> {
   await db
     .update(teams)
-    .set({ quizSecurityEnabled: enabled })
+    .set({
+      quizSecurityEnabled: settings.enabled,
+      quizSecurityApplyToMembers: settings.applyToMembers,
+      quizSecurityApplyToTeamAdmins: settings.applyToTeamAdmins,
+    })
     .where(eq(teams.id, teamId));
 }
 
@@ -177,7 +276,7 @@ export async function resolveQuizSecurityContextForStudy(
   deckId: number,
   teamId: number,
 ): Promise<QuizSecurityStudyContext | null> {
-  const securityEnabled = await isDeckQuizSecurityEnabled(teamId, deckId);
+  const securityEnabled = await isQuizSecurityActiveForViewer(userId, teamId, deckId);
   if (!securityEnabled) return null;
 
   const session = await getLatestQuizSecuritySessionForUserDeck(userId, teamId, deckId);

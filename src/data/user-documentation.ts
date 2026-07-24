@@ -59,7 +59,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Create, organize, and open your personal flashcard decks.",
         howItWorks: [
           "View decks in grid or list mode.",
-          "Add Deck opens the deck creation dialog (title, optional AI generation on eligible plans).",
+          "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional first card front image, and background gradient.",
+          "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
@@ -143,6 +144,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "From source review: Swap flips front and back before save; choose whether quiz wrong answers match the original answer (default) or original question/term.",
           "From source review: preview and edit three quiz wrong answers per card before saving; Regenerate refreshes them from AI.",
           "Upload a deck cover image when your plan allows.",
+          "Edit deck can set or replace the oldest card’s front image (first card front image).",
           "Open Study to start flashcard review or quiz mode.",
           "AI generation needs an internet connection — the Generate button is disabled while offline.",
         ],
@@ -172,7 +174,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "When a team admin (or you via Format Quiz Question) has published a question distribution, the lobby mix matches those exact counts.",
           "Each question shows a format badge (e.g. True / false, Fill in the blank) while you answer.",
           "When formats have been published, each card keeps its assigned format until published again; otherwise formats are chosen at random per card.",
-          "Team quizzes may enforce timers, schedules, and security rules set by admins; personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question.",
+          "Team study URLs use /decks/[deckId]/study?team=&userid=&plan=&teamMemberId= (auto-filled when you open a workspace deck).",
+          "Workspace owners and team admins see Cancel on the unanswered-submit dialog to leave the quiz without submitting.",
+          "Team quizzes may enforce timers, schedules, and security rules set by admins; when security is on for members, the Timed quiz lobby shows a green Security on light. Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question.",
           "AI Reading (text-to-speech) is available on Pro Plus when enabled.",
         ],
         requirements: [
@@ -185,7 +189,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not attempt to bypass quiz security or schedule locks — contact your team admin.",
           "Do not refresh mid-quiz if autosave fails — note your score and contact support if needed.",
-          "Do not expect Format Quiz Question on standard Pro, Free, or team-tier plans — Education Gold / Enterprise configure formats in Team Admin Study Privileges instead.",
+          "Do not expect Format Quiz Question on standard Pro or Free personal plans — team workspaces configure formats in Team Admin → Study Privileges instead.",
         ],
       },
       {
@@ -603,7 +607,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "How Flipvise collects payment, including overseas billing addresses and cards.",
         howItWorks: [
           "All paid plans bill through Stripe Checkout (subscription mode) — not a separate in-app card form on the pricing page.",
-          "Billing address is required at checkout. Enter your real country, city, postal code, and street address — overseas/international addresses are supported.",
+          "Billing address is required at checkout. Enter your real country, city, postal code, and street address — overseas/international addresses are supported. If it matches your Account Details mailing address, you can select Same as my Flipvise mailing address.",
           "Pay with a credit or debit card Stripe accepts in your region. Flipvise does not store your full card number; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
@@ -632,7 +636,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",
           "Slide to confirm or continue → /pricing/checkout/pay (new sub) or plan-change payment (existing sub).",
-          "Stripe Embedded Checkout collects card + billing address and shows final total with tax.",
+          "Stripe Embedded Checkout collects card + billing address (optional Same as my Flipvise mailing address) and shows final total with tax.",
           "Success redirects to /dashboard?checkout=success with a confirmation toast.",
         ],
         requirements: ["Signed-in account.", "Valid paid plan slug in the URL."],
@@ -788,7 +792,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Profile: update display name and profile image.",
           "Email addresses: add, verify, or set primary email.",
           "Security: change password, enable 2FA, review active sessions.",
-          "Account details (custom tab): view phone, mailing address, type/status, and masked security Q&A; Edit requires login verification.",
+          "Account details (custom tab): view phone, mailing address, type/status, and masked Security Q&A; Edit requires login verification.",
         ],
         requirements: ["Signed-in account."],
         doNots: [
@@ -804,7 +808,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "View and edit phone number, mailing address, type/status, and 3 security questions required for account verification.",
         howItWorks: [
           "Open Manage account — Account details is the first tab (before Profile / Security).",
-          "The page shows your current phone, mailing address, type/status, and security Q&A in a read-only summary (questions and answers are masked with asterisks).",
+          "The page shows your current phone, mailing address, type/status, and Security Q&A as ************** in a read-only summary.",
+          "Click the masked Security Q&A — Clerk prompts you to verify your login; after success, all security questions and answers are shown.",
           "Click Edit details — Clerk prompts you to verify your login before the editable form unlocks; Save or Cancel when finished.",
           "Education Institution and Corporation show a name sub-field.",
           "Save writes phone, mailing address, and type to public profile metadata and security answers to private metadata via a Server Action.",
@@ -953,6 +958,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Send, track, and revoke team invitations.",
         howItWorks: [
           "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only.",
+          "Invitee name is required and auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account.",
           "Pending Invitations lists revocable open invites.",
           "Invite History shows past invitations.",
         ],
@@ -969,7 +975,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Review member quiz scores and configure quiz policies.",
         howItWorks: [
           "View and filter quiz results across members.",
-          "Quiz Timer: set time limits for team quizzes.",
+          "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck in each workspace.",
           "Quiz Schedule: restrict when quizzes can be taken.",
           "Quiz Security: anti-cheating and session rules.",
         ],
@@ -1073,7 +1079,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Generate lesson plans, quizzes, homework, study guides, and worksheets from your linked flashcard decks.",
         howItWorks: [
-          "AI Lesson Builder (/teacher/lesson-builder) — multi-day lesson plans with objectives, activities, and vocabulary from deck cards.",
+          "AI Lesson Builder (/teacher/lesson-builder) — multi-day lesson plans with objectives, activities, and vocabulary; Jamaica NSC guidelines (including 5E class timelines) apply only when Learning Standard is confirmed Jamaica-linked.",
           "AI Quiz/Test Generator (/teacher/quizzes) — classroom assessments with review before saving to a deck.",
           "Homework Generator (/teacher/homework) — take-home assignments aligned to deck content.",
           "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export.",

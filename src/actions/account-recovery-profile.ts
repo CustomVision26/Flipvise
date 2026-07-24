@@ -50,6 +50,18 @@ export async function saveAccountRecoveryProfileAction(
     privateMetadata: buildAccountRecoveryPrivateMetadata(parsed.data),
   });
 
+  try {
+    const { syncStripeCustomerBillToForClerkUser } = await import(
+      "@/lib/stripe-invoice-addresses"
+    );
+    await syncStripeCustomerBillToForClerkUser(userId);
+  } catch (error) {
+    console.error(
+      "[saveAccountRecoveryProfileAction] sync Stripe Bill-to:",
+      error,
+    );
+  }
+
   return { ok: true };
 }
 

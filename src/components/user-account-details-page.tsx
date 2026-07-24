@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useReverification, useUser } from "@clerk/nextjs";
 import { isReverificationCancelledError } from "@clerk/nextjs/errors";
 import { Loader2, Pencil, ShieldAlert } from "lucide-react";
@@ -22,6 +22,7 @@ import {
 import {
   emptyAccountRecoveryFieldsValue,
   parseAccountRecoveryFieldsValue,
+  profileFieldsFromClerkMetadata,
   type AccountRecoveryFieldsValue,
 } from "@/lib/account-recovery-form-helpers";
 import {
@@ -32,11 +33,6 @@ import {
   type SecurityQuestionId,
 } from "@/lib/account-recovery-profile";
 import { Separator } from "@/components/ui/separator";
-
-function maskWithAsterisks(value: string, min = 8, max = 24): string {
-  const length = Math.max(min, Math.min(value.trim().length || min, max));
-  return "*".repeat(length);
-}
 
 function SummaryRow({
   label,
@@ -55,17 +51,43 @@ function SummaryRow({
   );
 }
 
+const SECURITY_QA_MASK = "**************";
+
+function mergeProfileWithSession(
+  next: AccountRecoveryFieldsValue,
+  summaryFromSession: AccountRecoveryFieldsValue,
+): AccountRecoveryFieldsValue {
+  const hasPublic =
+    Boolean(next.phoneNumber.trim()) ||
+    Boolean(formatMailingAddress(next.mailingAddress)) ||
+    Boolean(next.accountType);
+  if (hasPublic) return next;
+  return {
+    ...summaryFromSession,
+    securityQuestions: next.securityQuestions,
+  };
+}
+
+/** Read-only summary: phone, mailing address, type/status, and Security Q&A. */
 function AccountDetailsSummary({
   profile,
+  hasSecurityQa,
+  securityQaRevealed,
+  revealingSecurityQa,
+  onRevealSecurityQa,
 }: {
   profile: AccountRecoveryFieldsValue;
+  hasSecurityQa: boolean;
+  securityQaRevealed: boolean;
+  revealingSecurityQa: boolean;
+  onRevealSecurityQa: () => void;
 }) {
   const typeLabel =
     profile.accountType && profile.accountType in ACCOUNT_TYPE_LABELS
       ? ACCOUNT_TYPE_LABELS[profile.accountType as AccountType]
       : null;
 
-  const questions = profile.securityQuestions.filter(
+  const revealedQuestions = profile.securityQuestions.filter(
     (slot) => slot.questionId && slot.answer.trim(),
   );
 
@@ -88,35 +110,42 @@ function AccountDetailsSummary({
         <SummaryRow label="Type / status">
           <span className="font-medium">{typeLabel ?? "—"}</span>
         </SummaryRow>
-        {profile.organizationName.trim() ? (
-          <SummaryRow label="Organization">
-            <span className="break-words font-medium">
-              {profile.organizationName.trim()}
-            </span>
-          </SummaryRow>
-        ) : null}
         <SummaryRow label="Security Q&A">
-          {questions.length > 0 ? (
-            <ul className="space-y-3" aria-label="Security questions hidden">
-              {questions.map((slot) => {
-                const questionLabel =
-                  SECURITY_QUESTION_LABELS[
-                    slot.questionId as SecurityQuestionId
-                  ] ?? slot.questionId;
-                return (
-                  <li key={slot.questionId}>
-                    <p className="font-medium leading-snug tracking-wide">
-                      {maskWithAsterisks(questionLabel, 12, 32)}
-                    </p>
-                    <p className="mt-0.5 break-words tracking-wide text-muted-foreground">
-                      {maskWithAsterisks(slot.answer, 8, 24)}
-                    </p>
-                  </li>
-                );
-              })}
+          {!hasSecurityQa ? (
+            "—"
+          ) : securityQaRevealed && revealedQuestions.length > 0 ? (
+            <ul className="space-y-3">
+              {revealedQuestions.map((slot) => (
+                <li key={slot.questionId}>
+                  <p className="font-medium leading-snug">
+                    {SECURITY_QUESTION_LABELS[
+                      slot.questionId as SecurityQuestionId
+                    ] ?? slot.questionId}
+                  </p>
+                  <p className="mt-0.5 break-words text-muted-foreground">
+                    {slot.answer}
+                  </p>
+                </li>
+              ))}
             </ul>
           ) : (
-            "—"
+            <button
+              type="button"
+              onClick={onRevealSecurityQa}
+              disabled={revealingSecurityQa}
+              className="inline-flex items-center gap-2 rounded-sm text-left font-medium tracking-wide text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+              aria-label="Verify login to show security questions and answers"
+              title="Verify login to show security Q&A"
+            >
+              {revealingSecurityQa ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  Verifying…
+                </>
+              ) : (
+                SECURITY_QA_MASK
+              )}
+            </button>
           )}
         </SummaryRow>
       </dl>
@@ -126,9 +155,22 @@ function AccountDetailsSummary({
 
 export function UserAccountDetailsPage() {
   const { user, isLoaded } = useUser();
-  const unlockEditWithReverification = useReverification(
+  const unlockWithReverification = useReverification(
     unlockAccountDetailsEditAction,
   );
+  const summaryFromSession = useMemo(() => {
+    if (!user) return emptyAccountRecoveryFieldsValue();
+    return profileFieldsFromClerkMetadata(
+      user.publicMetadata as Record<string, unknown>,
+    );
+  }, [user]);
+
+  const sessionMarksRecoveryComplete =
+    user?.publicMetadata != null &&
+    typeof user.publicMetadata === "object" &&
+    (user.publicMetadata as Record<string, unknown>)
+      .accountRecoveryProfileComplete === true;
+
   const [profile, setProfile] = useState<AccountRecoveryFieldsValue>(
     emptyAccountRecoveryFieldsValue,
   );
@@ -136,26 +178,34 @@ export function UserAccountDetailsPage() {
     emptyAccountRecoveryFieldsValue,
   );
   const [editing, setEditing] = useState(false);
+  const [securityQaRevealed, setSecurityQaRevealed] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [unlockingEdit, setUnlockingEdit] = useState(false);
+  const [revealingSecurityQa, setRevealingSecurityQa] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isLoaded) return;
     let cancelled = false;
     setLoadingProfile(true);
+    setSecurityQaRevealed(false);
+    // Prefer session publicMetadata for the summary so phone / address / type
+    // still show if the private-metadata Server Action fails.
+    setProfile(summaryFromSession);
+    setDraft(summaryFromSession);
+
     void getAccountRecoveryProfileForEditAction()
       .then((next) => {
-        if (!cancelled) {
-          setProfile(next);
-          setDraft(next);
-        }
+        if (cancelled) return;
+        const merged = mergeProfileWithSession(next, summaryFromSession);
+        setProfile(merged);
+        setDraft(merged);
       })
       .catch(() => {
         if (!cancelled) {
-          const empty = emptyAccountRecoveryFieldsValue();
-          setProfile(empty);
-          setDraft(empty);
+          setProfile(summaryFromSession);
+          setDraft(summaryFromSession);
         }
       })
       .finally(() => {
@@ -164,20 +214,53 @@ export function UserAccountDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, isLoaded, summaryFromSession]);
+
+  async function verifyAndLoadFullProfile(): Promise<AccountRecoveryFieldsValue | null> {
+    const result = await unlockWithReverification();
+    if (!result || !("ok" in result) || !result.ok) {
+      return null;
+    }
+    const fresh = await getAccountRecoveryProfileForEditAction();
+    return mergeProfileWithSession(fresh, summaryFromSession);
+  }
+
+  async function revealSecurityQa() {
+    if (revealingSecurityQa || unlockingEdit || busy || securityQaRevealed) {
+      return;
+    }
+    setRevealingSecurityQa(true);
+    try {
+      const merged = await verifyAndLoadFullProfile();
+      if (!merged) return;
+      setProfile(merged);
+      setDraft(merged);
+      setSecurityQaRevealed(true);
+    } catch (err) {
+      if (isReverificationCancelledError(err)) {
+        return;
+      }
+      toast.error("Could not show security Q&A", {
+        description:
+          err instanceof Error
+            ? err.message
+            : "Verify your login and try again.",
+      });
+    } finally {
+      setRevealingSecurityQa(false);
+    }
+  }
 
   async function startEditing() {
-    if (unlockingEdit || busy) return;
+    if (unlockingEdit || revealingSecurityQa || busy) return;
     setUnlockingEdit(true);
     setError(null);
     try {
-      const result = await unlockEditWithReverification();
-      if (!result || !("ok" in result) || !result.ok) {
-        return;
-      }
-      const fresh = await getAccountRecoveryProfileForEditAction();
-      setProfile(fresh);
-      setDraft(fresh);
+      const merged = await verifyAndLoadFullProfile();
+      if (!merged) return;
+      setProfile(merged);
+      setDraft(merged);
+      setSecurityQaRevealed(true);
       setEditing(true);
     } catch (err) {
       if (isReverificationCancelledError(err)) {
@@ -218,6 +301,7 @@ export function UserAccountDetailsPage() {
       const saved = await getAccountRecoveryProfileForEditAction();
       setProfile(saved);
       setDraft(saved);
+      setSecurityQaRevealed(true);
       setEditing(false);
       toast.success("Account details saved.");
     } catch (err) {
@@ -231,6 +315,12 @@ export function UserAccountDetailsPage() {
     }
   }
 
+  const hasSecurityQa =
+    sessionMarksRecoveryComplete ||
+    profile.securityQuestions.some(
+      (slot) => slot.questionId && slot.answer.trim(),
+    );
+
   return (
     <div className="space-y-4 px-1 pb-4">
       <Card size="sm" className="border-border/70 shadow-none">
@@ -239,9 +329,9 @@ export function UserAccountDetailsPage() {
             Contact &amp; verification details
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Phone number, mailing address, account type, and security questions
-            are used to verify your identity if you lose access. Security Q&amp;A
-            stays hidden until you verify your login to edit.
+            Phone number, mailing address, and account type are shown below.
+            Click the masked Security Q&amp;A to verify your login and view your
+            questions and answers.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-5">
@@ -297,13 +387,19 @@ export function UserAccountDetailsPage() {
             </form>
           ) : (
             <div className="flex flex-col gap-4">
-              <AccountDetailsSummary profile={profile} />
+              <AccountDetailsSummary
+                profile={profile}
+                hasSecurityQa={hasSecurityQa}
+                securityQaRevealed={securityQaRevealed}
+                revealingSecurityQa={revealingSecurityQa}
+                onRevealSecurityQa={() => void revealSecurityQa()}
+              />
               <div className="flex justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => void startEditing()}
-                  disabled={unlockingEdit}
+                  disabled={unlockingEdit || revealingSecurityQa}
                   className="h-9"
                 >
                   {unlockingEdit ? (

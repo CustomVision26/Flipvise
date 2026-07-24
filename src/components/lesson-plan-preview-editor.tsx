@@ -135,6 +135,7 @@ function LessonPlanReadOnly({
           lessonContext={lessonContext}
           onScheduleChange={onWeeklyScheduleChange}
           isGeneratingAllDayDetails={isGeneratingAllDayDetails}
+          useFiveEModel={Boolean(result.jamaicaNscGuidelinesApplied)}
         />
       ) : null}
       <div>
@@ -267,6 +268,7 @@ function LessonPlanEditable({
           unitLabel={unitLabel}
           lessonContext={lessonContext}
           onScheduleChange={(weeklySchedule) => patch({ weeklySchedule })}
+          useFiveEModel={Boolean(draft.jamaicaNscGuidelinesApplied)}
         />
       ) : null}
       <ArrayFieldEditor
@@ -424,6 +426,22 @@ export function cloneLessonPlanResult(result: LessonPlanResult): LessonPlanResul
             additionalVocabulary: day.vocabularyDetail.additionalVocabulary?.map(
               (term) => ({ ...term }),
             ),
+            mainConcept: day.vocabularyDetail.mainConcept
+              ? { ...day.vocabularyDetail.mainConcept }
+              : undefined,
+            fiveEBreakdown: day.vocabularyDetail.fiveEBreakdown
+              ? {
+                  ...day.vocabularyDetail.fiveEBreakdown,
+                  phases: day.vocabularyDetail.fiveEBreakdown.phases.map(
+                    (phase) => ({
+                      ...phase,
+                      vocabularyFocus: [...phase.vocabularyFocus],
+                      teacherMoves: [...phase.teacherMoves],
+                      studentMoves: [...phase.studentMoves],
+                    }),
+                  ),
+                }
+              : undefined,
             process: day.vocabularyDetail.process
               ? {
                   ...day.vocabularyDetail.process,

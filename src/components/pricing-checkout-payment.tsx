@@ -5,18 +5,30 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, Tag } from "lucide-react";
 import {
-  BillingAddressElement,
   CheckoutElementsProvider,
   PaymentElement,
   useCheckoutElements,
 } from "@stripe/react-stripe-js/checkout";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { SlideToSubmitButton } from "@/components/slide-to-submit-button";
+import {
+  WORLD_COUNTRY_NAMES,
+  countryCodeFromName,
+} from "@/data/world-countries";
 import type { CheckoutPromoDisplay } from "@/lib/checkout-promo-display-types";
 import type { CheckoutSessionAmountsMajor } from "@/lib/stripe-checkout-session-amounts";
+import type { CheckoutSavedMailingAddress } from "@/lib/checkout-saved-mailing-address";
 import {
   stripeCheckoutElementsTotalFormatted,
   stripeCheckoutElementsTotalMajor,
@@ -32,6 +44,37 @@ import {
 import { formatPlanMoney } from "@/lib/pricing-period-display";
 import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
 import { cn } from "@/lib/utils";
+
+function countryNameFromCode(countryCode: string): string | null {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(countryCode) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+type ManualBillingAddress = {
+  line1: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryName: string;
+};
+
+function emptyManualBillingAddress(
+  saved: CheckoutSavedMailingAddress | null,
+): ManualBillingAddress {
+  if (!saved) {
+    return { line1: "", city: "", state: "", postalCode: "", countryName: "" };
+  }
+  return {
+    line1: saved.address.line1,
+    city: saved.address.city,
+    state: saved.address.state ?? "",
+    postalCode: saved.address.postal_code ?? "",
+    countryName: countryNameFromCode(saved.address.country) ?? "",
+  };
+}
 
 export type PricingCheckoutSummary = {
   planLabel: string;
@@ -261,8 +304,10 @@ function OrderSummary({
 
 function CheckoutPayBody({
   summary,
+  savedMailingAddress,
 }: {
   summary: PricingCheckoutSummary;
+  savedMailingAddress: CheckoutSavedMailingAddress | null;
 }) {
   const checkoutState = useCheckoutElements();
   const liveTotalMajor =
@@ -280,6 +325,7 @@ function CheckoutPayBody({
         isTrial={summary.isTrial}
         planLabel={summary.planLabel}
         trialDays={summary.trialDays}
+        savedMailingAddress={savedMailingAddress}
       />
     </>
   );
@@ -291,15 +337,23 @@ function CheckoutPaymentFields({
   isTrial,
   planLabel,
   trialDays,
+  savedMailingAddress,
 }: {
   customerEmail: string | null;
   checkoutState: ReturnType<typeof useCheckoutElements>;
   isTrial: boolean;
   planLabel: string;
   trialDays: number | null;
+  savedMailingAddress: CheckoutSavedMailingAddress | null;
 }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useMailingAsBilling, setUseMailingAsBilling] = useState(false);
+  const [isApplyingBillingAddress, setIsApplyingBillingAddress] = useState(false);
+  const [cardName, setCardName] = useState(savedMailingAddress?.name ?? "");
+  const [manualAddress, setManualAddress] = useState<ManualBillingAddress>(() =>
+    emptyManualBillingAddress(savedMailingAddress),
+  );
 
   if (checkoutState.type === "loading") {
     return (
@@ -325,13 +379,176 @@ function CheckoutPaymentFields({
       ? `Slide to subscribe — ${stripeTotal}`
       : "Slide to subscribe";
 
+  function mailingAddressPayload(name: string) {
+    if (!savedMailingAddress) return null;
+    return {
+      name: name.trim() || null,
+      address: {
+        line1: savedMailingAddress.address.line1,
+        ...(savedMailingAddress.address.line2
+          ? { line2: savedMailingAddress.address.line2 }
+          : {}),
+        city: savedMailingAddress.address.city,
+        ...(savedMailingAddress.address.state
+          ? { state: savedMailingAddress.address.state }
+          : {}),
+        ...(savedMailingAddress.address.postal_code
+          ? { postal_code: savedMailingAddress.address.postal_code }
+          : {}),
+        country: savedMailingAddress.address.country,
+      },
+    };
+  }
+
+  function manualAddressPayload(name: string) {
+    const country = countryCodeFromName(manualAddress.countryName);
+    if (!country) return null;
+    const line1 = manualAddress.line1.trim();
+    const city = manualAddress.city.trim();
+    if (!line1 || !city) return null;
+
+    return {
+      name: name.trim() || null,
+      address: {
+        line1,
+        city,
+        country,
+        ...(manualAddress.state.trim() ? { state: manualAddress.state.trim() } : {}),
+        ...(manualAddress.postalCode.trim()
+          ? { postal_code: manualAddress.postalCode.trim() }
+          : {}),
+      },
+    };
+  }
+
+  async function applyBillingAddressPayload(
+    payload: NonNullable<ReturnType<typeof mailingAddressPayload>>,
+    fallbackMessage: string,
+  ): Promise<boolean> {
+    setIsApplyingBillingAddress(true);
+    try {
+      const result = await checkout.updateBillingAddress(payload);
+      if (result.type === "error") {
+        setErrorMessage(result.error.message || fallbackMessage);
+        return false;
+      }
+      return true;
+    } catch {
+      setErrorMessage(fallbackMessage);
+      return false;
+    } finally {
+      setIsApplyingBillingAddress(false);
+    }
+  }
+
+  async function applyCurrentBillingAddress(name: string): Promise<boolean> {
+    if (useMailingAsBilling) {
+      const payload = mailingAddressPayload(name);
+      if (!payload) {
+        setErrorMessage(
+          "Could not apply your Flipvise mailing address. Enter the billing address manually.",
+        );
+        return false;
+      }
+      return applyBillingAddressPayload(
+        payload,
+        "Could not apply your Flipvise mailing address. Enter the billing address manually.",
+      );
+    }
+
+    const payload = manualAddressPayload(name);
+    if (!payload) {
+      setErrorMessage("Enter a complete billing address.");
+      return false;
+    }
+    return applyBillingAddressPayload(
+      payload,
+      "Could not update the billing address. Check the fields and try again.",
+    );
+  }
+
+  const manualAddressComplete = Boolean(
+    manualAddress.line1.trim() &&
+      manualAddress.city.trim() &&
+      countryCodeFromName(manualAddress.countryName),
+  );
+
   async function handleSubscribe() {
     setIsSubmitting(true);
     setErrorMessage(null);
-    const result = await checkout.confirm();
-    if (result.type === "error") {
-      setErrorMessage(result.error.message);
+
+    try {
+      const trimmedName = cardName.trim();
+      if (!trimmedName) {
+        setErrorMessage("Enter the name on the card.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Automatic tax forbids billingAddress on confirm(); use updateBillingAddress only.
+      const applied = await applyCurrentBillingAddress(trimmedName);
+      if (!applied) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      const result = await checkout.confirm();
+
+      if (result.type === "error") {
+        setErrorMessage(result.error.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Session already has return_url from creation; fall back if Stripe does not navigate.
+      const sessionId = result.session.id;
+      window.location.assign(
+        sessionId
+          ? `/dashboard?checkout=success&session_id=${encodeURIComponent(sessionId)}`
+          : "/dashboard?checkout=success",
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Payment could not be completed. Please try again.",
+      );
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleUseMailingAsBillingChange(checked: boolean) {
+    setErrorMessage(null);
+    if (!checked) {
+      setUseMailingAsBilling(false);
+      return;
+    }
+    if (!savedMailingAddress) return;
+
+    const nextCardName = cardName.trim() || savedMailingAddress.name || "";
+    const payload = mailingAddressPayload(nextCardName);
+    if (!payload) return;
+
+    setCardName(nextCardName);
+    setUseMailingAsBilling(true);
+    const applied = await applyBillingAddressPayload(
+      payload,
+      "Could not apply your Flipvise mailing address. Enter the billing address manually.",
+    );
+    if (!applied) {
+      setUseMailingAsBilling(false);
+    }
+  }
+
+  async function handleCardNameBlur() {
+    const trimmedName = cardName.trim();
+    if (!trimmedName) return;
+    if (useMailingAsBilling) {
+      await applyCurrentBillingAddress(trimmedName);
+      return;
+    }
+    if (manualAddressComplete) {
+      await applyCurrentBillingAddress(trimmedName);
     }
   }
 
@@ -367,19 +584,207 @@ function CheckoutPaymentFields({
           <CreditCard className="size-4 text-[#6b7280]" aria-hidden />
           <span>Card</span>
         </div>
-        <PaymentElement />
+        <PaymentElement
+          options={{
+            fields: {
+              billingDetails: {
+                // Name/address come from updateBillingAddress().
+                name: "never",
+                address: "never",
+              },
+            },
+          }}
+        />
       </div>
 
       <div className="space-y-3">
         <div className="space-y-1">
           <p className="text-sm font-medium text-[#30313d]">Billing address</p>
           <p className="text-xs leading-relaxed text-[#6b7280]">
-            Enter the name and address on the card or bank account you are using above —
-            not your Flipvise account details. These are used to verify your payment method
-            and calculate tax where applicable.
+            {useMailingAsBilling
+              ? "Your Flipvise mailing address will be used for billing verification and tax. Enter the name as it appears on the card."
+              : "Enter the name and address on the card or bank account you are using above. These are used to verify your payment method and calculate tax where applicable."}
+            {!useMailingAsBilling && savedMailingAddress
+              ? " If that matches your Flipvise mailing address from Account Details, you can select it below."
+              : null}
           </p>
         </div>
-        <BillingAddressElement />
+        {savedMailingAddress ? (
+          <div className="flex items-start gap-2.5 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2.5">
+            <Checkbox
+              id="checkout-same-as-mailing"
+              checked={useMailingAsBilling}
+              disabled={isApplyingBillingAddress || isSubmitting}
+              onCheckedChange={(value) => {
+                void handleUseMailingAsBillingChange(value === true);
+              }}
+              className="mt-0.5 border-[#d0d7e2] bg-white data-checked:border-[#1a2332] data-checked:bg-[#1a2332] data-checked:text-white"
+            />
+            <div className="min-w-0 space-y-1">
+              <Label
+                htmlFor="checkout-same-as-mailing"
+                className="cursor-pointer text-sm font-medium text-[#30313d]"
+              >
+                Same as my Flipvise mailing address
+              </Label>
+              <p className="whitespace-pre-line text-xs leading-relaxed text-[#6b7280]">
+                {savedMailingAddress.displayLines}
+              </p>
+              {isApplyingBillingAddress ? (
+                <p className="text-xs text-[#6b7280]">Applying address…</p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="space-y-2">
+          <Label htmlFor="checkout-card-name" className="text-sm font-medium text-[#30313d]">
+            Card Name
+          </Label>
+          <Input
+            id="checkout-card-name"
+            value={cardName}
+            onChange={(event) => setCardName(event.target.value)}
+            onBlur={() => {
+              void handleCardNameBlur();
+            }}
+            autoComplete="cc-name"
+            placeholder="Name on card"
+            disabled={isApplyingBillingAddress || isSubmitting}
+            className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
+          />
+        </div>
+
+        {!useMailingAsBilling ? (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label
+                htmlFor="checkout-billing-country"
+                className="text-sm font-medium text-[#30313d]"
+              >
+                Country or region
+              </Label>
+              <Select
+                value={manualAddress.countryName ? manualAddress.countryName : null}
+                disabled={isApplyingBillingAddress || isSubmitting}
+                itemToStringLabel={(value) => value}
+                onValueChange={(next) => {
+                  setManualAddress((prev) => ({
+                    ...prev,
+                    countryName: next ?? "",
+                  }));
+                }}
+              >
+                <SelectTrigger
+                  id="checkout-billing-country"
+                  className="h-11 w-full border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
+                >
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORLD_COUNTRY_NAMES.map((country) => (
+                    <SelectItem key={country} value={country} label={country}>
+                      {country}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="checkout-billing-line1"
+                className="text-sm font-medium text-[#30313d]"
+              >
+                Address
+              </Label>
+              <Input
+                id="checkout-billing-line1"
+                value={manualAddress.line1}
+                onChange={(event) =>
+                  setManualAddress((prev) => ({
+                    ...prev,
+                    line1: event.target.value,
+                  }))
+                }
+                autoComplete="address-line1"
+                placeholder="Address"
+                disabled={isApplyingBillingAddress || isSubmitting}
+                className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label
+                  htmlFor="checkout-billing-city"
+                  className="text-sm font-medium text-[#30313d]"
+                >
+                  City
+                </Label>
+                <Input
+                  id="checkout-billing-city"
+                  value={manualAddress.city}
+                  onChange={(event) =>
+                    setManualAddress((prev) => ({
+                      ...prev,
+                      city: event.target.value,
+                    }))
+                  }
+                  autoComplete="address-level2"
+                  placeholder="City"
+                  disabled={isApplyingBillingAddress || isSubmitting}
+                  className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="checkout-billing-state"
+                  className="text-sm font-medium text-[#30313d]"
+                >
+                  State / province
+                </Label>
+                <Input
+                  id="checkout-billing-state"
+                  value={manualAddress.state}
+                  onChange={(event) =>
+                    setManualAddress((prev) => ({
+                      ...prev,
+                      state: event.target.value,
+                    }))
+                  }
+                  autoComplete="address-level1"
+                  placeholder="State or province"
+                  disabled={isApplyingBillingAddress || isSubmitting}
+                  className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor="checkout-billing-postal"
+                className="text-sm font-medium text-[#30313d]"
+              >
+                Postal code
+              </Label>
+              <Input
+                id="checkout-billing-postal"
+                value={manualAddress.postalCode}
+                onChange={(event) =>
+                  setManualAddress((prev) => ({
+                    ...prev,
+                    postalCode: event.target.value,
+                  }))
+                }
+                autoComplete="postal-code"
+                placeholder="Postal code"
+                disabled={isApplyingBillingAddress || isSubmitting}
+                className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {errorMessage ? (
@@ -397,7 +802,13 @@ function CheckoutPaymentFields({
         </p>
         <SlideToSubmitButton
           label={slideLabel}
-          disabled={!checkout.canConfirm || isSubmitting}
+          disabled={
+            isSubmitting ||
+            isApplyingBillingAddress ||
+            !cardName.trim() ||
+            (!useMailingAsBilling && !manualAddressComplete) ||
+            !checkout.canConfirm
+          }
           pending={isSubmitting}
           onSubmit={handleSubscribe}
           variant="checkout"
@@ -424,11 +835,13 @@ export function PricingCheckoutPayment({
   clientSecret,
   summary,
   backHref,
+  savedMailingAddress = null,
   className,
 }: {
   clientSecret: string;
   summary: PricingCheckoutSummary;
   backHref: string;
+  savedMailingAddress?: CheckoutSavedMailingAddress | null;
   className?: string;
 }) {
   const stripePromise = useMemo(() => getStripePromise(), []);
@@ -493,7 +906,10 @@ export function PricingCheckoutPayment({
 
           <div className="space-y-8 px-5 py-6 sm:px-7 sm:py-8">
             <CheckoutElementsProvider stripe={stripePromise} options={options}>
-              <CheckoutPayBody summary={summary} />
+              <CheckoutPayBody
+                summary={summary}
+                savedMailingAddress={savedMailingAddress}
+              />
             </CheckoutElementsProvider>
           </div>
         </div>

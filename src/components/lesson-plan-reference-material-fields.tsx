@@ -89,6 +89,7 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
   ref,
 ) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastExtractErrorRef = useRef<string | null>(null);
   const [sourceMode, setSourceMode] = useState<SourcePickerId | null>(null);
   const [url, setUrl] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -109,10 +110,13 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
 
   async function extractAndAppendReference(nextUrl: string, nextFile: File | null) {
     if (atReferenceLimit) {
-      onError(`You can add up to ${MAX_LESSON_PLAN_REFERENCES} references.`);
+      const message = `You can add up to ${MAX_LESSON_PLAN_REFERENCES} references.`;
+      lastExtractErrorRef.current = message;
+      onError(message);
       return null;
     }
 
+    lastExtractErrorRef.current = null;
     onError(null);
     setIsExtracting(true);
     try {
@@ -134,11 +138,12 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
       resetSourcePickerState(setSourceMode, setUrl, setSelectedFile, fileInputRef);
       return material;
     } catch (error) {
-      onError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Could not read that reference material. Try another source.",
-      );
+          : "Could not read that reference material. Try another source.";
+      lastExtractErrorRef.current = message;
+      onError(message);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return null;
@@ -155,7 +160,8 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
         const material = await extractAndAppendReference(url, selectedFile);
         if (!material) {
           throw new Error(
-            "Finish adding the pending reference, or clear the URL/file before generating.",
+            lastExtractErrorRef.current ??
+              "Finish adding the pending reference, or clear the URL/file before generating.",
           );
         }
         references.push(material);

@@ -18,6 +18,7 @@ import {
 } from "@/lib/stripe-pricing-display";
 import { stripe } from "@/lib/stripe";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
+import { getSavedMailingAddressForCheckout } from "@/lib/stripe-invoice-addresses";
 import { publishedTrialDaysForPlan } from "@/lib/plan-trial";
 import { toClientJson } from "@/lib/to-client-json";
 
@@ -99,6 +100,8 @@ export default async function PricingCheckoutPayPage({
     customerEmail = primaryEmail?.trim().toLowerCase() ?? null;
   }
 
+  const savedMailingAddress = await getSavedMailingAddressForCheckout(userId);
+
   const plans = await loadPlansForPricingUi();
   const planRow = isStripePaidPlanId(planId)
     ? plans.find((p) => p.id === planId)
@@ -134,6 +137,9 @@ export default async function PricingCheckoutPayPage({
       clientSecret={session.client_secret}
       summary={toClientJson(summary)}
       backHref={backHref}
+      savedMailingAddress={
+        savedMailingAddress ? toClientJson(savedMailingAddress) : null
+      }
     />
   );
 }

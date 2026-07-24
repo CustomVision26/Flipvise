@@ -174,13 +174,15 @@ export function DeckCardPopover({
 
   const wrapperClass =
     view === "compact"
-      ? "relative min-h-[140px] sm:min-h-[160px]"
+      ? "relative h-full min-h-[140px] sm:min-h-[160px]"
       : view === "list"
         ? "relative"
         : "relative min-h-[4.75rem]";
 
-  const triggerClassName =
-    "block w-full min-h-0 text-left cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const triggerClassName = cn(
+    "block w-full min-h-0 text-left cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    view === "compact" && "h-full",
+  );
 
   const deckTriggerRender = (
     <div tabIndex={0} aria-label={`Quick actions for ${deck.name}`} />
@@ -415,7 +417,7 @@ export function DeckCardPopover({
             )
           : "border-border/80 bg-card/95 ring-1 ring-foreground/20 backdrop-blur-md hover:border-foreground/30 hover:bg-card hover:shadow-xl",
         view === "compact"
-          ? cn("flex flex-col hover:-translate-y-0.5", hasCover && "p-0")
+          ? cn("flex h-full min-h-0 flex-col hover:-translate-y-0.5", hasCover && "p-0")
           : view === "list"
             ? cn(
                 "flex flex-row items-center py-2.5 sm:gap-3",

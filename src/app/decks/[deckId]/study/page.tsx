@@ -10,6 +10,7 @@ import {
   getTeamById,
   getTeamQuizDurationMinutes,
   isDeckLinkedToWorkspace,
+  listLinkedWorkspaceTeamIdsForDeck,
 } from "@/db/queries/teams";
 import {
   resolveQuizSecurityContextForStudy,
@@ -30,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   buildResolvedTeamWorkspaceQueryString,
+  inferTeamIdForDeckStudyUrl,
   resolveTeamWorkspaceCanonicalRedirectQueryString,
   resolveTeamWorkspaceFromSearchParams,
 } from "@/lib/resolve-team-workspace-url";
@@ -68,26 +70,59 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   if (isNaN(id)) notFound();
 
   const sp = await searchParams;
-  const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
-  if (teamWorkspaceUrl != null) {
-    const canonicalQs = await resolveTeamWorkspaceCanonicalRedirectQueryString(
-      userId,
-      sp,
-      teamWorkspaceUrl,
-    );
-    if (canonicalQs != null) {
-      redirect(withTeamWorkspaceQuery(`/decks/${id}/study`, canonicalQs));
-    }
-  }
-  const workspaceQs =
-    teamWorkspaceUrl != null
-      ? await buildResolvedTeamWorkspaceQueryString(userId, teamWorkspaceUrl)
-      : "";
-
   const bundle = await getDeckWithViewerAccess(id, userId);
   if (!bundle) notFound();
 
   const { deck, access } = bundle;
+
+  let teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
+  if (teamWorkspaceUrl == null) {
+    // Prefer membership / decks.teamId, then deck_workspace_links (multi-workspace decks
+    // often leave decks.teamId null — without this, owner bare /study skips quiz security).
+    const candidateTeamIds: number[] = [];
+    const inferredTeamId = inferTeamIdForDeckStudyUrl({
+      access,
+      deckTeamId: deck.teamId,
+    });
+    if (inferredTeamId != null) candidateTeamIds.push(inferredTeamId);
+    for (const linkedTeamId of await listLinkedWorkspaceTeamIdsForDeck(id)) {
+      if (!candidateTeamIds.includes(linkedTeamId)) {
+        candidateTeamIds.push(linkedTeamId);
+      }
+    }
+    for (const candidateTeamId of candidateTeamIds) {
+      const resolved = await resolveTeamWorkspaceFromSearchParams(userId, {
+        team: String(candidateTeamId),
+      });
+      if (resolved != null) {
+        teamWorkspaceUrl = resolved;
+        break;
+      }
+    }
+  }
+
+  if (teamWorkspaceUrl != null) {
+    const deckAssociatedWithWorkspace =
+      (deck.teamId != null && deck.teamId === teamWorkspaceUrl.teamId) ||
+      access.kind === "team_member" ||
+      access.kind === "team_admin" ||
+      (await isDeckLinkedToWorkspace(teamWorkspaceUrl.teamId, deck.id));
+    if (deckAssociatedWithWorkspace) {
+      const canonicalQs = await resolveTeamWorkspaceCanonicalRedirectQueryString(
+        userId,
+        sp,
+        teamWorkspaceUrl,
+      );
+      if (canonicalQs != null) {
+        redirect(withTeamWorkspaceQuery(`/decks/${id}/study`, canonicalQs));
+      }
+    }
+  }
+
+  const workspaceQs =
+    teamWorkspaceUrl != null
+      ? await buildResolvedTeamWorkspaceQueryString(userId, teamWorkspaceUrl)
+      : "";
   const { heading: teamDeckHeading, teamTierPro } = await getTeamDeckContext(deck);
   const deckCap = resolveDeckCardCap({
     teamTierProWorkspace: teamTierPro,
@@ -124,11 +159,12 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         : deck.teamId ?? null;
 
   let quizDurationSeconds: number | undefined;
-  if (studyTeamId != null) {
+  // Per-deck timer wins when set; otherwise use workspace/subscriber effective minutes.
+  if (deck.quizDurationMinutes != null) {
+    quizDurationSeconds = teamQuizDurationSeconds(deck.quizDurationMinutes);
+  } else if (studyTeamId != null) {
     const minutes = await getTeamQuizDurationMinutes(studyTeamId);
     quizDurationSeconds = teamQuizDurationSeconds(minutes);
-  } else if (deck.quizDurationMinutes != null) {
-    quizDurationSeconds = teamQuizDurationSeconds(deck.quizDurationMinutes);
   }
 
   let quizSecurity: QuizSecurityStudyContext | undefined;
@@ -299,6 +335,9 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         exitHref={studyBackHref}
         exitLabel={studyExitLabel}
         ownerInboxAvailable={ownerInboxAvailable}
+        allowQuizCancelExit={
+          access.kind === "owner" || access.kind === "team_admin"
+        }
         isEducationTeamPlan={isEducationTeamPlan}
         quizFormats={quizFormats}
         quizFormatAssignmentPlan={quizFormatAssignmentPlan}

@@ -23,6 +23,13 @@ import {
   type CurriculumResearchContext,
 } from "@/lib/lesson-plan-curriculum-research";
 import {
+  confirmLearningStandardLinkedToJamaica,
+  formatJamaicaNscGuidelinesForPrompt,
+  getStoredJamaicaNscLessonGuidelines,
+  jamaicaNscSystemPromptRules,
+} from "@/lib/jamaica-nsc-lesson-guidelines";
+import type { JamaicaNscLessonGuidelines } from "@/data/jamaica-nsc-lesson-guidelines";
+import {
   buildTemplateDayVocabularyDetail,
   parseVocabularyLine,
   sanitizeDayVocabularyDetail,
@@ -118,6 +125,7 @@ function truncateReferenceSummary(summary: string, max = 200): string {
 function buildLessonPlanPrompt(
   input: LessonPlanActionInput,
   curriculumContext?: CurriculumResearchContext | null,
+  options?: { applyJamaicaNscGuidelines?: boolean },
 ): string {
   const lines = [
     `Subject: ${input.subject}`,
@@ -156,10 +164,18 @@ function buildLessonPlanPrompt(
   if (curriculumContext) {
     lines.push("", formatCurriculumContextForPrompt(curriculumContext));
   }
+  if (options?.applyJamaicaNscGuidelines) {
+    lines.push("", formatJamaicaNscGuidelinesForPrompt());
+  }
   if (input.vocabularyTeachingApproach) {
     lines.push("", vocabularyApproachPromptLine(input.vocabularyTeachingApproach));
   }
-  lines.push("", weeklySchedulePromptBlock(input.planPeriodDays, input.lessonDuration));
+  lines.push(
+    "",
+    weeklySchedulePromptBlock(input.planPeriodDays, input.lessonDuration, {
+      useFiveEModel: Boolean(options?.applyJamaicaNscGuidelines),
+    }),
+  );
   if (input.regenerationSeed && input.regenerationSeed > 0) {
     lines.push(
       `Variation request #${input.regenerationSeed}: produce a fresh alternative lesson plan with different activities, examples, and sequencing while keeping the same topic and standards.`,
@@ -192,8 +208,10 @@ function sanitizeUnitVocabulary(
 function normalizeLessonPlanResult(
   output: LessonPlanResult,
   input: LessonPlanActionInput,
+  options?: { applyJamaicaNscGuidelines?: boolean },
 ): LessonPlanResult {
   const planPeriodDays = clampPlanPeriodDays(input.planPeriodDays);
+  const applyJamaicaNscGuidelines = Boolean(options?.applyJamaicaNscGuidelines);
   const vocabulary = sanitizeUnitVocabulary(output.vocabulary, input);
   const filtered = {
     ...output,
@@ -202,6 +220,7 @@ function normalizeLessonPlanResult(
       output.differentiatedInstruction,
       input.difficultyLevel,
     ),
+    jamaicaNscGuidelinesApplied: applyJamaicaNscGuidelines,
   };
 
   if (planPeriodDays <= 1) {
@@ -215,6 +234,7 @@ function normalizeLessonPlanResult(
     lessonDuration: input.lessonDuration,
     topic: input.topic,
     difficulty: input.difficultyLevel,
+    useFiveEModel: applyJamaicaNscGuidelines,
   });
 
   return { ...filtered, weeklySchedule: schedule };
@@ -247,24 +267,34 @@ export async function generateLessonPlanAction(
   }
 
   const input = parsed.data;
+  const learningStandard = input.learningStandard?.trim() ?? "";
 
   let curriculumContext: CurriculumResearchContext | null = null;
-  if (input.learningStandard?.trim()) {
-    try {
-      curriculumContext = await fetchCurriculumContextForLessonPlan(input);
-    } catch (error) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          "[generateLessonPlanAction] Curriculum research failed; continuing without it.",
-          error,
-        );
-      }
-      curriculumContext = null;
-    }
+  let applyJamaicaNscGuidelines = false;
+
+  if (learningStandard) {
+    const [researchResult, jamaicaLinked] = await Promise.all([
+      fetchCurriculumContextForLessonPlan(input).catch((error) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            "[generateLessonPlanAction] Curriculum research failed; continuing without it.",
+            error,
+          );
+        }
+        return null;
+      }),
+      confirmLearningStandardLinkedToJamaica(learningStandard),
+    ]);
+    curriculumContext = researchResult;
+    applyJamaicaNscGuidelines = jamaicaLinked;
   }
 
   if (!process.env.OPENAI_API_KEY?.trim()) {
-    return generateLessonPlan(input);
+    const fallback = generateLessonPlan(input);
+    return {
+      ...fallback,
+      jamaicaNscGuidelinesApplied: applyJamaicaNscGuidelines,
+    };
   }
 
   try {
@@ -284,24 +314,32 @@ Requirements:
 - Main teaching steps must be detailed procedural steps a teacher can follow (5–8 steps).
 - Warm-up, classroom activity, homework, and assessment must be concrete and topic-specific.
 - Lesson timeline must break the full lesson duration into timed segments that add up logically.
-${weeklySchedulePromptBlock(input.planPeriodDays, input.lessonDuration)}
+${applyJamaicaNscGuidelines ? "- Because Jamaica NSC guidelines apply for this Learning Standard, each day's Class timeline MUST use the 5E model (Engage, Explore, Explain, Elaborate, Evaluate) with timed labeled lines — never Warm-up/Instruction/Activity/Closing phase labels." : "- Do not apply Jamaica NSC guidelines or force the 5E model unless Jamaica NSC rules are included below. Use a standard warm-up / instruction / practice / assessment class timeline."}
+${weeklySchedulePromptBlock(input.planPeriodDays, input.lessonDuration, {
+  useFiveEModel: applyJamaicaNscGuidelines,
+})}
 ${difficultyRigorAiRules(input.difficultyLevel)}
 ${differentiatedInstructionAiRules(input.difficultyLevel)}
 - Never use outdated labels like "On-level", "Support", or "Extension".
 - If special needs or accommodations are provided, weave specific adaptations into differentiated instruction and teacher notes.
 - If a learning standard is provided, align objectives, vocabulary, assessment, and pacing to that framework.
 ${curriculumContext ? "- Official curriculum / syllabus research is included in the user prompt. Treat it as authoritative grounding — cite applicable standard codes, competencies, and syllabus outcomes in learning objectives and assessment where relevant." : ""}
+${applyJamaicaNscGuidelines ? jamaicaNscSystemPromptRules() : ""}
 ${input.vocabularyTeachingApproach ? "- Follow the vocabulary teaching approach specified in the user prompt. Reflect it in vocabulary entries, lesson timeline, activities, homework, and teacher notes." : ""}
 ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- Teacher-provided reference material is included in the user prompt. Ground objectives, vocabulary, teaching steps, activities, and assessment in that content when it aligns with the topic." : ""}
 - Do not use markdown formatting.`,
-      prompt: buildLessonPlanPrompt(input, curriculumContext),
+      prompt: buildLessonPlanPrompt(input, curriculumContext, {
+        applyJamaicaNscGuidelines,
+      }),
     });
 
     if (!output) {
       throw new Error("AI lesson generation returned no output.");
     }
 
-    return normalizeLessonPlanResult(coerceLessonPlanResultAi(output), input);
+    return normalizeLessonPlanResult(coerceLessonPlanResultAi(output), input, {
+      applyJamaicaNscGuidelines,
+    });
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.warn(
@@ -309,7 +347,11 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
         error,
       );
     }
-    return generateLessonPlan(input);
+    const fallback = generateLessonPlan(input);
+    return {
+      ...fallback,
+      jamaicaNscGuidelinesApplied: applyJamaicaNscGuidelines,
+    };
   }
 }
 
@@ -323,16 +365,34 @@ const generateDayVocabularyDetailSchema = z.object({
   dayLabel: z.string().min(1),
   dailyFocus: z.string().min(1),
   vocabulary: z.array(z.string().min(1)).min(1).max(8),
+  lessonTimeline: z.array(z.string().min(1)).max(10).optional(),
+  /** When set, skips re-classification; must match generation-time Jamaica NSC gate. */
+  jamaicaNscGuidelinesApplied: z.boolean().optional(),
 });
+
+async function resolveApplyJamaicaNscForDetail(input: {
+  learningStandard?: string;
+  jamaicaNscGuidelinesApplied?: boolean;
+}): Promise<boolean> {
+  if (typeof input.jamaicaNscGuidelinesApplied === "boolean") {
+    return input.jamaicaNscGuidelinesApplied;
+  }
+  const learningStandard = input.learningStandard?.trim() ?? "";
+  if (!learningStandard) return false;
+  return confirmLearningStandardLinkedToJamaica(learningStandard);
+}
 
 async function generateDayVocabularyDetailCore(
   input: z.infer<typeof generateDayVocabularyDetailSchema>,
 ) {
+  const applyJamaicaNscGuidelines = await resolveApplyJamaicaNscForDetail(input);
+  const detailInput = { ...input, useFiveEModel: applyJamaicaNscGuidelines };
+
   const finalize = (detail: LessonPlanDayVocabularyDetail) =>
-    sanitizeDayVocabularyDetail(detail, input);
+    sanitizeDayVocabularyDetail(detail, detailInput);
 
   if (!process.env.OPENAI_API_KEY?.trim()) {
-    return finalize(buildTemplateDayVocabularyDetail(input));
+    return finalize(buildTemplateDayVocabularyDetail(detailInput));
   }
 
   const vocabularyLines = input.vocabulary
@@ -341,6 +401,14 @@ async function generateDayVocabularyDetailCore(
       return `- ${term}: ${shortDefinition}`;
     })
     .join("\n");
+
+  const timelineLines = (input.lessonTimeline ?? [])
+    .map((line) => `- ${line}`)
+    .join("\n");
+
+  const fiveERequirement = applyJamaicaNscGuidelines
+    ? `- fiveEBreakdown: REQUIRED because Jamaica NSC guidelines apply. Expand the day's class timeline into exactly 5 phases in order: Engage, Explore, Explain, Elaborate, Evaluate. For each phase include timeRange (e.g. "0-5 min"), activitySummary (one line), detail (2–4 sentences of teacher-facing guidance), vocabularyFocus (which of today's terms are emphasized in that phase), teacherMoves (1–4 bullets), and studentMoves (1–4 bullets). Map from the provided class timeline when present; if a timeline line already names a 5E phase, preserve its timing and intent while adding richer instructional detail. Heading should be "5E Class Timeline Detail".`
+    : `- fiveEBreakdown: MUST be null. Do not invent Engage/Explore/Explain/Elaborate/Evaluate phases — Jamaica NSC guidelines do not apply for this Learning Standard. Expand instructional guidance via process steps that follow the provided class timeline labels (warm-up, instruction, practice, etc.).`;
 
   try {
     const { output } = await generateText({
@@ -355,10 +423,11 @@ Requirements:
 - terms: prefer real subject-domain concepts students will be taught (e.g. Variable, Equation, Coefficient for Algebra). shortDefinition is the concise student-friendly meaning; definition is a fuller classroom explanation (2–4 sentences); example is a concrete italic-ready classroom example starting with "Example:".
 - If an assigned vocabulary line is the lesson topic/title or a generic meta-term (Process, Cause and effect, Evidence-as-filler, "main concept"), REPLACE it with authentic domain vocabulary for the topic instead of echoing it.
 - Keep roughly the same number of day terms as assigned (typically 1–6), but every term must be a teachable subject concept.
+${fiveERequirement}
 - mainConcept: a "Main Concept" section explaining how the day's terms connect to the topic (like a study guide overview).
 - process: numbered instructional steps (Collect, Organize, Display, Analyze, Interpret, etc. when appropriate) with bullet sub-points — match the rigor of ${input.difficultyLevel}.
 - learningGoal: "By the end of this class period, students should be able to:" plus measurable objectives.
-- additionalVocabulary: 6–12 related subject concepts students should know for this topic/day (PEP/exam-aligned when learning standard mentions Jamaica PEP or similar) — list real terms with definitions like a study guide vocabulary list, not the lesson title.
+- additionalVocabulary: 6–12 related subject concepts students should know for this topic/day (PEP/exam-aligned only when learning standard is Jamaica-linked) — list real terms with definitions like a study guide vocabulary list, not the lesson title.
 - contextIntro: one sentence framing the detail section for teachers.
 - Never use markdown. Use plain text only.`,
       prompt: [
@@ -370,11 +439,20 @@ Requirements:
         input.learningStandard?.trim()
           ? `Learning standard: ${input.learningStandard.trim()}`
           : null,
+        `Jamaica NSC guidelines applied: ${applyJamaicaNscGuidelines ? "yes" : "no"}`,
         `Day: ${input.dayLabel}`,
         `Daily focus: ${input.dailyFocus}`,
         "",
         "Assigned vocabulary for this day:",
         vocabularyLines,
+        "",
+        applyJamaicaNscGuidelines
+          ? "Class timeline for this day (expand into fiveEBreakdown):"
+          : "Class timeline for this day (use for process steps; do not convert to 5E):",
+        timelineLines ||
+          (applyJamaicaNscGuidelines
+            ? "- (no timeline provided — invent a sensible 5E pacing for one class period)"
+            : "- (no timeline provided — invent a sensible warm-up / instruction / practice / assessment pacing)"),
       ]
         .filter(Boolean)
         .join("\n"),
@@ -392,7 +470,7 @@ Requirements:
         error,
       );
     }
-    return finalize(buildTemplateDayVocabularyDetail(input));
+    return finalize(buildTemplateDayVocabularyDetail(detailInput));
   }
 }
 
@@ -420,12 +498,14 @@ const generateAllDaysVocabularyDetailSchema = z.object({
   difficultyLevel: lessonPlanInputSchema.shape.difficultyLevel,
   learningStandard: z.string().optional(),
   lessonTitle: z.string().min(1),
+  jamaicaNscGuidelinesApplied: z.boolean().optional(),
   days: z
     .array(
       z.object({
         dayLabel: z.string().min(1),
         dailyFocus: z.string().min(1),
         vocabulary: z.array(z.string().min(1)).min(1).max(8),
+        lessonTimeline: z.array(z.string().min(1)).max(10).optional(),
       }),
     )
     .min(1)
@@ -447,14 +527,18 @@ export async function generateAllDaysVocabularyDetailAction(
   }
 
   const { days, ...lessonContext } = parsed.data;
+  const jamaicaNscGuidelinesApplied =
+    await resolveApplyJamaicaNscForDetail(lessonContext);
 
   return Promise.all(
     days.map((day) =>
       generateDayVocabularyDetailCore({
         ...lessonContext,
+        jamaicaNscGuidelinesApplied,
         dayLabel: day.dayLabel,
         dailyFocus: day.dailyFocus,
         vocabulary: day.vocabulary,
+        lessonTimeline: day.lessonTimeline,
       }),
     ),
   );
@@ -576,6 +660,20 @@ async function tryUploadLessonPlanVocabularyDetailPdf(
     }
     return { vocabularyDetailPdfUrl: null, vocabularyDetailPdfFileName: null };
   }
+}
+
+/**
+ * Returns the stored Jamaica NSC lesson-structure guidelines.
+ * `generateLessonPlanAction` injects these only after AI confirms the
+ * Learning Standard field is linked to Jamaica.
+ */
+export async function getJamaicaNscLessonGuidelinesAction(): Promise<JamaicaNscLessonGuidelines> {
+  const ctx = await getAccessContext();
+  await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+  return getStoredJamaicaNscLessonGuidelines();
 }
 
 export async function extractLessonPlanReferenceAction(

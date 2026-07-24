@@ -47,9 +47,42 @@ export const lessonPlanProcessStepSchema = z.object({
   bullets: z.array(z.string().min(1)).min(1).max(8),
 });
 
+export const FIVE_E_PHASES = [
+  "Engage",
+  "Explore",
+  "Explain",
+  "Elaborate",
+  "Evaluate",
+] as const;
+
+export type FiveEPhaseName = (typeof FIVE_E_PHASES)[number];
+
+export const lessonPlanFiveEPhaseSchema = z.object({
+  phase: z.enum(FIVE_E_PHASES),
+  timeRange: z.string().min(1),
+  activitySummary: z.string().min(1),
+  detail: z.string().min(1),
+  vocabularyFocus: z.array(z.string().min(1)).max(8),
+  teacherMoves: z.array(z.string().min(1)).min(1).max(6),
+  studentMoves: z.array(z.string().min(1)).min(1).max(6),
+});
+
+export type LessonPlanFiveEPhase = z.infer<typeof lessonPlanFiveEPhaseSchema>;
+
+export const lessonPlanFiveEBreakdownSchema = z.object({
+  heading: z.string().min(1),
+  intro: z.string().optional(),
+  phases: z.array(lessonPlanFiveEPhaseSchema).min(5).max(5),
+});
+
+export type LessonPlanFiveEBreakdown = z.infer<
+  typeof lessonPlanFiveEBreakdownSchema
+>;
+
 export const lessonPlanDayVocabularyDetailSchema = z.object({
   contextIntro: z.string().min(1),
   terms: z.array(lessonPlanVocabularyTermDetailSchema).min(1).max(12),
+  fiveEBreakdown: lessonPlanFiveEBreakdownSchema.optional(),
   mainConcept: z
     .object({
       heading: z.string().min(1),
@@ -87,9 +120,26 @@ export const lessonPlanVocabularyTermDetailAiSchema = z.object({
   example: z.string().nullable(),
 });
 
+export const lessonPlanFiveEPhaseAiSchema = z.object({
+  phase: z.enum(FIVE_E_PHASES),
+  timeRange: z.string().min(1),
+  activitySummary: z.string().min(1),
+  detail: z.string().min(1),
+  vocabularyFocus: z.array(z.string().min(1)).max(8),
+  teacherMoves: z.array(z.string().min(1)).min(1).max(6),
+  studentMoves: z.array(z.string().min(1)).min(1).max(6),
+});
+
+export const lessonPlanFiveEBreakdownAiSchema = z.object({
+  heading: z.string().min(1),
+  intro: z.string().nullable(),
+  phases: z.array(lessonPlanFiveEPhaseAiSchema).min(5).max(5),
+});
+
 export const lessonPlanDayVocabularyDetailAiSchema = z.object({
   contextIntro: z.string().min(1),
   terms: z.array(lessonPlanVocabularyTermDetailAiSchema).min(1).max(12),
+  fiveEBreakdown: lessonPlanFiveEBreakdownAiSchema.nullable(),
   mainConcept: z
     .object({
       heading: z.string().min(1),
@@ -126,12 +176,25 @@ export function coerceLessonPlanVocabularyTermDetail(
   };
 }
 
+function coerceLessonPlanFiveEBreakdown(
+  breakdown: z.infer<typeof lessonPlanFiveEBreakdownAiSchema>,
+): LessonPlanFiveEBreakdown {
+  return {
+    heading: breakdown.heading,
+    phases: breakdown.phases,
+    ...(breakdown.intro ? { intro: breakdown.intro } : {}),
+  };
+}
+
 export function coerceLessonPlanDayVocabularyDetail(
   detail: z.infer<typeof lessonPlanDayVocabularyDetailAiSchema>,
 ): LessonPlanDayVocabularyDetail {
   return {
     contextIntro: detail.contextIntro,
     terms: detail.terms.map(coerceLessonPlanVocabularyTermDetail),
+    ...(detail.fiveEBreakdown
+      ? { fiveEBreakdown: coerceLessonPlanFiveEBreakdown(detail.fiveEBreakdown) }
+      : {}),
     ...(detail.mainConcept ? { mainConcept: detail.mainConcept } : {}),
     ...(detail.process ? { process: detail.process } : {}),
     ...(detail.learningGoal
@@ -212,6 +275,11 @@ export const lessonPlanResultSchema = z.object({
   homework: z.string().min(1),
   differentiatedInstruction: z.array(z.string().min(1)).min(1).max(6),
   teacherNotes: z.string().min(1),
+  /**
+   * Set after generation when Learning Standard was confirmed Jamaica-linked.
+   * Not produced by the AI schema — app metadata only.
+   */
+  jamaicaNscGuidelinesApplied: z.boolean().optional(),
 });
 
 /** Result shape for OpenAI Output.object — nullable instead of optional. */

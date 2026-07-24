@@ -21,16 +21,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  TeacherNameFieldHelpContent,
+  TeacherTopicFieldHelpContent,
+} from "@/components/teacher-field-help-content";
 import { createDeckAction } from "@/actions/decks";
 import { createCardAction, uploadCardImageAction } from "@/actions/cards";
 import { cn } from "@/lib/utils";
 import { GradientPicker } from "@/components/gradient-picker";
 import type { GradientSlug } from "@/lib/deck-gradients";
+import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 
 /** Minimal typings for browser Web Speech API (not in all TS lib.dom builds). */
 interface DeckSpeechRecognitionAlternative {
@@ -93,8 +105,8 @@ interface AddDeckDialogProps {
    */
   speechToTextEnabled?: boolean;
   /**
-   * When true with `forTeamWorkspace`, allows an optional image that becomes the first card’s front.
-   * Intended for team-tier subscribers on the main dashboard team workspace.
+   * When true, shows the optional first-card front image picker.
+   * Defaults to on for personal/team workspace create flows.
    */
   deckFrontImageUploadEnabled?: boolean;
 }
@@ -107,7 +119,7 @@ export function AddDeckDialog({
   forPersonalWorkspace = false,
   forTeamWorkspace = false,
   speechToTextEnabled = false,
-  deckFrontImageUploadEnabled = false,
+  deckFrontImageUploadEnabled = true,
 }: AddDeckDialogProps) {
   const router = useRouter();
   const { userId } = useAuth();
@@ -121,6 +133,7 @@ export function AddDeckDialog({
   );
   const [frontImageFile, setFrontImageFile] = React.useState<File | null>(null);
   const [frontImagePreviewUrl, setFrontImagePreviewUrl] = React.useState<string | null>(null);
+  const [difficultyLevel, setDifficultyLevel] = React.useState("");
 
   const nameInputRef = React.useRef<HTMLInputElement>(null);
   const descriptionRef = React.useRef<HTMLTextAreaElement>(null);
@@ -243,6 +256,7 @@ export function AddDeckDialog({
     setFrontImageFile(null);
     setFrontImagePreviewUrl(null);
     setGradient("none");
+    setDifficultyLevel("");
     stopDictation();
   }
 
@@ -329,6 +343,9 @@ export function AddDeckDialog({
     const description = (
       form.elements.namedItem("description") as HTMLTextAreaElement
     ).value.trim();
+    const gradeLevel = (
+      form.elements.namedItem("gradeLevel") as HTMLInputElement
+    ).value.trim();
 
     if (!name) {
       setError("Deck name is required.");
@@ -337,6 +354,8 @@ export function AddDeckDialog({
 
     setIsPending(true);
     const gradientValue = gradient !== "none" ? gradient : undefined;
+    const gradeLevelValue = gradeLevel || undefined;
+    const difficultyLevelValue = difficultyLevel.trim() || undefined;
     try {
       const networkOffline =
         typeof navigator !== "undefined" && !navigator.onLine;
@@ -358,9 +377,15 @@ export function AddDeckDialog({
         const r = await createDeckAction({
           name,
           description: description || undefined,
+          gradeLevel: gradeLevelValue,
+          difficultyLevel: difficultyLevelValue,
           gradient: gradientValue,
           personalOnly: true,
         });
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
         deckId = r.deckId;
       } else if (forTeamWorkspace) {
         if (teamId === undefined) {
@@ -370,18 +395,30 @@ export function AddDeckDialog({
         const r = await createDeckAction({
           name,
           description: description || undefined,
+          gradeLevel: gradeLevelValue,
+          difficultyLevel: difficultyLevelValue,
           gradient: gradientValue,
           teamId,
           teamWorkspaceOnly: true,
         });
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
         deckId = r.deckId;
       } else {
         const r = await createDeckAction({
           name,
           description: description || undefined,
+          gradeLevel: gradeLevelValue,
+          difficultyLevel: difficultyLevelValue,
           gradient: gradientValue,
           ...(teamId !== undefined ? { teamId } : {}),
         });
+        if (!r.ok) {
+          setError(r.error);
+          return;
+        }
         deckId = r.deckId;
       }
 
@@ -423,8 +460,12 @@ export function AddDeckDialog({
         }
       }
 
+      const raw =
+        err instanceof Error ? err.message : "Something went wrong. Please try again.";
       setError(
-        err instanceof Error ? err.message : "Something went wrong. Please try again.",
+        raw.includes("Server Components render") || raw.includes("digest property")
+          ? "Couldn't create the deck. Refresh the page and try again."
+          : raw,
       );
     } finally {
       setIsPending(false);
@@ -481,11 +522,12 @@ export function AddDeckDialog({
           {triggerLabel}
         </DialogTrigger>
       )}
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
+      <DialogContent className="mx-4 w-[calc(100vw-2rem)] max-h-[min(92dvh,40rem)] max-w-md overflow-y-auto sm:mx-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Create a new deck</DialogTitle>
           <DialogDescription className="text-sm">
-            Give your deck a name and an optional description.
+            Give your deck a name/subject/course, description/topic, and optional grade and
+            difficulty.
             {showSpeechUi ? " Use the microphone to dictate into the fields." : ""}
             {showDeckFrontImage
               ? " Optionally add an image for the first card’s front (question side)."
@@ -496,38 +538,29 @@ export function AddDeckDialog({
         <TooltipProvider>
           <form id="add-deck-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor="deck-name">Name</Label>
-                <Tooltip>
-                  <TooltipTrigger type="button" className="text-muted-foreground hover:text-foreground transition-colors">
-                    <HelpCircle className="h-4 w-4" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs">
-                    <p className="font-semibold mb-1">Examples:</p>
-                    <ul className="space-y-1 text-xs">
-                      <li>• Mathematics</li>
-                      <li>• Jamaica&apos;s History</li>
-                      <li>• Spanish Vocabulary</li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  ref={nameInputRef}
-                  id="deck-name"
-                  name="name"
-                  placeholder="e.g. Spanish Vocabulary"
-                  autoFocus
-                  className="min-w-0 flex-1"
-                />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="deck-name">Name/Subject/Course</Label>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Examples for name, subject, or course"
+                    >
+                      <HelpCircle className="h-4 w-4" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <TeacherNameFieldHelpContent />
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 {showSpeechUi && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={dictationField === "name" ? "destructive" : "outline"}
                     size="icon"
-                    className="size-9 shrink-0"
-                    disabled={isPending}
+                    className="h-7 w-7"
+                    disabled={isPending || dictationField === "description"}
                     title={dictationField === "name" ? "Stop dictation" : "Dictate name"}
                     onClick={() =>
                       dictationField === "name" ? stopDictation() : startDictation("name")
@@ -539,52 +572,46 @@ export function AddDeckDialog({
                     {dictationField === "name" ? (
                       <Square className="size-3.5" />
                     ) : (
-                      <Mic className="size-4" />
+                      <Mic className="size-3.5" />
                     )}
                   </Button>
                 )}
               </div>
+              <Input
+                ref={nameInputRef}
+                id="deck-name"
+                name="name"
+                placeholder="e.g. Spanish Vocabulary"
+                autoFocus
+                disabled={isPending}
+                className="text-sm"
+              />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5">
-                <Label htmlFor="deck-description">Description (optional)</Label>
-                <Tooltip>
-                  <TooltipTrigger type="button" className="text-muted-foreground hover:text-foreground transition-colors">
-                    <HelpCircle className="h-4 w-4" />
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs">
-                    <p className="font-semibold mb-1">Be specific to help AI understand:</p>
-                    <ul className="space-y-1.5 text-xs">
-                      <li>
-                        <span className="font-medium">Mathematics</span>
-                        <br />
-                        → Algebra, Geometry, or Calculus
-                      </li>
-                      <li>
-                        <span className="font-medium">Jamaica&apos;s History</span>
-                        <br />
-                        → Learning the 20th century history of Jamaica
-                      </li>
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="flex gap-2">
-                <Textarea
-                  ref={descriptionRef}
-                  id="deck-description"
-                  name="description"
-                  placeholder="What would you like to learn?"
-                  className="min-h-[88px] min-w-0 flex-1"
-                />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="deck-description">Description/Topic</Label>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Examples for description or topic"
+                    >
+                      <HelpCircle className="h-4 w-4" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      <TeacherTopicFieldHelpContent />
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 {showSpeechUi && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={dictationField === "description" ? "destructive" : "outline"}
                     size="icon"
-                    className="size-9 shrink-0 self-start"
-                    disabled={isPending}
+                    className="h-7 w-7"
+                    disabled={isPending || dictationField === "name"}
                     title={
                       dictationField === "description"
                         ? "Stop dictation"
@@ -604,10 +631,96 @@ export function AddDeckDialog({
                     {dictationField === "description" ? (
                       <Square className="size-3.5" />
                     ) : (
-                      <Mic className="size-4" />
+                      <Mic className="size-3.5" />
                     )}
                   </Button>
                 )}
+              </div>
+              <Textarea
+                ref={descriptionRef}
+                id="deck-description"
+                name="description"
+                placeholder="e.g. Learning Jamaica's independence and national identity"
+                disabled={isPending}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="deck-grade-level">Grade Level</Label>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Examples for grade level"
+                    >
+                      <HelpCircle className="h-4 w-4" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs text-xs leading-relaxed">
+                      <p className="mb-1 font-semibold">Examples by level:</p>
+                      <ul className="list-disc space-y-0.5 pl-4">
+                        <li>Primary: Grade 1–6</li>
+                        <li>Secondary: Grade 7–11</li>
+                        <li>Tertiary: Year 1, Year 2, 1st Year College, Undergraduate</li>
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  id="deck-grade-level"
+                  name="gradeLevel"
+                  placeholder="e.g. Grade 6"
+                  disabled={isPending}
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="deck-difficulty-level">Difficulty Level</Label>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="Examples for difficulty level"
+                    >
+                      <HelpCircle className="h-4 w-4" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs text-xs leading-relaxed">
+                      <p className="mb-1 font-semibold">Choose the class readiness level:</p>
+                      <p>
+                        Beginner for foundational support; Intermediate for most classes;
+                        Advanced for accelerated learners; Honors/Gifted for enrichment groups.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  value={difficultyLevel}
+                  onValueChange={(value) => {
+                    if (value == null) return;
+                    setDifficultyLevel(value);
+                  }}
+                >
+                  <SelectTrigger
+                    id="deck-difficulty-level"
+                    className="h-8 w-full bg-background text-sm sm:h-9"
+                    disabled={isPending}
+                  >
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LESSON_DIFFICULTY_LEVELS.filter((level) => level !== "All").map(
+                      (option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

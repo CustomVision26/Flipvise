@@ -22,6 +22,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Add, edit, reorder, and delete cards.",
           "AI card generation on Pro, Pro Plus, Education Plus, and team-tier / education team workspaces.",
           "Deck cover image upload when your plan allows (Pro personal, team-tier workspace).",
+          "Edit deck can set or replace the oldest card’s front image (first card front image).",
           "Open Study to launch flashcard review or quiz mode.",
           "AI generation requires a connection — the Generate button is disabled and explains why when you are offline.",
         ],
@@ -101,7 +102,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Fill in the blank — type the missing word or phrase in an AI-generated sentence.",
           "Pro Plus and Education Plus (Stripe paid, admin-assigned, or affiliate grant): on your personal deck’s quiz lobby, use Format Quiz Question to enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz (or Republish to quiz).",
           "Eligibility follows your effective Pro Plus / Education Plus entitlement — the same plan shown in Billing and the header plan badge.",
-          "Education Gold / Enterprise team admins configure formats in Team Admin → Deck Manager → Study privileges (not via Format Quiz Question on personal decks).",
+          "Team admins configure formats in Team Admin → Deck Manager → Study privileges (not via Format Quiz Question on personal decks).",
         ],
       },
       {
@@ -141,7 +142,9 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         bullets: [
           "Quiz timer — time limit per attempt set by team admin (or by you via Format Quiz Question on personal Pro Plus / Education Plus decks).",
           "Quiz schedule — quizzes cannot start before the configured date/time.",
-          "Quiz security — session locking, admin grant to resume/restart, one controlled attempt per deck.",
+          "Quiz security — session locking, admin grant to resume/restart, one controlled attempt per deck. Applies to the plan owner whenever security is on, plus Team Admins and/or Members selected in Quiz security settings. When active for you, the Timed quiz lobby shows a green Security on light.",
+          "Owners and team admins get a Cancel button on the unanswered-submit dialog to exit without submitting (members only see Keep answering / Submit anyway).",
+          "Workspace deck study links canonicalize to /decks/[deckId]/study?team=&userid=&plan=&teamMemberId=.",
         ],
       },
       {

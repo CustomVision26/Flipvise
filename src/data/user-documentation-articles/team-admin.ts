@@ -217,6 +217,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         bullets: [
           "Choose workspace, email, invitee name (required), and role (Member or Team admin).",
           "Email must match the address they will sign in with.",
+          "Invitee name auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account (you can still edit it).",
           "Invites expire in 3 days — expired invites must be resent.",
           "Cannot invite subscriber’s own primary email.",
           "Blocked when members + pending invites reach plan capacity.",
@@ -260,9 +261,9 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "timer",
         title: "Quiz timer",
         bullets: [
-          "Owner sets global default duration for all workspaces.",
-          "Per-workspace overrides with presets (5–120 minutes).",
-          "Co-admins configure workspace overrides when owner allows.",
+          "Owner sets a general quiz duration (minutes) for linked decks, or locks one time across workspaces.",
+          "Owner/team admin can set a timed-quiz length per individual deck (presets 5–120 minutes) when not locked.",
+          "Per-deck timer overrides the workspace/subscriber default when set.",
         ],
       },
       {
@@ -279,6 +280,8 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Quiz security",
         bullets: [
           "Workspace toggle applies to all decks unless deck overrides.",
+          "Choose Team Admin and/or Member checkboxes for whom security applies; the plan owner is always restricted when security is on.",
+          "Per-deck checkboxes can override the workspace audience default.",
           "Sessions can lock, complete, or terminate.",
           "Admins grant resume, restart/redo, or terminate from sessions table.",
           "Disabling security clears active sessions for that workspace.",

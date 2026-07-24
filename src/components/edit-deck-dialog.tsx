@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useTransition, useRef, useEffect, type ComponentProps, type ReactNode } from "react";
+import {
+  useState,
+  useTransition,
+  useRef,
+  useEffect,
+  type ChangeEvent,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff, ImagePlus, X, Loader2, HelpCircle } from "lucide-react";
@@ -41,6 +49,11 @@ import {
   uploadDeckCoverImageAction,
   removeDeckCoverImageAction,
 } from "@/actions/decks";
+import {
+  clearDeckFirstCardFrontImageAction,
+  getDeckFirstCardFrontStateAction,
+  setDeckFirstCardFrontImageAction,
+} from "@/actions/cards";
 import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 
@@ -105,9 +118,13 @@ export function EditDeckDialog({
   const [coverUrl, setCoverUrl] = useState(deck.coverImageUrl ?? null);
   const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [firstCardFrontUrl, setFirstCardFrontUrl] = useState<string | null>(null);
+  const [firstCardFrontError, setFirstCardFrontError] = useState<string | null>(null);
+  const [firstCardFrontUploading, setFirstCardFrontUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const coverFileRef = useRef<HTMLInputElement>(null);
+  const firstCardFrontFileRef = useRef<HTMLInputElement>(null);
 
   const showTeamDeckCover = allowCoverUpload;
 
@@ -123,8 +140,20 @@ export function EditDeckDialog({
   useEffect(() => {
     if (open) {
       setCoverUrl(deck.coverImageUrl ?? null);
+      setFirstCardFrontError(null);
+      let cancelled = false;
+      void getDeckFirstCardFrontStateAction({ deckId: deck.id })
+        .then((state) => {
+          if (!cancelled) setFirstCardFrontUrl(state.frontImageUrl);
+        })
+        .catch(() => {
+          if (!cancelled) setFirstCardFrontUrl(null);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [open, deck.coverImageUrl]);
+  }, [open, deck.coverImageUrl, deck.id]);
 
   function handleOpenChange(next: boolean) {
     if (!next) {
@@ -138,6 +167,7 @@ export function EditDeckDialog({
       setDifficultyLevel(deck.difficultyLevel ?? "");
       setGradient((deck.gradient as GradientSlug) ?? "none");
       setCoverUploadError(null);
+      setFirstCardFrontError(null);
       setError(null);
     }
     if (!isControlled) {
@@ -191,6 +221,54 @@ export function EditDeckDialog({
     }
   }
 
+  async function handleFirstCardFrontFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (firstCardFrontFileRef.current) firstCardFrontFileRef.current.value = "";
+    if (!file) return;
+
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setFirstCardFrontError(validationError);
+      return;
+    }
+
+    setFirstCardFrontError(null);
+    setFirstCardFrontUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const state = await setDeckFirstCardFrontImageAction(
+        { deckId: deck.id },
+        formData,
+      );
+      setFirstCardFrontUrl(state.frontImageUrl);
+      router.refresh();
+    } catch (err) {
+      setFirstCardFrontError(
+        err instanceof Error ? err.message : "Image upload failed.",
+      );
+    } finally {
+      setFirstCardFrontUploading(false);
+    }
+  }
+
+  async function handleRemoveFirstCardFront() {
+    if (!firstCardFrontUrl) return;
+    setFirstCardFrontError(null);
+    setFirstCardFrontUploading(true);
+    try {
+      const state = await clearDeckFirstCardFrontImageAction({ deckId: deck.id });
+      setFirstCardFrontUrl(state.frontImageUrl);
+      router.refresh();
+    } catch (err) {
+      setFirstCardFrontError(
+        err instanceof Error ? err.message : "Could not remove front image.",
+      );
+    } finally {
+      setFirstCardFrontUploading(false);
+    }
+  }
+
   function handleSubmit() {
     setError(null);
     nameSpeech.stop();
@@ -234,8 +312,8 @@ export function EditDeckDialog({
             Edit deck
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed sm:text-sm">
-            Update the name/subject/course, description/topic, grade level, and difficulty
-            for this deck.
+            Update the name/subject/course, description/topic, grade level, difficulty, and
+            optional first card front image for this deck.
             {showTeamDeckCover
               ? " Team decks can use an optional cover image on dashboard deck cards."
               : ""}
@@ -449,6 +527,60 @@ export function EditDeckDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="deck-first-card-front-image"
+              className="flex items-start gap-2 text-xs font-medium sm:items-center sm:text-sm"
+            >
+              <ImagePlus className="mt-0.5 size-4 shrink-0 text-muted-foreground sm:mt-0" aria-hidden />
+              <span className="leading-snug">First card front image (optional)</span>
+            </Label>
+            <Input
+              ref={firstCardFrontFileRef}
+              id="deck-first-card-front-image"
+              type="file"
+              accept={ALLOWED_IMAGE_TYPES.join(",")}
+              onChange={handleFirstCardFrontFileChange}
+              disabled={isPending || firstCardFrontUploading}
+              className="h-auto min-h-8 cursor-pointer bg-background py-1.5 text-xs text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2.5 file:py-1.5 file:text-[11px] file:font-medium file:text-foreground sm:file:text-xs"
+            />
+            {firstCardFrontUrl ? (
+              <div className="relative space-y-2">
+                <div className="relative mx-auto aspect-[5/2] w-full max-h-[7.5rem] overflow-hidden rounded-md border border-border bg-muted/30 sm:aspect-[2/1] sm:max-h-[10rem]">
+                  <Image
+                    src={firstCardFrontUrl}
+                    alt="First card front preview"
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 400px) 92vw, 448px"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-full gap-1.5 sm:h-9 sm:w-auto"
+                  onClick={handleRemoveFirstCardFront}
+                  disabled={isPending || firstCardFrontUploading}
+                >
+                  <X className="size-3.5" aria-hidden />
+                  Remove front image
+                </Button>
+              </div>
+            ) : null}
+            {firstCardFrontUploading && (
+              <div className="flex items-center gap-2 text-muted-foreground text-[11px] sm:text-xs">
+                <Loader2 className="size-3.5 animate-spin shrink-0" aria-hidden />
+                Updating front image…
+              </div>
+            )}
+            {firstCardFrontError && (
+              <p className="text-destructive text-[11px] leading-snug sm:text-xs">
+                {firstCardFrontError}
+              </p>
+            )}
           </div>
 
           {showTeamDeckCover && (
