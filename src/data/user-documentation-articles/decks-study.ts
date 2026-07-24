@@ -106,7 +106,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Offline: AI Recall™ shows “Internet connection required” and offers Continue with Standard Review — never a hard app error.",
           "Submit sends your answer to OpenAI for evaluation (synonyms and minor spelling accepted). I Don’t Know reveals immediately without AI and marks Needs Review.",
           "Session analytics (scores, forced unlocks, recall time, mastery) are stored for Teacher and Team dashboards.",
-          "Voice and drawing answers are reserved for future releases; text answers are supported today.",
+          "Answer with Type, Voice (microphone / speech-to-text), or Draw (sketch pad). Voice and drawings are evaluated by AI the same way as typed answers.",
         ],
       },
       {

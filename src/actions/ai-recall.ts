@@ -24,6 +24,16 @@ const evaluateSchema = z.object({
   correctAnswer: z.string().min(1).max(8000),
   studentAnswer: z.string().max(8000),
   modality: z.enum(["text", "voice", "drawing", "equation"]).default("text"),
+  /** Optional JPEG/PNG data URL when modality is drawing. */
+  drawingImageDataUrl: z
+    .union([
+      z
+        .string()
+        .max(1_800_000)
+        .regex(/^data:image\/(png|jpeg|jpg|webp);base64,/i),
+      z.null(),
+    ])
+    .optional(),
   teamId: z.number().int().positive().nullable().optional(),
 });
 
@@ -67,11 +77,21 @@ export async function evaluateAiRecallAnswerAction(
 
   const deckCtx = await getDeckSubjectContext(parsed.data.deckId);
 
+  if (
+    parsed.data.modality === "drawing" &&
+    !parsed.data.drawingImageDataUrl &&
+    !parsed.data.studentAnswer.trim()
+  ) {
+    return { ok: false, error: "invalid" };
+  }
+
   try {
     const evaluation = await evaluateAiRecallAnswer({
       question: parsed.data.question,
       correctAnswer: parsed.data.correctAnswer,
       studentAnswer: parsed.data.studentAnswer,
+      modality: parsed.data.modality,
+      drawingImageDataUrl: parsed.data.drawingImageDataUrl ?? null,
       deckSubject: deckCtx?.description ?? deckCtx?.name ?? null,
       difficulty: deckCtx?.difficultyLevel ?? null,
       cardMetadata: `cardId=${parsed.data.cardId}; modality=${parsed.data.modality}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { FormattedCardFront } from "@/components/formatted-card-front";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Lock,
   Unlock,
@@ -16,19 +17,29 @@ import {
   RotateCcw,
   ArrowRight,
   HelpCircle,
+  Mic,
+  MicOff,
+  Keyboard,
+  Pencil,
 } from "lucide-react";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
 import { cn } from "@/lib/utils";
 import { isNetworkOnlineForAiRecall } from "@/lib/ai-recall-network";
+import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import {
   evaluateAiRecallAnswerAction,
   saveAiRecallSessionAction,
 } from "@/actions/ai-recall";
 import type {
   AiRecallPerCardSnapshot,
+  RecallAnswerModality,
   RecallEvaluationResult,
 } from "@/lib/ai-recall-types";
+import {
+  AiRecallDrawingPad,
+  type AiRecallDrawingPadHandle,
+} from "./ai-recall-drawing-pad";
 
 type CardData = {
   id: number;
@@ -92,6 +103,9 @@ export function AiRecallStudy({
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("prompt");
   const [studentAnswer, setStudentAnswer] = useState("");
+  const [answerModality, setAnswerModality] =
+    useState<RecallAnswerModality>("text");
+  const [drawingHasInk, setDrawingHasInk] = useState(false);
   const [evaluation, setEvaluation] = useState<RecallEvaluationResult | null>(
     null,
   );
@@ -112,6 +126,27 @@ export function AiRecallStudy({
   const cardStartRef = useRef(Date.now());
   const savedRef = useRef(false);
   const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drawingPadRef = useRef<AiRecallDrawingPadHandle | null>(null);
+  const lastSubmittedModalityRef = useRef<RecallAnswerModality>("text");
+
+  const appendVoiceTranscript = useCallback((chunk: string) => {
+    const t = chunk.trim();
+    if (!t) return;
+    setStudentAnswer((prev) => {
+      const spacer = prev.trim().length > 0 && !/\s$/.test(prev) ? " " : "";
+      return `${prev}${spacer}${t}`;
+    });
+    setAnswerModality("voice");
+  }, []);
+
+  const {
+    isRecording,
+    supported: speechSupported,
+    error: speechError,
+    start: startSpeech,
+    stop: stopSpeech,
+    clearError: clearSpeechError,
+  } = useSpeechRecognition(appendVoiceTranscript);
 
   useEffect(() => {
     return () => {
@@ -148,10 +183,16 @@ export function AiRecallStudy({
   useEffect(() => {
     cardStartRef.current = Date.now();
     setStudentAnswer("");
+    setAnswerModality("text");
+    setDrawingHasInk(false);
     setEvaluation(null);
     setOutcome(null);
     setPhase("prompt");
     setEnlargedImage(null);
+    stopSpeech();
+    clearSpeechError();
+    // Intentionally only reset when the card changes — speech helpers are stable enough for teardown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- card transition reset
   }, [index, current?.id]);
 
   async function persistIfNeeded(finalSnapshots: AiRecallPerCardSnapshot[]) {
@@ -186,8 +227,13 @@ export function AiRecallStudy({
       feedback: evalResult?.feedback ?? null,
       explanation: evalResult?.explanation ?? null,
       recallTimeMs: Math.max(0, Date.now() - cardStartRef.current),
-      modality: "text",
+      modality: lastSubmittedModalityRef.current,
     };
+  }
+
+  function canSubmitAnswer(): boolean {
+    if (answerModality === "drawing") return drawingHasInk;
+    return studentAnswer.trim().length > 0;
   }
 
   function goNext(updatedSnapshots: AiRecallPerCardSnapshot[], newQueue?: CardData[]) {
@@ -204,9 +250,22 @@ export function AiRecallStudy({
 
   function handleSubmit() {
     if (!current || phase !== "prompt" || isPending) return;
-    const answer = studentAnswer.trim();
-    if (!answer) return;
+    if (!canSubmitAnswer()) return;
 
+    stopSpeech();
+    const answer = studentAnswer.trim();
+    const modality: RecallAnswerModality =
+      answerModality === "drawing"
+        ? "drawing"
+        : answerModality === "voice" || isRecording
+          ? "voice"
+          : "text";
+    const drawingImageDataUrl =
+      modality === "drawing" ? drawingPadRef.current?.toDataUrl() ?? null : null;
+
+    if (modality === "drawing" && !drawingImageDataUrl) return;
+
+    lastSubmittedModalityRef.current = modality;
     setPhase("checking");
     startTransition(async () => {
       const result = await evaluateAiRecallAnswerAction({
@@ -214,8 +273,12 @@ export function AiRecallStudy({
         cardId: current.id,
         question: current.front?.trim() || "",
         correctAnswer: current.back?.trim() || "",
-        studentAnswer: answer,
-        modality: "text",
+        studentAnswer:
+          modality === "drawing"
+            ? answer || "(drawing answer)"
+            : answer,
+        modality,
+        drawingImageDataUrl,
         teamId,
       });
 
@@ -247,6 +310,8 @@ export function AiRecallStudy({
 
   function handleIDontKnow() {
     if (!current || phase !== "prompt") return;
+    stopSpeech();
+    lastSubmittedModalityRef.current = answerModality;
     setEvaluation({
       correct: false,
       score: 0,
@@ -259,6 +324,22 @@ export function AiRecallStudy({
     setAnswerRevealKey((k) => k + 1);
     if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
     unlockTimerRef.current = setTimeout(() => setPhase("revealed"), 700);
+  }
+
+  function handleModalityChange(next: RecallAnswerModality) {
+    if (next === answerModality) return;
+    if (isRecording) stopSpeech();
+    setAnswerModality(next);
+  }
+
+  function toggleMic() {
+    clearSpeechError();
+    if (isRecording) {
+      stopSpeech();
+      return;
+    }
+    setAnswerModality("voice");
+    startSpeech();
   }
 
   function handleContinue() {
@@ -509,18 +590,109 @@ export function AiRecallStudy({
 
       {phase === "prompt" ? (
         <div className="flex flex-col gap-3">
-          <label htmlFor="ai-recall-answer" className="sr-only">
-            Type your answer
-          </label>
-          <Textarea
-            id="ai-recall-answer"
-            placeholder="Type your answer..."
-            value={studentAnswer}
-            onChange={(e) => setStudentAnswer(e.target.value)}
-            rows={3}
-            className="min-h-[88px] resize-y"
-            disabled={isPending}
-          />
+          <ToggleGroup
+            value={[answerModality === "equation" ? "text" : answerModality]}
+            onValueChange={(next) => {
+              const value = next[0] as RecallAnswerModality | undefined;
+              if (value === "text" || value === "voice" || value === "drawing") {
+                handleModalityChange(value);
+              }
+            }}
+            variant="outline"
+            spacing={0}
+            className="flex w-full"
+            aria-label="Answer input mode"
+          >
+            <ToggleGroupItem value="text" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">
+              <Keyboard className="h-3.5 w-3.5" />
+              Type
+            </ToggleGroupItem>
+            <ToggleGroupItem value="voice" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">
+              <Mic className="h-3.5 w-3.5" />
+              Voice
+            </ToggleGroupItem>
+            <ToggleGroupItem value="drawing" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">
+              <Pencil className="h-3.5 w-3.5" />
+              Draw
+            </ToggleGroupItem>
+          </ToggleGroup>
+
+          {answerModality === "drawing" ? (
+            <AiRecallDrawingPad
+              resetKey={current.id}
+              disabled={isPending}
+              padRef={drawingPadRef}
+              onInkChange={setDrawingHasInk}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <label htmlFor="ai-recall-answer" className="sr-only">
+                  {answerModality === "voice"
+                    ? "Spoken answer transcript"
+                    : "Type your answer"}
+                </label>
+                <Textarea
+                  id="ai-recall-answer"
+                  placeholder={
+                    answerModality === "voice"
+                      ? "Tap the mic and speak your answer..."
+                      : "Type your answer..."
+                  }
+                  value={studentAnswer}
+                  onChange={(e) => {
+                    setStudentAnswer(e.target.value);
+                    if (answerModality !== "voice") setAnswerModality("text");
+                  }}
+                  rows={3}
+                  className="min-h-[88px] flex-1 resize-y"
+                  disabled={isPending}
+                />
+                <Button
+                  type="button"
+                  variant={isRecording ? "destructive" : "outline"}
+                  size="icon"
+                  className="mt-0.5 h-11 w-11 shrink-0"
+                  onClick={toggleMic}
+                  disabled={isPending || !speechSupported}
+                  title={
+                    !speechSupported
+                      ? "Speech recognition is not supported in this browser"
+                      : isRecording
+                        ? "Stop listening"
+                        : "Speak your answer"
+                  }
+                  aria-label={
+                    isRecording ? "Stop voice answer" : "Start voice answer"
+                  }
+                  aria-pressed={isRecording}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-5 w-5" />
+                  ) : (
+                    <Mic className="h-5 w-5" />
+                  )}
+                </Button>
+              </div>
+              {isRecording ? (
+                <p className="text-xs text-primary animate-pulse">
+                  Listening… speak your answer clearly.
+                </p>
+              ) : null}
+              {speechError ? (
+                <p className="whitespace-pre-line text-xs text-destructive">
+                  {speechError}
+                </p>
+              ) : null}
+              {!speechSupported ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Voice answers need Chrome, Edge, or Safari with microphone
+                  permission.
+                </p>
+              ) : null}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
@@ -536,16 +708,12 @@ export function AiRecallStudy({
               type="button"
               className="gap-2"
               onClick={handleSubmit}
-              disabled={!studentAnswer.trim() || isPending}
+              disabled={!canSubmitAnswer() || isPending}
             >
               Submit
               <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Voice and drawing answers are coming soon — text answers are
-            supported today.
-          </p>
         </div>
       ) : null}
 

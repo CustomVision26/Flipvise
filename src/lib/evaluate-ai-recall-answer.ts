@@ -1,7 +1,10 @@
 import { generateText, Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
-import type { RecallEvaluationResult } from "@/lib/ai-recall-types";
+import type {
+  RecallAnswerModality,
+  RecallEvaluationResult,
+} from "@/lib/ai-recall-types";
 
 /**
  * OpenAI structured output requires every property in `required`.
@@ -19,10 +22,15 @@ export type EvaluateAiRecallAnswerInput = {
   question: string;
   correctAnswer: string;
   studentAnswer: string;
+  modality?: RecallAnswerModality;
+  /** JPEG/PNG data URL for drawing answers (vision). */
+  drawingImageDataUrl?: string | null;
   deckSubject?: string | null;
   difficulty?: string | null;
   cardMetadata?: string | null;
 };
+
+const DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i;
 
 export async function evaluateAiRecallAnswer(
   input: EvaluateAiRecallAnswerInput,
@@ -30,6 +38,8 @@ export async function evaluateAiRecallAnswer(
   const question = input.question.trim();
   const correctAnswer = input.correctAnswer.trim();
   const studentAnswer = input.studentAnswer.trim();
+  const modality = input.modality ?? "text";
+  const drawing = input.drawingImageDataUrl?.trim() || null;
 
   if (!question || !correctAnswer) {
     return {
@@ -41,12 +51,23 @@ export async function evaluateAiRecallAnswer(
     };
   }
 
-  if (!studentAnswer) {
+  const hasDrawing = Boolean(drawing && DATA_URL_RE.test(drawing));
+  if (!studentAnswer && !hasDrawing) {
     return {
       correct: false,
       score: 0,
       confidence: 100,
       feedback: "No answer was provided.",
+      explanation: correctAnswer,
+    };
+  }
+
+  if (drawing && drawing.length > 1_800_000) {
+    return {
+      correct: false,
+      score: 0,
+      confidence: 100,
+      feedback: "Drawing is too large to evaluate. Clear and try a simpler sketch.",
       explanation: correctAnswer,
     };
   }
@@ -59,26 +80,50 @@ export async function evaluateAiRecallAnswer(
     input.cardMetadata?.trim()
       ? `Card metadata: ${input.cardMetadata.trim()}`
       : null,
+    `Answer modality: ${modality}`,
   ].filter(Boolean);
 
-  const { output } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({ schema: aiRecallEvaluationSchema }),
-    system: [
-      "You evaluate Active Recall answers for a flashcard study app (AI Recall™).",
-      "Decide whether the student's answer demonstrates understanding of the correct answer.",
-      "Accept synonyms, equivalent wording, minor spelling mistakes, and alternate phrasing.",
-      "Reject factually incorrect answers.",
-      "Return JSON only matching the schema. Keep feedback concise (1–2 short sentences).",
-      "explanation should teach or clarify using the correct answer; do not invent unrelated facts.",
-    ].join(" "),
-    prompt: [
-      `Question: ${question}`,
-      `Correct answer: ${correctAnswer}`,
-      `Student answer: ${studentAnswer}`,
-      ...metaLines,
-    ].join("\n"),
-  });
+  const system = [
+    "You evaluate Active Recall answers for a flashcard study app (AI Recall™).",
+    "Decide whether the student's answer demonstrates understanding of the correct answer.",
+    "Accept synonyms, equivalent wording, minor spelling mistakes, and alternate phrasing.",
+    "For spoken (voice) answers, tolerate ASR transcription errors when the intended meaning is clear.",
+    "For drawings, interpret diagrams, labeled figures, plotted points, equations, and handwritten words.",
+    "Reject factually incorrect answers.",
+    "Return JSON only matching the schema. Keep feedback concise (1–2 short sentences).",
+    "explanation should teach or clarify using the correct answer; do not invent unrelated facts.",
+  ].join(" ");
+
+  const textPrompt = [
+    `Question: ${question}`,
+    `Correct answer: ${correctAnswer}`,
+    studentAnswer
+      ? `Student answer (text/transcript): ${studentAnswer}`
+      : "Student answer (text/transcript): (none — evaluate the drawing image)",
+    ...metaLines,
+  ].join("\n");
+
+  const { output } = hasDrawing
+    ? await generateText({
+        model: openai("gpt-4o"),
+        output: Output.object({ schema: aiRecallEvaluationSchema }),
+        system,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: textPrompt },
+              { type: "image", image: drawing! },
+            ],
+          },
+        ],
+      })
+    : await generateText({
+        model: openai("gpt-4o"),
+        output: Output.object({ schema: aiRecallEvaluationSchema }),
+        system,
+        prompt: textPrompt,
+      });
 
   if (!output) {
     return {
@@ -96,8 +141,9 @@ export async function evaluateAiRecallAnswer(
     confidence: Math.round(
       Math.min(100, Math.max(0, Number(output.confidence) || 0)),
     ),
-    feedback: String(output.feedback || "").trim() || (output.correct ? "Excellent." : "Not quite."),
-    explanation:
-      String(output.explanation || "").trim() || correctAnswer,
+    feedback:
+      String(output.feedback || "").trim() ||
+      (output.correct ? "Excellent." : "Not quite."),
+    explanation: String(output.explanation || "").trim() || correctAnswer,
   };
 }
