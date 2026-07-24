@@ -1367,18 +1367,15 @@ export async function getWorkspaceNavTeamsForUser(
     bootstrap?.manageTeams ?? (await getTeamsForTeamDashboard(userId));
 
   const eligible = await getEligibleWorkspaceTeamsForUser(userId, bootstrap);
+  // Team Dashboard switcher rows are for invited memberships only.
+  // Owned workspaces are managed via Personal Dash + Team Admin Dash (not `/dashboard?team=`).
   const invitedForSwitcher = eligible.filter((t) => {
     const isSubscriberOwnedTeamTier =
       t.ownerUserId === userId && isWorkspaceSubscriptionPlanSlug(t.planSlug);
     return !isSubscriberOwnedTeamTier;
   });
 
-  const ownedForSwitcher = manageTeams.filter(
-    (t) => t.ownerUserId === userId && isWorkspaceSubscriptionPlanSlug(t.planSlug),
-  );
-
   const byId = new Map<number, InferSelectModel<typeof teams>>();
-  for (const t of ownedForSwitcher) byId.set(t.id, t);
   for (const t of invitedForSwitcher) byId.set(t.id, t);
 
   const memberTeamIds = [

@@ -39,6 +39,7 @@ import {
   buildTeamWorkspaceDashboardPath,
   withTeamWorkspaceQuery,
 } from "@/lib/team-workspace-url";
+import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { StudySessionLoader } from "./study-session-loader";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import {
@@ -58,10 +59,12 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     maxCardsPerDeck,
     hasAiReading,
     effectivePlanSlug,
+    hasClerkPersonalPro,
     hasClerkPersonalProPlus,
     canAccessTeacherTools,
     activeTeamPlan,
     activeEducationTeamPlan,
+    isPro,
   } = await getAccessContext();
   if (!userId) redirect("/");
 
@@ -144,12 +147,29 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     ((deck.teamId != null && deck.teamId === teamWorkspaceUrl.teamId) ||
       (await isDeckLinkedToWorkspace(teamWorkspaceUrl.teamId, deck.id)));
 
+  const isWorkspaceOwnerViewer = teamWorkspaceUrl?.ownerUserId === userId;
+  const personalDashHref = personalDashboardHrefWithUserPlanQuery({
+    userId,
+    activeTeamPlan,
+    activeEducationTeamPlan,
+    isPro,
+    hasClerkPersonalPro,
+    hasClerkPersonalProPlus,
+  });
   const showTeamWorkspaceNavLinks =
-    canEditDeckContent(access) && fromTeamWorkspaceUrl && Boolean(workspaceQs);
-  const teamDashboardHref = workspaceQs ? `/dashboard?${workspaceQs}` : "/dashboard";
-  const deckPageHref = workspaceQs
-    ? withTeamWorkspaceQuery(`/decks/${id}`, workspaceQs)
-    : `/decks/${id}`;
+    canEditDeckContent(access) &&
+    fromTeamWorkspaceUrl &&
+    Boolean(workspaceQs) &&
+    !isWorkspaceOwnerViewer;
+  const teamDashboardHref = isWorkspaceOwnerViewer
+    ? personalDashHref
+    : workspaceQs
+      ? `/dashboard?${workspaceQs}`
+      : "/dashboard";
+  const deckPageHref =
+    workspaceQs && !isWorkspaceOwnerViewer
+      ? withTeamWorkspaceQuery(`/decks/${id}`, workspaceQs)
+      : `/decks/${id}`;
 
   const studyTeamId =
     fromTeamWorkspaceUrl && teamWorkspaceUrl
@@ -200,7 +220,10 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   let studyBackHref: string;
   let studyBackLabel: string;
-  if (workspaceQs) {
+  if (isWorkspaceOwnerViewer) {
+    studyBackHref = personalDashHref;
+    studyBackLabel = "← Dashboard";
+  } else if (workspaceQs) {
     studyBackHref = teamDashboardHref;
     studyBackLabel = "← Dashboard";
   } else if (
@@ -210,17 +233,15 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
       fromTeamWorkspaceUrl)
   ) {
     const team = await getTeamById(studyTeamId);
-    if (team) {
-      let teamMemberUrlParam = 0;
-      if (team.ownerUserId !== userId) {
-        const member = await getMemberRecord(studyTeamId, userId);
-        teamMemberUrlParam = member?.id ?? 0;
-      }
+    if (team && team.ownerUserId === userId) {
+      studyBackHref = personalDashHref;
+    } else if (team) {
+      const member = await getMemberRecord(studyTeamId, userId);
       studyBackHref = buildTeamWorkspaceDashboardPath({
         teamId: studyTeamId,
         ownerUserId: team.ownerUserId,
         planSlug: team.planSlug,
-        teamMemberUrlParam,
+        teamMemberUrlParam: member?.id ?? 0,
       });
     } else {
       studyBackHref = "/dashboard";

@@ -86,13 +86,16 @@ export async function loadTeamAdminPageContext(
   const personalDashboardParams = new URLSearchParams({ userid: userId });
   if (personalPlanQuery !== "") personalDashboardParams.set("plan", personalPlanQuery);
   const mainDashboardHref = `/dashboard?${personalDashboardParams.toString()}`;
-  const workspaceDashboardParams = new URLSearchParams({
-    team: String(selected.id),
-    userid: selected.ownerUserId,
-    plan: selected.planSlug,
-    teamMemberId: String(viewerTeamMemberUrlParam),
-  });
-  const workspaceDashboardHref = `/dashboard?${workspaceDashboardParams.toString()}`;
+  const isOwner = selected.ownerUserId === userId;
+  // Owners stay on Personal Dash; invited co-admins use `/dashboard?team=`.
+  const workspaceDashboardHref = isOwner
+    ? mainDashboardHref
+    : `/dashboard?${new URLSearchParams({
+        team: String(selected.id),
+        userid: selected.ownerUserId,
+        plan: selected.planSlug,
+        teamMemberId: String(viewerTeamMemberUrlParam),
+      }).toString()}`;
 
   return {
     userId,
@@ -100,7 +103,7 @@ export async function loadTeamAdminPageContext(
     teamsForSubscriber,
     subscriberTeamIds,
     viewerTeamMemberUrlParam,
-    isOwner: selected.ownerUserId === userId,
+    isOwner,
     planLabel: displayNameForBillingPlanSlug(selected.planSlug),
     mainDashboardHref,
     workspaceDashboardHref,

@@ -349,6 +349,8 @@ export function QuizStudy({
   const startTimeRef = useRef<number>(0);
   // Always show the Timed quiz intro first; never auto-skip into an in-progress session.
   const [quizStarted, setQuizStarted] = useState(false);
+  /** Owner/admin Cancel from unanswered dialog — return to lobby without leaving study. */
+  const [returnedToLobby, setReturnedToLobby] = useState(false);
   const [securitySessionId, setSecuritySessionId] = useState<number | null>(
     () => initialSession?.id ?? null,
   );
@@ -357,21 +359,29 @@ export function QuizStudy({
   );
   const [securityLocking, setSecurityLocking] = useState(false);
   const lockingRef = useRef(false);
-  /** Owner/admin Cancel exit — skip security lock on intentional leave. */
+  /** Owner/admin leave via Dashboard — skip security lock on intentional leave. */
   const skipSecurityLockOnExitRef = useRef(false);
 
   const grantedFreshStart = useMemo(
     () =>
       securityEnabled &&
       (securityStatus === "granted_resume" || initialSession?.status === "granted_resume") &&
-      restoredState == null,
-    [securityEnabled, securityStatus, initialSession?.status, restoredState],
+      restoredState == null &&
+      !returnedToLobby,
+    [securityEnabled, securityStatus, initialSession?.status, restoredState, returnedToLobby],
   );
   const grantedResume = useMemo(() => {
+    if (returnedToLobby) return true;
     if (!securityEnabled || restoredState == null) return false;
     const status = securityStatus ?? initialSession?.status;
     return status === "granted_resume" || status === "active";
-  }, [securityEnabled, securityStatus, initialSession?.status, restoredState]);
+  }, [
+    returnedToLobby,
+    securityEnabled,
+    securityStatus,
+    initialSession?.status,
+    restoredState,
+  ]);
   const isSecurityTerminated = useMemo(
     () =>
       securityEnabled &&
@@ -821,10 +831,41 @@ export function QuizStudy({
       }
     }
     startTimeRef.current = Date.now();
-    if (!restoredState) {
+    // Keep remaining time when resuming a server session or after Cancel → lobby.
+    if (!restoredState && !returnedToLobby) {
       setRemainingSeconds(totalSeconds);
     }
+    setReturnedToLobby(false);
     setQuizStarted(true);
+  }
+
+  async function handleCancelToLobby() {
+    setConfirmOpen(false);
+    if (securityEnabled && quizSecurity) {
+      const sessionState = buildQuizSessionState(
+        questions,
+        selectedByIndex,
+        typedAnswersByIndex,
+        currentIndex,
+        remainingSeconds,
+      );
+      try {
+        const session = await startQuizSecuritySessionAction({
+          teamId: quizSecurity.teamId,
+          deckId,
+          deckName,
+          sessionState,
+        });
+        if (session) {
+          setSecuritySessionId(session.id);
+          setSecurityStatus(session.status);
+        }
+      } catch {
+        // Still return to lobby; progress is kept in local state.
+      }
+    }
+    setReturnedToLobby(true);
+    setQuizStarted(false);
   }
 
   function handleRetake() {
@@ -870,9 +911,7 @@ export function QuizStudy({
                 className="w-full sm:w-auto"
                 disabled={submitting}
                 onClick={() => {
-                  setConfirmOpen(false);
-                  skipSecurityLockOnExitRef.current = true;
-                  leaveStudy();
+                  void handleCancelToLobby();
                 }}
               >
                 Cancel
@@ -1137,7 +1176,9 @@ export function QuizStudy({
             <p>
               {totalQuestions} question{totalQuestions !== 1 ? "s" : ""} ·{" "}
               <span className="tabular-nums font-medium text-foreground">
-                {formatClock(restoredState?.remainingSeconds ?? totalSeconds)}
+                {formatClock(
+                  grantedResume ? remainingSeconds : (restoredState?.remainingSeconds ?? totalSeconds),
+                )}
               </span>{" "}
               on the clock
             </p>

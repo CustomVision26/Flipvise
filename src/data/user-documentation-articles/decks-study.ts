@@ -143,7 +143,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Quiz timer — time limit per attempt set by team admin (or by you via Format Quiz Question on personal Pro Plus / Education Plus decks).",
           "Quiz schedule — quizzes cannot start before the configured date/time.",
           "Quiz security — session locking, admin grant to resume/restart, one controlled attempt per deck. Applies to the plan owner whenever security is on, plus Team Admins and/or Members selected in Quiz security settings. When active for you, the Timed quiz lobby shows a green Security on light.",
-          "Owners and team admins get a Cancel button on the unanswered-submit dialog to exit without submitting (members only see Keep answering / Submit anyway).",
+          "Owners and team admins get a Cancel button on the unanswered-submit dialog — it returns to the Resume quiz lobby without submitting (members only see Keep answering / Submit anyway).",
           "Workspace deck study links canonicalize to /decks/[deckId]/study?team=&userid=&plan=&teamMemberId=.",
         ],
       },

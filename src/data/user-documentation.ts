@@ -83,18 +83,19 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Team Workspace View",
         route: "/dashboard?team=…",
         purpose:
-          "Study or preview decks inside a team workspace you belong to.",
+          "Invited team members and co-admins study or preview decks inside a workspace.",
         howItWorks: [
-          "Switch workspaces from the header dropdown (Personal Dash vs team workspaces).",
-          "Team admins/co-admins with edit access see full deck management links.",
+          "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
+          "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
           "Assigned members see only decks assigned to them.",
-          "Team context is stored in a cookie when you switch workspaces.",
+          "Team context is stored in a cookie when invited members switch workspaces.",
         ],
         requirements: [
-          "Team membership or team-tier subscription.",
+          "Active invite membership on the workspace (team_member or team_admin).",
           "Assigned members need an active assignment from a team admin.",
         ],
         doNots: [
+          "Plan owners should not use /dashboard?team= for their own workspaces — use Personal Dash and Team Admin.",
           "Members cannot create or edit decks in another owner’s workspace unless they are team admin/co-admin.",
           "Do not bookmark cookie-only team context for co-admins — use the canonical ?team= URL.",
         ],
@@ -175,7 +176,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Each question shows a format badge (e.g. True / false, Fill in the blank) while you answer.",
           "When formats have been published, each card keeps its assigned format until published again; otherwise formats are chosen at random per card.",
           "Team study URLs use /decks/[deckId]/study?team=&userid=&plan=&teamMemberId= (auto-filled when you open a workspace deck).",
-          "Workspace owners and team admins see Cancel on the unanswered-submit dialog to leave the quiz without submitting.",
+          "Workspace owners and team admins see Cancel on the unanswered-submit dialog to return to the Resume quiz lobby without submitting.",
           "Team quizzes may enforce timers, schedules, and security rules set by admins; when security is on for members, the Timed quiz lobby shows a green Security on light. Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question.",
           "AI Reading (text-to-speech) is available on Pro Plus when enabled.",
         ],

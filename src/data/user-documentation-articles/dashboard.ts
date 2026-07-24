@@ -71,7 +71,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
   a(
     "team-workspace-dashboard",
     "Team Workspace View — In-Depth Guide",
-    "When you switch to a team workspace, the dashboard shows decks in that subscriber’s context (/dashboard?team=…).",
+    "Invited members and co-admins switch to a team workspace dashboard (/dashboard?team=…). Plan owners keep decks on Personal Dash and manage workspaces in Team Admin.",
     [
       {
         id: "who-sees-what",
@@ -79,9 +79,17 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         table: {
           headers: ["Role", "Deck visibility", "Edit access"],
           rows: [
-            ["Owner (subscriber)", "All linked workspace decks", "Full edit on personal + team context"],
-            ["Team admin", "All linked workspace decks", "Edit + assign (Team Admin)"],
-            ["Team member", "Assigned decks only", "Study only — no deck editor"],
+            [
+              "Owner (subscriber)",
+              "Personal Dashboard only (workspace-linked decks appear under workspace sections there)",
+              "Full edit on Personal Dash; manage members/assignments in Team Admin — not Team Dashboard",
+            ],
+            [
+              "Team admin (invited)",
+              "Team Dashboard — created decks (education) and/or assigned decks",
+              "Edit decks they created (education); assign via Team Admin; study assigned decks",
+            ],
+            ["Team member (invited)", "Assigned decks only on Team Dashboard", "Study only — no deck editor"],
           ],
         },
       },
@@ -89,8 +97,9 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "switching",
         title: "Switching workspaces",
         bullets: [
-          "Use the header workspace switcher — do not rely only on browser back.",
-          "Team context is stored in a cookie when you switch.",
+          "Use the header workspace switcher — Personal Dash for owners; invited workspaces open Team Dashboard.",
+          "Owners open Team Admin Dash from the switcher (owned workspaces are not Team Dashboard rows).",
+          "Team context is stored in a cookie when invited members switch.",
           "Co-admins should use canonical URLs with ?team= and teamMemberId= — not cookie-only bookmarks.",
         ],
       },

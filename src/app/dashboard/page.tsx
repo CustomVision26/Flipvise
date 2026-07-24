@@ -18,6 +18,7 @@ import {
   searchParamsLooksLikeTeamWorkspace,
   shouldRedirectUnauthorizedDashboardUseridParam,
 } from "@/lib/resolve-team-workspace-url";
+import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import {
   Card,
   CardContent,
@@ -34,7 +35,6 @@ import { getPersonalDecksByUserWithCardCount } from "@/db/queries/decks";
 import {
   countTeamsForOwner,
   getAssignedDecksForMemberWithCardCount,
-  getDecksForTeamWithCardCount,
   getEducationTeamAdminWorkspaceDecksWithCardCount,
   getTeamById,
   getTeamMembershipsForUser,
@@ -208,6 +208,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     activeEducationTeamPlan,
     isAdmin,
     hasAiReading,
+    hasClerkPersonalPro,
+    hasClerkPersonalProPlus,
   } = await getAccessContext();
   if (!userId) {
     if (await isNativeShellRequest()) {
@@ -219,14 +221,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   await redirectIfAccountRecoveryIncomplete(userId, "/dashboard");
   await redirectIfPlanReconciliationPending(userId);
 
+  const personalDashboardHref = personalDashboardHrefWithUserPlanQuery({
+    userId,
+    activeTeamPlan,
+    activeEducationTeamPlan,
+    isPro,
+    hasClerkPersonalPro,
+    hasClerkPersonalProPlus,
+  });
+
   const sp = await searchParams;
   if (shouldRedirectUnauthorizedDashboardUseridParam(userId, sp)) {
-    redirect("/dashboard");
+    redirect(personalDashboardHref);
   }
   const teamWorkspaceUrl = await resolveTeamWorkspaceFromSearchParams(userId, sp);
 
   if (searchParamsLooksLikeTeamWorkspace(sp) && !teamWorkspaceUrl) {
-    redirect("/dashboard");
+    redirect(personalDashboardHref);
+  }
+
+  // Plan owners use Personal Dash (+ Team Admin) — Team Dashboard is for invited members only.
+  if (teamWorkspaceUrl?.canEditTeamDecks) {
+    redirect(personalDashboardHref);
   }
 
   const canonicalDash = canonicalDashboardPathRemovingSensitiveQuery(sp, userId);
@@ -264,19 +280,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const teamCtxRaw = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
   const teamCtxId = teamCtxRaw ? Number(teamCtxRaw) : NaN;
 
-  const isTeamWorkspaceDeckViewer =
-    teamWorkspaceUrl?.isTeamAdminWorkspaceViewer ||
-    teamWorkspaceUrl?.canEditTeamDecks;
-
-  if (isTeamWorkspaceDeckViewer && teamWorkspaceUrl != null) {
+  if (teamWorkspaceUrl?.isTeamAdminWorkspaceViewer) {
     const tw = teamWorkspaceUrl;
-    const isSubscriberOwner = tw.canEditTeamDecks;
     const [workspaceHeadingRow, workspaceDecksRaw] = await Promise.all([
       tryTeamQuery(() => getTeamById(tw.teamId), null),
       tryTeamQuery(async () => {
-        if (isSubscriberOwner) {
-          return getDecksForTeamWithCardCount(tw.teamId, tw.ownerUserId);
-        }
         const teamRow = await getTeamById(tw.teamId);
         if (teamRow && isEducationTeamPlanId(teamRow.planSlug)) {
           return getEducationTeamAdminWorkspaceDecksWithCardCount(
@@ -289,7 +297,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       }, []),
     ]);
     const isEducationTeamAdminViewer =
-      !isSubscriberOwner &&
       workspaceHeadingRow != null &&
       isEducationTeamPlanId(workspaceHeadingRow.planSlug);
     const teamWorkspaceTierExtras = teamWorkspaceHasTierExtras(
@@ -321,22 +328,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
             {teamWorkspaceTierExtras ? (
               <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-                {isSubscriberOwner
-                  ? "Team workspace — open decks to edit cards or study"
-                  : isEducationTeamAdminViewer
-                    ? "Team workspace — edit decks you created; preview and study assigned decks"
-                    : "Team workspace — preview and study assigned decks"}
+                {isEducationTeamAdminViewer
+                  ? "Team workspace — edit decks you created; preview and study assigned decks"
+                  : "Team workspace — preview and study assigned decks"}
               </p>
             ) : (
               <DashboardTeamWorkspaceSubline
                 teamName={workspaceHeadingGroupName}
                 ownerName={workspaceHeadingOwnerName}
                 tailText={
-                  isSubscriberOwner
-                    ? "Team workspace — open decks to edit cards or study"
-                    : isEducationTeamAdminViewer
-                      ? "Team workspace — edit decks you created; preview and study assigned decks"
-                      : "Team workspace — preview and study assigned decks"
+                  isEducationTeamAdminViewer
+                    ? "Team workspace — edit decks you created; preview and study assigned decks"
+                    : "Team workspace — preview and study assigned decks"
                 }
               />
             )}
@@ -349,18 +352,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
             <div className="space-y-1">
               <p className="font-medium text-foreground text-sm">
-                {isSubscriberOwner
-                  ? "No decks in this workspace yet"
-                  : isEducationTeamAdminViewer
-                    ? "No decks yet"
-                    : "No decks assigned yet"}
+                {isEducationTeamAdminViewer ? "No decks yet" : "No decks assigned yet"}
               </p>
               <p className="text-muted-foreground text-xs max-w-xs">
-                {isSubscriberOwner
-                  ? "Use Deck Manager in Team Admin to link subscriber decks or assign them to members."
-                  : isEducationTeamAdminViewer
-                    ? "Create decks from Teacher tools or wait for your workspace owner to assign decks to you."
-                    : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
+                {isEducationTeamAdminViewer
+                  ? "Create decks from Teacher tools or wait for your workspace owner to assign decks to you."
+                  : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
               </p>
             </div>
           </div>
@@ -369,7 +366,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             decks={workspaceDecks}
             initialView={initialView}
             workspaceQueryString={workspaceQueryString}
-            deckPopoverVariant={isSubscriberOwner ? undefined : "team-preview"}
+            deckPopoverVariant="team-preview"
             allowCoverUpload={teamWorkspaceTierExtras}
             teamTierPreviewPromo={teamWorkspaceTierExtras}
             hasAiReading={hasAiReading}
@@ -489,13 +486,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     if (cookieMembership?.role === "team_admin") {
       const cookieTeam = await tryTeamQuery(() => getTeamById(teamCtxId), null);
       if (cookieTeam && isWorkspaceSubscriptionPlanSlug(cookieTeam.planSlug)) {
-        const isOwner = cookieTeam.ownerUserId === userId;
+        if (cookieTeam.ownerUserId === userId) {
+          redirect(personalDashboardHref);
+        }
         const canonicalQs = await buildResolvedTeamWorkspaceQueryString(userId, {
           teamId: teamCtxId,
           ownerUserId: cookieTeam.ownerUserId,
-          canEditTeamDecks: isOwner,
+          canEditTeamDecks: false,
           isAssignedMemberPreview: false,
-          isTeamAdminWorkspaceViewer: !isOwner,
+          isTeamAdminWorkspaceViewer: true,
           workspacePlanQuery: cookieTeam.planSlug,
         });
         const redirectParams = new URLSearchParams(canonicalQs);

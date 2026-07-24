@@ -38,7 +38,7 @@ export async function resolvePricingBackToDashboardHref(input: {
     { teams: [], totalEligibleCount: 0 },
   );
   const selected = teams.find((t) => t.id === teamId);
-  if (!selected) return personal;
+  if (!selected || selected.isSubscriberOwned) return personal;
 
   return buildTeamWorkspaceDashboardPath({
     teamId: selected.id,

@@ -15,7 +15,10 @@ export type ResolvedTeamWorkspaceUrl = {
   teamId: number;
   ownerUserId: string;
   /**
-   * Subscriber/workspace owner — may open and edit workspace decks on `/dashboard?team=`.
+   * True when the viewer is the subscriber owner.
+   * Owners manage decks on Personal Dash + Team Admin — they must not browse
+   * `/dashboard?team=` as a Team Dashboard (invited members / co-admins only).
+   * Still used so study/deck URLs can carry workspace identity (timer, security).
    */
   canEditTeamDecks: boolean;
   /**
@@ -23,8 +26,8 @@ export type ResolvedTeamWorkspaceUrl = {
    */
   isAssignedMemberPreview: boolean;
   /**
-   * Invited `team_admin` — `/dashboard?team=` shows only decks assigned to them for study.
-   * Deck linking and member assignment use `/dashboard/team-admin` (URLs use `teamMemberId`; `0` = owner).
+   * Invited `team_admin` — `/dashboard?team=` shows decks they created (education) and/or
+   * assigned decks for study. Deck linking and member assignment use `/dashboard/team-admin`.
    */
   isTeamAdminWorkspaceViewer: boolean;
   /** Canonical `plan=` for workspace URLs — matches DB team tier when applicable. */
