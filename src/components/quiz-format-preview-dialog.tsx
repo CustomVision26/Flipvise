@@ -45,10 +45,10 @@ function QuizPreviewText({
 }) {
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium uppercase tracking-wide text-sky-400/90">
         {label}
       </p>
-      <div className="max-h-[min(24rem,50vh)] overflow-y-auto overflow-x-hidden rounded-md border border-border/70 bg-muted/25 p-4 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+      <div className="max-h-[min(24rem,50vh)] overflow-y-auto overflow-x-hidden rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground shadow-[inset_0_0_0_1px_rgba(56,189,248,0.08)]">
         {children}
       </div>
     </div>
@@ -68,7 +68,7 @@ function McqOptionsList({
 }) {
   if (options.length === 0) return null;
   return (
-    <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 p-3">
+    <div className="space-y-1 rounded-md border border-border/70 bg-muted/30 p-3">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Original MCQ options (preserved)
       </p>
@@ -181,7 +181,7 @@ function PreviewItemCard({
           <QuizPreviewText label="What quiz takers see">
             {item.multipleChoice.question}
           </QuizPreviewText>
-          <ul className="space-y-1 rounded-md border border-border/60 bg-muted/20 p-3 text-sm">
+          <ul className="space-y-1 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-sm">
             {item.multipleChoice.options.map((opt, index) => (
               <li key={`${index}-${opt}`} className="break-words">
                 {String.fromCharCode(65 + index)}. {opt}

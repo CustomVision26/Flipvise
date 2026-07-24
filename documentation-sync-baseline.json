@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-24T06:10:49.675Z",
+  "updatedAt": "2026-07-24T19:41:21.513Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "bb35485aa372631d738d2951bc1ad9fd5855e656f18dc3cc57e7a2836213b4c9",
@@ -27,8 +27,8 @@
       "docFingerprint": "7a09742aceacc09f7981ec73939d65a01f8322552b5f986ac5d029153970f608"
     },
     "study-session": {
-      "watchFingerprint": "09b7e618d6ff846c7200f95928799df5fa3c6bd0f8b1bcbab9f2e0ba36e86820",
-      "docFingerprint": "0bf1519581e70dd3211671d583b5da221e30d74835073ba6f0d145e42b062691"
+      "watchFingerprint": "7a94558f2202237160a580535caae7636b4dd0e0009a46c8c60ede262f2ce41e",
+      "docFingerprint": "f33b02a88e5ebde4cd7f9166377710dbf1505b097cccf962df0330a64125cd52"
     },
     "quiz-result-detail": {
       "watchFingerprint": "b132a4bc7de1c6b87dc4783a702ecfea7ad25030c35f241242122a6639df961f",
@@ -155,19 +155,19 @@
       "docFingerprint": "98312e60f86f345fc37f1b467e5aa60687735958c0d6a437363ea70d391ea9b0"
     },
     "members": {
-      "watchFingerprint": "a541f1f2f3cd8791693fb0f17c423f484b284bbae779584e56ea1f7526957690",
+      "watchFingerprint": "e78b5da3542b970ec4dfa9c11345f13c448e2a254183f02943d5e3f2be946825",
       "docFingerprint": "d37c76f2c4f05e3c6d67040d395d96ce2e331e328e4c5c90de33757ec5eda055"
     },
     "deck-manager": {
-      "watchFingerprint": "af7e1e1f53c3da31573c2d8bbfc009462ed1f958a20a4d784c98080a3ab3a360",
-      "docFingerprint": "e54efaf44073ed79734ef080dc3fbb6c613709931e63a9c12189af4fea8b961c"
+      "watchFingerprint": "707f1c2bf7c61ff6eb85cbdd856ef1b4f37e79490ba53ae6f12dd509e4addfe7",
+      "docFingerprint": "3744c1cd009774aa593130d30d05b5acf4687fce344a6ba9db4b27b6ce38a489"
     },
     "invite-members": {
-      "watchFingerprint": "608857a607f1e2c2701ddf1a5d662fa0892e1150f27d7cbaf15469dcffa4357b",
+      "watchFingerprint": "cf4aefcc7bd41753430d040a5dc325d598a531d35a05af2cfa00f231618ff102",
       "docFingerprint": "1ac67d9660f1a1fab626a83c42f8f0d96762c51cae0d82f7f8db3480f81b6883"
     },
     "quiz-results-admin": {
-      "watchFingerprint": "1c4ae009feeff20f3c5692f92220a502a016f9d66c43b6ef84d61c7831e2ff02",
+      "watchFingerprint": "8d892ae47792706b4c901f3598bbd04e7ed88c3a7d471421c63f1364bb0d88ca",
       "docFingerprint": "61e870cdce92c7dce388a8a75f44b0708fe6f1107c778436254811148e11865e"
     },
     "ws-history": {
@@ -195,7 +195,7 @@
       "docFingerprint": "8ff711d68e1ecc895eca6138d1bce8713a7aadc9d5ff9d5d635da76cad3057a5"
     },
     "teacher-classroom": {
-      "watchFingerprint": "365d6fecc6093915f1ee15adcd28bc263370681a836c964d5ea3c5483c28fe6e",
+      "watchFingerprint": "3c49f67e8911bdf103ddf7fc858e2a920c07ae9b6db49ee4eeb255361d90d006",
       "docFingerprint": "739135679b9d84ba87c4783527d52dcdce48adbab5be172112ef1f5bb2966c4e"
     },
     "teacher-resources": {

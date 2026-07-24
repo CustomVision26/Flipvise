@@ -301,3 +301,20 @@ export function resolveOfflineAccountPlanDisplay(ctx: OfflineAccessContext): {
   }
   return { plan: accountPlan || stored, planType: accessType ?? "Free" };
 }
+
+/** Free personal plan — no offline speak / preview TTS. */
+export function offlineViewerCanSpeak(ctx: OfflineAccessContext): boolean {
+  return resolveOfflinePersonalPlanLabel(ctx) !== "Free";
+}
+
+/**
+ * AI voice (OpenAI TTS) when online — Pro Plus, team-tier, platform admins.
+ * Paid Pro uses device TTS only (online or offline).
+ */
+export function offlineViewerHasAiReading(ctx: OfflineAccessContext): boolean {
+  if (ctx.viewerIsSuperadmin || ctx.viewerIsPlatformAdmin) return true;
+  if (ctx.personalHasTeamTierPlan) return true;
+  if (ctx.maxPersonalDecks >= PRO_PLUS_PERSONAL_DECK_LIMIT) return true;
+  const account = ctx.personalAccountPlanLabel?.trim().toLowerCase();
+  return account === "pro plus";
+}

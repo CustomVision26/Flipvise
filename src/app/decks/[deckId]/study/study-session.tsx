@@ -2,21 +2,25 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { BookOpen, ListChecks } from "lucide-react";
+import { ListChecks } from "lucide-react";
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
 import type { DeckQuizFormatAssignments } from "@/lib/quiz-format-assignments";
 import type { CardQuizVariants } from "@/lib/card-quiz-variants";
 import type { QuizSecuritySessionState } from "@/db/schema";
+import {
+  AI_RECALL_STUDY_MODE_STORAGE_KEY,
+  type StudyModeTab,
+} from "@/lib/ai-recall-types";
 import { FlashcardStudy } from "./flashcard-study";
 import { QuizStudy } from "./quiz-study";
+import { AiRecallStudy } from "./ai-recall-study";
 
 type CardData = {
   id: number;
@@ -40,6 +44,8 @@ export interface StudySessionProps {
   allowsQuizStudy?: boolean;
   /** Team assignment — member may use Standard Review. */
   memberAllowReview?: boolean;
+  /** Team assignment — member may use AI Recall™ (still subject to plan tier). */
+  memberAllowAiRecall?: boolean;
   /** Team assignment — member may use Quiz (still subject to plan tier). */
   memberAllowQuiz?: boolean;
   deckGradient?: string | null;
@@ -49,6 +55,8 @@ export interface StudySessionProps {
   quizDurationSeconds?: number;
   /** Pro Plus / team / platform admin — listen-to-card (TTS). Not available on Free or Pro. */
   hasAiReading?: boolean;
+  /** Pro Plus / education / team tiers — AI Recall™. Not Free or Pro. */
+  hasAiRecall?: boolean;
   /** Leave study — team workspace dashboard or deck detail. */
   exitHref: string;
   exitLabel: string;
@@ -76,10 +84,47 @@ export interface StudySessionProps {
   quizFormats?: QuizFormatsSettings;
   /** Admin-applied per-card format map and target distribution for this deck. */
   quizFormatAssignmentPlan?: DeckQuizFormatAssignments | null;
+  quizCardOrder?: number[] | null;
+  quizCardOrderShuffledAt?: string | null;
+  canReshuffleCardOrder?: boolean;
   /** Education Gold / Enterprise — secured quizzes auto-save to user, owner, and team admins. */
   isEducationTeamPlan?: boolean;
   /** Pro Plus / Education Plus — Format Quiz Question dialog on the quiz lobby. */
   quizFormatEditorSnapshot?: import("@/db/queries/quiz-formats").QuizFormatsDeckSnapshot | null;
+}
+
+function readStoredStudyMode(): StudyModeTab | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = localStorage.getItem(AI_RECALL_STUDY_MODE_STORAGE_KEY);
+    if (v === "review" || v === "ai_recall" || v === "quiz") return v;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function writeStoredStudyMode(mode: StudyModeTab) {
+  try {
+    localStorage.setItem(AI_RECALL_STUDY_MODE_STORAGE_KEY, mode);
+  } catch {
+    // ignore
+  }
+}
+
+function resolveInitialTab(input: {
+  showReviewTab: boolean;
+  showQuizTab: boolean;
+  showAiRecallTab: boolean;
+}): StudyModeTab {
+  const stored = readStoredStudyMode();
+  if (stored === "review" && input.showReviewTab) return "review";
+  if (stored === "quiz" && input.showQuizTab) return "quiz";
+  if (stored === "ai_recall" && input.showAiRecallTab) return "ai_recall";
+  if (input.showReviewTab) return "review";
+  if (input.showQuizTab) return "quiz";
+  if (input.showAiRecallTab) return "ai_recall";
+  return "review";
 }
 
 export function StudySession({
@@ -90,11 +135,13 @@ export function StudySession({
   teamId,
   allowsQuizStudy = true,
   memberAllowReview = true,
+  memberAllowAiRecall = true,
   memberAllowQuiz = true,
   deckGradient,
   autoSaveQuizResult = false,
   quizDurationSeconds,
   hasAiReading = false,
+  hasAiRecall = false,
   exitHref,
   exitLabel,
   ownerInboxAvailable = false,
@@ -103,40 +150,60 @@ export function StudySession({
   quizSecurity,
   quizFormats,
   quizFormatAssignmentPlan,
+  quizCardOrder = null,
+  quizCardOrderShuffledAt = null,
+  canReshuffleCardOrder = false,
   isEducationTeamPlan = false,
   quizFormatEditorSnapshot = null,
 }: StudySessionProps) {
   const showReviewTab = memberAllowReview;
+  const showAiRecallTab = memberAllowAiRecall;
   const showQuizTab = memberAllowQuiz && allowsQuizStudy;
   const showQuizUpgradeHint = memberAllowQuiz && !allowsQuizStudy;
 
-  const initialTab = useMemo<"review" | "quiz">(() => {
-    if (showReviewTab) return "review";
-    if (showQuizTab) return "quiz";
-    return "review";
-  }, [showReviewTab, showQuizTab]);
+  const fallbackTab = useMemo<StudyModeTab>(
+    () =>
+      resolveInitialTab({
+        showReviewTab,
+        showQuizTab,
+        showAiRecallTab,
+      }),
+    [showReviewTab, showQuizTab, showAiRecallTab],
+  );
 
-  const [tab, setTab] = useState<"review" | "quiz">(initialTab);
+  // StudySession is loaded with ssr:false — safe to read localStorage in the
+  // initializer so we do not remount TabsContent after first paint (removeChild crash).
+  const [tab, setTab] = useState<StudyModeTab>(() =>
+    resolveInitialTab({
+      showReviewTab,
+      showQuizTab,
+      showAiRecallTab,
+    }),
+  );
 
   useEffect(() => {
-    setTab(initialTab);
-  }, [initialTab]);
+    writeStoredStudyMode(tab);
+  }, [tab]);
 
-  const effectiveTab =
+  useEffect(() => {
+    setTab((current) => {
+      if (current === "quiz" && !showQuizTab) return fallbackTab;
+      if (current === "review" && !showReviewTab) return fallbackTab;
+      if (current === "ai_recall" && !showAiRecallTab) return fallbackTab;
+      return current;
+    });
+  }, [fallbackTab, showReviewTab, showQuizTab, showAiRecallTab]);
+
+  const effectiveTab: StudyModeTab =
     tab === "quiz" && showQuizTab
       ? "quiz"
-      : tab === "review" && showReviewTab
-        ? "review"
-        : showReviewTab
+      : tab === "ai_recall" && showAiRecallTab
+        ? "ai_recall"
+        : tab === "review" && showReviewTab
           ? "review"
-          : showQuizTab
-            ? "quiz"
-            : "review";
+          : fallbackTab;
 
-  const showModeSwitcher =
-    showReviewTab && (showQuizTab || showQuizUpgradeHint);
-
-  if (!showReviewTab && !showQuizTab && !showQuizUpgradeHint) {
+  if (!showReviewTab && !showQuizTab && !showQuizUpgradeHint && !showAiRecallTab) {
     return (
       <p className="text-sm text-muted-foreground">
         No study modes are enabled for your account on this deck. Contact your team admin to update
@@ -152,18 +219,30 @@ export function StudySession({
         onValueChange={(v) => {
           if (v === "quiz" && !showQuizTab) return;
           if (v === "review" && !showReviewTab) return;
-          setTab(v as "review" | "quiz");
+          if (v === "ai_recall" && !showAiRecallTab) return;
+          setTab(v as StudyModeTab);
         }}
         className="flex flex-1 flex-col gap-4 sm:gap-6"
       >
-        {showModeSwitcher ? (
-          <TabsList className="self-center">
+        <div className="flex flex-col items-center gap-1.5">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Study Mode
+          </p>
+          <TabsList className="h-auto flex-wrap justify-center gap-1">
             {showReviewTab ? (
               <TabsTrigger value="review" className="gap-1.5">
-                <BookOpen className="h-3.5 w-3.5" />
+                <span aria-hidden>📖</span>
                 Standard Review
               </TabsTrigger>
             ) : null}
+
+            {showAiRecallTab ? (
+              <TabsTrigger value="ai_recall" className="gap-1.5">
+                <span aria-hidden>🤖</span>
+                AI Recall™
+              </TabsTrigger>
+            ) : null}
+
             {showQuizTab ? (
               <TabsTrigger value="quiz" className="gap-1.5">
                 <ListChecks className="h-3.5 w-3.5" />
@@ -172,25 +251,17 @@ export function StudySession({
             ) : showQuizUpgradeHint ? (
               <Tooltip>
                 <TooltipTrigger
-                  render={(props) => (
-                    <span
-                      {...props}
-                      className={cn(
-                        "inline-flex min-h-9 min-w-0 cursor-not-allowed items-stretch rounded-md",
-                        props.className,
-                      )}
-                    >
-                      <TabsTrigger
-                        value="quiz"
-                        disabled
-                        className="pointer-events-none gap-1.5 opacity-40"
-                      >
-                        <ListChecks className="h-3.5 w-3.5" />
-                        Quiz
-                      </TabsTrigger>
-                    </span>
-                  )}
-                />
+                  render={
+                    <TabsTrigger
+                      value="quiz"
+                      disabled
+                      className="gap-1.5 opacity-40"
+                    />
+                  }
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  Quiz
+                </TooltipTrigger>
                 <TooltipContent side="bottom" className="max-w-xs text-xs">
                   <p>
                     Quiz exercise is a Pro feature. Upgrade your personal plan to practice with timed
@@ -206,23 +277,42 @@ export function StudySession({
               </Tooltip>
             ) : null}
           </TabsList>
-        ) : null}
+        </div>
 
-        {showReviewTab ? (
-          <TabsContent value="review" className="flex flex-1 flex-col">
+        {/*
+          Render mode bodies outside TabsContent panels. Base UI tab panels +
+          heavy study trees were racing DOM deletions (removeChild on null)
+          when switching modes / restoring the last mode from localStorage.
+        */}
+        <div className="flex flex-1 flex-col" role="tabpanel">
+          {effectiveTab === "review" && showReviewTab ? (
             <FlashcardStudy
+              key="study-mode-review"
               cards={cards}
               deckId={deckId}
               deckName={deckName}
               deckGradient={deckGradient ?? null}
               hasAiReading={hasAiReading}
             />
-          </TabsContent>
-        ) : null}
+          ) : null}
 
-        {showQuizTab ? (
-          <TabsContent value="quiz" className="flex flex-1 flex-col">
+          {effectiveTab === "ai_recall" && showAiRecallTab ? (
+            <AiRecallStudy
+              key="study-mode-ai-recall"
+              cards={cards}
+              deckId={deckId}
+              deckName={deckName}
+              deckDescription={deckDescription}
+              teamId={teamId}
+              deckGradient={deckGradient ?? null}
+              hasAiRecall={hasAiRecall}
+              onSwitchToStandardReview={() => setTab("review")}
+            />
+          ) : null}
+
+          {effectiveTab === "quiz" && showQuizTab ? (
             <QuizStudy
+              key="study-mode-quiz"
               cards={cards}
               deckId={deckId}
               deckName={deckName}
@@ -240,11 +330,14 @@ export function StudySession({
               quizSecurity={quizSecurity}
               quizFormats={quizFormats}
               quizFormatAssignmentPlan={quizFormatAssignmentPlan}
+              quizCardOrder={quizCardOrder}
+              quizCardOrderShuffledAt={quizCardOrderShuffledAt}
+              canReshuffleCardOrder={canReshuffleCardOrder}
               isEducationTeamPlan={isEducationTeamPlan}
               quizFormatEditorSnapshot={quizFormatEditorSnapshot}
             />
-          </TabsContent>
-        ) : null}
+          ) : null}
+        </div>
       </Tabs>
     </TooltipProvider>
   );

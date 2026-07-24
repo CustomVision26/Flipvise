@@ -64,7 +64,9 @@ import {
   Lock,
   PenLine,
   ToggleLeft,
+  Shuffle,
 } from "lucide-react";
+import { shuffleDeckQuizCardOrdersAction } from "@/actions/quiz-card-orders";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   submitQuizResultAction,
@@ -175,6 +177,12 @@ interface QuizStudyProps {
   quizFormats?: QuizFormatsSettings;
   /** Admin-applied per-card format map and target distribution. */
   quizFormatAssignmentPlan?: DeckQuizFormatAssignments | null;
+  /** Stable per-viewer card order from Team Admin shuffle (when set, not randomized). */
+  quizCardOrder?: number[] | null;
+  /** ISO timestamp when deck-level member card-order shuffle was last applied. */
+  quizCardOrderShuffledAt?: string | null;
+  /** Owner / team admin may reshuffle card order from the Timed quiz lobby. */
+  canReshuffleCardOrder?: boolean;
   /** Education Gold / Enterprise — secured quizzes auto-save to user, owner, and team admins. */
   isEducationTeamPlan?: boolean;
   /** Pro Plus / Education Plus personal deck — Format Quiz Question dialog. */
@@ -280,6 +288,9 @@ export function QuizStudy({
   quizSecurity,
   quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
   quizFormatAssignmentPlan = null,
+  quizCardOrder = null,
+  quizCardOrderShuffledAt = null,
+  canReshuffleCardOrder = false,
   isEducationTeamPlan = false,
   quizFormatEditorSnapshot = null,
 }: QuizStudyProps) {
@@ -287,6 +298,15 @@ export function QuizStudy({
   const router = useRouter();
   const preparedCards = useMemo(() => prepareCardsForQuiz(cards), [cards]);
   const leaveStudy = useCallback(() => router.push(exitHref), [router, exitHref]);
+  const [cardOrderShuffledAtLocal, setCardOrderShuffledAtLocal] = useState<string | null>(
+    quizCardOrderShuffledAt,
+  );
+  const [cardOrderReshuffling, setCardOrderReshuffling] = useState(false);
+  const [cardOrderMessage, setCardOrderMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCardOrderShuffledAtLocal(quizCardOrderShuffledAt);
+  }, [quizCardOrderShuffledAt]);
   const securityEnabled = Boolean(quizSecurity?.enabled);
   const resultTeamId = quizSecurity?.teamId ?? teamId;
   const securedEducationInboxTargets = useMemo(
@@ -313,8 +333,14 @@ export function QuizStudy({
       : undefined;
 
   const buildQuestions = useCallback(
-    () => buildQuizQuestions(preparedCards, quizFormats, quizFormatAssignments),
-    [preparedCards, quizFormats, quizFormatAssignments],
+    () =>
+      buildQuizQuestions(
+        preparedCards,
+        quizFormats,
+        quizFormatAssignments,
+        quizCardOrder && quizCardOrder.length > 0 ? quizCardOrder : null,
+      ),
+    [preparedCards, quizFormats, quizFormatAssignments, quizCardOrder],
   );
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
@@ -839,6 +865,30 @@ export function QuizStudy({
     setQuizStarted(true);
   }
 
+  async function handleReshuffleCardOrder() {
+    const shuffleTeamId = quizSecurity?.teamId ?? teamId;
+    if (!canReshuffleCardOrder || shuffleTeamId == null) return;
+    setCardOrderReshuffling(true);
+    setCardOrderMessage(null);
+    try {
+      const result = await shuffleDeckQuizCardOrdersAction({
+        teamId: shuffleTeamId,
+        deckId,
+      });
+      setCardOrderShuffledAtLocal(result.shuffledAt);
+      setCardOrderMessage(
+        `Card order reshuffled for ${result.viewerCount} viewer${result.viewerCount === 1 ? "" : "s"}. Refreshing…`,
+      );
+      router.refresh();
+    } catch (e) {
+      setCardOrderMessage(
+        e instanceof Error ? e.message : "Could not reshuffle card order.",
+      );
+    } finally {
+      setCardOrderReshuffling(false);
+    }
+  }
+
   async function handleCancelToLobby() {
     setConfirmOpen(false);
     if (securityEnabled && quizSecurity) {
@@ -1218,6 +1268,29 @@ export function QuizStudy({
                 ) : null}
               </div>
             ) : null}
+            {cardOrderShuffledAtLocal ? (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-left">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                  <Shuffle className="size-3.5 shrink-0" aria-hidden />
+                  Question order shuffled for members
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Each assignee gets a unique card sequence. Last shuffled{" "}
+                  {new Date(cardOrderShuffledAtLocal).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                  .
+                </p>
+                {cardOrderMessage ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground" role="status">
+                    {cardOrderMessage}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {securityEnabled ? (
               <p className="text-xs text-amber-400/90">
                 Quiz security is on. Stay on this tab until you submit — leaving will lock your
@@ -1274,6 +1347,23 @@ export function QuizStudy({
                 cards={preparedCards}
                 onPublished={() => router.refresh()}
               />
+            ) : null}
+            {canReshuffleCardOrder && (quizSecurity?.teamId ?? teamId) != null ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                className="w-full gap-2 sm:w-auto"
+                disabled={cardOrderReshuffling || quizStarted}
+                onClick={() => void handleReshuffleCardOrder()}
+              >
+                <Shuffle className="h-4 w-4" />
+                {cardOrderReshuffling
+                  ? "Reshuffling…"
+                  : cardOrderShuffledAtLocal
+                    ? "Reshuffle order"
+                    : "Shuffle order"}
+              </Button>
             ) : null}
             <Button
               variant="outline"

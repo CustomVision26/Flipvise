@@ -170,7 +170,7 @@ const CAPTION_DECK =
   "Only decks linked to this workspace appear here — create on your Personal Dashboard, then link deck to this workspace below, or create a deck directly scoped to this workspace.";
 
 const CAPTION_STUDY_PRIVILEGE =
-  "Choose whether the assignee may use Standard Review, Quiz, or both on the study page for this deck. Team admins on Education Gold / Enterprise can be limited here; on other plans team admins always have full study access.";
+  "Choose whether the assignee may use Standard Review, AI Recall™, Quiz, or a combination on the study page for this deck. Team admins on Education Gold / Enterprise can be limited here; on other plans team admins always have full study access.";
 
 const CAPTION_LINK_PERSONAL =
   "Lists every deck from your Personal Dashboard. Decks already tied to this workspace stay selectable — linking again simply confirms they remain attached (no duplicate).";

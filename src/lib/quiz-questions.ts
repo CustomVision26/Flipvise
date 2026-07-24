@@ -1,4 +1,5 @@
 import type { CardQuizVariants, FillInBlankSegment } from "@/lib/card-quiz-variants";
+import { applyQuizCardOrder } from "@/lib/quiz-card-order";
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
 
 export type QuizQuestionType = "multiple_choice" | "true_false" | "fill_in_blank";
@@ -269,18 +270,24 @@ export function buildQuestionForCardType(
 /**
  * Builds one quiz question per card, choosing randomly among enabled formats
  * that have content for that card, or using admin {@link assignments} when set.
+ * When {@link cardOrder} is provided (admin member shuffle), question order is stable
+ * for that viewer instead of a random Fisher–Yates pass.
  */
 export function buildQuizQuestions(
   cards: QuizCardInput[],
   formats: QuizFormatsSettings,
   assignments?: Record<number, QuizQuestionType> | null,
+  cardOrder?: number[] | null,
 ): QuizQuestion[] {
   const hasAssignments =
     assignments != null && Object.keys(assignments).length > 0;
+  const hasCardOrder = cardOrder != null && cardOrder.length > 0;
+
+  let questions: QuizQuestion[];
 
   if (hasAssignments) {
     const cardById = new Map(cards.map((c) => [c.id, c]));
-    const questions: QuizQuestion[] = [];
+    questions = [];
 
     for (const [rawCardId, assigned] of Object.entries(assignments!)) {
       const cardId = Number(rawCardId);
@@ -299,31 +306,33 @@ export function buildQuizQuestions(
       }
       if (question) questions.push(question);
     }
+  } else {
+    questions = [];
 
-    return shuffleArray(questions);
+    for (const card of cards) {
+      const candidates: QuizQuestion[] = [];
+
+      if (formats.multipleChoice) {
+        const mc = buildMultipleChoiceQuestion(card, cards);
+        if (mc) candidates.push(mc);
+      }
+      if (formats.trueFalse) {
+        const tf = buildTrueFalseQuestion(card);
+        if (tf) candidates.push(tf);
+      }
+      if (formats.fillInBlank) {
+        const fib = buildFillInBlankQuestion(card);
+        if (fib) candidates.push(fib);
+      }
+
+      if (candidates.length > 0) {
+        questions.push(pickRandom(candidates));
+      }
+    }
   }
 
-  const questions: QuizQuestion[] = [];
-
-  for (const card of cards) {
-    const candidates: QuizQuestion[] = [];
-
-    if (formats.multipleChoice) {
-      const mc = buildMultipleChoiceQuestion(card, cards);
-      if (mc) candidates.push(mc);
-    }
-    if (formats.trueFalse) {
-      const tf = buildTrueFalseQuestion(card);
-      if (tf) candidates.push(tf);
-    }
-    if (formats.fillInBlank) {
-      const fib = buildFillInBlankQuestion(card);
-      if (fib) candidates.push(fib);
-    }
-
-    if (candidates.length > 0) {
-      questions.push(pickRandom(candidates));
-    }
+  if (hasCardOrder) {
+    return applyQuizCardOrder(questions, cardOrder);
   }
 
   return shuffleArray(questions);

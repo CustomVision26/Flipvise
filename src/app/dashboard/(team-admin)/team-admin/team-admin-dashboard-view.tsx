@@ -48,6 +48,8 @@ import {
 } from "@/lib/team-admin-dynamic-components";
 import { TeamAdminHome } from "@/components/team-admin-home";
 import { TeamAdminPageChrome } from "@/components/team-admin-page-chrome";
+import { AiRecallTeamStatsPanel } from "@/components/ai-recall-team-stats-panel";
+import { getTeamAiRecallStats } from "@/db/queries/ai-recall";
 
 interface TeamAdminDashboardViewProps {
   searchParams: Promise<{
@@ -92,6 +94,7 @@ export default async function TeamAdminDashboardView({
       teamDecksWithCardCounts,
       ownerDisplayName,
       workspaceQuizSnapshots,
+      aiRecallStats,
     ],
     assignWorkspaceSnapshots,
   ] = await Promise.all([
@@ -120,6 +123,7 @@ export default async function TeamAdminDashboardView({
           };
         }),
       ),
+      getTeamAiRecallStats(selected.id),
     ]),
     Promise.all(
       teamsForSubscriber.map(async (t) => {
@@ -363,6 +367,7 @@ export default async function TeamAdminDashboardView({
               teamDecksWithCardCounts={teamDecksWithCardCounts}
               planSlug={selected.planSlug}
             />
+            <AiRecallTeamStatsPanel stats={aiRecallStats} />
           </>
         ) : null}
         {manageTabs}
@@ -423,6 +428,7 @@ export default async function TeamAdminDashboardView({
         teamDecksWithCardCounts={teamDecksWithCardCounts}
         planSlug={selected.planSlug}
       />
+      <AiRecallTeamStatsPanel stats={aiRecallStats} />
 
       {manageTabs}
     </div>

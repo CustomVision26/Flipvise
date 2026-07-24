@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ListChecks, Send } from "lucide-react";
+import { ListChecks, Send, Shuffle } from "lucide-react";
 import { QuizFormatPreviewButton } from "@/components/quiz-format-preview-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,10 @@ import {
   updateDeckQuizFormatsAction,
   updateTeamQuizFormatsAction,
 } from "@/actions/quiz-formats";
+import {
+  shuffleDeckQuizCardOrdersAction,
+  shuffleWorkspaceQuizCardOrdersAction,
+} from "@/actions/quiz-card-orders";
 import type {
   QuizFormatsDeckSnapshot,
   QuizFormatsWorkspaceSnapshot,
@@ -173,6 +177,12 @@ export function TeamQuizFormatsSettings({
     Record<number, boolean>
   >({});
   const [reshuffledAtById, setReshuffledAtById] = React.useState<Record<number, string>>({});
+  const [cardOrderShuffledAtById, setCardOrderShuffledAtById] = React.useState<
+    Record<number, string>
+  >({});
+  const [cardOrderViewerCountById, setCardOrderViewerCountById] = React.useState<
+    Record<number, number>
+  >({});
   const [distributionByDeckId, setDistributionByDeckId] = React.useState<
     Record<number, QuizFormatDistribution>
   >({});
@@ -183,6 +193,13 @@ export function TeamQuizFormatsSettings({
   const [deckSavingId, setDeckSavingId] = React.useState<number | null>(null);
   const [generatingDeckId, setGeneratingDeckId] = React.useState<number | null>(null);
   const [reshufflingDeckId, setReshufflingDeckId] = React.useState<number | null>(null);
+  const [cardOrderShufflingDeckId, setCardOrderShufflingDeckId] = React.useState<number | null>(
+    null,
+  );
+  const [workspaceCardOrderShuffling, setWorkspaceCardOrderShuffling] = React.useState(false);
+  const [workspaceCardOrderMessage, setWorkspaceCardOrderMessage] = React.useState<string | null>(
+    null,
+  );
   const [workspaceError, setWorkspaceError] = React.useState<string | null>(null);
   const [deckErrorById, setDeckErrorById] = React.useState<Record<number, string>>({});
   const [generateMessageById, setGenerateMessageById] = React.useState<
@@ -269,6 +286,23 @@ export function TeamQuizFormatsSettings({
         if (deck.quizFormatShuffledAt) {
           next[deck.id] = deck.quizFormatShuffledAt;
         }
+      }
+      return next;
+    });
+
+    setCardOrderShuffledAtById((prev) => {
+      const next = { ...prev };
+      for (const deck of decks) {
+        if (deck.quizCardOrderShuffledAt) {
+          next[deck.id] = deck.quizCardOrderShuffledAt;
+        }
+      }
+      return next;
+    });
+    setCardOrderViewerCountById((prev) => {
+      const next = { ...prev };
+      for (const deck of decks) {
+        next[deck.id] = deck.quizCardOrderViewerCount;
       }
       return next;
     });
@@ -550,6 +584,68 @@ export function TeamQuizFormatsSettings({
     }
   }
 
+  async function shuffleCardOrderForDeck(deckId: number) {
+    if (!selected) return;
+    setCardOrderShufflingDeckId(deckId);
+    setDeckErrorById((prev) => {
+      const copy = { ...prev };
+      delete copy[deckId];
+      return copy;
+    });
+    try {
+      const result = await shuffleDeckQuizCardOrdersAction({
+        teamId: selected.id,
+        deckId,
+      });
+      setCardOrderShuffledAtById((prev) => ({ ...prev, [deckId]: result.shuffledAt }));
+      setCardOrderViewerCountById((prev) => ({ ...prev, [deckId]: result.viewerCount }));
+    } catch (e) {
+      setDeckErrorById((prev) => ({
+        ...prev,
+        [deckId]: e instanceof Error ? e.message : "Could not shuffle card order.",
+      }));
+    } finally {
+      setCardOrderShufflingDeckId(null);
+    }
+  }
+
+  async function shuffleCardOrderForWorkspace() {
+    if (!selected) return;
+    setWorkspaceCardOrderShuffling(true);
+    setWorkspaceCardOrderMessage(null);
+    setWorkspaceError(null);
+    try {
+      const result = await shuffleWorkspaceQuizCardOrdersAction({ teamId: selected.id });
+      setWorkspaceCardOrderMessage(
+        `Shuffled ${result.deckCount} deck${result.deckCount === 1 ? "" : "s"} · ${result.viewerCount} unique order${result.viewerCount === 1 ? "" : "s"}.`,
+      );
+      const nextAt: Record<number, string> = {};
+      for (const deck of decks) {
+        nextAt[deck.id] = result.shuffledAt;
+      }
+      setCardOrderShuffledAtById((prev) => ({ ...prev, ...nextAt }));
+    } catch (e) {
+      setWorkspaceError(
+        e instanceof Error ? e.message : "Could not shuffle card order for this workspace.",
+      );
+    } finally {
+      setWorkspaceCardOrderShuffling(false);
+    }
+  }
+
+  function formatShuffleTime(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  }
+
   React.useEffect(() => {
     if (!selected) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -683,25 +779,50 @@ export function TeamQuizFormatsSettings({
         {selected && workspaceFormats ? (
           <>
             <div className="space-y-3 rounded-lg border border-border/80 bg-muted/20 p-4">
-              <p className="text-sm font-medium text-foreground">Workspace defaults</p>
-              <FormatCheckboxRow
-                id={`ws-mc-${selected.id}`}
-                label="Multiple choice"
-                checked={workspaceFormats.multipleChoice}
-                onCheckedChange={(c) => toggleWorkspaceFormat("multipleChoice", c === true)}
-              />
-              <FormatCheckboxRow
-                id={`ws-tf-${selected.id}`}
-                label="True / false"
-                checked={workspaceFormats.trueFalse}
-                onCheckedChange={(c) => toggleWorkspaceFormat("trueFalse", c === true)}
-              />
-              <FormatCheckboxRow
-                id={`ws-fib-${selected.id}`}
-                label="Fill in the blank"
-                checked={workspaceFormats.fillInBlank}
-                onCheckedChange={(c) => toggleWorkspaceFormat("fillInBlank", c === true)}
-              />
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-3">
+                  <p className="text-sm font-medium text-foreground">Workspace defaults</p>
+                  <FormatCheckboxRow
+                    id={`ws-mc-${selected.id}`}
+                    label="Multiple choice"
+                    checked={workspaceFormats.multipleChoice}
+                    onCheckedChange={(c) => toggleWorkspaceFormat("multipleChoice", c === true)}
+                  />
+                  <FormatCheckboxRow
+                    id={`ws-tf-${selected.id}`}
+                    label="True / false"
+                    checked={workspaceFormats.trueFalse}
+                    onCheckedChange={(c) => toggleWorkspaceFormat("trueFalse", c === true)}
+                  />
+                  <FormatCheckboxRow
+                    id={`ws-fib-${selected.id}`}
+                    label="Fill in the blank"
+                    checked={workspaceFormats.fillInBlank}
+                    onCheckedChange={(c) => toggleWorkspaceFormat("fillInBlank", c === true)}
+                  />
+                </div>
+                <div className="flex w-full max-w-[14rem] flex-col items-stretch gap-1.5 sm:w-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={workspaceCardOrderShuffling || decks.length === 0}
+                    onClick={() => void shuffleCardOrderForWorkspace()}
+                  >
+                    <Shuffle className="size-3.5" aria-hidden />
+                    {workspaceCardOrderShuffling ? "Shuffling…" : "Shuffle card order"}
+                  </Button>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Gives each assignee a unique quiz card sequence on every linked deck.
+                  </p>
+                  {workspaceCardOrderMessage ? (
+                    <p className="text-[11px] font-medium text-emerald-400" role="status">
+                      {workspaceCardOrderMessage}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
               {workspaceError ? (
                 <p className="text-sm text-destructive" role="alert">
                   {workspaceError}
@@ -801,52 +922,97 @@ export function TeamQuizFormatsSettings({
                           Use workspace defaults
                         </label>
                       </div>
-                      {!inherit ? (
-                        <div className="space-y-2">
-                          <FormatCheckboxRow
-                            id={`deck-mc-${deck.id}`}
-                            label="Multiple choice"
-                            checked={effective.multipleChoice}
-                            onCheckedChange={(c) =>
-                              setDeckOverrideById((prev) => ({
-                                ...prev,
-                                [deck.id]: {
-                                  ...(prev[deck.id] ?? effective),
-                                  multipleChoice: c === true,
-                                },
-                              }))
-                            }
-                          />
-                          <FormatCheckboxRow
-                            id={`deck-tf-${deck.id}`}
-                            label="True / false"
-                            checked={effective.trueFalse}
-                            onCheckedChange={(c) =>
-                              setDeckOverrideById((prev) => ({
-                                ...prev,
-                                [deck.id]: {
-                                  ...(prev[deck.id] ?? effective),
-                                  trueFalse: c === true,
-                                },
-                              }))
-                            }
-                          />
-                          <FormatCheckboxRow
-                            id={`deck-fib-${deck.id}`}
-                            label="Fill in the blank"
-                            checked={effective.fillInBlank}
-                            onCheckedChange={(c) =>
-                              setDeckOverrideById((prev) => ({
-                                ...prev,
-                                [deck.id]: {
-                                  ...(prev[deck.id] ?? effective),
-                                  fillInBlank: c === true,
-                                },
-                              }))
-                            }
-                          />
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          {!inherit ? (
+                            <>
+                              <FormatCheckboxRow
+                                id={`deck-mc-${deck.id}`}
+                                label="Multiple choice"
+                                checked={effective.multipleChoice}
+                                onCheckedChange={(c) =>
+                                  setDeckOverrideById((prev) => ({
+                                    ...prev,
+                                    [deck.id]: {
+                                      ...(prev[deck.id] ?? effective),
+                                      multipleChoice: c === true,
+                                    },
+                                  }))
+                                }
+                              />
+                              <FormatCheckboxRow
+                                id={`deck-tf-${deck.id}`}
+                                label="True / false"
+                                checked={effective.trueFalse}
+                                onCheckedChange={(c) =>
+                                  setDeckOverrideById((prev) => ({
+                                    ...prev,
+                                    [deck.id]: {
+                                      ...(prev[deck.id] ?? effective),
+                                      trueFalse: c === true,
+                                    },
+                                  }))
+                                }
+                              />
+                              <FormatCheckboxRow
+                                id={`deck-fib-${deck.id}`}
+                                label="Fill in the blank"
+                                checked={effective.fillInBlank}
+                                onCheckedChange={(c) =>
+                                  setDeckOverrideById((prev) => ({
+                                    ...prev,
+                                    [deck.id]: {
+                                      ...(prev[deck.id] ?? effective),
+                                      fillInBlank: c === true,
+                                    },
+                                  }))
+                                }
+                              />
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Using workspace format defaults. Shuffle still applies a unique card
+                              order per assignee for this deck.
+                            </p>
+                          )}
                         </div>
-                      ) : null}
+                        <div className="flex w-full max-w-[14rem] flex-col items-stretch gap-1.5 sm:w-auto">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            disabled={
+                              cardOrderShufflingDeckId === deck.id ||
+                              workspaceCardOrderShuffling ||
+                              deck.eligibleCardCount === 0
+                            }
+                            onClick={() => void shuffleCardOrderForDeck(deck.id)}
+                          >
+                            <Shuffle className="size-3.5" aria-hidden />
+                            {cardOrderShufflingDeckId === deck.id
+                              ? "Shuffling…"
+                              : cardOrderShuffledAtById[deck.id]
+                                ? "Reshuffle order"
+                                : "Shuffle card order"}
+                          </Button>
+                          {cardOrderShuffledAtById[deck.id] ? (
+                            <p className="text-[11px] font-medium text-emerald-400" role="status">
+                              Shuffle in effect
+                              {(cardOrderViewerCountById[deck.id] ?? 0) > 0
+                                ? ` · ${cardOrderViewerCountById[deck.id]} viewer${cardOrderViewerCountById[deck.id] === 1 ? "" : "s"}`
+                                : ""}
+                              <span className="mt-0.5 block font-normal text-muted-foreground">
+                                {formatShuffleTime(cardOrderShuffledAtById[deck.id]!)}
+                              </span>
+                            </p>
+                          ) : (
+                            <p className="text-[11px] leading-snug text-muted-foreground">
+                              Unique question order per member.
+                            </p>
+                          )}
+                        </div>
+                      </div>
                       {showDistribution ? (
                         <div className="space-y-2 rounded-md border border-border/60 bg-muted/15 p-3">
                           {distributionLocked ? (

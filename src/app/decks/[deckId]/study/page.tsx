@@ -23,6 +23,7 @@ import {
 import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
 import { isEducationTeamPlanId, canConfigurePersonalDeckQuizFormatsFromAccess } from "@/lib/education-plans";
+import { resolveAiRecallAccess } from "@/lib/ai-recall-eligibility";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   teamWorkspaceDeckTitleLinkClass,
@@ -47,6 +48,7 @@ import {
   resolveDeckCardCap,
 } from "@/lib/deck-limits";
 import { resolveQuizFormatsForStudy, getDeckQuizFormatAssignmentsForStudy, getQuizFormatsDeckSnapshotForOwner } from "@/db/queries/quiz-formats";
+import { getQuizCardOrderForViewer } from "@/db/queries/quiz-card-orders";
 
 interface StudyPageProps {
   params: Promise<{ deckId: string }>;
@@ -58,6 +60,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     userId,
     maxCardsPerDeck,
     hasAiReading,
+    hasAiRecall,
     effectivePlanSlug,
     hasClerkPersonalPro,
     hasClerkPersonalProPlus,
@@ -199,6 +202,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   }
 
   let memberAllowReview = true;
+  let memberAllowAiRecall = true;
   let memberAllowQuiz = true;
   if (access.kind === "team_member" || access.kind === "team_admin") {
     const privilegeTeamId = access.teamId;
@@ -214,6 +218,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
       );
       const modes = resolveMemberStudyModes(privilege);
       memberAllowReview = modes.allowReview;
+      memberAllowAiRecall = modes.allowAiRecall;
       memberAllowQuiz = modes.allowQuiz;
     }
   }
@@ -261,12 +266,30 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     studyTeam != null ? studyTeam.ownerUserId !== userId : false;
   const isEducationTeamPlan =
     studyTeam != null && isEducationTeamPlanId(studyTeam.planSlug);
+  const studyHasAiRecall =
+    hasAiRecall ||
+    resolveAiRecallAccess({
+      personalPlanSlug: effectivePlanSlug,
+      hasClerkProPlusPlan: hasClerkPersonalProPlus,
+      activeTeamPlan,
+      activeEducationTeamPlan,
+      studyWorkspacePlanSlug: studyTeam?.planSlug ?? null,
+    });
 
   const quizFormats = await resolveQuizFormatsForStudy(
     id,
     studyTeamId ?? deck.teamId ?? null,
   );
   const quizFormatAssignmentPlan = await getDeckQuizFormatAssignmentsForStudy(id);
+
+  const cardOrderTeamId = studyTeamId ?? deck.teamId ?? null;
+  const quizCardOrderContext =
+    cardOrderTeamId != null
+      ? await getQuizCardOrderForViewer(cardOrderTeamId, id, userId).catch(() => null)
+      : null;
+  const canReshuffleCardOrder =
+    cardOrderTeamId != null &&
+    (access.kind === "owner" || access.kind === "team_admin");
 
   const canEditFormats =
     canEditDeckContent(access) &&
@@ -346,11 +369,13 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         teamId={studyTeamId ?? deck.teamId ?? null}
         allowsQuizStudy={allowsQuizStudy}
         memberAllowReview={memberAllowReview}
+        memberAllowAiRecall={memberAllowAiRecall}
         memberAllowQuiz={memberAllowQuiz}
         deckGradient={deck.gradient ?? null}
         autoSaveQuizResult={fromTeamWorkspaceUrl}
         quizDurationSeconds={quizDurationSeconds}
         hasAiReading={hasAiReading}
+        hasAiRecall={studyHasAiRecall}
         quizSecurity={quizSecurity}
         quizSchedule={quizSchedule}
         exitHref={studyBackHref}
@@ -362,6 +387,15 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         isEducationTeamPlan={isEducationTeamPlan}
         quizFormats={quizFormats}
         quizFormatAssignmentPlan={quizFormatAssignmentPlan}
+        quizCardOrder={
+          quizCardOrderContext?.cardIds && quizCardOrderContext.cardIds.length > 0
+            ? quizCardOrderContext.cardIds
+            : null
+        }
+        quizCardOrderShuffledAt={
+          quizCardOrderContext?.deckShuffledAt ?? quizCardOrderContext?.shuffledAt ?? null
+        }
+        canReshuffleCardOrder={canReshuffleCardOrder}
         quizFormatEditorSnapshot={quizFormatEditorSnapshot}
       />
     </div>

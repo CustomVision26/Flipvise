@@ -75,6 +75,7 @@ export function withNullCover<
     | "quizDurationMinutes"
     | "quizSecurityApplyToMembers"
     | "quizSecurityApplyToTeamAdmins"
+    | "quizCardOrderShuffledAt"
   >,
 >(row: T): DeckRow {
   return {
@@ -97,6 +98,11 @@ export function withNullCover<
       "quizSecurityApplyToTeamAdmins" in row
         ? ((row as { quizSecurityApplyToTeamAdmins?: boolean | null })
             .quizSecurityApplyToTeamAdmins ?? null)
+        : null,
+    quizCardOrderShuffledAt:
+      "quizCardOrderShuffledAt" in row
+        ? ((row as { quizCardOrderShuffledAt?: Date | null }).quizCardOrderShuffledAt ??
+          null)
         : null,
   };
 }

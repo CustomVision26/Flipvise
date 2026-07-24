@@ -165,9 +165,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Study Session",
         route: "/decks/[deckId]/study",
         purpose:
-          "Review flashcards and take quizzes with progress tracking.",
+          "Review flashcards with Standard Review, practice Active Recall with AI Recall™, or take quizzes.",
         howItWorks: [
-          "Flashcard review flips cards and tracks familiarity.",
+          "Study Mode selector: Standard Review (offline-friendly flip cards), AI Recall™ (Pro Plus+ Active Recall with AI scoring), and Quiz. Your last mode is remembered.",
+          "Standard Review flips cards to reveal answers, then Next — no Correct/Incorrect self-grading.",
+          "AI Recall™ asks you to type an answer before unlocking the solution; AI scores understanding. Requires Pro Plus / Education Plus / team plans and internet; offline users continue with Standard Review.",
           "Double-click a front or back card image during flashcard review to enlarge it; press Escape or click outside to close.",
           "Quiz mode supports multiple question formats: multiple choice, true/false, and fill-in-the-blank.",
           "The quiz start screen lists enabled formats and shows how many of each type appear in this session (e.g. 5 MCQ, 2 True/False, 3 Fill in the blank).",
@@ -183,7 +185,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         requirements: [
           "At least one card in the deck.",
           "Quiz mode requires a paid or team-tier deck (above free card cap).",
-          "Team members: review/quiz modes depend on admin study privileges per assignment.",
+          "AI Recall™ requires Pro Plus, Education Plus, or a team / education team plan, plus an internet connection.",
+          "Team members: Standard Review / AI Recall™ / Quiz modes depend on admin study privileges per assignment.",
           "Format Quiz Question (personal decks) requires Pro Plus or Education Plus — from Stripe, admin assignment, or affiliate grant — and deck ownership.",
           "True/false and fill-in-the-blank require enabled formats and AI-generated quiz content on cards.",
         ],
@@ -191,6 +194,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not attempt to bypass quiz security or schedule locks — contact your team admin.",
           "Do not refresh mid-quiz if autosave fails — note your score and contact support if needed.",
           "Do not expect Format Quiz Question on standard Pro or Free personal plans — team workspaces configure formats in Team Admin → Study Privileges instead.",
+          "Do not expect AI Recall™ on Free or standard Pro — upgrade or continue with Standard Review.",
         ],
       },
       {
@@ -930,7 +934,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Link subscriber decks to the workspace and assign them to members.",
         howItWorks: [
           "Assign decks from the subscriber’s personal library to team members.",
-          "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) controls review vs quiz access per member per deck.",
+          "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) controls Standard Review, AI Recall™, and Quiz access per member per deck.",
           "Study Privileges also configures quiz question formats (multiple choice, true/false, fill-in-the-blank) per workspace or per deck.",
           "Workspace selector shows the workspace name (not the numeric id).",
           "After formats are saved, set Questions per format — number inputs for each enabled type that must add up to the deck’s card total (e.g. 10 cards: MCQ 5, True/False 2, Fill in the blank 3).",

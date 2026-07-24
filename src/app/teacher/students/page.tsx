@@ -9,6 +9,8 @@ import { listSavedHomeworkAssignmentOptionsForUser, listSavedHomeworkAssignmentO
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { TeacherStudentProgressView } from "@/components/teacher-student-progress-view";
+import { AiRecallTeacherStatsPanel } from "@/components/ai-recall-teacher-stats-panel";
+import { getTeacherAiRecallStatsForWorkspace } from "@/db/queries/ai-recall";
 
 type TeacherStudentsPageProps = {
   searchParams: Promise<{
@@ -38,7 +40,7 @@ export default async function TeacherStudentsPage({
   const showQuizResultsTab = isEducationTeamWorkspace;
   const showGradesAndReportsTabs = isEducationPlus || showQuizResultsTab;
 
-  const [progress, registeredStudents, workspaceInvitees, manualGrades, personalClasses, savedHomeworkAssignments, savedQuizOptions] =
+  const [progress, registeredStudents, workspaceInvitees, manualGrades, personalClasses, savedHomeworkAssignments, savedQuizOptions, aiRecallStats] =
     await Promise.all([
     listTeacherStudentProgressForWorkspace(userId, workspace.teamId),
     showRegisterStudentTab
@@ -64,6 +66,7 @@ export default async function TeacherStudentsPage({
     showRegisterStudentTab && isEducationPlus
       ? listTeacherManualGradeQuizOptionsForUser(userId)
       : Promise.resolve([]),
+    getTeacherAiRecallStatsForWorkspace(userId, workspace.teamId),
   ]);
 
   const isWorkspaceOwner = team != null && team.ownerUserId === userId;
@@ -73,30 +76,33 @@ export default async function TeacherStudentsPage({
       progress.memberMetaByUserId[userId]?.role === "team_admin");
 
   return (
-    <TeacherStudentProgressView
-      rows={progress.rows}
-      teamId={workspace.teamId}
-      teamMemberId={workspace.teamMemberId}
-      canDeleteResults={canDeleteResults}
-      ownerUserId={progress.ownerUserId}
-      ownerName={progress.ownerName}
-      ownerEmail={progress.ownerEmail}
-      memberMetaByUserId={progress.memberMetaByUserId}
-      workspaceLabel={team?.name ?? null}
-      workspacePlanSlug={workspacePlanSlug}
-      backHref={backHref}
-      isWorkspaceOwner={isWorkspaceOwner}
-      showRegisterStudentTab={showRegisterStudentTab}
-      isPersonalEducation={isEducationPlus}
-      isEducationTeamWorkspace={isEducationTeamWorkspace}
-      workspaceInvitees={workspaceInvitees}
-      showQuizResultsTab={showQuizResultsTab}
-      showGradesAndReportsTabs={showGradesAndReportsTabs}
-      registeredStudents={registeredStudents}
-      personalClasses={personalClasses}
-      savedHomeworkAssignments={savedHomeworkAssignments}
-      savedQuizOptions={savedQuizOptions}
-      manualGrades={manualGrades}
-    />
+    <div className="flex flex-col gap-4">
+      <AiRecallTeacherStatsPanel stats={aiRecallStats} />
+      <TeacherStudentProgressView
+        rows={progress.rows}
+        teamId={workspace.teamId}
+        teamMemberId={workspace.teamMemberId}
+        canDeleteResults={canDeleteResults}
+        ownerUserId={progress.ownerUserId}
+        ownerName={progress.ownerName}
+        ownerEmail={progress.ownerEmail}
+        memberMetaByUserId={progress.memberMetaByUserId}
+        workspaceLabel={team?.name ?? null}
+        workspacePlanSlug={workspacePlanSlug}
+        backHref={backHref}
+        isWorkspaceOwner={isWorkspaceOwner}
+        showRegisterStudentTab={showRegisterStudentTab}
+        isPersonalEducation={isEducationPlus}
+        isEducationTeamWorkspace={isEducationTeamWorkspace}
+        workspaceInvitees={workspaceInvitees}
+        showQuizResultsTab={showQuizResultsTab}
+        showGradesAndReportsTabs={showGradesAndReportsTabs}
+        registeredStudents={registeredStudents}
+        personalClasses={personalClasses}
+        savedHomeworkAssignments={savedHomeworkAssignments}
+        savedQuizOptions={savedQuizOptions}
+        manualGrades={manualGrades}
+      />
+    </div>
   );
 }

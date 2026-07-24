@@ -18,6 +18,8 @@ import {
   quizResults,
   quizSecurityInboxMessages,
   quizSecuritySessions,
+  aiRecallSessions,
+  cardMastery,
   savedHomeworkAssignments,
   savedLessonPlans,
   stripeSubscriptions,
@@ -202,6 +204,8 @@ export async function purgeAllUserData(
     .where(eq(welcomeInboxMessages.recipientUserId, userId));
   await db.delete(quizResults).where(eq(quizResults.userId, userId));
   await db.delete(quizSecuritySessions).where(eq(quizSecuritySessions.userId, userId));
+  await db.delete(aiRecallSessions).where(eq(aiRecallSessions.userId, userId));
+  await db.delete(cardMastery).where(eq(cardMastery.userId, userId));
   await db
     .delete(quizResultInboxMessages)
     .where(eq(quizResultInboxMessages.recipientUserId, userId));

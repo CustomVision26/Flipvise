@@ -23,6 +23,8 @@ import type {
 import {
   consumeOfflineLibraryMigrationPendingSync,
   defaultOfflineAccessContext,
+  offlineViewerCanSpeak,
+  offlineViewerHasAiReading,
   resolveOfflineAccountPlanDisplay,
   resolveOfflinePersonalPlanLabel,
 } from "../../src/lib/offline/access-context";
@@ -52,6 +54,7 @@ import {
 import { DeckLibrary } from "./deck-library";
 import { ImagePickerField } from "./image-picker-field";
 import { DeckDetail } from "./deck-detail";
+import { DeckPreview } from "./deck-preview";
 import { DeckStudyHub } from "./deck-study-hub";
 import { StandardReview } from "./standard-review";
 import { DeckQuiz } from "./deck-quiz";
@@ -164,7 +167,7 @@ export function App() {
   const [workspaceScope, setWorkspaceScope] = useState<SavedWorkspaceScope>("personal");
   const [activeDeck, setActiveDeck] = useState<OfflineDeckRow | null>(null);
   const [deckView, setDeckView] = useState<
-    "menu" | "study-hub" | "flash" | "quiz"
+    "menu" | "preview" | "study-hub" | "flash" | "quiz"
   >("menu");
   const [syncing, setSyncing] = useState(false);
   const [openingLive, setOpeningLive] = useState(false);
@@ -713,6 +716,18 @@ export function App() {
   }
 
   if (activeDeck) {
+    if (deckView === "preview") {
+      return (
+        <DeckPreview
+          deck={activeDeck}
+          online={online}
+          canSpeak={offlineViewerCanSpeak(accessContext)}
+          hasAiReading={offlineViewerHasAiReading(accessContext)}
+          apiBaseUrl={bundledLiveUrl()}
+          onClose={() => setActiveDeck(null)}
+        />
+      );
+    }
     if (deckView === "flash") {
       return (
         <StandardReview
@@ -798,6 +813,10 @@ export function App() {
           onOpenDeck={(deck) => {
             setActiveDeck(deck);
             setDeckView("menu");
+          }}
+          onPreviewDeck={(deck) => {
+            setActiveDeck(deck);
+            setDeckView("preview");
           }}
           onDecksChanged={async () => {
             if (userId) await loadDecks(userId, workspaceScope, accessContext);

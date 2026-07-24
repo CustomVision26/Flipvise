@@ -127,7 +127,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         bullets: [
           "Assign to members and team admins (not the owner row).",
           "Records who assigned and when.",
-          "Set study privilege on assign: Standard Review only, Quiz only, or Both (default).",
+          "Set study privilege on assign: Standard Review, AI Recall™, Quiz, or combinations (default: all three).",
           "Unassign removes member access to that deck in the workspace.",
           "Assignments by member table — workspace owner sees all members and workspaces; team admins see only the current workspace’s members (no Workspace column).",
         ],
@@ -137,8 +137,9 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Study privileges sub-tab",
         bullets: [
           "/dashboard/team-admin/deck-manager/study-privileges",
-          "Change review vs quiz access per member per assigned deck.",
-          "Applies to team members in the privileges table.",
+          "Change Standard Review, AI Recall™, and/or Quiz access per member per assigned deck.",
+          "Options include single modes and combinations (e.g. AI Recall™ only, Standard Review & AI Recall™, all three).",
+          "Applies to team members in the privileges table (and Education Gold / Enterprise team admins).",
         ],
       },
       {
@@ -149,6 +150,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Workspace selector shows the workspace name — pick the workspace before editing defaults or per-deck overrides.",
           "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
           "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
+          "Shuffle card order (workspace or per-deck) gives each assignee a unique quiz question sequence; the Timed quiz lobby shows when shuffle is in effect and owners/admins can reshuffle there.",
           "Multiple choice works from card content; true/false and fill-in-the-blank need AI-generated quiz sentences.",
           "Personal Pro Plus / Education Plus (paid, admin-assigned, or affiliate) use Format Quiz Question on /decks/[deckId]/study instead of this Team Admin panel.",
         ],

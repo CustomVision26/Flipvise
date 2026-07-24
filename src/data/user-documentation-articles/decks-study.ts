@@ -81,16 +81,32 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
   a(
     "study-session",
     "Study Session — In-Depth Guide",
-    "Study sessions (/decks/[deckId]/study) run flashcard review and quiz modes with optional team policies.",
+    "Study sessions (/decks/[deckId]/study) run Standard Review, AI Recall™, and Quiz modes with optional team policies.",
     [
       {
         id: "modes",
         title: "Study modes",
         bullets: [
-          "Flashcard review — flip cards and track familiarity.",
+          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered.",
+          "Standard Review — flip cards to reveal answers, then Next. Works online and offline (browser PWA / Capacitor). No Correct/Incorrect self-grading.",
           "Double-click the front or back image on a flashcard to open a full-size preview; Escape or click outside closes it.",
+          "AI Recall™ — type your answer before the solution unlocks; AI scores understanding, then Continue or Review Again. Requires Pro Plus / Education Plus / team plans and an internet connection.",
           "Quiz mode — timed session with scoring and optional team policies.",
           "Team members may be restricted to review only, quiz only, or both per assignment.",
+        ],
+      },
+      {
+        id: "ai-recall",
+        title: "AI Recall™",
+        paragraphs: [
+          "AI Recall™ is Flipvise’s Active Recall study mode. You answer first; the correct answer stays locked until AI evaluates your response (or you choose I Don’t Know).",
+        ],
+        bullets: [
+          "Eligible plans: Pro Plus, Education Plus, Team Basic/Gold/Platinum/Enterprise, Education Gold/Enterprise. Not available on Free or standard Pro.",
+          "Offline: AI Recall™ shows “Internet connection required” and offers Continue with Standard Review — never a hard app error.",
+          "Submit sends your answer to OpenAI for evaluation (synonyms and minor spelling accepted). I Don’t Know reveals immediately without AI and marks Needs Review.",
+          "Session analytics (scores, forced unlocks, recall time, mastery) are stored for Teacher and Team dashboards.",
+          "Voice and drawing answers are reserved for future releases; text answers are supported today.",
         ],
       },
       {
@@ -123,6 +139,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Before you start a quiz, the lobby lists which formats are enabled and how many questions of each type you will see (e.g. 5 multiple choice, 2 true/false, 3 fill in the blank).",
           "When question counts have been entered and Publish to quiz used (personal Format Quiz Question or team Study privileges reshuffle), the lobby reflects that exact distribution.",
           "Without a publish/reshuffle, the lobby estimates a random mix across enabled formats.",
+          "When Team Admin shuffled card order for the workspace deck, the Timed quiz lobby shows Question order shuffled for members; owners/admins can Reshuffle order from that lobby.",
           "Each question shows a format badge while you answer (Multiple choice, True / false, or Fill in the blank).",
           "When published, each card keeps its assigned format until formats are published again.",
         ],

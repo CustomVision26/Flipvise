@@ -232,6 +232,20 @@
       "when": 1778800000000,
       "tag": "0061_quiz_security_audience",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1778900000000,
+      "tag": "0062_quiz_card_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1779000000000,
+      "tag": "0063_team_study_privilege_ai_recall",
+      "breakpoints": true
     }
   ]
 }

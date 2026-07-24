@@ -668,13 +668,21 @@ export async function revokeTeamInvitationAction(
   revalidatePath("/dashboard/team-admin", "layout");
 }
 
-const studyPrivilegeSchema = z.enum(["standard_review", "quiz", "both"]);
+const studyPrivilegeSchema = z.enum([
+  "standard_review",
+  "ai_recall",
+  "quiz",
+  "review_and_ai_recall",
+  "both",
+  "ai_recall_and_quiz",
+  "all",
+]);
 
 const assignDeckSchema = z.object({
   teamId: z.number().int().positive(),
   deckId: z.number().int().positive(),
   memberUserId: z.string().min(1),
-  studyPrivilege: studyPrivilegeSchema.default("both"),
+  studyPrivilege: studyPrivilegeSchema.default("all"),
 });
 
 export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSchema>) {

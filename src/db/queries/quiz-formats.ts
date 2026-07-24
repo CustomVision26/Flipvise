@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { cards, decks, teams } from "@/db/schema";
 import { getCardsByDeckUnscoped } from "@/db/queries/cards";
+import { listDeckQuizCardOrderShuffleSnapshots } from "@/db/queries/quiz-card-orders";
 import { getDecksForTeam } from "@/db/queries/teams";
 import { parseCardQuizVariants } from "@/lib/card-quiz-variants";
 import {
@@ -41,6 +42,10 @@ export type QuizFormatsDeckSnapshot = {
   savedDistribution: QuizFormatDistribution | null;
   hasQuizFormatAssignments: boolean;
   quizFormatShuffledAt: string | null;
+  /** When Team Admin shuffled per-member quiz card order for this deck. */
+  quizCardOrderShuffledAt: string | null;
+  /** Number of viewers with a stored unique card order for this workspace deck. */
+  quizCardOrderViewerCount: number;
   aiQuizContentReady: boolean;
   canReshuffleFormats: boolean;
   /** Personal timed-quiz length in minutes; null means auto from card count. */
@@ -115,6 +120,7 @@ export async function listQuizFormatsDecksForWorkspace(
     quizFormatFillInBlank: boolean | null;
     quizFormatAssignments: DeckQuizFormatAssignments | null;
     quizDurationMinutes: number | null;
+    quizCardOrderShuffledAt: Date | null;
   };
 
   let rows: DeckFormatRow[];
@@ -128,12 +134,17 @@ export async function listQuizFormatsDecksForWorkspace(
         quizFormatFillInBlank: decks.quizFormatFillInBlank,
         quizFormatAssignments: decks.quizFormatAssignments,
         quizDurationMinutes: decks.quizDurationMinutes,
+        quizCardOrderShuffledAt: decks.quizCardOrderShuffledAt,
       })
       .from(decks)
       .where(eq(decks.userId, ownerUserId));
   } catch (e) {
-    if (!isMissingDeckQuizDurationColumnError(e)) throw e;
-    warnMissingDeckQuizDurationColumnOnce();
+    if (!isMissingDeckQuizDurationColumnError(e) && !/quizCardOrderShuffledAt/i.test(String(e))) {
+      throw e;
+    }
+    if (isMissingDeckQuizDurationColumnError(e)) {
+      warnMissingDeckQuizDurationColumnOnce();
+    }
     const fallback = await db
       .select({
         id: decks.id,
@@ -145,11 +156,19 @@ export async function listQuizFormatsDecksForWorkspace(
       })
       .from(decks)
       .where(eq(decks.userId, ownerUserId));
-    rows = fallback.map((r) => ({ ...r, quizDurationMinutes: null }));
+    rows = fallback.map((r) => ({
+      ...r,
+      quizDurationMinutes: null,
+      quizCardOrderShuffledAt: null,
+    }));
   }
 
   const idSet = new Set(deckIds);
   const filtered = rows.filter((r) => idSet.has(r.id));
+  const cardOrderSnapshots = await listDeckQuizCardOrderShuffleSnapshots(
+    teamId,
+    filtered.map((d) => d.id),
+  ).catch(() => ({} as Record<number, { shuffledAt: string | null; viewerCount: number }>));
 
   const cardRows =
     filtered.length === 0
@@ -211,6 +230,11 @@ export async function listQuizFormatsDecksForWorkspace(
         hasQuizFormatAssignments:
           assignments != null && Object.keys(assignments.byCardId).length > 0,
         quizFormatShuffledAt: assignments?.shuffledAt ?? null,
+        quizCardOrderShuffledAt:
+          cardOrderSnapshots[r.id]?.shuffledAt ??
+          r.quizCardOrderShuffledAt?.toISOString() ??
+          null,
+        quizCardOrderViewerCount: cardOrderSnapshots[r.id]?.viewerCount ?? 0,
         aiQuizContentReady: deckAiQuizContentReady(
           formats,
           counts,
@@ -506,6 +530,8 @@ export async function getQuizFormatsDeckSnapshotForOwner(
     hasQuizFormatAssignments:
       assignments != null && Object.keys(assignments.byCardId).length > 0,
     quizFormatShuffledAt: assignments?.shuffledAt ?? null,
+    quizCardOrderShuffledAt: null,
+    quizCardOrderViewerCount: 0,
     aiQuizContentReady: deckAiQuizContentReady(
       formats,
       counts,

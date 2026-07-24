@@ -101,7 +101,10 @@ function DeckTile({
   view,
   online,
   canEdit,
+  expanded,
+  onToggleExpand,
   onOpen,
+  onPreview,
   onEdit,
   onDelete,
 }: {
@@ -109,14 +112,17 @@ function DeckTile({
   view: OfflineDeckViewMode;
   online: boolean;
   canEdit: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
   onOpen: () => void;
+  onPreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const gradient = offlineDeckGradientStyle(deck.gradient);
   const countLabel = `${deck.cardCount} card${deck.cardCount === 1 ? "" : "s"}`;
   const updated = formatUpdated(deck.updated_at_ms);
-  const showActions = canEdit && canEditDeckLocally(deck);
+  const showEditDelete = canEdit && canEditDeckLocally(deck);
   const hasCover = !!deck.cover_image_url;
   const gradientStyle =
     !hasCover && (view === "thumbnail" || view === "grid") && gradient
@@ -131,16 +137,30 @@ function DeckTile({
     />
   ) : null;
 
-  const actions = showActions ? (
-    <LibraryTileActions onEdit={onEdit} onDelete={onDelete} />
+  const actions = expanded ? (
+    <LibraryTileActions
+      onOpen={onOpen}
+      onPreview={onPreview}
+      onEdit={showEditDelete ? onEdit : undefined}
+      onDelete={showEditDelete ? onDelete : undefined}
+    />
   ) : null;
+
+  const shellClass = `deck-tile-shell deck-tile ${view}${
+    expanded ? " deck-tile-shell--expanded" : ""
+  }`;
 
   if (view === "list") {
     return (
-      <div className="deck-tile-shell deck-tile list">
+      <div className={shellClass}>
         <LibraryTileWatermark label="Deck" />
         {coverImage}
-        <button type="button" className="deck-tile__open" onClick={onOpen}>
+        <button
+          type="button"
+          className="deck-tile__open"
+          onClick={onToggleExpand}
+          aria-expanded={expanded}
+        >
           <span className="deck-tile__name">{deck.name}</span>
           <span className="deck-tile__meta">{countLabel}</span>
         </button>
@@ -151,13 +171,15 @@ function DeckTile({
 
   if (view === "thumbnail") {
     return (
-      <div
-        className="deck-tile-shell deck-tile thumbnail"
-        style={gradientStyle}
-      >
+      <div className={shellClass} style={gradientStyle}>
         <LibraryTileWatermark label="Deck" />
         {coverImage}
-        <button type="button" className="deck-tile__open" onClick={onOpen}>
+        <button
+          type="button"
+          className="deck-tile__open"
+          onClick={onToggleExpand}
+          aria-expanded={expanded}
+        >
           <span className="deck-tile__thumb-title">{deck.name}</span>
           <span className="deck-tile__thumb-count">{countLabel}</span>
         </button>
@@ -168,10 +190,15 @@ function DeckTile({
 
   if (view === "grid") {
     return (
-      <div className="deck-tile-shell deck-tile grid" style={gradientStyle}>
+      <div className={shellClass} style={gradientStyle}>
         <LibraryTileWatermark label="Deck" />
         {coverImage}
-        <button type="button" className="deck-tile__open" onClick={onOpen}>
+        <button
+          type="button"
+          className="deck-tile__open"
+          onClick={onToggleExpand}
+          aria-expanded={expanded}
+        >
           <h3 className="deck-tile__title">{deck.name}</h3>
           {deck.description && (
             <p className="deck-tile__desc">{deck.description}</p>
@@ -187,10 +214,15 @@ function DeckTile({
   }
 
   return (
-    <div className="deck-tile-shell deck-tile detail">
+    <div className={shellClass}>
       <LibraryTileWatermark label="Deck" />
       {coverImage}
-      <button type="button" className="deck-tile__open" onClick={onOpen}>
+      <button
+        type="button"
+        className="deck-tile__open"
+        onClick={onToggleExpand}
+        aria-expanded={expanded}
+      >
         <div
           className="deck-tile__accent"
           style={gradient ? { background: gradient } : undefined}
@@ -394,6 +426,7 @@ export function DeckLibrary({
   workspaceContextStale = false,
   onNewDeck,
   onOpenDeck,
+  onPreviewDeck,
   onDecksChanged,
 }: {
   decks: OfflineDeckRow[];
@@ -416,6 +449,7 @@ export function DeckLibrary({
   workspaceContextStale?: boolean;
   onNewDeck: () => void;
   onOpenDeck: (deck: OfflineDeckRow) => void;
+  onPreviewDeck: (deck: OfflineDeckRow) => void;
   onDecksChanged: () => void | Promise<void>;
 }) {
   const [view, setView] = useState<OfflineDeckViewMode>(() => loadDeckViewMode());
@@ -423,6 +457,7 @@ export function DeckLibrary({
   const [showOptions, setShowOptions] = useState(false);
   const [editingDeck, setEditingDeck] = useState<OfflineDeckRow | null>(null);
   const [deletingDeck, setDeletingDeck] = useState<OfflineDeckRow | null>(null);
+  const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [page, setPage] = useState(1);
 
@@ -443,6 +478,10 @@ export function DeckLibrary({
       cancelled = true;
     };
   }, [decks]);
+
+  useEffect(() => {
+    setExpandedDeckId(null);
+  }, [page, view, workspaceScope, sort]);
 
   const decksWithCounts = useMemo<DeckWithCount[]>(
     () =>
@@ -621,7 +660,20 @@ export function DeckLibrary({
                 view={view}
                 online={online}
                 canEdit={canEditDecks}
-                onOpen={() => onOpenDeck(deck)}
+                expanded={expandedDeckId === deck.local_id}
+                onToggleExpand={() =>
+                  setExpandedDeckId((id) =>
+                    id === deck.local_id ? null : deck.local_id,
+                  )
+                }
+                onOpen={() => {
+                  setExpandedDeckId(null);
+                  onOpenDeck(deck);
+                }}
+                onPreview={() => {
+                  setExpandedDeckId(null);
+                  onPreviewDeck(deck);
+                }}
                 onEdit={() => setEditingDeck(deck)}
                 onDelete={() => setDeletingDeck(deck)}
               />

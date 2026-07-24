@@ -72,6 +72,11 @@ export type AccessContext = {
   hasAI: boolean;
   /** Pro Plus semantic feature — text-to-speech / reading aids gated in UI. */
   hasAiReading: boolean;
+  /**
+   * AI Recall™ study mode — Pro Plus / education / team tiers only (not Free or Pro).
+   * Platform admins included. Offline clients must still soft-gate on network.
+   */
+  hasAiRecall: boolean;
   /** Pro Plus personal or team-tier plan only — not standard Pro. Platform admins included. */
   hasPrioritySupport: boolean;
   hasCustomColors: boolean;
@@ -134,6 +139,7 @@ function educationTeamTierAccessContext(input: {
       has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
       hasAI: true,
       hasAiReading: true,
+      hasAiRecall: true,
       hasPrioritySupport: true,
       hasCustomColors: true,
       hasProPlusInterfacePalette: true,
@@ -278,6 +284,7 @@ async function accessContextFromActiveAffiliateGrant(input: {
         has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
         hasAiReading: true,
+        hasAiRecall: true,
         hasPrioritySupport: true,
         hasCustomColors: true,
         hasProPlusInterfacePalette: true,
@@ -309,6 +316,7 @@ async function accessContextFromActiveAffiliateGrant(input: {
         has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
         hasAiReading: input.aiReadingForTier(planSlug),
+        hasAiRecall: input.aiReadingForTier(planSlug),
         hasPrioritySupport: prioritySupportForAccess({
           isPlatformAdmin: false,
           activeTeamPlan: null,
@@ -360,6 +368,7 @@ async function accessContextFromActiveAffiliateGrant(input: {
         has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
         hasAiReading: true,
+        hasAiRecall: true,
         hasPrioritySupport: prioritySupportForAccess({
           isPlatformAdmin: false,
           activeTeamPlan: null,
@@ -408,6 +417,7 @@ export function guestAccessContext(): AccessContext {
     has75CardsPerDeck: false,
     hasAI: false,
     hasAiReading: false,
+    hasAiRecall: false,
     hasPrioritySupport: false,
     hasCustomColors: false,
     hasProPlusInterfacePalette: false,
@@ -552,6 +562,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
         has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
         hasAiReading: true,
+        hasAiRecall: true,
         hasPrioritySupport: true,
         hasCustomColors: true,
         hasProPlusInterfacePalette: true,
@@ -601,6 +612,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
         has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
         hasAI: true,
         hasAiReading: true,
+        hasAiRecall: true,
         hasPrioritySupport: true,
         hasCustomColors: true,
         hasProPlusInterfacePalette: true,
@@ -644,6 +656,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
           has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
           hasAI: true,
           hasAiReading: aiReadingForTier(stripeSlug),
+          hasAiRecall: aiReadingForTier(stripeSlug),
           hasPrioritySupport: prioritySupportForAccess({
             isPlatformAdmin: false,
             activeTeamPlan: null,
@@ -708,6 +721,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
             has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
             hasAI: true,
             hasAiReading: true,
+            hasAiRecall: true,
             hasPrioritySupport: true,
             hasCustomColors: true,
             hasProPlusInterfacePalette: true,
@@ -743,6 +757,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
             has75CardsPerDeck: lim.maxCardsPerDeck > FREE_CARDS_PER_DECK_LIMIT,
             hasAI: true,
             hasAiReading: aiReadingForTier(rawBillingPlan),
+            hasAiRecall: aiReadingForTier(rawBillingPlan),
             hasPrioritySupport: prioritySupportForAccess({
               isPlatformAdmin: false,
               activeTeamPlan: null,
@@ -832,6 +847,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
         jwtPaid &&
         (paidAI || paidProFromHas || paidProPlusFromHas || proFeatureBundle),
       hasAiReading: aiReadingForTier(inferredStripeSlug),
+      hasAiRecall: aiReadingForTier(inferredStripeSlug),
       hasPrioritySupport: prioritySupportForAccess({
         isPlatformAdmin: unlocked,
         activeTeamPlan: null,

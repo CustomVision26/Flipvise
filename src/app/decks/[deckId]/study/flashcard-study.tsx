@@ -10,33 +10,14 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   ChevronLeft,
   ChevronRight,
   Shuffle,
   RefreshCw,
-  CheckCircle,
-  XCircle,
   RotateCcw,
   ArrowLeft,
   Trophy,
   Flag,
-  CircleDashed,
 } from "lucide-react";
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
@@ -102,7 +83,6 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-const FLIP_DURATION_MS = 560;
 const SLIDE_MS = 260;
 
 export function FlashcardStudy({
@@ -121,10 +101,9 @@ export function FlashcardStudy({
   const [isFlipped, setIsFlipped] = useState(false);
   const [answerRevealKey, setAnswerRevealKey] = useState(0);
   const [voice, setVoice] = useState<TtsVoice>("nova");
-  const [answers, setAnswers] = useState<Record<number, "correct" | "incorrect">>({});
   const [sessionComplete, setSessionComplete] = useState(false);
-  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [autoShuffle, setAutoShuffle] = useState(false);
+  const [reviewedCount, setReviewedCount] = useState(0);
   const [slideX, setSlideX] = useState(0);
   const [slideOpacity, setSlideOpacity] = useState(1);
   const [enableSlideTransition, setEnableSlideTransition] = useState(false);
@@ -143,11 +122,6 @@ export function FlashcardStudy({
   const total = deck.length;
   const currentCard = deck[visibleIndex];
   const progressPercent = ((currentIndex + 1) / total) * 100;
-  const answerValues = Object.values(answers);
-  const correctCount = answerValues.filter((v) => v === "correct").length;
-  const incorrectCount = answerValues.filter((v) => v === "incorrect").length;
-  const answeredCount = correctCount + incorrectCount;
-  const unansweredCount = Math.max(0, total - answeredCount);
 
   function navigateTo(newIndex: number, direction: "left" | "right") {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
@@ -257,7 +231,13 @@ export function FlashcardStudy({
   }
 
   function handleNext() {
-    if (currentIndex === total - 1) return;
+    if (currentIndex === total - 1) {
+      setReviewedCount(total);
+      setIsFlipped(false);
+      setSessionComplete(true);
+      return;
+    }
+    setReviewedCount((c) => Math.max(c, currentIndex + 1));
     navigateTo(currentIndex + 1, "left");
   }
 
@@ -303,31 +283,9 @@ export function FlashcardStudy({
     setIsFlipped(false);
   }
 
-  function handleCorrect() {
-    const cardId = currentCard.id;
-    setAnswers((prev) => ({ ...prev, [cardId]: "correct" }));
-    if (currentIndex < total - 1) {
-      navigateTo(currentIndex + 1, "left");
-    } else {
-      setIsFlipped(false);
-      pendingNavRef.current = setTimeout(() => setSessionComplete(true), FLIP_DURATION_MS);
-    }
-  }
-
-  function handleIncorrect() {
-    const cardId = currentCard.id;
-    setAnswers((prev) => ({ ...prev, [cardId]: "incorrect" }));
-    if (currentIndex < total - 1) {
-      navigateTo(currentIndex + 1, "left");
-    } else {
-      setIsFlipped(false);
-      pendingNavRef.current = setTimeout(() => setSessionComplete(true), FLIP_DURATION_MS);
-    }
-  }
-
-  function handleSubmit() {
+  function handleFinish() {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
-    setSubmitConfirmOpen(false);
+    setReviewedCount(Math.max(reviewedCount, currentIndex + 1));
     setIsFlipped(false);
     setSessionComplete(true);
   }
@@ -339,26 +297,11 @@ export function FlashcardStudy({
     setCurrentIndex(0);
     setVisibleIndex(0);
     setIsFlipped(false);
-    setAnswers({});
+    setReviewedCount(0);
     setSessionComplete(false);
   }
 
   if (sessionComplete) {
-    const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-
-    let motivationalMessage = "";
-    let messageColor = "";
-    if (scorePercent === 100) {
-      motivationalMessage = "Perfect score! You've mastered this deck!";
-      messageColor = "text-yellow-500";
-    } else if (scorePercent >= 50) {
-      motivationalMessage = "Great progress! Keep practicing to reach perfection!";
-      messageColor = "text-blue-400";
-    } else {
-      motivationalMessage = "Don't give up! Every mistake is a step toward mastery!";
-      messageColor = "text-purple-400";
-    }
-
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:gap-8 px-4">
         <div className="w-full max-w-md flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-card p-6 sm:p-10 shadow-md text-center">
@@ -366,39 +309,14 @@ export function FlashcardStudy({
             <Trophy className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-500" />
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Session Complete!</h2>
             <p className="text-muted-foreground text-sm break-words max-w-full">{deckName}</p>
-            <p className={`text-sm sm:text-base font-semibold ${messageColor} mt-2 px-4`}>
-              {motivationalMessage}
+            <p className="text-sm text-muted-foreground mt-2 px-4">
+              Nice work reviewing offline-friendly Standard Review. Use AI Recall™ when you are
+              online for scored Active Recall practice.
             </p>
           </div>
 
-          <div className="w-full flex flex-col gap-2">
-            <div className="flex justify-between text-sm text-muted-foreground mb-1">
-              <span>Score</span>
-              <span className="font-semibold text-foreground">{scorePercent}%</span>
-            </div>
-            <Progress value={scorePercent} className="h-3" />
-          </div>
-
-          <div className="w-full grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="flex flex-col items-center gap-1 rounded-xl border bg-emerald-500/10 border-emerald-500/20 py-3 sm:py-4">
-              <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500" />
-              <span className="text-xl sm:text-2xl font-bold text-emerald-500">{correctCount}</span>
-              <span className="text-xs text-muted-foreground">Correct</span>
-            </div>
-            <div className="flex flex-col items-center gap-1 rounded-xl border bg-rose-500/10 border-rose-500/20 py-3 sm:py-4">
-              <XCircle className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
-              <span className="text-xl sm:text-2xl font-bold text-rose-500">{incorrectCount}</span>
-              <span className="text-xs text-muted-foreground">Incorrect</span>
-            </div>
-            <div className="flex flex-col items-center gap-1 rounded-xl border bg-muted/40 border-border py-3 sm:py-4">
-              <CircleDashed className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-              <span className="text-xl sm:text-2xl font-bold text-foreground">{unansweredCount}</span>
-              <span className="text-xs text-muted-foreground">Unanswered</span>
-            </div>
-          </div>
-
           <p className="text-muted-foreground text-sm">
-            {answeredCount} of {total} card{total !== 1 ? "s" : ""} answered
+            {Math.max(reviewedCount, total)} of {total} card{total !== 1 ? "s" : ""} reviewed
           </p>
 
           <div className="w-full flex flex-col gap-3">
@@ -460,19 +378,7 @@ export function FlashcardStudy({
           </div>
         </div>
         <Progress value={progressPercent} className="h-2" />
-        <div className="flex items-center justify-between gap-3 mt-1">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-emerald-500">
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="font-semibold">{correctCount}</span>
-              <span className="text-muted-foreground hidden sm:inline">correct</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-rose-500">
-              <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="font-semibold">{incorrectCount}</span>
-              <span className="text-muted-foreground hidden sm:inline">incorrect</span>
-            </div>
-          </div>
+        <div className="flex items-center justify-end gap-3 mt-1">
           {hasAiReading ? <VoiceSelector voice={voice} onChange={setVoice} /> : null}
         </div>
       </div>
@@ -672,53 +578,7 @@ export function FlashcardStudy({
         </div>
       )}
 
-      {/* Correct / Incorrect buttons — visible only on back side */}
-      {isFlipped && (
-        <div className="flex flex-col items-center gap-2 sm:gap-3">
-          <p className="text-xs sm:text-sm text-muted-foreground italic text-center max-w-xs sm:max-w-sm px-4">
-            🤝 Be honest with yourself — your growth depends on it. Did you really get it right?
-          </p>
-        <TooltipProvider>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <Tooltip>
-              <TooltipTrigger render={<span />}>
-                <Button
-                  size="default"
-                  className="gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white h-10 sm:h-11 px-4 sm:px-6 text-sm"
-                  onClick={handleCorrect}
-                >
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="hidden sm:inline">Correct</span>
-                  <span className="sm:hidden">✓</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Click if you answered correctly</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger render={<span />}>
-                <Button
-                  size="default"
-                  variant="destructive"
-                  className="gap-1.5 sm:gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
-                  onClick={handleIncorrect}
-                >
-                  <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="hidden sm:inline">Incorrect</span>
-                  <span className="sm:hidden">✗</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Click if you answered incorrectly</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </TooltipProvider>
-        </div>
-      )}
-
-      {/* Navigation controls */}
+      {/* Navigation controls — flip to reveal, then Next (no self-grading). */}
       <div className="flex flex-col items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-3">
           <Button
@@ -747,9 +607,10 @@ export function FlashcardStudy({
             size="default"
             className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
             onClick={handleNext}
-            disabled={currentIndex === total - 1}
           >
-            <span className="hidden sm:inline">Next</span>
+            <span className="hidden sm:inline">
+              {currentIndex === total - 1 ? "Finish" : "Next"}
+            </span>
             <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
@@ -757,41 +618,12 @@ export function FlashcardStudy({
         <Button
           size="default"
           className="gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
-          onClick={() => {
-            if (unansweredCount > 0) {
-              setSubmitConfirmOpen(true);
-            } else {
-              handleSubmit();
-            }
-          }}
+          onClick={handleFinish}
         >
           <Flag className="h-4 w-4" />
-          Submit Review
+          Finish Review
         </Button>
       </div>
-
-      <AlertDialog open={submitConfirmOpen} onOpenChange={setSubmitConfirmOpen}>
-        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base sm:text-lg">
-              Submit with {unansweredCount} unanswered{" "}
-              {unansweredCount === 1 ? "card" : "cards"}?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs sm:text-sm">
-              Your results will be posted as-is. Unanswered cards will be shown
-              separately and won&apos;t count toward your correct score.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-            <AlertDialogCancel className="w-full sm:w-auto">
-              Keep reviewing
-            </AlertDialogCancel>
-            <AlertDialogAction className="w-full sm:w-auto" onClick={handleSubmit}>
-              Submit anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {enlargedImage ? (
         <ImageEnlargeOverlay
