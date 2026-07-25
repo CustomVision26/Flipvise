@@ -54,7 +54,7 @@
     "db:ensure-documentation-agent-kinds": "tsx scripts/ensure-documentation-agent-kinds.ts",
     "db:ensure-ai-recall-tables": "tsx scripts/ensure-ai-recall-tables.ts",
     "db:ensure-team-study-privilege-ai-recall": "tsx scripts/ensure-team-study-privilege-ai-recall.ts",
-    "test:ai-recall": "tsx --test src/lib/ai-recall-eligibility.test.ts src/lib/ai-recall-mastery.test.ts src/db/queries/ai-recall-analytics.test.ts",
+    "test:ai-recall": "tsx --test src/lib/ai-recall-eligibility.test.ts src/lib/ai-recall-mastery.test.ts src/lib/ai-recall-motivation.test.ts src/db/queries/ai-recall-analytics.test.ts",
     "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.mjs",
     "db:generate:local": "drizzle-kit generate --config=drizzle.config.local.ts",
     "db:generate:prod": "drizzle-kit generate --config=drizzle.config.local.ts",

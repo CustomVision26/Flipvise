@@ -346,13 +346,26 @@ const ALL_ARTICLES: DocArticle[] = [
       },
       {
         id: "subscriber-features",
-        title: "Subscriber-managed quiz settings",
+        title: "Subscriber-managed study & quiz settings",
         bullets: [
           "Team owners and co-admins configure quiz question formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
+          "Study privileges also gate Standard Review, AI Recall™, and Quiz per member per assigned deck (single modes or combinations; default: all three).",
           "Formats: multiple choice (from card content), true/false, and fill-in-the-blank (AI-generated sentences).",
           "After setup, admins can Reshuffle format questions to change which format each card uses in team quizzes.",
           "Personal Pro Plus and Education Plus (paid, admin-assigned, or affiliate) configure formats on the study quiz lobby via Format Quiz Question — including Questions per format, Quiz time limit, Generate AI, and Publish to quiz.",
           "Platform admins troubleshooting missing formats should verify settings are saved, AI generation completed, and publish/reshuffle was run when multiple formats are enabled.",
+        ],
+      },
+      {
+        id: "ai-recall",
+        title: "AI Recall™ (product behavior for support)",
+        bullets: [
+          "Eligible: Pro Plus, Education Plus, team-tier and education team plans, and platform admins. Not available on Free or standard Pro.",
+          "Requires internet — offline users see a soft gate and can continue with Standard Review.",
+          "Learners answer with Type, Voice, or Draw before the solution unlocks; AI feedback is shown without AI Score / Confidence percentages.",
+          "Review Again requeues a card later in the same session (amber progress count + Review Again badge).",
+          "Session complete shows Reviewed / Correct / Incorrect / Forced unlocks, Session score (correct ÷ reviewed), and an AI motivational quote with author (under 50% improve; 50–90% encourage; over 90% flower of excellence).",
+          "End-of-session results are on screen only and are not saved to the database automatically — dashboard AI Recall analytics panels only reflect sessions that were explicitly saved.",
         ],
       },
       {
@@ -361,6 +374,7 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Do not delete workspaces from this view — subscribers manage workspaces in their Team Admin Dashboard.",
           "Do not confuse personal-dashboard Pro features with the team workspace tier — they resolve separately.",
+          "Do not tell users AI Recall™ will auto-save session history — it currently does not.",
         ],
       },
     ],
@@ -388,7 +402,7 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Roles sub-tab lists every user with their current role badge.",
           "Toggle Admin Role — only superadmin/owner can promote or demote co-admins.",
-          "Granting admin applies complimentary Pro Plus–level personal workspace features via adminGranted metadata.",
+          "Granting admin applies complimentary Pro Plus–level personal workspace features via adminGranted metadata (includes AI Recall™).",
           "preAdminGrantSnapshot is saved at grant time so the pre-admin state restores on revoke.",
         ],
       },
@@ -567,6 +581,15 @@ const ALL_ARTICLES: DocArticle[] = [
             ["education_enterprise", "Education Enterprise"],
           ],
         },
+      },
+      {
+        id: "ai-recall-entitlement",
+        title: "AI Recall™ entitlement",
+        bullets: [
+          "AI Recall™ is available on Pro Plus, Education Plus, all team-tier plans, education team plans, and platform admins.",
+          "Free and standard Pro do not include AI Recall™ — keep /pricing feature bullets accurate when editing plans-config.json.",
+          "Team members may still be blocked from AI Recall™ by Study privileges even when the workspace plan is eligible.",
+        ],
       },
       {
         id: "env",

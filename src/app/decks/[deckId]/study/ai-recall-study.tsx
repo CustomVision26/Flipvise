@@ -21,6 +21,8 @@ import {
   MicOff,
   Keyboard,
   Pencil,
+  Shuffle,
+  Flower2,
 } from "lucide-react";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
@@ -29,13 +31,18 @@ import { isNetworkOnlineForAiRecall } from "@/lib/ai-recall-network";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import {
   evaluateAiRecallAnswerAction,
-  saveAiRecallSessionAction,
+  generateAiRecallMotivationAction,
 } from "@/actions/ai-recall";
 import type {
   AiRecallPerCardSnapshot,
   RecallAnswerModality,
   RecallEvaluationResult,
 } from "@/lib/ai-recall-types";
+import {
+  computeSessionAccuracyPercent,
+  fallbackAiRecallMotivation,
+  type AiRecallMotivation,
+} from "@/lib/ai-recall-motivation";
 import {
   AiRecallDrawingPad,
   type AiRecallDrawingPadHandle,
@@ -113,18 +120,17 @@ export function AiRecallStudy({
     "correct" | "incorrect" | "forced_unlock" | null
   >(null);
   const [snapshots, setSnapshots] = useState<AiRecallPerCardSnapshot[]>([]);
+  const [motivation, setMotivation] = useState<AiRecallMotivation | null>(null);
+  const [motivationLoading, setMotivationLoading] = useState(false);
   const [answerRevealKey, setAnswerRevealKey] = useState(0);
   const [isPending, startTransition] = useTransition();
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [enlargedImage, setEnlargedImage] = useState<{
     src: string;
     title: string;
     alt: string;
   } | null>(null);
 
-  const sessionStartRef = useRef(Date.now());
   const cardStartRef = useRef(Date.now());
-  const savedRef = useRef(false);
   const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawingPadRef = useRef<AiRecallDrawingPadHandle | null>(null);
   const lastSubmittedModalityRef = useRef<RecallAnswerModality>("text");
@@ -155,7 +161,13 @@ export function AiRecallStudy({
   }, []);
 
   const current = queue[index];
-  const total = queue.length;
+  const deckTotal = cards.length;
+  const sessionTotal = queue.length;
+  const total = sessionTotal;
+  const requeuedCount = Math.max(0, sessionTotal - deckTotal);
+  const isReviewAgainCard =
+    current != null &&
+    queue.findIndex((card, i) => i < index && card.id === current.id) !== -1;
   const progressPercent = total > 0 ? ((index + 1) / total) * 100 : 0;
 
   useEffect(() => {
@@ -195,21 +207,37 @@ export function AiRecallStudy({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- card transition reset
   }, [index, current?.id]);
 
-  async function persistIfNeeded(finalSnapshots: AiRecallPerCardSnapshot[]) {
-    if (savedRef.current || finalSnapshots.length === 0) return;
-    savedRef.current = true;
-    const result = await saveAiRecallSessionAction({
-      deckId,
-      deckName,
-      teamId,
-      sessionDurationMs: Date.now() - sessionStartRef.current,
-      perCard: finalSnapshots,
-    });
-    if (!result.ok) {
-      savedRef.current = false;
-      setSaveError("Session progress could not be saved. You can keep studying.");
-    }
-  }
+  useEffect(() => {
+    if (phase !== "complete") return;
+
+    const correct = snapshots.filter((s) => s.outcome === "correct").length;
+    const reviewed = snapshots.length;
+    const percentCorrect = computeSessionAccuracyPercent(correct, reviewed);
+    const fallback = fallbackAiRecallMotivation(percentCorrect);
+
+    let cancelled = false;
+    setMotivationLoading(true);
+    setMotivation(fallback);
+
+    void (async () => {
+      const result = await generateAiRecallMotivationAction({
+        deckId,
+        deckName,
+        correct,
+        reviewed,
+        percentCorrect,
+        teamId,
+      });
+      if (cancelled) return;
+      if (result.ok) setMotivation(result.motivation);
+      else setMotivation(fallback);
+      setMotivationLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, snapshots, deckId, deckName, teamId]);
 
   function recordSnapshot(
     nextOutcome: "correct" | "incorrect" | "forced_unlock",
@@ -241,7 +269,6 @@ export function AiRecallStudy({
     if (index >= q.length - 1) {
       setSnapshots(updatedSnapshots);
       setPhase("complete");
-      void persistIfNeeded(updatedSnapshots);
       return;
     }
     setSnapshots(updatedSnapshots);
@@ -368,13 +395,32 @@ export function AiRecallStudy({
   }
 
   function handleRestart() {
-    savedRef.current = false;
-    setSaveError(null);
     setQueue(shuffleArray(cards));
     setIndex(0);
     setSnapshots([]);
+    setMotivation(null);
+    setMotivationLoading(false);
     setPhase("prompt");
-    sessionStartRef.current = Date.now();
+  }
+
+  /** Shuffle remaining cards (including current). Keeps already-reviewed order. */
+  function handleShuffle() {
+    if (!current || isPending || phase === "checking" || phase === "unlocking") {
+      return;
+    }
+    stopSpeech();
+    clearSpeechError();
+    const reviewed = queue.slice(0, index);
+    const remaining = shuffleArray(queue.slice(index));
+    setQueue([...reviewed, ...remaining]);
+    setStudentAnswer("");
+    setAnswerModality("text");
+    setDrawingHasInk(false);
+    setEvaluation(null);
+    setOutcome(null);
+    setPhase("prompt");
+    setEnlargedImage(null);
+    cardStartRef.current = Date.now();
   }
 
   if (!hasAiRecall) {
@@ -437,17 +483,21 @@ export function AiRecallStudy({
     const correct = snapshots.filter((s) => s.outcome === "correct").length;
     const incorrect = snapshots.filter((s) => s.outcome === "incorrect").length;
     const forced = snapshots.filter((s) => s.outcome === "forced_unlock").length;
-    const scores = snapshots
-      .map((s) => s.score)
-      .filter((s): s is number => s != null);
-    const avgScore =
-      scores.length > 0
-        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-        : null;
+    const percentCorrect = computeSessionAccuracyPercent(
+      correct,
+      snapshots.length,
+    );
+    const displayMotivation =
+      motivation ?? fallbackAiRecallMotivation(percentCorrect);
+    const isExcellence = displayMotivation.tier === "excellence";
 
     return (
       <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl border border-border bg-card/60 p-6 text-center sm:p-8">
-        <Sparkles className="h-8 w-8 text-primary" aria-hidden />
+        {isExcellence ? (
+          <Flower2 className="h-8 w-8 text-rose-400" aria-hidden />
+        ) : (
+          <Sparkles className="h-8 w-8 text-primary" aria-hidden />
+        )}
         <h2 className="text-xl font-semibold">AI Recall™ session complete</h2>
         <p className="text-sm text-muted-foreground">{deckName}</p>
         <div className="grid w-full grid-cols-2 gap-3 text-sm sm:grid-cols-4">
@@ -456,19 +506,52 @@ export function AiRecallStudy({
           <Stat label="Incorrect" value={String(incorrect)} />
           <Stat label="Forced unlocks" value={String(forced)} />
         </div>
-        {avgScore != null ? (
-          <p className="text-sm">
-            Average AI score:{" "}
-            <span className="font-semibold text-foreground">{avgScore}%</span>
+        <div
+          className={cn(
+            "w-full space-y-2 rounded-xl border px-4 py-3",
+            isExcellence
+              ? "border-rose-400/40 bg-rose-500/10"
+              : displayMotivation.tier === "encourage"
+                ? "border-emerald-500/30 bg-emerald-500/10"
+                : "border-amber-500/30 bg-amber-500/10",
+          )}
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Session score · {percentCorrect}%
           </p>
-        ) : null}
-        {saveError ? (
-          <p className="text-xs text-amber-500">{saveError}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Session analytics saved for your progress dashboards.
+          <p
+            className={cn(
+              "text-base font-semibold",
+              isExcellence
+                ? "text-rose-300"
+                : displayMotivation.tier === "encourage"
+                  ? "text-emerald-300"
+                  : "text-amber-300",
+            )}
+          >
+            {displayMotivation.title}
           </p>
-        )}
+          <p
+            className={cn(
+              "text-sm text-muted-foreground italic",
+              motivationLoading && "opacity-70",
+            )}
+          >
+            “
+            {displayMotivation.message
+              .trim()
+              .replace(/^["'“”]+|["'“”]+$/g, "")}
+            ”
+          </p>
+          {displayMotivation.author?.trim() ? (
+            <p className="text-xs font-medium text-muted-foreground/90">
+              — {displayMotivation.author.trim()}
+            </p>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Results are shown for this session only and are not saved automatically.
+        </p>
         <Button onClick={handleRestart} className="gap-2">
           <RotateCcw className="h-4 w-4" />
           Study again
@@ -487,9 +570,44 @@ export function AiRecallStudy({
             <Sparkles className="h-3 w-3" />
             AI Recall™
           </Badge>
-          <span className="text-xs text-muted-foreground">
-            Card {Math.min(index + 1, total)} of {total}
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">
+                Step {Math.min(index + 1, sessionTotal)} of {sessionTotal}
+              </p>
+              <p className="text-[10px]">
+                <span className="text-muted-foreground">
+                  {deckTotal} card{deckTotal !== 1 ? "s" : ""} in deck
+                </span>
+                {requeuedCount > 0 ? (
+                  <>
+                    <span className="text-muted-foreground"> · </span>
+                    <span className="font-medium text-amber-400">
+                      +{requeuedCount} Review Again
+                    </span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={handleShuffle}
+              disabled={
+                isPending ||
+                phase === "checking" ||
+                phase === "unlocking" ||
+                total <= 1
+              }
+              title="Shuffle remaining cards"
+              aria-label="Shuffle remaining AI Recall cards"
+            >
+              <Shuffle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Shuffle</span>
+            </Button>
+          </div>
         </div>
         <Progress value={progressPercent} className="h-1.5" />
         {deckDescription?.trim() ? (
@@ -506,15 +624,28 @@ export function AiRecallStudy({
         )}
       >
         <div className="flex items-center justify-between px-3 pt-3 sm:px-5 sm:pt-4">
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-xs",
-              hasGradient && "border-white/30 bg-white/20 text-white",
-            )}
-          >
-            Question
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-xs",
+                hasGradient && "border-white/30 bg-white/20 text-white",
+              )}
+            >
+              Question
+            </Badge>
+            {isReviewAgainCard ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs border-amber-400/50 bg-amber-500/20 text-amber-200",
+                  !hasGradient && "text-amber-400 border-amber-500/40 bg-amber-500/10",
+                )}
+              >
+                Review Again
+              </Badge>
+            ) : null}
+          </div>
           {!showAnswer ? (
             <span
               className={cn(
@@ -732,16 +863,6 @@ export function AiRecallStudy({
               <p className="text-lg font-semibold text-emerald-500">
                 {evaluation?.feedback?.trim() || "Excellent!"}
               </p>
-              <div className="flex flex-wrap gap-3 text-sm">
-                <span>
-                  AI Score{" "}
-                  <strong>{evaluation?.score ?? 0}%</strong>
-                </span>
-                <span>
-                  Confidence{" "}
-                  <strong>{evaluation?.confidence ?? 0}%</strong>
-                </span>
-              </div>
             </div>
           ) : (
             <div className="space-y-1">

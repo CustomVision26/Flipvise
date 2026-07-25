@@ -149,11 +149,14 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Shows workspace names, member counts, and plan slug per owned team.",
           "Search and role/status filters match All Users patterns.",
           "Quiz question formats (multiple choice, true/false, fill-in-the-blank) are configured by subscribers in Team Admin → Deck Manager → Study privileges — not from this platform admin view.",
+          "Study privileges also control Standard Review, AI Recall™, and Quiz (single modes or combinations) per member per assigned deck.",
+          "AI Recall™ is available on Pro Plus, Education Plus, team-tier, and education team plans (and platform admins). Session results are on-screen only and not saved automatically.",
           "Subscribers can reshuffle which format each card uses after saving formats and generating AI content where required.",
         ],
         requirements: ["Platform admin access."],
         doNots: [
           "Do not delete workspaces from this view — subscribers manage workspaces in their dashboard.",
+          "Do not expect AI Recall™ Average AI Score / Confidence in the learner UI — those percentages are hidden; session complete shows Session score and a motivational quote instead.",
         ],
       },
     ],
@@ -171,7 +174,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Roles sub-tab lists every user with current role badge.",
           "Toggle Admin Role — only superadmin/owner can promote or demote co-admins.",
-          "Granting admin applies complimentary Pro Plus–level personal workspace features via metadata snapshot.",
+          "Granting admin applies complimentary Pro Plus–level personal workspace features via metadata snapshot (includes AI Recall™ and other Pro Plus entitlements).",
         ],
         requirements: ["Superadmin (platform owner) for role changes."],
         doNots: [
@@ -244,11 +247,13 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Edit plan display, Stripe price env references, discount coupons, and promo schedules.",
           "Changes affect /pricing cards and checkout validation.",
           "Affiliate discount blocks are configured per tier for combined codes.",
+          "AI Recall™ (Active Recall study mode) is an entitlement of Pro Plus, Education Plus, team-tier, and education team plans — not Free or standard Pro. Keep feature lists on /pricing aligned with that gate.",
         ],
         requirements: ["Platform admin access.", "Matching Stripe price IDs in environment."],
         doNots: [
           "Do not hardcode price_* IDs in the editor — use env var keys as documented.",
           "Do not enable overlapping promo windows without verifying Stripe coupon validity.",
+          "Do not advertise AI Recall™ on Free or standard Pro feature lists — eligibility is enforced in code.",
         ],
       },
       {

@@ -16,6 +16,11 @@ import type {
   AiRecallPerCardSnapshot,
   RecallEvaluationResult,
 } from "@/lib/ai-recall-types";
+import {
+  fallbackAiRecallMotivation,
+  generateAiRecallMotivation,
+  type AiRecallMotivation,
+} from "@/lib/ai-recall-motivation";
 
 const evaluateSchema = z.object({
   deckId: z.number().int().positive(),
@@ -190,4 +195,68 @@ export async function saveAiRecallSessionAction(
   });
 
   return { ok: true, sessionId: row.id };
+}
+
+const motivationSchema = z.object({
+  deckId: z.number().int().positive(),
+  deckName: z.string().min(1).max(255),
+  correct: z.number().int().min(0).max(10_000),
+  reviewed: z.number().int().min(0).max(10_000),
+  percentCorrect: z.number().min(0).max(100),
+  teamId: z.number().int().positive().nullable().optional(),
+});
+
+export type GenerateAiRecallMotivationActionResult =
+  | { ok: true; motivation: AiRecallMotivation }
+  | { ok: false; error: "unauthorized" | "forbidden" | "invalid" };
+
+export async function generateAiRecallMotivationAction(
+  data: z.infer<typeof motivationSchema>,
+): Promise<GenerateAiRecallMotivationActionResult> {
+  const parsed = motivationSchema.safeParse(data);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+
+  const access = await getAccessContext();
+  if (!access.userId) return { ok: false, error: "unauthorized" };
+
+  let studyWorkspacePlanSlug: string | null = null;
+  if (parsed.data.teamId != null) {
+    const team = await getTeamById(parsed.data.teamId);
+    studyWorkspacePlanSlug = team?.planSlug ?? null;
+  }
+
+  const eligible =
+    access.hasAiRecall ||
+    resolveAiRecallAccess({
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+      activeTeamPlan: access.activeTeamPlan,
+      activeEducationTeamPlan: access.activeEducationTeamPlan,
+      personalPlanSlug: access.effectivePlanSlug,
+      hasClerkProPlusPlan: access.hasClerkPersonalProPlus,
+      studyWorkspacePlanSlug,
+    });
+
+  if (!eligible) return { ok: false, error: "forbidden" };
+
+  const bundle = await getDeckWithViewerAccess(
+    parsed.data.deckId,
+    access.userId,
+  );
+  if (!bundle) return { ok: false, error: "forbidden" };
+
+  try {
+    const motivation = await generateAiRecallMotivation({
+      percentCorrect: parsed.data.percentCorrect,
+      correct: parsed.data.correct,
+      reviewed: parsed.data.reviewed,
+      deckName: parsed.data.deckName,
+    });
+    return { ok: true, motivation };
+  } catch (err) {
+    console.error("[generateAiRecallMotivationAction]", err);
+    return {
+      ok: true,
+      motivation: fallbackAiRecallMotivation(parsed.data.percentCorrect),
+    };
+  }
 }

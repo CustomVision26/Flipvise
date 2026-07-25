@@ -90,9 +90,9 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered.",
           "Standard Review — flip cards to reveal answers, then Next. Works online and offline (browser PWA / Capacitor). No Correct/Incorrect self-grading.",
           "Double-click the front or back image on a flashcard to open a full-size preview; Escape or click outside closes it.",
-          "AI Recall™ — type your answer before the solution unlocks; AI scores understanding, then Continue or Review Again. Requires Pro Plus / Education Plus / team plans and an internet connection.",
+          "AI Recall™ — answer first (type, voice, or draw) before the solution unlocks; AI evaluates understanding, then Continue or Review Again. Requires Pro Plus / Education Plus / team plans and an internet connection.",
           "Quiz mode — timed session with scoring and optional team policies.",
-          "Team members may be restricted to review only, quiz only, or both per assignment.",
+          "Team members may be restricted to Standard Review, AI Recall™, Quiz, or combinations per assignment.",
         ],
       },
       {
@@ -104,9 +104,13 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         bullets: [
           "Eligible plans: Pro Plus, Education Plus, Team Basic/Gold/Platinum/Enterprise, Education Gold/Enterprise. Not available on Free or standard Pro.",
           "Offline: AI Recall™ shows “Internet connection required” and offers Continue with Standard Review — never a hard app error.",
-          "Submit sends your answer to OpenAI for evaluation (synonyms and minor spelling accepted). I Don’t Know reveals immediately without AI and marks Needs Review.",
-          "Session analytics (scores, forced unlocks, recall time, mastery) are stored for Teacher and Team dashboards.",
           "Answer with Type, Voice (microphone / speech-to-text), or Draw (sketch pad). Voice and drawings are evaluated by AI the same way as typed answers.",
+          "Submit sends your answer to OpenAI for evaluation (synonyms and minor spelling accepted). Feedback and the correct answer are shown — AI Score and Confidence percentages are not displayed.",
+          "I Don’t Know reveals the answer immediately without AI evaluation and counts as a forced unlock.",
+          "Review Again requeues the card later in the same session (shown in amber in the progress line and with a Review Again badge on the card).",
+          "Session complete shows Reviewed / Correct / Incorrect / Forced unlocks, plus Session score (correct ÷ reviewed).",
+          "An AI motivational quote appears from that session score: under 50% encourage improvement; 50–90% encourage the work; over 90% flower of excellence. Author is shown when available (real attribution or Flipvise).",
+          "End-of-session results are on screen only and are not saved to the database automatically.",
         ],
       },
       {

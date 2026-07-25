@@ -167,9 +167,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Review flashcards with Standard Review, practice Active Recall with AI Recall™, or take quizzes.",
         howItWorks: [
-          "Study Mode selector: Standard Review (offline-friendly flip cards), AI Recall™ (Pro Plus+ Active Recall with AI scoring), and Quiz. Your last mode is remembered.",
+          "Study Mode selector: Standard Review (offline-friendly flip cards), AI Recall™ (Pro Plus+ Active Recall with AI evaluation), and Quiz. Your last mode is remembered.",
           "Standard Review flips cards to reveal answers, then Next — no Correct/Incorrect self-grading.",
-          "AI Recall™ asks you to answer (type, voice mic, or draw) before unlocking the solution; AI scores understanding. Requires Pro Plus / Education Plus / team plans and internet; offline users continue with Standard Review.",
+          "AI Recall™ asks you to answer (type, voice mic, or draw) before unlocking the solution; AI evaluates understanding (feedback shown; score/confidence percentages are hidden). Requires Pro Plus / Education Plus / team plans and internet; offline users continue with Standard Review.",
+          "AI Recall™ session complete shows Reviewed / Correct / Incorrect / Forced unlocks, Session score (correct ÷ reviewed), and an AI motivational quote with author (tiers: under 50% improve, 50–90% encourage, over 90% flower of excellence). Results are not saved automatically.",
           "Double-click a front or back card image during flashcard review to enlarge it; press Escape or click outside to close.",
           "Quiz mode supports multiple question formats: multiple choice, true/false, and fill-in-the-blank.",
           "The quiz start screen lists enabled formats and shows how many of each type appear in this session (e.g. 5 MCQ, 2 True/False, 3 Fill in the blank).",
