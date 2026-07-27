@@ -75,7 +75,7 @@ export function TeamQuizResultsSubTabs({
           role="tab"
           aria-selected={securityActive}
         >
-          Quiz security
+          Exam Mode
         </Link>
       </div>
     </div>

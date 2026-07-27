@@ -10,6 +10,12 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ChevronLeft,
   ChevronRight,
   Shuffle,
@@ -320,19 +326,41 @@ export function FlashcardStudy({
           </p>
 
           <div className="w-full flex flex-col gap-3">
-            <Button size="default" className="w-full gap-2 h-10 sm:h-11" onClick={handleStudyAgain}>
-              <RotateCcw className="h-4 w-4" />
-              Study Again
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              className="w-full gap-2 h-10 sm:h-11"
-              onClick={() => router.push(`/decks/${deckId}`)}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Deck
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      size="default"
+                      className="w-full gap-2 h-10 sm:h-11"
+                      onClick={handleStudyAgain}
+                    />
+                  }
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Study Again
+                </TooltipTrigger>
+                <TooltipContent>Restart this review session from the beginning</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="w-full gap-2 h-10 sm:h-11"
+                      onClick={() => router.push(`/decks/${deckId}`)}
+                    />
+                  }
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Deck
+                </TooltipTrigger>
+                <TooltipContent>Return to the deck page</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>
@@ -340,15 +368,15 @@ export function FlashcardStudy({
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-4 sm:gap-8">
-      {/* Progress bar */}
-      <div className="w-full max-w-2xl flex flex-col gap-2">
-        <div className="flex justify-between items-center text-xs sm:text-sm text-muted-foreground">
-          <span>
+    <div className="flex flex-1 flex-col items-center gap-4 sm:gap-6">
+      {/* Progress + controls */}
+      <div className="w-full max-w-2xl space-y-3 rounded-2xl border border-border/70 bg-card/50 p-3 shadow-md shadow-black/10 backdrop-blur-md sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
+          <span className="font-medium tabular-nums text-foreground/90">
             Card {currentIndex + 1} of {total}
           </span>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="text-xs sm:text-sm font-semibold text-foreground">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-xs font-semibold tabular-nums text-foreground">
               {Math.round(progressPercent)}%
             </span>
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -360,38 +388,60 @@ export function FlashcardStudy({
               />
               <label
                 htmlFor="auto-shuffle"
-                className="text-xs sm:text-sm text-muted-foreground cursor-pointer select-none"
+                className="cursor-pointer select-none text-xs sm:text-sm text-muted-foreground"
               >
                 Auto Shuffle
               </label>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0 text-xs sm:text-sm text-muted-foreground hover:text-foreground"
-              onClick={handleShuffle}
-              disabled={autoShuffle}
-            >
-              <Shuffle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              <span className="hidden sm:inline">Shuffle</span>
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="inline-flex" tabIndex={0} />}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto gap-1 px-1.5 py-0 text-xs text-muted-foreground hover:text-foreground sm:gap-1.5 sm:px-2 sm:text-sm"
+                    onClick={handleShuffle}
+                    disabled={autoShuffle}
+                  >
+                    <Shuffle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="hidden sm:inline">Shuffle</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {autoShuffle
+                    ? "Turn off Auto Shuffle to shuffle manually"
+                    : "Shuffle the remaining cards"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
-        <Progress value={progressPercent} className="h-2" />
-        <div className="flex items-center justify-end gap-3 mt-1">
-          {hasAiReading ? <VoiceSelector voice={voice} onChange={setVoice} /> : null}
-        </div>
+        <Progress value={progressPercent} className="h-1.5" />
+        {hasAiReading ? (
+          <div className="flex items-center justify-end border-t border-border/50 pt-2">
+            <VoiceSelector voice={voice} onChange={setVoice} />
+          </div>
+        ) : null}
       </div>
 
       {/* Hint */}
-      <p className="text-muted-foreground text-xs sm:text-sm md:hidden text-center">
+      <p className="text-center text-xs text-muted-foreground sm:text-sm md:hidden">
         Swipe left / right to navigate · Tap to flip
       </p>
-      <p className="text-muted-foreground text-xs sm:text-sm hidden md:block">
-        Use <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">←</kbd>{" "}
-        <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">→</kbd>{" "}
+      <p className="hidden text-xs text-muted-foreground sm:text-sm md:block">
+        Use{" "}
+        <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-xs">
+          ←
+        </kbd>{" "}
+        <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-xs">
+          →
+        </kbd>{" "}
         arrow keys to navigate and{" "}
-        <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">Space</kbd>{" "}
+        <kbd className="rounded border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-xs">
+          Space
+        </kbd>{" "}
         to flip · or drag the card
       </p>
 
@@ -581,48 +631,88 @@ export function FlashcardStudy({
       {/* Navigation controls — flip to reveal, then Next (no self-grading). */}
       <div className="flex flex-col items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-3">
-          <Button
-            variant="outline"
-            size="default"
-            className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
-          >
-            <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Previous</span>
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" tabIndex={0} />}>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                  onClick={handlePrevious}
+                  disabled={currentIndex === 0}
+                >
+                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Previous</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Go to the previous card</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-          <Button
-            variant="secondary"
-            size="default"
-            className="gap-1 sm:gap-2 min-w-20 sm:min-w-28 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-            onClick={handleFlip}
-          >
-            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-            {isFlipped ? "Unflip" : "Flip"}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="secondary"
+                    size="default"
+                    className="gap-1 sm:gap-2 min-w-20 sm:min-w-28 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                    onClick={handleFlip}
+                  />
+                }
+              >
+                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+                {isFlipped ? "Unflip" : "Flip"}
+              </TooltipTrigger>
+              <TooltipContent>
+                {isFlipped ? "Hide the answer" : "Reveal the answer"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
 
-          <Button
-            variant="outline"
-            size="default"
-            className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-            onClick={handleNext}
-          >
-            <span className="hidden sm:inline">
-              {currentIndex === total - 1 ? "Finish" : "Next"}
-            </span>
-            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                    onClick={handleNext}
+                  />
+                }
+              >
+                <span className="hidden sm:inline">
+                  {currentIndex === total - 1 ? "Finish" : "Next"}
+                </span>
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+              </TooltipTrigger>
+              <TooltipContent>
+                {currentIndex === total - 1
+                  ? "Finish this review session"
+                  : "Go to the next card"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
-        <Button
-          size="default"
-          className="gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
-          onClick={handleFinish}
-        >
-          <Flag className="h-4 w-4" />
-          Finish Review
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="default"
+                  className="gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm"
+                  onClick={handleFinish}
+                />
+              }
+            >
+              <Flag className="h-4 w-4" />
+              Finish Review
+            </TooltipTrigger>
+            <TooltipContent>End the review session now</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {enlargedImage ? (

@@ -57,3 +57,39 @@ export async function mailingAddressSubdivisionError(
   }
   return null;
 }
+
+/**
+ * Resolve a Flipvise state/province label (or code) to the subdivision code Stripe
+ * Checkout / Tax expects. Returns null when the region cannot be used with Stripe
+ * (e.g. Baker Island → UM-81 under US is not a valid Stripe US state).
+ */
+export async function stateProvinceToStripeCode(
+  countryCode: string,
+  stateProvince: string,
+): Promise<string | null> {
+  const trimmed = stateProvince.trim();
+  if (!trimmed) return null;
+
+  const states = await getStatesOfCountry(countryCode);
+  if (!states.length) {
+    return trimmed.length >= 1 && trimmed.length <= 120 ? trimmed : null;
+  }
+
+  const upper = trimmed.toUpperCase();
+  const match =
+    states.find((state) => state.isoCode.toUpperCase() === upper) ??
+    states.find(
+      (state) => state.name.localeCompare(trimmed, undefined, { sensitivity: "accent" }) === 0,
+    );
+
+  if (!match?.isoCode) return null;
+
+  const code = match.isoCode;
+  // country-state-city nests some territories under US as "UM-81", etc.
+  // Stripe expects ISO 3166-2 codes without a country prefix (e.g. "FL", "ON").
+  if (code.includes("-")) return null;
+  if ((countryCode === "US" || countryCode === "CA") && code.length !== 2) {
+    return null;
+  }
+  return code;
+}

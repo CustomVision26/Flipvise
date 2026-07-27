@@ -83,7 +83,7 @@ export async function startQuizSecuritySessionAction(data: z.infer<typeof startS
     parsed.data.teamId,
     parsed.data.deckId,
   );
-  if (!enabled) throw new Error("Quiz security is not enabled for this quiz.");
+  if (!enabled) throw new Error("Exam Mode is not enabled for this quiz.");
 
   const existing = await getLatestQuizSecuritySessionForUserDeck(
     userId,
@@ -334,4 +334,39 @@ export async function terminateQuizSecuritySessionAction(
 
   revalidatePath("/dashboard/team-admin/quiz-results", "layout");
   revalidatePath("/dashboard/inbox");
+}
+
+const accessStatusSchema = z.object({
+  teamId: z.number().int().positive(),
+  deckId: z.number().int().positive(),
+});
+
+export type QuizSecurityAccessStatus = {
+  id: number;
+  status: "active" | "locked" | "granted_resume" | "terminated" | "completed";
+  sessionState: QuizSecuritySessionState | null;
+};
+
+/** Learner polls Exam Mode session after admin grant / terminate. */
+export async function getQuizSecurityAccessStatusAction(
+  data: z.infer<typeof accessStatusSchema>,
+): Promise<QuizSecurityAccessStatus | null> {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = accessStatusSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const session = await getLatestQuizSecuritySessionForUserDeck(
+    userId,
+    parsed.data.teamId,
+    parsed.data.deckId,
+  );
+  if (!session) return null;
+
+  return {
+    id: session.id,
+    status: session.status,
+    sessionState: session.sessionState ?? null,
+  };
 }

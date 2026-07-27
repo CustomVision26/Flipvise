@@ -2,7 +2,10 @@ import "server-only";
 
 import { getAccessContext } from "@/lib/access";
 import {
+  getAssignedDecksForMember,
   getDecksForTeam,
+  getEducationTeamAdminWorkspaceDecks,
+  getMemberRecord,
   getTeamsForTeamDashboard,
 } from "@/db/queries/teams";
 import {
@@ -29,6 +32,13 @@ export type TeacherDeckContext = {
   teamOwnerUserId: string | null;
 };
 
+type EducationWorkspaceTeam = {
+  id: number;
+  name: string;
+  ownerUserId: string;
+  planSlug: string;
+};
+
 function sortDecksNewestFirst(decks: DeckRow[]): DeckRow[] {
   return decks.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
@@ -36,7 +46,16 @@ function sortDecksNewestFirst(decks: DeckRow[]): DeckRow[] {
 function resolveEducationWorkspace(
   teams: Awaited<ReturnType<typeof getTeamsForTeamDashboard>>,
   userId: string,
+  preferredTeamId?: number | null,
 ) {
+  if (preferredTeamId != null) {
+    const preferred = teams.find(
+      (team) =>
+        team.id === preferredTeamId && isEducationTeamPlanId(team.planSlug),
+    );
+    if (preferred) return preferred;
+  }
+
   return (
     teams.find(
       (team) =>
@@ -67,11 +86,12 @@ function personalMaxCardsPerDeck(
 function workspaceQuota(
   planSlug: EducationTeamPlanId,
   workspace: { id: number; name: string; ownerUserId: string } | null,
-  decks: DeckRow[],
+  /** Full workspace deck set — used for quota / at-limit (not the picker subset). */
+  quotaDecks: DeckRow[],
 ): TeacherDeckQuota {
   const limits = limitsForEducationTeamPlan(planSlug);
   const maxDecks = limits.maxDecksPerWorkspace;
-  const deckCount = decks.length;
+  const deckCount = quotaDecks.length;
   const planLabel = EDUCATION_PLAN_LABELS[planSlug];
 
   return {
@@ -109,21 +129,62 @@ function personalQuota(
   };
 }
 
+/**
+ * Decks shown in teacher tool pickers for a workspace.
+ * Owners see the full workspace library; education team admins see decks they
+ * created plus decks assigned to them (Team Dashboard parity); other members
+ * see assigned decks only.
+ */
+async function loadPickerDecksForEducationWorkspace(
+  userId: string,
+  workspace: EducationWorkspaceTeam,
+): Promise<{ pickerDecks: DeckRow[]; quotaDecks: DeckRow[] }> {
+  const quotaDecks = await getDecksForTeam(workspace.id, workspace.ownerUserId);
+
+  if (workspace.ownerUserId === userId) {
+    return { pickerDecks: quotaDecks, quotaDecks };
+  }
+
+  if (isEducationTeamPlanId(workspace.planSlug)) {
+    const member = await getMemberRecord(workspace.id, userId);
+    if (member?.role === "team_admin") {
+      const pickerDecks = await getEducationTeamAdminWorkspaceDecks(
+        workspace.id,
+        workspace.ownerUserId,
+        userId,
+      );
+      return { pickerDecks, quotaDecks };
+    }
+  }
+
+  const assigned = await getAssignedDecksForMember(workspace.id, userId);
+  return { pickerDecks: assigned, quotaDecks };
+}
+
+/**
+ * @param preferredTeamId — teacher workspace from the URL/cookie. When set, deck
+ *   pickers resolve that workspace (including assigned team decks) instead of
+ *   guessing via the first owned education team.
+ */
 export async function loadTeacherDeckContext(
   userId: string,
+  preferredTeamId?: number | null,
 ): Promise<TeacherDeckContext> {
   const ctx = await getAccessContext();
+  const teams = await getTeamsForTeamDashboard(userId);
 
   if (ctx.activeEducationTeamPlan != null) {
     const planSlug = ctx.activeEducationTeamPlan;
-    const teams = await getTeamsForTeamDashboard(userId);
-    const workspace = resolveEducationWorkspace(teams, userId);
+    const workspace = resolveEducationWorkspace(teams, userId, preferredTeamId);
 
     if (workspace) {
-      const decks = await getDecksForTeam(workspace.id, workspace.ownerUserId);
+      const { pickerDecks, quotaDecks } = await loadPickerDecksForEducationWorkspace(
+        userId,
+        workspace,
+      );
       return {
-        quota: workspaceQuota(planSlug, workspace, decks),
-        decks: sortDecksNewestFirst(decks),
+        quota: workspaceQuota(planSlug, workspace, quotaDecks),
+        decks: sortDecksNewestFirst(pickerDecks),
         teamId: workspace.id,
         teamOwnerUserId: workspace.ownerUserId,
       };
@@ -137,18 +198,21 @@ export async function loadTeacherDeckContext(
     };
   }
 
-  const teams = await getTeamsForTeamDashboard(userId);
-  const memberWorkspace = resolveEducationWorkspace(teams, userId);
+  const memberWorkspace = resolveEducationWorkspace(
+    teams,
+    userId,
+    preferredTeamId,
+  );
 
   if (memberWorkspace && isEducationTeamPlanId(memberWorkspace.planSlug)) {
     const planSlug = memberWorkspace.planSlug;
-    const decks = await getDecksForTeam(
-      memberWorkspace.id,
-      memberWorkspace.ownerUserId,
+    const { pickerDecks, quotaDecks } = await loadPickerDecksForEducationWorkspace(
+      userId,
+      memberWorkspace,
     );
     return {
-      quota: workspaceQuota(planSlug, memberWorkspace, decks),
-      decks: sortDecksNewestFirst(decks),
+      quota: workspaceQuota(planSlug, memberWorkspace, quotaDecks),
+      decks: sortDecksNewestFirst(pickerDecks),
       teamId: memberWorkspace.id,
       teamOwnerUserId: memberWorkspace.ownerUserId,
     };

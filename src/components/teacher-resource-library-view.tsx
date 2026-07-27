@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Pagination,
@@ -170,6 +171,7 @@ function itemHaystack(item: TeacherResourceLibraryItem): string {
     item.creatorName,
     item.creatorEmail,
     item.sourceLabel,
+    item.isOutdatedVsSourceDeck ? "deck updated outdated" : null,
   ]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(" ")
@@ -369,6 +371,9 @@ function ResourceItemCard({
 }) {
   const creatorLabel = item.creatorName ?? item.creatorEmail ?? "Unknown creator";
   const savedLabel = formatSavedDate(item.savedAt);
+  const sourceDeckUpdatedLabel = item.sourceDeckUpdatedAt
+    ? formatSavedDate(item.sourceDeckUpdatedAt)
+    : "";
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 px-4 py-3">
@@ -385,6 +390,11 @@ function ResourceItemCard({
           {creatorLabel}
           {savedLabel ? ` · Saved ${savedLabel}` : ""}
         </p>
+        {item.isOutdatedVsSourceDeck && sourceDeckUpdatedLabel ? (
+          <p className="text-xs text-destructive">
+            Source deck updated {sourceDeckUpdatedLabel}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {item.pdfUrl ? (
@@ -465,6 +475,8 @@ function ResourceItemCard({
         ) : null}
         {item.isPlaceholder ? (
           <Badge variant="secondary">Placeholder</Badge>
+        ) : item.isOutdatedVsSourceDeck ? (
+          <Badge variant="destructive">Deck updated</Badge>
         ) : (
           <Badge variant="secondary">Saved</Badge>
         )}
@@ -962,11 +974,9 @@ function subjectOnlyGroupKey(sectionId: string, subject: string): string {
   return `${sectionId}:${subject}`;
 }
 
-function SubjectGroupedResourceSection({
-  section,
+function SubjectGroupedResourceList({
+  sectionId,
   items,
-  lessonBuilderHref,
-  homeworkHref,
   teamId,
   viewerUserId,
   isWorkspaceOwner,
@@ -974,10 +984,8 @@ function SubjectGroupedResourceSection({
   sortDir,
   onItemDeleted,
 }: {
-  section: TeacherResourceLibrarySection;
+  sectionId: TeacherResourceLibrarySection["id"];
   items: TeacherResourceLibraryItem[];
-  lessonBuilderHref: string;
-  homeworkHref: string;
   teamId: number | null;
   viewerUserId: string;
   isWorkspaceOwner: boolean;
@@ -995,7 +1003,7 @@ function SubjectGroupedResourceSection({
   );
 
   function toggleSubjectGroup(subject: string) {
-    const key = subjectOnlyGroupKey(section.id, subject);
+    const key = subjectOnlyGroupKey(sectionId, subject);
     setCollapsedSubjectKeys((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
@@ -1004,36 +1012,10 @@ function SubjectGroupedResourceSection({
     });
   }
 
-  if (items.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {section.emptyMessage}
-        {section.id === "lessonPlans" ? (
-          <>
-            {" "}
-            <Link href={lessonBuilderHref} className="underline underline-offset-2">
-              AI Lesson Builder
-            </Link>
-            .
-          </>
-        ) : null}
-        {section.id === "homework" ? (
-          <>
-            {" "}
-            <Link href={homeworkHref} className="underline underline-offset-2">
-              Homework Generator
-            </Link>
-            .
-          </>
-        ) : null}
-      </p>
-    );
-  }
-
   return (
     <div className="space-y-3">
       {subjectGroups.map((subjectGroup) => {
-        const subjectKey = subjectOnlyGroupKey(section.id, subjectGroup.subject);
+        const subjectKey = subjectOnlyGroupKey(sectionId, subjectGroup.subject);
         const isSubjectCollapsed = collapsedSubjectKeys.has(subjectKey);
 
         return (
@@ -1066,11 +1048,11 @@ function SubjectGroupedResourceSection({
                   <ResourceItemCard
                     key={item.key}
                     item={item}
-                    sectionId={section.id}
+                    sectionId={sectionId}
                     teamId={teamId}
                     canDelete={canDeleteItem(
                       item,
-                      section.id,
+                      sectionId,
                       viewerUserId,
                       isWorkspaceOwner,
                     )}
@@ -1083,6 +1065,168 @@ function SubjectGroupedResourceSection({
         );
       })}
     </div>
+  );
+}
+
+function LessonPlanOriginSectionHeader({
+  title,
+  description,
+  count,
+}: {
+  title: string;
+  description: string;
+  count: number;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <Badge variant="outline" className="text-[10px] tabular-nums">
+          {count}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function SubjectGroupedResourceSection({
+  section,
+  items,
+  lessonBuilderHref,
+  homeworkHref,
+  teamId,
+  viewerUserId,
+  isWorkspaceOwner,
+  sortKey,
+  sortDir,
+  onItemDeleted,
+  lessonPlanOriginTotals,
+}: {
+  section: TeacherResourceLibrarySection;
+  items: TeacherResourceLibraryItem[];
+  lessonBuilderHref: string;
+  homeworkHref: string;
+  teamId: number | null;
+  viewerUserId: string;
+  isWorkspaceOwner: boolean;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  onItemDeleted: (itemKey: string) => void;
+  /** Full filtered totals for origin headers (may exceed current page item counts). */
+  lessonPlanOriginTotals?: { assigned: number; mine: number } | null;
+}) {
+  const useLessonPlanOrigins =
+    section.id === "lessonPlans" &&
+    !isWorkspaceOwner &&
+    (lessonPlanOriginTotals != null ||
+      items.some((item) => item.lessonPlanOrigin != null));
+
+  const assignedItems = useMemo(
+    () => items.filter((item) => item.lessonPlanOrigin === "assigned"),
+    [items],
+  );
+  const mineItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          item.lessonPlanOrigin === "mine" || item.lessonPlanOrigin == null,
+      ),
+    [items],
+  );
+
+  const assignedTotal = lessonPlanOriginTotals?.assigned ?? assignedItems.length;
+  const mineTotal = lessonPlanOriginTotals?.mine ?? mineItems.length;
+
+  if (items.length === 0 && assignedTotal === 0 && mineTotal === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {section.emptyMessage}
+        {section.id === "lessonPlans" ? (
+          <>
+            {" "}
+            <Link href={lessonBuilderHref} className="underline underline-offset-2">
+              AI Lesson Builder
+            </Link>
+            .
+          </>
+        ) : null}
+        {section.id === "homework" ? (
+          <>
+            {" "}
+            <Link href={homeworkHref} className="underline underline-offset-2">
+              Homework Generator
+            </Link>
+            .
+          </>
+        ) : null}
+      </p>
+    );
+  }
+
+  if (useLessonPlanOrigins && (assignedTotal > 0 || mineTotal > 0)) {
+    // Only render origin blocks that have items on the current page.
+    const showAssigned = assignedItems.length > 0;
+    const showMine = mineItems.length > 0;
+
+    return (
+      <div className="space-y-6">
+        {showAssigned ? (
+          <div className="space-y-3">
+            <LessonPlanOriginSectionHeader
+              title="From assigned decks"
+              description="Original lesson plans that came with decks assigned to you. Edit opens AI Lesson Builder; saving creates your own copy."
+              count={assignedTotal}
+            />
+            <SubjectGroupedResourceList
+              sectionId={section.id}
+              items={assignedItems}
+              teamId={teamId}
+              viewerUserId={viewerUserId}
+              isWorkspaceOwner={isWorkspaceOwner}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onItemDeleted={onItemDeleted}
+            />
+          </div>
+        ) : null}
+
+        {showAssigned && showMine ? <Separator /> : null}
+
+        {showMine ? (
+          <div className="space-y-3">
+            <LessonPlanOriginSectionHeader
+              title="My lesson plans"
+              description="Lesson plans you created or saved as your own updated copies."
+              count={mineTotal}
+            />
+            <SubjectGroupedResourceList
+              sectionId={section.id}
+              items={mineItems}
+              teamId={teamId}
+              viewerUserId={viewerUserId}
+              isWorkspaceOwner={isWorkspaceOwner}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onItemDeleted={onItemDeleted}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <SubjectGroupedResourceList
+      sectionId={section.id}
+      items={items}
+      teamId={teamId}
+      viewerUserId={viewerUserId}
+      isWorkspaceOwner={isWorkspaceOwner}
+      sortKey={sortKey}
+      sortDir={sortDir}
+      onItemDeleted={onItemDeleted}
+    />
   );
 }
 
@@ -1132,6 +1276,23 @@ function ResourceSectionPanel({
     () => sortItems(filteredItems, sortKey, sortDir),
     [filteredItems, sortKey, sortDir],
   );
+
+  const lessonPlanOriginTotals = useMemo(() => {
+    if (
+      section.id !== "lessonPlans" ||
+      isWorkspaceOwner ||
+      !displayItems.some((item) => item.lessonPlanOrigin != null)
+    ) {
+      return null;
+    }
+    let assigned = 0;
+    let mine = 0;
+    for (const item of displayItems) {
+      if (item.lessonPlanOrigin === "assigned") assigned += 1;
+      else mine += 1;
+    }
+    return { assigned, mine };
+  }, [section.id, isWorkspaceOwner, displayItems]);
 
   const totalPages = Math.max(1, Math.ceil(displayItems.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -1203,6 +1364,7 @@ function ResourceSectionPanel({
           sortKey={sortKey}
           sortDir={sortDir}
           onItemDeleted={(itemKey) => onItemDeleted(section.id, itemKey)}
+          lessonPlanOriginTotals={lessonPlanOriginTotals}
         />
       )}
 
@@ -1278,6 +1440,11 @@ export function TeacherResourceLibraryView({
             {isWorkspaceOwner ? (
               <CardDescription className="px-6 pt-6">
                 Grouped by team admin, then subject. Click a group to expand or collapse.
+              </CardDescription>
+            ) : section.id === "lessonPlans" ? (
+              <CardDescription className="px-6 pt-6">
+                Plans from assigned decks and your own lesson plans are listed separately.
+                Grouped by subject within each section.
               </CardDescription>
             ) : (
               <CardDescription className="px-6 pt-6">

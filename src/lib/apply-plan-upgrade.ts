@@ -333,6 +333,7 @@ export async function cancelOtherActiveSubscriptionsForCustomer(
   customerId: string,
   keepSubscriptionId: string,
 ): Promise<void> {
+  const { isStripeAddonSubscription } = await import("@/lib/stripe-addon-metadata");
   const listed = await stripe.subscriptions.list({
     customer: customerId,
     status: "all",
@@ -340,6 +341,8 @@ export async function cancelOtherActiveSubscriptionsForCustomer(
   });
   for (const sub of listed.data) {
     if (sub.id === keepSubscriptionId) continue;
+    // Preserve monthly add-on subscriptions stacked beside the base plan.
+    if (isStripeAddonSubscription(sub)) continue;
     if (
       sub.status === "active" ||
       sub.status === "trialing" ||

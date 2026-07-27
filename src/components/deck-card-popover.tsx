@@ -23,7 +23,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -41,7 +40,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
-import { deleteDeckAction } from "@/actions/decks";
+import { deleteDeckAction, getDeckDeleteImpactAction } from "@/actions/decks";
+import type { DeckDeleteImpact } from "@/db/queries/deck-delete-impact";
+import { DeckDeleteWarningBody } from "@/components/deck-delete-warning-body";
 import { getGradientBySlug } from "@/lib/deck-gradients";
 import {
   getCardsForDeckViewerPreviewAction,
@@ -96,6 +97,11 @@ interface DeckCardPopoverProps {
   teamTierPreviewPromo?: boolean;
   /** Listen-to-card in deck preview — Pro Plus / team / platform admin only. */
   hasAiReading?: boolean;
+  /**
+   * Education / teacher-tools users — always show the detailed permanent-delete
+   * warning (linked lesson plans, assignments, classes, etc.).
+   */
+  detailedDeleteWarning?: boolean;
 }
 
 export function DeckCardPopover({
@@ -107,6 +113,7 @@ export function DeckCardPopover({
   allowCoverUpload = false,
   teamTierPreviewPromo = false,
   hasAiReading = false,
+  detailedDeleteWarning = false,
 }: DeckCardPopoverProps) {
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const [teamWorkspaceDialogOpen, setTeamWorkspaceDialogOpen] =
@@ -117,6 +124,9 @@ export function DeckCardPopover({
   const [previewCards, setPreviewCards] = React.useState<PreviewCard[]>([]);
   const [loadingPreview, setLoadingPreview] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteImpact, setDeleteImpact] =
+    React.useState<DeckDeleteImpact | null>(null);
+  const [deleteImpactLoading, setDeleteImpactLoading] = React.useState(false);
 
   async function handlePreview() {
     if (variant === "team-preview") {
@@ -157,6 +167,31 @@ export function DeckCardPopover({
       setDeleteOpen(false);
     }
   }
+
+  React.useEffect(() => {
+    if (!deleteOpen) {
+      setDeleteImpact(null);
+      setDeleteImpactLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDeleteImpactLoading(true);
+    void getDeckDeleteImpactAction({ deckId: deck.id })
+      .then((impact) => {
+        if (!cancelled) setDeleteImpact(impact);
+      })
+      .catch(() => {
+        if (!cancelled) setDeleteImpact(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDeleteImpactLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteOpen, deck.id]);
 
   const updatedLabel = deck.updatedAt.toLocaleString("en-US", {
     year: "numeric",
@@ -727,10 +762,12 @@ export function DeckCardPopover({
             <AlertDialogTitle className="text-base sm:text-lg">
               Delete &ldquo;{deck.name}&rdquo;?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs sm:text-sm">
-              This will permanently delete the deck and all of its cards. This
-              action cannot be undone.
-            </AlertDialogDescription>
+            <DeckDeleteWarningBody
+              deckName={deck.name}
+              forceDetailed={detailedDeleteWarning}
+              impact={deleteImpact}
+              impactLoading={deleteImpactLoading}
+            />
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
             <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>

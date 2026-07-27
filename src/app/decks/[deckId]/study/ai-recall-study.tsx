@@ -11,6 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Lock,
   Unlock,
   Sparkles,
@@ -436,11 +442,27 @@ export function AiRecallStudy({
         </ul>
         <p className="text-sm text-muted-foreground">Upgrade to continue.</p>
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button render={<Link href="/pricing" />}>Upgrade</Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger render={<Button render={<Link href="/pricing" />} />}>
+                Upgrade
+              </TooltipTrigger>
+              <TooltipContent>View plans that include AI Recall™</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           {onSwitchToStandardReview ? (
-            <Button variant="outline" onClick={onSwitchToStandardReview}>
-              Continue with Standard Review
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button variant="outline" onClick={onSwitchToStandardReview} />
+                  }
+                >
+                  Continue with Standard Review
+                </TooltipTrigger>
+                <TooltipContent>Switch to offline-friendly Standard Review</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : null}
         </div>
       </div>
@@ -459,13 +481,32 @@ export function AiRecallStudy({
           Continue studying using Standard Review.
         </p>
         {onSwitchToStandardReview ? (
-          <Button onClick={onSwitchToStandardReview}>
-            Continue with Standard Review
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={<Button onClick={onSwitchToStandardReview} />}
+              >
+                Continue with Standard Review
+              </TooltipTrigger>
+              <TooltipContent>Switch to offline-friendly Standard Review</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ) : (
-          <Button variant="outline" render={<Link href={`/decks/${deckId}`} />}>
-            Back to deck
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    render={<Link href={`/decks/${deckId}`} />}
+                  />
+                }
+              >
+                Back to deck
+              </TooltipTrigger>
+              <TooltipContent>Return to the deck page</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     );
@@ -552,10 +593,17 @@ export function AiRecallStudy({
         <p className="text-xs text-muted-foreground">
           Results are shown for this session only and are not saved automatically.
         </p>
-        <Button onClick={handleRestart} className="gap-2">
-          <RotateCcw className="h-4 w-4" />
-          Study again
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button onClick={handleRestart} className="gap-2" />}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Study again
+            </TooltipTrigger>
+            <TooltipContent>Restart AI Recall™ from the beginning</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     );
   }
@@ -589,24 +637,32 @@ export function AiRecallStudy({
                 ) : null}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={handleShuffle}
-              disabled={
-                isPending ||
-                phase === "checking" ||
-                phase === "unlocking" ||
-                total <= 1
-              }
-              title="Shuffle remaining cards"
-              aria-label="Shuffle remaining AI Recall cards"
-            >
-              <Shuffle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Shuffle</span>
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="inline-flex" tabIndex={0} />}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={handleShuffle}
+                    disabled={
+                      isPending ||
+                      phase === "checking" ||
+                      phase === "unlocking" ||
+                      total <= 1
+                    }
+                    aria-label="Shuffle remaining AI Recall cards"
+                  >
+                    <Shuffle className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Shuffle</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Shuffle remaining cards</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         <Progress value={progressPercent} className="h-1.5" />
@@ -779,31 +835,39 @@ export function AiRecallStudy({
                   className="min-h-[88px] flex-1 resize-y"
                   disabled={isPending}
                 />
-                <Button
-                  type="button"
-                  variant={isRecording ? "destructive" : "outline"}
-                  size="icon"
-                  className="mt-0.5 h-11 w-11 shrink-0"
-                  onClick={toggleMic}
-                  disabled={isPending || !speechSupported}
-                  title={
-                    !speechSupported
-                      ? "Speech recognition is not supported in this browser"
-                      : isRecording
-                        ? "Stop listening"
-                        : "Speak your answer"
-                  }
-                  aria-label={
-                    isRecording ? "Stop voice answer" : "Start voice answer"
-                  }
-                  aria-pressed={isRecording}
-                >
-                  {isRecording ? (
-                    <MicOff className="h-5 w-5" />
-                  ) : (
-                    <Mic className="h-5 w-5" />
-                  )}
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<span className="inline-flex shrink-0" tabIndex={0} />}
+                    >
+                      <Button
+                        type="button"
+                        variant={isRecording ? "destructive" : "outline"}
+                        size="icon"
+                        className="mt-0.5 h-11 w-11 shrink-0"
+                        onClick={toggleMic}
+                        disabled={isPending || !speechSupported}
+                        aria-label={
+                          isRecording ? "Stop voice answer" : "Start voice answer"
+                        }
+                        aria-pressed={isRecording}
+                      >
+                        {isRecording ? (
+                          <MicOff className="h-5 w-5" />
+                        ) : (
+                          <Mic className="h-5 w-5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {!speechSupported
+                        ? "Speech recognition is not supported in this browser"
+                        : isRecording
+                          ? "Stop listening"
+                          : "Speak your answer"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               {isRecording ? (
                 <p className="text-xs text-primary animate-pulse">
@@ -825,25 +889,43 @@ export function AiRecallStudy({
           )}
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Button
-              type="button"
-              variant="ghost"
-              className="gap-1.5 text-muted-foreground"
-              onClick={handleIDontKnow}
-              disabled={isPending}
-            >
-              <HelpCircle className="h-4 w-4" />
-              I Don&apos;t Know
-            </Button>
-            <Button
-              type="button"
-              className="gap-2"
-              onClick={handleSubmit}
-              disabled={!canSubmitAnswer() || isPending}
-            >
-              Submit
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="inline-flex" tabIndex={0} />}
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="gap-1.5 text-muted-foreground"
+                    onClick={handleIDontKnow}
+                    disabled={isPending}
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                    I Don&apos;t Know
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reveal the answer without submitting one</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="inline-flex" tabIndex={0} />}
+                >
+                  <Button
+                    type="button"
+                    className="gap-2"
+                    onClick={handleSubmit}
+                    disabled={!canSubmitAnswer() || isPending}
+                  >
+                    Submit
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Submit your answer for AI scoring</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       ) : null}
@@ -929,13 +1011,31 @@ export function AiRecallStudy({
 
           {phase === "revealed" ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button variant="outline" onClick={handleReviewAgain}>
-                Review Again
-              </Button>
-              <Button onClick={handleContinue} className="gap-2">
-                Continue
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button variant="outline" onClick={handleReviewAgain} />
+                    }
+                  >
+                    Review Again
+                  </TooltipTrigger>
+                  <TooltipContent>Queue this card to practice again later</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button onClick={handleContinue} className="gap-2" />
+                    }
+                  >
+                    Continue
+                    <ArrowRight className="h-4 w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent>Move on to the next card</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           ) : null}
         </div>

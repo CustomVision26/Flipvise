@@ -1410,6 +1410,80 @@ export const cardMastery = pgTable(
   ],
 );
 
+/** Add-on entitlement source — Stripe paid vs platform-admin complimentary grant. */
+export const addonEntitlementSourceEnum = pgEnum('addon_entitlement_source', [
+  'stripe',
+  'admin',
+]);
+
+/** Add-on entitlement lifecycle status. */
+export const addonEntitlementStatusEnum = pgEnum('addon_entitlement_status', [
+  'active',
+  'canceled',
+  'revoked',
+]);
+
+/**
+ * Catalog of optional paid/admin-granted features that stack on top of base plans.
+ * Stripe monthly price IDs are resolved from env via `stripePriceEnvKey` (never hardcode price_*).
+ */
+export const addonCatalog = pgTable(
+  'addon_catalog',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    key: varchar({ length: 128 }).notNull(),
+    name: varchar({ length: 255 }).notNull(),
+    description: text().notNull().default(''),
+    marketingBlurb: text().notNull().default(''),
+    /** Plan slugs eligible to purchase or receive this add-on. */
+    eligiblePlanIds: json().$type<string[]>().notNull().default([]),
+    /**
+     * Env var name holding the Stripe monthly Price id, e.g. `STRIPE_ADDON_STUDY_MODE_XYZ_PRICE_ID`.
+     * Empty string means admin-grant-only (no self-serve Checkout).
+     */
+    stripePriceEnvKey: varchar({ length: 128 }).notNull().default(''),
+    /** When false, new purchases and admin assigns are blocked; existing entitlements remain. */
+    active: boolean().notNull().default(true),
+    /** When true (and settings.pricingCatalogVisible), listed on `/pricing/add-ons`. */
+    publishedOnPricing: boolean().notNull().default(false),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('addon_catalog_key_uidx').on(t.key)],
+);
+
+/** Singleton — master toggle for showing the Add-on Catalog page on pricing. */
+export const addonCatalogSettings = pgTable('addon_catalog_settings', {
+  id: integer().primaryKey().default(1),
+  pricingCatalogVisible: boolean().notNull().default(false),
+  updatedAt: timestamp().notNull().defaultNow(),
+  updatedByUserId: varchar({ length: 255 }),
+});
+
+/** Per-user active/canceled/revoked add-on entitlements. */
+export const userAddonEntitlements = pgTable(
+  'user_addon_entitlements',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    userId: varchar({ length: 255 }).notNull(),
+    addonKey: varchar({ length: 128 }).notNull(),
+    source: addonEntitlementSourceEnum().notNull(),
+    status: addonEntitlementStatusEnum().notNull().default('active'),
+    stripeSubscriptionId: varchar({ length: 255 }),
+    stripeSubscriptionItemId: varchar({ length: 255 }),
+    grantedByAdminUserId: varchar({ length: 255 }),
+    startsAt: timestamp().notNull().defaultNow(),
+    endsAt: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('user_addon_entitlements_user_addon_uidx').on(t.userId, t.addonKey),
+    index('user_addon_entitlements_user_id_idx').on(t.userId),
+    index('user_addon_entitlements_addon_key_idx').on(t.addonKey),
+  ],
+);
+
 /**
  * Completed AI Recall™ session analytics — stored permanently for teacher / team dashboards.
  */
@@ -1449,3 +1523,6 @@ export type PlanReconciliationSession = InferSelectModel<typeof planReconciliati
 export type TeacherClassRow = InferSelectModel<typeof teacherClasses>;
 export type AiRecallSessionRow = InferSelectModel<typeof aiRecallSessions>;
 export type CardMasteryRow = InferSelectModel<typeof cardMastery>;
+export type AddonCatalogRow = InferSelectModel<typeof addonCatalog>;
+export type AddonCatalogSettingsRow = InferSelectModel<typeof addonCatalogSettings>;
+export type UserAddonEntitlementRow = InferSelectModel<typeof userAddonEntitlements>;

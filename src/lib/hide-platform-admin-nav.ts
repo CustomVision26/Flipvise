@@ -30,7 +30,7 @@ export function isDashboardTeamAdminOrWorkspaceManagementRoute(
   return false;
 }
 
-/** Hide platform `/admin` link and workspace "To Admin Dash" on these routes. */
+/** Hide platform `/admin` link and workspace "WS Admin Dash" on these routes. */
 export function shouldHidePlatformAdminNav(pathname: string | null): boolean {
   return isDashboardTeamAdminOrWorkspaceManagementRoute(pathname);
 }

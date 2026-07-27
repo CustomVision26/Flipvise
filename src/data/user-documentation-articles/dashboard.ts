@@ -108,7 +108,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Studying in team context",
         bullets: [
           "Review vs quiz modes depend on study privileges set per assignment.",
-          "Team quizzes may enforce timer, schedule, and security rules from Team Admin.",
+          "Team quizzes may enforce timer, schedule, and Exam Mode rules from Team Admin.",
           "Quiz results sync to team admin reporting and your inbox when applicable.",
         ],
       },

@@ -245,13 +245,14 @@ async function resolvePlanSlugFromInvoiceSubscription(
       "metadata" in subscriptionRef
         ? (subscriptionRef as Stripe.Subscription)
         : await stripe.subscriptions.retrieve(subId);
+    const { isStripeAddonSubscription, basePlanPriceIdFromSubscription } =
+      await import("@/lib/stripe-addon-metadata");
+    if (isStripeAddonSubscription(sub)) return null;
+
     const fromMeta = asPaidPlanId(sub.metadata?.plan);
     if (fromMeta) return fromMeta;
 
-    const priceId =
-      typeof sub.items?.data?.[0]?.price === "string"
-        ? sub.items.data[0].price
-        : sub.items?.data?.[0]?.price?.id;
+    const priceId = basePlanPriceIdFromSubscription(sub);
     return planSlugFromStripePriceId(priceId);
   } catch {
     return null;

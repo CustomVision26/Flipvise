@@ -14,6 +14,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { deleteAllCardsAction } from "@/actions/cards";
 
 interface DeleteAllCardsDialogProps {
@@ -32,17 +38,30 @@ export function DeleteAllCardsDialog({ deckId, cardCount }: DeleteAllCardsDialog
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={
-          <Button
-            size="sm"
-            className="h-9 gap-2 font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          />
-        }
-      >
-        <Trash2 className="size-4" />
-        Delete all
-      </AlertDialogTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger
+            render={<span className="inline-flex" />}
+          >
+            <AlertDialogTrigger
+              render={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                />
+              }
+            >
+              <Trash2 className="size-4" />
+              Delete all
+            </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-56 text-center">
+            Permanently delete all {cardCount} card
+            {cardCount !== 1 ? "s" : ""} in this deck
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-base sm:text-lg">Delete all cards?</AlertDialogTitle>

@@ -24,6 +24,10 @@ import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
 import { cancelOtherActiveSubscriptionsForCustomer } from "@/lib/apply-plan-upgrade";
 import { syncCheckoutCompletedSubscription } from "@/lib/stripe-subscription-lifecycle";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
+import {
+  basePlanPriceIdFromSubscription,
+  isStripeAddonSubscription,
+} from "@/lib/stripe-addon-metadata";
 
 function planRank(planSlug: string | undefined): number {
   const slug = planSlug?.trim() ?? "";
@@ -36,7 +40,9 @@ export function pickPreferredStripeSubscription(
   subs: Stripe.Subscription[],
 ): Stripe.Subscription | null {
   const manageable = subs.filter(
-    (s) => s.status === "active" || s.status === "trialing",
+    (s) =>
+      (s.status === "active" || s.status === "trialing") &&
+      !isStripeAddonSubscription(s),
   );
   if (manageable.length === 0) return null;
   return [...manageable].sort((a, b) => {
@@ -50,13 +56,13 @@ async function resolvePlanSlugFromStripeSubscription(
   sub: Stripe.Subscription,
   customerId: string,
 ): Promise<StripePaidPlanId | null> {
+  // Add-on-only subscriptions must never drive base plan billing metadata.
+  if (isStripeAddonSubscription(sub)) return null;
+
   const fromSubMeta = asPaidPlanId(sub.metadata?.plan);
   if (fromSubMeta) return fromSubMeta;
 
-  const priceId =
-    typeof sub.items?.data?.[0]?.price === "string"
-      ? sub.items.data[0].price
-      : sub.items?.data?.[0]?.price?.id;
+  const priceId = basePlanPriceIdFromSubscription(sub);
   const fromPrice = planSlugFromStripePriceId(priceId);
   if (fromPrice) return fromPrice;
 

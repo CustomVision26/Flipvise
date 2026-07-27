@@ -319,13 +319,16 @@ export function WorkspaceContextDropdown({
             size="sm"
             className="h-8 shrink-0 px-2 text-xs whitespace-nowrap"
             disabled={pending || !sessionLoaded}
+            // Native title — do not nest Tooltip inside DropdownMenuContent (portal teardown bug).
+            title="This Workspace Admin Dashboard"
+            aria-label="WS Admin Dash. This Workspace Admin Dashboard"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               goToTeamAdmin(teamAdminHref);
             }}
           >
-            To Admin Dash
+            WS Admin Dash
           </Button>
         ) : null}
       </DropdownMenuItem>

@@ -11,6 +11,10 @@ import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { listTeamInvitationsForInviteeEmail } from "@/db/queries/teams";
 import { isTeamInviteExpired } from "@/lib/team-invite-expiry";
 import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
+import {
+  formatTeamInviteInboxDescription,
+  formatTeamInviteInboxTitle,
+} from "@/lib/team-invite-message-copy";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { listBillingInvoicesForUser } from "@/db/queries/billing";
 import { listSubscriptionCheckoutConfirmationsForUser } from "@/db/queries/subscription-checkout-inbox";
@@ -129,12 +133,19 @@ export default async function DashboardInboxPage() {
   const quizTakerIds = quizEntries.map((e) => e.quizResult.userId);
   const quizSecurityMemberIds = quizSecurityInboxRows.map((e) => e.session.userId);
   const teamOwnerIds = teamsRows.map((t) => t.ownerUserId);
+  const teamInviteOwnerIds = teamInviteRows.map((r) => r.team.ownerUserId);
   const teamInviteInviterIds = teamInviteRows
-    .map((r) => r.invitation.invitedByUserId ?? r.team.ownerUserId)
-    .filter(Boolean) as string[];
+    .map((r) => r.invitation.invitedByUserId)
+    .filter((id): id is string => Boolean(id));
 
   const allUserIds = [
-    ...new Set([...quizTakerIds, ...quizSecurityMemberIds, ...teamOwnerIds, ...teamInviteInviterIds]),
+    ...new Set([
+      ...quizTakerIds,
+      ...quizSecurityMemberIds,
+      ...teamOwnerIds,
+      ...teamInviteOwnerIds,
+      ...teamInviteInviterIds,
+    ]),
   ];
   const userDisplayById = allUserIds.length > 0
     ? await getClerkUserFieldDisplaysByIds(allUserIds)
@@ -201,9 +212,16 @@ export default async function DashboardInboxPage() {
 
   // 2. Team invitations
   for (const row of teamInviteRows) {
-    const inviterId = row.invitation.invitedByUserId ?? row.team.ownerUserId;
+    const ownerDisplay = userDisplayById[row.team.ownerUserId];
+    const ownerName =
+      ownerDisplay?.primaryLine ?? ownerDisplay?.primaryEmail ?? null;
+    const inviterId =
+      row.invitation.invitedByUserId ?? row.team.ownerUserId;
     const inviterDisplay = userDisplayById[inviterId];
-    const inviterName = inviterDisplay?.primaryLine ?? inviterDisplay?.primaryEmail ?? "Team admin";
+    const inviterName =
+      inviterDisplay?.primaryLine ??
+      inviterDisplay?.primaryEmail ??
+      "Team Admin";
     const expired = isTeamInviteExpired(row.invitation.expiresAt);
     const outcome = resolveTeamInviteInboxOutcome(row.invitation.status, expired);
 
@@ -219,8 +237,14 @@ export default async function DashboardInboxPage() {
     items.push({
       type: "team_invite",
       key,
-      title: `Team Invitation — ${row.team.name}`,
-      description: `${row.invitation.role === "team_admin" ? "Team Admin" : "Member"} role · from ${inviterName}`,
+      title: formatTeamInviteInboxTitle(row.team.name),
+      description: formatTeamInviteInboxDescription({
+        workspaceName: row.team.name,
+        role: row.invitation.role,
+        ownerName,
+        inviterName,
+        outcome,
+      }),
       dateIso: row.invitation.createdAt.toISOString(),
       isRead,
       requiresAction: outcome === "needs_response",
@@ -228,6 +252,7 @@ export default async function DashboardInboxPage() {
         invitationId: row.invitation.id,
         teamName: row.team.name,
         role: row.invitation.role,
+        ownerName,
         inviterName,
         expiresAtIso: row.invitation.expiresAt.toISOString(),
         outcome,
@@ -319,13 +344,13 @@ export default async function DashboardInboxPage() {
     const deckName = entry.session.deckName;
 
     const description = isOwnerCopy
-      ? `Quiz for ${memberName ?? "a member"} on "${deckName}" was terminated due to suspicious behaviour (left the secured quiz).`
+      ? `Quiz for ${memberName ?? "a member"} on "${deckName}" was terminated due to suspicious behaviour (left the Exam Mode quiz).`
       : `Due to suspicious behaviour, your quiz on "${deckName}" was terminated. Await team owner feedback for access to quiz again.`;
 
     items.push({
       type: "quiz_security_notice",
       key,
-      title: isOwnerCopy ? "Secured quiz terminated" : "Quiz session terminated",
+      title: isOwnerCopy ? "Exam Mode quiz terminated" : "Quiz session terminated",
       description,
       dateIso: entry.createdAt.toISOString(),
       isRead,

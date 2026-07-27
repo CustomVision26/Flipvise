@@ -18,6 +18,7 @@ import {
   mergePlansConfigWithStripePricing,
 } from "@/lib/stripe-pricing-display";
 import type { PlanConfig } from "@/components/pricing-content";
+import { getAddonCatalogSettings } from "@/db/queries/addons";
 
 /** Stripe price snapshots must run at request time (env + live amounts). */
 export const dynamic = "force-dynamic";
@@ -109,6 +110,14 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
   const hasStripeSubscription = stripeSubRow !== null;
 
+  let showAddonCatalogLink = false;
+  try {
+    const addonSettings = await getAddonCatalogSettings();
+    showAddonCatalogLink = addonSettings.pricingCatalogVisible;
+  } catch (error) {
+    console.error("[PricingPage] addon catalog settings:", error);
+  }
+
   return (
     <div className="min-h-screen bg-background px-4 py-10 sm:px-6 sm:py-14">
       <Suspense fallback={null}>
@@ -138,6 +147,19 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               Start for free. Upgrade anytime for higher deck limits, AI flashcards,
               optional AI reading on Pro Plus, and team workspaces.
             </p>
+            {showAddonCatalogLink ? (
+              <p className="mt-4">
+                <Link
+                  href="/pricing/add-ons"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "inline-flex",
+                  )}
+                >
+                  Browse Add-on Catalog
+                </Link>
+              </p>
+            ) : null}
           </div>
         </div>
 

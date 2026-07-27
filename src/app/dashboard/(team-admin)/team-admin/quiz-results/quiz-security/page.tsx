@@ -111,7 +111,7 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
                     teamAdminPanelScrollClass,
                   )}
                 >
-                  Quiz security
+                  Exam Mode
                 </h1>
                 <p className="truncate text-sm text-muted-foreground" title={selected.name}>
                   {selected.name}
@@ -168,11 +168,11 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
           <CardTitle className={cn(teamAdminActivePanelTitleClass, teamAdminPanelScrollClass)}>
             <span className="inline-flex items-center gap-2">
               <Shield className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              Workspace security
+              Workspace Exam Mode
             </span>
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Turn quiz security on or off per workspace and per deck. Members on a secured quiz
+            Turn Exam Mode on or off per workspace and per deck. Members on a quiz in Exam Mode
             cannot switch tabs or leave until they submit.
           </CardDescription>
         </CardHeader>

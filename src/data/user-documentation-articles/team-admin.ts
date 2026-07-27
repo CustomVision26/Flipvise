@@ -32,7 +32,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "navigation",
         title: "Getting there",
         bullets: [
-          "Workspace switcher → To Admin Dash.",
+          "Workspace switcher → WS Admin Dash (invited) or Team Admin Dash (personal).",
           "Direct URL: /dashboard/team-admin?team=<id>&teamMemberId=<id>.",
           "Default landing redirects to Deck Manager → Assign decks to members.",
           "teamMemberId=0 means you are the subscriber owner.",
@@ -248,7 +248,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
   a(
     "quiz-results-admin",
     "Quiz Results & Policies — In-Depth Guide",
-    "Review scores and configure quiz timer, schedule, and security.",
+    "Review scores and configure quiz timer, schedule, and Exam Mode.",
     [
       {
         id: "results",
@@ -279,14 +279,14 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
       },
       {
         id: "security",
-        title: "Quiz security",
+        title: "Exam Mode",
         bullets: [
           "Workspace toggle applies to all decks unless deck overrides.",
-          "Choose Team Admin and/or Member checkboxes for whom security applies; the plan owner is always restricted when security is on.",
+          "Choose Team Admin and/or Member checkboxes for whom Exam Mode applies; the plan owner is always restricted when Exam Mode is on.",
           "Per-deck checkboxes can override the workspace audience default.",
           "Sessions can lock, complete, or terminate.",
           "Admins grant resume, restart/redo, or terminate from sessions table.",
-          "Disabling security clears active sessions for that workspace.",
+          "Disabling Exam Mode clears active sessions for that workspace.",
         ],
       },
     ],

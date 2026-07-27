@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -62,35 +68,52 @@ export function AnswerChoiceImageControl({
               …
             </div>
           ) : (
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="absolute -right-1 -top-1 h-4 w-4 rounded-full"
-              onClick={(event) => {
-                event.stopPropagation();
-                onRemove();
-              }}
-              disabled={isBusy}
-              aria-label={`Remove ${altText}`}
-            >
-              <X className="h-2.5 w-2.5" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -right-1 -top-1 h-4 w-4 rounded-full"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemove();
+                      }}
+                      disabled={isBusy}
+                      aria-label={`Remove ${altText}`}
+                    />
+                  }
+                >
+                  <X className="h-2.5 w-2.5" />
+                </TooltipTrigger>
+                <TooltipContent>Remove image</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 shrink-0 sm:h-10 sm:w-10"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isBusy}
-          aria-label={`Add ${altText}`}
-          title="Add image"
-        >
-          <ImagePlus className="h-4 w-4" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex" tabIndex={0} />}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 sm:h-10 sm:w-10"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy}
+                aria-label={`Add ${altText}`}
+              >
+                <ImagePlus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add image for this answer choice</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
       <input
         ref={fileInputRef}

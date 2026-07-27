@@ -13,6 +13,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { deleteCardAction } from "@/actions/cards";
 
 interface DeleteCardDialogProps {
@@ -31,17 +37,24 @@ export function DeleteCardDialog({ cardId, deckId }: DeleteCardDialogProps) {
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-          />
-        }
-      >
-        Delete
-      </AlertDialogTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            <AlertDialogTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                />
+              }
+            >
+              Delete
+            </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Permanently delete this card</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-base sm:text-lg">Delete this card?</AlertDialogTitle>

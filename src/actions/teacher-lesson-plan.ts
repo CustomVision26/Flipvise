@@ -47,12 +47,23 @@ import {
   weeklySchedulePromptBlock,
 } from "@/lib/lesson-plan-weekly-schedule";
 import {
+  findPersonalLessonPlanCopyForAssignedContext,
+  isAssignedDeckLessonPlanForViewer,
+  isDeckLinkedLessonPlanFrozenByAssignments,
   resolveSavedLessonPlanForViewer,
   saveLessonPlan,
+  updateAssigneePersonalLessonPlanCopyById,
   updateSavedLessonPlanById,
+  updateSavedLessonPlanIntakeById,
+  type SavedLessonPlanRow,
 } from "@/db/queries/saved-lesson-plans";
+import { areLessonPlanSnapshotsSimilar } from "@/lib/lesson-plan-similarity";
 import { createDeck, getDeckRowById } from "@/db/queries/decks";
-import { linkDeckToTeamWorkspace, resolveDeckViewerAccess } from "@/db/queries/teams";
+import {
+  getTeamById,
+  linkDeckToTeamWorkspace,
+  resolveDeckViewerAccess,
+} from "@/db/queries/teams";
 import {
   buildTeacherLessonDeckMetadata,
   resolveTeacherQuizSaveTarget,
@@ -85,6 +96,7 @@ import {
   type LessonPlanInput,
   type LessonPlanResult,
 } from "@/lib/teacher-generators";
+import { adaptLessonPlanResultToIntake } from "@/lib/adapt-lesson-plan-to-intake";
 
 const LESSON_PLAN_FIELD_LABELS: Record<string, string> = {
   subject: "Enter a subject.",
@@ -622,6 +634,27 @@ async function resolveLessonPlanDeckTarget(
   throw new Error("Select an existing deck or enter a name for a new deck.");
 }
 
+type LessonPlanSaveResult = {
+  id: number;
+  lessonTitle: string;
+  pdfUrl: string | null;
+  vocabularyDetailPdfUrl: string | null;
+  deckId: number | null;
+  sourceDeckName: string;
+  /** True when save created a personal copy instead of overwriting an assigned original. */
+  savedAsPersonalCopy: boolean;
+  /**
+   * True when an assignee personal copy already matched current input+result,
+   * so no DB overwrite was needed (navigate-away keep path).
+   */
+  skippedOverwrite?: boolean;
+};
+
+export type AdaptAssignedLessonPlanResult = LessonPlanSaveResult & {
+  input: LessonPlanInput;
+  result: LessonPlanResult;
+};
+
 async function tryUploadLessonPlanVocabularyDetailPdf(
   userId: string,
   result: LessonPlanResult,
@@ -660,6 +693,242 @@ async function tryUploadLessonPlanVocabularyDetailPdf(
     }
     return { vocabularyDetailPdfUrl: null, vocabularyDetailPdfFileName: null };
   }
+}
+
+function revalidateLessonPlanPaths() {
+  revalidatePath("/teacher/resources");
+  revalidatePath("/teacher/lesson-builder");
+  revalidatePath("/teacher/quizzes");
+  revalidatePath("/teacher/classes");
+  revalidatePath("/dashboard");
+}
+
+/**
+ * Never overwrite a deck-linked original that assignees rely on.
+ *
+ * Writes only an unlinked personal library row (`deckId` null). Prefer updating
+ * an existing personal copy (matched by sourceDeckName / subject+topic);
+ * otherwise insert a new row. The linked original remains untouched.
+ *
+ * Used for assignees always, and for creators/owners once the deck has any
+ * team assignments (frozen assigned original).
+ */
+async function upsertAssigneePersonalLessonPlanCopy(options: {
+  userId: string;
+  assignedOriginal: SavedLessonPlanRow;
+  input: LessonPlanInput;
+  result: LessonPlanResult;
+  sourceDeckName?: string | null;
+  skipIfSimilar?: boolean;
+  uploadPdfs?: boolean;
+  unitContext?: LessonPlanPdfUnitContext;
+  /**
+   * When true, the plan owner may save changes as an unlinked personal copy
+   * because the deck-linked original is frozen by team assignments.
+   */
+  allowOwnerPersonalCopy?: boolean;
+}): Promise<LessonPlanSaveResult> {
+  // Assignees must not own the original; creators use allowOwnerPersonalCopy.
+  if (
+    !options.allowOwnerPersonalCopy &&
+    options.assignedOriginal.userId === options.userId
+  ) {
+    throw new Error(
+      "Cannot create an assignee personal copy from a plan you already own.",
+    );
+  }
+
+  const sourceDeckName =
+    options.sourceDeckName !== undefined
+      ? options.sourceDeckName
+      : options.assignedOriginal.sourceDeckName;
+
+  const existingCopy = await findPersonalLessonPlanCopyForAssignedContext(
+    options.userId,
+    {
+      sourceDeckName,
+      subject: options.input.subject,
+      topic: options.input.topic,
+      sourceSubject: options.assignedOriginal.subject,
+      sourceTopic: options.assignedOriginal.topic,
+      excludePlanId: options.assignedOriginal.id,
+    },
+  );
+
+  // Regression guard: never update the assigned original or another user's row.
+  if (
+    existingCopy &&
+    (existingCopy.id === options.assignedOriginal.id ||
+      existingCopy.userId !== options.userId ||
+      existingCopy.deckId != null)
+  ) {
+    throw new Error(
+      "Refusing to overwrite the linked lesson plan; personal copy path only.",
+    );
+  }
+
+  if (
+    options.skipIfSimilar &&
+    !existingCopy &&
+    areLessonPlanSnapshotsSimilar(
+      { input: options.input, result: options.result },
+      {
+        input: options.assignedOriginal.input,
+        result: options.assignedOriginal.result,
+      },
+    )
+  ) {
+    return {
+      id: options.assignedOriginal.id,
+      lessonTitle: options.assignedOriginal.lessonTitle,
+      pdfUrl: options.assignedOriginal.pdfUrl,
+      vocabularyDetailPdfUrl: options.assignedOriginal.vocabularyDetailPdfUrl,
+      deckId: options.assignedOriginal.deckId,
+      sourceDeckName:
+        options.assignedOriginal.sourceDeckName ?? sourceDeckName ?? "Lesson plan",
+      savedAsPersonalCopy: false,
+      skippedOverwrite: true,
+    };
+  }
+
+  if (
+    existingCopy &&
+    options.skipIfSimilar &&
+    areLessonPlanSnapshotsSimilar(
+      { input: options.input, result: options.result },
+      { input: existingCopy.input, result: existingCopy.result },
+    )
+  ) {
+    return {
+      id: existingCopy.id,
+      lessonTitle: existingCopy.lessonTitle,
+      pdfUrl: existingCopy.pdfUrl,
+      vocabularyDetailPdfUrl: existingCopy.vocabularyDetailPdfUrl,
+      deckId: null,
+      sourceDeckName: existingCopy.sourceDeckName ?? sourceDeckName ?? "Lesson plan",
+      savedAsPersonalCopy: true,
+      skippedOverwrite: true,
+    };
+  }
+
+  let pdfUrl: string | null = existingCopy?.pdfUrl ?? null;
+  let pdfFileName: string | null = existingCopy?.pdfFileName ?? null;
+  let vocabularyDetailPdfUrl: string | null =
+    existingCopy?.vocabularyDetailPdfUrl ?? null;
+  let vocabularyDetailPdfFileName: string | null =
+    existingCopy?.vocabularyDetailPdfFileName ?? null;
+
+  if (options.uploadPdfs && options.unitContext) {
+    try {
+      const pdfBuffer = await generateLessonPlanPdfBuffer(
+        options.result,
+        options.unitContext,
+      );
+      pdfFileName = `${lessonPlanPdfSafeFileName(options.result.lessonTitle)}.pdf`;
+      const uploadedUrl = await uploadLessonPlanPdfBufferToS3({
+        userId: options.userId,
+        fileName: pdfFileName,
+        buffer: pdfBuffer,
+      });
+      if (
+        uploadedUrl &&
+        existingCopy?.pdfUrl &&
+        existingCopy.pdfUrl !== uploadedUrl
+      ) {
+        try {
+          await deleteFromS3(existingCopy.pdfUrl);
+        } catch {
+          // proceed even if old PDF removal fails
+        }
+      }
+      pdfUrl = uploadedUrl;
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[upsertAssigneePersonalLessonPlanCopy] PDF upload skipped or failed.",
+          error,
+        );
+      }
+    }
+
+    const vocabularyDetailPdf = await tryUploadLessonPlanVocabularyDetailPdf(
+      options.userId,
+      options.result,
+      options.unitContext,
+    );
+    if (vocabularyDetailPdf.vocabularyDetailPdfUrl) {
+      if (
+        existingCopy?.vocabularyDetailPdfUrl &&
+        existingCopy.vocabularyDetailPdfUrl !==
+          vocabularyDetailPdf.vocabularyDetailPdfUrl
+      ) {
+        try {
+          await deleteFromS3(existingCopy.vocabularyDetailPdfUrl);
+        } catch {
+          // proceed even if old vocabulary detail PDF removal fails
+        }
+      }
+      vocabularyDetailPdfUrl = vocabularyDetailPdf.vocabularyDetailPdfUrl;
+      vocabularyDetailPdfFileName =
+        vocabularyDetailPdf.vocabularyDetailPdfFileName;
+    } else if (!lessonPlanHasVocabularyDetails(options.result)) {
+      vocabularyDetailPdfUrl = null;
+      vocabularyDetailPdfFileName = null;
+    }
+  }
+
+  if (existingCopy) {
+    // Ownership + deckId-null enforced in the query helper (never mutates originals).
+    const updated = await updateAssigneePersonalLessonPlanCopyById(
+      options.userId,
+      existingCopy.id,
+      {
+        input: options.input,
+        result: options.result,
+        pdfUrl,
+        pdfFileName,
+        vocabularyDetailPdfUrl,
+        vocabularyDetailPdfFileName,
+        sourceDeckName,
+      },
+    );
+    if (!updated) {
+      throw new Error("Could not update personal lesson plan copy.");
+    }
+    return {
+      id: updated.id,
+      lessonTitle: updated.lessonTitle,
+      pdfUrl: updated.pdfUrl,
+      vocabularyDetailPdfUrl: updated.vocabularyDetailPdfUrl,
+      deckId: null,
+      sourceDeckName: updated.sourceDeckName ?? sourceDeckName ?? "Lesson plan",
+      savedAsPersonalCopy: true,
+      skippedOverwrite: false,
+    };
+  }
+
+  const saved = await saveLessonPlan({
+    userId: options.userId,
+    input: options.input,
+    result: options.result,
+    pdfUrl,
+    pdfFileName,
+    vocabularyDetailPdfUrl,
+    vocabularyDetailPdfFileName,
+    deckId: null,
+    sourceDeckName,
+  });
+
+  return {
+    id: saved.id,
+    lessonTitle: saved.lessonTitle,
+    pdfUrl: saved.pdfUrl,
+    vocabularyDetailPdfUrl: saved.vocabularyDetailPdfUrl,
+    deckId: null,
+    sourceDeckName: saved.sourceDeckName ?? sourceDeckName ?? "Lesson plan",
+    savedAsPersonalCopy: true,
+    skippedOverwrite: false,
+  };
 }
 
 /**
@@ -734,14 +1003,7 @@ export async function saveLessonPlanAction(data: {
   deckId?: number;
   newDeckName?: string;
   teamId?: number;
-}): Promise<{
-  id: number;
-  lessonTitle: string;
-  pdfUrl: string | null;
-  vocabularyDetailPdfUrl: string | null;
-  deckId: number;
-  sourceDeckName: string;
-}> {
+}): Promise<LessonPlanSaveResult> {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -812,6 +1074,7 @@ export async function saveLessonPlanAction(data: {
     vocabularyDetailPdfUrl: saved.vocabularyDetailPdfUrl,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
+    savedAsPersonalCopy: false,
   };
 }
 
@@ -825,14 +1088,7 @@ export async function updateLessonPlanAction(data: {
   result: LessonPlanResult;
   deckId?: number;
   teamId?: number;
-}): Promise<{
-  id: number;
-  lessonTitle: string;
-  pdfUrl: string | null;
-  vocabularyDetailPdfUrl: string | null;
-  deckId: number;
-  sourceDeckName: string;
-}> {
+}): Promise<LessonPlanSaveResult> {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -853,18 +1109,77 @@ export async function updateLessonPlanAction(data: {
     throw new Error("Lesson plan not found.");
   }
 
-  const deckTarget = await resolveLessonPlanDeckTarget(userId, parsed.data);
-
-  let pdfUrl: string | null = existing.pdfUrl;
-  let pdfFileName: string | null = existing.pdfFileName;
-  let vocabularyDetailPdfUrl: string | null = existing.vocabularyDetailPdfUrl;
-  let vocabularyDetailPdfFileName: string | null = existing.vocabularyDetailPdfFileName;
   const unitContext: LessonPlanPdfUnitContext = {
     planPeriodDays: clampPlanPeriodDays(
       parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
     ),
     lessonDuration: parsed.data.input.lessonDuration,
   };
+
+  const isAssignedOriginal = await isAssignedDeckLessonPlanForViewer(
+    userId,
+    existing,
+    parsed.data.teamId,
+  );
+
+  // Copy-on-write: assignees editing an assigned-deck original save a personal
+  // library row. Original keeps deckId; personal copy stays unlinked (deckId null).
+  // Reuse an existing personal copy for the same deck/context when present.
+  if (isAssignedOriginal) {
+    const saved = await upsertAssigneePersonalLessonPlanCopy({
+      userId,
+      assignedOriginal: existing,
+      input: parsed.data.input,
+      result: parsed.data.result,
+      sourceDeckName: existing.sourceDeckName,
+      uploadPdfs: true,
+      unitContext,
+    });
+    revalidateLessonPlanPaths();
+    return saved;
+  }
+
+  const team =
+    parsed.data.teamId != null ? await getTeamById(parsed.data.teamId) : null;
+  const isWorkspaceOwner = team != null && team.ownerUserId === userId;
+  if (existing.userId !== userId && !isWorkspaceOwner) {
+    throw new Error("You can only update your own lesson plans.");
+  }
+
+  // Once the deck is assigned, the linked original stays frozen for assignees —
+  // creator/owner edits save as an unlinked personal copy instead.
+  if (await isDeckLinkedLessonPlanFrozenByAssignments(existing)) {
+    const saved = await upsertAssigneePersonalLessonPlanCopy({
+      userId,
+      assignedOriginal: existing,
+      input: parsed.data.input,
+      result: parsed.data.result,
+      sourceDeckName: existing.sourceDeckName,
+      uploadPdfs: true,
+      unitContext,
+      allowOwnerPersonalCopy: true,
+    });
+    revalidateLessonPlanPaths();
+    return saved;
+  }
+
+  // Personal copies (and any unlinked plan) keep deckId null so they never steal
+  // the assigned deck's original lesson-plan link.
+  const deckTarget =
+    existing.deckId == null
+      ? {
+          deckId: null as number | null,
+          sourceDeckName: existing.sourceDeckName ?? "Lesson plan",
+        }
+      : await resolveLessonPlanDeckTarget(userId, {
+          ...parsed.data,
+          deckId: parsed.data.deckId ?? existing.deckId,
+        });
+
+  let pdfUrl: string | null = existing.pdfUrl;
+  let pdfFileName: string | null = existing.pdfFileName;
+  let vocabularyDetailPdfUrl: string | null = existing.vocabularyDetailPdfUrl;
+  let vocabularyDetailPdfFileName: string | null = existing.vocabularyDetailPdfFileName;
 
   try {
     const pdfBuffer = await generateLessonPlanPdfBuffer(parsed.data.result, unitContext);
@@ -929,11 +1244,7 @@ export async function updateLessonPlanAction(data: {
     throw new Error("Could not update lesson plan.");
   }
 
-  revalidatePath("/teacher/resources");
-  revalidatePath("/teacher/lesson-builder");
-  revalidatePath("/teacher/quizzes");
-  revalidatePath("/teacher/classes");
-  revalidatePath("/dashboard");
+  revalidateLessonPlanPaths();
 
   return {
     id: updated.id,
@@ -942,5 +1253,443 @@ export async function updateLessonPlanAction(data: {
     vocabularyDetailPdfUrl: updated.vocabularyDetailPdfUrl,
     deckId: deckTarget.deckId,
     sourceDeckName: deckTarget.sourceDeckName,
+    savedAsPersonalCopy: false,
+  };
+}
+
+const updateLessonPlanIntakeSchema = z.object({
+  lessonPlanId: z.number().int().positive(),
+  input: lessonPlanInputSchema,
+  teamId: z.number().int().positive().optional(),
+  sourceDeckName: z.string().max(255).nullable().optional(),
+});
+
+/**
+ * Keep the generated lesson plan as-is; only persist updated intake
+ * (e.g. after Edit deck → Lesson Builder sync). Prefer keepLessonPlanOnExitAction
+ * when leaving edit mode so both intake and preview are persisted.
+ */
+export async function updateLessonPlanIntakeAction(data: {
+  lessonPlanId: number;
+  input: LessonPlanInput;
+  teamId?: number;
+  sourceDeckName?: string | null;
+}): Promise<LessonPlanSaveResult> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+
+  const parsed = updateLessonPlanIntakeSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid lesson plan intake data");
+  }
+
+  const existing = await resolveSavedLessonPlanForViewer(
+    userId,
+    parsed.data.lessonPlanId,
+    parsed.data.teamId,
+  );
+  if (!existing) {
+    throw new Error("Lesson plan not found.");
+  }
+
+  const isAssignedOriginal = await isAssignedDeckLessonPlanForViewer(
+    userId,
+    existing,
+    parsed.data.teamId,
+  );
+
+  // Assignees cannot mutate the original — personal copy with same result.
+  if (isAssignedOriginal) {
+    const saved = await upsertAssigneePersonalLessonPlanCopy({
+      userId,
+      assignedOriginal: existing,
+      input: parsed.data.input,
+      result: existing.result,
+      sourceDeckName:
+        parsed.data.sourceDeckName !== undefined
+          ? parsed.data.sourceDeckName
+          : existing.sourceDeckName,
+      skipIfSimilar: true,
+      uploadPdfs: false,
+    });
+    revalidateLessonPlanPaths();
+    return saved;
+  }
+
+  if (existing.userId !== userId) {
+    throw new Error("Forbidden");
+  }
+
+  if (await isDeckLinkedLessonPlanFrozenByAssignments(existing)) {
+    const saved = await upsertAssigneePersonalLessonPlanCopy({
+      userId,
+      assignedOriginal: existing,
+      input: parsed.data.input,
+      result: existing.result,
+      sourceDeckName:
+        parsed.data.sourceDeckName !== undefined
+          ? parsed.data.sourceDeckName
+          : existing.sourceDeckName,
+      skipIfSimilar: true,
+      uploadPdfs: false,
+      allowOwnerPersonalCopy: true,
+    });
+    revalidateLessonPlanPaths();
+    return saved;
+  }
+
+  const updated = await updateSavedLessonPlanIntakeById(existing.id, {
+    input: parsed.data.input,
+    sourceDeckName: parsed.data.sourceDeckName,
+  });
+
+  if (!updated) {
+    throw new Error("Could not update lesson plan intake.");
+  }
+
+  revalidateLessonPlanPaths();
+
+  return {
+    id: updated.id,
+    lessonTitle: updated.lessonTitle,
+    pdfUrl: updated.pdfUrl,
+    vocabularyDetailPdfUrl: updated.vocabularyDetailPdfUrl,
+    deckId: updated.deckId,
+    sourceDeckName: updated.sourceDeckName ?? "Lesson plan",
+    savedAsPersonalCopy: false,
+  };
+}
+
+const keepLessonPlanOnExitSchema = z.object({
+  lessonPlanId: z.number().int().positive(),
+  input: lessonPlanInputSchema,
+  result: lessonPlanResultSchema,
+  teamId: z.number().int().positive().optional(),
+  sourceDeckName: z.string().max(255).nullable().optional(),
+});
+
+/**
+ * Edit-mode navigate-away "keep current lesson plan":
+ * persist current Input + current Preview without running AI generate.
+ * - Creator (deck not assigned): overwrite own plan
+ * - Creator (deck assigned to anyone): personal copy — linked original stays frozen
+ * - Assignee on assigned original: personal copy (reuse existing when present)
+ * - Assignee personal copy already similar: skip overwrite
+ */
+export async function keepLessonPlanOnExitAction(data: {
+  lessonPlanId: number;
+  input: LessonPlanInput;
+  result: LessonPlanResult;
+  teamId?: number;
+  sourceDeckName?: string | null;
+}): Promise<LessonPlanSaveResult> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+
+  const parsed = keepLessonPlanOnExitSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Invalid lesson plan data");
+  }
+
+  const existing = await resolveSavedLessonPlanForViewer(
+    userId,
+    parsed.data.lessonPlanId,
+    parsed.data.teamId,
+  );
+  if (!existing) {
+    throw new Error("Lesson plan not found.");
+  }
+
+  const unitContext: LessonPlanPdfUnitContext = {
+    planPeriodDays: clampPlanPeriodDays(
+      parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+    ),
+    lessonDuration: parsed.data.input.lessonDuration,
+  };
+
+  const isAssignedOriginal = await isAssignedDeckLessonPlanForViewer(
+    userId,
+    existing,
+    parsed.data.teamId,
+  );
+
+  if (isAssignedOriginal) {
+    const saved = await upsertAssigneePersonalLessonPlanCopy({
+      userId,
+      assignedOriginal: existing,
+      input: parsed.data.input,
+      result: parsed.data.result,
+      sourceDeckName:
+        parsed.data.sourceDeckName !== undefined
+          ? parsed.data.sourceDeckName
+          : existing.sourceDeckName,
+      skipIfSimilar: true,
+      uploadPdfs: true,
+      unitContext,
+    });
+    revalidateLessonPlanPaths();
+    return saved;
+  }
+
+  if (existing.userId !== userId) {
+    throw new Error("You can only update your own lesson plans.");
+  }
+
+  if (await isDeckLinkedLessonPlanFrozenByAssignments(existing)) {
+    const saved = await upsertAssigneePersonalLessonPlanCopy({
+      userId,
+      assignedOriginal: existing,
+      input: parsed.data.input,
+      result: parsed.data.result,
+      sourceDeckName:
+        parsed.data.sourceDeckName !== undefined
+          ? parsed.data.sourceDeckName
+          : existing.sourceDeckName,
+      skipIfSimilar: true,
+      uploadPdfs: true,
+      unitContext,
+      allowOwnerPersonalCopy: true,
+    });
+    revalidateLessonPlanPaths();
+    return saved;
+  }
+
+  // Personal copy already matches — allow leave without a needless write.
+  const isPersonalCopy =
+    existing.deckId == null && Boolean(existing.sourceDeckName?.trim());
+  if (
+    isPersonalCopy &&
+    areLessonPlanSnapshotsSimilar(
+      { input: parsed.data.input, result: parsed.data.result },
+      { input: existing.input, result: existing.result },
+    )
+  ) {
+    return {
+      id: existing.id,
+      lessonTitle: existing.lessonTitle,
+      pdfUrl: existing.pdfUrl,
+      vocabularyDetailPdfUrl: existing.vocabularyDetailPdfUrl,
+      deckId: existing.deckId,
+      sourceDeckName: existing.sourceDeckName ?? "Lesson plan",
+      savedAsPersonalCopy: false,
+      skippedOverwrite: true,
+    };
+  }
+
+  // Creators (and non-personal own plans): always persist input + preview.
+  // Personal copies that are not similar: overwrite the personal row.
+  const deckTarget =
+    existing.deckId == null
+      ? {
+          deckId: null as number | null,
+          sourceDeckName:
+            parsed.data.sourceDeckName !== undefined
+              ? parsed.data.sourceDeckName
+              : (existing.sourceDeckName ?? "Lesson plan"),
+        }
+      : await resolveLessonPlanDeckTarget(userId, {
+          ...parsed.data,
+          deckId: existing.deckId,
+        });
+
+  let pdfUrl: string | null = existing.pdfUrl;
+  let pdfFileName: string | null = existing.pdfFileName;
+  let vocabularyDetailPdfUrl: string | null = existing.vocabularyDetailPdfUrl;
+  let vocabularyDetailPdfFileName: string | null =
+    existing.vocabularyDetailPdfFileName;
+
+  try {
+    const pdfBuffer = await generateLessonPlanPdfBuffer(
+      parsed.data.result,
+      unitContext,
+    );
+    pdfFileName = `${lessonPlanPdfSafeFileName(parsed.data.result.lessonTitle)}.pdf`;
+    const uploadedUrl = await uploadLessonPlanPdfBufferToS3({
+      userId: existing.userId,
+      fileName: pdfFileName,
+      buffer: pdfBuffer,
+    });
+    if (uploadedUrl && existing.pdfUrl && existing.pdfUrl !== uploadedUrl) {
+      try {
+        await deleteFromS3(existing.pdfUrl);
+      } catch {
+        // proceed even if old PDF removal fails
+      }
+    }
+    pdfUrl = uploadedUrl;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[keepLessonPlanOnExitAction] PDF upload skipped or failed; keeping prior PDF if any.",
+        error,
+      );
+    }
+  }
+
+  const vocabularyDetailPdf = await tryUploadLessonPlanVocabularyDetailPdf(
+    existing.userId,
+    parsed.data.result,
+    unitContext,
+  );
+  if (vocabularyDetailPdf.vocabularyDetailPdfUrl) {
+    if (
+      existing.vocabularyDetailPdfUrl &&
+      existing.vocabularyDetailPdfUrl !== vocabularyDetailPdf.vocabularyDetailPdfUrl
+    ) {
+      try {
+        await deleteFromS3(existing.vocabularyDetailPdfUrl);
+      } catch {
+        // proceed even if old vocabulary detail PDF removal fails
+      }
+    }
+    vocabularyDetailPdfUrl = vocabularyDetailPdf.vocabularyDetailPdfUrl;
+    vocabularyDetailPdfFileName = vocabularyDetailPdf.vocabularyDetailPdfFileName;
+  } else if (!lessonPlanHasVocabularyDetails(parsed.data.result)) {
+    vocabularyDetailPdfUrl = null;
+    vocabularyDetailPdfFileName = null;
+  }
+
+  const updated = await updateSavedLessonPlanById(parsed.data.lessonPlanId, {
+    input: parsed.data.input,
+    result: parsed.data.result,
+    pdfUrl,
+    pdfFileName,
+    vocabularyDetailPdfUrl,
+    vocabularyDetailPdfFileName,
+    deckId: deckTarget.deckId,
+    sourceDeckName: deckTarget.sourceDeckName,
+  });
+
+  if (!updated) {
+    throw new Error("Could not save lesson plan.");
+  }
+
+  revalidateLessonPlanPaths();
+
+  return {
+    id: updated.id,
+    lessonTitle: updated.lessonTitle,
+    pdfUrl: updated.pdfUrl,
+    vocabularyDetailPdfUrl: updated.vocabularyDetailPdfUrl,
+    deckId: deckTarget.deckId,
+    sourceDeckName: deckTarget.sourceDeckName ?? "Lesson plan",
+    savedAsPersonalCopy: false,
+    skippedOverwrite: false,
+  };
+}
+
+const adaptAssignedLessonPlanSchema = z.object({
+  lessonPlanId: z.number().int().positive(),
+  input: lessonPlanInputSchema,
+  teamId: z.number().int().positive().optional(),
+  sourceDeckName: z.string().max(255).nullable().optional(),
+});
+
+/**
+ * Assignee-only: create a personal lesson plan from the creator's deck-linked
+ * plan, adapted to the assignee's current intake (no AI generation).
+ *
+ * Content source is always the assigned/original creator plan (`deckId` linked),
+ * never a previously edited personal draft. The original row is never mutated —
+ * only the assignee's personal copy is inserted or updated.
+ */
+export async function adaptAssignedLessonPlanToIntakeAction(data: {
+  lessonPlanId: number;
+  input: LessonPlanInput;
+  teamId?: number;
+  sourceDeckName?: string | null;
+}): Promise<AdaptAssignedLessonPlanResult> {
+  const ctx = await getAccessContext();
+  const { userId } = await requireTeacherToolsAccess(
+    ctx,
+    "Lesson Builder requires an education plan.",
+  );
+
+  const parsed = adaptAssignedLessonPlanSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error(lessonPlanValidationError(parsed.error));
+  }
+
+  const existing = await resolveSavedLessonPlanForViewer(
+    userId,
+    parsed.data.lessonPlanId,
+    parsed.data.teamId,
+  );
+  if (!existing) {
+    throw new Error("Lesson plan not found.");
+  }
+
+  const isAssignedOriginal = await isAssignedDeckLessonPlanForViewer(
+    userId,
+    existing,
+    parsed.data.teamId,
+  );
+  if (!isAssignedOriginal) {
+    throw new Error(
+      "Creating a lesson plan from the linked plan is only available for assigned-deck originals.",
+    );
+  }
+
+  // Authoritative content source: creator's deck-linked plan (not a personal draft).
+  // isAssignedDeckLessonPlanForViewer already requires existing.userId !== assignee
+  // and a non-null deckId on an assigned deck.
+  const creatorLinkedPlan = existing;
+  if (
+    creatorLinkedPlan.userId === userId ||
+    creatorLinkedPlan.deckId == null
+  ) {
+    throw new Error(
+      "Linked lesson plan source is invalid for assignee personal-copy creation.",
+    );
+  }
+
+  // Full assignee intake (topic/subject/grade/duration/period/difficulty/
+  // learningStandard/classSize/specialInstructions) drives deterministic adapt.
+  const adaptedResult = adaptLessonPlanResultToIntake(
+    creatorLinkedPlan.result,
+    creatorLinkedPlan.input,
+    parsed.data.input,
+  );
+
+  const unitContext: LessonPlanPdfUnitContext = {
+    planPeriodDays: clampPlanPeriodDays(
+      parsed.data.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+    ),
+    lessonDuration: parsed.data.input.lessonDuration,
+  };
+
+  const saved = await upsertAssigneePersonalLessonPlanCopy({
+    userId,
+    assignedOriginal: creatorLinkedPlan,
+    input: parsed.data.input,
+    result: adaptedResult,
+    sourceDeckName:
+      parsed.data.sourceDeckName !== undefined
+        ? parsed.data.sourceDeckName
+        : creatorLinkedPlan.sourceDeckName,
+    skipIfSimilar: false,
+    uploadPdfs: true,
+    unitContext,
+  });
+
+  // Post-condition: personal copy must not be the original deck-linked row.
+  if (saved.id === creatorLinkedPlan.id || saved.deckId != null) {
+    throw new Error(
+      "Personal copy save unexpectedly targeted the linked lesson plan.",
+    );
+  }
+
+  revalidateLessonPlanPaths();
+
+  return {
+    ...saved,
+    input: parsed.data.input,
+    result: adaptedResult,
   };
 }

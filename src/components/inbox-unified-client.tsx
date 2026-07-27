@@ -60,6 +60,7 @@ import {
   normalizeBroadcastDetailsForDisplay,
   normalizeBroadcastMessageForDisplay,
 } from "@/lib/affiliate-broadcast-messaging";
+import { formatTeamInviteInboxMetaLine } from "@/lib/team-invite-message-copy";
 const INBOX_PAGE_SIZE = 5;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -650,11 +651,11 @@ function InboxItemRow({
               </p>
               {item.type === "team_invite" && item.payload.outcome === "needs_response" && (
                 <p className="text-xs text-muted-foreground">
-                  From <span className="text-foreground">{item.payload.inviterName}</span> ·{" "}
-                  Role:{" "}
-                  <span className="text-foreground capitalize">
-                    {item.payload.role === "team_admin" ? "Team Admin" : "Member"}
-                  </span>
+                  {formatTeamInviteInboxMetaLine({
+                    role: item.payload.role,
+                    ownerName: item.payload.ownerName,
+                    inviterName: item.payload.inviterName,
+                  })}
                 </p>
               )}
             </div>
@@ -664,8 +665,11 @@ function InboxItemRow({
             item.type === "team_invite" &&
             item.payload.outcome === "needs_response" && (
             <p className="text-xs text-muted-foreground">
-              From <span className="text-foreground">{item.payload.inviterName}</span> ·{" "}
-              Role: <span className="text-foreground capitalize">{item.payload.role === "team_admin" ? "Team Admin" : "Member"}</span>
+              {formatTeamInviteInboxMetaLine({
+                role: item.payload.role,
+                ownerName: item.payload.ownerName,
+                inviterName: item.payload.inviterName,
+              })}
             </p>
           )}
         </div>

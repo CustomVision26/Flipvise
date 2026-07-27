@@ -1,6 +1,10 @@
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import {
+  basePlanPriceIdFromSubscription,
+  isStripeAddonSubscriptionItem,
+} from "@/lib/stripe-addon-metadata";
 
 export type CancelSubscriptionPreview = {
   planLabel: string;
@@ -9,8 +13,17 @@ export type CancelSubscriptionPreview = {
   cancelAtPeriodEnd: boolean;
 };
 
+function basePlanSubscriptionItem(
+  sub: Stripe.Subscription,
+): Stripe.SubscriptionItem | null {
+  for (const item of sub.items.data) {
+    if (!isStripeAddonSubscriptionItem(item)) return item;
+  }
+  return sub.items.data[0] ?? null;
+}
+
 function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
-  const item = sub.items.data[0];
+  const item = basePlanSubscriptionItem(sub);
   if (!item) return null;
   const itemAny = item as Stripe.SubscriptionItem & {
     current_period_end?: number;
@@ -24,9 +37,12 @@ function subscriptionPeriodEnd(sub: Stripe.Subscription): Date | null {
 function billingIntervalFromSubscription(
   sub: Stripe.Subscription,
 ): "month" | "year" | null {
-  const price = sub.items.data[0]?.price;
+  const item = basePlanSubscriptionItem(sub);
+  const price = item?.price;
   const interval = price?.recurring?.interval;
   if (interval === "month" || interval === "year") return interval;
+  // Fallback: look up via base plan price id when expanded price is missing.
+  void basePlanPriceIdFromSubscription(sub);
   return null;
 }
 

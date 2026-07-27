@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -161,17 +167,26 @@ export function AiRecallDrawingPad({
         <p className="text-[11px] text-muted-foreground">
           Draw your answer — diagrams, equations, or short written words.
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          onClick={clearCanvas}
-          disabled={disabled || !hasInk}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          Clear
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex" tabIndex={0} />}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={clearCanvas}
+                disabled={disabled || !hasInk}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Clear the drawing canvas</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );

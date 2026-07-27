@@ -67,7 +67,12 @@ import {
   Shuffle,
 } from "lucide-react";
 import { shuffleDeckQuizCardOrdersAction } from "@/actions/quiz-card-orders";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   submitQuizResultAction,
   saveQuizResultAction,
@@ -75,6 +80,7 @@ import {
 } from "@/actions/study";
 import {
   completeQuizSecuritySessionAction,
+  getQuizSecurityAccessStatusAction,
   lockQuizSecuritySessionAction,
   startQuizSecuritySessionAction,
 } from "@/actions/quiz-security";
@@ -316,10 +322,11 @@ export function QuizStudy({
   const securedEducationSave = securedEducationInboxTargets != null;
   const shouldAutoSaveResult = autoSaveQuizResult || securityEnabled;
   const initialSession = quizSecurity?.initialSession ?? null;
-  const restoredState =
+  const initialRestoredState =
     initialSession?.sessionState &&
     (initialSession.status === "active" ||
-      (initialSession.status === "granted_resume" && initialSession.sessionState != null))
+      (initialSession.status === "granted_resume" &&
+        initialSession.sessionState != null))
       ? initialSession.sessionState
       : null;
 
@@ -344,21 +351,23 @@ export function QuizStudy({
   );
 
   const [questions, setQuestions] = useState<QuizQuestion[]>(() =>
-    restoredState
-      ? questionsFromSessionState(restoredState)
+    initialRestoredState
+      ? questionsFromSessionState(initialRestoredState)
       : buildQuestions(),
   );
-  const [currentIndex, setCurrentIndex] = useState(() => restoredState?.currentIndex ?? 0);
+  const [currentIndex, setCurrentIndex] = useState(
+    () => initialRestoredState?.currentIndex ?? 0,
+  );
   const [selectedByIndex, setSelectedByIndex] = useState<(number | null)[]>(() =>
-    restoredState
-      ? restoredState.selectedByIndex
+    initialRestoredState
+      ? initialRestoredState.selectedByIndex
       : Array(buildQuestions().length).fill(null),
   );
   const [typedAnswersByIndex, setTypedAnswersByIndex] = useState<(string | null)[]>(() => {
-    if (restoredState) {
+    if (initialRestoredState) {
       return (
-        restoredState.typedAnswersByIndex ??
-        Array(restoredState.questions.length).fill(null)
+        initialRestoredState.typedAnswersByIndex ??
+        Array(initialRestoredState.questions.length).fill(null)
       );
     }
     return Array(buildQuestions().length).fill(null);
@@ -370,7 +379,7 @@ export function QuizStudy({
     [quizDurationSeconds, questions.length],
   );
   const [remainingSeconds, setRemainingSeconds] = useState(
-    () => restoredState?.remainingSeconds ?? totalSeconds,
+    () => initialRestoredState?.remainingSeconds ?? totalSeconds,
   );
   const startTimeRef = useRef<number>(0);
   // Always show the Timed quiz intro first; never auto-skip into an in-progress session.
@@ -383,49 +392,153 @@ export function QuizStudy({
   const [securityStatus, setSecurityStatus] = useState<QuizSecurityStatus | null>(
     () => initialSession?.status ?? null,
   );
+  /** Session payload from props or a fresh “Check for access” poll. */
+  const [securitySessionState, setSecuritySessionState] =
+    useState<QuizSecuritySessionState | null>(
+      () => initialSession?.sessionState ?? null,
+    );
   const [securityLocking, setSecurityLocking] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(false);
+  const [accessCheckMessage, setAccessCheckMessage] = useState<string | null>(null);
   const lockingRef = useRef(false);
   /** Owner/admin leave via Dashboard — skip security lock on intentional leave. */
   const skipSecurityLockOnExitRef = useRef(false);
 
+  useEffect(() => {
+    if (!initialSession) return;
+    setSecuritySessionId(initialSession.id);
+    setSecurityStatus(initialSession.status);
+    setSecuritySessionState(initialSession.sessionState ?? null);
+    if (initialSession.status === "granted_resume") {
+      setReturnedToLobby(false);
+      setAccessCheckMessage(null);
+    }
+  }, [
+    initialSession?.id,
+    initialSession?.status,
+    initialSession?.sessionState,
+  ]);
+
+  const effectiveSecurityStatus = securityStatus ?? initialSession?.status ?? null;
+  const effectiveSessionState =
+    securitySessionState ?? initialSession?.sessionState ?? null;
+
+  const restoredState = useMemo(() => {
+    if (!effectiveSessionState) return null;
+    if (
+      effectiveSecurityStatus === "active" ||
+      effectiveSecurityStatus === "granted_resume"
+    ) {
+      return effectiveSessionState;
+    }
+    return null;
+  }, [effectiveSecurityStatus, effectiveSessionState]);
+
   const grantedFreshStart = useMemo(
     () =>
       securityEnabled &&
-      (securityStatus === "granted_resume" || initialSession?.status === "granted_resume") &&
+      effectiveSecurityStatus === "granted_resume" &&
       restoredState == null &&
       !returnedToLobby,
-    [securityEnabled, securityStatus, initialSession?.status, restoredState, returnedToLobby],
+    [
+      securityEnabled,
+      effectiveSecurityStatus,
+      restoredState,
+      returnedToLobby,
+    ],
   );
   const grantedResume = useMemo(() => {
     if (returnedToLobby) return true;
     if (!securityEnabled || restoredState == null) return false;
-    const status = securityStatus ?? initialSession?.status;
-    return status === "granted_resume" || status === "active";
+    return (
+      effectiveSecurityStatus === "granted_resume" ||
+      effectiveSecurityStatus === "active"
+    );
   }, [
     returnedToLobby,
     securityEnabled,
-    securityStatus,
-    initialSession?.status,
+    effectiveSecurityStatus,
     restoredState,
   ]);
   const isSecurityTerminated = useMemo(
-    () =>
-      securityEnabled &&
-      (securityStatus === "terminated" || initialSession?.status === "terminated"),
-    [securityEnabled, securityStatus, initialSession?.status],
+    () => securityEnabled && effectiveSecurityStatus === "terminated",
+    [securityEnabled, effectiveSecurityStatus],
   );
   const isSecurityCompleted = useMemo(
-    () =>
-      securityEnabled &&
-      (securityStatus === "completed" || initialSession?.status === "completed"),
-    [securityEnabled, securityStatus, initialSession?.status],
+    () => securityEnabled && effectiveSecurityStatus === "completed",
+    [securityEnabled, effectiveSecurityStatus],
   );
   const isSecurityLocked = useMemo(
-    () =>
-      securityEnabled &&
-      (securityStatus === "locked" || initialSession?.status === "locked"),
-    [securityEnabled, securityStatus, initialSession?.status],
+    () => securityEnabled && effectiveSecurityStatus === "locked",
+    [securityEnabled, effectiveSecurityStatus],
   );
+
+  /** When admin grants resume/restart, hydrate lobby state from the polled session. */
+  useEffect(() => {
+    if (quizStarted) return;
+    if (
+      effectiveSecurityStatus !== "granted_resume" &&
+      effectiveSecurityStatus !== "active"
+    ) {
+      return;
+    }
+    if (!effectiveSessionState) return;
+    setQuestions(questionsFromSessionState(effectiveSessionState));
+    setCurrentIndex(effectiveSessionState.currentIndex);
+    setSelectedByIndex(effectiveSessionState.selectedByIndex);
+    setTypedAnswersByIndex(
+      effectiveSessionState.typedAnswersByIndex ??
+        Array(effectiveSessionState.questions.length).fill(null),
+    );
+    setRemainingSeconds(effectiveSessionState.remainingSeconds);
+  }, [quizStarted, effectiveSecurityStatus, effectiveSessionState]);
+
+  const handleCheckAccess = useCallback(async () => {
+    if (!quizSecurity || checkingAccess) return;
+    setCheckingAccess(true);
+    setAccessCheckMessage(null);
+    try {
+      const latest = await getQuizSecurityAccessStatusAction({
+        teamId: quizSecurity.teamId,
+        deckId,
+      });
+      if (!latest) {
+        setAccessCheckMessage("No Exam Mode session found. Try again later.");
+        return;
+      }
+      setSecuritySessionId(latest.id);
+      setSecurityStatus(latest.status);
+      setSecuritySessionState(latest.sessionState);
+      if (latest.status === "granted_resume") {
+        setReturnedToLobby(false);
+        setAccessCheckMessage(
+          latest.sessionState
+            ? "Access restored — you can resume your quiz."
+            : "Access restored — you can start over.",
+        );
+      } else if (latest.status === "locked") {
+        setAccessCheckMessage(
+          "Still locked. Ask your team admin to grant Continue.",
+        );
+      } else if (latest.status === "terminated") {
+        setAccessCheckMessage(
+          "Still terminated. Ask your team admin to grant Start over.",
+        );
+      } else if (latest.status === "completed") {
+        setAccessCheckMessage("This quiz is already completed.");
+      } else {
+        setAccessCheckMessage(null);
+      }
+      router.refresh();
+    } catch (err) {
+      setAccessCheckMessage(
+        err instanceof Error ? err.message : "Could not check access. Try again.",
+      );
+    } finally {
+      setCheckingAccess(false);
+    }
+  }, [quizSecurity, checkingAccess, deckId, router]);
+
   const canStartSecuredQuiz = useMemo(
     () =>
       !securityEnabled ||
@@ -852,7 +965,7 @@ export function QuizStudy({
           setSecurityStatus(session.status);
         }
       } catch (err) {
-        setSubmitError(err instanceof Error ? err.message : "Could not start secured quiz");
+        setSubmitError(err instanceof Error ? err.message : "Could not start Exam Mode quiz");
         return;
       }
     }
@@ -1107,16 +1220,44 @@ export function QuizStudy({
                 : "You already finished this quiz. Retakes are not allowed for this deck."}
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            {isTerminated ? (
-              <Button variant="secondary" onClick={() => router.refresh()}>
-                Check for access
-              </Button>
+          <CardFooter className="flex flex-col gap-3">
+            {accessCheckMessage ? (
+              <p className="text-center text-xs text-muted-foreground" role="status">
+                {accessCheckMessage}
+              </p>
             ) : null}
-            <Button variant="outline" onClick={leaveStudy}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {exitLabel}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+              {isTerminated ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="inline-flex" />}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={checkingAccess}
+                        onClick={() => void handleCheckAccess()}
+                      >
+                        {checkingAccess ? "Checking…" : "Check for access"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Check whether your team admin restored Exam Mode access
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : null}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button type="button" variant="outline" onClick={leaveStudy}>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      {exitLabel}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Leave quiz and return</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </CardFooter>
         </Card>
       </div>
@@ -1135,14 +1276,42 @@ export function QuizStudy({
               {securityLocking ? " Saving your progress…" : null}
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Button variant="secondary" onClick={() => router.refresh()}>
-              Check for access
-            </Button>
-            <Button variant="outline" onClick={leaveStudy}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {exitLabel}
-            </Button>
+          <CardFooter className="flex flex-col gap-3">
+            {accessCheckMessage ? (
+              <p className="text-center text-xs text-muted-foreground" role="status">
+                {accessCheckMessage}
+              </p>
+            ) : null}
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={checkingAccess}
+                      onClick={() => void handleCheckAccess()}
+                    >
+                      {checkingAccess ? "Checking…" : "Check for access"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Check whether your team admin restored Exam Mode access
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button type="button" variant="outline" onClick={leaveStudy}>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      {exitLabel}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Leave quiz and return</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </CardFooter>
         </Card>
       </div>
@@ -1157,15 +1326,24 @@ export function QuizStudy({
             Quiz mode needs cards with a text answer. Add a few cards with a
             written back, or generate multiple-choice cards, then come back.
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="self-center gap-2"
-            onClick={leaveStudy}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {exitLabel}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="self-center gap-2"
+                    onClick={leaveStudy}
+                  />
+                }
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {exitLabel}
+              </TooltipTrigger>
+              <TooltipContent>Leave quiz and return</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
     );
@@ -1177,26 +1355,28 @@ export function QuizStudy({
       >
         <Card className="relative w-full max-w-lg shadow-md">
           {securityEnabled ? (
-            <Tooltip>
-              <TooltipTrigger
-                type="button"
-                className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-1 text-emerald-400"
-                aria-label="Quiz security is on for members"
-              >
-                <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
-                </span>
-                <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span className="text-[11px] font-medium leading-none tracking-wide">
-                  Security on
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="left" className="max-w-xs text-left">
-                Quiz security is on for normal members. Stay on this tab until you submit — leaving
-                will lock your session.
-              </TooltipContent>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  type="button"
+                  className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-1 text-emerald-400"
+                  aria-label="Exam Mode is on for members"
+                >
+                  <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+                  </span>
+                  <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="text-[11px] font-medium leading-none tracking-wide">
+                    Exam Mode on
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="max-w-xs text-left">
+                  Exam Mode is on for members. Stay on this tab until you submit — leaving will lock
+                  your session.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : null}
           <CardHeader className="text-center">
             <div
@@ -1293,7 +1473,7 @@ export function QuizStudy({
             ) : null}
             {securityEnabled ? (
               <p className="text-xs text-amber-400/90">
-                Quiz security is on. Stay on this tab until you submit — leaving will lock your
+                Exam Mode is on. Stay on this tab until you submit — leaving will lock your
                 session.
               </p>
             ) : null}
@@ -1321,22 +1501,37 @@ export function QuizStudy({
           </CardContent>
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
             {canStartQuiz ? (
-              <Button
-                size="default"
-                className={cn(
-                  "w-full gap-2 sm:w-auto sm:min-w-40",
-                  deckAccent.hasDeckAccent &&
-                    "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-                )}
-                onClick={handleStartQuiz}
-              >
-                <Play className="h-4 w-4" />
-                {grantedResume
-                  ? "Resume quiz"
-                  : grantedFreshStart
-                    ? "Start over"
-                    : "Start quiz"}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="default"
+                        className={cn(
+                          "w-full gap-2 sm:w-auto sm:min-w-40",
+                          deckAccent.hasDeckAccent &&
+                            "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+                        )}
+                        onClick={handleStartQuiz}
+                      />
+                    }
+                  >
+                    <Play className="h-4 w-4" />
+                    {grantedResume
+                      ? "Resume quiz"
+                      : grantedFreshStart
+                        ? "Start over"
+                        : "Start quiz"}
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {grantedResume
+                      ? "Continue your in-progress quiz"
+                      : grantedFreshStart
+                        ? "Start this quiz over from the beginning"
+                        : "Begin the timed quiz"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : null}
             {quizFormatEditorSnapshot ? (
               <FormatQuizQuestionButton
@@ -1349,31 +1544,51 @@ export function QuizStudy({
               />
             ) : null}
             {canReshuffleCardOrder && (quizSecurity?.teamId ?? teamId) != null ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="default"
-                className="w-full gap-2 sm:w-auto"
-                disabled={cardOrderReshuffling || quizStarted}
-                onClick={() => void handleReshuffleCardOrder()}
-              >
-                <Shuffle className="h-4 w-4" />
-                {cardOrderReshuffling
-                  ? "Reshuffling…"
-                  : cardOrderShuffledAtLocal
-                    ? "Reshuffle order"
-                    : "Shuffle order"}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span className="inline-flex w-full sm:w-auto" tabIndex={0} />
+                    }
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="default"
+                      className="w-full gap-2 sm:w-auto"
+                      disabled={cardOrderReshuffling || quizStarted}
+                      onClick={() => void handleReshuffleCardOrder()}
+                    >
+                      <Shuffle className="h-4 w-4" />
+                      {cardOrderReshuffling
+                        ? "Reshuffling…"
+                        : cardOrderShuffledAtLocal
+                          ? "Reshuffle order"
+                          : "Shuffle order"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Randomize the order of quiz questions</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : null}
-            <Button
-              variant="outline"
-              size="default"
-              className="w-full gap-2 sm:w-auto"
-              onClick={leaveStudy}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              {exitLabel}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="default"
+                      className="w-full gap-2 sm:w-auto"
+                      onClick={leaveStudy}
+                    />
+                  }
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  {exitLabel}
+                </TooltipTrigger>
+                <TooltipContent>Leave quiz and return</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </CardFooter>
         </Card>
       </div>
@@ -1684,54 +1899,90 @@ export function QuizStudy({
       ) : null}
 
       <div className="w-full max-w-2xl flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
-        <Button
-          variant="outline"
-          size="default"
-          className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-          onClick={goPrev}
-          disabled={currentIndex === 0}
-        >
-          <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Previous</span>
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" tabIndex={0} />}>
+              <Button
+                variant="outline"
+                size="default"
+                className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                onClick={goPrev}
+                disabled={currentIndex === 0}
+              >
+                <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Previous</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Go to the previous question</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
-        <Button
-          size="default"
-          className={cn(
-            "gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm",
-            deckAccent.hasDeckAccent &&
-              "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-          )}
-          onClick={handleFinishRequest}
-          disabled={submitting}
-        >
-          <Flag className="h-4 w-4" />
-          {submitting ? "Submitting…" : "Finish Quiz"}
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex" tabIndex={0} />}
+            >
+              <Button
+                size="default"
+                className={cn(
+                  "gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm",
+                  deckAccent.hasDeckAccent &&
+                    "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+                )}
+                onClick={handleFinishRequest}
+                disabled={submitting}
+              >
+                <Flag className="h-4 w-4" />
+                {submitting ? "Submitting…" : "Finish Quiz"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Submit your answers and see results</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
-        <Button
-          variant="outline"
-          size="default"
-          className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
-          onClick={goNext}
-          disabled={currentIndex === totalQuestions - 1}
-        >
-          <span className="hidden sm:inline">Next</span>
-          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex" tabIndex={0} />}
+            >
+              <Button
+                variant="outline"
+                size="default"
+                className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                onClick={goNext}
+                disabled={currentIndex === totalQuestions - 1}
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Go to the next question</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {submitError && (
         <div className="w-full max-w-2xl flex flex-col items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-center">
           <p className="text-sm text-destructive">{submitError}</p>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => submitQuiz({ timedOut: false })}
-            disabled={submitting}
-          >
-            Retry submission
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span className="inline-flex" tabIndex={0} />
+                }
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => submitQuiz({ timedOut: false })}
+                  disabled={submitting}
+                >
+                  Retry submission
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Try submitting your quiz again</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
     </div>
@@ -1948,16 +2199,25 @@ function QuizResultCard({
 
         <div className="w-full flex flex-col gap-3">
           {!saved && !hideSaveResult ? (
-            <Button
-              size="default"
-              variant="secondary"
-              className="w-full gap-2 h-10 sm:h-11"
-              onClick={() => setSaveDialogOpen(true)}
-              disabled={saving}
-            >
-              <BookCheck className="h-4 w-4" />
-              Save Result
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={<span className="inline-flex w-full" tabIndex={0} />}
+                >
+                  <Button
+                    size="default"
+                    variant="secondary"
+                    className="w-full gap-2 h-10 sm:h-11"
+                    onClick={() => setSaveDialogOpen(true)}
+                    disabled={saving}
+                  >
+                    <BookCheck className="h-4 w-4" />
+                    Save Result
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save this quiz score to your inbox</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : saved ? (
             <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-sm font-medium text-emerald-400">
               <CheckCircle className="h-4 w-4" />
@@ -1969,28 +2229,46 @@ function QuizResultCard({
             </div>
           ) : null}
           {allowRetake ? (
-            <Button
-              size="default"
-              className={cn(
-                "w-full gap-2 h-10 sm:h-11",
-                resultAccent.hasDeckAccent &&
-                  "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-              )}
-              onClick={onRetake}
-            >
-              <RotateCcw className="h-4 w-4" />
-              Retake Quiz
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      size="default"
+                      className={cn(
+                        "w-full gap-2 h-10 sm:h-11",
+                        resultAccent.hasDeckAccent &&
+                          "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+                      )}
+                      onClick={onRetake}
+                    />
+                  }
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Retake Quiz
+                </TooltipTrigger>
+                <TooltipContent>Start a new attempt of this quiz</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : null}
-          <Button
-            variant="outline"
-            size="default"
-            className="w-full gap-2 h-10 sm:h-11"
-            onClick={onBack}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {backLabel}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="w-full gap-2 h-10 sm:h-11"
+                    onClick={onBack}
+                  />
+                }
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {backLabel}
+              </TooltipTrigger>
+              <TooltipContent>Leave results and return</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <AlertDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>

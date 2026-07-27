@@ -4,6 +4,12 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/clerk-auth";
 import { getAccessContext } from "@/lib/access";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ManageWorkspacesPanel } from "@/components/manage-workspaces-panel";
 import { cn } from "@/lib/utils";
 import { listTeamWorkspaceEventsForOwner } from "@/db/queries/team-workspace-events";
@@ -51,16 +57,25 @@ export default async function ManageWorkspacesPage() {
             deletes.
           </p>
         </div>
-        <Link
-          href={teamAdminBackHref}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "w-full gap-2 sm:w-auto shrink-0",
-          )}
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Back To Team Dashboard
-        </Link>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link
+                  href={teamAdminBackHref}
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "w-full gap-2 sm:w-auto shrink-0",
+                  )}
+                />
+              }
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Back To Team Dashboard
+            </TooltipTrigger>
+            <TooltipContent>Return to the team admin dashboard</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <ManageWorkspacesPanel

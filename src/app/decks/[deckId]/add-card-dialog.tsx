@@ -183,16 +183,25 @@ function ImageEnlargeOverlay({
             priority
           />
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="absolute top-2 right-2 text-primary-foreground hover:bg-primary-foreground/20"
-          onClick={onClose}
-          aria-label="Close enlarged preview"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="absolute top-2 right-2 text-primary-foreground hover:bg-primary-foreground/20"
+                  onClick={onClose}
+                  aria-label="Close enlarged preview"
+                />
+              }
+            >
+              <X className="h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent>Close enlarged preview</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>,
     document.body,
@@ -258,29 +267,49 @@ function ImageUploadSection({
             </div>
           )}
           {!isUploading && (
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="absolute top-2 right-2 h-6 w-6 sm:h-7 sm:w-7"
-              onClick={onRemove}
-            >
-              <X className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-6 w-6 sm:h-7 sm:w-7"
+                      onClick={onRemove}
+                    />
+                  }
+                >
+                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                </TooltipTrigger>
+                <TooltipContent>Remove image</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-fit gap-2 text-xs sm:text-sm h-8 sm:h-9"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isBusy}
-        >
-          <ImagePlus className="h-3 w-3 sm:h-4 sm:w-4" />
-          Add image
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span className="inline-flex w-fit" tabIndex={0} />
+              }
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-fit gap-2 text-xs sm:text-sm h-8 sm:h-9"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy}
+              >
+                <ImagePlus className="h-3 w-3 sm:h-4 sm:w-4" />
+                Add image
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Upload an image for this side</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
       <input
         ref={fileInputRef}
@@ -862,27 +891,43 @@ function StandardCardForm({
       )}
 
       <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-        <Button
-          variant="outline"
-          onClick={onCancel}
-          disabled={isBusy}
-          className="w-full sm:w-auto"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={isBusy || !frontHasContent || !backHasContent}
-          className="w-full sm:w-auto"
-        >
-          {isPending
-            ? "Adding…"
-            : isUploading
-              ? "Uploading…"
-              : isGeneratingAnswer || isGeneratingBackImage || isGeneratingDiagram
-                ? "Generating…"
-                : "Add Card"}
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex w-full sm:w-auto" />}>
+              <Button
+                variant="outline"
+                onClick={onCancel}
+                disabled={isBusy}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Cancel and close</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex w-full sm:w-auto" tabIndex={0} />}
+            >
+              <Button
+                onClick={handleSubmit}
+                disabled={isBusy || !frontHasContent || !backHasContent}
+                className="w-full sm:w-auto"
+              >
+                {isPending
+                  ? "Adding…"
+                  : isUploading
+                    ? "Uploading…"
+                    : isGeneratingAnswer || isGeneratingBackImage || isGeneratingDiagram
+                      ? "Generating…"
+                      : "Add Card"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Save this card to the deck</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </DialogFooter>
     </div>
   );
@@ -1513,27 +1558,43 @@ function MultipleChoiceCardForm({
       )}
 
       <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-        <Button
-          variant="outline"
-          onClick={onCancel}
-          disabled={isBusy}
-          className="w-full sm:w-auto"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={isBusy || !questionHasContent || !correctFilled || !allDistractorsFilled}
-          className="w-full sm:w-auto"
-        >
-          {isPending
-            ? "Adding…"
-            : isUploadingImage || isUploadingCorrectImage
-              ? "Uploading…"
-              : isGenerating || isGeneratingQuestionImage || isRegeneratingDistractors
-                ? "Generating…"
-                : "Add Card"}
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex w-full sm:w-auto" />}>
+              <Button
+                variant="outline"
+                onClick={onCancel}
+                disabled={isBusy}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Cancel and close</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex w-full sm:w-auto" tabIndex={0} />}
+            >
+              <Button
+                onClick={handleSubmit}
+                disabled={isBusy || !questionHasContent || !correctFilled || !allDistractorsFilled}
+                className="w-full sm:w-auto"
+              >
+                {isPending
+                  ? "Adding…"
+                  : isUploadingImage || isUploadingCorrectImage
+                    ? "Uploading…"
+                    : isGenerating || isGeneratingQuestionImage || isRegeneratingDistractors
+                      ? "Generating…"
+                      : "Add Card"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Save this multiple-choice card to the deck</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </DialogFooter>
     </div>
   );
@@ -1604,20 +1665,31 @@ export function AddCardDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {trigger !== undefined ? (
-        <DialogTrigger render={trigger} />
-      ) : (
-        <DialogTrigger
-          render={
-            <Button
-              variant="default"
-              className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 font-bold"
-            />
-          }
-        >
-          + Add Card
-        </DialogTrigger>
-      )}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            {trigger !== undefined ? (
+              <DialogTrigger render={trigger} />
+            ) : (
+              <DialogTrigger
+                render={
+                  <Button
+                    variant="default"
+                    className="text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 font-bold"
+                  />
+                }
+              >
+                + Add Card
+              </DialogTrigger>
+            )}
+          </TooltipTrigger>
+          <TooltipContent>
+            {trigger !== undefined
+              ? "Add your first card to this deck"
+              : "Add a new card to this deck"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-lg mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Add a new card</DialogTitle>

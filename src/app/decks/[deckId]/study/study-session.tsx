@@ -222,13 +222,13 @@ export function StudySession({
           if (v === "ai_recall" && !showAiRecallTab) return;
           setTab(v as StudyModeTab);
         }}
-        className="flex flex-1 flex-col gap-4 sm:gap-6"
+        className="flex flex-1 flex-col gap-5 sm:gap-7"
       >
-        <div className="flex flex-col items-center gap-1.5">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card/55 px-4 py-3 shadow-md shadow-black/10 backdrop-blur-md sm:px-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Study Mode
           </p>
-          <TabsList className="h-auto flex-wrap justify-center gap-1">
+          <TabsList className="h-auto w-full flex-wrap justify-center gap-1 bg-muted/40 p-1">
             {showReviewTab ? (
               <TabsTrigger value="review" className="gap-1.5">
                 <span aria-hidden>📖</span>

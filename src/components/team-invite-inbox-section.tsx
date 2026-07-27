@@ -2,6 +2,10 @@ import { listTeamInvitationsForInviteeEmail } from "@/db/queries/teams";
 import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
 import { isTeamInviteExpired } from "@/lib/team-invite-expiry";
 import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
+import {
+  formatTeamInviteInboxDescription,
+  formatTeamInviteInboxTitle,
+} from "@/lib/team-invite-message-copy";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 import {
   TeamInviteInboxClient,
@@ -40,6 +44,10 @@ export async function TeamInviteInboxSection({
       const inviterId =
         r.invitation.invitedByUserId ?? r.team.ownerUserId;
       const inviterDisplayName = await getClerkUserDisplayNameById(inviterId);
+      const ownerName =
+        inviterId === r.team.ownerUserId
+          ? inviterDisplayName
+          : await getClerkUserDisplayNameById(r.team.ownerUserId);
       const expired = isTeamInviteExpired(r.invitation.expiresAt);
       const outcome = resolveTeamInviteInboxOutcome(
         r.invitation.status,
@@ -49,7 +57,16 @@ export async function TeamInviteInboxSection({
         invitationId: r.invitation.id,
         teamName: r.team.name,
         role: r.invitation.role,
+        ownerName,
         inviterDisplayName,
+        title: formatTeamInviteInboxTitle(r.team.name),
+        description: formatTeamInviteInboxDescription({
+          workspaceName: r.team.name,
+          role: r.invitation.role,
+          ownerName,
+          inviterName: inviterDisplayName,
+          outcome,
+        }),
         expiresAtIso: r.invitation.expiresAt.toISOString(),
         createdAtIso: r.invitation.createdAt.toISOString(),
         outcome,

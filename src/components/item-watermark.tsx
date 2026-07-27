@@ -24,7 +24,7 @@ export function ItemWatermark({
             : "bottom-1 right-2 top-1 w-[40%] items-center justify-end",
         "text-[length:clamp(0.7rem,min(14cqi,4.5vw),2.75rem)] tracking-[0.16em]",
         "rotate-[-12deg] font-semibold uppercase",
-        onGradient ? "text-white/18" : "text-muted-foreground/22",
+        onGradient ? "text-white/12" : "text-muted-foreground/14",
       )}
     >
       {label}

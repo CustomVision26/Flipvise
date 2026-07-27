@@ -260,23 +260,29 @@ export async function loopsSendQuizResultEmail(
  *
  * | Variable | Purpose |
  * |----------|---------|
- * | `subjectLine` | Full subject line (set Subject in Loops to `{DATA_VARIABLE:subjectLine}`). |
+ * | `subjectLine` | Full subject line (set Subject in Loops to `{DATA_VARIABLE:subjectLine}`). Formal: `Invitation to join {workspace}`. |
  * | `acceptInvitationUrl` | **Primary link** — opens the invite landing page; signing in with the invited email lets them accept (`/invite/team/{token}`). |
  * | `dashboardInboxUrl` | Link to `/dashboard/inbox` when they already have an account (invitation also appears in-app). |
  * | `inviteeEmail` | Normalized recipient email. |
  * | `inviteeName` | Invitee name from the form (required). Falls back to email local-part if empty. |
  * | `workspaceName` | Team workspace display name. |
- * | `roleLabel` | `"Member"` or `"Team admin"`. |
- * | `inviterName` | Display name of the person who sent the invite. |
+ * | `roleLabel` | `"Member"` or `"Team Admin"`. |
+ * | `inviterName` | Display name of the team admin (or owner) who sent the invite. |
+ * | `planOwnerName` | Display name of the workspace / plan owner. Empty string when unknown. Optional in Loops templates — add `{DATA_VARIABLE:planOwnerName}` when you want owner copy in the email body. |
  * | `expiresInDays` | Number of days until the invite link expires (matches app policy). |
  */
 export type TeamInvitationEmailPayload = {
   inviteeEmail: string;
   inviteeDisplayName: string;
   workspaceName: string;
-  /** `"Member"` or `"Team admin"` */
+  /** `"Member"` or `"Team Admin"` */
   roleLabel: string;
   inviterName: string;
+  /**
+   * Plan / workspace owner display name for formal invitation copy.
+   * Always sent (may be `""`); add the variable on the Loops template only if you use it.
+   */
+  planOwnerName: string;
   /** Absolute URL to `/invite/team/{token}` — use as the main “Accept invitation” button href. */
   acceptInvitationUrl: string;
   /** Absolute URL to `/dashboard/inbox` for signed-in users who see the invite in-app. */
@@ -320,6 +326,7 @@ export async function loopsSendTeamInvitationEmail(
     workspaceName: payload.workspaceName,
     roleLabel: payload.roleLabel,
     inviterName: payload.inviterName,
+    planOwnerName: payload.planOwnerName.trim(),
     expiresInDays: payload.expiresInDays,
   });
 }

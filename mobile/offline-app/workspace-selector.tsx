@@ -247,6 +247,8 @@ export function WorkspaceSelector({
             data-team-admin-dash-link
             type="button"
             className="workspace-scope__admin-btn"
+            title="This Workspace Admin Dashboard"
+            aria-label="WS Admin Dash. This Workspace Admin Dashboard"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -254,7 +256,7 @@ export function WorkspaceSelector({
               closeMenu();
             }}
           >
-            To Admin Dash
+            WS Admin Dash
           </button>
         ) : null}
       </button>

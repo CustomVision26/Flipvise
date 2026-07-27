@@ -11,6 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type ViewMode = "grid" | "list" | "compact";
@@ -72,20 +78,29 @@ export function ViewModeDropdown<T extends string = string>({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={(props) => (
-          <Button
-            {...props}
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 px-2.5 text-xs"
-            aria-label={`View (currently ${activeView.label})`}
-          >
-            <ActiveViewIcon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">View</span>
-          </Button>
-        )}
-      />
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            <DropdownMenuTrigger
+              render={(props) => (
+                <Button
+                  {...props}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 px-2.5 text-xs"
+                  aria-label={`View (currently ${activeView.label})`}
+                >
+                  <ActiveViewIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">View</span>
+                </Button>
+              )}
+            />
+          </TooltipTrigger>
+          <TooltipContent>
+            Change layout{showSort ? " or sort order" : ""}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">

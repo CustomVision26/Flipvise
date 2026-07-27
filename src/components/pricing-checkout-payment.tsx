@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, Tag } from "lucide-react";
@@ -25,10 +25,17 @@ import { SlideToSubmitButton } from "@/components/slide-to-submit-button";
 import {
   WORLD_COUNTRY_NAMES,
   countryCodeFromName,
+  isWorldCountryName,
 } from "@/data/world-countries";
 import type { CheckoutPromoDisplay } from "@/lib/checkout-promo-display-types";
 import type { CheckoutSessionAmountsMajor } from "@/lib/stripe-checkout-session-amounts";
 import type { CheckoutSavedMailingAddress } from "@/lib/checkout-saved-mailing-address";
+import {
+  isStripeBillingContactComplete,
+  normalizeManualBillingAddress,
+  normalizeStripeCheckoutBillingAddress,
+  type StripeCheckoutBillingContact,
+} from "@/lib/stripe-checkout-billing-address";
 import {
   stripeCheckoutElementsTotalFormatted,
   stripeCheckoutElementsTotalMajor,
@@ -44,6 +51,9 @@ import {
 import { formatPlanMoney } from "@/lib/pricing-period-display";
 import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
 import { cn } from "@/lib/utils";
+
+const MAILING_INVALID_FOR_STRIPE_MESSAGE =
+  'Your Flipvise mailing address cannot be used for Stripe billing (invalid country or region — e.g. Baker Island). Enter a valid billing address manually below.';
 
 function countryNameFromCode(countryCode: string): string | null {
   try {
@@ -67,12 +77,14 @@ function emptyManualBillingAddress(
   if (!saved) {
     return { line1: "", city: "", state: "", postalCode: "", countryName: "" };
   }
+  const resolvedCountry = countryNameFromCode(saved.address.country) ?? "";
   return {
     line1: saved.address.line1,
     city: saved.address.city,
     state: saved.address.state ?? "",
     postalCode: saved.address.postal_code ?? "",
-    countryName: countryNameFromCode(saved.address.country) ?? "",
+    // Only prefill when the label matches the Select options (avoids a stuck value).
+    countryName: isWorldCountryName(resolvedCountry) ? resolvedCountry : "",
   };
 }
 
@@ -348,12 +360,260 @@ function CheckoutPaymentFields({
 }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Prefer saved mailing only after it normalizes to a Stripe-valid address.
   const [useMailingAsBilling, setUseMailingAsBilling] = useState(false);
+  const [mailingValidForStripe, setMailingValidForStripe] = useState(false);
+  /** True only after updateBillingAddress succeeds with a complete session address. */
+  const [billingSyncedToStripe, setBillingSyncedToStripe] = useState(false);
   const [isApplyingBillingAddress, setIsApplyingBillingAddress] = useState(false);
+  const [paymentComplete, setPaymentComplete] = useState(false);
   const [cardName, setCardName] = useState(savedMailingAddress?.name ?? "");
   const [manualAddress, setManualAddress] = useState<ManualBillingAddress>(() =>
     emptyManualBillingAddress(savedMailingAddress),
   );
+
+  const manualCountryCode = countryCodeFromName(manualAddress.countryName);
+  const manualNeedsStatePostal =
+    manualCountryCode === "US" || manualCountryCode === "CA";
+  const manualAddressComplete = Boolean(
+    manualAddress.line1.trim() &&
+      manualAddress.city.trim() &&
+      manualCountryCode &&
+      (!manualNeedsStatePostal ||
+        (manualAddress.state.trim() && manualAddress.postalCode.trim())),
+  );
+
+  const localBillingReady =
+    Boolean(cardName.trim()) &&
+    (useMailingAsBilling
+      ? Boolean(savedMailingAddress) && mailingValidForStripe
+      : manualAddressComplete);
+
+  // Always a boolean so the billing-sync effect deps stay fixed-length.
+  const checkoutReady =
+    checkoutState.type !== "loading" && checkoutState.type !== "error";
+
+  const checkoutStateRef = useRef(checkoutState);
+  checkoutStateRef.current = checkoutState;
+  const lastSyncedBillingKeyRef = useRef<string | null>(null);
+
+  async function buildBillingContact(
+    name: string,
+  ): Promise<StripeCheckoutBillingContact | null> {
+    if (useMailingAsBilling && savedMailingAddress) {
+      const normalized = await normalizeStripeCheckoutBillingAddress(
+        {
+          line1: savedMailingAddress.address.line1,
+          line2: savedMailingAddress.address.line2,
+          city: savedMailingAddress.address.city,
+          state: savedMailingAddress.address.state,
+          postal_code: savedMailingAddress.address.postal_code,
+          country: savedMailingAddress.address.country,
+        },
+        name,
+      );
+      if (!normalized.ok) {
+        setMailingValidForStripe(false);
+        setUseMailingAsBilling(false);
+        setErrorMessage(MAILING_INVALID_FOR_STRIPE_MESSAGE);
+        return null;
+      }
+      return normalized.contact;
+    }
+
+    const normalized = await normalizeManualBillingAddress({
+      line1: manualAddress.line1,
+      city: manualAddress.city,
+      state: manualAddress.state,
+      postalCode: manualAddress.postalCode,
+      countryName: manualAddress.countryName,
+      name,
+    });
+    if (!normalized.ok) {
+      setErrorMessage(normalized.message);
+      return null;
+    }
+    return normalized.contact;
+  }
+
+  async function applyBillingContact(
+    contact: StripeCheckoutBillingContact,
+    fallbackMessage: string,
+    options?: { quietIfNotReady?: boolean },
+  ): Promise<boolean> {
+    const state = checkoutStateRef.current;
+    if (state.type === "loading" || state.type === "error") {
+      if (!options?.quietIfNotReady) {
+        setErrorMessage(fallbackMessage);
+      }
+      return false;
+    }
+
+    setIsApplyingBillingAddress(true);
+    try {
+      const result = await state.checkout.updateBillingAddress(contact);
+      if (result.type === "error") {
+        setBillingSyncedToStripe(false);
+        setErrorMessage(result.error.message || fallbackMessage);
+        return false;
+      }
+      if (!isStripeBillingContactComplete(result.session.billingAddress)) {
+        setBillingSyncedToStripe(false);
+        setErrorMessage(
+          "Stripe still needs a complete billing address. Check country, state/province, and postal code.",
+        );
+        return false;
+      }
+      lastSyncedBillingKeyRef.current = JSON.stringify(contact);
+      setBillingSyncedToStripe(true);
+      return true;
+    } catch {
+      setBillingSyncedToStripe(false);
+      setErrorMessage(fallbackMessage);
+      return false;
+    } finally {
+      setIsApplyingBillingAddress(false);
+    }
+  }
+
+  /** Always normalize + updateBillingAddress successfully before confirm(). */
+  async function applyCurrentBillingAddress(name: string): Promise<boolean> {
+    const contact = await buildBillingContact(name);
+    if (!contact) {
+      if (!useMailingAsBilling) {
+        setErrorMessage((prev) => prev ?? "Enter a complete billing address.");
+      }
+      return false;
+    }
+
+    const fallback = useMailingAsBilling
+      ? MAILING_INVALID_FOR_STRIPE_MESSAGE
+      : "Could not update the billing address. Check the fields and try again.";
+    const applied = await applyBillingContact(contact, fallback);
+    if (!applied && useMailingAsBilling) {
+      setUseMailingAsBilling(false);
+      setMailingValidForStripe(false);
+    }
+    return applied;
+  }
+
+  // Validate saved mailing against Stripe region rules before offering the checkbox.
+  useEffect(() => {
+    if (!savedMailingAddress) {
+      setMailingValidForStripe(false);
+      setUseMailingAsBilling(false);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const normalized = await normalizeStripeCheckoutBillingAddress(
+        {
+          line1: savedMailingAddress.address.line1,
+          line2: savedMailingAddress.address.line2,
+          city: savedMailingAddress.address.city,
+          state: savedMailingAddress.address.state,
+          postal_code: savedMailingAddress.address.postal_code,
+          country: savedMailingAddress.address.country,
+        },
+        savedMailingAddress.name || "",
+      );
+      if (cancelled) return;
+      if (!normalized.ok) {
+        setMailingValidForStripe(false);
+        setUseMailingAsBilling(false);
+        setBillingSyncedToStripe(false);
+        setErrorMessage(MAILING_INVALID_FOR_STRIPE_MESSAGE);
+        // Prefill line/city/postal/country but clear the invalid subdivision (e.g. Baker Island).
+        const resolvedCountry =
+          countryNameFromCode(savedMailingAddress.address.country) ?? "";
+        setManualAddress({
+          line1: savedMailingAddress.address.line1,
+          city: savedMailingAddress.address.city,
+          state: "",
+          postalCode: savedMailingAddress.address.postal_code ?? "",
+          countryName: isWorldCountryName(resolvedCountry) ? resolvedCountry : "",
+        });
+        return;
+      }
+      setMailingValidForStripe(true);
+      setUseMailingAsBilling(true);
+      setErrorMessage((prev) =>
+        prev === MAILING_INVALID_FOR_STRIPE_MESSAGE ? null : prev,
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [savedMailingAddress]);
+
+  // PaymentElement hides address fields; Stripe canConfirm stays false until
+  // updateBillingAddress runs. Sync a Stripe-normalized address as soon as local
+  // fields are ready — but do not gate the slide on canConfirm (deadlock).
+  useEffect(() => {
+    if (!localBillingReady) {
+      lastSyncedBillingKeyRef.current = null;
+      setBillingSyncedToStripe(false);
+      return;
+    }
+
+    const trimmedName = cardName.trim();
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const state = checkoutStateRef.current;
+        if (state.type === "loading" || state.type === "error") return;
+
+        const built = await buildBillingContact(trimmedName);
+        if (cancelled || !built) {
+          if (!cancelled) setBillingSyncedToStripe(false);
+          return;
+        }
+
+        const syncKey = JSON.stringify(built);
+        if (lastSyncedBillingKeyRef.current === syncKey) {
+          setBillingSyncedToStripe(true);
+          return;
+        }
+
+        const applied = await applyBillingContact(
+          built,
+          useMailingAsBilling
+            ? MAILING_INVALID_FOR_STRIPE_MESSAGE
+            : "Could not update the billing address. Check the fields and try again.",
+          { quietIfNotReady: true },
+        );
+        if (!applied && useMailingAsBilling) {
+          setUseMailingAsBilling(false);
+          setMailingValidForStripe(false);
+        }
+        if (!applied && !cancelled) {
+          setBillingSyncedToStripe(false);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // Intentional: rebuild when local address fields change or Checkout becomes ready.
+    // Deps must stay fixed-length every render (never conditionally spread).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    localBillingReady,
+    useMailingAsBilling,
+    mailingValidForStripe,
+    savedMailingAddress,
+    cardName,
+    manualAddress.line1,
+    manualAddress.city,
+    manualAddress.state,
+    manualAddress.postalCode,
+    manualAddress.countryName,
+    checkoutReady,
+  ]);
 
   if (checkoutState.type === "loading") {
     return (
@@ -379,99 +639,36 @@ function CheckoutPaymentFields({
       ? `Slide to subscribe — ${stripeTotal}`
       : "Slide to subscribe";
 
-  function mailingAddressPayload(name: string) {
-    if (!savedMailingAddress) return null;
-    return {
-      name: name.trim() || null,
-      address: {
-        line1: savedMailingAddress.address.line1,
-        ...(savedMailingAddress.address.line2
-          ? { line2: savedMailingAddress.address.line2 }
-          : {}),
-        city: savedMailingAddress.address.city,
-        ...(savedMailingAddress.address.state
-          ? { state: savedMailingAddress.address.state }
-          : {}),
-        ...(savedMailingAddress.address.postal_code
-          ? { postal_code: savedMailingAddress.address.postal_code }
-          : {}),
-        country: savedMailingAddress.address.country,
-      },
-    };
-  }
+  // Do not gate on checkout.canConfirm (can stick false with address "never").
+  // Gate on our own successful updateBillingAddress + complete session address.
+  const slideDisabled =
+    isSubmitting ||
+    !localBillingReady ||
+    !paymentComplete ||
+    !billingSyncedToStripe ||
+    isApplyingBillingAddress;
 
-  function manualAddressPayload(name: string) {
-    const country = countryCodeFromName(manualAddress.countryName);
-    if (!country) return null;
-    const line1 = manualAddress.line1.trim();
-    const city = manualAddress.city.trim();
-    if (!line1 || !city) return null;
-
-    return {
-      name: name.trim() || null,
-      address: {
-        line1,
-        city,
-        country,
-        ...(manualAddress.state.trim() ? { state: manualAddress.state.trim() } : {}),
-        ...(manualAddress.postalCode.trim()
-          ? { postal_code: manualAddress.postalCode.trim() }
-          : {}),
-      },
-    };
-  }
-
-  async function applyBillingAddressPayload(
-    payload: NonNullable<ReturnType<typeof mailingAddressPayload>>,
-    fallbackMessage: string,
-  ): Promise<boolean> {
-    setIsApplyingBillingAddress(true);
-    try {
-      const result = await checkout.updateBillingAddress(payload);
-      if (result.type === "error") {
-        setErrorMessage(result.error.message || fallbackMessage);
-        return false;
-      }
-      return true;
-    } catch {
-      setErrorMessage(fallbackMessage);
-      return false;
-    } finally {
-      setIsApplyingBillingAddress(false);
+  const slideDisabledHint = (() => {
+    if (isSubmitting) return null;
+    if (!paymentComplete) {
+      return "Enter complete card details to enable Subscribe.";
     }
-  }
-
-  async function applyCurrentBillingAddress(name: string): Promise<boolean> {
-    if (useMailingAsBilling) {
-      const payload = mailingAddressPayload(name);
-      if (!payload) {
-        setErrorMessage(
-          "Could not apply your Flipvise mailing address. Enter the billing address manually.",
-        );
-        return false;
-      }
-      return applyBillingAddressPayload(
-        payload,
-        "Could not apply your Flipvise mailing address. Enter the billing address manually.",
-      );
+    if (!cardName.trim()) {
+      return "Enter the name on the card to enable Subscribe.";
     }
-
-    const payload = manualAddressPayload(name);
-    if (!payload) {
-      setErrorMessage("Enter a complete billing address.");
-      return false;
+    if (savedMailingAddress && !mailingValidForStripe && !manualAddressComplete) {
+      return "Your Flipvise mailing address is not valid for Stripe billing. Enter a billing address manually.";
     }
-    return applyBillingAddressPayload(
-      payload,
-      "Could not update the billing address. Check the fields and try again.",
-    );
-  }
-
-  const manualAddressComplete = Boolean(
-    manualAddress.line1.trim() &&
-      manualAddress.city.trim() &&
-      countryCodeFromName(manualAddress.countryName),
-  );
+    if (!useMailingAsBilling && !manualAddressComplete) {
+      return manualNeedsStatePostal
+        ? "Enter a complete billing address including state/province and postal code."
+        : "Enter a complete billing address below, or select your Flipvise mailing address.";
+    }
+    if (isApplyingBillingAddress || (localBillingReady && !billingSyncedToStripe)) {
+      return "Applying billing address to Stripe…";
+    }
+    return null;
+  })();
 
   async function handleSubscribe() {
     setIsSubmitting(true);
@@ -486,6 +683,7 @@ function CheckoutPaymentFields({
       }
 
       // Automatic tax forbids billingAddress on confirm(); use updateBillingAddress only.
+      // Confirm must not run until Stripe session has a complete normalized address.
       const applied = await applyCurrentBillingAddress(trimmedName);
       if (!applied) {
         setIsSubmitting(false);
@@ -495,7 +693,16 @@ function CheckoutPaymentFields({
       const result = await checkout.confirm();
 
       if (result.type === "error") {
-        setErrorMessage(result.error.message);
+        const message = result.error.message || "Payment could not be completed.";
+        if (/complete billing address/i.test(message)) {
+          setUseMailingAsBilling(false);
+          setMailingValidForStripe(false);
+          setErrorMessage(
+            "Stripe needs a complete billing address before payment. Enter a valid address below (use a standard state/province — not territories like Baker Island).",
+          );
+        } else {
+          setErrorMessage(message);
+        }
         setIsSubmitting(false);
         return;
       }
@@ -526,30 +733,54 @@ function CheckoutPaymentFields({
     if (!savedMailingAddress) return;
 
     const nextCardName = cardName.trim() || savedMailingAddress.name || "";
-    const payload = mailingAddressPayload(nextCardName);
-    if (!payload) return;
-
     setCardName(nextCardName);
+
+    const normalized = await normalizeStripeCheckoutBillingAddress(
+      {
+        line1: savedMailingAddress.address.line1,
+        line2: savedMailingAddress.address.line2,
+        city: savedMailingAddress.address.city,
+        state: savedMailingAddress.address.state,
+        postal_code: savedMailingAddress.address.postal_code,
+        country: savedMailingAddress.address.country,
+      },
+      nextCardName,
+    );
+    if (!normalized.ok) {
+      setMailingValidForStripe(false);
+      setUseMailingAsBilling(false);
+      setErrorMessage(MAILING_INVALID_FOR_STRIPE_MESSAGE);
+      return;
+    }
+
+    setMailingValidForStripe(true);
     setUseMailingAsBilling(true);
-    const applied = await applyBillingAddressPayload(
-      payload,
-      "Could not apply your Flipvise mailing address. Enter the billing address manually.",
+    const applied = await applyBillingContact(
+      normalized.contact,
+      MAILING_INVALID_FOR_STRIPE_MESSAGE,
     );
     if (!applied) {
       setUseMailingAsBilling(false);
+      setMailingValidForStripe(false);
     }
   }
 
   async function handleCardNameBlur() {
     const trimmedName = cardName.trim();
     if (!trimmedName) return;
-    if (useMailingAsBilling) {
+    if (useMailingAsBilling && mailingValidForStripe) {
       await applyCurrentBillingAddress(trimmedName);
       return;
     }
-    if (manualAddressComplete) {
+    if (!useMailingAsBilling && manualAddressComplete) {
       await applyCurrentBillingAddress(trimmedName);
     }
+  }
+
+  async function handleManualAddressBlur() {
+    const trimmedName = cardName.trim();
+    if (!trimmedName || !manualAddressComplete || useMailingAsBilling) return;
+    await applyCurrentBillingAddress(trimmedName);
   }
 
   return (
@@ -585,6 +816,9 @@ function CheckoutPaymentFields({
           <span>Card</span>
         </div>
         <PaymentElement
+          onChange={(event) => {
+            setPaymentComplete(event.complete);
+          }}
           options={{
             fields: {
               billingDetails: {
@@ -605,7 +839,7 @@ function CheckoutPaymentFields({
               ? "Your Flipvise mailing address will be used for billing verification and tax. Enter the name as it appears on the card."
               : "Enter the name and address on the card or bank account you are using above. These are used to verify your payment method and calculate tax where applicable."}
             {!useMailingAsBilling && savedMailingAddress
-              ? " If that matches your Flipvise mailing address from Account Details, you can select it below."
+              ? " Complete the billing address fields below, or re-select your Flipvise mailing address."
               : null}
           </p>
         </div>
@@ -613,8 +847,12 @@ function CheckoutPaymentFields({
           <div className="flex items-start gap-2.5 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2.5">
             <Checkbox
               id="checkout-same-as-mailing"
-              checked={useMailingAsBilling}
-              disabled={isApplyingBillingAddress || isSubmitting}
+              checked={useMailingAsBilling && mailingValidForStripe}
+              disabled={
+                isApplyingBillingAddress ||
+                isSubmitting ||
+                !mailingValidForStripe
+              }
               onCheckedChange={(value) => {
                 void handleUseMailingAsBillingChange(value === true);
               }}
@@ -623,14 +861,23 @@ function CheckoutPaymentFields({
             <div className="min-w-0 space-y-1">
               <Label
                 htmlFor="checkout-same-as-mailing"
-                className="cursor-pointer text-sm font-medium text-[#30313d]"
+                className={cn(
+                  "text-sm font-medium text-[#30313d]",
+                  mailingValidForStripe ? "cursor-pointer" : "cursor-not-allowed opacity-70",
+                )}
               >
                 Same as my Flipvise mailing address
               </Label>
               <p className="whitespace-pre-line text-xs leading-relaxed text-[#6b7280]">
                 {savedMailingAddress.displayLines}
               </p>
-              {isApplyingBillingAddress ? (
+              {!mailingValidForStripe ? (
+                <p className="text-xs text-destructive">
+                  This mailing address is not valid for Stripe billing. Enter a
+                  billing address manually below.
+                </p>
+              ) : null}
+              {isApplyingBillingAddress && useMailingAsBilling ? (
                 <p className="text-xs text-[#6b7280]">Applying address…</p>
               ) : null}
             </div>
@@ -656,7 +903,8 @@ function CheckoutPaymentFields({
         </div>
 
         {!useMailingAsBilling ? (
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-3">
+            <p className="text-sm font-medium text-[#30313d]">Billing address details</p>
             <div className="space-y-2">
               <Label
                 htmlFor="checkout-billing-country"
@@ -707,6 +955,9 @@ function CheckoutPaymentFields({
                     line1: event.target.value,
                   }))
                 }
+                onBlur={() => {
+                  void handleManualAddressBlur();
+                }}
                 autoComplete="address-line1"
                 placeholder="Address"
                 disabled={isApplyingBillingAddress || isSubmitting}
@@ -731,6 +982,9 @@ function CheckoutPaymentFields({
                       city: event.target.value,
                     }))
                   }
+                  onBlur={() => {
+                    void handleManualAddressBlur();
+                  }}
                   autoComplete="address-level2"
                   placeholder="City"
                   disabled={isApplyingBillingAddress || isSubmitting}
@@ -753,6 +1007,9 @@ function CheckoutPaymentFields({
                       state: event.target.value,
                     }))
                   }
+                  onBlur={() => {
+                    void handleManualAddressBlur();
+                  }}
                   autoComplete="address-level1"
                   placeholder="State or province"
                   disabled={isApplyingBillingAddress || isSubmitting}
@@ -777,6 +1034,9 @@ function CheckoutPaymentFields({
                     postalCode: event.target.value,
                   }))
                 }
+                onBlur={() => {
+                  void handleManualAddressBlur();
+                }}
                 autoComplete="postal-code"
                 placeholder="Postal code"
                 disabled={isApplyingBillingAddress || isSubmitting}
@@ -802,17 +1062,16 @@ function CheckoutPaymentFields({
         </p>
         <SlideToSubmitButton
           label={slideLabel}
-          disabled={
-            isSubmitting ||
-            isApplyingBillingAddress ||
-            !cardName.trim() ||
-            (!useMailingAsBilling && !manualAddressComplete) ||
-            !checkout.canConfirm
-          }
+          disabled={slideDisabled}
           pending={isSubmitting}
           onSubmit={handleSubscribe}
           variant="checkout"
         />
+        {slideDisabledHint ? (
+          <p className="text-center text-xs leading-relaxed text-[#6b7280]" role="status">
+            {slideDisabledHint}
+          </p>
+        ) : null}
         <p className="text-center text-xs leading-relaxed text-[#6b7280]">
           {isTrial ? (
             <>

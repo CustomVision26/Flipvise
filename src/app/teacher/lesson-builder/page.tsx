@@ -3,7 +3,11 @@ import { getAccessContext } from "@/lib/access";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadOwnerTeamAdminDeckPicker } from "@/db/queries/teacher-owner-pickers";
-import { resolveLessonPlanDeckUsage, resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
+import {
+  isAssignedDeckLessonPlanForViewer,
+  resolveLessonPlanDeckUsage,
+  resolveSavedLessonPlanForViewer,
+} from "@/db/queries/saved-lesson-plans";
 import {
   filterDecksWithoutLessonPlans,
   filterOwnerDeckPickerWithoutLessonPlans,
@@ -31,6 +35,7 @@ type TeacherLessonBuilderPageProps = {
     teamMemberId?: string;
     deckId?: string;
     lessonPlanId?: string;
+    fromDeckEdit?: string;
   }>;
 };
 
@@ -51,6 +56,8 @@ export default async function TeacherLessonBuilderPage({
     ? parsedLessonPlanId
     : undefined;
   const initialDeckIdFromParams = Number.isFinite(parsedDeckId) ? parsedDeckId : undefined;
+  const fromDeckEdit =
+    params.fromDeckEdit === "1" || params.fromDeckEdit === "true";
 
   const savedPlan =
     initialLessonPlanId != null
@@ -67,10 +74,19 @@ export default async function TeacherLessonBuilderPage({
     );
   }
 
+  const isAssignedSourcePlan =
+    savedPlan != null
+      ? await isAssignedDeckLessonPlanForViewer(
+          userId,
+          savedPlan,
+          workspace.teamId,
+        )
+      : false;
+
   const keepDeckId = savedPlan?.deckId ?? initialDeckIdFromParams;
 
   const [deckContext, ownerDeckPickerRaw, ctx] = await Promise.all([
-    loadTeacherDeckContext(userId),
+    loadTeacherDeckContext(userId, workspace.teamId),
     loadOwnerTeamAdminDeckPicker(userId, workspace.teamId),
     getAccessContext(),
   ]);
@@ -135,6 +151,7 @@ export default async function TeacherLessonBuilderPage({
               sourceDeckName: savedPlan.sourceDeckName,
               lessonTitle: savedPlan.lessonTitle,
               vocabularyDetailPdfUrl: savedPlan.vocabularyDetailPdfUrl,
+              isAssignedSourcePlan,
             }
           : undefined
       }
@@ -148,6 +165,7 @@ export default async function TeacherLessonBuilderPage({
             }
           : undefined
       }
+      fromDeckEdit={fromDeckEdit && savedPlan != null}
     />
   );
 }

@@ -7,9 +7,14 @@ import {
   clampPlanPeriodDays,
   DEFAULT_PLAN_PERIOD_DAYS,
 } from "@/lib/lesson-plan-weekly-schedule";
-import { getTeamById, listTeamMembers } from "@/db/queries/teams";
+import {
+  deckHasAnyTeamAssignments,
+  getAssignedDecksForMember,
+  getTeamById,
+  listTeamMembers,
+} from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
-import { desc, eq, and, inArray, isNotNull } from "drizzle-orm";
+import { desc, eq, and, inArray, isNotNull, isNull } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type SavedLessonPlanRow = InferSelectModel<typeof savedLessonPlans>;
@@ -174,6 +179,42 @@ export async function getSavedLessonPlansByUserIds(
     .orderBy(desc(savedLessonPlans.createdAt));
 }
 
+/** Lesson plans explicitly linked to any of the given decks (any owner). */
+export async function getSavedLessonPlansByDeckIds(
+  deckIds: number[],
+): Promise<SavedLessonPlanRow[]> {
+  const uniqueDeckIds = [...new Set(deckIds.filter((id) => id > 0))];
+  if (uniqueDeckIds.length === 0) return [];
+  return db
+    .select()
+    .from(savedLessonPlans)
+    .where(
+      and(
+        inArray(savedLessonPlans.deckId, uniqueDeckIds),
+        isNotNull(savedLessonPlans.deckId),
+      ),
+    )
+    .orderBy(desc(savedLessonPlans.createdAt));
+}
+
+/**
+ * Original lesson plans linked to decks assigned to `memberUserId` on `teamId`.
+ * Query-time inclusion (no copy on assign). Excludes plans already owned by the member.
+ */
+export async function getAssignedDeckLessonPlansForMember(
+  teamId: number,
+  memberUserId: string,
+): Promise<SavedLessonPlanRow[]> {
+  const assignedDecks = await getAssignedDecksForMember(teamId, memberUserId);
+  if (assignedDecks.length === 0) return [];
+
+  const plans = await getSavedLessonPlansByDeckIds(
+    assignedDecks.map((deck) => deck.id),
+  );
+
+  return plans.filter((plan) => plan.userId !== memberUserId);
+}
+
 export async function getSavedLessonPlanByIdForUser(
   userId: string,
   id: number,
@@ -285,6 +326,23 @@ export async function getSavedLessonPlanByDeckIdForUser(
   return row ? mapSavedLessonPlanRowToPickerItem(row) : null;
 }
 
+/**
+ * Lesson plan linked to a deck for Edit-deck → Lesson Builder sync.
+ * Prefers the viewer's own plan; otherwise the most recent plan for that deckId.
+ */
+export async function getPrimaryLinkedLessonPlanForDeck(
+  deckId: number,
+  viewerUserId: string,
+): Promise<SavedLessonPlanRow | null> {
+  if (!Number.isFinite(deckId) || deckId <= 0) return null;
+
+  const plans = await getSavedLessonPlansByDeckIds([deckId]);
+  if (plans.length === 0) return null;
+
+  const own = plans.find((plan) => plan.userId === viewerUserId);
+  return own ?? plans[0] ?? null;
+}
+
 export async function deleteSavedLessonPlanById(
   id: number,
 ): Promise<SavedLessonPlanRow | null> {
@@ -294,6 +352,17 @@ export async function deleteSavedLessonPlanById(
     .returning();
 
   return row ?? null;
+}
+
+/**
+ * Deck-linked lesson plans that are currently assigned to any team member are
+ * immutable. Assignees (and creators after assignment) must copy-on-write.
+ */
+export async function isDeckLinkedLessonPlanFrozenByAssignments(
+  plan: Pick<SavedLessonPlanRow, "deckId">,
+): Promise<boolean> {
+  if (plan.deckId == null) return false;
+  return deckHasAnyTeamAssignments(plan.deckId);
 }
 
 export async function updateSavedLessonPlanById(
@@ -306,6 +375,56 @@ export async function updateSavedLessonPlanById(
     vocabularyDetailPdfUrl?: string | null;
     vocabularyDetailPdfFileName?: string | null;
     deckId?: number | null;
+    sourceDeckName?: string | null;
+  },
+): Promise<SavedLessonPlanRow | null> {
+  const existing = await getSavedLessonPlanById(planId);
+  if (!existing) return null;
+  if (await isDeckLinkedLessonPlanFrozenByAssignments(existing)) {
+    throw new Error(
+      "This lesson plan is linked to an assigned deck and cannot be overwritten. Save changes as a personal copy instead.",
+    );
+  }
+
+  const [row] = await db
+    .update(savedLessonPlans)
+    .set({
+      lessonTitle: data.result.lessonTitle,
+      subject: data.input.subject,
+      gradeLevel: data.input.gradeLevel,
+      topic: data.input.topic,
+      difficultyLevel: data.input.difficultyLevel,
+      input: data.input,
+      result: data.result,
+      pdfUrl: data.pdfUrl ?? null,
+      pdfFileName: data.pdfFileName ?? null,
+      vocabularyDetailPdfUrl: data.vocabularyDetailPdfUrl ?? null,
+      vocabularyDetailPdfFileName: data.vocabularyDetailPdfFileName ?? null,
+      deckId: data.deckId ?? null,
+      sourceDeckName: data.sourceDeckName ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedLessonPlans.id, planId))
+    .returning();
+
+  return row ?? null;
+}
+
+/**
+ * Update an assignee personal copy only.
+ * Requires ownership (`userId`) and an unlinked row (`deckId` null) so
+ * deck-linked creator originals can never be mutated through this path.
+ */
+export async function updateAssigneePersonalLessonPlanCopyById(
+  userId: string,
+  planId: number,
+  data: {
+    input: LessonPlanInput;
+    result: LessonPlanResult;
+    pdfUrl?: string | null;
+    pdfFileName?: string | null;
+    vocabularyDetailPdfUrl?: string | null;
+    vocabularyDetailPdfFileName?: string | null;
     sourceDeckName?: string | null;
   },
 ): Promise<SavedLessonPlanRow | null> {
@@ -323,8 +442,49 @@ export async function updateSavedLessonPlanById(
       pdfFileName: data.pdfFileName ?? null,
       vocabularyDetailPdfUrl: data.vocabularyDetailPdfUrl ?? null,
       vocabularyDetailPdfFileName: data.vocabularyDetailPdfFileName ?? null,
-      deckId: data.deckId ?? null,
+      deckId: null,
       sourceDeckName: data.sourceDeckName ?? null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(savedLessonPlans.id, planId),
+        eq(savedLessonPlans.userId, userId),
+        isNull(savedLessonPlans.deckId),
+      ),
+    )
+    .returning();
+
+  return row ?? null;
+}
+
+/** Patch intake fields only — keeps generated result and PDFs unchanged. */
+export async function updateSavedLessonPlanIntakeById(
+  planId: number,
+  data: {
+    input: LessonPlanInput;
+    sourceDeckName?: string | null;
+  },
+): Promise<SavedLessonPlanRow | null> {
+  const existing = await getSavedLessonPlanById(planId);
+  if (!existing) return null;
+  if (await isDeckLinkedLessonPlanFrozenByAssignments(existing)) {
+    throw new Error(
+      "This lesson plan is linked to an assigned deck and cannot be overwritten. Save changes as a personal copy instead.",
+    );
+  }
+
+  const [row] = await db
+    .update(savedLessonPlans)
+    .set({
+      subject: data.input.subject,
+      gradeLevel: data.input.gradeLevel,
+      topic: data.input.topic,
+      difficultyLevel: data.input.difficultyLevel,
+      input: data.input,
+      ...(data.sourceDeckName !== undefined
+        ? { sourceDeckName: data.sourceDeckName }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(savedLessonPlans.id, planId))
@@ -469,17 +629,110 @@ export async function resolveSavedLessonPlanForViewer(
   if (teamId == null) return null;
 
   const team = await getTeamById(teamId);
-  if (!team || team.ownerUserId !== viewerUserId) return null;
+  if (!team) return null;
 
   const plan = await getSavedLessonPlanById(planId);
   if (!plan) return null;
 
-  const members = await listTeamMembers(teamId);
-  const workspaceUserIds = new Set([
-    team.ownerUserId,
-    ...members.map((member) => member.userId),
-  ]);
+  if (team.ownerUserId === viewerUserId) {
+    const members = await listTeamMembers(teamId);
+    const workspaceUserIds = new Set([
+      team.ownerUserId,
+      ...members.map((member) => member.userId),
+    ]);
 
-  if (!workspaceUserIds.has(plan.userId)) return null;
+    if (!workspaceUserIds.has(plan.userId)) return null;
+    return plan;
+  }
+
+  // Assignees may open originals linked to decks assigned to them (read + copy-on-write save).
+  if (plan.deckId == null) return null;
+
+  const assignedDecks = await getAssignedDecksForMember(teamId, viewerUserId);
+  if (!assignedDecks.some((deck) => deck.id === plan.deckId)) return null;
   return plan;
+}
+
+/** True when the viewer may see the plan only via an assigned-deck link (not as owner). */
+export async function isAssignedDeckLessonPlanForViewer(
+  viewerUserId: string,
+  plan: SavedLessonPlanRow,
+  teamId: number | null | undefined,
+): Promise<boolean> {
+  if (plan.userId === viewerUserId) return false;
+  if (teamId == null || plan.deckId == null) return false;
+
+  const team = await getTeamById(teamId);
+  if (!team || team.ownerUserId === viewerUserId) return false;
+
+  const assignedDecks = await getAssignedDecksForMember(teamId, viewerUserId);
+  return assignedDecks.some((deck) => deck.id === plan.deckId);
+}
+
+function normalizeMatchText(value: string | null | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+/**
+ * Assignee personal copies are unlinked (`deckId` null) and keep `sourceDeckName`
+ * (and usually subject/topic) from the assigned-deck original.
+ *
+ * Match order: source deck name → current intake subject/topic → original
+ * subject/topic (so renaming intake still updates the same personal row).
+ * Never returns a deck-linked original (`deckId` non-null).
+ */
+export async function findPersonalLessonPlanCopyForAssignedContext(
+  userId: string,
+  context: {
+    sourceDeckName?: string | null;
+    subject?: string | null;
+    topic?: string | null;
+    /** Creator-plan subject — used when intake subject/topic already changed. */
+    sourceSubject?: string | null;
+    /** Creator-plan topic — used when intake subject/topic already changed. */
+    sourceTopic?: string | null;
+    excludePlanId?: number;
+  },
+): Promise<SavedLessonPlanRow | null> {
+  const plans = await getSavedLessonPlansByUser(userId);
+  // Personal copies only: never match a deck-linked (or other-user) row.
+  const personalCopies = plans.filter(
+    (plan) =>
+      plan.userId === userId &&
+      plan.deckId == null &&
+      (context.excludePlanId == null || plan.id !== context.excludePlanId),
+  );
+  if (personalCopies.length === 0) return null;
+
+  const sourceName = normalizeMatchText(context.sourceDeckName);
+  if (sourceName) {
+    const bySourceName = personalCopies.find(
+      (plan) => normalizeMatchText(plan.sourceDeckName) === sourceName,
+    );
+    if (bySourceName) return bySourceName;
+  }
+
+  const subject = normalizeMatchText(context.subject);
+  const topic = normalizeMatchText(context.topic);
+  if (subject && topic) {
+    const bySubjectTopic = personalCopies.find(
+      (plan) =>
+        normalizeMatchText(plan.subject) === subject &&
+        normalizeMatchText(plan.topic) === topic,
+    );
+    if (bySubjectTopic) return bySubjectTopic;
+  }
+
+  const sourceSubject = normalizeMatchText(context.sourceSubject);
+  const sourceTopic = normalizeMatchText(context.sourceTopic);
+  if (sourceSubject && sourceTopic) {
+    const byOriginalSubjectTopic = personalCopies.find(
+      (plan) =>
+        normalizeMatchText(plan.subject) === sourceSubject &&
+        normalizeMatchText(plan.topic) === sourceTopic,
+    );
+    if (byOriginalSubjectTopic) return byOriginalSubjectTopic;
+  }
+
+  return null;
 }

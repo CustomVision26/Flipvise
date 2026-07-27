@@ -180,7 +180,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "When formats have been published, each card keeps its assigned format until published again; otherwise formats are chosen at random per card.",
           "Team study URLs use /decks/[deckId]/study?team=&userid=&plan=&teamMemberId= (auto-filled when you open a workspace deck).",
           "Workspace owners and team admins see Cancel on the unanswered-submit dialog to return to the Resume quiz lobby without submitting.",
-          "Team quizzes may enforce timers, schedules, and security rules set by admins; when security is on for members, the Timed quiz lobby shows a green Security on light. Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question.",
+          "Team quizzes may enforce timers, schedules, and Exam Mode rules set by admins; when Exam Mode is on for members, the Timed quiz lobby shows a green Exam Mode on light. Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question.",
           "AI Reading (text-to-speech) is available on Pro Plus when enabled.",
         ],
         requirements: [
@@ -192,7 +192,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "True/false and fill-in-the-blank require enabled formats and AI-generated quiz content on cards.",
         ],
         doNots: [
-          "Do not attempt to bypass quiz security or schedule locks — contact your team admin.",
+          "Do not attempt to bypass Exam Mode or schedule locks — contact your team admin.",
           "Do not refresh mid-quiz if autosave fails — note your score and contact support if needed.",
           "Do not expect Format Quiz Question on standard Pro or Free personal plans — team workspaces configure formats in Team Admin → Study Privileges instead.",
           "Do not expect AI Recall™ on Free or standard Pro — upgrade or continue with Standard Review.",
@@ -270,6 +270,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "History tab shows completed or read items.",
           "New accounts receive a formal Welcome to Flipvise message with getting-started tips.",
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
+          "Team workspace invites use a formal message with the workspace name, role (Team Admin or Member), plan owner, and inviting team admin when available — accept or decline from the inbox.",
           "Accept team invites, review billing receipts, open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",
@@ -613,7 +614,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "How Flipvise collects payment, including overseas billing addresses and cards.",
         howItWorks: [
           "All paid plans bill through Stripe Checkout (subscription mode) — not a separate in-app card form on the pricing page.",
-          "Billing address is required at checkout. Enter your real country, city, postal code, and street address — overseas/international addresses are supported. If it matches your Account Details mailing address, you can select Same as my Flipvise mailing address.",
+          "Billing address is required at checkout. Enter your real country, city, postal code, and street address — overseas/international addresses are supported. When your Account Details mailing address is complete, Same as my Flipvise mailing address is selected by default; uncheck it to enter a different billing address.",
           "Pay with a credit or debit card Stripe accepts in your region. Flipvise does not store your full card number; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
@@ -642,7 +643,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",
           "Slide to confirm or continue → /pricing/checkout/pay (new sub) or plan-change payment (existing sub).",
-          "Stripe Embedded Checkout collects card + billing address (optional Same as my Flipvise mailing address) and shows final total with tax.",
+          "Stripe Embedded Checkout collects card + billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Slide to subscribe enables when card details, Card Name, and billing address are complete.",
           "Success redirects to /dashboard?checkout=success with a confirmation toast.",
         ],
         requirements: ["Signed-in account.", "Valid paid plan slug in the URL."],
@@ -898,7 +899,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Central hub for members, deck assignment, invites, quiz settings, and workspace history.",
         howItWorks: [
-          "Access via workspace switcher → To Admin Dash, or direct URL with ?team= and teamMemberId=.",
+          "Access via workspace switcher → WS Admin Dash (invited workspaces) or Team Admin Dash (personal), or direct URL with ?team= and teamMemberId=.",
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
         ],
@@ -983,11 +984,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "View and filter quiz results across members.",
           "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck in each workspace.",
           "Quiz Schedule: restrict when quizzes can be taken.",
-          "Quiz Security: anti-cheating and session rules.",
+          "Exam Mode: anti-cheating and session rules.",
         ],
         requirements: ["Team owner or team_admin."],
         doNots: [
-          "Do not change schedule or security mid-session without warning members.",
+          "Do not change schedule or Exam Mode mid-session without warning members.",
         ],
       },
       {
@@ -1085,7 +1086,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Generate lesson plans, quizzes, homework, study guides, and worksheets from your linked flashcard decks.",
         howItWorks: [
-          "AI Lesson Builder (/teacher/lesson-builder) — multi-day lesson plans with objectives, activities, and vocabulary; Jamaica NSC guidelines (including 5E class timelines) apply only when Learning Standard is confirmed Jamaica-linked.",
+          "AI Lesson Builder (/teacher/lesson-builder) — multi-day lesson plans with objectives, activities, and vocabulary; Jamaica NSC guidelines (including 5E class timelines) apply only when Learning Standard is confirmed Jamaica-linked. Existing deck lists workspace decks you can use (including assigned team decks) that do not already have a linked lesson plan. In edit mode, leaving via Back, sidebar/tabs, other in-app links, or browser Back with unsaved Input/Preview changes (or intake vs preview mismatches) prompts you to stay, generate a new plan (AI runs only on Generate), or keep the current preview and auto-save both intake and preview — creators overwrite their plan only while the deck is unassigned; once the deck is assigned to any member, the linked original stays frozen and creator edits save as a personal copy. Assignees never overwrite an assigned original (personal copy, with skip when already similar). Assignees editing a creator-linked assigned plan are prompted before Generate (and from the leave-dialog Generate action) to either run a completely new AI generation or create their own lesson plan from the linked plan without a new AI call (original stays unchanged; personal copy is created or updated, with content restructured to match changed intake details).",
           "AI Quiz/Test Generator (/teacher/quizzes) — classroom assessments with review before saving to a deck.",
           "Homework Generator (/teacher/homework) — take-home assignments aligned to deck content.",
           "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export.",
@@ -1127,11 +1128,16 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Saved materials from each AI tool appear here for quick access.",
           "Reopen saved items to edit, regenerate, or export (PDF where supported).",
+          "Lesson plan cards show the creator’s name; on team workspaces, Owner and Team Admin creators are labeled (Owner) or (Team Admin) next to that name (source line and footer).",
+          "Lesson plans linked to a source deck show a Deck updated badge when that deck (or its cards) changed after the plan was saved — use Edit to refresh the plan.",
+          "When a deck with a linked lesson plan is assigned to you, that original plan appears under From assigned decks (with the creator’s name). On team workspaces, lesson plan cards show (Owner) or (Team Admin) next to the creator’s name when that person is the workspace owner or a team admin. Edit opens AI Lesson Builder; Save stores your own copy under My lesson plans without changing the original. Before Generate, choose a completely new AI plan or create your lesson plan from the linked plan (original stays unchanged; personal copy is created or updated, with content restructured when intake details differ — no new AI generation). After assignment, the creator also cannot overwrite that linked original (their later edits save as a personal copy), so assignees keep seeing the plan that was linked at assign time.",
           "Education Gold/Enterprise teams can share resources via the shared lesson library.",
         ],
         requirements: ["Education plan access.", "At least one previously saved resource to see a list."],
         doNots: [
           "Do not delete saved resources you still need for active classes — exports are your backup.",
+          "Do not treat a Saved date as proof the plan matches the current deck — check for Deck updated when you change flashcards.",
+          "Do not expect Save or keep-on-leave on an assigned-deck original to overwrite the owner’s plan — it creates or updates your personal copy only (and skips overwrite when that copy already matches).",
         ],
       },
     ],

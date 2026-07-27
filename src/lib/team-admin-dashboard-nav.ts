@@ -141,7 +141,7 @@ export const TEAM_ADMIN_DASHBOARD_NAV: TeamAdminNavSection[] = [
         isActive: isTeamAdminQuizSchedulePath,
       },
       {
-        title: "Quiz security",
+        title: "Exam Mode",
         path: TEAM_ADMIN_QUIZ_SECURITY_PATH,
         icon: Shield,
         isActive: isTeamAdminQuizSecurityPath,

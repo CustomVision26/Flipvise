@@ -10,11 +10,17 @@ import {
   setDeckCoverImageUrl,
   updateDeck,
 } from "@/db/queries/decks";
+import { getDeckDeleteImpact } from "@/db/queries/deck-delete-impact";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
-import { getTeamById, getDecksForTeam } from "@/db/queries/teams";
+import { getTeamById, getDecksForTeam, getTeamsForTeamDashboard } from "@/db/queries/teams";
+import { getPrimaryLinkedLessonPlanForDeck } from "@/db/queries/saved-lesson-plans";
 import { getAccessContext } from "@/lib/access";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
+import { isEducationTeamPlanId } from "@/lib/education-plans";
+import { teamMemberUrlParamForTeamAdmin } from "@/lib/resolve-team-admin-dashboard-selection";
+import { userHasTeacherToolsAccess } from "@/lib/teacher-access";
+import { buildTeacherLessonBuilderPath } from "@/lib/teacher-url";
 import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
 
 const createDeckSchema = z
@@ -339,6 +345,28 @@ const deleteDeckSchema = z.object({
 
 type DeleteDeckInput = z.infer<typeof deleteDeckSchema>;
 
+const deckDeleteImpactSchema = z.object({
+  deckId: z.number().int().positive(),
+});
+
+/** Preview cascade / orphan impact before confirming deck delete. */
+export async function getDeckDeleteImpactAction(
+  data: z.infer<typeof deckDeleteImpactSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = deckDeleteImpactSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Forbidden");
+  }
+
+  return getDeckDeleteImpact(parsed.data.deckId);
+}
+
 export async function deleteDeckAction(data: DeleteDeckInput) {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
@@ -354,4 +382,78 @@ export async function deleteDeckAction(data: DeleteDeckInput) {
   await deleteDeck(parsed.data.deckId, bundle.deck.userId);
 
   revalidatePath("/dashboard");
+  revalidatePath("/teacher/resources");
+}
+
+const linkedLessonPlanForDeckEditSchema = z.object({
+  deckId: z.number().int().positive(),
+});
+
+export type LinkedLessonPlanForDeckEditResult =
+  | { linked: false }
+  | {
+      linked: true;
+      lessonPlanId: number;
+      lessonBuilderHref: string;
+    };
+
+/**
+ * Education Plus / education team tiers: if this deck has a linked lesson plan,
+ * Edit deck must continue in Lesson Builder so intake stays in sync.
+ */
+export async function getLinkedLessonPlanForDeckEditAction(
+  data: z.infer<typeof linkedLessonPlanForDeckEditSchema>,
+): Promise<LinkedLessonPlanForDeckEditResult> {
+  const ctx = await getAccessContext();
+  if (!ctx.userId) throw new Error("Unauthorized");
+
+  const parsed = linkedLessonPlanForDeckEditSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  if (!(await userHasTeacherToolsAccess(ctx))) {
+    return { linked: false };
+  }
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, ctx.userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Forbidden");
+  }
+
+  const plan = await getPrimaryLinkedLessonPlanForDeck(
+    parsed.data.deckId,
+    ctx.userId,
+  );
+  if (!plan) {
+    return { linked: false };
+  }
+
+  let teamId: number | null = null;
+  let teamMemberId: number | null = null;
+
+  const deckTeamId = bundle.deck.teamId;
+  if (deckTeamId != null) {
+    const manageTeams = (await getTeamsForTeamDashboard(ctx.userId)).filter(
+      (team) => isEducationTeamPlanId(team.planSlug),
+    );
+    const team = manageTeams.find((row) => row.id === deckTeamId);
+    if (team) {
+      teamId = team.id;
+      teamMemberId = await teamMemberUrlParamForTeamAdmin(team, ctx.userId);
+    }
+  }
+
+  const extra = new URLSearchParams({
+    lessonPlanId: String(plan.id),
+    fromDeckEdit: "1",
+  });
+
+  return {
+    linked: true,
+    lessonPlanId: plan.id,
+    lessonBuilderHref: buildTeacherLessonBuilderPath(
+      teamId,
+      teamMemberId,
+      extra,
+    ),
+  };
 }

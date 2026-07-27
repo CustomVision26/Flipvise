@@ -127,6 +127,8 @@ interface DeckGridProps {
   /** Team Clerk plan — richer “preview cards” entry with first-card image + CTA. */
   teamTierPreviewPromo?: boolean;
   hasAiReading?: boolean;
+  /** Education / teacher-tools — detailed permanent-delete warning. */
+  detailedDeleteWarning?: boolean;
 }
 
 export function DeckGrid({
@@ -137,6 +139,7 @@ export function DeckGrid({
   allowCoverUpload = false,
   teamTierPreviewPromo = false,
   hasAiReading = false,
+  detailedDeleteWarning = false,
 }: DeckGridProps) {
   const [sort, setSort] = useState<SortOption>("newest");
   const [pageSize, setPageSize] = useState<PageSize>(9);
@@ -169,7 +172,7 @@ export function DeckGrid({
   return (
     <div className="flex flex-col gap-4">
       {/* Controls bar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 border-b border-border/50 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-xs sm:text-sm tabular-nums">
           {sorted.length === 0
             ? "No decks"
@@ -240,6 +243,7 @@ export function DeckGrid({
             allowCoverUpload={allowCoverUpload}
             teamTierPreviewPromo={teamTierPreviewPromo}
             hasAiReading={hasAiReading}
+            detailedDeleteWarning={detailedDeleteWarning}
           />
         ))}
       </div>

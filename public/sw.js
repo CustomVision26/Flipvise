@@ -1,13 +1,15 @@
 /* Flipvise service worker — conservative offline shell.
  *
  * Strategy:
- *  - Static build assets (/_next/static, fonts, images): cache-first.
+ *  - Next.js / Turbopack runtime (/_next/*): NEVER intercepted (browser handles
+ *    revalidation). Touching these caused "module factory is not available".
+ *  - Fonts / images / icons: cache-first.
  *  - Navigations (HTML): network-first, fall back to /offline.html when offline.
  *  - API, auth, and Clerk requests: ALWAYS network (never cached) to avoid serving
  *    stale or cross-user authenticated data.
  */
 
-const CACHE_VERSION = "flipvise-v2";
+const CACHE_VERSION = "flipvise-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 
@@ -43,6 +45,8 @@ self.addEventListener("activate", (event) => {
 
 function isNeverCached(url) {
   return (
+    // Never intercept Next/Turbopack runtime — leave caching to the browser.
+    url.pathname.startsWith("/_next/") ||
     url.pathname.startsWith("/api/") ||
     url.pathname.includes("/sign-in") ||
     url.pathname.includes("/sign-up") ||
@@ -51,11 +55,8 @@ function isNeverCached(url) {
   );
 }
 
-function isStaticAsset(url) {
-  return (
-    url.pathname.startsWith("/_next/static/") ||
-    /\.(?:js|css|woff2?|png|jpg|jpeg|svg|webp|avif|ico)$/.test(url.pathname)
-  );
+function isCacheFirstStaticAsset(url) {
+  return /\.(?:woff2?|png|jpg|jpeg|svg|webp|avif|ico)$/.test(url.pathname);
 }
 
 self.addEventListener("fetch", (event) => {
@@ -66,7 +67,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (isNeverCached(url)) return;
 
-  if (isStaticAsset(url)) {
+  if (isCacheFirstStaticAsset(url)) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
         const cached = await cache.match(request);

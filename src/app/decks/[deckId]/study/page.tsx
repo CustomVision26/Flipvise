@@ -306,98 +306,124 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     : null;
 
   return (
-    <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <Link
-            href={studyBackHref}
-            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            {studyBackLabel.replace("← ", "")}
-          </Link>
-          {teamDeckHeading && (
-            <div className="mt-1 space-y-0.5">
-              <p className="text-muted-foreground text-sm">
-                Team:{" "}
-                {showTeamWorkspaceNavLinks ? (
-                  <Link href={teamDashboardHref} className={teamWorkspaceNavLinkClass}>
-                    {teamDeckHeading.teamName}
-                  </Link>
-                ) : (
-                  <span className="font-medium text-foreground">{teamDeckHeading.teamName}</span>
-                )}
-              </p>
-              <p className="text-muted-foreground text-xs sm:text-sm">
-                Owner:{" "}
-                <span className="text-foreground/90">{teamDeckHeading.ownerDisplayName}</span>
-              </p>
-            </div>
-          )}
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">
-            {showTeamWorkspaceNavLinks ? (
-              <Link
-                href={deckPageHref}
-                className={cn(teamWorkspaceDeckTitleLinkClass, "text-2xl sm:text-3xl")}
-              >
-                {deck.name}
-              </Link>
-            ) : (
-              deck.name
-            )}
-          </h1>
-          {deck.description?.trim() ? (
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
-              {deck.description.trim()}
-            </p>
-          ) : null}
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-muted-foreground">Study Session</span>
-            <span className="text-muted-foreground text-xs" aria-hidden>·</span>
-            <Badge variant="secondary" className="text-xs">
-              {cards.length} card{cards.length !== 1 ? "s" : ""}
-            </Badge>
-          </div>
-        </div>
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -right-24 -top-24 size-[20rem] rounded-full bg-primary/12 blur-3xl animate-float-gentle" />
+        <div className="absolute -left-16 top-1/3 size-[16rem] rounded-full bg-violet-500/10 blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-[-4rem] right-1/4 size-[14rem] rounded-full bg-fuchsia-500/8 blur-3xl animate-drift" />
       </div>
 
-      <StudySessionLoader
-        cards={cards}
-        deckId={id}
-        deckName={deck.name}
-        deckDescription={deck.description ?? null}
-        teamId={studyTeamId ?? deck.teamId ?? null}
-        allowsQuizStudy={allowsQuizStudy}
-        memberAllowReview={memberAllowReview}
-        memberAllowAiRecall={memberAllowAiRecall}
-        memberAllowQuiz={memberAllowQuiz}
-        deckGradient={deck.gradient ?? null}
-        autoSaveQuizResult={fromTeamWorkspaceUrl}
-        quizDurationSeconds={quizDurationSeconds}
-        hasAiReading={hasAiReading}
-        hasAiRecall={studyHasAiRecall}
-        quizSecurity={quizSecurity}
-        quizSchedule={quizSchedule}
-        exitHref={studyBackHref}
-        exitLabel={studyExitLabel}
-        ownerInboxAvailable={ownerInboxAvailable}
-        allowQuizCancelExit={
-          access.kind === "owner" || access.kind === "team_admin"
-        }
-        isEducationTeamPlan={isEducationTeamPlan}
-        quizFormats={quizFormats}
-        quizFormatAssignmentPlan={quizFormatAssignmentPlan}
-        quizCardOrder={
-          quizCardOrderContext?.cardIds && quizCardOrderContext.cardIds.length > 0
-            ? quizCardOrderContext.cardIds
-            : null
-        }
-        quizCardOrderShuffledAt={
-          quizCardOrderContext?.deckShuffledAt ?? quizCardOrderContext?.shuffledAt ?? null
-        }
-        canReshuffleCardOrder={canReshuffleCardOrder}
-        quizFormatEditorSnapshot={quizFormatEditorSnapshot}
-      />
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
+        <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-border/70 bg-card/55 p-5 shadow-lg shadow-black/10 backdrop-blur-md sm:p-7">
+          <div className="flex flex-col gap-3">
+            <Link
+              href={studyBackHref}
+              className="group inline-flex w-fit items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+              {studyBackLabel.replace("← ", "")}
+            </Link>
+            {teamDeckHeading && (
+              <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-xs sm:text-sm">
+                <p className="text-muted-foreground">
+                  Team:{" "}
+                  {showTeamWorkspaceNavLinks ? (
+                    <Link href={teamDashboardHref} className={teamWorkspaceNavLinkClass}>
+                      {teamDeckHeading.teamName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-foreground">
+                      {teamDeckHeading.teamName}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-muted-foreground">
+                  Owner:{" "}
+                  <span className="text-foreground/90">
+                    {teamDeckHeading.ownerDisplayName}
+                  </span>
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  Study session
+                </Badge>
+                <Badge variant="secondary" className="text-xs tabular-nums">
+                  {cards.length} card{cards.length !== 1 ? "s" : ""}
+                </Badge>
+              </div>
+              <h1 className="text-balance text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+                {showTeamWorkspaceNavLinks ? (
+                  <Link
+                    href={deckPageHref}
+                    className={cn(
+                      teamWorkspaceDeckTitleLinkClass,
+                      "text-2xl sm:text-3xl",
+                    )}
+                  >
+                    {deck.name}
+                  </Link>
+                ) : (
+                  deck.name
+                )}
+              </h1>
+              {deck.description?.trim() ? (
+                <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
+                  {deck.description.trim()}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <div className="animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both flex flex-1 flex-col">
+          <StudySessionLoader
+            cards={cards}
+            deckId={id}
+            deckName={deck.name}
+            deckDescription={deck.description ?? null}
+            teamId={studyTeamId ?? deck.teamId ?? null}
+            allowsQuizStudy={allowsQuizStudy}
+            memberAllowReview={memberAllowReview}
+            memberAllowAiRecall={memberAllowAiRecall}
+            memberAllowQuiz={memberAllowQuiz}
+            deckGradient={deck.gradient ?? null}
+            autoSaveQuizResult={fromTeamWorkspaceUrl}
+            quizDurationSeconds={quizDurationSeconds}
+            hasAiReading={hasAiReading}
+            hasAiRecall={studyHasAiRecall}
+            quizSecurity={quizSecurity}
+            quizSchedule={quizSchedule}
+            exitHref={studyBackHref}
+            exitLabel={studyExitLabel}
+            ownerInboxAvailable={ownerInboxAvailable}
+            allowQuizCancelExit={
+              access.kind === "owner" || access.kind === "team_admin"
+            }
+            isEducationTeamPlan={isEducationTeamPlan}
+            quizFormats={quizFormats}
+            quizFormatAssignmentPlan={quizFormatAssignmentPlan}
+            quizCardOrder={
+              quizCardOrderContext?.cardIds &&
+              quizCardOrderContext.cardIds.length > 0
+                ? quizCardOrderContext.cardIds
+                : null
+            }
+            quizCardOrderShuffledAt={
+              quizCardOrderContext?.deckShuffledAt ??
+              quizCardOrderContext?.shuffledAt ??
+              null
+            }
+            canReshuffleCardOrder={canReshuffleCardOrder}
+            quizFormatEditorSnapshot={quizFormatEditorSnapshot}
+          />
+        </div>
+      </div>
     </div>
   );
 }

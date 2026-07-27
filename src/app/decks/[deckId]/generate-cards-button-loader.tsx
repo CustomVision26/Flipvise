@@ -10,6 +10,7 @@ export type GenerateCardsButtonLoaderProps = {
   aiGeneratedCount: number;
   hasAI: boolean;
   deckCardLimit: number;
+  onGradient?: boolean;
 };
 
 const GenerateCardsButtonDynamic = dynamic<GenerateCardsButtonLoaderProps>(

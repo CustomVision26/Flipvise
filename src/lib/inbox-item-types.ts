@@ -26,6 +26,9 @@ export type TeamInvitePayload = {
   invitationId: number;
   teamName: string;
   role: "team_admin" | "team_member";
+  /** Plan / workspace owner display name when Clerk lookup succeeds. */
+  ownerName: string | null;
+  /** Team admin (or owner) who sent the invite. */
   inviterName: string;
   expiresAtIso: string;
   outcome: TeamInviteInboxOutcome;
@@ -268,7 +271,7 @@ export type UnifiedInboxItem =
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   quiz_result: "Quiz Result",
-  team_invite: "Team Invitation",
+  team_invite: "Workspace invitation",
   subscription_confirmed: "Subscription",
   billing: "Billing",
   affiliate: "Affiliate Invite",
@@ -277,7 +280,7 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   billing_notice: "Billing notice",
   admin_plan_log: "Plan update",
   admin_plan_invite: "Plan request",
-  quiz_security_notice: "Quiz security",
+  quiz_security_notice: "Exam Mode",
   support_ticket: "Support ticket",
   contact_us_message: "Contact Us",
   welcome: "Welcome",

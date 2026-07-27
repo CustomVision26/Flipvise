@@ -164,21 +164,37 @@ function EditCardDialogFooter({
 }) {
   return (
     <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0 pt-1">
-      <Button
-        variant="outline"
-        onClick={onCancel}
-        disabled={isBusy}
-        className="w-full sm:w-auto"
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={onSave}
-        disabled={isBusy || saveDisabled}
-        className="w-full sm:w-auto"
-      >
-        {saveLabel}
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex w-full sm:w-auto" />}>
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              disabled={isBusy}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Cancel and close</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger
+            render={<span className="inline-flex w-full sm:w-auto" tabIndex={0} />}
+          >
+            <Button
+              onClick={onSave}
+              disabled={isBusy || saveDisabled}
+              className="w-full sm:w-auto"
+            >
+              {saveLabel}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Save card changes</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </DialogFooter>
   );
 }
@@ -242,29 +258,47 @@ function ImageUploadSection({
             </div>
           )}
           {!isUploading && (
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="absolute top-2 right-2 h-6 w-6 sm:h-7 sm:w-7"
-              onClick={onRemove}
-            >
-              <X className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-6 w-6 sm:h-7 sm:w-7"
+                      onClick={onRemove}
+                    />
+                  }
+                >
+                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                </TooltipTrigger>
+                <TooltipContent>Remove image</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-fit gap-2 text-xs sm:text-sm h-8 sm:h-9"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isBusy}
-        >
-          <ImagePlus className="h-3 w-3 sm:h-4 sm:w-4" />
-          Add image
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex w-fit" tabIndex={0} />}
+            >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-fit gap-2 text-xs sm:text-sm h-8 sm:h-9"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBusy}
+              >
+                <ImagePlus className="h-3 w-3 sm:h-4 sm:w-4" />
+                Add image
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Upload an image for this side</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
       <input
         ref={fileInputRef}
@@ -1423,17 +1457,24 @@ export function EditCardDialog({ card, deckId, hasAI = false }: EditCardDialogPr
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
-          />
-        }
-      >
-        Edit
-      </DialogTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            <DialogTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
+                />
+              }
+            >
+              Edit
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Edit this card&apos;s content</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto max-h-[90vh] overflow-y-auto bg-background">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Edit Card</DialogTitle>

@@ -133,7 +133,7 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
   if (isTeamAdminQuizSecurityPath(pathname)) {
     return {
       section: "Quiz administration",
-      title: "Quiz security",
+      title: "Exam Mode",
       description: "Manage quiz lock settings and review locked sessions.",
       isOverview: false,
     };

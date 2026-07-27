@@ -101,7 +101,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "Account email — your signed-in Flipvise address; receipts and billing notices go here.",
           "Payment method — card number, expiry, and CVC for whoever is paying.",
-          "Billing address — name and address on the card or bank account you are paying with. If it matches your Flipvise mailing address from Account Details, check Same as my Flipvise mailing address to hide country/address fields and enter Card Name only. Used to verify the payment method and calculate tax where applicable.",
+          "Billing address — name and address on the card or bank account you are paying with. When you have a complete Flipvise mailing address in Account Details, Same as my Flipvise mailing address is selected by default so country/address fields stay hidden and you enter Card Name only. Uncheck it to enter a different billing address. Used to verify the payment method and calculate tax where applicable.",
         ],
       },
     ],

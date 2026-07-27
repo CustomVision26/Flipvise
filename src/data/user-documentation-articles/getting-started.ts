@@ -84,7 +84,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         bullets: [
           "Personal Dash — your own decks and account context.",
           "Team workspaces — study or manage decks in a subscriber’s workspace.",
-          "To Admin Dash — opens Team Admin for owners and co-admins.",
+          "WS Admin Dash — opens Team Admin for co-admins on invited workspaces (tooltip: This Workspace Admin Dashboard).",
           "Switching workspaces updates URL query params and a team context cookie.",
         ],
       },

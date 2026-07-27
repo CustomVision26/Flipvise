@@ -797,6 +797,21 @@ export async function getDecksForTeamWithCardCount(
   }
 }
 
+/** True when any team member currently has this deck assigned. */
+export async function deckHasAnyTeamAssignments(
+  deckId: number,
+): Promise<boolean> {
+  if (!Number.isFinite(deckId) || deckId <= 0) return false;
+
+  const [row] = await db
+    .select({ deckId: teamDeckAssignments.deckId })
+    .from(teamDeckAssignments)
+    .where(eq(teamDeckAssignments.deckId, deckId))
+    .limit(1);
+
+  return row != null;
+}
+
 export async function getAssignedDecksForMember(
   teamId: number,
   memberUserId: string,
@@ -878,6 +893,37 @@ export type TeamAdminWorkspaceDeckWithCardCount = {
   cardCount: number;
   canEditContent: boolean;
 };
+
+/**
+ * Education team admins — decks they created in the workspace plus owner-assigned
+ * decks (same visibility as Team Dashboard, without card counts).
+ */
+export async function getEducationTeamAdminWorkspaceDecks(
+  teamId: number,
+  ownerUserId: string,
+  teamAdminUserId: string,
+): Promise<DeckRow[]> {
+  const [workspaceDecks, assignedDecks] = await Promise.all([
+    getDecksForTeam(teamId, ownerUserId),
+    getAssignedDecksForMember(teamId, teamAdminUserId),
+  ]);
+
+  const byId = new Map<number, DeckRow>();
+
+  for (const deck of workspaceDecks) {
+    if (deck.createdByUserId !== teamAdminUserId) continue;
+    byId.set(deck.id, deck);
+  }
+
+  for (const deck of assignedDecks) {
+    if (byId.has(deck.id)) continue;
+    byId.set(deck.id, deck);
+  }
+
+  return [...byId.values()].sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+  );
+}
 
 /** Education team admins — decks they created in the workspace plus owner-assigned decks (study only). */
 export async function getEducationTeamAdminWorkspaceDecksWithCardCount(

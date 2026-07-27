@@ -76,6 +76,10 @@ import {
 } from "@/lib/clerk-user-display";
 import { loopsSendTeamInvitationEmail } from "@/lib/loops";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
+import {
+  formatTeamInviteSubjectLine,
+  teamInviteRoleLabel,
+} from "@/lib/team-invite-message-copy";
 import { updateDeckQuizDurationMinutes } from "@/db/queries/quiz-formats";
 import { getDeckRowById } from "@/db/queries/decks";
 import type { InferSelectModel } from "drizzle-orm";
@@ -490,7 +494,12 @@ export async function inviteTeamMemberAction(
   const dashboardInboxUrl = `${base}/dashboard/inbox`;
 
   const inviterName = await getClerkUserDisplayNameById(userId);
-  const roleLabel = parsed.data.role === "team_admin" ? "Team admin" : "Member";
+  const planOwnerName =
+    team.ownerUserId === userId
+      ? inviterName
+      : await getClerkUserDisplayNameById(team.ownerUserId);
+  const roleLabel = teamInviteRoleLabel(parsed.data.role);
+  const subjectLine = formatTeamInviteSubjectLine(team.name);
 
   /** Registered Clerk user → dashboard inbox (+ push); no Loops transactional email. */
   const registeredClerkInvitee = await findClerkUserIdByEmail(normalizedEmail);
@@ -502,16 +511,17 @@ export async function inviteTeamMemberAction(
       workspaceName: team.name,
       roleLabel,
       inviterName,
+      planOwnerName,
       acceptInvitationUrl: inviteUrl,
       dashboardInboxUrl,
       expiresInDays: TEAM_INVITE_EXPIRY_DAYS,
-      subjectLine: `You're invited to ${team.name}`,
+      subjectLine,
     });
   } else {
     notifyNativeInboxPush({
       recipientUserId: registeredClerkInvitee,
       category: "team_invite",
-      body: `You're invited to ${team.name}`,
+      body: subjectLine,
     });
   }
 

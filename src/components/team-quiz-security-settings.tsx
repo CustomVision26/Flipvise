@@ -62,10 +62,10 @@ function SecurityAudienceCheckboxes({
   return (
     <div className="space-y-2 pt-1">
       <p className="text-xs font-medium text-muted-foreground">
-        Apply security to
+        Apply Exam Mode to
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Plan owner is always restricted when security is on.
+        Plan owner is always restricted when Exam Mode is on.
       </p>
       <div className="flex flex-wrap gap-4">
         <div className="flex items-center gap-2">
@@ -230,7 +230,7 @@ export function TeamQuizSecuritySettings({
           [selected.id]: previousAudience,
         }));
       }
-      setWorkspaceError(e instanceof Error ? e.message : "Could not update quiz security.");
+      setWorkspaceError(e instanceof Error ? e.message : "Could not update Exam Mode.");
     } finally {
       setWorkspaceSaving(false);
     }
@@ -278,7 +278,7 @@ export function TeamQuizSecuritySettings({
       setDeckAudienceById((prev) => ({ ...prev, [deckId]: previousAudience }));
       setDeckErrorById((prev) => ({
         ...prev,
-        [deckId]: e instanceof Error ? e.message : "Could not update deck quiz security.",
+        [deckId]: e instanceof Error ? e.message : "Could not update deck Exam Mode.",
       }));
     } finally {
       setDeckSavingId(null);
@@ -316,9 +316,9 @@ export function TeamQuizSecuritySettings({
     <div className="space-y-8">
       <section className="space-y-5">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-foreground">Workspace security</h3>
+          <h3 className="text-sm font-semibold text-foreground">Workspace Exam Mode</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Turn quiz security on or off for every deck in the selected workspace unless a deck has
+            Turn Exam Mode on or off for every deck in the selected workspace unless a deck has
             its own setting.
           </p>
         </div>
@@ -384,7 +384,7 @@ export function TeamQuizSecuritySettings({
               checked={workspaceEnabled}
               disabled={workspaceSaving}
               onCheckedChange={handleWorkspaceToggle}
-              aria-label={`Quiz security for ${selected.name}`}
+              aria-label={`Exam Mode for ${selected.name}`}
             />
           </div>
         ) : null}
@@ -400,9 +400,9 @@ export function TeamQuizSecuritySettings({
 
       <section className="space-y-5">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-foreground">Deck security</h3>
+          <h3 className="text-sm font-semibold text-foreground">Deck Exam Mode</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Set quiz security for individual decks in{" "}
+            Set Exam Mode for individual decks in{" "}
             <span className="font-medium text-foreground">{selected?.name ?? "this workspace"}</span>
             . Decks without a custom setting use the workspace default above.
           </p>
@@ -451,7 +451,7 @@ export function TeamQuizSecuritySettings({
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       {usesWorkspaceDefault
                         ? `Using workspace default (${workspaceEnabled ? "on" : "off"}).`
-                        : "Custom security setting for this deck."}
+                        : "Custom Exam Mode setting for this deck."}
                     </p>
                     <p
                       className={cn(
@@ -459,7 +459,7 @@ export function TeamQuizSecuritySettings({
                         effective ? "text-emerald-400" : "text-muted-foreground",
                       )}
                     >
-                      {effective ? "Secured" : "Not secured"}
+                      {effective ? "Exam Mode on" : "Exam Mode off"}
                     </p>
                     {effective ? (
                       <SecurityAudienceCheckboxes
@@ -494,7 +494,7 @@ export function TeamQuizSecuritySettings({
                     checked={effective}
                     disabled={saving || workspaceSaving}
                     onCheckedChange={(checked) => void handleDeckToggle(deck.id, checked)}
-                    aria-label={`Quiz security for ${deck.name}`}
+                    aria-label={`Exam Mode for ${deck.name}`}
                   />
                 </div>
               );

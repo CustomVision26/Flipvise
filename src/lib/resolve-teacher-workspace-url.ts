@@ -67,6 +67,10 @@ function preservedExtraParams(
     if (sourceType) {
       extra.set("sourceType", sourceType);
     }
+    const fromDeckEdit = firstParam(searchParams, "fromDeckEdit");
+    if (fromDeckEdit) {
+      extra.set("fromDeckEdit", fromDeckEdit);
+    }
   }
   return extra;
 }

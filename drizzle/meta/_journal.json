@@ -246,6 +246,13 @@
       "when": 1779000000000,
       "tag": "0063_team_study_privilege_ai_recall",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779100000000,
+      "tag": "0064_addon_catalog_entitlements",
+      "breakpoints": true
     }
   ]
 }

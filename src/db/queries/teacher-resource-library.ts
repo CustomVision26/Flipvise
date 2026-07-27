@@ -1,13 +1,21 @@
 import "server-only";
 
+import { getDeckContentUpdatedAtByIds } from "@/db/queries/decks";
 import { getSavedHomeworkAssignmentsByUserIds } from "@/db/queries/saved-homework";
-import { getSavedLessonPlansByUserIds } from "@/db/queries/saved-lesson-plans";
+import {
+  getAssignedDeckLessonPlansForMember,
+  getSavedLessonPlansByUserIds,
+  type SavedLessonPlanRow,
+} from "@/db/queries/saved-lesson-plans";
 import { getSavedQuizzesByUserIds } from "@/db/queries/saved-quizzes";
 import { getSavedStudyGuidesByUserIds } from "@/db/queries/saved-study-guides";
 import { getSavedWorksheetsByUserIds } from "@/db/queries/saved-worksheets";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import type { WorkspaceMemberMeta } from "@/lib/teacher-workspace-member-grouping";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
+
+/** How a lesson plan appears for non-owner workspace viewers. */
+export type TeacherLessonPlanLibraryOrigin = "assigned" | "mine";
 
 export type TeacherResourceLibraryItem = {
   key: string;
@@ -32,8 +40,44 @@ export type TeacherResourceLibraryItem = {
   savedQuizId: number | null;
   quizHref: string | null;
   sourceLabel: string | null;
+  /** ISO timestamp when the linked source deck (or its cards) is newer than this resource. */
+  sourceDeckUpdatedAt: string | null;
+  /** True when a linked source deck changed after this resource was last saved/updated. */
+  isOutdatedVsSourceDeck: boolean;
   isPlaceholder: boolean;
+  /**
+   * Set on lesson-plan items for non-owner workspace viewers:
+   * `assigned` = original linked to an assigned deck; `mine` = viewer-owned copy/plan.
+   */
+  lessonPlanOrigin: TeacherLessonPlanLibraryOrigin | null;
 };
+
+function toTimestampMs(value: Date | string): number {
+  const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+function resolveSourceDeckStaleState(
+  planUpdatedAt: Date | string,
+  planCreatedAt: Date | string,
+  sourceDeckUpdatedAt: Date | undefined,
+): { sourceDeckUpdatedAt: string | null; isOutdatedVsSourceDeck: boolean } {
+  if (!sourceDeckUpdatedAt) {
+    return { sourceDeckUpdatedAt: null, isOutdatedVsSourceDeck: false };
+  }
+  const planFreshnessMs = Math.max(
+    toTimestampMs(planUpdatedAt),
+    toTimestampMs(planCreatedAt),
+  );
+  const deckMs = toTimestampMs(sourceDeckUpdatedAt);
+  if (deckMs <= planFreshnessMs) {
+    return { sourceDeckUpdatedAt: null, isOutdatedVsSourceDeck: false };
+  }
+  return {
+    sourceDeckUpdatedAt: sourceDeckUpdatedAt.toISOString(),
+    isOutdatedVsSourceDeck: true,
+  };
+}
 
 export type TeacherResourceLibrarySection = {
   id: "lessonPlans" | "homework" | "quizzes" | "worksheets" | "studyGuides";
@@ -126,8 +170,94 @@ function placeholderItems(
     savedQuizId: null,
     quizHref: null,
     sourceLabel: null,
+    sourceDeckUpdatedAt: null,
+    isOutdatedVsSourceDeck: false,
     isPlaceholder: true,
+    lessonPlanOrigin: null,
   }));
+}
+
+/**
+ * Workspace role suffix for lesson-plan creator display.
+ * Only Owner and Team Admin are labeled; members and personal (no-team) views get "".
+ */
+function lessonPlanCreatorRoleSuffix(
+  creatorUserId: string,
+  ownerUserId: string | null,
+  memberMetaByUserId: Record<string, WorkspaceMemberMeta>,
+): string {
+  if (ownerUserId == null) return "";
+  if (creatorUserId === ownerUserId) return " (Owner)";
+  if (memberMetaByUserId[creatorUserId]?.role === "team_admin") {
+    return " (Team Admin)";
+  }
+  return "";
+}
+
+function formatLessonPlanCreatorName(
+  primaryLine: string | null | undefined,
+  creatorUserId: string,
+  ownerUserId: string | null,
+  memberMetaByUserId: Record<string, WorkspaceMemberMeta>,
+): string | null {
+  if (!primaryLine) return null;
+  return `${primaryLine}${lessonPlanCreatorRoleSuffix(creatorUserId, ownerUserId, memberMetaByUserId)}`;
+}
+
+function mapLessonPlanToLibraryItem(
+  plan: SavedLessonPlanRow,
+  creatorDisplay: { primaryLine: string | null; primaryEmail: string | null } | undefined,
+  stale: { sourceDeckUpdatedAt: string | null; isOutdatedVsSourceDeck: boolean },
+  origin: TeacherLessonPlanLibraryOrigin | null,
+  ownerUserId: string | null,
+  memberMetaByUserId: Record<string, WorkspaceMemberMeta>,
+): TeacherResourceLibraryItem {
+  const creatorName = formatLessonPlanCreatorName(
+    creatorDisplay?.primaryLine,
+    plan.userId,
+    ownerUserId,
+    memberMetaByUserId,
+  );
+  const sourceFromDeck = plan.sourceDeckName
+    ? `From deck: ${plan.sourceDeckName}`
+    : null;
+
+  let sourceLabel = sourceFromDeck;
+  if (origin === "assigned") {
+    const creatorBit = creatorName ? ` · Created by ${creatorName}` : "";
+    sourceLabel = plan.sourceDeckName
+      ? `Assigned with deck: ${plan.sourceDeckName}${creatorBit}`
+      : `Assigned with deck${creatorBit}`;
+  }
+
+  return {
+    key: `lesson-plan:${plan.id}`,
+    title: plan.lessonTitle,
+    subject: plan.subject,
+    gradeLevel: plan.gradeLevel,
+    difficultyLevel: plan.difficultyLevel,
+    creatorUserId: plan.userId,
+    creatorName,
+    creatorEmail: creatorDisplay?.primaryEmail ?? null,
+    savedAt: plan.createdAt.toISOString(),
+    pdfUrl: plan.pdfUrl,
+    answerKeyPdfUrl: null,
+    lessonPlanId: plan.id,
+    lessonPlanEditHref: null,
+    homeworkEditHref: null,
+    worksheetEditHref: null,
+    studyGuideEditHref: null,
+    homeworkId: null,
+    worksheetId: null,
+    studyGuideId: null,
+    savedQuizId: null,
+    quizHref: null,
+    sourceLabel,
+    sourceDeckUpdatedAt: stale.sourceDeckUpdatedAt,
+    isOutdatedVsSourceDeck: stale.isOutdatedVsSourceDeck,
+    isPlaceholder: false,
+    lessonPlanOrigin: origin,
+  };
 }
 
 function formatSavedQuizSourceLabel(quiz: {
@@ -175,42 +305,84 @@ export async function loadTeacherResourceLibrary(
     };
   }
 
-  const [lessonPlans, homeworkAssignments, studyGuides, worksheets, savedQuizzes] = await Promise.all([
+  const assignedLessonPlansPromise =
+    !isWorkspaceOwner && teamId != null
+      ? getAssignedDeckLessonPlansForMember(teamId, viewerUserId)
+      : Promise.resolve([] as SavedLessonPlanRow[]);
+
+  const [
+    lessonPlans,
+    assignedLessonPlans,
+    homeworkAssignments,
+    studyGuides,
+    worksheets,
+    savedQuizzes,
+  ] = await Promise.all([
     getSavedLessonPlansByUserIds(workspaceUserIds),
+    assignedLessonPlansPromise,
     getSavedHomeworkAssignmentsByUserIds(workspaceUserIds),
     getSavedStudyGuidesByUserIds(workspaceUserIds),
     getSavedWorksheetsByUserIds(workspaceUserIds),
     getSavedQuizzesByUserIds(workspaceUserIds),
   ]);
 
-  const lessonPlanItems: TeacherResourceLibraryItem[] = lessonPlans.map((plan) => {
-    const creatorDisplay = userDisplayById[plan.userId];
-    return {
-      key: `lesson-plan:${plan.id}`,
-      title: plan.lessonTitle,
-      subject: plan.subject,
-      gradeLevel: plan.gradeLevel,
-      difficultyLevel: plan.difficultyLevel,
-      creatorUserId: plan.userId,
-      creatorName: creatorDisplay?.primaryLine ?? null,
-      creatorEmail: creatorDisplay?.primaryEmail ?? null,
-      savedAt: plan.createdAt.toISOString(),
-      pdfUrl: plan.pdfUrl,
-      answerKeyPdfUrl: null,
-      lessonPlanId: plan.id,
-      lessonPlanEditHref: null,
-    homeworkEditHref: null,
-    worksheetEditHref: null,
-    studyGuideEditHref: null,
-      homeworkId: null,
-      worksheetId: null,
-      studyGuideId: null,
-      savedQuizId: null,
-      quizHref: null,
-      sourceLabel: null,
-      isPlaceholder: false,
-    };
-  });
+  const assignedCreatorIds = assignedLessonPlans.map((plan) => plan.userId);
+  const needsExtraDisplays = assignedCreatorIds.filter(
+    (id) => userDisplayById[id] == null,
+  );
+  if (needsExtraDisplays.length > 0) {
+    const extraDisplays = await getClerkUserFieldDisplaysByIds(needsExtraDisplays);
+    Object.assign(userDisplayById, extraDisplays);
+  }
+
+  const ownLessonPlanIds = new Set(lessonPlans.map((plan) => plan.id));
+  const assignedPlansForLibrary = assignedLessonPlans.filter(
+    (plan) => !ownLessonPlanIds.has(plan.id),
+  );
+
+  const lessonPlanDeckIds = [
+    ...lessonPlans.map((plan) => plan.deckId),
+    ...assignedPlansForLibrary.map((plan) => plan.deckId),
+  ].filter((deckId): deckId is number => deckId != null);
+  const sourceDeckUpdatedAtById =
+    await getDeckContentUpdatedAtByIds(lessonPlanDeckIds);
+
+  const teamOwnerUserId = team != null ? team.ownerUserId : null;
+
+  const lessonPlanItems: TeacherResourceLibraryItem[] = [
+    ...assignedPlansForLibrary.map((plan) => {
+      const creatorDisplay = userDisplayById[plan.userId];
+      const stale = resolveSourceDeckStaleState(
+        plan.updatedAt,
+        plan.createdAt,
+        plan.deckId != null ? sourceDeckUpdatedAtById.get(plan.deckId) : undefined,
+      );
+      return mapLessonPlanToLibraryItem(
+        plan,
+        creatorDisplay,
+        stale,
+        isWorkspaceOwner ? null : "assigned",
+        teamOwnerUserId,
+        memberMetaByUserId,
+      );
+    }),
+    ...lessonPlans.map((plan) => {
+      const creatorDisplay = userDisplayById[plan.userId];
+      const stale = resolveSourceDeckStaleState(
+        plan.updatedAt,
+        plan.createdAt,
+        plan.deckId != null ? sourceDeckUpdatedAtById.get(plan.deckId) : undefined,
+      );
+      return mapLessonPlanToLibraryItem(
+        plan,
+        creatorDisplay,
+        stale,
+        isWorkspaceOwner ? null : "mine",
+        teamOwnerUserId,
+        memberMetaByUserId,
+      );
+    }),
+  ];
 
   const homeworkItems: TeacherResourceLibraryItem[] = homeworkAssignments.map((homework) => {
     const creatorDisplay = userDisplayById[homework.userId];
@@ -228,16 +400,19 @@ export async function loadTeacherResourceLibrary(
       answerKeyPdfUrl: null,
       lessonPlanId: homework.savedLessonPlanId,
       lessonPlanEditHref: null,
-    homeworkEditHref: null,
-    worksheetEditHref: null,
-    studyGuideEditHref: null,
+      homeworkEditHref: null,
+      worksheetEditHref: null,
+      studyGuideEditHref: null,
       homeworkId: homework.id,
       worksheetId: null,
       studyGuideId: null,
       savedQuizId: null,
       quizHref: null,
       sourceLabel: formatHomeworkSourceLabel(homework),
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
       isPlaceholder: false,
+      lessonPlanOrigin: null,
     };
   });
 
@@ -257,16 +432,19 @@ export async function loadTeacherResourceLibrary(
       answerKeyPdfUrl: null,
       lessonPlanId: guide.savedLessonPlanId,
       lessonPlanEditHref: null,
-    homeworkEditHref: null,
-    worksheetEditHref: null,
-    studyGuideEditHref: null,
+      homeworkEditHref: null,
+      worksheetEditHref: null,
+      studyGuideEditHref: null,
       homeworkId: guide.savedHomeworkId,
       worksheetId: null,
       studyGuideId: guide.id,
       savedQuizId: null,
       quizHref: null,
       sourceLabel: formatStudyGuideSourceLabel(guide),
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
       isPlaceholder: false,
+      lessonPlanOrigin: null,
     };
   });
 
@@ -286,16 +464,19 @@ export async function loadTeacherResourceLibrary(
       answerKeyPdfUrl: worksheet.answerKeyPdfUrl,
       lessonPlanId: null,
       lessonPlanEditHref: null,
-    homeworkEditHref: null,
-    worksheetEditHref: null,
-    studyGuideEditHref: null,
+      homeworkEditHref: null,
+      worksheetEditHref: null,
+      studyGuideEditHref: null,
       homeworkId: null,
       worksheetId: worksheet.id,
       studyGuideId: null,
       savedQuizId: null,
       quizHref: null,
       sourceLabel: formatWorksheetSourceLabel(worksheet),
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
       isPlaceholder: false,
+      lessonPlanOrigin: null,
     };
   });
 
@@ -324,7 +505,10 @@ export async function loadTeacherResourceLibrary(
       savedQuizId: quiz.id,
       quizHref: null,
       sourceLabel: formatSavedQuizSourceLabel(quiz),
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
       isPlaceholder: false,
+      lessonPlanOrigin: null,
     };
   });
 
@@ -342,8 +526,9 @@ export async function loadTeacherResourceLibrary(
     {
       id: "lessonPlans",
       title: "Saved Lesson Plans",
-      emptyMessage:
-        "No saved lesson plans yet. Generate one in the AI Lesson Builder and click Save Lesson Plan.",
+      emptyMessage: isWorkspaceOwner
+        ? "No saved lesson plans yet. Generate one in the AI Lesson Builder and click Save Lesson Plan."
+        : "No lesson plans yet. Plans linked to decks assigned to you appear here automatically, and plans you save appear under My lesson plans.",
       items: lessonPlanItems,
     },
     {

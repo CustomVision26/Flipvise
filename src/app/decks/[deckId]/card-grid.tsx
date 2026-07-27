@@ -72,7 +72,7 @@ type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 // Elevated, near-opaque surface so card rows lift off the deck's gradient page
 // background and stay clearly legible — matching the dashboard deck rows.
 const cardSurfaceClass =
-  "border border-border/80 bg-card/95 ring-1 ring-foreground/20 shadow-lg shadow-black/30 backdrop-blur-md hover:bg-card";
+  "border border-border/70 bg-card/95 ring-1 ring-foreground/10 shadow-md shadow-black/20 backdrop-blur-md transition-[transform,box-shadow,background-color] duration-200 hover:-translate-y-0.5 hover:bg-card hover:shadow-lg hover:shadow-black/25";
 
 const SORT_OPTIONS: DropdownSortOption<SortOption>[] = [
   { value: "newest", label: "Newest first" },

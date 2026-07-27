@@ -12,7 +12,7 @@ export type NativeInboxPushCategory =
   | "welcome";
 
 const CATEGORY_TITLES: Record<NativeInboxPushCategory, string> = {
-  team_invite: "Team invitation",
+  team_invite: "Workspace invitation",
   affiliate_broadcast: "New inbox message",
   subscription_checkout: "Subscription confirmed",
   billing_notice: "Billing notice",

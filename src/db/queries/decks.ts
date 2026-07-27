@@ -1,7 +1,38 @@
 import { db } from "@/db";
 import { decks, cards, type DeckRow } from "@/db/schema";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, max } from "drizzle-orm";
 export type { DeckRow };
+
+/**
+ * Effective content freshness for source decks linked to saved teacher resources.
+ * Uses the later of `decks.updatedAt` and the newest card `updatedAt` in that deck.
+ */
+export async function getDeckContentUpdatedAtByIds(
+  deckIds: number[],
+): Promise<Map<number, Date>> {
+  const uniqueIds = [...new Set(deckIds.filter((id) => Number.isInteger(id) && id > 0))];
+  const result = new Map<number, Date>();
+  if (uniqueIds.length === 0) return result;
+
+  const rows = await db
+    .select({
+      id: decks.id,
+      deckUpdatedAt: decks.updatedAt,
+      latestCardUpdatedAt: max(cards.updatedAt),
+    })
+    .from(decks)
+    .leftJoin(cards, eq(cards.deckId, decks.id))
+    .where(inArray(decks.id, uniqueIds))
+    .groupBy(decks.id, decks.updatedAt);
+
+  for (const row of rows) {
+    const deckTime = row.deckUpdatedAt.getTime();
+    const cardTime = row.latestCardUpdatedAt?.getTime() ?? 0;
+    result.set(row.id, new Date(Math.max(deckTime, cardTime)));
+  }
+
+  return result;
+}
 
 /** Drizzle projection when DB is behind schema (missing `coverImageUrl` / `gradient` / `quizDurationMinutes` columns). */
 export const deckRowSelectWithoutCover = {

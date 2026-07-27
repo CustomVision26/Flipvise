@@ -16,6 +16,8 @@ import {
   syncCheckoutCompletedSubscription,
   syncSubscriptionLifecycleEvent,
 } from "@/lib/stripe-subscription-lifecycle";
+import { isStripeAddonSubscription } from "@/lib/stripe-addon-metadata";
+import { syncAddonEntitlementsFromStripeSubscription } from "@/lib/stripe-addon-sync";
 import { createClerkClient } from "@clerk/backend";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -122,6 +124,55 @@ export async function POST(req: NextRequest) {
         }
 
         const userId = stringOrNull(session.metadata?.clerkUserId);
+        const isAddonCheckout = session.metadata?.type === "addon";
+
+        if (isAddonCheckout) {
+          const customerId =
+            typeof session.customer === "string" ? session.customer : session.customer?.id;
+          const subscriptionId =
+            typeof session.subscription === "string"
+              ? session.subscription
+              : session.subscription?.id ?? null;
+
+          if (customerId && userId) {
+            try {
+              await stripe.customers.update(customerId, {
+                metadata: { clerkUserId: userId },
+              });
+            } catch {
+              // best-effort
+            }
+          }
+
+          if (subscriptionId) {
+            try {
+              const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+                expand: ["items.data"],
+              });
+              await syncAddonEntitlementsFromStripeSubscription(sub, userId);
+            } catch (error) {
+              console.error(
+                "[stripe webhook] addon checkout.session.completed sync",
+                session.id,
+                error,
+              );
+            }
+          }
+
+          if (userId && session.id) {
+            try {
+              await syncCheckoutSessionInvoicesForUser(userId, session.id);
+            } catch (error) {
+              console.error(
+                "[stripe webhook] addon checkout invoice sync",
+                session.id,
+                error,
+              );
+            }
+          }
+          break;
+        }
+
         const selectedPlan = asPaidPlanId(session.metadata?.plan) ?? "pro";
         const isTrialCheckout = session.metadata?.isTrial === "true";
 
@@ -215,6 +266,18 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.trial_will_end": {
         const sub = event.data.object as Stripe.Subscription;
         const resolution = await resolveUserAndPlanFromSubscription(sub);
+
+        try {
+          await syncAddonEntitlementsFromStripeSubscription(sub, resolution?.userId);
+        } catch (error) {
+          console.error("[stripe webhook] addon entitlement sync", sub.id, error);
+        }
+
+        // Add-on-only subscriptions must not rewrite base plan billing metadata.
+        if (isStripeAddonSubscription(sub)) {
+          break;
+        }
+
         if (resolution) {
           await syncSubscriptionLifecycleEvent(sub, resolution, event.type);
         }

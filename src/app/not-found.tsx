@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { FileQuestion, Home } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export default function NotFound() {
@@ -19,13 +25,31 @@ export default function NotFound() {
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-3">
-        <Link href="/dashboard" className={cn(buttonVariants(), "gap-2")}>
-          <Home className="h-4 w-4" />
-          Go to Dashboard
-        </Link>
-        <Link href="/" className={buttonVariants({ variant: "outline" })}>
-          Back to Home
-        </Link>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link href="/dashboard" className={cn(buttonVariants(), "gap-2")} />
+              }
+            >
+              <Home className="h-4 w-4" />
+              Go to Dashboard
+            </TooltipTrigger>
+            <TooltipContent>Return to your dashboard</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link href="/" className={buttonVariants({ variant: "outline" })} />
+              }
+            >
+              Back to Home
+            </TooltipTrigger>
+            <TooltipContent>Go to the Flipvise homepage</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );

@@ -28,6 +28,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +55,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  getLinkedLessonPlanForDeckEditAction,
   updateDeckAction,
   uploadDeckCoverImageAction,
   removeDeckCoverImageAction,
@@ -54,6 +65,10 @@ import {
   getDeckFirstCardFrontStateAction,
   setDeckFirstCardFrontImageAction,
 } from "@/actions/cards";
+import {
+  buildLessonIntakeFromDeckFields,
+  writeDeckEditLessonIntake,
+} from "@/lib/deck-edit-lesson-plan-sync";
 import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 
@@ -123,6 +138,13 @@ export function EditDeckDialog({
   const [firstCardFrontUploading, setFirstCardFrontUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [lessonPlanAlertOpen, setLessonPlanAlertOpen] = useState(false);
+  const [linkedLessonPlanId, setLinkedLessonPlanId] = useState<number | null>(
+    null,
+  );
+  const [lessonBuilderHref, setLessonBuilderHref] = useState<string | null>(
+    null,
+  );
   const coverFileRef = useRef<HTMLInputElement>(null);
   const firstCardFrontFileRef = useRef<HTMLInputElement>(null);
 
@@ -169,6 +191,9 @@ export function EditDeckDialog({
       setCoverUploadError(null);
       setFirstCardFrontError(null);
       setError(null);
+      setLessonPlanAlertOpen(false);
+      setLinkedLessonPlanId(null);
+      setLessonBuilderHref(null);
     }
     if (!isControlled) {
       setUncontrolledOpen(next);
@@ -269,28 +294,73 @@ export function EditDeckDialog({
     }
   }
 
+  function persistDeckChanges() {
+    return updateDeckAction({
+      deckId: deck.id,
+      name,
+      description: description.trim() || undefined,
+      gradeLevel: gradeLevel.trim() || undefined,
+      difficultyLevel: difficultyLevel.trim() || undefined,
+      gradient: gradient !== "none" ? gradient : undefined,
+    });
+  }
+
   function handleSubmit() {
     setError(null);
     nameSpeech.stop();
     descriptionSpeech.stop();
     startTransition(async () => {
       try {
-        await updateDeckAction({
+        const linked = await getLinkedLessonPlanForDeckEditAction({
           deckId: deck.id,
-          name,
-          description: description.trim() || undefined,
-          gradeLevel: gradeLevel.trim() || undefined,
-          difficultyLevel: difficultyLevel.trim() || undefined,
-          gradient: gradient !== "none" ? gradient : undefined,
         });
+        if (linked.linked) {
+          setLinkedLessonPlanId(linked.lessonPlanId);
+          setLessonBuilderHref(linked.lessonBuilderHref);
+          setLessonPlanAlertOpen(true);
+          return;
+        }
+
+        await persistDeckChanges();
         handleOpenChange(false);
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
       }
     });
   }
 
+  function handleProceedToLessonBuilder() {
+    if (linkedLessonPlanId == null || !lessonBuilderHref) return;
+    setError(null);
+    nameSpeech.stop();
+    descriptionSpeech.stop();
+    startTransition(async () => {
+      try {
+        await persistDeckChanges();
+        writeDeckEditLessonIntake(
+          linkedLessonPlanId,
+          buildLessonIntakeFromDeckFields({
+            name,
+            description,
+            gradeLevel,
+            difficultyLevel,
+            deckId: deck.id,
+          }),
+        );
+        setLessonPlanAlertOpen(false);
+        handleOpenChange(false);
+        router.push(lessonBuilderHref);
+        router.refresh();
+      } catch (err) {
+        setLessonPlanAlertOpen(false);
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+      }
+    });
+  }
+
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {!hideTrigger ? (
         <DialogTrigger
@@ -674,5 +744,37 @@ export function EditDeckDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={lessonPlanAlertOpen} onOpenChange={setLessonPlanAlertOpen}>
+      <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-base sm:text-lg">
+            Update linked lesson plan?
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-xs sm:text-sm">
+            This deck is linked to a saved lesson plan. To update the deck, you
+            also need to update that lesson plan in AI Lesson Builder. Your new
+            deck details will prefill the intake fields — generation will not
+            run until you click Generate.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+          <AlertDialogCancel disabled={isPending} className="w-full sm:w-auto">
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            disabled={isPending}
+            className="w-full sm:w-auto"
+            onClick={(event) => {
+              event.preventDefault();
+              handleProceedToLessonBuilder();
+            }}
+          >
+            {isPending ? "Continuing…" : "Continue to Lesson Builder"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

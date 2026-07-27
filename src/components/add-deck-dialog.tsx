@@ -82,7 +82,7 @@ function getSpeechRecognitionCtor():
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-interface AddDeckDialogProps {
+export interface AddDeckDialogProps {
   triggerLabel?: string;
   /** Shown on hover when set (e.g. expands a short trigger label). */
   triggerTooltip?: string;

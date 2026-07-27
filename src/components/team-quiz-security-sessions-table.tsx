@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -10,6 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   grantQuizSecurityRestartAction,
   grantQuizSecurityResumeAction,
@@ -24,6 +31,8 @@ type TeamQuizSecuritySessionsTableProps = {
   sessions: QuizSecuritySessionAdminRow[];
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
 };
+
+type SessionStatus = QuizSecuritySessionAdminRow["status"];
 
 function formatStoppedAt(session: QuizSecuritySessionAdminRow): string {
   const iso = session.terminatedAt ?? session.completedAt ?? session.lockedAt;
@@ -41,16 +50,21 @@ function formatStoppedAt(session: QuizSecuritySessionAdminRow): string {
   }
 }
 
-function statusLabel(session: QuizSecuritySessionAdminRow): string {
-  switch (session.status) {
+function statusLabel(
+  status: SessionStatus,
+  sessionState: QuizSecuritySessionAdminRow["sessionState"],
+): string {
+  switch (status) {
     case "granted_resume":
-      return session.sessionState == null ? "Redo granted" : "Resume granted";
+      return sessionState == null ? "Start over granted" : "Continue granted";
     case "terminated":
       return "Terminated";
     case "completed":
       return "Completed";
-    default:
+    case "locked":
       return "Locked";
+    default:
+      return "Active";
   }
 }
 
@@ -59,18 +73,35 @@ export function TeamQuizSecuritySessionsTable({
   sessions,
   userFieldDisplayById,
 }: TeamQuizSecuritySessionsTableProps) {
+  const router = useRouter();
   const [pendingId, setPendingId] = React.useState<number | null>(null);
-  const [actionType, setActionType] = React.useState<"grant" | "restart" | "terminate" | null>(
-    null,
-  );
+  const [actionType, setActionType] = React.useState<
+    "grant" | "restart" | "terminate" | null
+  >(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState<string | null>(null);
+  /** Optimistic status overrides until the server refresh lands. */
+  const [statusOverrides, setStatusOverrides] = React.useState<
+    Record<number, { status: SessionStatus; clearSessionState?: boolean }>
+  >({});
+
+  React.useEffect(() => {
+    setStatusOverrides({});
+  }, [sessions]);
 
   async function handleGrant(sessionId: number) {
     setError(null);
+    setSuccess(null);
     setPendingId(sessionId);
     setActionType("grant");
     try {
       await grantQuizSecurityResumeAction({ teamId, sessionId });
+      setStatusOverrides((prev) => ({
+        ...prev,
+        [sessionId]: { status: "granted_resume" },
+      }));
+      setSuccess("Continue granted — the member can resume after Check for access.");
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not grant access.");
     } finally {
@@ -81,10 +112,19 @@ export function TeamQuizSecuritySessionsTable({
 
   async function handleRestart(sessionId: number) {
     setError(null);
+    setSuccess(null);
     setPendingId(sessionId);
     setActionType("restart");
     try {
       await grantQuizSecurityRestartAction({ teamId, sessionId });
+      setStatusOverrides((prev) => ({
+        ...prev,
+        [sessionId]: { status: "granted_resume", clearSessionState: true },
+      }));
+      setSuccess(
+        "Start over granted — the member can begin a fresh quiz after Check for access.",
+      );
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not grant start over.");
     } finally {
@@ -95,10 +135,17 @@ export function TeamQuizSecuritySessionsTable({
 
   async function handleTerminate(sessionId: number) {
     setError(null);
+    setSuccess(null);
     setPendingId(sessionId);
     setActionType("terminate");
     try {
       await terminateQuizSecuritySessionAction({ teamId, sessionId });
+      setStatusOverrides((prev) => ({
+        ...prev,
+        [sessionId]: { status: "terminated" },
+      }));
+      setSuccess("Session terminated.");
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not terminate session.");
     } finally {
@@ -132,12 +179,18 @@ export function TeamQuizSecuritySessionsTable({
           <TableBody>
             {sessions.map((session) => {
               const display = userFieldDisplayById[session.userId];
-              const memberLabel = display?.primaryLine ?? display?.primaryEmail ?? session.userId;
+              const memberLabel =
+                display?.primaryLine ?? display?.primaryEmail ?? session.userId;
               const isPending = pendingId === session.id;
-              const canRestart =
-                session.status === "terminated" || session.status === "completed";
+              const override = statusOverrides[session.id];
+              const status = override?.status ?? session.status;
+              const sessionState = override?.clearSessionState
+                ? null
+                : session.sessionState;
+              const canRestart = status === "terminated" || status === "completed";
+              const canContinue = status === "locked";
               const canTerminate =
-                session.status === "locked" || session.status === "granted_resume";
+                status === "locked" || status === "granted_resume";
               return (
                 <TableRow key={session.id}>
                   <TableCell className="font-medium">{memberLabel}</TableCell>
@@ -145,54 +198,95 @@ export function TeamQuizSecuritySessionsTable({
                   <TableCell className="text-muted-foreground">
                     {formatStoppedAt(session)}
                   </TableCell>
-                  <TableCell className="capitalize text-muted-foreground">
-                    {statusLabel(session)}
+                  <TableCell
+                    className={
+                      status === "granted_resume"
+                        ? "font-medium text-emerald-400"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {statusLabel(status, sessionState)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {session.status === "locked" ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={isPending}
-                          onClick={() => handleGrant(session.id)}
-                        >
-                          {isPending && actionType === "grant" ? (
-                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                          ) : (
-                            "Continue"
-                          )}
-                        </Button>
-                      ) : null}
-                      {canRestart ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={isPending}
-                          onClick={() => handleRestart(session.id)}
-                        >
-                          {isPending && actionType === "restart" ? (
-                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                          ) : (
-                            "Start over"
-                          )}
-                        </Button>
-                      ) : null}
-                      {canTerminate ? (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={isPending}
-                          onClick={() => handleTerminate(session.id)}
-                        >
-                          {isPending && actionType === "terminate" ? (
-                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                          ) : (
-                            "Terminate"
-                          )}
-                        </Button>
-                      ) : null}
-                    </div>
+                    <TooltipProvider>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canContinue ? (
+                          <Tooltip>
+                            <TooltipTrigger render={<span className="inline-flex" />}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={isPending}
+                                onClick={() => void handleGrant(session.id)}
+                              >
+                                {isPending && actionType === "grant" ? (
+                                  <Loader2
+                                    className="size-3.5 animate-spin"
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  "Continue"
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Let the member resume their in-progress quiz
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                        {canRestart ? (
+                          <Tooltip>
+                            <TooltipTrigger render={<span className="inline-flex" />}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={isPending}
+                                onClick={() => void handleRestart(session.id)}
+                              >
+                                {isPending && actionType === "restart" ? (
+                                  <Loader2
+                                    className="size-3.5 animate-spin"
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  "Start over"
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Grant a fresh quiz attempt (clears prior progress)
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                        {canTerminate ? (
+                          <Tooltip>
+                            <TooltipTrigger render={<span className="inline-flex" />}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                disabled={isPending}
+                                onClick={() => void handleTerminate(session.id)}
+                              >
+                                {isPending && actionType === "terminate" ? (
+                                  <Loader2
+                                    className="size-3.5 animate-spin"
+                                    aria-hidden
+                                  />
+                                ) : (
+                                  "Terminate"
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              End this member&apos;s Exam Mode session
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                      </div>
+                    </TooltipProvider>
                   </TableCell>
                 </TableRow>
               );
@@ -200,6 +294,11 @@ export function TeamQuizSecuritySessionsTable({
           </TableBody>
         </Table>
       </div>
+      {success ? (
+        <p className="text-sm text-emerald-400" role="status">
+          {success}
+        </p>
+      ) : null}
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}

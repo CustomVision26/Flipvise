@@ -34,6 +34,7 @@ export function TeacherToolPageShell({
   headerExtra,
   submitDisabled = false,
   backHref = "/teacher",
+  onBackClick,
 }: {
   title: string;
   description: string;
@@ -52,6 +53,8 @@ export function TeacherToolPageShell({
   headerExtra?: ReactNode;
   submitDisabled?: boolean;
   backHref?: string;
+  /** Return false to block navigation (e.g. unsaved deck→lesson sync). */
+  onBackClick?: () => boolean;
 }) {
   const [internalShowResult, setInternalShowResult] = useState(false);
   const showResult = controlledShowResult ?? internalShowResult;
@@ -111,6 +114,11 @@ export function TeacherToolPageShell({
               <Link
                 href={backHref}
                 className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-0.5 gap-2 shrink-0")}
+                onClick={(event) => {
+                  if (onBackClick && onBackClick() === false) {
+                    event.preventDefault();
+                  }
+                }}
               >
                 <ArrowLeft className="size-4" aria-hidden />
                 Back

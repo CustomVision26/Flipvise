@@ -84,6 +84,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/inbox-unified-client.tsx",
     "src/app/dashboard/inbox/page.tsx",
     "src/lib/record-welcome-inbox.ts",
+    "src/lib/team-invite-message-copy.ts",
     "src/components/login-welcome-toast.tsx",
   ],
   "help-center-overview": ["src/components/help-center.tsx"],
@@ -182,10 +183,16 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "teacher-ai-content-tools": [
     "src/app/teacher/lesson-builder/page.tsx",
     "src/app/teacher/lesson-builder/teacher-lesson-builder-form.tsx",
+    "src/hooks/use-dirty-route-leave-guard.ts",
     "src/components/lesson-plan-day-vocabulary-detail.tsx",
     "src/lib/lesson-plan-vocabulary-detail.ts",
     "src/lib/lesson-plan-ai-schema.ts",
+    "src/lib/lesson-plan-intake-preview-discrepancy.ts",
+    "src/lib/adapt-lesson-plan-to-intake.ts",
+    "src/lib/lesson-plan-similarity.ts",
+    "src/lib/deck-edit-lesson-plan-sync.ts",
     "src/actions/teacher-lesson-plan.ts",
+    "src/db/queries/saved-lesson-plans.ts",
     "src/data/jamaica-nsc-lesson-guidelines.ts",
     "src/lib/jamaica-nsc-lesson-guidelines.ts",
     "src/app/teacher/quizzes/page.tsx",
@@ -198,7 +205,11 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/teacher/classes/page.tsx",
     "src/app/teacher/students/page.tsx",
   ],
-  "teacher-resources": ["src/app/teacher/resources/page.tsx"],
+  "teacher-resources": [
+    "src/app/teacher/resources/page.tsx",
+    "src/components/teacher-resource-library-view.tsx",
+    "src/db/queries/teacher-resource-library.ts",
+  ],
 };
 
 export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly string[]>> = {

@@ -30,7 +30,7 @@ export const TEAM_ADMIN_QUIZ_RESULTS_PATH = "/dashboard/team-admin/quiz-results"
 /** Quiz timer settings for the workspace (`?team=`). */
 export const TEAM_ADMIN_QUIZ_TIMER_PATH = "/dashboard/team-admin/quiz-results/quiz-timer";
 
-/** Quiz security settings and locked sessions (`?team=`). */
+/** Exam Mode (quiz security) settings and locked sessions (`?team=`). */
 export const TEAM_ADMIN_QUIZ_SECURITY_PATH =
   "/dashboard/team-admin/quiz-results/quiz-security";
 

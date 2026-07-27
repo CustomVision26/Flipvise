@@ -43,6 +43,7 @@ import {
   type EducationTeamPlanId,
 } from "@/lib/education-plans";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
+import { listActiveAddonKeysForUser } from "@/db/queries/addons";
 import { enforceExpiredPaymentGraceIfNeeded } from "@/lib/billing-grace-enforcement";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
@@ -101,7 +102,17 @@ export type AccessContext = {
   canAccessTeacherTools: boolean;
   /** education_gold or education_enterprise — parallel to activeTeamPlan for education team tiers. */
   activeEducationTeamPlan: EducationTeamPlanId | null;
+  /**
+   * Active add-on catalog keys for this user (Stripe-paid or admin-granted).
+   * Use {@link accessHasAddon} — never gate add-on features on plan slug alone.
+   */
+  activeAddonKeys: string[];
 };
+
+/** True when the user holds an active entitlement for the given add-on catalog key. */
+export function accessHasAddon(ctx: AccessContext, addonKey: string): boolean {
+  return ctx.activeAddonKeys.includes(addonKey);
+}
 
 function withEducationFields(
   ctx: Omit<
@@ -109,10 +120,15 @@ function withEducationFields(
     | "effectivePlanSlug"
     | "canAccessTeacherTools"
     | "activeEducationTeamPlan"
-  >,
+    | "activeAddonKeys"
+  > & { activeAddonKeys?: string[] },
   education: EducationAccessFields,
 ): AccessContext {
-  return { ...ctx, ...education };
+  return {
+    ...ctx,
+    ...education,
+    activeAddonKeys: ctx.activeAddonKeys ?? [],
+  };
 }
 
 function educationTeamTierAccessContext(input: {
@@ -431,6 +447,7 @@ export function guestAccessContext(): AccessContext {
     effectivePlanSlug: null,
     canAccessTeacherTools: false,
     activeEducationTeamPlan: null,
+    activeAddonKeys: [],
   };
 }
 
@@ -442,6 +459,18 @@ export function guestAccessContext(): AccessContext {
  * per request (avoids Backend API rate limits during dev prefetch/HMR).
  */
 export const getAccessContext = cache(async function getAccessContext(): Promise<AccessContext> {
+  const ctx = await resolveAccessContextCore();
+  if (!ctx.userId) return ctx;
+  try {
+    const activeAddonKeys = await listActiveAddonKeysForUser(ctx.userId);
+    if (activeAddonKeys.length === 0) return ctx;
+    return { ...ctx, activeAddonKeys };
+  } catch {
+    return ctx;
+  }
+});
+
+async function resolveAccessContextCore(): Promise<AccessContext> {
   const { userId, has } = await auth();
 
   if (!userId) {
@@ -871,4 +900,4 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
     },
     educationFields,
   );
-});
+}

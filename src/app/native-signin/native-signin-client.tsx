@@ -8,6 +8,12 @@ import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
 import { Eye, EyeOff, Loader2, ShieldAlert, Wifi, WifiOff } from "lucide-react";
 import { AccountRecoveryFields } from "@/components/account-recovery-fields";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -181,18 +187,27 @@ function NativeResendCodeControl({
   }
 
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="w-full"
-      disabled={resending || disabled}
-      onClick={() => {
-        void handleResend();
-      }}
-    >
-      {resending ? "Sending code…" : "Resend verification code"}
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={<span className="inline-flex w-full" tabIndex={0} />}
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            disabled={resending || disabled}
+            onClick={() => {
+              void handleResend();
+            }}
+          >
+            {resending ? "Sending code…" : "Resend verification code"}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Send a new verification code to your email</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -566,27 +581,45 @@ function CenteredSpinner({
         </CardHeader>
         {showEscapeActions ? (
           <CardFooter className={NATIVE_AUTH_FOOTER_CLASS}>
-            <Button
-              type="button"
-              variant="secondary"
-              className={NATIVE_BTN_CLASS}
-              onPointerDown={() => {
-                window.location.href = "/api/auth/clear-stale-session";
-              }}
-            >
-              Try again
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className={NATIVE_BTN_CLASS}
+                      onPointerDown={() => {
+                        window.location.href = "/api/auth/clear-stale-session";
+                      }}
+                    />
+                  }
+                >
+                  Try again
+                </TooltipTrigger>
+                <TooltipContent>Clear a stuck session and try again</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             {isNativeContext ? (
-              <Button
-                type="button"
-                variant="outline"
-                className={NATIVE_BTN_CLASS}
-                onPointerDown={() => {
-                  navigateToOfflineShellFast();
-                }}
-              >
-                Back to offline study
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={NATIVE_BTN_CLASS}
+                        onPointerDown={() => {
+                          navigateToOfflineShellFast();
+                        }}
+                      />
+                    }
+                  >
+                    Back to offline study
+                  </TooltipTrigger>
+                  <TooltipContent>Leave sign-in and return to offline study</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : null}
           </CardFooter>
         ) : null}
@@ -627,35 +660,62 @@ function SignInRecovery({
         {!isNativeContext || onContinue || showSignOut ? (
         <CardFooter className={NATIVE_AUTH_FOOTER_CLASS}>
           {onContinue ? (
-            <Button
-              type="button"
-              className={NATIVE_BTN_CLASS}
-              onPointerDown={onContinue}
-            >
-              {continueLabel ?? "Continue"}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      className={NATIVE_BTN_CLASS}
+                      onPointerDown={onContinue}
+                    />
+                  }
+                >
+                  {continueLabel ?? "Continue"}
+                </TooltipTrigger>
+                <TooltipContent>Continue with sign-in</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : !isNativeContext ? (
-            <Button
-              type="button"
-              className={NATIVE_BTN_CLASS}
-              onPointerDown={() => {
-                window.location.reload();
-              }}
-            >
-              Try again
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      className={NATIVE_BTN_CLASS}
+                      onPointerDown={() => {
+                        window.location.reload();
+                      }}
+                    />
+                  }
+                >
+                  Try again
+                </TooltipTrigger>
+                <TooltipContent>Reload the page and try again</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : null}
           {showSignOut ? (
-            <Button
-              type="button"
-              variant="secondary"
-              className={NATIVE_BTN_CLASS}
-              onPointerDown={() => {
-                void signOut().then(() => window.location.reload());
-              }}
-            >
-              Sign out and try again
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className={NATIVE_BTN_CLASS}
+                      onPointerDown={() => {
+                        void signOut().then(() => window.location.reload());
+                      }}
+                    />
+                  }
+                >
+                  Sign out and try again
+                </TooltipTrigger>
+                <TooltipContent>Sign out, then reload to start fresh</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : null}
         </CardFooter>
         ) : null}
@@ -732,21 +792,34 @@ function PasswordInput({
         required
         className={`pr-10 ${NATIVE_AUTH_INPUT_CLASS}`}
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="absolute top-0 right-0 size-8 text-muted-foreground hover:text-foreground"
-        disabled={disabled}
-        aria-label={visible ? "Hide password" : "Show password"}
-        onClick={() => setVisible((current) => !current)}
-      >
-        {visible ? (
-          <EyeOff className="size-4" aria-hidden />
-        ) : (
-          <Eye className="size-4" aria-hidden />
-        )}
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="absolute top-0 right-0 inline-flex" tabIndex={0} />
+            }
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              disabled={disabled}
+              aria-label={visible ? "Hide password" : "Show password"}
+              onClick={() => setVisible((current) => !current)}
+            >
+              {visible ? (
+                <EyeOff className="size-4" aria-hidden />
+              ) : (
+                <Eye className="size-4" aria-hidden />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {visible ? "Hide password" : "Show password"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

@@ -43,7 +43,7 @@ import {
 } from "@/db/queries/teams";
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
-import { AddDeckDialog } from "@/components/add-deck-dialog";
+import { AddDeckDialogLoader as AddDeckDialog } from "@/components/add-deck-dialog-loader";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
@@ -96,13 +96,13 @@ function DashboardPersonalHeading({
   viewerName: string | null;
 }) {
   return (
-    <h1 className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0 text-2xl sm:text-3xl font-bold tracking-tight">
+    <h1 className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0 text-2xl sm:text-3xl font-semibold tracking-tight">
       <span className="min-w-0 text-foreground">
         Personal Dashboard
         {showTeamTierExtras && viewerName ? (
           <>
             <span className="text-muted-foreground">{" "}:{" "}</span>
-            <span className="font-semibold text-muted-foreground">{viewerName}</span>
+            <span className="font-medium text-muted-foreground">{viewerName}</span>
           </>
         ) : null}
       </span>
@@ -661,13 +661,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     (personalOnlyDecks.length > 0 || workspaceDeckSections.length > 0);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -right-24 -top-28 size-[22rem] rounded-full bg-primary/10 blur-3xl animate-float-gentle" />
+        <div className="absolute -left-20 top-1/3 size-[18rem] rounded-full bg-violet-500/10 blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-[-5rem] right-1/3 size-[14rem] rounded-full bg-fuchsia-500/8 blur-3xl animate-drift" />
+      </div>
+
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
       <Suspense fallback={null}>
         <TeamInviteAcceptedBanner />
         <StripeCheckoutToast />
       </Suspense>
       {showTeamOnboarding && (
-        <Alert>
+        <Alert className="animate-in fade-in-0 slide-in-from-top-2 duration-500 fill-mode-both">
           <AlertTitle>Finish team setup</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center gap-2">
             Create your team name and invite members.
@@ -682,17 +689,24 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Page header */}
-      <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
+      <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-border/70 bg-card/55 p-5 shadow-lg shadow-black/10 backdrop-blur-md sm:p-7">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <Layers className="size-3" />
+            Workspace
+          </Badge>
           {ownSubscriberTeamTierExtras ? (
             <DashboardPersonalHeading
               showTeamTierExtras
               viewerName={personalViewerName}
             />
           ) : (
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Personal Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Personal Dashboard</h1>
           )}
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your flashcard decks</p>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Manage your flashcard decks
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <DashboardNativeActions />
@@ -703,12 +717,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           />
         </div>
       </div>
+      </section>
 
       {/* Free plan usage banner */}
       {isFreePlan && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-75 fill-mode-both gap-4 sm:grid-cols-2">
           {/* Usage card */}
-          <Card className="border-border bg-card">
+          <Card className="border-border/70 bg-card/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -743,7 +758,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </Card>
 
           {/* Pro upgrade card */}
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className="border-primary/30 bg-primary/5 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -797,10 +812,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Deck grid */}
+      <section className="animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both flex flex-1 flex-col gap-5 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-xl shadow-black/15 backdrop-blur-xl sm:p-6">
       {decks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-14 sm:py-24 text-center px-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
-            <Layers className="h-7 w-7 text-muted-foreground" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-14 text-center sm:py-24">
+          <div className="relative flex h-16 w-16 items-center justify-center">
+            <div
+              className="absolute inset-0 rounded-full bg-primary/15 blur-md animate-pulse-slow"
+              aria-hidden
+            />
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-border/70 bg-card shadow-sm">
+              <Layers className="h-7 w-7 text-muted-foreground" />
+            </div>
           </div>
           <div className="space-y-1">
             <p className="font-medium text-foreground text-sm">No decks yet</p>
@@ -856,7 +878,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       {/* Pro plan — already subscribed */}
       {isPro && planAccessPhrase && (
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="border-t border-border/60 pt-4 text-center text-xs text-muted-foreground">
           You&apos;re on {planAccessPhrase.article}{" "}
           <span className="text-foreground font-medium">
             {planAccessPhrase.label}
@@ -865,6 +887,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           {maxPersonalDecks === 1 ? "" : "s"} and {maxCardsPerDeck} cards per deck.
         </p>
       )}
+      </section>
+      </div>
     </div>
   );
 }

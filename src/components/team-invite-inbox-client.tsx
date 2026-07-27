@@ -23,14 +23,17 @@ export type TeamInviteInboxItemView = {
   invitationId: number;
   teamName: string;
   role: "team_admin" | "team_member";
+  ownerName: string | null;
   inviterDisplayName: string;
+  title: string;
+  description: string;
   expiresAtIso: string;
   createdAtIso: string;
   outcome: TeamInviteInboxOutcome;
 };
 
 function roleLabel(role: "team_admin" | "team_member") {
-  return role === "team_admin" ? "Team admin" : "Member";
+  return role === "team_admin" ? "Team Admin" : "Member";
 }
 
 function outcomeBadge(outcome: TeamInviteInboxOutcome) {
@@ -181,15 +184,13 @@ export function TeamInviteInboxClient({
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-foreground">{row.teamName}</p>
+                      <p className="font-medium text-foreground">{row.title}</p>
                       {outcomeBadge(row.outcome)}
                       <Badge variant="outline" className="shrink-0">
                         {roleLabel(row.role)}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      From <span className="text-foreground">{row.inviterDisplayName}</span>
-                    </p>
+                    <p className="text-sm text-muted-foreground">{row.description}</p>
                     <p className="text-xs text-muted-foreground">
                       Sent {formatShortDate(row.createdAtIso)}
                       {" · "}
@@ -236,12 +237,13 @@ export function TeamInviteInboxClient({
                 >
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-foreground">{row.teamName}</p>
+                      <p className="font-medium text-foreground">{row.title}</p>
                       {outcomeBadge(row.outcome)}
                       <Badge variant="outline" className="shrink-0">
                         {roleLabel(row.role)}
                       </Badge>
                     </div>
+                    <p className="text-sm text-muted-foreground">{row.description}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatShortDate(row.createdAtIso)}
                     </p>

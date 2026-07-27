@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { loadTeacherResourceLibrary } from "@/db/queries/teacher-resource-library";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
@@ -94,13 +100,25 @@ export default async function TeacherResourcesPage({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
       <div className="flex items-center gap-3">
-        <Link
-          href={backHref}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          Back
-        </Link>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link
+                  href={backHref}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "gap-2",
+                  )}
+                />
+              }
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Back
+            </TooltipTrigger>
+            <TooltipContent>Return to the previous teacher page</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Teacher Resource Library</h1>
           <p className="text-sm text-muted-foreground">

@@ -4,8 +4,9 @@ import { getAccessContext } from "@/lib/access";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import { canUseDeckAiFeatures } from "@/lib/deck-ai-access";
 import Link from "next/link";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarDays, Layers3, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -104,226 +105,384 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
   });
   const isFreePlan = !paidDeckCards;
   const isAtCardLimit = cards.length >= deckCardLimit;
+  const fillPercent =
+    deckCardLimit > 0
+      ? Math.min(100, Math.round((cards.length / deckCardLimit) * 100))
+      : 0;
 
   const deckGradient = getGradientBySlug(deck.gradient);
   const hasGradient = deckGradient.slug !== "none";
+  const updatedLabel = deck.updatedAt.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
-    <div className={cn("flex flex-1 flex-col gap-6 sm:gap-8 p-4 sm:p-8", deckGradient.classes)}>
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1 space-y-3">
-            <Link
-              href={dashboardHref}
-              className={cn(
-                "inline-flex w-fit items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] transition-colors",
-                hasGradient
-                  ? "text-white/60 hover:text-white"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <ArrowLeft className="size-3.5" />
-              Dashboard
-            </Link>
+    <div
+      className={cn(
+        "relative flex min-h-0 flex-1 flex-col overflow-hidden",
+        deckGradient.classes,
+      )}
+    >
+      {hasGradient ? (
+        <div
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          aria-hidden
+        >
+          <div className="absolute -right-24 -top-28 size-[22rem] rounded-full bg-white/12 blur-3xl animate-float-gentle" />
+          <div className="absolute -left-20 top-1/3 size-[18rem] rounded-full bg-black/25 blur-3xl animate-pulse-slow" />
+          <div className="absolute bottom-[-6rem] right-1/4 size-[16rem] rounded-full bg-white/8 blur-3xl animate-drift" />
+          <div
+            className="absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.35) 1px, transparent 1px)",
+              backgroundSize: "48px 48px",
+            }}
+          />
+        </div>
+      ) : null}
 
-            {teamDeckHeading ? (
-              <div className="space-y-1">
-                <p className={cn("text-sm", hasGradient ? "text-white/70" : "text-muted-foreground")}>
-                  Team workspace:{" "}
-                  <span className={cn("font-medium", hasGradient ? "text-white" : "text-foreground")}>
-                    {teamDeckHeading.teamName}
-                  </span>
-                </p>
-                <p className={cn("text-xs sm:text-sm", hasGradient ? "text-white/60" : "text-muted-foreground")}>
-                  Owner:{" "}
-                  <span className={hasGradient ? "text-white/85" : "text-foreground/85"}>
-                    {teamDeckHeading.ownerDisplayName}
-                  </span>
-                </p>
-              </div>
-            ) : null}
-
-            <div className="space-y-2">
-              <h1
-                className={cn(
-                  "text-2xl font-semibold tracking-tight break-words sm:text-3xl",
-                  hasGradient && "text-white",
-                )}
-              >
-                {deck.name}
-              </h1>
-              {deck.description ? (
-                <p
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:gap-8 sm:p-8">
+        <section
+          className={cn(
+            "animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both",
+            "rounded-2xl border p-5 sm:p-7",
+            hasGradient
+              ? "border-white/15 bg-black/25 shadow-2xl shadow-black/25 backdrop-blur-md"
+              : "border-border/80 bg-card/60 shadow-lg shadow-black/10",
+          )}
+        >
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-8">
+            <div className="flex min-w-0 flex-1 flex-col justify-between gap-5">
+              <div className="space-y-4">
+                <Link
+                  href={dashboardHref}
                   className={cn(
-                    "max-w-2xl text-sm leading-relaxed sm:text-[0.9375rem]",
-                    hasGradient ? "text-white/75" : "text-muted-foreground",
+                    "group inline-flex w-fit items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors",
+                    hasGradient
+                      ? "text-white/60 hover:text-white"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {deck.description}
-                </p>
-              ) : null}
+                  <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
+                  Dashboard
+                </Link>
+
+                {teamDeckHeading ? (
+                  <div
+                    className={cn(
+                      "rounded-xl border px-3 py-2.5 text-xs sm:text-sm",
+                      hasGradient
+                        ? "border-white/12 bg-white/5 text-white/70"
+                        : "border-border/70 bg-muted/40 text-muted-foreground",
+                    )}
+                  >
+                    <p>
+                      Team workspace:{" "}
+                      <span
+                        className={cn(
+                          "font-medium",
+                          hasGradient ? "text-white" : "text-foreground",
+                        )}
+                      >
+                        {teamDeckHeading.teamName}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 opacity-90">
+                      Owner:{" "}
+                      <span className={hasGradient ? "text-white/90" : "text-foreground/85"}>
+                        {teamDeckHeading.ownerDisplayName}
+                      </span>
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="space-y-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "gap-1 border-transparent text-[10px] uppercase tracking-[0.14em]",
+                        hasGradient
+                          ? "bg-white/15 text-white"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      <Layers3 className="size-3" />
+                      Deck editor
+                    </Badge>
+                    {effectiveAI ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "gap-1 text-[10px]",
+                          hasGradient
+                            ? "border-white/20 bg-white/10 text-white/90"
+                            : "border-primary/30 bg-primary/10 text-primary",
+                        )}
+                      >
+                        <Sparkles className="size-3" />
+                        AI ready
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <h1
+                    className={cn(
+                      "text-balance text-3xl font-semibold tracking-tight sm:text-4xl",
+                      hasGradient && "text-white",
+                    )}
+                  >
+                    {deck.name}
+                  </h1>
+                  {deck.description ? (
+                    <p
+                      className={cn(
+                        "max-w-2xl text-sm leading-relaxed sm:text-[0.95rem]",
+                        hasGradient ? "text-white/75" : "text-muted-foreground",
+                      )}
+                    >
+                      {deck.description}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "gap-1.5 tabular-nums",
+                      hasGradient &&
+                        "border border-white/15 bg-white/10 text-white hover:bg-white/15",
+                    )}
+                  >
+                    <Layers3 className="size-3 opacity-80" />
+                    {cards.length} / {deckCardLimit} cards
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      hasGradient &&
+                        "border border-white/15 bg-white/10 text-white hover:bg-white/15",
+                    )}
+                  >
+                    {isFreePlan ? "Free plan" : "Paid plan"}
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "gap-1.5",
+                      hasGradient &&
+                        "border border-white/15 bg-white/10 text-white hover:bg-white/15",
+                    )}
+                  >
+                    <CalendarDays className="size-3 opacity-80" />
+                    Updated {updatedLabel}
+                  </Badge>
+                </div>
+                <div className="max-w-md space-y-1.5">
+                  <div
+                    className={cn(
+                      "flex items-center justify-between text-[11px] font-medium uppercase tracking-wide",
+                      hasGradient ? "text-white/55" : "text-muted-foreground",
+                    )}
+                  >
+                    <span>Deck capacity</span>
+                    <span className="tabular-nums">{fillPercent}%</span>
+                  </div>
+                  <div
+                    className={cn(
+                      "h-1.5 overflow-hidden rounded-full",
+                      hasGradient ? "bg-white/15" : "bg-muted",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-[width] duration-700 ease-out",
+                        hasGradient ? "bg-white" : "bg-primary",
+                        isAtCardLimit && (hasGradient ? "bg-rose-200" : "bg-destructive"),
+                      )}
+                      style={{ width: `${fillPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div
+            <aside
               className={cn(
-                "flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm",
-                hasGradient ? "text-white/65" : "text-muted-foreground",
+                "flex w-full shrink-0 flex-col justify-between gap-4 rounded-xl border p-4 sm:p-5 lg:max-w-sm",
+                "animate-in fade-in-0 slide-in-from-right-2 duration-700 fill-mode-both",
+                hasGradient
+                  ? "border-white/20 bg-black/30 shadow-xl shadow-black/20 backdrop-blur-md"
+                  : "border-border/80 bg-background/70 shadow-md",
               )}
             >
-              <span className={cn("font-medium tabular-nums", hasGradient ? "text-white/90" : "text-foreground")}>
-                {cards.length} / {deckCardLimit} cards
-              </span>
-              <span aria-hidden className="select-none">
-                ·
-              </span>
-              <span>{isFreePlan ? "Free plan" : "Paid plan"}</span>
-              <span aria-hidden className="select-none">
-                ·
-              </span>
-              <span>
-                Updated{" "}
-                {deck.updatedAt.toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
+              <GenerateCardsButtonLoader
+                deckId={id}
+                hasDescription={!!deck.description}
+                totalCardCount={cards.length}
+                aiGeneratedCount={aiGeneratedCount}
+                hasAI={effectiveAI}
+                deckCardLimit={deckCardLimit}
+                onGradient={hasGradient}
+              />
+
+              <div
+                className={cn(
+                  "flex flex-wrap gap-2 border-t pt-4",
+                  hasGradient ? "border-white/10" : "border-border/60",
+                )}
+              >
+                {cards.length > 0 ? (
+                  <StudyLink
+                    deckId={id}
+                    workspaceQueryString={fromTeamWorkspaceUrl ? workspaceQs : undefined}
+                  />
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<span tabIndex={0} className="cursor-not-allowed" />}
+                      >
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="pointer-events-none h-9 gap-2 font-semibold"
+                          disabled
+                          aria-disabled
+                        >
+                          <BookOpen className="size-4" />
+                          Study deck
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Add at least one card to start a study session.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </aside>
           </div>
 
-          <div
-            className={cn(
-              "w-full shrink-0 space-y-3 rounded-xl border p-4 sm:p-5 lg:max-w-md",
-              hasGradient
-                ? "border-white/15 bg-black/20 backdrop-blur-sm"
-                : "border-border/80 bg-card/50",
-            )}
-          >
-            <GenerateCardsButtonLoader
-              deckId={id}
-              hasDescription={!!deck.description}
-              totalCardCount={cards.length}
-              aiGeneratedCount={aiGeneratedCount}
-              hasAI={effectiveAI}
-              deckCardLimit={deckCardLimit}
-            />
-
-            <div
+          {isAtCardLimit ? (
+            <p
               className={cn(
-                "flex flex-wrap gap-2 border-t pt-3",
-                hasGradient ? "border-white/10" : "border-border/60",
+                "mt-5 border-t pt-4 text-xs",
+                hasGradient
+                  ? "border-white/10 text-rose-100 font-medium"
+                  : "border-border/60 text-destructive",
               )}
             >
+              {isFreePlan ? (
+                <>
+                  Card limit reached for this deck ({deckCardLimit} max on Free).{" "}
+                  <Link
+                    href="/pricing"
+                    className={cn(
+                      "underline underline-offset-3",
+                      hasGradient && "text-white",
+                    )}
+                  >
+                    Upgrade on Pricing
+                  </Link>{" "}
+                  for up to {CARDS_PER_DECK_LIMIT_PRO_PLUS} cards per deck.
+                </>
+              ) : (
+                <>
+                  Card limit reached for this deck ({deckCardLimit} max on your plan).
+                  Delete cards to add more.
+                </>
+              )}
+            </p>
+          ) : null}
+        </section>
+
+        <section
+          className={cn(
+            "animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both",
+            "flex flex-1 flex-col gap-5 rounded-2xl border p-4 sm:p-6",
+            hasGradient
+              ? "border-white/12 bg-background/90 shadow-2xl shadow-black/30 backdrop-blur-xl"
+              : "border-border/80 bg-card/80 shadow-lg",
+          )}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+            <div className="space-y-0.5">
+              <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+                Cards
+              </h2>
+              {cards.length > 0 ? (
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  {cards.length} card{cards.length === 1 ? "" : "s"} in this deck
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Build your deck with manual or AI-generated cards
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {cards.length > 0 ? (
                 <DeleteAllCardsDialogLoader deckId={id} cardCount={cards.length} />
               ) : null}
-              {cards.length > 0 ? (
-                <StudyLink
-                  deckId={id}
-                  workspaceQueryString={fromTeamWorkspaceUrl ? workspaceQs : undefined}
+              <AddCardDialog
+                deckId={id}
+                deckName={deck.name}
+                isAtLimit={isAtCardLimit}
+                hasAI={effectiveAI}
+                hasAdvancedSourceImport={effectiveAdvancedSourceImport}
+                aiGeneratedCount={aiGeneratedCount}
+                totalCardCount={cards.length}
+                deckCardLimit={deckCardLimit}
+                allowsMultipleChoiceFormat={paidDeckCards}
+              />
+            </div>
+          </div>
+
+          {cards.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-14 text-center sm:py-20">
+              <div className="relative flex h-16 w-16 items-center justify-center">
+                <div
+                  className="absolute inset-0 rounded-full bg-primary/15 blur-md animate-pulse-slow"
+                  aria-hidden
                 />
-              ) : (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger render={<span tabIndex={0} className="cursor-not-allowed" />}>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="pointer-events-none gap-2 font-bold"
-                        disabled
-                        aria-disabled
-                      >
-                        <BookOpen className="size-4" />
-                        Study deck
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Add at least one card to start a study session.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+                <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-border/70 bg-card shadow-sm">
+                  <BookOpen className="h-7 w-7 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">No cards yet</p>
+                <p className="max-w-xs text-xs text-muted-foreground">
+                  Add your first card to start building this deck.
+                </p>
+              </div>
+              <AddCardDialog
+                deckId={id}
+                deckName={deck.name}
+                isAtLimit={isAtCardLimit}
+                hasAI={effectiveAI}
+                hasAdvancedSourceImport={effectiveAdvancedSourceImport}
+                aiGeneratedCount={aiGeneratedCount}
+                totalCardCount={cards.length}
+                deckCardLimit={deckCardLimit}
+                allowsMultipleChoiceFormat={paidDeckCards}
+                trigger={<Button className="gap-2">Add your first card</Button>}
+              />
             </div>
-          </div>
-        </div>
-        {isAtCardLimit && (
-          <p className={cn("text-xs", hasGradient ? "text-rose-200 font-medium" : "text-destructive")}>
-            {isFreePlan ? (
-              <>
-                Card limit reached for this deck ({deckCardLimit} max on Free).{" "}
-                <Link href="/pricing" className={cn("underline underline-offset-3", hasGradient && "text-white")}>
-                  Upgrade on Pricing
-                </Link>{" "}
-                for up to {CARDS_PER_DECK_LIMIT_PRO_PLUS} cards per deck.
-              </>
-            ) : (
-              <>
-                Card limit reached for this deck ({deckCardLimit} max on your plan). Delete cards to add
-                more.
-              </>
-            )}
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3 border-b pb-3 sm:pb-4">
-          <div className="space-y-0.5">
-            <h2 className={cn("text-base font-medium tracking-tight sm:text-lg", hasGradient && "text-white")}>
-              Cards
-            </h2>
-            {cards.length > 0 ? (
-              <p className={cn("text-xs sm:text-sm", hasGradient ? "text-white/60" : "text-muted-foreground")}>
-                {cards.length} card{cards.length === 1 ? "" : "s"} in this deck
-              </p>
-            ) : null}
-          </div>
-          <AddCardDialog
-            deckId={id}
-            deckName={deck.name}
-            isAtLimit={isAtCardLimit}
-            hasAI={effectiveAI}
-            hasAdvancedSourceImport={effectiveAdvancedSourceImport}
-            aiGeneratedCount={aiGeneratedCount}
-            totalCardCount={cards.length}
-            deckCardLimit={deckCardLimit}
-            allowsMultipleChoiceFormat={paidDeckCards}
-          />
-        </div>
-
-        {cards.length === 0 ? (
-          <div className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-14 sm:py-24 text-center px-4",
-            hasGradient && "border-white/30",
-          )}>
-            <div className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-full",
-              hasGradient ? "bg-white/20" : "bg-muted/60",
-            )}>
-              <BookOpen className={cn("h-7 w-7", hasGradient ? "text-white/80" : "text-muted-foreground")} />
-            </div>
-            <div className="space-y-1">
-              <p className={cn("font-medium text-sm", hasGradient ? "text-white" : "text-foreground")}>No cards yet</p>
-              <p className={cn("text-xs max-w-xs", hasGradient ? "text-white/70" : "text-muted-foreground")}>
-                Add your first card to start building this deck.
-              </p>
-            </div>
-            <AddCardDialog
+          ) : (
+            <CardGrid
+              cards={cards}
               deckId={id}
-              deckName={deck.name}
-              isAtLimit={isAtCardLimit}
               hasAI={effectiveAI}
-              hasAdvancedSourceImport={effectiveAdvancedSourceImport}
-              aiGeneratedCount={aiGeneratedCount}
-              totalCardCount={cards.length}
-              deckCardLimit={deckCardLimit}
-              allowsMultipleChoiceFormat={paidDeckCards}
-              trigger={<Button>Add your first card</Button>}
+              initialView={initialView}
             />
-          </div>
-        ) : (
-          <CardGrid cards={cards} deckId={id} hasAI={effectiveAI} initialView={initialView} />
-        )}
+          )}
+        </section>
       </div>
     </div>
   );

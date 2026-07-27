@@ -30,7 +30,10 @@ export const INBOX_ARTICLES: DocArticle[] = [
         table: {
           headers: ["Type", "Typical action"],
           rows: [
-            ["Team invite", "Accept or decline workspace membership"],
+            [
+              "Workspace invitation",
+              "Formal invite with workspace name, role, plan owner, and inviting team admin — accept or decline",
+            ],
             ["Affiliate invite / arrangement change", "Accept invite or confirm plan change"],
             ["Billing / Stripe receipt", "Review charge or open portal"],
             ["Quiz result", "Open full attempt breakdown"],

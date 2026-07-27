@@ -1,8 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Download, ExternalLink, Loader2, Pencil, RefreshCw, Save, X } from "lucide-react";
-import { generateLessonPlanAction, saveLessonPlanAction, updateLessonPlanAction, generateAllDaysVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
+import {
+  generateLessonPlanAction,
+  saveLessonPlanAction,
+  updateLessonPlanAction,
+  keepLessonPlanOnExitAction,
+  adaptAssignedLessonPlanToIntakeAction,
+  generateAllDaysVocabularyDetailAction,
+} from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +30,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   cloneLessonPlanResult,
   LessonPlanPreviewEditor,
@@ -77,11 +102,88 @@ import {
   normalizeLessonPlanReferenceMaterial,
   type LessonPlanReferenceMaterial,
 } from "@/lib/lesson-plan-reference-material";
+import {
+  clearDeckEditLessonIntake,
+  readDeckEditLessonIntake,
+} from "@/lib/deck-edit-lesson-plan-sync";
+import {
+  buildLessonPlanIntakePreviewDiscrepancies,
+  cloneComparableLessonPlanIntake,
+  type LessonPlanIntakePreviewDiscrepancy,
+} from "@/lib/lesson-plan-intake-preview-discrepancy";
+import { isLessonPlanEditorStateDirty } from "@/lib/lesson-plan-similarity";
+import {
+  BROWSER_BACK_EXIT_HREF,
+  proceedAfterDirtyLeaveConfirm,
+  useDirtyRouteLeaveGuard,
+} from "@/hooks/use-dirty-route-leave-guard";
 
 const DIFFICULTY_LEVEL_OPTIONS = LESSON_DIFFICULTY_LEVELS;
 const DECK_NONE = "__none__";
 
 type DeckTargetMode = "existing" | "new";
+
+function CompareValue({
+  value,
+  className,
+}: {
+  value: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "min-w-0 whitespace-pre-wrap break-words text-xs leading-relaxed",
+        className,
+      )}
+    >
+      {value}
+    </span>
+  );
+}
+
+function IntakePreviewDiscrepancyList({
+  items,
+}: {
+  items: LessonPlanIntakePreviewDiscrepancy[];
+}) {
+  const rows = (
+    <ul className="divide-y divide-border">
+      {items.map((item) => (
+        <li
+          key={item.field}
+          className="grid grid-cols-[minmax(5.5rem,0.9fr)_minmax(0,1.1fr)_minmax(0,1.1fr)] items-start gap-x-3 px-3 py-2.5"
+        >
+          <span className="min-w-0 break-words text-xs font-medium text-foreground">
+            {item.field}
+          </span>
+          <CompareValue value={item.inputValue} className="text-foreground" />
+          <CompareValue
+            value={item.previewValue}
+            className="text-muted-foreground"
+          />
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <div className="w-full overflow-hidden rounded-md border border-border bg-muted/30 text-left">
+      <div className="grid grid-cols-[minmax(5.5rem,0.9fr)_minmax(0,1.1fr)_minmax(0,1.1fr)] items-center gap-x-3 border-b border-border bg-muted/50 px-3 py-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Field
+        </span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Input
+        </span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Preview
+        </span>
+      </div>
+      <div className="max-h-56 overflow-y-auto overscroll-contain">{rows}</div>
+    </div>
+  );
+}
 
 function lessonDifficultyFromDeck(
   deckDefaults: ReturnType<typeof deckToHomeworkDefaults>,
@@ -160,6 +262,8 @@ type InitialSavedLessonPlan = {
   sourceDeckName: string | null;
   lessonTitle: string;
   vocabularyDetailPdfUrl?: string | null;
+  /** Prefill from an assigned-deck original; Save creates a personal copy. */
+  isAssignedSourcePlan?: boolean;
 };
 
 type TeacherLessonBuilderFormProps = {
@@ -178,6 +282,8 @@ type TeacherLessonBuilderFormProps = {
     topic: string;
     difficultyLevel: string;
   };
+  /** Arrived from Edit deck with pending intake sync (sessionStorage). */
+  fromDeckEdit?: boolean;
 };
 
 export function TeacherLessonBuilderForm({
@@ -191,7 +297,9 @@ export function TeacherLessonBuilderForm({
   initialDeckAdminUserId,
   initialSavedPlan,
   initialDeckDefaults,
+  fromDeckEdit = false,
 }: TeacherLessonBuilderFormProps) {
+  const router = useRouter();
   const isWorkspaceOwner = ownerDeckPicker.isWorkspaceOwner;
   const isEditingExistingPlan = initialSavedPlan != null;
   const resolvedInitialDeckId = initialSavedPlan?.deckId ?? initialDeckId;
@@ -262,6 +370,104 @@ export function TeacherLessonBuilderForm({
   );
   const [selectedDeckAdminUserId, setSelectedDeckAdminUserId] = useState<string>(
     initialDeckAdminUserId ?? ADMIN_NONE,
+  );
+  const [isAssignedSourceEditing, setIsAssignedSourceEditing] = useState(
+    Boolean(initialSavedPlan?.isAssignedSourcePlan),
+  );
+  const [pendingDeckEditSync, setPendingDeckEditSync] = useState(false);
+  const [exitSyncDialogOpen, setExitSyncDialogOpen] = useState(false);
+  const [assigneeGenerateChoiceOpen, setAssigneeGenerateChoiceOpen] =
+    useState(false);
+  const [assigneeGenerateChoiceSource, setAssigneeGenerateChoiceSource] =
+    useState<"generate" | "leave">("generate");
+  const [isAdaptingCreatorPlan, setIsAdaptingCreatorPlan] = useState(false);
+  const [isKeepingCurrentPlan, setIsKeepingCurrentPlan] = useState(false);
+  const [previewSyncedIntake, setPreviewSyncedIntake] =
+    useState<LessonPlanInput | null>(
+      initialSavedPlan?.input
+        ? cloneComparableLessonPlanIntake(initialSavedPlan.input)
+        : null,
+    );
+  const [savedBaseline, setSavedBaseline] = useState<{
+    input: LessonPlanInput;
+    result: LessonPlanResult;
+  } | null>(
+    initialSavedPlan
+      ? {
+          input: initialSavedPlan.input,
+          result: normalizeLessonPlanResultDayLabels(initialSavedPlan.result),
+        }
+      : null,
+  );
+  const [exitDiscrepancies, setExitDiscrepancies] = useState<
+    LessonPlanIntakePreviewDiscrepancy[]
+  >([]);
+  const pendingDeckEditSyncRef = useRef(false);
+  const shouldGuardExitRef = useRef(false);
+  const allowExitNavigationRef = useRef(false);
+  const pendingExitHrefRef = useRef<string | null>(null);
+  const intakePreviewDiscrepanciesRef = useRef<LessonPlanIntakePreviewDiscrepancy[]>(
+    [],
+  );
+
+  const activePreviewResult =
+    isEditing && editDraft != null ? editDraft : result;
+
+  const intakePreviewDiscrepancies =
+    isEditingExistingPlan &&
+    activePreviewResult != null &&
+    previewSyncedIntake != null
+      ? buildLessonPlanIntakePreviewDiscrepancies(
+          form,
+          activePreviewResult,
+          previewSyncedIntake,
+        )
+      : [];
+  const isDirtyVsSaved =
+    isEditingExistingPlan &&
+    savedBaseline != null &&
+    activePreviewResult != null &&
+    isLessonPlanEditorStateDirty(
+      { input: form, result: activePreviewResult },
+      savedBaseline,
+    );
+  const shouldGuardExit =
+    isEditingExistingPlan &&
+    activePreviewResult != null &&
+    (pendingDeckEditSync ||
+      isDirtyVsSaved ||
+      intakePreviewDiscrepancies.length > 0);
+  shouldGuardExitRef.current = shouldGuardExit;
+  intakePreviewDiscrepanciesRef.current = intakePreviewDiscrepancies;
+
+  const openExitGuard = useCallback((destinationHref: string | null) => {
+    if (!shouldGuardExitRef.current) return;
+    pendingExitHrefRef.current = destinationHref;
+    setExitDiscrepancies(intakePreviewDiscrepanciesRef.current);
+    setExitSyncDialogOpen(true);
+  }, []);
+
+  useDirtyRouteLeaveGuard({
+    enabled: shouldGuardExit,
+    allowNavigationRef: allowExitNavigationRef,
+    onBlock: openExitGuard,
+  });
+
+  const markDeckEditSyncResolved = useCallback(
+    (nextIntake?: LessonPlanInput, nextResult?: LessonPlanResult | null) => {
+      pendingDeckEditSyncRef.current = false;
+      setPendingDeckEditSync(false);
+      if (nextIntake) {
+        setPreviewSyncedIntake(cloneComparableLessonPlanIntake(nextIntake));
+      }
+      if (nextIntake && nextResult) {
+        setSavedBaseline({ input: nextIntake, result: nextResult });
+      }
+      if (initialSavedPlan?.id != null) {
+        clearDeckEditLessonIntake(initialSavedPlan.id);
+      }
+    },
+    [initialSavedPlan?.id],
   );
 
   const activeDecks = useOwnerScopedItems(
@@ -357,6 +563,39 @@ export function TeacherLessonBuilderForm({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed form once from server-provided deck id
   }, []);
+
+  useEffect(() => {
+    if (!fromDeckEdit || initialSavedPlan == null) return;
+    const intake = readDeckEditLessonIntake(initialSavedPlan.id);
+    if (!intake) return;
+
+    setForm((prev) => ({
+      ...prev,
+      subject: intake.subject || prev.subject,
+      topic: intake.topic || prev.topic,
+      gradeLevel: intake.gradeLevel || prev.gradeLevel,
+      difficultyLevel: intake.difficultyLevel || prev.difficultyLevel,
+    }));
+    pendingDeckEditSyncRef.current = true;
+    setPendingDeckEditSync(true);
+    toast.message("Deck details applied", {
+      description:
+        "Intake fields were updated from your deck edit. Generate a new lesson plan when ready, or keep the current plan when you leave.",
+    });
+  }, [fromDeckEdit, initialSavedPlan]);
+
+  useEffect(() => {
+    if (!shouldGuardExit) return;
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!shouldGuardExitRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [shouldGuardExit]);
 
   function handleDeckTargetModeChange(mode: DeckTargetMode) {
     dismissOpenOverlays();
@@ -467,6 +706,7 @@ export function TeacherLessonBuilderForm({
           setResult(plan);
           setShowResult(true);
         }
+        markDeckEditSyncResolved(form);
       } catch (error) {
         const raw =
           error instanceof Error
@@ -481,7 +721,7 @@ export function TeacherLessonBuilderForm({
         setIsGenerating(false);
       }
     },
-    [form, regenerationSeed, referenceMaterials],
+    [form, regenerationSeed, referenceMaterials, markDeckEditSyncResolved],
   );
 
   const shouldAutoRefreshVocabularyDetails = useCallback(
@@ -586,6 +826,112 @@ export function TeacherLessonBuilderForm({
     void runGeneration(true, regenerateApproach);
   }
 
+  function openAssigneeGenerateChoice(source: "generate" | "leave") {
+    setAssigneeGenerateChoiceSource(source);
+    setAssigneeGenerateChoiceOpen(true);
+  }
+
+  function requestGenerateFromIntake() {
+    if (isAssignedSourceEditing) {
+      openAssigneeGenerateChoice("generate");
+      return;
+    }
+    void runGeneration(false);
+  }
+
+  function handleLeaveGenerateClick() {
+    pendingExitHrefRef.current = null;
+    setExitSyncDialogOpen(false);
+    if (isAssignedSourceEditing) {
+      openAssigneeGenerateChoice("leave");
+      return;
+    }
+    toast.message("Ready when you are", {
+      description:
+        "Click Generate to create a new lesson plan from the current intake fields. AI does not run until you click Generate.",
+    });
+  }
+
+  function handleAssigneeChooseNewGeneration() {
+    setAssigneeGenerateChoiceOpen(false);
+    if (assigneeGenerateChoiceSource === "leave") {
+      toast.message("Ready when you are", {
+        description:
+          "Click Generate to create a completely new lesson plan from the current intake fields. AI does not run until you click Generate.",
+      });
+      return;
+    }
+    void runGeneration(false);
+  }
+
+  async function handleAssigneeAdaptCreatorPlan() {
+    if (editingPlanId == null) {
+      toast.error("Open the assigned lesson plan before adapting it.");
+      return;
+    }
+
+    setIsAdaptingCreatorPlan(true);
+    setErrorMessage(null);
+    try {
+      const resolvedReferences = normalizeLessonPlanReferences(
+        (await referenceFieldsRef.current?.resolveReferences()) ??
+          referenceMaterials,
+      );
+
+      const validationError = validateLessonPlanFormForGeneration(
+        form,
+        resolvedReferences,
+      );
+      if (validationError) {
+        setErrorMessage(validationError);
+        setAssigneeGenerateChoiceOpen(false);
+        return;
+      }
+
+      const inputToSave: LessonPlanInput = {
+        ...form,
+        planPeriodDays: form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+        referenceMaterials:
+          resolvedReferences.length > 0 ? resolvedReferences : undefined,
+      };
+
+      const saved = await adaptAssignedLessonPlanToIntakeAction({
+        lessonPlanId: editingPlanId,
+        input: inputToSave,
+        teamId: teacherWorkspace?.teamId ?? undefined,
+        sourceDeckName: selectedDeckLabel,
+      });
+
+      const adapted = normalizeLessonPlanResultDayLabels(saved.result);
+      setResult(adapted);
+      setShowResult(true);
+      setIsEditing(false);
+      setEditDraft(null);
+      setSavedPlanId(saved.id);
+      setEditingPlanId(saved.id);
+      setSavedVocabularyDetailPdfUrl(saved.vocabularyDetailPdfUrl ?? null);
+      setDeckId(undefined);
+      setSelectedDeckKey(DECK_NONE);
+      setIsAssignedSourceEditing(false);
+      setReferenceMaterials(getLessonPlanReferenceMaterials(inputToSave));
+      markDeckEditSyncResolved(inputToSave, adapted);
+      setAssigneeGenerateChoiceOpen(false);
+
+      toast.success("Personal lesson plan created", {
+        description:
+          "A personal copy was created from the linked plan. The original stays unchanged. No new AI generation was run.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not create your lesson plan from the linked plan.",
+      );
+    } finally {
+      setIsAdaptingCreatorPlan(false);
+    }
+  }
+
   async function handleSavePlan() {
     if (!result) return;
     let planToSave = isEditing && editDraft ? editDraft : result;
@@ -599,13 +945,22 @@ export function TeacherLessonBuilderForm({
       }
     }
 
-    if (deckTargetMode === "existing" && deckId == null) {
-      toast.error("Select a deck to save this lesson plan.");
-      return;
-    }
-    if (deckTargetMode === "new" && !defaultNewDeckName(form.subject, form.topic).trim()) {
-      toast.error("Enter Subject and Topic — they become the new deck name when you save.");
-      return;
+    // Existing plans (including assigned-source copy-on-write and unlinked personal
+    // copies) keep their deck linkage rules on the server — only new plans require a target.
+    if (!isEditingExistingPlan && !isAssignedSourceEditing) {
+      if (deckTargetMode === "existing" && deckId == null) {
+        toast.error("Select a deck to save this lesson plan.");
+        return;
+      }
+      if (
+        deckTargetMode === "new" &&
+        !defaultNewDeckName(form.subject, form.topic).trim()
+      ) {
+        toast.error(
+          "Enter Subject and Topic — they become the new deck name when you save.",
+        );
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -645,7 +1000,12 @@ export function TeacherLessonBuilderForm({
       setSavedPlanId(saved.id);
       setEditingPlanId(saved.id);
       setSavedVocabularyDetailPdfUrl(saved.vocabularyDetailPdfUrl ?? null);
-      if (deckTargetMode === "new") {
+      markDeckEditSyncResolved(form, planToSave);
+      if (saved.savedAsPersonalCopy || saved.deckId == null) {
+        setDeckId(undefined);
+        setSelectedDeckKey(DECK_NONE);
+        setIsAssignedSourceEditing(false);
+      } else if (deckTargetMode === "new") {
         setDeckTargetMode("existing");
         setDeckId(saved.deckId);
         setSelectedDeckKey(String(saved.deckId));
@@ -664,17 +1024,45 @@ export function TeacherLessonBuilderForm({
             teacherWorkspace.teamMemberId,
           )
         : "/teacher/resources";
+      const deckLabel = saved.sourceDeckName || "your library";
       toast.success(
-        editingPlanId != null && initialSavedPlan?.id === saved.id
-          ? "Lesson plan updated"
-          : "Lesson plan saved",
+        saved.savedAsPersonalCopy
+          ? "Personal lesson plan saved"
+          : editingPlanId != null && initialSavedPlan?.id === saved.id
+            ? "Lesson plan updated"
+            : "Lesson plan saved",
         {
         description: (
           <span>
-            {saved.lessonTitle} was {editingPlanId != null ? "updated in" : "saved to"}{" "}
-            <Link href={`/decks/${saved.deckId}`} className="underline underline-offset-2">
-              {saved.sourceDeckName}
-            </Link>
+            {saved.savedAsPersonalCopy ? (
+              <>
+                {saved.lessonTitle} was saved as your own copy under My lesson plans
+                {saved.sourceDeckName ? (
+                  <>
+                    {" "}
+                    (derived from{" "}
+                    <span className="font-medium">{saved.sourceDeckName}</span>)
+                  </>
+                ) : null}
+                . The linked assigned original was not changed.
+              </>
+            ) : saved.deckId != null ? (
+              <>
+                {saved.lessonTitle} was{" "}
+                {editingPlanId != null ? "updated in" : "saved to"}{" "}
+                <Link
+                  href={`/decks/${saved.deckId}`}
+                  className="underline underline-offset-2"
+                >
+                  {deckLabel}
+                </Link>
+              </>
+            ) : (
+              <>
+                {saved.lessonTitle} was{" "}
+                {editingPlanId != null ? "updated in" : "saved to"} your resource library
+              </>
+            )}
             {saved.pdfUrl ? " with lesson PDF" : ""}
             {saved.vocabularyDetailPdfUrl ? " and vocabulary detail PDF" : ""}. Use it in the{" "}
             <Link href={quizzesHref} className="underline underline-offset-2">
@@ -740,20 +1128,115 @@ export function TeacherLessonBuilderForm({
 
   const hasVocabularyDetails = result != null && lessonPlanHasVocabularyDetails(result);
 
+  function handleBackNavigationAttempt(): boolean {
+    if (!shouldGuardExitRef.current) return true;
+    openExitGuard(backHref);
+    return false;
+  }
+
+  function proceedWithConfirmedExit() {
+    const destination = pendingExitHrefRef.current;
+    pendingExitHrefRef.current = null;
+    allowExitNavigationRef.current = true;
+    proceedAfterDirtyLeaveConfirm(router, destination, backHref);
+    if (destination !== BROWSER_BACK_EXIT_HREF) {
+      router.refresh();
+    }
+  }
+
+  async function handleKeepCurrentLessonPlan() {
+    const previewToKeep = activePreviewResult;
+    if (editingPlanId == null || previewToKeep == null) {
+      markDeckEditSyncResolved(form, previewToKeep);
+      setExitSyncDialogOpen(false);
+      proceedWithConfirmedExit();
+      return;
+    }
+
+    setIsKeepingCurrentPlan(true);
+    try {
+      const resolvedReferences =
+        (await referenceFieldsRef.current?.resolveReferences()) ??
+        referenceMaterials;
+
+      const inputToSave: LessonPlanInput = {
+        ...form,
+        referenceMaterials:
+          resolvedReferences.length > 0 ? resolvedReferences : undefined,
+      };
+
+      const saved = await keepLessonPlanOnExitAction({
+        lessonPlanId: editingPlanId,
+        input: inputToSave,
+        result: previewToKeep,
+        teamId: teacherWorkspace?.teamId ?? undefined,
+        sourceDeckName: selectedDeckLabel,
+      });
+
+      setSavedPlanId(saved.id);
+      setEditingPlanId(saved.id);
+      setSavedVocabularyDetailPdfUrl(saved.vocabularyDetailPdfUrl ?? null);
+      if (saved.savedAsPersonalCopy || saved.deckId == null) {
+        setDeckId(undefined);
+        setSelectedDeckKey(DECK_NONE);
+        setIsAssignedSourceEditing(false);
+      }
+      if (isEditing && editDraft) {
+        setResult(previewToKeep);
+        setIsEditing(false);
+        setEditDraft(null);
+      }
+      markDeckEditSyncResolved(inputToSave, previewToKeep);
+      setExitSyncDialogOpen(false);
+
+      if (saved.skippedOverwrite) {
+        toast.message("No changes needed", {
+          description:
+            "Your personal lesson plan already matches the current intake and preview. Leaving without overwriting.",
+        });
+      } else {
+        toast.success(
+          saved.savedAsPersonalCopy
+            ? "Personal lesson plan saved"
+            : "Lesson plan saved",
+          {
+            description: saved.savedAsPersonalCopy
+              ? "Intake and preview were saved as your own copy. The linked assigned original was not changed."
+              : "Current intake and lesson plan preview were saved to the Resource Library.",
+          },
+        );
+      }
+      proceedWithConfirmedExit();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not save the current lesson plan.",
+      );
+    } finally {
+      setIsKeepingCurrentPlan(false);
+    }
+  }
+
   return (
     <>
       <TeacherToolPageShell
         title={isEditingExistingPlan ? "Edit Lesson Plan" : "AI Lesson Builder"}
         description={
-          isEditingExistingPlan
-            ? `Update ${initialSavedPlan.lessonTitle} and save changes back to your Resource Library.`
-            : "Generate a structured lesson plan for review before saving."
+          pendingDeckEditSync
+            ? "Deck details were updated. Review the intake fields, then generate a new lesson plan or keep the current one when you leave."
+            : shouldGuardExit
+              ? "You have unsaved edit-mode changes. Leaving prompts you to generate a new plan, or keep the current preview and auto-save intake + preview."
+              : isEditingExistingPlan
+                ? `Update ${initialSavedPlan.lessonTitle} and save changes back to your Resource Library.`
+                : "Generate a structured lesson plan for review before saving."
         }
         backHref={backHref}
+        onBackClick={handleBackNavigationAttempt}
         showResult={showResult && result != null}
         isGenerating={isGenerating}
         errorMessage={errorMessage ?? referenceError}
-        onGenerate={() => runGeneration(false)}
+        onGenerate={requestGenerateFromIntake}
         result={
           result ? (
             <LessonPlanPreviewEditor
@@ -781,139 +1264,220 @@ export function TeacherLessonBuilderForm({
         }
         previewActions={
           result ? (
-            <>
+            <TooltipProvider>
               {isEditing ? (
                 <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={cancelEditing}
-                  >
-                    <X className="size-4" aria-hidden />
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={isGeneratingDayDetails}
-                    onClick={() => void finishEditing()}
-                  >
-                    {isGeneratingDayDetails ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : null}
-                    Done editing
-                  </Button>
-                  {editingPlanId != null ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={isSaving || isGeneratingDayDetails}
-                      onClick={() => void handleSavePlan()}
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={cancelEditing}
+                        />
+                      }
                     >
-                      {isSaving ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                      ) : (
-                        <Save className="size-4" aria-hidden />
-                      )}
-                      Save changes
-                    </Button>
+                      <X className="size-4" aria-hidden />
+                      Cancel
+                    </TooltipTrigger>
+                    <TooltipContent>Discard edits and close editor</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="inline-flex" tabIndex={0} />
+                      }
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isGeneratingDayDetails}
+                        onClick={() => void finishEditing()}
+                      >
+                        {isGeneratingDayDetails ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                        ) : null}
+                        Done editing
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Finish editing this lesson plan</TooltipContent>
+                  </Tooltip>
+                  {editingPlanId != null ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<span className="inline-flex" tabIndex={0} />}
+                      >
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={isSaving || isGeneratingDayDetails}
+                          onClick={() => void handleSavePlan()}
+                        >
+                          {isSaving ? (
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                          ) : (
+                            <Save className="size-4" aria-hidden />
+                          )}
+                          Save changes
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Save your lesson plan changes</TooltipContent>
+                    </Tooltip>
                   ) : null}
                 </>
               ) : (
                 <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isGenerating || isSaving}
-                    onClick={startEditing}
-                  >
-                    <Pencil className="size-4" aria-hidden />
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isGenerating}
-                    onClick={() => {
-                      const planPeriodDays =
-                        form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
-                      if (planPeriodDays > 1) {
-                        void runGeneration(true, "weekly");
-                        return;
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="inline-flex" tabIndex={0} />
                       }
-                      setRegenerateDialogOpen(true);
-                    }}
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : (
-                      <RefreshCw className="size-4" aria-hidden />
-                    )}
-                    Regenerate
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isSaving || isGeneratingDayDetails || (savedPlanId !== null && editingPlanId == null)}
-                    onClick={() => void handleSavePlan()}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : (
-                      <Save className="size-4" aria-hidden />
-                    )}
-                    {editingPlanId != null
-                      ? "Save changes"
-                      : savedPlanId !== null
-                        ? "Saved"
-                        : "Save Lesson Plan"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isDownloading}
-                    onClick={() => void handleDownloadPdf()}
-                  >
-                    {isDownloading ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : (
-                      <Download className="size-4" aria-hidden />
-                    )}
-                    Download PDF
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasVocabularyDetails || isDownloadingVocabularyDetail}
-                    onClick={() => void handleDownloadVocabularyDetailPdf()}
-                  >
-                    {isDownloadingVocabularyDetail ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden />
-                    ) : (
-                      <Download className="size-4" aria-hidden />
-                    )}
-                    Download vocabulary PDF
-                  </Button>
-                  {savedVocabularyDetailPdfUrl ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(savedVocabularyDetailPdfUrl, "_blank", "noopener,noreferrer")}
                     >
-                      <ExternalLink className="size-4" aria-hidden />
-                      Saved vocabulary PDF
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isGenerating || isSaving}
+                        onClick={startEditing}
+                      >
+                        <Pencil className="size-4" aria-hidden />
+                        Edit
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit this lesson plan</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<span className="inline-flex" tabIndex={0} />}
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isGenerating}
+                        onClick={() => {
+                          const planPeriodDays =
+                            form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
+                          if (planPeriodDays > 1) {
+                            void runGeneration(true, "weekly");
+                            return;
+                          }
+                          setRegenerateDialogOpen(true);
+                        }}
+                      >
+                        {isGenerating ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                        ) : (
+                          <RefreshCw className="size-4" aria-hidden />
+                        )}
+                        Regenerate
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Generate a new version of this plan</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<span className="inline-flex" tabIndex={0} />}
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isSaving || isGeneratingDayDetails || (savedPlanId !== null && editingPlanId == null)}
+                        onClick={() => void handleSavePlan()}
+                      >
+                        {isSaving ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Save className="size-4" aria-hidden />
+                        )}
+                        {editingPlanId != null
+                          ? "Save changes"
+                          : savedPlanId !== null
+                            ? "Saved"
+                            : "Save Lesson Plan"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {savedPlanId !== null && editingPlanId == null
+                        ? "This lesson plan is already saved"
+                        : "Save this lesson plan to your library"}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<span className="inline-flex" tabIndex={0} />}
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isDownloading}
+                        onClick={() => void handleDownloadPdf()}
+                      >
+                        {isDownloading ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="size-4" aria-hidden />
+                        )}
+                        Download PDF
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Download the lesson plan as a PDF</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<span className="inline-flex" tabIndex={0} />}
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!hasVocabularyDetails || isDownloadingVocabularyDetail}
+                        onClick={() => void handleDownloadVocabularyDetailPdf()}
+                      >
+                        {isDownloadingVocabularyDetail ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="size-4" aria-hidden />
+                        )}
+                        Download vocabulary PDF
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {!hasVocabularyDetails
+                        ? "Vocabulary details are not available yet"
+                        : "Download the vocabulary detail PDF"}
+                    </TooltipContent>
+                  </Tooltip>
+                  {savedVocabularyDetailPdfUrl ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              window.open(
+                                savedVocabularyDetailPdfUrl,
+                                "_blank",
+                                "noopener,noreferrer",
+                              )
+                            }
+                          />
+                        }
+                      >
+                        <ExternalLink className="size-4" aria-hidden />
+                        Saved vocabulary PDF
+                      </TooltipTrigger>
+                      <TooltipContent>Open the saved vocabulary PDF</TooltipContent>
+                    </Tooltip>
                   ) : null}
                 </>
               )}
-            </>
+            </TooltipProvider>
           ) : null
         }
       >
@@ -982,7 +1546,13 @@ export function TeacherLessonBuilderForm({
               <TeacherFieldLabel
                 htmlFor="lessonBuilderDeckLocked"
                 label="Deck"
-                help="A saved lesson plan stays linked to its original deck. Create a new lesson plan if you need a different deck."
+                help={
+                  isAssignedSourceEditing
+                    ? "This plan came with an assigned deck. Saving creates your own copy in My lesson plans and leaves the original unchanged."
+                    : (initialSavedPlan?.deckId == null && deckId == null)
+                      ? "This is your personal library copy. It is not linked to the assigned deck’s original lesson plan."
+                      : "A saved lesson plan stays linked to its original deck. Create a new lesson plan if you need a different deck."
+                }
               />
               <Input
                 id="lessonBuilderDeckLocked"
@@ -991,6 +1561,11 @@ export function TeacherLessonBuilderForm({
                 disabled
                 className="h-10 cursor-not-allowed bg-muted/40 text-muted-foreground"
               />
+              {isAssignedSourceEditing ? (
+                <p className="text-xs text-muted-foreground">
+                  Save will add an updated personal version to your Teacher Resource Library.
+                </p>
+              ) : null}
               {(initialSavedPlan?.deckId ?? deckId) != null ? (
                 <p className="text-xs text-muted-foreground">
                   <Link
@@ -1064,8 +1639,10 @@ export function TeacherLessonBuilderForm({
                 {activeDecks.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     No decks without a lesson plan are available. Switch to{" "}
-                    <strong>New deck</strong> or create a deck from your Personal Dashboard
-                    first.
+                    <strong>New deck</strong>
+                    {teacherWorkspace?.teamId != null
+                      ? " or use a deck from this workspace Team Dashboard (including decks assigned to you)."
+                      : " or create a deck from your Personal Dashboard first."}
                   </p>
                 ) : null}
                 {selectedDeck ? (
@@ -1347,8 +1924,164 @@ export function TeacherLessonBuilderForm({
       </TooltipProvider>
       </TeacherToolPageShell>
 
+      <AlertDialog
+        open={exitSyncDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !isKeepingCurrentPlan) {
+            pendingExitHrefRef.current = null;
+          }
+          setExitSyncDialogOpen(open);
+        }}
+      >
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-xl mx-4 gap-0 p-0 sm:mx-auto sm:max-w-xl">
+          <AlertDialogHeader className="place-items-start gap-2 p-4 pb-3 text-left sm:p-5 sm:pb-3">
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <AlertDialogTitle className="text-base font-semibold sm:text-lg">
+                {exitDiscrepancies.length > 0
+                  ? "Intake differs from lesson preview"
+                  : "Leave Lesson Builder?"}
+              </AlertDialogTitle>
+              {exitDiscrepancies.length > 0 ? (
+                <Badge variant="secondary" className="rounded-md font-normal">
+                  {exitDiscrepancies.length}{" "}
+                  {exitDiscrepancies.length === 1 ? "difference" : "differences"}
+                </Badge>
+              ) : null}
+            </div>
+            <AlertDialogDescription className="text-left text-sm text-muted-foreground">
+              {pendingDeckEditSync
+                ? "Deck details updated the intake fields, but the lesson plan preview is unchanged. Choose how you would like to continue."
+                : exitDiscrepancies.length > 0
+                  ? "Some intake fields no longer match the current lesson plan preview. Review the differences below, then choose how to continue."
+                  : "You have unsaved changes on this page. Choose how you would like to continue."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {exitDiscrepancies.length > 0 ? (
+            <div className="space-y-2 px-4 pb-4 sm:px-5">
+              <p className="text-xs text-muted-foreground">
+                Comparison of current intake values against the lesson plan
+                preview.
+              </p>
+              <IntakePreviewDiscrepancyList items={exitDiscrepancies} />
+            </div>
+          ) : (
+            <div className="px-4 pb-4 sm:px-5">
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 text-left text-xs text-muted-foreground">
+                You can generate a new plan from the current intake, keep the
+                current plan and leave, or stay and continue editing.
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          <AlertDialogFooter className="m-0 flex-col gap-2 rounded-b-xl border-0 bg-muted/40 p-4 sm:flex-col sm:space-x-0">
+            <AlertDialogAction
+              disabled={isKeepingCurrentPlan || isAdaptingCreatorPlan}
+              className="w-full"
+              onClick={(event) => {
+                event.preventDefault();
+                handleLeaveGenerateClick();
+              }}
+            >
+              Generate a new lesson plan
+            </AlertDialogAction>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={
+                isKeepingCurrentPlan ||
+                isAdaptingCreatorPlan ||
+                editingPlanId == null
+              }
+              onClick={() => {
+                void handleKeepCurrentLessonPlan();
+              }}
+            >
+              {isKeepingCurrentPlan
+                ? "Saving…"
+                : "Keep current plan and leave"}
+            </Button>
+            <AlertDialogCancel
+              disabled={isKeepingCurrentPlan || isAdaptingCreatorPlan}
+              className="mt-0 w-full"
+            >
+              Stay on this page
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={assigneeGenerateChoiceOpen}
+        onOpenChange={(open) => {
+          if (!open && isAdaptingCreatorPlan) return;
+          setAssigneeGenerateChoiceOpen(open);
+        }}
+      >
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-xl mx-4 gap-0 p-0 sm:mx-auto sm:max-w-xl">
+          <AlertDialogHeader className="place-items-start gap-2 p-4 pb-3 text-left sm:p-5 sm:pb-3">
+            <AlertDialogTitle className="text-base font-semibold sm:text-lg">
+              How would you like to proceed?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left text-sm text-muted-foreground">
+              This deck includes the creator’s saved lesson plan. Choose whether
+              to generate an entirely new plan with AI, or create your own lesson
+              plan from the linked plan without running a new AI generation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-2 px-4 pb-4 sm:px-5">
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 text-left text-xs text-muted-foreground">
+              Creating from the linked plan leaves the original unchanged forever.
+              A personal copy is saved to your Teacher Resource Library. If your
+              intake details differ (subject, topic, grade, difficulty, duration,
+              plan period, learning standard, and related fields), the copied
+              content is restructured to match — no new AI generation.
+            </div>
+          </div>
+
+          <Separator />
+
+          <AlertDialogFooter className="m-0 flex-col gap-2 rounded-b-xl border-0 bg-muted/40 p-4 sm:flex-col sm:space-x-0">
+            <AlertDialogAction
+              disabled={isAdaptingCreatorPlan || isGenerating}
+              className="w-full"
+              onClick={(event) => {
+                event.preventDefault();
+                handleAssigneeChooseNewGeneration();
+              }}
+            >
+              Generate a completely new lesson plan
+            </AlertDialogAction>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              disabled={isAdaptingCreatorPlan || isGenerating || editingPlanId == null}
+              onClick={() => {
+                void handleAssigneeAdaptCreatorPlan();
+              }}
+            >
+              {isAdaptingCreatorPlan
+                ? "Creating…"
+                : "Create my lesson plan from the linked plan"}
+            </Button>
+            <AlertDialogCancel
+              disabled={isAdaptingCreatorPlan}
+              className="mt-0 w-full"
+            >
+              Cancel
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
         <DialogContent className="sm:max-w-lg">
+          <TooltipProvider>
           <DialogHeader>
             <DialogTitle>Vocabulary teaching approach</DialogTitle>
             <DialogDescription>
@@ -1361,41 +2094,62 @@ export function TeacherLessonBuilderForm({
             {VOCABULARY_TEACHING_APPROACH_OPTIONS.map((option) => {
               const selected = regenerateApproach === option.value;
               return (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant={selected ? "default" : "outline"}
-                  className={cn(
-                    "h-auto flex-col items-start gap-1 whitespace-normal px-4 py-3 text-left",
-                    !selected && "text-foreground",
-                  )}
-                  onClick={() => setRegenerateApproach(option.value)}
-                >
-                  <span className="font-medium">{option.label}</span>
-                  <span
-                    className={cn(
-                      "text-xs font-normal leading-snug",
-                      selected ? "text-primary-foreground/90" : "text-muted-foreground",
-                    )}
+                <Tooltip key={option.value}>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                        className={cn(
+                          "h-auto flex-col items-start gap-1 whitespace-normal px-4 py-3 text-left",
+                          !selected && "text-foreground",
+                        )}
+                        onClick={() => setRegenerateApproach(option.value)}
+                      />
+                    }
                   >
-                    {option.description}
-                  </span>
-                </Button>
+                    <span className="font-medium">{option.label}</span>
+                    <span
+                      className={cn(
+                        "text-xs font-normal leading-snug",
+                        selected ? "text-primary-foreground/90" : "text-muted-foreground",
+                      )}
+                    >
+                      {option.description}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Select this vocabulary teaching approach
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setRegenerateDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleRegenerateConfirm}>
-              Regenerate plan
-            </Button>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRegenerateDialogOpen(false)}
+                  />
+                }
+              >
+                Cancel
+              </TooltipTrigger>
+              <TooltipContent>Cancel and close</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={<Button type="button" onClick={handleRegenerateConfirm} />}
+              >
+                Regenerate plan
+              </TooltipTrigger>
+              <TooltipContent>Replace this plan with a newly generated version</TooltipContent>
+            </Tooltip>
           </DialogFooter>
+          </TooltipProvider>
         </DialogContent>
       </Dialog>
     </>

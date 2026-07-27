@@ -3,6 +3,12 @@
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -36,14 +42,33 @@ export default function ErrorPage({
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-3">
-        <Button onClick={reset} className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Try Again
-        </Button>
-        <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline" }), "gap-2")}>
-          <Home className="h-4 w-4" />
-          Go to Dashboard
-        </Link>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button onClick={reset} className="gap-2" />}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </TooltipTrigger>
+            <TooltipContent>Reload this page and try again</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Link
+                  href="/dashboard"
+                  className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
+                />
+              }
+            >
+              <Home className="h-4 w-4" />
+              Go to Dashboard
+            </TooltipTrigger>
+            <TooltipContent>Return to your dashboard</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );
