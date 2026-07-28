@@ -1,4 +1,9 @@
 import type { HomeworkResult } from "@/lib/teacher-homework-ai-schema";
+import { getHomeworkPassageSections } from "@/lib/homework-list-items";
+import {
+  drawHomeworkAnswerGraphOnPdf,
+  isRenderableHomeworkAnswerGraph,
+} from "@/lib/homework-answer-graph";
 
 export function homeworkPdfSafeFileName(title: string): string {
   return (
@@ -79,15 +84,46 @@ export async function buildHomeworkPdfDocument(
   yRef.y += 16;
 
   addSection(doc, margin, contentW, yRef, pageH, "Instructions", [homework.instructions]);
-  addSection(
-    doc,
-    margin,
-    contentW,
-    yRef,
-    pageH,
-    "Questions",
-    homework.questions.map((question, index) => `${index + 1}. ${question}`),
-  );
+
+  const sections = getHomeworkPassageSections(homework);
+  const hasPassageBodies = sections.some((section) => section.body.trim());
+
+  if (hasPassageBodies) {
+    for (const [index, section] of sections.entries()) {
+      if (section.body.trim()) {
+        const passageHeading = section.title?.trim()
+          ? `Reading Passage — ${section.title.trim()}`
+          : sections.filter((item) => item.body.trim()).length > 1
+            ? `Reading Passage ${index + 1}`
+            : "Reading Passage";
+        addSection(doc, margin, contentW, yRef, pageH, passageHeading, [section.body]);
+      }
+      if (section.questions.length > 0) {
+        addSection(
+          doc,
+          margin,
+          contentW,
+          yRef,
+          pageH,
+          section.body.trim() ? "Questions" : "Questions (continued)",
+          section.questions.map(
+            (question, qIndex) =>
+              `${section.questionNumbers[qIndex]}. ${question}`,
+          ),
+        );
+      }
+    }
+  } else {
+    addSection(
+      doc,
+      margin,
+      contentW,
+      yRef,
+      pageH,
+      "Questions",
+      homework.questions.map((question, index) => `${index + 1}. ${question}`),
+    );
+  }
 
   if (includeAnswerKey) {
     doc.addPage();
@@ -97,15 +133,17 @@ export async function buildHomeworkPdfDocument(
     doc.setTextColor(20);
     doc.text("Answer Key", margin, yRef.y);
     yRef.y += 20;
-    addSection(
-      doc,
-      margin,
-      contentW,
-      yRef,
-      pageH,
-      "Answers",
-      homework.answerKey.map((answer, index) => `${index + 1}. ${answer}`),
-    );
+
+    for (let index = 0; index < homework.answerKey.length; index++) {
+      const answer = homework.answerKey[index]!;
+      addSection(doc, margin, contentW, yRef, pageH, `Answer ${index + 1}`, [
+        answer,
+      ]);
+      const graph = homework.answerGraphs?.[index];
+      if (graph && isRenderableHomeworkAnswerGraph(graph)) {
+        drawHomeworkAnswerGraphOnPdf(doc, graph, margin, contentW, yRef, pageH);
+      }
+    }
   }
 
   return doc;

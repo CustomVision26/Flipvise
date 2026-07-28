@@ -22,7 +22,7 @@ import {
 import { homeworkMatchesSavedLessonPlan } from "@/lib/homework-lesson-plan-link";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
 import { buildDeckHomeworkContext } from "@/lib/homework-source-context";
-import { buildLessonPlanQuizContext } from "@/lib/lesson-plan-quiz-context";
+import { buildLessonPlanQuizContext, getLessonPlanVocabularyTermsForScope } from "@/lib/lesson-plan-quiz-context";
 import {
   generateHomeworkPdfBuffer,
   homeworkPdfSafeFileName,
@@ -32,17 +32,65 @@ import { resolveReferenceMaterialsForHomeworkSource } from "@/lib/resolve-saved-
 import {
   homeworkResultSchema,
   homeworkSourceTypeSchema,
+  homeworkNeedsReadingPassage,
   teacherHomeworkInputSchema,
   type HomeworkResult,
   type TeacherHomeworkActionInput,
 } from "@/lib/teacher-homework-ai-schema";
 import { generateHomework, type HomeworkInput } from "@/lib/teacher-generators";
 import { normalizeHomeworkResult } from "@/lib/homework-list-items";
+import {
+  buildEnglishHomeworkPassageRules,
+  buildGeneralHomeworkPassageRules,
+} from "@/lib/homework-reading-passage";
+import { detectQuizSubjectArea } from "@/lib/teacher-quiz-reading-passage";
+import {
+  buildGenerationTitleSourceSuffix,
+  parseLessonScopeLabelFromDescription,
+  shortenTeacherTitleSegment,
+  withTitleSourceSuffix,
+} from "@/lib/teacher-generation-titles";
+
+async function applyHomeworkSourceTitle(
+  input: TeacherHomeworkActionInput,
+  result: HomeworkResult,
+): Promise<HomeworkResult> {
+  let deckName: string | null = null;
+  let deckLessonScopeLabel: string | null = null;
+
+  if (input.sourceType === "deck" && input.deckId != null) {
+    const deck = await getDeckRowById(input.deckId);
+    deckName = deck?.name ?? null;
+    deckLessonScopeLabel = parseLessonScopeLabelFromDescription(deck?.description);
+  }
+
+  const includeDayScope =
+    input.sourceType === "lesson_plan" && input.dayScope != null;
+
+  const suffix = buildGenerationTitleSourceSuffix({
+    sourceType: input.sourceType,
+    dayScope: includeDayScope ? input.dayScope : null,
+    deckName,
+    deckLessonScopeLabel,
+  });
+
+  return {
+    ...result,
+    assignmentTitle: withTitleSourceSuffix(
+      shortenTeacherTitleSegment(result.assignmentTitle, 72),
+      suffix,
+    ),
+  };
+}
 
 function buildHomeworkPrompt(
   input: TeacherHomeworkActionInput,
   sourceContext: string | null,
+  vocabularyTerms: string[] = [],
 ): string {
+  const numberOfPassages = input.numberOfPassages ?? 1;
+  const questionsPerPassage =
+    input.questionsPerPassage ?? input.numberOfQuestions;
   const lines = [
     `Subject: ${input.subject}`,
     `Grade level: ${input.gradeLevel}`,
@@ -51,6 +99,21 @@ function buildHomeworkPrompt(
     `Difficulty level: ${input.difficultyLevel}`,
     `Source type: ${input.sourceType}`,
   ];
+
+  if (input.numberOfPassages != null && input.questionsPerPassage != null) {
+    lines.push(
+      `Number of passages: ${numberOfPassages}`,
+      `Questions per passage: ${questionsPerPassage}`,
+    );
+  }
+
+  if (vocabularyTerms.length > 0) {
+    lines.push(
+      "",
+      "Priority vocabulary TERMS (use these in the problems):",
+      ...vocabularyTerms.map((term) => `- ${term}`),
+    );
+  }
 
   if (input.sourceType === "deck") {
     lines.push(
@@ -70,6 +133,16 @@ function buildHomeworkPrompt(
       "- Base homework questions on the lesson objectives, vocabulary, activities, and assessment samples in the source below.",
       "- Use assessment questions and homework from the plan as models for style and rigor.",
       "- Match question depth to the requested difficulty level above.",
+      "- Prefer concrete practice items students can solve using the listed vocabulary TERMS.",
+    );
+  }
+
+  if (homeworkNeedsReadingPassage(input.subject, input.topic)) {
+    lines.push(
+      "",
+      "Reading passage requirement:",
+      `- Generate exactly ${numberOfPassages} distinct passage${numberOfPassages === 1 ? "" : "s"} with exactly ${questionsPerPassage} question${questionsPerPassage === 1 ? "" : "s"} each.`,
+      "- Populate the passages array and passageQuestionCounts; flatten questions/answerKey in passage order.",
     );
   }
 
@@ -80,20 +153,29 @@ function buildHomeworkPrompt(
   return lines.join("\n");
 }
 
-function toTemplateInput(input: TeacherHomeworkActionInput): HomeworkInput {
+function toTemplateInput(
+  input: TeacherHomeworkActionInput,
+  vocabularyTerms?: string[],
+): HomeworkInput {
   return {
     subject: input.subject,
     gradeLevel: input.gradeLevel,
     topic: input.topic,
     numberOfQuestions: input.numberOfQuestions,
     difficultyLevel: input.difficultyLevel,
+    numberOfPassages: input.numberOfPassages,
+    questionsPerPassage: input.questionsPerPassage,
+    vocabularyTerms,
   };
 }
 
 async function resolveHomeworkSourceContext(
   input: TeacherHomeworkActionInput,
   userId: string,
-): Promise<string | null> {
+): Promise<{
+  context: string | null;
+  vocabularyTerms: string[];
+}> {
   if (input.sourceType === "lesson_plan" && input.savedLessonPlanId != null) {
     const saved = await resolveSavedLessonPlanForViewer(
       userId,
@@ -103,11 +185,24 @@ async function resolveHomeworkSourceContext(
     if (!saved) {
       throw new Error("Saved lesson plan not found.");
     }
-    return buildLessonPlanQuizContext({
-      input: saved.input,
-      result: saved.result,
-      referencePurpose: "homework",
-    });
+    const dayScope = input.dayScope ?? "all";
+    if (dayScope !== "all") {
+      const scheduleLength = saved.result.weeklySchedule?.length ?? 0;
+      if (dayScope.dayIndex >= scheduleLength) {
+        throw new Error(
+          "Selected lesson-plan day is not available on this plan. Choose All Days or another day.",
+        );
+      }
+    }
+    return {
+      context: buildLessonPlanQuizContext({
+        input: saved.input,
+        result: saved.result,
+        referencePurpose: "homework",
+        dayScope,
+      }),
+      vocabularyTerms: getLessonPlanVocabularyTermsForScope(saved.result, dayScope),
+    };
   }
 
   if (input.sourceType === "deck" && input.deckId != null) {
@@ -123,10 +218,16 @@ async function resolveHomeworkSourceContext(
     if (cardRows.length === 0) {
       throw new Error("The selected deck has no cards. Add cards first or choose another deck.");
     }
-    return buildDeckHomeworkContext(deck, cardRows);
+    return {
+      context: buildDeckHomeworkContext(deck, cardRows),
+      vocabularyTerms: cardRows
+        .map((card) => card.front?.trim())
+        .filter((front): front is string => Boolean(front))
+        .slice(0, 16),
+    };
   }
 
-  return null;
+  return { context: null, vocabularyTerms: [] };
 }
 
 export async function generateHomeworkAction(
@@ -145,10 +246,39 @@ export async function generateHomeworkAction(
   }
 
   const input = parsed.data;
-  const sourceContext = await resolveHomeworkSourceContext(input, ctx.userId!);
+  const {
+    context: sourceContext,
+    vocabularyTerms,
+  } = await resolveHomeworkSourceContext(input, ctx.userId!);
+  const needsPassage = homeworkNeedsReadingPassage(input.subject, input.topic);
+  const numberOfPassages = input.numberOfPassages ?? (needsPassage ? 1 : 1);
+  const questionsPerPassage =
+    input.questionsPerPassage ??
+    (needsPassage ? input.numberOfQuestions : input.numberOfQuestions);
+  const passageRules = needsPassage
+    ? detectQuizSubjectArea(input.subject, input.topic) === "english"
+      ? buildEnglishHomeworkPassageRules(
+          input.gradeLevel,
+          numberOfPassages,
+          questionsPerPassage,
+        )
+      : buildGeneralHomeworkPassageRules(
+          input.gradeLevel,
+          numberOfPassages,
+          questionsPerPassage,
+        )
+    : `- This is NOT a reading-passage assignment. Set passages, passageQuestionCounts, passageTitle, and passage to null.
+- Write concrete solvable practice problems (not placeholders like "Practice problem on…").
+- When vocabulary/source material is provided, every question must use those terms or skills.`;
+
+  async function finalizeHomeworkResult(result: HomeworkResult): Promise<HomeworkResult> {
+    return applyHomeworkSourceTitle(input, normalizeHomeworkResult(result));
+  }
 
   if (!process.env.OPENAI_API_KEY?.trim()) {
-    return normalizeHomeworkResult(generateHomework(toTemplateInput(input)));
+    return finalizeHomeworkResult(
+      generateHomework(toTemplateInput(input, vocabularyTerms)),
+    );
   }
 
   try {
@@ -161,16 +291,23 @@ export async function generateHomeworkAction(
 
 Requirements:
 - Generate exactly ${input.numberOfQuestions} homework questions unless the source material supports fewer focused items — never exceed ${input.numberOfQuestions}.
-- Questions must be specific to the subject, grade, topic, and difficulty — never generic placeholders.
-- When source material is provided (lesson plan or deck flashcards), base questions primarily on that content — vocabulary, concepts, and skills from the source.
+- Questions must be specific, solvable classroom problems for the subject, grade, topic, and difficulty — NEVER generic placeholders such as "Practice problem on…" or "Sample solution for…".
+- When source material is provided (lesson plan or deck flashcards), base questions primarily on that content — vocabulary TERMS, concepts, and skills from the source.
+- For Mathematics / Algebra: write real expressions, equations, inequalities, or word problems students can solve; include numbers and require shown work where appropriate. Answer key must include the worked solution or final answer.
+- When a question asks students to graph on a number line or coordinate plane, ALSO fill answerGraphs[i] with a figure (do not only describe the graph in words):
+  - Number line (e.g. x > 6): type "number_line", lineMin/lineMax covering the mark (e.g. 0 and 12), markValue 6, markStyle "open" for < or > and "closed" for ≤ or ≥, shadeDirection "right" or "left".
+  - Coordinate plane: type "coordinate_graph" with xMin/xMax/yMin/yMax and points and/or lines.
+  - Non-graph answers: type "none" with other graph fields null.
+- answerGraphs must be the same length as answerKey (one entry per answer). If no answer needs a graph, set answerGraphs to null.
 - For deck sources, derive questions from the listed sample flashcards (front/back content and multiple-choice distractors when present). Calibrate wording and rigor to the requested difficulty level (${input.difficultyLevel}).
 - For lesson plan sources, draw from objectives, vocabulary, teaching steps, and assessment sample items in the plan. Calibrate to difficulty level (${input.difficultyLevel}).
 - Do NOT prefix questions or answerKey entries with numbers, bullets, or labels — plain text only (numbering is added by the UI).
 - instructions must tell students how to complete the assignment clearly.
 - assignmentTitle should be concise and classroom-ready.
 - answerKey must align one-to-one with questions (same count and order).
-- Do not use markdown formatting.`,
-      prompt: buildHomeworkPrompt(input, sourceContext),
+- Do not use markdown formatting.
+${passageRules}`,
+      prompt: buildHomeworkPrompt(input, sourceContext, vocabularyTerms),
     });
 
     if (!output) {
@@ -181,12 +318,45 @@ Requirements:
       throw new Error("Homework generation returned mismatched questions and answers.");
     }
 
-    return normalizeHomeworkResult(output);
+    const normalized = normalizeHomeworkResult(output);
+    if (needsPassage && !(normalized.passages?.length || normalized.passage?.trim())) {
+      throw new Error(
+        "Homework generation omitted the reading passage. Please try Generate again.",
+      );
+    }
+    if (
+      needsPassage &&
+      input.numberOfPassages != null &&
+      (normalized.passages?.length ?? 0) < input.numberOfPassages &&
+      !(input.numberOfPassages === 1 && normalized.passage?.trim())
+    ) {
+      throw new Error(
+        `Homework generation returned fewer than ${input.numberOfPassages} passages. Please try Generate again.`,
+      );
+    }
+
+    const looksLikePlaceholder = normalized.questions.every((question) =>
+      /practice problem on|sample solution for/i.test(question),
+    );
+    if (looksLikePlaceholder) {
+      throw new Error("Homework generation returned placeholder questions.");
+    }
+
+    return applyHomeworkSourceTitle(input, normalized);
   } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("omitted the reading passage") ||
+        error.message.includes("fewer than"))
+    ) {
+      throw error;
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn("[generateHomeworkAction] AI failed; using template fallback.", error);
     }
-    return normalizeHomeworkResult(generateHomework(toTemplateInput(input)));
+    return finalizeHomeworkResult(
+      generateHomework(toTemplateInput(input, vocabularyTerms)),
+    );
   }
 }
 
@@ -240,7 +410,7 @@ async function buildHomeworkSavePayload(
     };
     const plans = await getSavedLessonPlansByUser(userId);
     const matchedPlan = plans
-      .map(mapSavedLessonPlanRowToPickerItem)
+      .map((row) => mapSavedLessonPlanRowToPickerItem(row))
       .find((plan) => homeworkMatchesSavedLessonPlan(homeworkCandidate, plan));
     if (matchedPlan) {
       resolvedLessonPlanId = matchedPlan.id;
@@ -280,7 +450,10 @@ async function buildHomeworkSavePayload(
       gradeLevel: payload.input.gradeLevel,
       topic: payload.input.topic,
       numberOfQuestions: payload.input.numberOfQuestions,
+      numberOfPassages: payload.input.numberOfPassages,
+      questionsPerPassage: payload.input.questionsPerPassage,
       difficultyLevel: payload.input.difficultyLevel,
+      dayScope: payload.input.dayScope,
       referenceMaterials:
         referenceMaterials.length > 0 ? referenceMaterials : undefined,
     },

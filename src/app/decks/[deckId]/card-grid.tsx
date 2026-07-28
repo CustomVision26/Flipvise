@@ -270,6 +270,8 @@ interface CardGridProps {
   deckId: number;
   hasAI?: boolean;
   initialView?: ViewMode;
+  /** When false, hide edit/delete actions (view-only deck access). */
+  canEditContent?: boolean;
 }
 
 export function CardGrid({
@@ -277,6 +279,7 @@ export function CardGrid({
   deckId,
   hasAI = false,
   initialView = "grid",
+  canEditContent = true,
 }: CardGridProps) {
   const [sort, setSort] = useState<SortOption>("newest");
   const [pageSize, setPageSize] = useState<PageSize>(9);
@@ -363,7 +366,9 @@ export function CardGrid({
                 </TableHead>
                 <TableHead className="hidden w-28 sm:table-cell">Type</TableHead>
                 <TableHead className="hidden w-36 md:table-cell">Updated</TableHead>
-                <TableHead className="w-[1%] pr-4 text-right">Actions</TableHead>
+                {canEditContent ? (
+                  <TableHead className="w-[1%] pr-4 text-right">Actions</TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -405,12 +410,14 @@ export function CardGrid({
                       <span className="hidden lg:inline">{updatedLabel}</span>
                       <span className="lg:hidden">{updatedShort}</span>
                     </TableCell>
-                    <TableCell className="pr-4 align-top">
-                      <div className="flex items-center justify-end gap-1">
-                        <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
-                        <DeleteCardDialog cardId={card.id} deckId={deckId} />
-                      </div>
-                    </TableCell>
+                    {canEditContent ? (
+                      <TableCell className="pr-4 align-top">
+                        <div className="flex items-center justify-end gap-1">
+                          <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
+                          <DeleteCardDialog cardId={card.id} deckId={deckId} />
+                        </div>
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 );
               })}
@@ -478,8 +485,12 @@ export function CardGrid({
                   {updatedShort}
                 </span>
                 <div className="flex shrink-0 items-center gap-1">
-                  <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
-                  <DeleteCardDialog cardId={card.id} deckId={deckId} />
+                  {canEditContent ? (
+                    <>
+                      <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
+                      <DeleteCardDialog cardId={card.id} deckId={deckId} />
+                    </>
+                  ) : null}
                 </div>
               </Card>
             );
@@ -515,10 +526,12 @@ export function CardGrid({
                   <span className="truncate text-[8px] text-muted-foreground tabular-nums">
                     {updatedCompact}
                   </span>
-                  <div className="flex shrink-0 items-center [&_button]:h-5 [&_button]:min-h-5 [&_button]:px-1 [&_button]:text-[9px]">
-                    <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
-                    <DeleteCardDialog cardId={card.id} deckId={deckId} />
-                  </div>
+                  {canEditContent ? (
+                    <div className="flex shrink-0 items-center [&_button]:h-5 [&_button]:min-h-5 [&_button]:px-1 [&_button]:text-[9px]">
+                      <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
+                      <DeleteCardDialog cardId={card.id} deckId={deckId} />
+                    </div>
+                  ) : null}
                 </div>
               </Card>
             );

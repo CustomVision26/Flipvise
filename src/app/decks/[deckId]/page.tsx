@@ -70,12 +70,8 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
 
   const bundle = await getDeckWithViewerAccess(id, userId);
   if (!bundle) notFound();
-  if (!canEditDeckContent(bundle.access)) {
-    const studyPath = `/decks/${id}/study`;
-    redirect(
-      workspaceQs ? withTeamWorkspaceQuery(studyPath, workspaceQs) : studyPath,
-    );
-  }
+  // Viewers with access see the cards page read-only (do not redirect to study).
+  const canEdit = canEditDeckContent(bundle.access);
 
   const deck = bundle.deck;
   const { heading: teamDeckHeading, teamTierPro } = await getTeamDeckContext(deck);
@@ -211,9 +207,9 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                       )}
                     >
                       <Layers3 className="size-3" />
-                      Deck editor
+                      {canEdit ? "Deck editor" : "Deck cards"}
                     </Badge>
-                    {effectiveAI ? (
+                    {canEdit && effectiveAI ? (
                       <Badge
                         variant="outline"
                         className={cn(
@@ -321,15 +317,27 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                   : "border-border/80 bg-background/70 shadow-md",
               )}
             >
-              <GenerateCardsButtonLoader
-                deckId={id}
-                hasDescription={!!deck.description}
-                totalCardCount={cards.length}
-                aiGeneratedCount={aiGeneratedCount}
-                hasAI={effectiveAI}
-                deckCardLimit={deckCardLimit}
-                onGradient={hasGradient}
-              />
+              {canEdit ? (
+                <GenerateCardsButtonLoader
+                  deckId={id}
+                  hasDescription={!!deck.description}
+                  totalCardCount={cards.length}
+                  aiGeneratedCount={aiGeneratedCount}
+                  hasAI={effectiveAI}
+                  deckCardLimit={deckCardLimit}
+                  onGradient={hasGradient}
+                />
+              ) : (
+                <p
+                  className={cn(
+                    "text-sm leading-relaxed",
+                    hasGradient ? "text-white/75" : "text-muted-foreground",
+                  )}
+                >
+                  You can view the cards in this deck. Editing is limited to the deck
+                  owner or creator.
+                </p>
+              )}
 
               <div
                 className={cn(
@@ -360,7 +368,11 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Add at least one card to start a study session.</p>
+                        <p>
+                          {canEdit
+                            ? "Add at least one card to start a study session."
+                            : "This deck has no cards yet."}
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -369,7 +381,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             </aside>
           </div>
 
-          {isAtCardLimit ? (
+          {canEdit && isAtCardLimit ? (
             <p
               className={cn(
                 "mt-5 border-t pt-4 text-xs",
@@ -426,22 +438,24 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                 </p>
               )}
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {cards.length > 0 ? (
-                <DeleteAllCardsDialogLoader deckId={id} cardCount={cards.length} />
-              ) : null}
-              <AddCardDialog
-                deckId={id}
-                deckName={deck.name}
-                isAtLimit={isAtCardLimit}
-                hasAI={effectiveAI}
-                hasAdvancedSourceImport={effectiveAdvancedSourceImport}
-                aiGeneratedCount={aiGeneratedCount}
-                totalCardCount={cards.length}
-                deckCardLimit={deckCardLimit}
-                allowsMultipleChoiceFormat={paidDeckCards}
-              />
-            </div>
+            {canEdit ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {cards.length > 0 ? (
+                  <DeleteAllCardsDialogLoader deckId={id} cardCount={cards.length} />
+                ) : null}
+                <AddCardDialog
+                  deckId={id}
+                  deckName={deck.name}
+                  isAtLimit={isAtCardLimit}
+                  hasAI={effectiveAI}
+                  hasAdvancedSourceImport={effectiveAdvancedSourceImport}
+                  aiGeneratedCount={aiGeneratedCount}
+                  totalCardCount={cards.length}
+                  deckCardLimit={deckCardLimit}
+                  allowsMultipleChoiceFormat={paidDeckCards}
+                />
+              </div>
+            ) : null}
           </div>
 
           {cards.length === 0 ? (
@@ -458,21 +472,25 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">No cards yet</p>
                 <p className="max-w-xs text-xs text-muted-foreground">
-                  Add your first card to start building this deck.
+                  {canEdit
+                    ? "Add your first card to start building this deck."
+                    : "This deck does not have any cards yet."}
                 </p>
               </div>
-              <AddCardDialog
-                deckId={id}
-                deckName={deck.name}
-                isAtLimit={isAtCardLimit}
-                hasAI={effectiveAI}
-                hasAdvancedSourceImport={effectiveAdvancedSourceImport}
-                aiGeneratedCount={aiGeneratedCount}
-                totalCardCount={cards.length}
-                deckCardLimit={deckCardLimit}
-                allowsMultipleChoiceFormat={paidDeckCards}
-                trigger={<Button className="gap-2">Add your first card</Button>}
-              />
+              {canEdit ? (
+                <AddCardDialog
+                  deckId={id}
+                  deckName={deck.name}
+                  isAtLimit={isAtCardLimit}
+                  hasAI={effectiveAI}
+                  hasAdvancedSourceImport={effectiveAdvancedSourceImport}
+                  aiGeneratedCount={aiGeneratedCount}
+                  totalCardCount={cards.length}
+                  deckCardLimit={deckCardLimit}
+                  allowsMultipleChoiceFormat={paidDeckCards}
+                  trigger={<Button className="gap-2">Add your first card</Button>}
+                />
+              ) : null}
             </div>
           ) : (
             <CardGrid
@@ -480,6 +498,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               deckId={id}
               hasAI={effectiveAI}
               initialView={initialView}
+              canEditContent={canEdit}
             />
           )}
         </section>

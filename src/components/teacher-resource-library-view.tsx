@@ -172,6 +172,7 @@ function itemHaystack(item: TeacherResourceLibraryItem): string {
     item.creatorEmail,
     item.sourceLabel,
     item.isOutdatedVsSourceDeck ? "deck updated outdated" : null,
+    item.isSourceDeckDeleted ? "deck deleted source missing" : null,
   ]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(" ")
@@ -390,7 +391,12 @@ function ResourceItemCard({
           {creatorLabel}
           {savedLabel ? ` · Saved ${savedLabel}` : ""}
         </p>
-        {item.isOutdatedVsSourceDeck && sourceDeckUpdatedLabel ? (
+        {item.isSourceDeckDeleted ? (
+          <p className="text-xs text-destructive">
+            Source deck deleted — Edit and Create Quiz are unavailable for this
+            saved plan
+          </p>
+        ) : item.isOutdatedVsSourceDeck && sourceDeckUpdatedLabel ? (
           <p className="text-xs text-destructive">
             Source deck updated {sourceDeckUpdatedLabel}
           </p>
@@ -475,6 +481,8 @@ function ResourceItemCard({
         ) : null}
         {item.isPlaceholder ? (
           <Badge variant="secondary">Placeholder</Badge>
+        ) : item.isSourceDeckDeleted ? (
+          <Badge variant="destructive">Deck deleted</Badge>
         ) : item.isOutdatedVsSourceDeck ? (
           <Badge variant="destructive">Deck updated</Badge>
         ) : (

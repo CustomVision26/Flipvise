@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { savedLessonPlans } from "@/db/schema";
+import { decks, savedHomeworkAssignments, savedLessonPlans } from "@/db/schema";
 import type { DeckRow } from "@/db/queries/decks";
 import type { LessonPlanInput, LessonPlanResult } from "@/lib/teacher-generators";
 import { lessonPlanMatchesDeck } from "@/lib/lesson-plan-deck-match";
@@ -14,7 +14,8 @@ import {
   listTeamMembers,
 } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
-import { desc, eq, and, inArray, isNotNull, isNull } from "drizzle-orm";
+import { lessonPlanDeckDescriptionMarker } from "@/lib/lesson-plan-deck-marker";
+import { desc, eq, and, inArray, isNotNull, isNull, ne, like } from "drizzle-orm";
 import type { InferSelectModel } from "drizzle-orm";
 
 export type SavedLessonPlanRow = InferSelectModel<typeof savedLessonPlans>;
@@ -506,17 +507,103 @@ export type SavedLessonPlanPickerItem = {
   sourceDeckName: string | null;
   input: LessonPlanInput;
   result: LessonPlanResult;
+  /** Select / combobox label — short title + grade; creator for assigned originals. */
+  optionLabel: string;
+  /** True when this is a creator original linked to a deck assigned to the viewer. */
+  isAssignedOriginal?: boolean;
 };
 
+type AssignedPickerLabelContext = {
+  isAssignedOriginal: true;
+  creatorPrimaryLine: string | null;
+  ownerUserId: string;
+  creatorRole: "team_admin" | "team_member" | null;
+};
+
+function lessonPlanCreatorRoleSuffix(
+  creatorUserId: string,
+  ownerUserId: string,
+  creatorRole: "team_admin" | "team_member" | null,
+): string {
+  if (creatorUserId === ownerUserId) return " (Owner)";
+  if (creatorRole === "team_admin") return " (Team Admin)";
+  return "";
+}
+
+/**
+ * Compact Select labels for quiz/homework/study-guide/worksheet pickers.
+ * Personal: `{title} · {grade}`
+ * Assigned originals: `{title} · {grade} · {creatorName} (Owner|Team Admin)`
+ */
+function formatLessonPlanPickerOptionLabel(
+  row: Pick<SavedLessonPlanRow, "lessonTitle" | "gradeLevel" | "userId">,
+  assigned?: AssignedPickerLabelContext,
+): string {
+  const title = row.lessonTitle.trim() || "Untitled lesson";
+  const grade = row.gradeLevel.trim();
+  const shortBase = grade ? `${title} · ${grade}` : title;
+  if (!assigned) return shortBase;
+
+  const creatorLine = assigned.creatorPrimaryLine?.trim();
+  if (!creatorLine) return shortBase;
+
+  const creatorName = `${creatorLine}${lessonPlanCreatorRoleSuffix(
+    row.userId,
+    assigned.ownerUserId,
+    assigned.creatorRole,
+  )}`;
+  return `${shortBase} · ${creatorName}`;
+}
+
+/**
+ * Personal saved plans for the viewer, plus (when in a team workspace as a
+ * non-owner member) original lesson plans linked to decks assigned to them.
+ * Owners keep using `loadOwnerQuizLessonPlanPicker` for cross-creator browse.
+ */
 export async function getSavedLessonPlansForQuizPicker(
   userId: string,
+  teamId?: number | null,
 ): Promise<SavedLessonPlanPickerItem[]> {
-  const rows = await getSavedLessonPlansByUser(userId);
-  return rows.map(mapSavedLessonPlanRowToPickerItem);
+  const ownRows = await getSavedLessonPlansByUser(userId);
+  const ownItems = ownRows.map((row) => mapSavedLessonPlanRowToPickerItem(row));
+
+  if (teamId == null) return ownItems;
+
+  const team = await getTeamById(teamId);
+  if (!team || team.ownerUserId === userId) return ownItems;
+
+  const assignedRows = await getAssignedDeckLessonPlansForMember(teamId, userId);
+  if (assignedRows.length === 0) return ownItems;
+
+  const ownIds = new Set(ownItems.map((item) => item.id));
+  const uniqueAssigned = assignedRows.filter((row) => !ownIds.has(row.id));
+  if (uniqueAssigned.length === 0) return ownItems;
+
+  const [members, displays] = await Promise.all([
+    listTeamMembers(teamId),
+    getClerkUserFieldDisplaysByIds([
+      ...new Set(uniqueAssigned.map((row) => row.userId)),
+    ]),
+  ]);
+  const roleByUserId = new Map(
+    members.map((member) => [member.userId, member.role] as const),
+  );
+
+  const assignedItems = uniqueAssigned.map((row) =>
+    mapSavedLessonPlanRowToPickerItem(row, {
+      isAssignedOriginal: true,
+      creatorPrimaryLine: displays[row.userId]?.primaryLine ?? null,
+      ownerUserId: team.ownerUserId,
+      creatorRole: roleByUserId.get(row.userId) ?? null,
+    }),
+  );
+
+  return [...ownItems, ...assignedItems];
 }
 
 export function mapSavedLessonPlanRowToPickerItem(
   row: SavedLessonPlanRow,
+  assigned?: AssignedPickerLabelContext,
 ): SavedLessonPlanPickerItem {
   return {
     id: row.id,
@@ -531,6 +618,8 @@ export function mapSavedLessonPlanRowToPickerItem(
     sourceDeckName: row.sourceDeckName,
     input: row.input,
     result: row.result,
+    optionLabel: formatLessonPlanPickerOptionLabel(row, assigned),
+    ...(assigned ? { isAssignedOriginal: true } : {}),
   };
 }
 
@@ -735,4 +824,127 @@ export async function findPersonalLessonPlanCopyForAssignedContext(
   }
 
   return null;
+}
+
+/** Marker written into quiz deck descriptions when saving from a lesson plan. */
+export { lessonPlanDeckDescriptionMarker } from "@/lib/lesson-plan-deck-marker";
+
+export type LessonPlanAlternateDeck = {
+  deckId: number;
+  name: string;
+};
+
+/**
+ * Other live decks still usable as the lesson plan's source link after
+ * `excludeDeckId` is deleted (quiz decks tagged with this plan, or homework
+ * source decks generated from this plan).
+ */
+export async function findAlternateLiveDecksForLessonPlan(
+  lessonPlanId: number,
+  excludeDeckId: number,
+): Promise<LessonPlanAlternateDeck[]> {
+  if (!Number.isFinite(lessonPlanId) || lessonPlanId <= 0) return [];
+  if (!Number.isFinite(excludeDeckId) || excludeDeckId <= 0) return [];
+
+  const marker = lessonPlanDeckDescriptionMarker(lessonPlanId);
+  const [quizTaggedDecks, homeworkRows] = await Promise.all([
+    db
+      .select({ id: decks.id, name: decks.name })
+      .from(decks)
+      .where(
+        and(ne(decks.id, excludeDeckId), like(decks.description, `%${marker}%`)),
+      ),
+    db
+      .select({ deckId: savedHomeworkAssignments.deckId })
+      .from(savedHomeworkAssignments)
+      .where(
+        and(
+          eq(savedHomeworkAssignments.savedLessonPlanId, lessonPlanId),
+          isNotNull(savedHomeworkAssignments.deckId),
+          ne(savedHomeworkAssignments.deckId, excludeDeckId),
+        ),
+      ),
+  ]);
+
+  const homeworkDeckIds = [
+    ...new Set(
+      homeworkRows
+        .map((row) => row.deckId)
+        .filter((id): id is number => id != null && id !== excludeDeckId),
+    ),
+  ];
+
+  const homeworkDecks =
+    homeworkDeckIds.length > 0
+      ? await db
+          .select({ id: decks.id, name: decks.name })
+          .from(decks)
+          .where(inArray(decks.id, homeworkDeckIds))
+      : [];
+
+  const byId = new Map<number, string>();
+  for (const deck of [...quizTaggedDecks, ...homeworkDecks]) {
+    byId.set(deck.id, deck.name);
+  }
+
+  return [...byId.entries()].map(([deckId, name]) => ({ deckId, name }));
+}
+
+export type LessonPlanDeckDeleteFate = {
+  lessonPlanId: number;
+  lessonTitle: string;
+  /** When set, plan keeps a live deck link — Edit / Create Quiz stay available. */
+  reassignToDeckId: number | null;
+  reassignToDeckName: string | null;
+};
+
+/**
+ * For every lesson plan linked to `deckId`, decide whether to reassign the
+ * plan to another related live deck or leave it to lose Edit / Create Quiz
+ * after this deck is deleted.
+ */
+export async function getLessonPlanFatesForDeckDelete(
+  deckId: number,
+): Promise<LessonPlanDeckDeleteFate[]> {
+  const plans = await getSavedLessonPlansByDeckIds([deckId]);
+  const fates: LessonPlanDeckDeleteFate[] = [];
+
+  for (const plan of plans) {
+    const alternates = await findAlternateLiveDecksForLessonPlan(plan.id, deckId);
+    const next = alternates[0] ?? null;
+    fates.push({
+      lessonPlanId: plan.id,
+      lessonTitle: plan.lessonTitle,
+      reassignToDeckId: next?.deckId ?? null,
+      reassignToDeckName: next?.name ?? null,
+    });
+  }
+
+  return fates;
+}
+
+/**
+ * Before deleting a deck: re-link lesson plans that still have another related
+ * deck so Edit / Create Quiz stay available. Plans with no alternate keep the
+ * orphaned deckId until delete (Resource Library treats missing source deck as
+ * Edit / Create Quiz unavailable).
+ */
+export async function reassignLessonPlansBeforeDeckDelete(
+  deckId: number,
+): Promise<LessonPlanDeckDeleteFate[]> {
+  const fates = await getLessonPlanFatesForDeckDelete(deckId);
+
+  for (const fate of fates) {
+    if (fate.reassignToDeckId == null) continue;
+    await db
+      .update(savedLessonPlans)
+      .set({
+        deckId: fate.reassignToDeckId,
+        sourceDeckName: fate.reassignToDeckName,
+        updatedAt: new Date(),
+      })
+      .where(eq(savedLessonPlans.id, fate.lessonPlanId));
+  }
+
+  return fates;
 }

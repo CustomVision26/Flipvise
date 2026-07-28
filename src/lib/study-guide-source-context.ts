@@ -14,6 +14,26 @@ export function buildHomeworkStudyGuideContext(homework: SavedHomeworkRow): stri
     "Student instructions:",
     result.instructions,
     "",
+    ...(result.passages?.length
+      ? [
+          "Reading passages:",
+          ...result.passages.flatMap((passage, index) => [
+            passage.title?.trim()
+              ? `Passage ${index + 1} title: ${passage.title.trim()}`
+              : `Passage ${index + 1}:`,
+            passage.body.trim(),
+            "",
+          ]),
+        ]
+      : result.passage?.trim()
+        ? [
+            result.passageTitle?.trim()
+              ? `Reading passage title: ${result.passageTitle.trim()}`
+              : "Reading passage:",
+            result.passage.trim(),
+            "",
+          ]
+        : []),
     "Homework questions:",
     ...result.questions.map((item) => `- ${item}`),
     "",

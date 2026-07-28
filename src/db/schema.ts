@@ -36,7 +36,10 @@ export type SavedHomeworkGenerationInput = Pick<
   | 'gradeLevel'
   | 'topic'
   | 'numberOfQuestions'
+  | 'numberOfPassages'
+  | 'questionsPerPassage'
   | 'difficultyLevel'
+  | 'dayScope'
 > & {
   referenceMaterials?: LessonPlanReferenceMaterial[];
 };
@@ -49,6 +52,7 @@ export type SavedStudyGuideGenerationInput = Pick<
   | 'savedLessonPlanId'
   | 'savedHomeworkId'
   | 'referenceMaterials'
+  | 'dayScope'
 >;
 
 export type SavedWorksheetGenerationInput = Pick<

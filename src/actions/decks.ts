@@ -13,7 +13,7 @@ import {
 import { getDeckDeleteImpact } from "@/db/queries/deck-delete-impact";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
 import { getTeamById, getDecksForTeam, getTeamsForTeamDashboard } from "@/db/queries/teams";
-import { getPrimaryLinkedLessonPlanForDeck } from "@/db/queries/saved-lesson-plans";
+import { getPrimaryLinkedLessonPlanForDeck, reassignLessonPlansBeforeDeckDelete } from "@/db/queries/saved-lesson-plans";
 import { getAccessContext } from "@/lib/access";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
@@ -379,6 +379,7 @@ export async function deleteDeckAction(data: DeleteDeckInput) {
     throw new Error("Forbidden");
   }
 
+  await reassignLessonPlansBeforeDeckDelete(parsed.data.deckId);
   await deleteDeck(parsed.data.deckId, bundle.deck.userId);
 
   revalidatePath("/dashboard");

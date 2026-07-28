@@ -70,13 +70,22 @@ export type HomeworkInput = {
   topic: string;
   numberOfQuestions: number;
   difficultyLevel: string;
+  numberOfPassages?: number;
+  questionsPerPassage?: number;
+  /** Lesson-plan / deck vocabulary terms to drive concrete practice items. */
+  vocabularyTerms?: string[];
 };
 
 export type HomeworkResult = {
   assignmentTitle: string;
   instructions: string;
+  passages?: Array<{ title: string | null; body: string }> | null;
+  passageQuestionCounts?: number[] | null;
+  passageTitle?: string | null;
+  passage?: string | null;
   questions: string[];
   answerKey: string[];
+  answerGraphs?: import("@/lib/homework-answer-graph").HomeworkAnswerGraph[] | null;
 };
 
 export type StudyGuideInput = {
@@ -476,19 +485,328 @@ export function generateTeacherQuiz(input: TeacherQuizInput): TeacherQuizResult 
 }
 
 export function generateHomework(input: HomeworkInput): HomeworkResult {
-  const count = Math.max(1, Math.min(input.numberOfQuestions, 15));
+  const text = `${input.subject} ${input.topic}`.toLowerCase();
+  const needsPassage =
+    /reading|comprehension|literature|language arts|\bela\b|english|inference|main idea|theme|character/.test(
+      text,
+    );
+
+  const numberOfPassages = Math.max(
+    1,
+    Math.min(5, input.numberOfPassages ?? (needsPassage ? 1 : 1)),
+  );
+  const questionsPerPassage = Math.max(
+    1,
+    Math.min(
+      15,
+      input.questionsPerPassage ??
+        Math.max(1, Math.ceil(input.numberOfQuestions / numberOfPassages)),
+    ),
+  );
+  const count = needsPassage
+    ? numberOfPassages * questionsPerPassage
+    : Math.max(1, Math.min(input.numberOfQuestions, 30));
+
+  if (needsPassage) {
+    const storyBank = [
+      {
+        title: "Fixing the Community Center",
+        body: [
+          "Maya and Jordan stared at the cracked windows of their neighborhood community center. Paint peeled from the doors, and the basketball hoop hung crooked on the wall.",
+          '"If we work together, we can fix this," Maya said. She paced back and forth, sighing as she thought about the fundraiser test her class still had to take that week.',
+          "Jordan fetched a toolbox while neighbors brought leftover paint. After an afternoon of scrubbing, hammering, and laughing, the center looked brighter. Maya finally stopped pacing and smiled — teamwork had turned worry into pride.",
+        ].join("\n\n"),
+        prompts: [
+          "What is the main idea of the passage? Use evidence from the text to support your answer.",
+          "What can you infer about Maya's emotional state, and which clues support that inference?",
+          "Identify a cause-and-effect relationship in the passage and explain it.",
+          "What theme does the author convey? Justify your choice with details from the text.",
+        ],
+        answers: [
+          "Teamwork helps people solve community problems; Maya and Jordan fix the center with neighbors' help.",
+          "Maya feels anxious about an upcoming test — she paces and sighs before the group works together.",
+          "Working together (cause) leads to a brighter, repaired community center (effect).",
+          "Cooperation turns worry into pride; details include shared tools, neighbors helping, and Maya's smile.",
+        ],
+      },
+      {
+        title: "The Mango Tree",
+        body: [
+          "On the first warm afternoon of the term, Amara climbed the mango tree behind her grandmother's house. The leaves whispered above her as she searched for fruit that was almost ripe.",
+          "When her little brother called for help with a stuck kite, Amara hesitated, then climbed down and untangled the string. Together they laughed as the kite rose again over the yard.",
+          "Grandmother watched from the porch and said kindness grows like mangoes — slowly, then all at once when you share it.",
+        ].join("\n\n"),
+        prompts: [
+          "What is the main idea of this passage?",
+          "What character trait best describes Amara? Cite evidence.",
+          "What does the grandmother's comparison suggest about kindness?",
+          "Infer why Amara hesitated before helping her brother.",
+        ],
+        answers: [
+          "Helping family and sharing kindness matter more than keeping fruit to yourself.",
+          "Amara is caring/responsible — she climbs down to help with the kite.",
+          "Kindness develops over time and becomes clear when you share it.",
+          "She wanted the mangoes but chose to help anyway.",
+        ],
+      },
+    ];
+
+    const passages = Array.from({ length: numberOfPassages }, (_, index) => {
+      const story = storyBank[index % storyBank.length]!;
+      return {
+        title: numberOfPassages > 1 ? `${story.title}` : story.title,
+        body: story.body,
+      };
+    });
+
+    const questions: string[] = [];
+    const answerKey: string[] = [];
+    const passageQuestionCounts: number[] = [];
+
+    for (let p = 0; p < numberOfPassages; p++) {
+      const story = storyBank[p % storyBank.length]!;
+      passageQuestionCounts.push(questionsPerPassage);
+      for (let q = 0; q < questionsPerPassage; q++) {
+        questions.push(story.prompts[q % story.prompts.length]!);
+        answerKey.push(story.answers[q % story.answers.length]!);
+      }
+    }
+
+    return {
+      assignmentTitle: `${input.subject} Homework — ${input.topic}`,
+      instructions: multiPassageInstructions(numberOfPassages),
+      passages,
+      passageQuestionCounts,
+      passageTitle: passages[0]?.title ?? null,
+      passage: passages[0]?.body ?? null,
+      questions,
+      answerKey,
+      answerGraphs: null,
+    };
+  }
+
+  const isMath =
+    /math|algebra|geometry|equation|variable|expression|inequalit|arithm/.test(
+      text,
+    );
+  if (isMath) {
+    return buildMathHomeworkFallback(input, count);
+  }
+
   return {
     assignmentTitle: `${input.subject} Homework — ${input.topic}`,
     instructions: `Complete all questions on ${input.topic}. Show your work where applicable.`,
+    passages: null,
+    passageQuestionCounts: null,
+    passageTitle: null,
+    passage: null,
     questions: Array.from(
       { length: count },
-      () => `Practice problem on ${input.topic} (${input.difficultyLevel}).`,
+      (_, index) =>
+        `Explain one key idea from ${input.topic} and give a concrete ${input.gradeLevel} example (item ${index + 1}).`,
     ),
     answerKey: Array.from(
       { length: count },
-      () => `Sample solution for ${input.topic}.`,
+      (_, index) =>
+        `Accept any accurate explanation of ${input.topic} with a grade-appropriate example (item ${index + 1}).`,
     ),
+    answerGraphs: null,
   };
+}
+
+function buildMathHomeworkFallback(
+  input: HomeworkInput,
+  count: number,
+): HomeworkResult {
+  const terms = (input.vocabularyTerms ?? [])
+    .map((term) => term.trim())
+    .filter(Boolean);
+  const topic = input.topic;
+  const bank: Array<{
+    question: string;
+    answer: string;
+    graph?: import("@/lib/homework-answer-graph").HomeworkAnswerGraph;
+  }> = [
+    {
+      question:
+        "Evaluate the expression 3x + 7 when x = 5. Show each step.",
+      answer: "3(5) + 7 = 15 + 7 = 22.",
+    },
+    {
+      question:
+        "Write an algebraic expression for: “7 more than twice a number n.”",
+      answer: "2n + 7",
+    },
+    {
+      question: "Solve for x: 4x − 9 = 15. Justify each step.",
+      answer: "4x − 9 = 15 → 4x = 24 → x = 6.",
+    },
+    {
+      question:
+        "Solve the inequality and graph on a number line: 3(x − 2) > 12.",
+      answer: "x > 6; open circle at 6 with shading to the right.",
+      graph: {
+        type: "number_line",
+        title: "x > 6",
+        lineMin: 0,
+        lineMax: 12,
+        markValue: 6,
+        markStyle: "open",
+        shadeDirection: "right",
+        xMin: null,
+        xMax: null,
+        yMin: null,
+        yMax: null,
+        points: null,
+        lines: null,
+      },
+    },
+    {
+      question:
+        "Simplify the expression 5(2y − 3) − 4y. Identify like terms.",
+      answer: "10y − 15 − 4y = 6y − 15.",
+    },
+    {
+      question:
+        "A number increased by 12 is 40. Write an equation and solve for the number.",
+      answer: "n + 12 = 40 → n = 28.",
+    },
+    {
+      question:
+        "Translate and solve: Three times a number decreased by 8 equals 19.",
+      answer: "3n − 8 = 19 → 3n = 27 → n = 9.",
+    },
+    {
+      question:
+        "Graph the solution set of x ≥ −1 on a number line.",
+      answer: "Closed circle at −1 with shading to the right.",
+      graph: {
+        type: "number_line",
+        title: "x ≥ −1",
+        lineMin: -5,
+        lineMax: 5,
+        markValue: -1,
+        markStyle: "closed",
+        shadeDirection: "right",
+        xMin: null,
+        xMax: null,
+        yMin: null,
+        yMax: null,
+        points: null,
+        lines: null,
+      },
+    },
+  ];
+
+  // Prefer vocabulary-tied stems when lesson terms exist.
+  const vocabItems = terms.slice(0, count).map((term, index) => {
+    const lower = term.toLowerCase();
+    if (/variable|unknown|letter/.test(lower)) {
+      return {
+        question: `Define the term “${term}” and give one example expression that uses a variable.`,
+        answer: `A ${term} is a symbol for an unknown value; e.g. 2x + 1 uses variable x.`,
+      };
+    }
+    if (/expression/.test(lower)) {
+      return {
+        question: `Write an algebraic expression for “4 less than three times a number,” then evaluate it when the number is 6. (Use the idea of ${term}.)`,
+        answer: "3n − 4; when n = 6: 3(6) − 4 = 14.",
+      };
+    }
+    if (/equation/.test(lower)) {
+      return {
+        question: `Create an ${term.toLowerCase()} that represents “a number plus 9 equals 20,” then solve it.`,
+        answer: "n + 9 = 20 → n = 11.",
+      };
+    }
+    if (/inequalit/.test(lower)) {
+      return {
+        question: `Solve and graph on a number line: a number is at most 12 (write an ${term.toLowerCase()}).`,
+        answer: "n ≤ 12; closed circle at 12 with shading to the left.",
+        graph: {
+          type: "number_line" as const,
+          title: "n ≤ 12",
+          lineMin: 6,
+          lineMax: 16,
+          markValue: 12,
+          markStyle: "closed" as const,
+          shadeDirection: "left" as const,
+          xMin: null,
+          xMax: null,
+          yMin: null,
+          yMax: null,
+          points: null,
+          lines: null,
+        },
+      };
+    }
+    if (/coefficient|constant|term/.test(lower)) {
+      return {
+        question: `In the expression 7x − 3, identify the ${term.toLowerCase()} and explain how you know.`,
+        answer:
+          /coefficient/.test(lower)
+            ? "7 is the coefficient of x."
+            : /constant/.test(lower)
+              ? "−3 is the constant term."
+              : "7x and −3 are the terms.",
+      };
+    }
+    return {
+      question: `Use the vocabulary term “${term}” in a short ${input.gradeLevel} practice problem on ${topic}, then solve it.`,
+      answer: `Problem should correctly apply “${term}” to ${topic}; accept any mathematically correct solution.`,
+    };
+  });
+
+  const items =
+    vocabItems.length >= count
+      ? vocabItems.slice(0, count)
+      : [
+          ...vocabItems,
+          ...Array.from({ length: count - vocabItems.length }, (_, i) => {
+            const item = bank[(vocabItems.length + i) % bank.length]!;
+            return item;
+          }),
+        ];
+
+  const answerGraphs = items.map(
+    (item) =>
+      item.graph ?? {
+        type: "none" as const,
+        title: null,
+        lineMin: null,
+        lineMax: null,
+        markValue: null,
+        markStyle: null,
+        shadeDirection: null,
+        xMin: null,
+        xMax: null,
+        yMin: null,
+        yMax: null,
+        points: null,
+        lines: null,
+      },
+  );
+  const hasGraph = answerGraphs.some((graph) => graph.type !== "none");
+
+  return {
+    assignmentTitle: `${input.subject} Homework — ${input.topic}`,
+    instructions:
+      "Solve each problem. Show your work and justify algebraic steps where asked. Graph solutions on a number line when asked.",
+    passages: null,
+    passageQuestionCounts: null,
+    passageTitle: null,
+    passage: null,
+    questions: items.map((item) => item.question),
+    answerKey: items.map((item) => item.answer),
+    answerGraphs: hasGraph ? answerGraphs : null,
+  };
+}
+
+function multiPassageInstructions(numberOfPassages: number): string {
+  if (numberOfPassages <= 1) {
+    return "Read the passage carefully and answer the following questions. Use evidence from the text to support your answers when needed.";
+  }
+  return `Read each passage carefully and answer the questions that follow it. Use evidence from the matching text to support your answers when needed. There are ${numberOfPassages} passages.`;
 }
 
 export function generateStudyGuide(input: StudyGuideInput): StudyGuideResult {

@@ -22,6 +22,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "Deck grid or list toggle for browsing your library.",
           "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional first card front image, and gradient.",
           "Edit deck updates the same metadata and first card front image from a deck card menu.",
+          "Delete deck confirms first. Education plans get a detailed impact list: linked lesson plans stay in the Resource Library; Edit and Create Quiz stay available when another related deck (for example a quiz deck from that plan) can take over the link, and become unavailable only when this is the last linked deck. On a non-Education plan with leftover Education lesson-plan links, the dialog warns that the Education link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "Each deck card links to the deck editor and study session.",
           "Usage banners show deck count and cards-per-deck limits for your plan.",
         ],
@@ -38,6 +39,16 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
             ["Education Plus", "15", "52"],
           ],
         },
+      },
+      {
+        id: "deleting-decks",
+        title: "Deleting decks",
+        bullets: [
+          "Deleting permanently removes the deck and its flashcards.",
+          "Team assignments for that deck are removed — assignees lose access.",
+          "Saved Education lesson plans that pointed at the deck can remain in the Resource Library. If another related deck still links the plan, Edit and Create Quiz stay available; if this was the last linked deck, the plan shows Deck deleted and Edit/Create Quiz are unavailable.",
+          "If you deleted the deck while on Free, Pro, Pro Plus, or a consumer team tier after previously using Education, the delete dialog already explained that returning to Education later will not restore the deck link.",
+        ],
       },
       {
         id: "team-subscribers",

@@ -10,6 +10,49 @@ export function isStepAnswer(text: string): boolean {
   return /\bStep\s*\d+\s*:/i.test(text);
 }
 
+/**
+ * Prompt contract for study-mode–compatible worked answers.
+ * Standard Review / AI Recall render this via FormattedCardAnswer;
+ * Quiz mode shortens options to the final Answer: line for display.
+ */
+export const STUDY_MODE_STEP_ANSWER_PROMPT = `Use EXACTLY this uniform format (plain newlines, no markdown, no bullet points):
+
+Step 1: [Brief label describing the action]
+[The computation or reasoning for this step]
+Step 2: [Brief label describing the action]
+[The computation or reasoning for this step]
+(continue for as many steps as needed)
+Answer: [The final result]`;
+
+/**
+ * When a choice/back stores a full workout, return the final answer
+ * (text after Answer:/Result:/Solution:) for short quiz options / distractors.
+ */
+export function extractStepFinalAnswer(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed || !isStepAnswer(trimmed)) return null;
+
+  let lastExplicit: string | null = null;
+  const explicitRe = /(?:Answer|Result|Solution|∴)\s*:\s*([^\n]+)/gi;
+  let em: RegExpExecArray | null;
+  while ((em = explicitRe.exec(trimmed)) !== null) {
+    const v = em[1]?.trim();
+    if (v) lastExplicit = v;
+  }
+  if (lastExplicit) return lastExplicit;
+
+  const lines = trimmed
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!;
+    if (!/^Step\s*\d+\s*:/i.test(line) && line.length > 0) return line;
+  }
+
+  return null;
+}
+
 export function parseStepAnswer(text: string): AnswerBlock[] {
   const lines = text
     .split(/\n/)

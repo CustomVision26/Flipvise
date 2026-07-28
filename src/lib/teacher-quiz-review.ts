@@ -1,6 +1,10 @@
 import type { TeacherQuizQuestion } from "@/lib/teacher-generators";
 import type { TeacherQuizPassageQuestion } from "@/lib/teacher-quiz-ai-schema";
 import {
+  extractStepFinalAnswer,
+  isStepAnswer,
+} from "@/lib/parse-step-answer";
+import {
   formatReadingPassageQuizFront,
   normalizePassageQuizFront,
 } from "@/lib/teacher-quiz-reading-passage";
@@ -23,13 +27,43 @@ export function stripChoiceLabel(text: string): string {
   return text.replace(/^[A-D]\)\s*/i, "").trim();
 }
 
+/**
+ * Prefer a study-mode step workout on the card back when AI returned one
+ * in correctAnswer or explanation. Quiz mode still shows only the final
+ * Answer: line via formatQuizOptionForDisplay.
+ */
+export function resolveTeacherQuizStudyBack(
+  correctAnswer: string,
+  explanation?: string | null,
+): string {
+  const answer = stripChoiceLabel(correctAnswer).trim();
+  const expl = (explanation ?? "").trim();
+
+  if (isStepAnswer(answer)) return answer;
+
+  if (isStepAnswer(expl)) {
+    if (/(?:Answer|Result|Solution|∴)\s*:/i.test(expl)) return expl;
+    return answer ? `${expl}\nAnswer: ${answer}` : expl;
+  }
+
+  return answer;
+}
+
+/** Short final-answer text for comparing/filtering MC choices and distractors. */
+export function teacherQuizFinalAnswerKey(text: string): string {
+  const stripped = stripChoiceLabel(text).trim();
+  return extractStepFinalAnswer(stripped) ?? stripped;
+}
+
 export function extractWrongChoicesFromQuestion(
   question: TeacherQuizQuestion,
 ): [string, string, string] {
-  const correctNorm = stripChoiceLabel(question.correctAnswer);
+  const correctKey = teacherQuizFinalAnswerKey(question.correctAnswer);
   const wrong = question.choices
     .map(stripChoiceLabel)
-    .filter((choice) => choice !== correctNorm);
+    .filter((choice) => teacherQuizFinalAnswerKey(choice) !== correctKey)
+    // Prefer short distractors when the correct choice is a full workout.
+    .map((choice) => extractStepFinalAnswer(choice) ?? choice);
 
   const padded = [...wrong];
   while (padded.length < 3) {
@@ -43,7 +77,10 @@ export function teacherQuizQuestionToReviewRow(
   question: TeacherQuizQuestion,
   id: string,
 ): TeacherQuizReviewRow {
-  const back = stripChoiceLabel(question.correctAnswer);
+  const back = resolveTeacherQuizStudyBack(
+    question.correctAnswer,
+    question.explanation,
+  );
   return {
     id,
     selected: true,
@@ -64,9 +101,19 @@ export function teacherQuizPassageQuestionToReviewRow(
   id: string,
 ): TeacherQuizReviewRow {
   const front = normalizePassageQuizFront(
-    formatReadingPassageQuizFront(question.passage, question.question),
+    formatReadingPassageQuizFront(
+      question.passage,
+      question.question,
+      question.passageTitle,
+    ),
   );
-  const back = question.correctAnswer.trim();
+  const back = resolveTeacherQuizStudyBack(
+    question.correctAnswer,
+    question.explanation,
+  );
+  const distractors = question.wrongAnswers.map(
+    (answer) => extractStepFinalAnswer(answer) ?? answer.trim(),
+  ) as [string, string, string];
   return {
     id,
     selected: true,
@@ -75,7 +122,7 @@ export function teacherQuizPassageQuestionToReviewRow(
     originalFront: front,
     originalBack: back,
     explanation: question.explanation.trim(),
-    distractors: question.wrongAnswers,
+    distractors,
     distractorsFromOriginalFront: false,
     distractorsLoading: false,
     isReadingPassage: true,

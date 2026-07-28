@@ -51,7 +51,7 @@ export default async function TeacherWorksheetsPage({
   const [deckContext, ownerDeckPicker, savedLessonPlans] = await Promise.all([
     loadTeacherDeckContext(userId),
     loadOwnerTeamAdminDeckPicker(userId, workspace.teamId),
-    getSavedLessonPlansForQuizPicker(userId),
+    getSavedLessonPlansForQuizPicker(userId, workspace.teamId),
   ]);
 
   return (

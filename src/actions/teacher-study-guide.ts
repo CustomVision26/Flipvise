@@ -32,6 +32,22 @@ import {
   type StudyGuideInput,
   type StudyGuideResult,
 } from "@/lib/teacher-generators";
+import {
+  buildGenerationTitleSourceSuffix,
+  shortenTeacherTitleSegment,
+  withTitleSourceSuffix,
+} from "@/lib/teacher-generation-titles";
+
+function buildStudyGuideTitle(input: TeacherStudyGuideActionInput): string {
+  const base = `${shortenTeacherTitleSegment(input.topic, 56)} Study Guide`;
+  const includeDayScope =
+    input.savedLessonPlanId != null && input.dayScope != null;
+  const suffix = buildGenerationTitleSourceSuffix({
+    sourceType: input.savedLessonPlanId != null ? "lesson_plan" : "topic",
+    dayScope: includeDayScope ? input.dayScope : null,
+  });
+  return withTitleSourceSuffix(base, suffix);
+}
 
 function buildStudyGuidePrompt(
   input: TeacherStudyGuideActionInput,
@@ -116,10 +132,20 @@ async function resolveStudyGuideSourceContext(
     if (!savedPlan) {
       throw new Error("Saved lesson plan not found.");
     }
+    const dayScope = input.dayScope ?? "all";
+    if (dayScope !== "all") {
+      const scheduleLength = savedPlan.result.weeklySchedule?.length ?? 0;
+      if (dayScope.dayIndex >= scheduleLength) {
+        throw new Error(
+          "Selected lesson-plan day is not available on this plan. Choose All Days or another day.",
+        );
+      }
+    }
     lessonPlanContext = buildLessonPlanQuizContext({
       input: savedPlan.input,
       result: savedPlan.result,
       referencePurpose: "study guide",
+      dayScope,
     });
   }
 
@@ -292,6 +318,7 @@ async function resolveStudyGuideSaveMetadata(
       topic: input.topic,
       savedLessonPlanId: input.savedLessonPlanId,
       savedHomeworkId: input.savedHomeworkId,
+      dayScope: input.dayScope,
       referenceMaterials:
         input.referenceMaterials && input.referenceMaterials.length > 0
           ? input.referenceMaterials
@@ -325,7 +352,7 @@ export async function saveStudyGuideAction(data: {
   const payload = parsed.data;
   const metadata = await resolveStudyGuideSaveMetadata(userId, payload.input);
 
-  const guideTitle = `${payload.input.topic} Study Guide`;
+  const guideTitle = buildStudyGuideTitle(payload.input);
   let pdfUrl: string | null = null;
   let pdfFileName: string | null = null;
 
@@ -335,7 +362,7 @@ export async function saveStudyGuideAction(data: {
       gradeLevel: payload.input.gradeLevel,
       topic: payload.input.topic,
     });
-    pdfFileName = `${studyGuidePdfSafeFileName(payload.input.topic)}_study_guide.pdf`;
+    pdfFileName = `${studyGuidePdfSafeFileName(guideTitle)}_study_guide.pdf`;
     pdfUrl = await uploadStudyGuidePdfBufferToS3({
       userId,
       fileName: pdfFileName,
@@ -413,7 +440,7 @@ export async function updateStudyGuideAction(data: {
 
   const payload = parsed.data;
   const metadata = await resolveStudyGuideSaveMetadata(userId, payload.input);
-  const guideTitle = `${payload.input.topic} Study Guide`;
+  const guideTitle = buildStudyGuideTitle(payload.input);
 
   let pdfUrl: string | null = existing.pdfUrl;
   let pdfFileName: string | null = existing.pdfFileName;
@@ -424,7 +451,7 @@ export async function updateStudyGuideAction(data: {
       gradeLevel: payload.input.gradeLevel,
       topic: payload.input.topic,
     });
-    pdfFileName = `${studyGuidePdfSafeFileName(payload.input.topic)}_study_guide.pdf`;
+    pdfFileName = `${studyGuidePdfSafeFileName(guideTitle)}_study_guide.pdf`;
     const uploadedUrl = await uploadStudyGuidePdfBufferToS3({
       userId: existing.userId,
       fileName: pdfFileName,

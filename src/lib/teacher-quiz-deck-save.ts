@@ -16,27 +16,39 @@ import {
 } from "@/lib/education-plans";
 import { limitsForPersonalIndividualTier } from "@/lib/personal-plan-limits";
 
+import { lessonPlanDeckDescriptionMarker } from "@/lib/lesson-plan-deck-marker";
+import type { LessonPlanDayScope } from "@/lib/lesson-plan-day-scope";
+import {
+  buildShortTeacherDeckName,
+  formatLessonScopeDescriptionSegment,
+} from "@/lib/teacher-generation-titles";
+
 export function buildTeacherQuizDeckMetadata(input: {
   subject: string;
   topic: string;
   gradeLevel: string;
   difficultyLevel: string;
   savedLessonPlanId?: number;
+  dayScope?: LessonPlanDayScope | null;
 }): { name: string; description: string } {
   const subject = input.subject.trim();
   const topic = input.topic.trim();
   const gradeLevel = input.gradeLevel.trim();
   const difficultyLevel = input.difficultyLevel.trim();
+  const fromLessonPlan = input.savedLessonPlanId != null;
 
-  const name = `${subject} — ${topic}`;
+  const name = buildShortTeacherDeckName(subject, topic);
   const description = [
-    topic,
-    subject,
+    topic && topic !== subject ? topic : null,
+    subject && subject !== name ? subject : null,
     gradeLevel ? `Grade ${gradeLevel}` : null,
     difficultyLevel ? `${difficultyLevel} difficulty` : null,
     "Teacher quiz deck",
-    input.savedLessonPlanId != null
-      ? `Lesson plan #${input.savedLessonPlanId}`
+    fromLessonPlan && input.dayScope != null
+      ? formatLessonScopeDescriptionSegment(input.dayScope)
+      : null,
+    fromLessonPlan
+      ? lessonPlanDeckDescriptionMarker(input.savedLessonPlanId!)
       : null,
   ]
     .filter(Boolean)
@@ -58,10 +70,11 @@ export function buildTeacherLessonDeckMetadata(input: {
   const difficultyLevel = input.difficultyLevel.trim();
   const name =
     input.name?.trim() ||
-    (subject && topic ? `${subject} — ${topic}` : subject || topic || "Lesson deck");
+    buildShortTeacherDeckName(subject, topic) ||
+    "Lesson deck";
   const description = [
-    topic,
-    subject,
+    topic && topic !== name ? topic : null,
+    subject && subject !== name ? subject : null,
     gradeLevel ? `Grade ${gradeLevel}` : null,
     difficultyLevel ? `${difficultyLevel} difficulty` : null,
     "Teacher lesson plan deck",

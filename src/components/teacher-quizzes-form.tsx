@@ -48,6 +48,9 @@ import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-
 import {
   TEACHER_QUIZ_DEFAULT_QUESTION_COUNT,
   TEACHER_QUIZ_DEFAULT_QUESTION_TYPE,
+  TEACHER_QUIZ_MAX_PASSAGES,
+  activePassageQuestionCounts,
+  sumPassageQuestionCounts,
 } from "@/lib/teacher-quiz-ai-schema";
 import {
   teacherQuizMixedResultToReviewRows,
@@ -55,6 +58,13 @@ import {
 } from "@/lib/teacher-quiz-review";
 import { TeacherQuizReviewPanel } from "@/components/teacher-quiz-review-panel";
 import { TeacherTooltipButton } from "@/components/teacher-tooltip-button";
+import { LessonPlanDayScopeDialog } from "@/components/lesson-plan-day-scope-dialog";
+import {
+  getLessonPlanDayScopeOptions,
+  shouldPromptLessonPlanDayScope,
+  type LessonPlanDayScope,
+} from "@/lib/lesson-plan-day-scope";
+import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { cn } from "@/lib/utils";
 import { ADMIN_NONE, adminDisplayLabel } from "@/lib/owner-team-admin-picker";
 import { toast } from "sonner";
@@ -62,8 +72,15 @@ import { toast } from "sonner";
 const SAVED_PLAN_NONE = "__none__";
 
 function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
-  return [plan.lessonTitle, plan.subject, plan.gradeLevel, plan.topic]
-    .filter((part) => part.trim())
+  return [
+    plan.optionLabel,
+    plan.lessonTitle,
+    plan.subject,
+    plan.gradeLevel,
+    plan.topic,
+    plan.sourceDeckName,
+  ]
+    .filter((part): part is string => Boolean(part?.trim()))
     .join(" ")
     .toLowerCase();
 }
@@ -144,7 +161,11 @@ export function TeacherQuizzesForm({
   const [showResult, setShowResult] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [readingPassageQuestions, setReadingPassageQuestions] = useState(false);
-  const [readingPassageQuestionCount, setReadingPassageQuestionCount] = useState("5");
+  const [readingPassageCount, setReadingPassageCount] = useState("1");
+  const [passageQuestionCounts, setPassageQuestionCounts] = useState<string[]>(["5"]);
+  const [dayScopeDialogOpen, setDayScopeDialogOpen] = useState(false);
+  const [generationDayScope, setGenerationDayScope] =
+    useState<LessonPlanDayScope>("all");
 
   function handleSavedPlanChange(
     value: string | null,
@@ -209,6 +230,11 @@ export function TeacherQuizzesForm({
       ? activeLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
       : null;
 
+  const dayScopeOptions = useMemo(
+    () => getLessonPlanDayScopeOptions(selectedPlan?.result),
+    [selectedPlan],
+  );
+
   useEffect(() => {
     if (!initialLessonPlanId) return;
 
@@ -230,42 +256,82 @@ export function TeacherQuizzesForm({
     }
   }, [initialLessonPlanId, savedLessonPlans, isWorkspaceOwner, ownerPicker]);
 
-  async function handleGenerate() {
+  function validateGenerateCounts(): {
+    standardCount: number;
+    passageQuestionCounts: number[];
+    passageCount: number;
+  } | null {
+    const standardCount = readingPassageQuestions
+      ? parseOptionalCardCount(form.numberOfCards, deckQuota.maxCardsPerDeck)
+      : parseNumberOfCards(form.numberOfCards, deckQuota.maxCardsPerDeck);
+    const configuredPassageCount = readingPassageQuestions
+      ? parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES)
+      : 0;
+    const perPassageCounts = readingPassageQuestions
+      ? passageQuestionCounts
+          .slice(0, Math.max(1, configuredPassageCount))
+          .map((value) => parseOptionalCardCount(value, deckQuota.maxCardsPerDeck))
+      : [];
+    while (
+      readingPassageQuestions &&
+      perPassageCounts.length < Math.max(1, configuredPassageCount)
+    ) {
+      perPassageCounts.push(0);
+    }
+    const passageCount = sumPassageQuestionCounts(perPassageCounts);
+    const totalCount = standardCount + passageCount;
+
+    if (readingPassageQuestions && activePassageQuestionCounts(perPassageCounts).length < 1) {
+      setErrorMessage(
+        "Give at least one passage one or more questions, or turn off Include reading passage.",
+      );
+      return null;
+    }
+    if (totalCount < 1) {
+      setErrorMessage(
+        "Enter at least one regular quiz card or one question linked to a reading passage.",
+      );
+      return null;
+    }
+    if (totalCount > deckQuota.maxCardsPerDeck) {
+      setErrorMessage(
+        `Combined card count (regular + passage questions) cannot exceed ${deckQuota.maxCardsPerDeck} per deck.`,
+      );
+      return null;
+    }
+
+    return { standardCount, passageQuestionCounts: perPassageCounts, passageCount };
+  }
+
+  async function runGenerate(dayScope: LessonPlanDayScope = "all") {
+    const counts = validateGenerateCounts();
+    if (!counts) return;
+
     setIsGenerating(true);
     setErrorMessage(null);
 
     try {
-      const standardCount = readingPassageQuestions
-        ? parseOptionalCardCount(form.numberOfCards, deckQuota.maxCardsPerDeck)
-        : parseNumberOfCards(form.numberOfCards, deckQuota.maxCardsPerDeck);
-      const passageCount = readingPassageQuestions
-        ? parseOptionalCardCount(readingPassageQuestionCount, deckQuota.maxCardsPerDeck)
-        : 0;
-      const totalCount = standardCount + passageCount;
-
-      if (totalCount < 1) {
-        setErrorMessage("Enter at least one regular or passage card to generate.");
-        return;
-      }
-      if (totalCount > deckQuota.maxCardsPerDeck) {
-        setErrorMessage(
-          `Combined card count cannot exceed ${deckQuota.maxCardsPerDeck} per deck.`,
-        );
-        return;
-      }
-
       const result = await generateTeacherQuizAction({
         savedLessonPlanId: form.savedLessonPlanId,
         subject: form.subject,
         gradeLevel: form.gradeLevel,
         topic: form.topic,
         difficultyLevel: form.difficultyLevel,
-        numberOfQuestions: standardCount,
+        numberOfQuestions: counts.standardCount,
         questionTypes: TEACHER_QUIZ_DEFAULT_QUESTION_TYPE,
         readingPassageQuestions,
-        readingPassageQuestionCount: readingPassageQuestions ? passageCount : undefined,
+        readingPassageCount: readingPassageQuestions
+          ? counts.passageQuestionCounts.length
+          : undefined,
+        readingPassageQuestionCounts: readingPassageQuestions
+          ? counts.passageQuestionCounts
+          : undefined,
         teamId: teacherWorkspace?.teamId ?? undefined,
+        dayScope: form.savedLessonPlanId != null && dayScopeOptions.length > 0
+          ? dayScope
+          : undefined,
       });
+      setGenerationDayScope(dayScope);
       setReviewRows(
         teacherQuizMixedResultToReviewRows({
           standardQuestions: result.standardQuestions,
@@ -282,6 +348,26 @@ export function TeacherQuizzesForm({
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleGenerate() {
+    setErrorMessage(null);
+    if (!validateGenerateCounts()) return;
+
+    if (
+      form.savedLessonPlanId != null &&
+      shouldPromptLessonPlanDayScope(selectedPlan?.result)
+    ) {
+      setDayScopeDialogOpen(true);
+      return;
+    }
+
+    await runGenerate("all");
+  }
+
+  function handleDayScopeConfirm(scope: LessonPlanDayScope) {
+    setDayScopeDialogOpen(false);
+    void runGenerate(scope);
   }
 
   async function handleSaveDeck() {
@@ -317,6 +403,10 @@ export function TeacherQuizzesForm({
         topic: form.topic,
         difficultyLevel: form.difficultyLevel,
         teamId: teacherWorkspace?.teamId ?? undefined,
+        dayScope:
+          form.savedLessonPlanId != null && dayScopeOptions.length > 0
+            ? generationDayScope
+            : undefined,
         cards: selected.map((row) => ({
           front: row.front.trim(),
           back: row.back.trim(),
@@ -327,11 +417,14 @@ export function TeacherQuizzesForm({
           ],
         })),
       });
+      const openDeckHref = teacherWorkspace?.queryString
+        ? withTeamWorkspaceQuery(`/decks/${saved.deckId}`, teacherWorkspace.queryString)
+        : `/decks/${saved.deckId}`;
       toast.success("Deck saved", {
         description: (
           <span>
             {saved.deckName} was created with {saved.cardCount} quiz cards. Open it from your{" "}
-            <Link href={`/decks/${saved.deckId}`} className="underline underline-offset-2">
+            <Link href={openDeckHref} className="underline underline-offset-2">
               deck
             </Link>{" "}
             or team dashboard.
@@ -354,7 +447,8 @@ export function TeacherQuizzesForm({
   const selectedPlanLabel =
     selectedPlanKey === SAVED_PLAN_NONE
       ? null
-      : activeLessonPlans.find((plan) => String(plan.id) === selectedPlanKey)?.lessonTitle;
+      : activeLessonPlans.find((plan) => String(plan.id) === selectedPlanKey)
+          ?.optionLabel;
 
   const selectedAdminLabel =
     selectedAdminUserId === ADMIN_NONE
@@ -375,27 +469,54 @@ export function TeacherQuizzesForm({
   const parsedStandardCount = readingPassageQuestions
     ? parseOptionalCardCount(form.numberOfCards, deckQuota.maxCardsPerDeck)
     : parseNumberOfCards(form.numberOfCards, deckQuota.maxCardsPerDeck);
-  const parsedPassageCount = readingPassageQuestions
-    ? parseOptionalCardCount(readingPassageQuestionCount, deckQuota.maxCardsPerDeck)
+  const parsedPassageCountValue = readingPassageQuestions
+    ? Math.max(
+        1,
+        Math.min(
+          TEACHER_QUIZ_MAX_PASSAGES,
+          parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES) || 1,
+        ),
+      )
     : 0;
+  const parsedPassageQuestionCounts = readingPassageQuestions
+    ? Array.from({ length: parsedPassageCountValue }, (_, index) =>
+        parseOptionalCardCount(
+          passageQuestionCounts[index] ?? "0",
+          deckQuota.maxCardsPerDeck,
+        ),
+      )
+    : [];
+  const parsedPassageCount = sumPassageQuestionCounts(parsedPassageQuestionCounts);
+  const activePassageCount = activePassageQuestionCounts(parsedPassageQuestionCounts).length;
   const combinedCardCount = parsedStandardCount + parsedPassageCount;
   const maxStandardCount = readingPassageQuestions
     ? Math.max(0, deckQuota.maxCardsPerDeck - parsedPassageCount)
     : deckQuota.maxCardsPerDeck;
-  const maxPassageCount = Math.max(0, deckQuota.maxCardsPerDeck - parsedStandardCount);
+  const maxPassageQuestionsTotal = Math.max(
+    0,
+    deckQuota.maxCardsPerDeck - parsedStandardCount,
+  );
+  const passageBreakdown =
+    parsedPassageQuestionCounts.length > 0
+      ? parsedPassageQuestionCounts.join("+")
+      : "0";
   const combinedOverLimit = combinedCardCount > deckQuota.maxCardsPerDeck;
+  const passageModeInvalid =
+    readingPassageQuestions && activePassageCount < 1;
 
   const generateTooltip = combinedOverLimit
-    ? `Combined card count cannot exceed ${deckQuota.maxCardsPerDeck} per deck.`
-    : readingPassageQuestions && combinedCardCount < 1
-      ? "Enter at least one regular or passage card to generate."
-      : deckQuota.atLimit
-        ? `Deck limit reached — up to ${deckQuota.maxDecks} decks on your plan.`
-        : deckQuota.needsWorkspace
-          ? "Select a workspace from the header to create team decks."
-          : readingPassageQuestions
-            ? "AI generates regular and passage quiz cards for review before saving to a deck."
-            : "AI generates multiple-choice quiz cards for review before saving to a deck.";
+    ? `Combined card count (regular + passage questions) cannot exceed ${deckQuota.maxCardsPerDeck} per deck.`
+    : passageModeInvalid
+      ? "Give at least one passage one or more questions, or turn off Include reading passage."
+      : readingPassageQuestions && combinedCardCount < 1
+        ? "Enter at least one regular quiz card or one question linked to a reading passage."
+        : deckQuota.atLimit
+          ? `Deck limit reached — up to ${deckQuota.maxDecks} decks on your plan.`
+          : deckQuota.needsWorkspace
+            ? "Select a workspace from the header to create team decks."
+            : readingPassageQuestions
+              ? "AI generates regular quiz cards plus distinct vocabulary-focused reading passages with per-passage comprehension questions for review before saving."
+              : "AI generates multiple-choice quiz cards for review before saving to a deck.";
 
   return (
     <TeacherToolPageShell
@@ -409,7 +530,12 @@ export function TeacherQuizzesForm({
       generateTooltip={generateTooltip}
       errorMessage={errorMessage}
       onGenerate={handleGenerate}
-      submitDisabled={cannotSaveDeck || combinedOverLimit || (readingPassageQuestions && combinedCardCount < 1)}
+      submitDisabled={
+        cannotSaveDeck ||
+        combinedOverLimit ||
+        passageModeInvalid ||
+        (readingPassageQuestions && combinedCardCount < 1)
+      }
       backHref={backHref}
       result={
         reviewRows ? (
@@ -514,7 +640,14 @@ export function TeacherQuizzesForm({
                       No decks yet. Select a saved lesson plan and click AI Generate to create one.
                     </p>
                   ) : (
-                    decks.map((deck) => (
+                    decks.map((deck) => {
+                      const deckHref = teacherWorkspace?.queryString
+                        ? withTeamWorkspaceQuery(
+                            `/decks/${deck.id}`,
+                            teacherWorkspace.queryString,
+                          )
+                        : `/decks/${deck.id}`;
+                      return (
                       <div
                         key={deck.id}
                         className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 px-4 py-3"
@@ -526,13 +659,14 @@ export function TeacherQuizzesForm({
                           ) : null}
                         </div>
                         <Link
-                          href={`/decks/${deck.id}`}
+                          href={deckHref}
                           className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                         >
                           Open Deck
                         </Link>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </CardContent>
               </div>
@@ -634,7 +768,7 @@ export function TeacherQuizzesForm({
                   <SelectItem value={SAVED_PLAN_NONE}>No saved lesson plan</SelectItem>
                   {filteredLessonPlans.map((plan) => (
                     <SelectItem key={plan.id} value={String(plan.id)}>
-                      {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
+                      {plan.optionLabel}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -798,9 +932,11 @@ export function TeacherQuizzesForm({
                 <p className="mb-1 font-semibold">Example:</p>
                 <p>
                   {readingPassageQuestions
-                    ? "How many standard multiple-choice cards to include alongside passage cards."
+                    ? "How many standard multiple-choice cards to include alongside the per-passage reading questions."
                     : "Enter how many multiple-choice quiz cards to generate for this deck."}{" "}
                   Each deck on your plan holds up to {deckQuota.maxCardsPerDeck} cards total.
+                  When reading passages are included, regular cards plus all passage questions
+                  must stay within that limit.
                 </p>
               </>
             }
@@ -843,11 +979,11 @@ export function TeacherQuizzesForm({
                 ),
               }));
             }}
-            required={!readingPassageQuestions || parsedPassageCount === 0}
+            required={!readingPassageQuestions || activePassageCount < 1}
           />
           <p className="text-xs text-muted-foreground">
             {readingPassageQuestions
-              ? `0–${maxStandardCount} regular cards (combined total ≤ ${deckQuota.maxCardsPerDeck}).`
+              ? `0–${maxStandardCount} regular cards (regular + passage questions ≤ ${deckQuota.maxCardsPerDeck}).`
               : `1–${deckQuota.maxCardsPerDeck} cards per deck on your ${deckQuota.planLabel} plan.`}
           </p>
         </div>
@@ -867,65 +1003,198 @@ export function TeacherQuizzesForm({
                     deckQuota.maxCardsPerDeck,
                   );
                   const remaining = Math.max(0, deckQuota.maxCardsPerDeck - regular);
-                  setReadingPassageQuestionCount(
-                    String(Math.min(5, remaining)),
-                  );
+                  setReadingPassageCount("1");
+                  setPassageQuestionCounts([String(Math.min(5, remaining))]);
                 }
               }}
-              aria-label="Include reading passage questions"
+              aria-label="Include reading passage"
             />
             <div className="min-w-0 flex-1 space-y-2">
               <Label
                 htmlFor="readingPassageQuestions"
                 className="cursor-pointer text-sm font-medium text-foreground"
               >
-                Include reading passage + multiple choice
+                Include reading passage
               </Label>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Mix passage cards (short paragraph + question on front) with regular quiz cards.
-                Passage backs store the correct answer (step-by-step for math) plus three wrong
-                answers for quiz mode.
+                Adds one or more short informational reading passages (PEP-style) that teach the
+                lesson vocabulary in context — not a summary of classroom activities. Set how many
+                questions each passage should get — use 0 to skip a passage row. Only passages
+                with at least one question are generated. Each question is saved as its own quiz
+                card with that passage on the front; backs store the correct answer plus three
+                wrong answers for quiz mode. Total cards must stay within your plan limit.
               </p>
               {readingPassageQuestions ? (
-                <div className="space-y-1.5">
-                  <Label htmlFor="readingPassageQuestionCount" className="text-xs">
-                    Passage quiz cards
-                  </Label>
-                  <Input
-                    id="readingPassageQuestionCount"
-                    type="number"
-                    min={0}
-                    max={maxPassageCount}
-                    value={readingPassageQuestionCount}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === "") {
-                        setReadingPassageQuestionCount("");
-                        return;
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <TeacherFieldLabel
+                      htmlFor="readingPassageCount"
+                      label="Number of passages"
+                      help={
+                        <>
+                          <p className="mb-1 font-semibold">Multiple passages</p>
+                          <p>
+                            Choose how many passage rows to configure (up to{" "}
+                            {TEACHER_QUIZ_MAX_PASSAGES}). Then set questions per passage. Rows
+                            set to 0 questions are skipped during generation.
+                          </p>
+                        </>
                       }
-                      setReadingPassageQuestionCount(
-                        clampCardCountInput(raw, maxPassageCount, 0),
+                    />
+                    <Input
+                      id="readingPassageCount"
+                      type="number"
+                      min={1}
+                      max={TEACHER_QUIZ_MAX_PASSAGES}
+                      value={readingPassageCount}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === "") {
+                          setReadingPassageCount("");
+                          return;
+                        }
+                        const nextCount = Number.parseInt(
+                          clampCardCountInput(raw, TEACHER_QUIZ_MAX_PASSAGES, 1),
+                          10,
+                        );
+                        setReadingPassageCount(String(nextCount));
+                        setPassageQuestionCounts((current) => {
+                          if (current.length === nextCount) return current;
+                          if (current.length < nextCount) {
+                            const remainingBudget = Math.max(
+                              0,
+                              maxPassageQuestionsTotal -
+                                sumPassageQuestionCounts(
+                                  current.map((value) =>
+                                    parseOptionalCardCount(value, deckQuota.maxCardsPerDeck),
+                                  ),
+                                ),
+                            );
+                            const defaultForNew =
+                              remainingBudget > 0
+                                ? String(Math.min(1, remainingBudget))
+                                : "0";
+                            return [
+                              ...current,
+                              ...Array.from(
+                                { length: nextCount - current.length },
+                                () => defaultForNew,
+                              ),
+                            ];
+                          }
+                          return current.slice(0, nextCount);
+                        });
+                      }}
+                      onBlur={() => {
+                        const nextCount = Math.max(
+                          1,
+                          parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES) ||
+                            1,
+                        );
+                        setReadingPassageCount(String(nextCount));
+                        setPassageQuestionCounts((current) => {
+                          if (current.length === nextCount) return current;
+                          if (current.length < nextCount) {
+                            return [
+                              ...current,
+                              ...Array.from(
+                                { length: nextCount - current.length },
+                                () => "0",
+                              ),
+                            ];
+                          }
+                          return current.slice(0, nextCount);
+                        });
+                      }}
+                      className="w-full sm:w-28"
+                      disabled={isBusy}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    {Array.from({ length: parsedPassageCountValue }, (_, index) => {
+                      const otherPassageTotal = parsedPassageQuestionCounts.reduce(
+                        (sum, count, countIndex) =>
+                          countIndex === index ? sum : sum + count,
+                        0,
                       );
-                    }}
-                    onBlur={() => {
-                      setReadingPassageQuestionCount(
-                        String(
-                          parseOptionalCardCount(readingPassageQuestionCount, maxPassageCount),
-                        ),
+                      const maxForThisPassage = Math.max(
+                        0,
+                        deckQuota.maxCardsPerDeck - parsedStandardCount - otherPassageTotal,
                       );
-                    }}
-                    className="w-full sm:w-28"
-                    disabled={isBusy}
-                  />
+                      const fieldId = `passageQuestionCount-${index + 1}`;
+                      return (
+                        <div key={fieldId} className="space-y-1">
+                          <TeacherFieldLabel
+                            htmlFor={fieldId}
+                            label={`Passage ${index + 1} — questions`}
+                            help={
+                              <>
+                                <p className="mb-1 font-semibold">Questions for this passage</p>
+                                <p>
+                                  AI writes a distinct informational passage and this many
+                                  comprehension questions about it. Set 0 to skip generating
+                                  this passage. Each question counts as one card toward the deck
+                                  limit.
+                                </p>
+                              </>
+                            }
+                          />
+                          <Input
+                            id={fieldId}
+                            type="number"
+                            min={0}
+                            max={maxForThisPassage}
+                            value={passageQuestionCounts[index] ?? "0"}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setPassageQuestionCounts((current) => {
+                                const next = [...current];
+                                while (next.length < parsedPassageCountValue) next.push("0");
+                                if (raw === "") {
+                                  next[index] = "";
+                                  return next;
+                                }
+                                next[index] = clampCardCountInput(raw, maxForThisPassage, 0);
+                                return next;
+                              });
+                            }}
+                            onBlur={() => {
+                              setPassageQuestionCounts((current) => {
+                                const next = [...current];
+                                while (next.length < parsedPassageCountValue) next.push("0");
+                                next[index] = String(
+                                  parseOptionalCardCount(
+                                    next[index] ?? "0",
+                                    maxForThisPassage,
+                                  ),
+                                );
+                                return next;
+                              });
+                            }}
+                            className="w-full sm:w-28"
+                            disabled={isBusy}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   <p
                     className={cn(
                       "text-xs",
-                      combinedOverLimit ? "text-destructive" : "text-muted-foreground",
+                      combinedOverLimit || passageModeInvalid
+                        ? "text-destructive"
+                        : "text-muted-foreground",
                     )}
                   >
-                    {parsedStandardCount} regular + {parsedPassageCount} passage ={" "}
+                    {parsedStandardCount} regular + ({passageBreakdown}) passage questions ={" "}
                     {combinedCardCount} / {deckQuota.maxCardsPerDeck} cards
-                    {combinedOverLimit ? " — reduce one count to continue." : null}
+                    {combinedOverLimit
+                      ? " — reduce one count to continue."
+                      : passageModeInvalid
+                        ? " — set at least one passage to 1 or more questions."
+                        : null}
                   </p>
                 </div>
               ) : null}
@@ -946,6 +1215,16 @@ export function TeacherQuizzesForm({
         ) : null}
       </div>
       </TooltipProvider>
+
+      <LessonPlanDayScopeDialog
+        open={dayScopeDialogOpen}
+        onOpenChange={setDayScopeDialogOpen}
+        options={dayScopeOptions}
+        onConfirm={handleDayScopeConfirm}
+        confirmLabel="Generate"
+        title="Which part of the lesson plan?"
+        description="All Days uses the full multi-day plan. A single day uses only that day’s vocabulary, daily focus, and class outline. Quiz cards are generated only from your choice."
+      />
     </TeacherToolPageShell>
   );
 }

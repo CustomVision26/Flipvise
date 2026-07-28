@@ -71,7 +71,7 @@ export default async function TeacherStudyGuidesPage({
 
   const [savedLessonPlans, savedHomework, ownerLessonPlanPicker, ownerHomeworkPicker] =
     await Promise.all([
-      getSavedLessonPlansForQuizPicker(userId),
+      getSavedLessonPlansForQuizPicker(userId, workspace.teamId),
       getSavedHomeworkForPicker(userId),
       loadOwnerTeamAdminLessonPlanPicker(userId, workspace.teamId),
       loadOwnerTeamAdminHomeworkPicker(userId, workspace.teamId),

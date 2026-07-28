@@ -71,7 +71,7 @@ export function normalizeLessonPlanDayEntry(
   const dayNumber = lessonPlanDayNumberFromIndex(index);
   const parsed = parseLessonPlanDayLabel(day.dayLabel);
   const dayOfWeek =
-    day.dayOfWeek ??
+    coerceLessonPlanDayOfWeek(day.dayOfWeek) ??
     coerceLessonPlanDayOfWeek(
       parsed.dayNumber != null ? parsed.dayOfWeek : undefined,
     );

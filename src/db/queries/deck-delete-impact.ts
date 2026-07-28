@@ -15,6 +15,7 @@ import {
   teacherClasses,
   teamDeckAssignments,
 } from "@/db/schema";
+import { getLessonPlanFatesForDeckDelete } from "@/db/queries/saved-lesson-plans";
 import { and, count, eq, isNotNull, or } from "drizzle-orm";
 
 /** Snapshot of what deleting a deck will remove or break (schema-accurate). */
@@ -26,6 +27,16 @@ export type DeckDeleteImpact = {
   teamAssignmentCount: number;
   workspaceLinkCount: number;
   linkedLessonPlanCount: number;
+  /**
+   * Linked lesson plans that will keep Edit / Create Quiz after delete
+   * because another related live deck can take over the link.
+   */
+  linkedLessonPlansKeepingEditCreateCount: number;
+  /**
+   * Linked lesson plans that lose Edit / Create Quiz — this deck is their
+   * last live source-deck link.
+   */
+  linkedLessonPlansLosingEditCreateCount: number;
   linkedHomeworkCount: number;
   linkedWorksheetCount: number;
   teacherClassCount: number;
@@ -67,6 +78,7 @@ export async function getDeckDeleteImpact(
     quizOrderRows,
     quizResultRows,
     aiRecallRows,
+    lessonPlanFates,
   ] = await Promise.all([
     db
       .select({ value: count() })
@@ -121,7 +133,16 @@ export async function getDeckDeleteImpact(
       .select({ value: count() })
       .from(aiRecallSessions)
       .where(eq(aiRecallSessions.deckId, deckId)),
+    getLessonPlanFatesForDeckDelete(deckId),
   ]);
+
+  const linkedLessonPlanCount = Number(lessonPlanRows[0]?.value ?? 0);
+  const linkedLessonPlansKeepingEditCreateCount = lessonPlanFates.filter(
+    (fate) => fate.reassignToDeckId != null,
+  ).length;
+  const linkedLessonPlansLosingEditCreateCount = lessonPlanFates.filter(
+    (fate) => fate.reassignToDeckId == null,
+  ).length;
 
   return {
     deckName: deck.name,
@@ -130,7 +151,9 @@ export async function getDeckDeleteImpact(
     hasCardImages: Number(cardImageRows[0]?.value ?? 0) > 0,
     teamAssignmentCount: Number(assignmentRows[0]?.value ?? 0),
     workspaceLinkCount: Number(workspaceLinkRows[0]?.value ?? 0),
-    linkedLessonPlanCount: Number(lessonPlanRows[0]?.value ?? 0),
+    linkedLessonPlanCount,
+    linkedLessonPlansKeepingEditCreateCount,
+    linkedLessonPlansLosingEditCreateCount,
     linkedHomeworkCount: Number(homeworkRows[0]?.value ?? 0),
     linkedWorksheetCount: Number(worksheetRows[0]?.value ?? 0),
     teacherClassCount: Number(teacherClassRows[0]?.value ?? 0),

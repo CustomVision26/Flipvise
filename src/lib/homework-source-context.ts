@@ -1,5 +1,5 @@
 import type { DeckRow, cards } from "@/db/schema";
-import { parseDeckSubjectTopic } from "@/lib/deck-subject-topic";
+import { resolveDeckSubjectAndTopic } from "@/lib/deck-subject-topic";
 
 type CardRow = typeof cards.$inferSelect;
 
@@ -33,7 +33,7 @@ function formatCardForHomeworkContext(card: CardRow): string {
 }
 
 export function buildDeckHomeworkContext(deck: DeckRow, cardRows: CardRow[]): string {
-  const { subject, topic } = parseDeckSubjectTopic(deck);
+  const { subject, topic } = resolveDeckSubjectAndTopic(deck);
   const lines = [`Deck name: ${deck.name}`];
 
   if (subject) {
@@ -42,7 +42,7 @@ export function buildDeckHomeworkContext(deck: DeckRow, cardRows: CardRow[]): st
   if (topic) {
     lines.push(`Topic: ${topic}`);
   }
-  if (deck.description?.trim()) {
+  if (deck.description?.trim() && deck.description.trim() !== topic) {
     lines.push(`Deck description: ${deck.description.trim()}`);
   }
   if (deck.gradeLevel?.trim()) {
@@ -79,7 +79,8 @@ export function deckToHomeworkDefaults(deck: DeckRow): {
   gradeLevel: string;
   difficultyLevel: string;
 } {
-  const { subject, topic } = parseDeckSubjectTopic(deck);
+  // Deck edit "Description/Topic" → homework Topic; name → Subject (and topic fallback).
+  const { subject, topic } = resolveDeckSubjectAndTopic(deck);
   return {
     subject,
     topic,

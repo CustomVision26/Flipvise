@@ -8,11 +8,15 @@ import type { DeckDeleteImpact } from "@/db/queries/deck-delete-impact";
 import {
   buildDeckDeleteBrokenLinkItems,
   buildDeckDeletePermanentLossItems,
+  buildNonEducationPriorLessonPlanNotice,
 } from "@/lib/deck-delete-warning-copy";
 
 type DeckDeleteWarningBodyProps = {
   deckName: string;
-  /** Education / teacher-tools surfaces always use the detailed list. */
+  /**
+   * Education / teacher-tools surfaces always use the detailed list and
+   * Education-oriented lesson-plan wording.
+   */
   forceDetailed: boolean;
   impact: DeckDeleteImpact | null;
   impactLoading: boolean;
@@ -24,6 +28,7 @@ export function DeckDeleteWarningBody({
   impact,
   impactLoading,
 }: DeckDeleteWarningBodyProps) {
+  const isEducationPlan = forceDetailed;
   const showDetailed =
     forceDetailed ||
     (impact != null &&
@@ -52,7 +57,13 @@ export function DeckDeleteWarningBody({
   const permanentItems = impact
     ? buildDeckDeletePermanentLossItems(impact)
     : [`The deck “${deckName}” and all of its flashcards`];
-  const brokenLinkItems = impact ? buildDeckDeleteBrokenLinkItems(impact) : [];
+  const brokenLinkItems = impact
+    ? buildDeckDeleteBrokenLinkItems(impact, { isEducationPlan })
+    : [];
+  const priorEducationNotice =
+    !isEducationPlan && impact
+      ? buildNonEducationPriorLessonPlanNotice(impact)
+      : null;
 
   return (
     <div className="space-y-3 text-xs sm:text-sm text-muted-foreground">
@@ -67,6 +78,11 @@ export function DeckDeleteWarningBody({
         </p>
       ) : (
         <>
+          {priorEducationNotice ? (
+            <p className="rounded-md border border-border bg-muted/40 p-2.5 text-foreground">
+              {priorEducationNotice}
+            </p>
+          ) : null}
           <ul className="list-disc space-y-1.5 pl-5 text-muted-foreground">
             {permanentItems.map((item) => (
               <li key={item}>{item}</li>

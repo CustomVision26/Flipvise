@@ -89,9 +89,9 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         id: "quizzes-homework",
         title: "Quiz, Homework, Study Guide, Worksheet generators",
         bullets: [
-          "AI Quiz/Test Generator (/teacher/quizzes) — review AI cards before saving to a deck.",
-          "Homework Generator (/teacher/homework) — take-home practice aligned to deck content.",
-          "Study Guide Generator (/teacher/study-guides) — structured review materials with PDF export.",
+          "AI Quiz/Test Generator (/teacher/quizzes) — review AI cards before saving to a deck. Set Regular quiz cards, optionally Include reading passage, then Number of passages and Passage 1 — questions / Passage 2 — questions / … (0 skips that passage; only passages with ≥1 questions are generated). Reading passages are short informational texts that teach the lesson vocabulary in context (not classroom-activity summaries); each question counts as one card toward the deck limit (regular + sum of passage questions). For Mathematics, passages use a Passage Title and real-world story (e.g. Selling Fruit Juice) with linked questions on variables, expressions, equations, and evaluation. For English / Literature / Language Arts, passages use a Jamaica PEP–style titled short story (e.g. The Mango Tree) based on that day’s lesson vocabulary, with main idea, detail, vocab-in-context, character trait, theme, and evidence questions. For math and problem-solving questions, AI can put a Step 1: … Answer: … workout on the card back for Standard Review study mode, while Quiz mode shows only the final Answer: value with short wrong answers. With a multi-day saved lesson plan selected, AI Generate asks whether to use All Days (full multi-day plan) or a specific day (Day 1 (Monday), Day 2 (Wednesday), etc.); each day option can show a muted caption from that day’s daily focus or vocabulary when present. Generation uses only that day’s vocab/focus/outline (or the whole plan for All Days). Single-day plans skip the dialog. Team members see assigned-deck original lesson plans in the Lesson plan dropdown (alongside personal saves), labeled as title · grade · creator name with (Owner)/(Team Admin) when applicable; personal saves use title · grade. View saved PDF works when the original has a PDF.",
+          "Homework Generator (/teacher/homework) — take-home practice aligned to deck content. From saved lesson plan includes the same assigned-deck originals for team members. Multi-day plans show the same All Days / day picker (with day captions) before Generate. For Reading / Language Arts / Literature topics, set Number of passages and Questions per passage (total = passages × questions). Generate produces concrete practice from lesson vocabulary (math: solvable problems; reading: titled passages with linked questions) in Preview, Edit, and PDF. Math answers that require a number-line or coordinate graph include a drawn figure in the Answer Key (not only a text description).",
+          "Study Guide Generator (/teacher/study-guides) — structured review materials with PDF export. Lesson plan picker includes assigned-deck originals for team members. Multi-day plans show the same day-scope dialog (with day captions) before Generate.",
           "Worksheet Generator (/teacher/worksheets) — printable sheets with answer keys.",
         ],
       },
@@ -154,6 +154,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "Filter and search by title or tool type.",
           "On team workspaces, lesson plan cards label the creator as (Owner) or (Team Admin) when that person is the workspace owner or a team admin; other roles show the name only.",
           "Saved Lesson Plans keep their original Saved date; if the linked source deck changes later, the card shows Source deck updated and a Deck updated badge.",
+          "If the linked source deck no longer exists, the card shows a Deck deleted badge and caption; Edit and Create Quiz stay hidden because the deck link is broken. The saved plan content (and PDF, if any) can still be kept.",
         ],
       },
       {
@@ -163,6 +164,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "If an owner or team admin assigns you a deck that already has a linked lesson plan, that original plan auto-appears under From assigned decks in Saved Lesson Plans.",
           "Cards show the creator’s name and the assigned deck source label. On team workspaces, the name includes (Owner) or (Team Admin) when the creator is the workspace owner or a team admin (members have no role suffix).",
           "Edit opens AI Lesson Builder prefilled from the original. Save, keep-on-leave, or Create my lesson plan from the linked plan creates/updates your own copy under My lesson plans; the assigned original (and its deck link) stays unchanged forever — including against later creator deck-edit/keep/save updates, which also write personal copies once the deck is assigned. Create-from-linked uses the creator’s deck-linked plan as the content source (never a prior personal draft) and restructures it to your intake when details differ. If your personal copy already matches the current intake and preview, leave does not needlessly overwrite it.",
+          "If the creator deletes the source deck, the assigned plan can remain as a saved copy with Deck deleted — without a working deck link.",
         ],
       },
       {
@@ -180,6 +182,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "Export PDFs for offline classroom use as a backup.",
           "Do not delete resources still referenced in active class plans.",
           "When a lesson plan shows Deck updated, open Edit in the AI Lesson Builder to regenerate or revise against the current deck.",
+          "Deleting a deck while on a non-Education plan also breaks any leftover Education lesson-plan↔deck link — returning to Education later shows the saved plan only, not a working deck link.",
         ],
       },
     ],

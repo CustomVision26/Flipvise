@@ -33,7 +33,7 @@ export const lessonPlanVocabularyTermDetailSchema = z.object({
   term: z.string().min(1),
   shortDefinition: z.string().min(1),
   definition: z.string().min(1),
-  example: z.string().optional(),
+  example: z.string().nullish(),
 });
 
 export type LessonPlanVocabularyTermDetail = z.infer<
@@ -71,7 +71,7 @@ export type LessonPlanFiveEPhase = z.infer<typeof lessonPlanFiveEPhaseSchema>;
 
 export const lessonPlanFiveEBreakdownSchema = z.object({
   heading: z.string().min(1),
-  intro: z.string().optional(),
+  intro: z.string().nullish(),
   phases: z.array(lessonPlanFiveEPhaseSchema).min(5).max(5),
 });
 
@@ -82,27 +82,27 @@ export type LessonPlanFiveEBreakdown = z.infer<
 export const lessonPlanDayVocabularyDetailSchema = z.object({
   contextIntro: z.string().min(1),
   terms: z.array(lessonPlanVocabularyTermDetailSchema).min(1).max(12),
-  fiveEBreakdown: lessonPlanFiveEBreakdownSchema.optional(),
+  fiveEBreakdown: lessonPlanFiveEBreakdownSchema.nullish(),
   mainConcept: z
     .object({
       heading: z.string().min(1),
       body: z.string().min(1),
     })
-    .optional(),
+    .nullish(),
   process: z
     .object({
       heading: z.string().min(1),
       steps: z.array(lessonPlanProcessStepSchema).min(1).max(10),
     })
-    .optional(),
+    .nullish(),
   learningGoal: z
     .object({
       heading: z.string().min(1),
-      intro: z.string().optional(),
+      intro: z.string().nullish(),
       objectives: z.array(z.string().min(1)).min(1).max(10),
     })
-    .optional(),
-  additionalVocabulary: z.array(lessonPlanVocabularyTermDetailSchema).max(20).optional(),
+    .nullish(),
+  additionalVocabulary: z.array(lessonPlanVocabularyTermDetailSchema).max(20).nullish(),
 });
 
 export type LessonPlanDayVocabularyDetail = z.infer<
@@ -220,11 +220,11 @@ export function coerceLessonPlanDayVocabularyDetail(
 
 export const lessonPlanDaySchema = z.object({
   dayLabel: z.string().min(1),
-  dayOfWeek: z.enum(TEACHER_CLASS_DAY_OPTIONS).optional(),
+  dayOfWeek: z.enum(TEACHER_CLASS_DAY_OPTIONS).nullish(),
   dailyFocus: z.string().min(1),
   vocabulary: z.array(z.string().min(1)).min(1).max(8),
   lessonTimeline: z.array(z.string().min(1)).min(3).max(10),
-  vocabularyDetail: lessonPlanDayVocabularyDetailSchema.optional(),
+  vocabularyDetail: lessonPlanDayVocabularyDetailSchema.nullish(),
 });
 
 export type LessonPlanDaySchedule = z.infer<typeof lessonPlanDaySchema>;

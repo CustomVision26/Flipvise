@@ -43,7 +43,7 @@ export default async function TeacherResourcesPage({
     items: section.items.map((item) => ({
       ...item,
       quizHref:
-        item.lessonPlanId != null
+        item.lessonPlanId != null && !item.isSourceDeckDeleted
           ? buildTeacherQuizzesPath(
               workspace.teamId,
               workspace.teamMemberId,
@@ -51,7 +51,9 @@ export default async function TeacherResourcesPage({
             )
           : null,
       lessonPlanEditHref:
-        item.lessonPlanId != null && !item.isPlaceholder
+        item.lessonPlanId != null &&
+        !item.isPlaceholder &&
+        !item.isSourceDeckDeleted
           ? buildTeacherLessonBuilderPath(
               workspace.teamId,
               workspace.teamMemberId,

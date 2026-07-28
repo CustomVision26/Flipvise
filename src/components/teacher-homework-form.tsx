@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   cloneHomeworkResult,
@@ -48,14 +47,26 @@ import { downloadHomeworkPdf } from "@/lib/homework-pdf";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
+import { LessonPlanDayScopeDialog } from "@/components/lesson-plan-day-scope-dialog";
+import {
+  getLessonPlanDayScopeOptions,
+  shouldPromptLessonPlanDayScope,
+  type LessonPlanDayScope,
+} from "@/lib/lesson-plan-day-scope";
 import type { HomeworkResult } from "@/lib/teacher-homework-ai-schema";
 import type { HomeworkSourceType } from "@/lib/teacher-homework-ai-schema";
+import {
+  HOMEWORK_MAX_PASSAGES,
+  HOMEWORK_MAX_QUESTIONS,
+  HOMEWORK_MAX_QUESTIONS_PER_PASSAGE,
+  homeworkNeedsReadingPassage,
+} from "@/lib/teacher-homework-ai-schema";
 import {
   buildTeacherQuizzesPath,
   buildTeacherSubPath,
   type TeacherWorkspaceContext,
 } from "@/lib/teacher-url";
-import { buildHomeworkExamplePreview } from "@/lib/homework-example-preview";
+import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -74,6 +85,8 @@ type HomeworkFormState = {
   gradeLevel: string;
   topic: string;
   numberOfQuestions: number;
+  numberOfPassages: number;
+  questionsPerPassage: number;
   difficultyLevel: string;
 };
 
@@ -82,8 +95,96 @@ const EMPTY_FORM: HomeworkFormState = {
   gradeLevel: "",
   topic: "",
   numberOfQuestions: 8,
+  numberOfPassages: 1,
+  questionsPerPassage: 8,
   difficultyLevel: "On-level",
 };
+
+function passageTotals(passages: number, perPassage: number): {
+  numberOfPassages: number;
+  questionsPerPassage: number;
+  numberOfQuestions: number;
+} {
+  const numberOfPassages = Math.min(
+    HOMEWORK_MAX_PASSAGES,
+    Math.max(1, passages),
+  );
+  const maxPer = Math.max(
+    1,
+    Math.floor(HOMEWORK_MAX_QUESTIONS / numberOfPassages),
+  );
+  const questionsPerPassage = Math.min(
+    HOMEWORK_MAX_QUESTIONS_PER_PASSAGE,
+    maxPer,
+    Math.max(1, perPassage),
+  );
+  return {
+    numberOfPassages,
+    questionsPerPassage,
+    numberOfQuestions: numberOfPassages * questionsPerPassage,
+  };
+}
+
+function formFromSavedHomeworkInput(input: {
+  subject: string;
+  gradeLevel: string;
+  topic: string;
+  numberOfQuestions: number;
+  difficultyLevel: string;
+  numberOfPassages?: number;
+  questionsPerPassage?: number;
+}): HomeworkFormState {
+  const needsPassage = homeworkNeedsReadingPassage(input.subject, input.topic);
+  if (
+    needsPassage &&
+    input.numberOfPassages != null &&
+    input.questionsPerPassage != null
+  ) {
+    const totals = passageTotals(input.numberOfPassages, input.questionsPerPassage);
+    return {
+      subject: input.subject,
+      gradeLevel: input.gradeLevel,
+      topic: input.topic,
+      difficultyLevel: input.difficultyLevel,
+      ...totals,
+    };
+  }
+  if (needsPassage) {
+    const totals = passageTotals(1, input.numberOfQuestions);
+    return {
+      subject: input.subject,
+      gradeLevel: input.gradeLevel,
+      topic: input.topic,
+      difficultyLevel: input.difficultyLevel,
+      ...totals,
+    };
+  }
+  return {
+    subject: input.subject,
+    gradeLevel: input.gradeLevel,
+    topic: input.topic,
+    numberOfQuestions: input.numberOfQuestions,
+    numberOfPassages: 1,
+    questionsPerPassage: input.numberOfQuestions,
+    difficultyLevel: input.difficultyLevel,
+  };
+}
+
+function formFromTopicFields(fields: {
+  subject: string;
+  gradeLevel: string;
+  topic: string;
+  difficultyLevel: string;
+  numberOfQuestions?: number;
+}): HomeworkFormState {
+  return formFromSavedHomeworkInput({
+    subject: fields.subject,
+    gradeLevel: fields.gradeLevel,
+    topic: fields.topic,
+    numberOfQuestions: fields.numberOfQuestions ?? 8,
+    difficultyLevel: fields.difficultyLevel,
+  });
+}
 
 export function TeacherHomeworkForm({
   savedLessonPlans,
@@ -145,21 +246,15 @@ export function TeacherHomeworkForm({
   );
   const [form, setForm] = useState<HomeworkFormState>(
     initialSavedHomework
-      ? {
-          subject: initialSavedHomework.input.subject,
-          gradeLevel: initialSavedHomework.input.gradeLevel,
-          topic: initialSavedHomework.input.topic,
-          numberOfQuestions: initialSavedHomework.input.numberOfQuestions,
-          difficultyLevel: initialSavedHomework.input.difficultyLevel,
-        }
+      ? formFromSavedHomeworkInput(initialSavedHomework.input)
       : initialDeckDefaults
-        ? {
+        ? formFromSavedHomeworkInput({
             subject: initialDeckDefaults.subject,
             gradeLevel: initialDeckDefaults.gradeLevel,
             topic: initialDeckDefaults.topic,
             numberOfQuestions: 8,
             difficultyLevel: initialDeckDefaults.difficultyLevel,
-          }
+          })
         : EMPTY_FORM,
   );
   const [result, setResult] = useState<HomeworkResult | null>(
@@ -180,6 +275,7 @@ export function TeacherHomeworkForm({
     initialSavedHomework ? cloneHomeworkResult(initialSavedHomework.result) : null,
   );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [dayScopeDialogOpen, setDayScopeDialogOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState(initialSavedHomework?.label ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedLessonPlanAdminUserId, setSelectedLessonPlanAdminUserId] =
@@ -200,13 +296,45 @@ export function TeacherHomeworkForm({
     decks,
   );
 
+  /** Full picker pool so day-scope still resolves when admin scope and selection drift. */
+  const allLessonPlans = useMemo(() => {
+    if (!isWorkspaceOwner) return savedLessonPlans;
+    const byId = new Map<number, SavedLessonPlanPickerItem>();
+    for (const plan of Object.values(
+      ownerLessonPlanPicker.lessonPlansByAdminUserId,
+    ).flat()) {
+      byId.set(plan.id, plan);
+    }
+    for (const plan of savedLessonPlans) {
+      byId.set(plan.id, plan);
+    }
+    return [...byId.values()];
+  }, [
+    isWorkspaceOwner,
+    savedLessonPlans,
+    ownerLessonPlanPicker.lessonPlansByAdminUserId,
+  ]);
+
   const selectedPlan =
     savedLessonPlanId != null
-      ? activeLessonPlans.find((plan) => plan.id === savedLessonPlanId) ?? null
+      ? allLessonPlans.find((plan) => plan.id === savedLessonPlanId) ??
+        activeLessonPlans.find((plan) => plan.id === savedLessonPlanId) ??
+        null
       : null;
+
+  const dayScopeOptions = useMemo(
+    () => getLessonPlanDayScopeOptions(selectedPlan?.result),
+    [selectedPlan],
+  );
 
   const selectedDeck =
     deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+
+  const openDeckHref = selectedDeck
+    ? teacherWorkspace?.queryString
+      ? withTeamWorkspaceQuery(`/decks/${selectedDeck.id}`, teacherWorkspace.queryString)
+      : `/decks/${selectedDeck.id}`
+    : null;
 
   function handleLessonPlanAdminChange(adminUserId: string) {
     setSelectedLessonPlanAdminUserId(adminUserId);
@@ -229,8 +357,15 @@ export function TeacherHomeworkForm({
   }
 
   function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
-    return [plan.lessonTitle, plan.subject, plan.gradeLevel, plan.topic]
-      .filter((part) => part.trim())
+    return [
+      plan.optionLabel,
+      plan.lessonTitle,
+      plan.subject,
+      plan.gradeLevel,
+      plan.topic,
+      plan.sourceDeckName,
+    ]
+      .filter((part): part is string => Boolean(part?.trim()))
       .join(" ")
       .toLowerCase();
   }
@@ -261,20 +396,23 @@ export function TeacherHomeworkForm({
     }
 
     const planId = Number(value);
-    const plan = activeLessonPlans.find((item) => item.id === planId);
+    const plan =
+      activeLessonPlans.find((item) => item.id === planId) ??
+      allLessonPlans.find((item) => item.id === planId);
     if (!plan) return;
 
     const defaults = lessonPlanInputToQuizDefaults(plan.input);
     setSelectedPlanKey(value);
     setSavedLessonPlanId(plan.id);
-    setForm({
-      subject: defaults.subject,
-      gradeLevel: defaults.gradeLevel,
-      topic: defaults.topic,
-      numberOfQuestions: 8,
-      difficultyLevel:
-        defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
-    });
+    setForm(
+      formFromTopicFields({
+        subject: defaults.subject,
+        gradeLevel: defaults.gradeLevel,
+        topic: defaults.topic,
+        difficultyLevel:
+          defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
+      }),
+    );
   }
 
   function handleDeckChange(value: string | null) {
@@ -292,13 +430,14 @@ export function TeacherHomeworkForm({
     const defaults = deckToHomeworkDefaults(deck);
     setSelectedDeckKey(value);
     setDeckId(deck.id);
-    setForm({
-      subject: defaults.subject,
-      gradeLevel: defaults.gradeLevel,
-      topic: defaults.topic,
-      numberOfQuestions: 8,
-      difficultyLevel: defaults.difficultyLevel,
-    });
+    setForm(
+      formFromTopicFields({
+        subject: defaults.subject,
+        gradeLevel: defaults.gradeLevel,
+        topic: defaults.topic,
+        difficultyLevel: defaults.difficultyLevel,
+      }),
+    );
   }
 
   useEffect(() => {
@@ -321,13 +460,14 @@ export function TeacherHomeworkForm({
     setSelectedDeckAdminUserId(adminWithDeck.userId);
     setSelectedDeckKey(String(initialDeckId));
     setDeckId(deck.id);
-    setForm({
-      subject: defaults.subject,
-      gradeLevel: defaults.gradeLevel,
-      topic: defaults.topic,
-      numberOfQuestions: 8,
-      difficultyLevel: defaults.difficultyLevel,
-    });
+    setForm(
+      formFromTopicFields({
+        subject: defaults.subject,
+        gradeLevel: defaults.gradeLevel,
+        topic: defaults.topic,
+        difficultyLevel: defaults.difficultyLevel,
+      }),
+    );
   }, [initialDeckId, initialSourceType, isWorkspaceOwner, ownerDeckPicker, initialSavedHomework]);
 
   useEffect(() => {
@@ -352,14 +492,15 @@ export function TeacherHomeworkForm({
       setSelectedLessonPlanAdminUserId(adminWithPlan.userId);
       setSelectedPlanKey(String(initialLessonPlanId));
       setSavedLessonPlanId(plan.id);
-      setForm({
-        subject: defaults.subject,
-        gradeLevel: defaults.gradeLevel,
-        topic: defaults.topic,
-        numberOfQuestions: 8,
-        difficultyLevel:
-          defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
-      });
+      setForm(
+        formFromTopicFields({
+          subject: defaults.subject,
+          gradeLevel: defaults.gradeLevel,
+          topic: defaults.topic,
+          difficultyLevel:
+            defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
+        }),
+      );
       return;
     }
 
@@ -370,14 +511,15 @@ export function TeacherHomeworkForm({
     setSourceType("lesson_plan");
     setSelectedPlanKey(String(initialLessonPlanId));
     setSavedLessonPlanId(plan.id);
-    setForm({
-      subject: defaults.subject,
-      gradeLevel: defaults.gradeLevel,
-      topic: defaults.topic,
-      numberOfQuestions: 8,
-      difficultyLevel:
-        defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
-    });
+    setForm(
+      formFromTopicFields({
+        subject: defaults.subject,
+        gradeLevel: defaults.gradeLevel,
+        topic: defaults.topic,
+        difficultyLevel:
+          defaults.difficultyLevel === "All" ? "On-level" : defaults.difficultyLevel,
+      }),
+    );
   }, [initialLessonPlanId, isWorkspaceOwner, ownerLessonPlanPicker, savedLessonPlans, initialSavedHomework]);
 
   const savedHomeworkReferences =
@@ -398,7 +540,7 @@ export function TeacherHomeworkForm({
       )
     : "/teacher/quizzes";
 
-  async function handleGenerate() {
+  async function runGenerate(dayScope: LessonPlanDayScope = "all") {
     setIsGenerating(true);
     setErrorMessage(null);
 
@@ -410,6 +552,15 @@ export function TeacherHomeworkForm({
         throw new Error("Select a deck.");
       }
 
+      const usesPassages = homeworkNeedsReadingPassage(form.subject, form.topic);
+      const totals = usesPassages
+        ? passageTotals(form.numberOfPassages, form.questionsPerPassage)
+        : {
+            numberOfPassages: undefined,
+            questionsPerPassage: undefined,
+            numberOfQuestions: form.numberOfQuestions,
+          };
+
       const homework = await generateHomeworkAction({
         sourceType,
         savedLessonPlanId,
@@ -417,9 +568,19 @@ export function TeacherHomeworkForm({
         subject: form.subject,
         gradeLevel: form.gradeLevel,
         topic: form.topic,
-        numberOfQuestions: form.numberOfQuestions,
+        numberOfQuestions: totals.numberOfQuestions,
+        ...(usesPassages
+          ? {
+              numberOfPassages: totals.numberOfPassages,
+              questionsPerPassage: totals.questionsPerPassage,
+            }
+          : {}),
         difficultyLevel: form.difficultyLevel,
         teamId: teacherWorkspace?.teamId ?? undefined,
+        dayScope:
+          sourceType === "lesson_plan" && dayScopeOptions.length > 0
+            ? dayScope
+            : undefined,
       });
       setResult(homework);
       setShowResult(true);
@@ -437,9 +598,38 @@ export function TeacherHomeworkForm({
     }
   }
 
+  async function handleGenerate() {
+    setErrorMessage(null);
+    if (sourceType === "lesson_plan" && savedLessonPlanId == null) {
+      setErrorMessage("Select a saved lesson plan.");
+      return;
+    }
+    if (sourceType === "deck" && deckId == null) {
+      setErrorMessage("Select a deck.");
+      return;
+    }
+
+    if (
+      sourceType === "lesson_plan" &&
+      shouldPromptLessonPlanDayScope(selectedPlan?.result)
+    ) {
+      setDayScopeDialogOpen(true);
+      return;
+    }
+
+    await runGenerate("all");
+  }
+
+  function handleDayScopeConfirm(scope: LessonPlanDayScope) {
+    setDayScopeDialogOpen(false);
+    void runGenerate(scope);
+  }
+
   const generateTooltip =
     sourceType === "lesson_plan"
-      ? "Generate homework from the selected lesson plan."
+      ? dayScopeOptions.length > 0
+        ? "Choose All Days or a single lesson-plan day, then generate homework."
+        : "Generate homework from the selected lesson plan."
       : sourceType === "deck"
         ? "Generate homework from the selected deck's flashcards."
         : "Generate homework from the topic fields below.";
@@ -447,11 +637,6 @@ export function TeacherHomeworkForm({
   const submitDisabled =
     (sourceType === "lesson_plan" && savedLessonPlanId == null) ||
     (sourceType === "deck" && deckId == null);
-
-  const examplePreview = useMemo(
-    () => buildHomeworkExamplePreview(form),
-    [form.subject, form.gradeLevel, form.topic, form.difficultyLevel],
-  );
 
   const resourcesHref = teacherWorkspace
     ? buildTeacherSubPath(
@@ -537,6 +722,12 @@ export function TeacherHomeworkForm({
           gradeLevel: form.gradeLevel,
           topic: form.topic,
           numberOfQuestions: form.numberOfQuestions,
+          ...(homeworkNeedsReadingPassage(form.subject, form.topic)
+            ? {
+                numberOfPassages: form.numberOfPassages,
+                questionsPerPassage: form.questionsPerPassage,
+              }
+            : {}),
           difficultyLevel: form.difficultyLevel,
           teamId: teacherWorkspace?.teamId ?? undefined,
         },
@@ -764,7 +955,7 @@ export function TeacherHomeworkForm({
                 resourceSelectId="homeworkLessonPlan"
                 adminSelectId="homeworkTeamAdmin"
                 getItemKey={(plan) => String(plan.id)}
-                getItemLabel={(plan) => `${plan.lessonTitle} (${plan.subject} · ${plan.gradeLevel})`}
+                getItemLabel={(plan) => plan.optionLabel}
                 getItemHaystack={lessonPlanHaystack}
                 searchPlaceholder="Search lesson plans by title, subject, grade, or topic…"
                 resourceHelp="Pick a plan saved from the AI Lesson Builder. Subject, grade, topic, and difficulty will auto-fill."
@@ -795,7 +986,7 @@ export function TeacherHomeworkForm({
               <Select value={selectedPlanKey} onValueChange={handleLessonPlanChange}>
                 <SelectTrigger id="homeworkLessonPlan" className="h-10 w-full bg-background">
                   <SelectValue placeholder="Select a lesson plan">
-                    {selectedPlan?.lessonTitle ?? "Select a lesson plan"}
+                    {selectedPlan?.optionLabel ?? "Select a lesson plan"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -804,7 +995,7 @@ export function TeacherHomeworkForm({
                   </SelectItem>
                   {activeLessonPlans.map((plan) => (
                     <SelectItem key={plan.id} value={String(plan.id)}>
-                      {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
+                      {plan.optionLabel}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -860,10 +1051,10 @@ export function TeacherHomeworkForm({
                 searchPlaceholder="Search decks by name, subject, or description…"
                 resourceHelp="Pick one of the team admin's decks. Homework questions will be based on the flashcards in that deck."
                 resourceFooter={
-                  selectedDeck ? (
+                  openDeckHref ? (
                     <p className="text-xs text-muted-foreground">
                       <Link
-                        href={`/decks/${selectedDeck.id}`}
+                        href={openDeckHref}
                         className="inline-flex items-center gap-1 underline underline-offset-2"
                       >
                         Open deck
@@ -910,10 +1101,10 @@ export function TeacherHomeworkForm({
                   .
                 </p>
               ) : null}
-              {selectedDeck ? (
+              {openDeckHref ? (
                 <p className="text-xs text-muted-foreground">
                   <Link
-                    href={`/decks/${selectedDeck.id}`}
+                    href={openDeckHref}
                     className="inline-flex items-center gap-1 underline underline-offset-2"
                   >
                     Open deck
@@ -939,7 +1130,17 @@ export function TeacherHomeworkForm({
             <Input
               id="subject"
               value={form.subject}
-              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) =>
+                  formFromTopicFields({
+                    subject: e.target.value,
+                    gradeLevel: f.gradeLevel,
+                    topic: f.topic,
+                    difficultyLevel: f.difficultyLevel,
+                    numberOfQuestions: f.numberOfQuestions,
+                  }),
+                )
+              }
               required
             />
           </div>
@@ -970,31 +1171,96 @@ export function TeacherHomeworkForm({
             <Input
               id="topic"
               value={form.topic}
-              onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <TeacherFieldLabel
-              htmlFor="numberOfQuestions"
-              label="Number of Questions"
-              help="How many homework questions to generate (1–30)."
-            />
-            <Input
-              id="numberOfQuestions"
-              type="number"
-              min={1}
-              max={30}
-              value={form.numberOfQuestions}
               onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  numberOfQuestions: Math.min(30, Math.max(1, Number(e.target.value) || 1)),
-                }))
+                setForm((f) =>
+                  formFromTopicFields({
+                    subject: f.subject,
+                    gradeLevel: f.gradeLevel,
+                    topic: e.target.value,
+                    difficultyLevel: f.difficultyLevel,
+                    numberOfQuestions: f.numberOfQuestions,
+                  }),
+                )
               }
               required
             />
           </div>
+          {homeworkNeedsReadingPassage(form.subject, form.topic) ? (
+            <>
+              <div className="space-y-2">
+                <TeacherFieldLabel
+                  htmlFor="numberOfPassages"
+                  label="Number of passages"
+                  help="How many distinct reading passages to include (1–5). Each passage gets its own linked questions."
+                />
+                <Input
+                  id="numberOfPassages"
+                  type="number"
+                  min={1}
+                  max={HOMEWORK_MAX_PASSAGES}
+                  value={form.numberOfPassages}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) || 1;
+                    setForm((f) => ({
+                      ...f,
+                      ...passageTotals(next, f.questionsPerPassage),
+                    }));
+                  }}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <TeacherFieldLabel
+                  htmlFor="questionsPerPassage"
+                  label="Questions per passage"
+                  help={`How many comprehension questions to link to each passage (1–${HOMEWORK_MAX_QUESTIONS_PER_PASSAGE}). Total questions = passages × this value (max ${HOMEWORK_MAX_QUESTIONS}).`}
+                />
+                <Input
+                  id="questionsPerPassage"
+                  type="number"
+                  min={1}
+                  max={HOMEWORK_MAX_QUESTIONS_PER_PASSAGE}
+                  value={form.questionsPerPassage}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) || 1;
+                    setForm((f) => ({
+                      ...f,
+                      ...passageTotals(f.numberOfPassages, next),
+                    }));
+                  }}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Total questions: {form.numberOfQuestions}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <TeacherFieldLabel
+                htmlFor="numberOfQuestions"
+                label="Number of Questions"
+                help={`How many homework questions to generate (1–${HOMEWORK_MAX_QUESTIONS}).`}
+              />
+              <Input
+                id="numberOfQuestions"
+                type="number"
+                min={1}
+                max={HOMEWORK_MAX_QUESTIONS}
+                value={form.numberOfQuestions}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    numberOfQuestions: Math.min(
+                      HOMEWORK_MAX_QUESTIONS,
+                      Math.max(1, Number(e.target.value) || 1),
+                    ),
+                  }))
+                }
+                required
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <TeacherFieldLabel
               htmlFor="difficultyLevel"
@@ -1020,24 +1286,6 @@ export function TeacherHomeworkForm({
               </SelectContent>
             </Select>
           </div>
-
-          {examplePreview ? (
-            <Card className="border-border/70 bg-muted/20 sm:col-span-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-foreground">
-                  Example question
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="leading-relaxed text-foreground">{examplePreview.question}</p>
-                <p className="leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground">Sample answer: </span>
-                  {examplePreview.answer}
-                </p>
-                <p className="text-xs text-muted-foreground">{examplePreview.note}</p>
-              </CardContent>
-            </Card>
-          ) : null}
         </div>
       </TooltipProvider>
     </TeacherToolPageShell>
@@ -1101,6 +1349,16 @@ export function TeacherHomeworkForm({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <LessonPlanDayScopeDialog
+      open={dayScopeDialogOpen}
+      onOpenChange={setDayScopeDialogOpen}
+      options={dayScopeOptions}
+      onConfirm={handleDayScopeConfirm}
+      confirmLabel="Generate"
+      title="Which part of the lesson plan?"
+      description="All Days uses the full multi-day plan. A single day uses only that day’s vocabulary, daily focus, and class outline. Homework is generated only from your choice."
+    />
     </>
   );
 }

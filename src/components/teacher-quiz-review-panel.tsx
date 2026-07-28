@@ -140,9 +140,9 @@ export function TeacherQuizReviewPanel({
         <div className="flex items-start gap-1.5">
           <p className="text-xs leading-relaxed text-muted-foreground">
             {mixedReview
-              ? "Review regular and passage-based quiz cards before saving. Passage cards show a paragraph and question on the front; regular cards use a single question prompt."
+              ? "Review regular quiz cards and reading-passage questions before saving. Passage cards show their own reading passage on the front with a comprehension question; regular cards use a single question prompt."
               : hasPassageCards
-                ? "Review passage-based quiz cards before saving. Each front has a passage and question; the back holds the correct answer with three wrong answers for quiz mode."
+                ? "Review reading-passage quiz cards before saving. Each front shows that card’s reading passage (math stories include a Passage Title) with a comprehension question; the back holds the correct answer with three wrong answers for quiz mode."
                 : "Review AI-generated quiz cards before saving. Check the boxes for cards you want in the deck, edit any field, then click Save selected."}
           </p>
           <TeacherHelpBalloon
@@ -153,9 +153,11 @@ export function TeacherQuizReviewPanel({
                 <p className="mb-1 font-semibold">Before you save</p>
                 <p>
                   Edit front (question), back (correct answer), and three quiz wrong answers.
-                  Use Swap to flip question and answer; wrong answers refresh automatically.
-                  Toggle Wrong answers from original front after swap when distractors should
-                  match the term or question side.
+                  For math and problem-solving cards, the back may include a Step 1: … Answer: …
+                  breakdown for Standard Review study mode; Quiz mode still shows only the final
+                  Answer: value. Use Swap to flip question and answer; wrong answers refresh
+                  automatically. Toggle Wrong answers from original front after swap when
+                  distractors should match the term or question side.
                 </p>
               </>
             }
@@ -227,13 +229,13 @@ export function TeacherQuizReviewPanel({
                 <TeacherReviewFieldLabel
                   htmlFor={`teacher-quiz-back-${row.id}`}
                   label="Back"
-                  help="The correct answer saved with this card — e.g. a definition, formula, or short response."
+                  help="The correct answer saved with this card. For math/problem-solving, use Step 1: … Answer: … so Standard Review study mode shows the breakdown; Quiz mode still shows only the final Answer: value."
                 />
                 <Textarea
                   id={`teacher-quiz-back-${row.id}`}
                   value={row.back}
                   onChange={(event) => updateRow(row.id, { back: event.target.value })}
-                  rows={3}
+                  rows={row.back.includes("Step") ? 8 : 3}
                   disabled={disabled}
                   className="min-h-[3rem] resize-y text-sm"
                 />

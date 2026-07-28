@@ -3,6 +3,12 @@ import type { DeckRow } from "@/db/queries/decks";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-material";
 import type { DeckWorksheetResult, WorksheetItem } from "@/lib/teacher-worksheet-schema";
+import {
+  buildGenerationTitleSourceSuffix,
+  parseLessonScopeLabelFromDescription,
+  shortenTeacherTitleSegment,
+  withTitleSourceSuffix,
+} from "@/lib/teacher-generation-titles";
 
 type CardRow = typeof cards.$inferSelect;
 
@@ -91,17 +97,27 @@ export function buildDeckWorksheetResult(
   const referenceNote = buildWorksheetReferenceInstructions(
     options?.referenceMaterials ?? [],
   );
+  const shortTopic = shortenTeacherTitleSegment(topic, 48);
+  const deckLessonScopeLabel = parseLessonScopeLabelFromDescription(deck.description);
+  const titleSuffix = buildGenerationTitleSourceSuffix({
+    sourceType: "deck",
+    deckName: deck.name,
+    deckLessonScopeLabel,
+  });
 
   return {
-    worksheetTitle: `${topic} — ${worksheetType} Worksheet`,
+    worksheetTitle: withTitleSourceSuffix(
+      `${shortTopic} — ${worksheetType} Worksheet`,
+      titleSuffix,
+    ),
     deckName: deck.name,
     subject,
     gradeLevel,
     topic,
     worksheetType,
     difficultyLevel,
-    instructions: `Complete this ${worksheetType.toLowerCase()} worksheet on ${topic}. Use the questions below. Write your answers in the space provided.${referenceNote}`,
-    studentHeader: `Name: ____________________    Date: ____________________\n\n${topic} — ${worksheetType} (${difficultyLevel})`,
+    instructions: `Complete this ${worksheetType.toLowerCase()} worksheet on ${shortTopic || topic}. Use the questions below. Write your answers in the space provided.${referenceNote}`,
+    studentHeader: `Name: ____________________    Date: ____________________\n\n${shortTopic || topic} — ${worksheetType} (${difficultyLevel})`,
     items,
   };
 }

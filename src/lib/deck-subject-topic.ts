@@ -1,5 +1,5 @@
-/** Splits teacher/quiz deck names formatted as `Subject — Topic`. */
-const DECK_NAME_SEPARATOR = /\s+[—–-]\s+/;
+/** Splits teacher/quiz deck names formatted as `Subject — Topic` or `Subject : Topic`. */
+const DECK_NAME_SEPARATOR = /\s+(?:[—–-]|:)\s+/;
 
 export function parseDeckSubjectTopic(deck: {
   name: string;

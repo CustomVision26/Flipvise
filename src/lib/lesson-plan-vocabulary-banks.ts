@@ -146,15 +146,15 @@ const EXACT_TOPIC_BANKS: Record<string, VocabularyBankEntry[]> = {
   "jamaican independence": JAMAICAN_INDEPENDENCE_BANK,
 };
 
-/** Generic meta-terms that must never be treated as subject vocabulary. */
+/** Generic meta-terms that must never be treated as subject vocabulary.
+ * Keep this list to instructional fillers (not literacy/math skill words like
+ * "evidence" or "cause and effect", which are real ELA/science concepts).
+ */
 const META_VOCABULARY_TERMS = new Set([
   "process",
-  "cause and effect",
-  "evidence",
   "model",
   "application",
   "vocabulary",
-  "analysis",
   "concept",
   "example",
   "review",
@@ -162,6 +162,10 @@ const META_VOCABULARY_TERMS = new Set([
   "main concept",
   "key idea",
   "key ideas",
+  "term a",
+  "term b",
+  "key concept 1",
+  "key concept 2",
 ]);
 
 function normalizeTopicKey(topic: string): string {
@@ -267,8 +271,9 @@ export function sliceVocabularyForDifficulty(
   entries: VocabularyBankEntry[],
   difficulty: string,
 ): VocabularyBankEntry[] {
+  // lessonPlanResultSchema requires vocabulary.min(6) — never return fewer when possible.
   if (difficulty === "Beginner") {
-    return entries.slice(0, 5);
+    return entries.slice(0, 6);
   }
   if (difficulty === "Advanced" || difficulty === "Honors/Gifted") {
     return entries;

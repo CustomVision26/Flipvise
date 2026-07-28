@@ -13,6 +13,75 @@ import { getSavedWorksheetsByUserIds } from "@/db/queries/saved-worksheets";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import type { WorkspaceMemberMeta } from "@/lib/teacher-workspace-member-grouping";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
+import {
+  formatCompactDayScopeLabel,
+  shortenTeacherTitleSegment,
+} from "@/lib/teacher-generation-titles";
+import type { LessonPlanDayScope } from "@/lib/lesson-plan-day-scope";
+import type { SavedHomeworkGenerationInput } from "@/db/schema";
+import type { SavedStudyGuideGenerationInput } from "@/db/schema";
+
+function dayScopeLabelFromInput(
+  dayScope: LessonPlanDayScope | null | undefined,
+  multiDayHint?: boolean,
+): string | null {
+  if (dayScope == null) return null;
+  // Only show All Days / Day N when a day scope was stored (multi-day generations).
+  if (multiDayHint === false) return null;
+  return formatCompactDayScopeLabel(dayScope);
+}
+
+function formatStudyGuideSourceLabel(guide: {
+  sourceLessonPlanTitle: string | null;
+  sourceHomeworkLabel: string | null;
+  input?: SavedStudyGuideGenerationInput | null;
+}): string | null {
+  const parts: string[] = [];
+  if (guide.sourceLessonPlanTitle) {
+    parts.push(`From lesson plan: ${shortenTeacherTitleSegment(guide.sourceLessonPlanTitle, 48)}`);
+  }
+  if (guide.sourceHomeworkLabel) {
+    parts.push(`Homework: ${shortenTeacherTitleSegment(guide.sourceHomeworkLabel, 40)}`);
+  }
+  const day = dayScopeLabelFromInput(guide.input?.dayScope);
+  if (day) parts.push(day);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function formatHomeworkSourceLabel(homework: {
+  sourceType: string;
+  sourceLessonPlanTitle: string | null;
+  sourceDeckName: string | null;
+  input?: SavedHomeworkGenerationInput | null;
+}): string | null {
+  const parts: string[] = [];
+  if (homework.sourceType === "lesson_plan" && homework.sourceLessonPlanTitle) {
+    parts.push(
+      `From lesson plan: ${shortenTeacherTitleSegment(homework.sourceLessonPlanTitle, 48)}`,
+    );
+    const day = dayScopeLabelFromInput(homework.input?.dayScope);
+    if (day) parts.push(day);
+  } else if (homework.sourceType === "deck" && homework.sourceDeckName) {
+    parts.push(`From deck: ${shortenTeacherTitleSegment(homework.sourceDeckName, 48)}`);
+    // Prefer day scope stored on homework input; else none (deck scope is in deck description / title).
+    const day = dayScopeLabelFromInput(homework.input?.dayScope);
+    if (day) parts.push(day);
+  } else if (homework.sourceType === "topic") {
+    parts.push("From custom topic");
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function formatWorksheetSourceLabel(worksheet: {
+  sourceDeckName: string;
+  result?: { deckName?: string } | null;
+}): string {
+  const parts = [
+    `From deck: ${shortenTeacherTitleSegment(worksheet.sourceDeckName, 48)}`,
+  ];
+  // Worksheet titles already embed deck + lesson scope; keep source line concise.
+  return parts.join(" · ");
+}
 
 /** How a lesson plan appears for non-owner workspace viewers. */
 export type TeacherLessonPlanLibraryOrigin = "assigned" | "mine";
@@ -44,6 +113,11 @@ export type TeacherResourceLibraryItem = {
   sourceDeckUpdatedAt: string | null;
   /** True when a linked source deck changed after this resource was last saved/updated. */
   isOutdatedVsSourceDeck: boolean;
+  /**
+   * True when the lesson plan (or resource) still stores a `deckId` but that deck
+   * row no longer exists — distinct from {@link isOutdatedVsSourceDeck}.
+   */
+  isSourceDeckDeleted: boolean;
   isPlaceholder: boolean;
   /**
    * Set on lesson-plan items for non-owner workspace viewers:
@@ -60,10 +134,26 @@ function toTimestampMs(value: Date | string): number {
 function resolveSourceDeckStaleState(
   planUpdatedAt: Date | string,
   planCreatedAt: Date | string,
+  planDeckId: number | null | undefined,
   sourceDeckUpdatedAt: Date | undefined,
-): { sourceDeckUpdatedAt: string | null; isOutdatedVsSourceDeck: boolean } {
+): {
+  sourceDeckUpdatedAt: string | null;
+  isOutdatedVsSourceDeck: boolean;
+  isSourceDeckDeleted: boolean;
+} {
+  if (planDeckId != null && sourceDeckUpdatedAt == null) {
+    return {
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: true,
+    };
+  }
   if (!sourceDeckUpdatedAt) {
-    return { sourceDeckUpdatedAt: null, isOutdatedVsSourceDeck: false };
+    return {
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: false,
+    };
   }
   const planFreshnessMs = Math.max(
     toTimestampMs(planUpdatedAt),
@@ -71,11 +161,16 @@ function resolveSourceDeckStaleState(
   );
   const deckMs = toTimestampMs(sourceDeckUpdatedAt);
   if (deckMs <= planFreshnessMs) {
-    return { sourceDeckUpdatedAt: null, isOutdatedVsSourceDeck: false };
+    return {
+      sourceDeckUpdatedAt: null,
+      isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: false,
+    };
   }
   return {
     sourceDeckUpdatedAt: sourceDeckUpdatedAt.toISOString(),
     isOutdatedVsSourceDeck: true,
+    isSourceDeckDeleted: false,
   };
 }
 
@@ -101,45 +196,6 @@ const PLACEHOLDER_RESOURCES = {
     { title: "Cell Structure Study Guide", subject: "Biology", grade: "10th" },
   ],
 } as const;
-
-function formatStudyGuideSourceLabel(guide: {
-  sourceLessonPlanTitle: string | null;
-  sourceHomeworkLabel: string | null;
-}): string | null {
-  if (guide.sourceLessonPlanTitle && guide.sourceHomeworkLabel) {
-    return `From lesson plan: ${guide.sourceLessonPlanTitle} · Homework: ${guide.sourceHomeworkLabel}`;
-  }
-  if (guide.sourceLessonPlanTitle) {
-    return `From lesson plan: ${guide.sourceLessonPlanTitle}`;
-  }
-  if (guide.sourceHomeworkLabel) {
-    return `From homework: ${guide.sourceHomeworkLabel}`;
-  }
-  return null;
-}
-
-function formatHomeworkSourceLabel(homework: {
-  sourceType: string;
-  sourceLessonPlanTitle: string | null;
-  sourceDeckName: string | null;
-}): string | null {
-  if (homework.sourceType === "lesson_plan" && homework.sourceLessonPlanTitle) {
-    return `From lesson plan: ${homework.sourceLessonPlanTitle}`;
-  }
-  if (homework.sourceType === "deck" && homework.sourceDeckName) {
-    return `From deck: ${homework.sourceDeckName}`;
-  }
-  if (homework.sourceType === "topic") {
-    return "From custom topic";
-  }
-  return null;
-}
-
-function formatWorksheetSourceLabel(worksheet: {
-  sourceDeckName: string;
-}): string {
-  return `From deck: ${worksheet.sourceDeckName}`;
-}
 
 function placeholderItems(
   sectionId: keyof typeof PLACEHOLDER_RESOURCES,
@@ -172,6 +228,7 @@ function placeholderItems(
     sourceLabel: null,
     sourceDeckUpdatedAt: null,
     isOutdatedVsSourceDeck: false,
+    isSourceDeckDeleted: false,
     isPlaceholder: true,
     lessonPlanOrigin: null,
   }));
@@ -207,7 +264,11 @@ function formatLessonPlanCreatorName(
 function mapLessonPlanToLibraryItem(
   plan: SavedLessonPlanRow,
   creatorDisplay: { primaryLine: string | null; primaryEmail: string | null } | undefined,
-  stale: { sourceDeckUpdatedAt: string | null; isOutdatedVsSourceDeck: boolean },
+  stale: {
+    sourceDeckUpdatedAt: string | null;
+    isOutdatedVsSourceDeck: boolean;
+    isSourceDeckDeleted: boolean;
+  },
   origin: TeacherLessonPlanLibraryOrigin | null,
   ownerUserId: string | null,
   memberMetaByUserId: Record<string, WorkspaceMemberMeta>,
@@ -255,6 +316,7 @@ function mapLessonPlanToLibraryItem(
     sourceLabel,
     sourceDeckUpdatedAt: stale.sourceDeckUpdatedAt,
     isOutdatedVsSourceDeck: stale.isOutdatedVsSourceDeck,
+    isSourceDeckDeleted: stale.isSourceDeckDeleted,
     isPlaceholder: false,
     lessonPlanOrigin: origin,
   };
@@ -355,7 +417,10 @@ export async function loadTeacherResourceLibrary(
       const stale = resolveSourceDeckStaleState(
         plan.updatedAt,
         plan.createdAt,
-        plan.deckId != null ? sourceDeckUpdatedAtById.get(plan.deckId) : undefined,
+        plan.deckId,
+        plan.deckId != null
+          ? sourceDeckUpdatedAtById.get(plan.deckId)
+          : undefined,
       );
       return mapLessonPlanToLibraryItem(
         plan,
@@ -371,7 +436,10 @@ export async function loadTeacherResourceLibrary(
       const stale = resolveSourceDeckStaleState(
         plan.updatedAt,
         plan.createdAt,
-        plan.deckId != null ? sourceDeckUpdatedAtById.get(plan.deckId) : undefined,
+        plan.deckId,
+        plan.deckId != null
+          ? sourceDeckUpdatedAtById.get(plan.deckId)
+          : undefined,
       );
       return mapLessonPlanToLibraryItem(
         plan,
@@ -408,9 +476,15 @@ export async function loadTeacherResourceLibrary(
       studyGuideId: null,
       savedQuizId: null,
       quizHref: null,
-      sourceLabel: formatHomeworkSourceLabel(homework),
+      sourceLabel: formatHomeworkSourceLabel({
+        sourceType: homework.sourceType,
+        sourceLessonPlanTitle: homework.sourceLessonPlanTitle,
+        sourceDeckName: homework.sourceDeckName,
+        input: homework.input,
+      }),
       sourceDeckUpdatedAt: null,
       isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: false,
       isPlaceholder: false,
       lessonPlanOrigin: null,
     };
@@ -440,9 +514,14 @@ export async function loadTeacherResourceLibrary(
       studyGuideId: guide.id,
       savedQuizId: null,
       quizHref: null,
-      sourceLabel: formatStudyGuideSourceLabel(guide),
+      sourceLabel: formatStudyGuideSourceLabel({
+        sourceLessonPlanTitle: guide.sourceLessonPlanTitle,
+        sourceHomeworkLabel: guide.sourceHomeworkLabel,
+        input: guide.input,
+      }),
       sourceDeckUpdatedAt: null,
       isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: false,
       isPlaceholder: false,
       lessonPlanOrigin: null,
     };
@@ -475,6 +554,7 @@ export async function loadTeacherResourceLibrary(
       sourceLabel: formatWorksheetSourceLabel(worksheet),
       sourceDeckUpdatedAt: null,
       isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: false,
       isPlaceholder: false,
       lessonPlanOrigin: null,
     };
@@ -507,6 +587,7 @@ export async function loadTeacherResourceLibrary(
       sourceLabel: formatSavedQuizSourceLabel(quiz),
       sourceDeckUpdatedAt: null,
       isOutdatedVsSourceDeck: false,
+      isSourceDeckDeleted: false,
       isPlaceholder: false,
       lessonPlanOrigin: null,
     };

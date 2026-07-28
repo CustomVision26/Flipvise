@@ -206,6 +206,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     isPro,
     activeTeamPlan,
     activeEducationTeamPlan,
+    canAccessTeacherTools,
     isAdmin,
     hasAiReading,
     hasClerkPersonalPro,
@@ -217,6 +218,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
     redirect("/");
   }
+
+  const detailedDeleteWarning =
+    canAccessTeacherTools || activeEducationTeamPlan != null;
 
   await redirectIfAccountRecoveryIncomplete(userId, "/dashboard");
   await redirectIfPlanReconciliationPending(userId);
@@ -370,6 +374,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             allowCoverUpload={teamWorkspaceTierExtras}
             teamTierPreviewPromo={teamWorkspaceTierExtras}
             hasAiReading={hasAiReading}
+            detailedDeleteWarning={
+              detailedDeleteWarning || isEducationTeamAdminViewer
+            }
           />
         )}
       </div>
@@ -447,6 +454,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             allowCoverUpload={teamWorkspaceTierExtras}
             teamTierPreviewPromo={teamWorkspaceTierExtras}
             hasAiReading={hasAiReading}
+            detailedDeleteWarning={detailedDeleteWarning}
           />
         )}
       </div>
@@ -848,6 +856,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 allowCoverUpload={ownSubscriberTeamTierExtras}
                 teamTierPreviewPromo={ownSubscriberTeamTierExtras}
                 hasAiReading={hasAiReading}
+                detailedDeleteWarning={detailedDeleteWarning}
               />
             </section>
           ) : null}
@@ -862,6 +871,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 allowCoverUpload={ownSubscriberTeamTierExtras}
                 teamTierPreviewPromo={ownSubscriberTeamTierExtras}
                 hasAiReading={hasAiReading}
+                detailedDeleteWarning={detailedDeleteWarning}
               />
             </section>
           ))}
@@ -873,6 +883,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           allowCoverUpload={ownSubscriberTeamTierExtras}
           teamTierPreviewPromo={ownSubscriberTeamTierExtras}
           hasAiReading={hasAiReading}
+          detailedDeleteWarning={detailedDeleteWarning}
         />
       )}
 

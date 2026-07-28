@@ -45,18 +45,66 @@ export function buildDeckDeletePermanentLossItems(
   return items;
 }
 
+export type DeckDeleteWarningCopyOptions = {
+  /**
+   * True when the user’s current plan can open Teacher Tools
+   * (Education Plus / Gold / Enterprise). Non-Education plans use
+   * prior-Education lesson-plan link wording when links still exist.
+   */
+  isEducationPlan: boolean;
+};
+
+/**
+ * Notice shown only on non-Education plans when a deck still has linked
+ * saved lesson plans from a previous Education subscription.
+ */
+export function buildNonEducationPriorLessonPlanNotice(
+  impact: DeckDeleteImpact,
+): string | null {
+  if (impact.linkedLessonPlanCount <= 0) return null;
+
+  const planWord = plural(impact.linkedLessonPlanCount, "plan");
+  const countLabel =
+    impact.linkedLessonPlanCount === 1
+      ? "a linked lesson plan"
+      : `${impact.linkedLessonPlanCount} linked lesson plans`;
+
+  return (
+    `This deck still has ${countLabel} from a previous Education plan. ` +
+    `The lesson plan link under that previous Education workspace / Teacher Tools will be lost. ` +
+    `If you return to an Education plan later, you will only see the saved lesson ${planWord} in the Resource Library — the link to this deck will not be available (Edit and Create Quiz will not work for ${impact.linkedLessonPlanCount === 1 ? "that plan" : "those plans"}).`
+  );
+}
+
 /**
  * Rows that survive delete but lose a usable deck link (set-null or orphaned deckId).
  */
 export function buildDeckDeleteBrokenLinkItems(
   impact: DeckDeleteImpact,
+  options: DeckDeleteWarningCopyOptions,
 ): string[] {
   const items: string[] = [];
 
   if (impact.linkedLessonPlanCount > 0) {
-    items.push(
-      `Linked lesson ${plural(impact.linkedLessonPlanCount, "plan")} (${impact.linkedLessonPlanCount}) stay in the Resource Library, but Edit and Create Quiz become unavailable`,
-    );
+    const keeping = impact.linkedLessonPlansKeepingEditCreateCount;
+    const losing = impact.linkedLessonPlansLosingEditCreateCount;
+
+    if (options.isEducationPlan) {
+      if (keeping > 0) {
+        items.push(
+          `Linked lesson ${plural(keeping, "plan")} (${keeping}) stay in the Resource Library with Edit and Create Quiz still available (another related deck remains linked)`,
+        );
+      }
+      if (losing > 0) {
+        items.push(
+          `Linked lesson ${plural(losing, "plan")} (${losing}) stay in the Resource Library, but Edit and Create Quiz become unavailable (this is the last linked deck)`,
+        );
+      }
+    } else {
+      items.push(
+        `Saved lesson ${plural(impact.linkedLessonPlanCount, "plan")} (${impact.linkedLessonPlanCount}) may remain in the Resource Library after you return to Education, but without a working link to this deck`,
+      );
+    }
   }
 
   if (impact.linkedHomeworkCount > 0) {

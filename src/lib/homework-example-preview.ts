@@ -103,7 +103,7 @@ const EXAMPLES: Record<
     Intermediate: ({ topic, gradeLevel }) => ({
       question: `After reading a passage on ${topic}, explain how the author's word choice creates mood. Cite two phrases from the text.`,
       answer: `Answers should connect specific words (e.g., storm, whispered, bright) to a named mood such as tense, hopeful, or calm, with brief explanation.`,
-      note: `Example for ${gradeLabel(gradeLevel)} ${topic} — inference and author's craft.`,
+      note: `Example for ${gradeLabel(gradeLevel)} ${topic} — inference and author's craft. Generate includes the full reading passage above the questions.`,
     }),
     Advanced: ({ topic, gradeLevel }) => ({
       question: `Compare how two characters in a ${topic} passage respond to the same problem. What does each response reveal about their values?`,

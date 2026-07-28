@@ -43,6 +43,7 @@ import {
   clampPlanPeriodDays,
   DEFAULT_PLAN_PERIOD_DAYS,
   formatUnitPacingLabel,
+  normalizeLessonPlanDayEntry,
   reconcileWeeklySchedule,
   weeklySchedulePromptBlock,
 } from "@/lib/lesson-plan-weekly-schedule";
@@ -122,6 +123,33 @@ function lessonPlanValidationError(error: z.ZodError): string {
     }
     if (issue.path[2] === "text") {
       return `Reference ${typeof index === "number" ? index + 1 : ""} is too large. Remove it and add a shorter source.`.trim();
+    }
+  }
+
+  if (issue.path[0] === "result") {
+    const path = issue.path.slice(1).join(".");
+    if (path.startsWith("vocabulary")) {
+      return "Lesson vocabulary must include at least 6 teachable terms. Regenerate the plan and try saving again.";
+    }
+    if (path.includes("vocabularyDetail")) {
+      return "A daily vocabulary detail section is incomplete. Expand day vocabulary again, then save.";
+    }
+    if (path.includes("weeklySchedule")) {
+      return "The daily schedule data is incomplete. Regenerate the plan and try saving again.";
+    }
+    return path
+      ? `Invalid lesson plan data (${path}: ${issue.message})`
+      : `Invalid lesson plan data (${issue.message})`;
+  }
+
+  if (issue.path[0] === "newDeckName") {
+    return "New deck name must be 1–255 characters.";
+  }
+
+  if (issue.path[0] === "input") {
+    const inputField = issue.path[1];
+    if (typeof inputField === "string" && LESSON_PLAN_FIELD_LABELS[inputField]) {
+      return LESSON_PLAN_FIELD_LABELS[inputField];
     }
   }
 
@@ -206,15 +234,46 @@ function sanitizeUnitVocabulary(
     return !isNonConceptVocabularyTerm(term, input.topic, undefined);
   });
 
-  if (usable.length >= 4) {
-    return usable;
-  }
-
-  return buildTopicVocabularyLines(
+  const fallback = buildTopicVocabularyLines(
     input.topic,
     input.subject,
     input.difficultyLevel,
   );
+
+  const merged = [...usable];
+  const seen = new Set(
+    merged.map((line) => parseVocabularyLine(line).term.toLowerCase().trim()),
+  );
+
+  for (const line of fallback) {
+    if (merged.length >= 6) break;
+    const { term } = parseVocabularyLine(line);
+    const key = term.toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    if (isNonConceptVocabularyTerm(term, input.topic, undefined)) continue;
+    seen.add(key);
+    merged.push(line);
+  }
+
+  // Schema requires 6–20 unit vocabulary lines. Prefer usable+fallback; if still
+  // short (aggressive filtering), keep original AI lines that were filtered only
+  // as a last resort so Save does not fail validation.
+  if (merged.length < 6) {
+    for (const line of vocabulary) {
+      if (merged.length >= 6) break;
+      const { term } = parseVocabularyLine(line);
+      const key = term.toLowerCase().trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(line);
+    }
+  }
+
+  if (merged.length < 6) {
+    return fallback.slice(0, 20);
+  }
+
+  return merged.slice(0, 20);
 }
 
 function normalizeLessonPlanResult(
@@ -1010,9 +1069,33 @@ export async function saveLessonPlanAction(data: {
     "Lesson Builder requires an education plan.",
   );
 
-  const parsed = saveLessonPlanSchema.safeParse(data);
+  const prepared = {
+    ...data,
+    newDeckName: data.newDeckName?.trim()
+      ? data.newDeckName.trim().slice(0, 255)
+      : data.newDeckName,
+    result: {
+      ...data.result,
+      vocabulary: sanitizeUnitVocabulary(data.result.vocabulary, {
+        ...data.input,
+        difficultyLevel: data.input.difficultyLevel,
+      } as LessonPlanActionInput),
+      weeklySchedule: data.result.weeklySchedule?.map((day, index) =>
+        normalizeLessonPlanDayEntry(day, index),
+      ),
+    },
+  };
+
+  const parsed = saveLessonPlanSchema.safeParse(prepared);
   if (!parsed.success) {
-    throw new Error("Invalid lesson plan data");
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[saveLessonPlanAction] Invalid lesson plan data",
+        parsed.error.flatten(),
+        parsed.error.issues.slice(0, 12),
+      );
+    }
+    throw new Error(lessonPlanValidationError(parsed.error));
   }
 
   const deckTarget = await resolveLessonPlanDeckTarget(userId, parsed.data);
@@ -1095,9 +1178,30 @@ export async function updateLessonPlanAction(data: {
     "Lesson Builder requires an education plan.",
   );
 
-  const parsed = updateLessonPlanSchema.safeParse(data);
+  const prepared = {
+    ...data,
+    result: {
+      ...data.result,
+      vocabulary: sanitizeUnitVocabulary(data.result.vocabulary, {
+        ...data.input,
+        difficultyLevel: data.input.difficultyLevel,
+      } as LessonPlanActionInput),
+      weeklySchedule: data.result.weeklySchedule?.map((day, index) =>
+        normalizeLessonPlanDayEntry(day, index),
+      ),
+    },
+  };
+
+  const parsed = updateLessonPlanSchema.safeParse(prepared);
   if (!parsed.success) {
-    throw new Error("Invalid lesson plan data");
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[updateLessonPlanAction] Invalid lesson plan data",
+        parsed.error.flatten(),
+        parsed.error.issues.slice(0, 12),
+      );
+    }
+    throw new Error(lessonPlanValidationError(parsed.error));
   }
 
   const existing = await resolveSavedLessonPlanForViewer(
@@ -1392,9 +1496,30 @@ export async function keepLessonPlanOnExitAction(data: {
     "Lesson Builder requires an education plan.",
   );
 
-  const parsed = keepLessonPlanOnExitSchema.safeParse(data);
+  const prepared = {
+    ...data,
+    result: {
+      ...data.result,
+      vocabulary: sanitizeUnitVocabulary(data.result.vocabulary, {
+        ...data.input,
+        difficultyLevel: data.input.difficultyLevel,
+      } as LessonPlanActionInput),
+      weeklySchedule: data.result.weeklySchedule?.map((day, index) =>
+        normalizeLessonPlanDayEntry(day, index),
+      ),
+    },
+  };
+
+  const parsed = keepLessonPlanOnExitSchema.safeParse(prepared);
   if (!parsed.success) {
-    throw new Error("Invalid lesson plan data");
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[keepLessonPlanOnExitAction] Invalid lesson plan data",
+        parsed.error.flatten(),
+        parsed.error.issues.slice(0, 12),
+      );
+    }
+    throw new Error(lessonPlanValidationError(parsed.error));
   }
 
   const existing = await resolveSavedLessonPlanForViewer(

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { lessonPlanReferenceMaterialSchema } from "@/lib/lesson-plan-ai-schema";
+import { lessonPlanDayScopeSchema } from "@/lib/lesson-plan-day-scope";
 import { MAX_LESSON_PLAN_REFERENCES } from "@/lib/lesson-plan-reference-material";
 
 export const teacherStudyGuideInputSchema = z.object({
@@ -14,6 +15,7 @@ export const teacherStudyGuideInputSchema = z.object({
     .optional(),
   regenerationSeed: z.number().int().nonnegative().optional(),
   teamId: z.number().int().positive().optional(),
+  dayScope: lessonPlanDayScopeSchema.optional(),
 });
 
 export type TeacherStudyGuideActionInput = z.infer<typeof teacherStudyGuideInputSchema>;

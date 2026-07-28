@@ -29,6 +29,12 @@ import {
   type LessonPlanReferenceMaterialFieldsHandle,
 } from "@/components/lesson-plan-reference-material-fields";
 import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
+import { LessonPlanDayScopeDialog } from "@/components/lesson-plan-day-scope-dialog";
+import {
+  getLessonPlanDayScopeOptions,
+  shouldPromptLessonPlanDayScope,
+  type LessonPlanDayScope,
+} from "@/lib/lesson-plan-day-scope";
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
@@ -56,6 +62,11 @@ import {
   cloneStudyGuideResult,
 } from "@/components/study-guide-preview-editor";
 import { savedStudyGuideResultSchema } from "@/lib/teacher-study-guide-ai-schema";
+import {
+  buildGenerationTitleSourceSuffix,
+  shortenTeacherTitleSegment,
+  withTitleSourceSuffix,
+} from "@/lib/teacher-generation-titles";
 
 const SAVED_PLAN_NONE = "__none__";
 const HOMEWORK_NONE = "__none__";
@@ -140,6 +151,9 @@ export function TeacherStudyGuidesForm({
     isEditingExistingStudyGuide ? initialSavedStudyGuide.id : null,
   );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [dayScopeDialogOpen, setDayScopeDialogOpen] = useState(false);
+  const [generationDayScope, setGenerationDayScope] =
+    useState<LessonPlanDayScope>("all");
   const [saveLabel, setSaveLabel] = useState(initialSavedStudyGuide?.label ?? "");
   const [isEditing, setIsEditing] = useState(isEditingExistingStudyGuide);
   const [editDraft, setEditDraft] = useState<StudyGuideResult | null>(
@@ -191,6 +205,11 @@ export function TeacherStudyGuidesForm({
     form.savedLessonPlanId != null
       ? allLessonPlans.find((plan) => plan.id === form.savedLessonPlanId) ?? null
       : null;
+
+  const dayScopeOptions = useMemo(
+    () => getLessonPlanDayScopeOptions(selectedPlan?.result),
+    [selectedPlan],
+  );
 
   const homeworkForPlan = useMemo(
     () => filterHomeworkForLessonPlan(homeworkPool, selectedPlan, form.savedLessonPlanId),
@@ -252,8 +271,15 @@ export function TeacherStudyGuidesForm({
   }
 
   function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
-    return [plan.lessonTitle, plan.subject, plan.gradeLevel, plan.topic]
-      .filter((part) => part.trim())
+    return [
+      plan.optionLabel,
+      plan.lessonTitle,
+      plan.subject,
+      plan.gradeLevel,
+      plan.topic,
+      plan.sourceDeckName,
+    ]
+      .filter((part): part is string => Boolean(part?.trim()))
       .join(" ")
       .toLowerCase();
   }
@@ -374,7 +400,10 @@ export function TeacherStudyGuidesForm({
     initialSavedStudyGuide,
   ]);
 
-  async function runGeneration(isRegenerate = false) {
+  async function runGeneration(
+    isRegenerate = false,
+    dayScope: LessonPlanDayScope = "all",
+  ) {
     setIsGenerating(true);
     setErrorMessage(null);
     setReferenceError(null);
@@ -404,9 +433,14 @@ export function TeacherStudyGuidesForm({
         referenceMaterials:
           resolvedReferences.length > 0 ? resolvedReferences : undefined,
         teamId: teacherWorkspace?.teamId ?? undefined,
+        dayScope:
+          form.savedLessonPlanId != null && dayScopeOptions.length > 0
+            ? dayScope
+            : undefined,
       });
 
       setResult(studyGuide);
+      setGenerationDayScope(dayScope);
       setShowResult(true);
       setSavedStudyGuideId(null);
       setIsEditing(false);
@@ -423,7 +457,19 @@ export function TeacherStudyGuidesForm({
   }
 
   async function handleGenerate() {
-    await runGeneration(false);
+    if (
+      form.savedLessonPlanId != null &&
+      shouldPromptLessonPlanDayScope(selectedPlan?.result)
+    ) {
+      setDayScopeDialogOpen(true);
+      return;
+    }
+    await runGeneration(false, "all");
+  }
+
+  function handleDayScopeConfirm(scope: LessonPlanDayScope) {
+    setDayScopeDialogOpen(false);
+    void runGeneration(false, scope);
   }
 
   function handleRegenerate() {
@@ -432,7 +478,16 @@ export function TeacherStudyGuidesForm({
 
   function openSaveDialog() {
     if (!result) return;
-    setSaveLabel(`${form.topic.trim() || "Topic"} Study Guide`);
+    const multiDay = dayScopeOptions.length > 0;
+    const base = `${shortenTeacherTitleSegment(form.topic.trim() || "Topic", 56)} Study Guide`;
+    const suffix = buildGenerationTitleSourceSuffix({
+      sourceType: form.savedLessonPlanId != null ? "lesson_plan" : "topic",
+      dayScope:
+        form.savedLessonPlanId != null && multiDay
+          ? generationDayScope
+          : null,
+    });
+    setSaveLabel(withTitleSourceSuffix(base, suffix));
     setSaveDialogOpen(true);
   }
 
@@ -575,9 +630,7 @@ export function TeacherStudyGuidesForm({
     }
   }
 
-  const selectedPlanLabel = selectedPlan
-    ? `${selectedPlan.lessonTitle} (${selectedPlan.subject} · ${selectedPlan.gradeLevel})`
-    : null;
+  const selectedPlanLabel = selectedPlan?.optionLabel ?? null;
 
   const selectedHomeworkLabel = selectedHomework?.label ?? null;
 
@@ -706,7 +759,7 @@ export function TeacherStudyGuidesForm({
               resourceSelectId="studyGuideLessonPlan"
               adminSelectId="studyGuideTeamAdmin"
               getItemKey={(plan) => String(plan.id)}
-              getItemLabel={(plan) => `${plan.lessonTitle} (${plan.subject} · ${plan.gradeLevel})`}
+              getItemLabel={(plan) => plan.optionLabel}
               getItemHaystack={lessonPlanHaystack}
               searchPlaceholder="Search lesson plans by title, subject, grade, or topic…"
               resourceHelp={
@@ -760,7 +813,7 @@ export function TeacherStudyGuidesForm({
                 <SelectItem value={SAVED_PLAN_NONE}>No saved lesson plan</SelectItem>
                 {activeLessonPlans.map((plan) => (
                   <SelectItem key={plan.id} value={String(plan.id)}>
-                    {plan.lessonTitle} ({plan.subject} · {plan.gradeLevel})
+                    {plan.optionLabel}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -967,6 +1020,16 @@ export function TeacherStudyGuidesForm({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <LessonPlanDayScopeDialog
+      open={dayScopeDialogOpen}
+      onOpenChange={setDayScopeDialogOpen}
+      options={dayScopeOptions}
+      onConfirm={handleDayScopeConfirm}
+      confirmLabel="Generate"
+      title="Which part of the lesson plan?"
+      description="All Days uses the full multi-day plan. A single day uses only that day’s vocabulary, daily focus, and class outline. The study guide is generated only from your choice."
+    />
   </>
   );
 }
