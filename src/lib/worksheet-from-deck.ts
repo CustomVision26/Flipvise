@@ -5,6 +5,7 @@ import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-ma
 import type { DeckWorksheetResult, WorksheetItem } from "@/lib/teacher-worksheet-schema";
 import {
   buildGenerationTitleSourceSuffix,
+  parseLessonScopeLabelFromDeckName,
   parseLessonScopeLabelFromDescription,
   shortenTeacherTitleSegment,
   withTitleSourceSuffix,
@@ -58,6 +59,13 @@ export function buildWorksheetItemsFromCards(cardRows: CardRow[]): WorksheetItem
   });
 }
 
+export function renumberWorksheetItems(items: WorksheetItem[]): WorksheetItem[] {
+  return items.map((item, index) => ({
+    ...item,
+    questionNumber: index + 1,
+  }));
+}
+
 function buildWorksheetReferenceInstructions(
   references: LessonPlanReferenceMaterial[],
 ): string {
@@ -85,9 +93,13 @@ export function buildDeckWorksheetResult(
   },
   options?: {
     referenceMaterials?: LessonPlanReferenceMaterial[];
+    /** When set, used instead of mapping every card 1:1. */
+    items?: WorksheetItem[];
   },
 ): DeckWorksheetResult {
-  const items = buildWorksheetItemsFromCards(cardRows);
+  const items = renumberWorksheetItems(
+    options?.items ?? buildWorksheetItemsFromCards(cardRows),
+  );
   const defaults = deckToHomeworkDefaults(deck);
   const subject = input.subject.trim() || defaults.subject;
   const topic = input.topic.trim() || defaults.topic;
@@ -98,7 +110,9 @@ export function buildDeckWorksheetResult(
     options?.referenceMaterials ?? [],
   );
   const shortTopic = shortenTeacherTitleSegment(topic, 48);
-  const deckLessonScopeLabel = parseLessonScopeLabelFromDescription(deck.description);
+  const deckLessonScopeLabel =
+    parseLessonScopeLabelFromDescription(deck.description) ??
+    parseLessonScopeLabelFromDeckName(deck.name);
   const titleSuffix = buildGenerationTitleSourceSuffix({
     sourceType: "deck",
     deckName: deck.name,

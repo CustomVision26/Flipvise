@@ -90,6 +90,8 @@ interface HeaderUserSectionProps {
   showHelpCenter?: boolean;
   /** When true, show Teacher Dashboard nav link on team-admin routes (education plans only). */
   showTeacherDashboard?: boolean;
+  /** Teacher Dash under Personal in the workspace switcher — education plan owners only. */
+  showPersonalTeacherDash?: boolean;
 }
 
 export function HeaderUserSection({
@@ -112,6 +114,7 @@ export function HeaderUserSection({
   inboxUnreadCount = 0,
   showHelpCenter = false,
   showTeacherDashboard = false,
+  showPersonalTeacherDash = false,
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
   const { userId, isLoaded: authLoaded } = useAuth();
@@ -421,7 +424,7 @@ export function HeaderUserSection({
                 resolvedActiveEducationTeamPlan != null
               }
               teamDashFallback={teamDashFallback}
-              showTeacherDashboard={showTeacherDashboard}
+              showTeacherDashboard={showPersonalTeacherDash}
             />
           </span>
         </div>

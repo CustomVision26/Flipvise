@@ -1,0 +1,32 @@
+{
+  "version": "2026-07-01",
+  "currency": "usd",
+  "models": {
+    "gpt-4o": {
+      "inputPerMillionMicros": 2500000,
+      "cachedInputPerMillionMicros": 1250000,
+      "outputPerMillionMicros": 10000000
+    },
+    "gpt-4o-mini": {
+      "inputPerMillionMicros": 150000,
+      "cachedInputPerMillionMicros": 75000,
+      "outputPerMillionMicros": 600000
+    },
+    "gpt-image-1-mini": {
+      "inputPerMillionMicros": 0,
+      "cachedInputPerMillionMicros": 0,
+      "outputPerMillionMicros": 0,
+      "flatPerImageMicros": 20000
+    },
+    "tts-1": {
+      "inputPerMillionMicros": 15000000,
+      "cachedInputPerMillionMicros": 0,
+      "outputPerMillionMicros": 0
+    },
+    "default": {
+      "inputPerMillionMicros": 2500000,
+      "cachedInputPerMillionMicros": 1250000,
+      "outputPerMillionMicros": 10000000
+    }
+  }
+}

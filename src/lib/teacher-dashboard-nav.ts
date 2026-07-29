@@ -8,6 +8,7 @@ import {
   Library,
   NotebookPen,
   PenLine,
+  Sparkles,
 } from "lucide-react";
 
 export type TeacherNavItem = {
@@ -16,6 +17,11 @@ export type TeacherNavItem = {
   icon: LucideIcon;
   /** One-line description for the Teacher Dashboard welcome guide. */
   summary: string;
+  /**
+   * When set, the nav link uses this absolute path instead of `/teacher{suffix}`.
+   * Used for premium add-ons that live outside the teacher shell.
+   */
+  absoluteHref?: string;
 };
 
 export type TeacherNavSection = {
@@ -59,6 +65,14 @@ export const TEACHER_DASHBOARD_NAV: TeacherNavSection[] = [
         icon: FileText,
         summary: "Create printable practice worksheets and answer keys from your deck vocabulary and concepts.",
       },
+      {
+        title: "Generate AI Essay",
+        suffix: "/essay",
+        icon: Sparkles,
+        absoluteHref: "/dashboard/essay/generate",
+        summary:
+          "Premium add-on: generate essay activities, drafts, and AI feedback from /dashboard/essay.",
+      },
     ],
   },
   {
@@ -93,7 +107,14 @@ export const TEACHER_DASHBOARD_NAV: TeacherNavSection[] = [
   },
 ];
 
-export function isTeacherNavItemActive(pathname: string, suffix: string): boolean {
+export function isTeacherNavItemActive(
+  pathname: string,
+  suffix: string,
+  absoluteHref?: string,
+): boolean {
+  if (absoluteHref) {
+    return pathname === absoluteHref || pathname.startsWith(`${absoluteHref}/`) || pathname.startsWith("/dashboard/essay");
+  }
   const normalized = suffix.startsWith("/") ? suffix : `/${suffix}`;
   const target = `/teacher${normalized}`;
   if (target === "/teacher") {

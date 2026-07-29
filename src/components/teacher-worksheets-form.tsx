@@ -42,6 +42,10 @@ import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans"
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
 import type { DeckWorksheetResult } from "@/lib/teacher-worksheet-schema";
+import {
+  TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT,
+  TEACHER_WORKSHEET_MAX_QUESTIONS,
+} from "@/lib/teacher-worksheet-schema";
 import { downloadWorksheetPdf } from "@/lib/worksheet-pdf-build";
 import {
   WorksheetPreviewEditor,
@@ -56,6 +60,7 @@ type WorksheetFormState = {
   topic: string;
   worksheetType: string;
   difficultyLevel: string;
+  numberOfQuestions: string;
 };
 
 const EMPTY_FORM: WorksheetFormState = {
@@ -64,6 +69,7 @@ const EMPTY_FORM: WorksheetFormState = {
   topic: "",
   worksheetType: "Practice",
   difficultyLevel: "On-level",
+  numberOfQuestions: String(TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT),
 };
 
 export function TeacherWorksheetsForm({
@@ -104,6 +110,11 @@ export function TeacherWorksheetsForm({
           topic: initialSavedWorksheet.input.topic,
           worksheetType: initialSavedWorksheet.input.worksheetType,
           difficultyLevel: initialSavedWorksheet.input.difficultyLevel,
+          numberOfQuestions: String(
+            initialSavedWorksheet.input.numberOfQuestions ??
+              initialSavedWorksheet.result.items.length ??
+              TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT,
+          ),
         }
       : initialDeckDefaults
         ? {
@@ -112,6 +123,7 @@ export function TeacherWorksheetsForm({
             topic: initialDeckDefaults.topic,
             worksheetType: "Practice",
             difficultyLevel: initialDeckDefaults.difficultyLevel,
+            numberOfQuestions: String(TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT),
           }
         : EMPTY_FORM,
   );
@@ -212,7 +224,19 @@ export function TeacherWorksheetsForm({
       topic: defaults.topic,
       worksheetType: "Practice",
       difficultyLevel: defaults.difficultyLevel,
+      numberOfQuestions: String(TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT),
     });
+  }
+
+  function parseNumberOfQuestions(value: string): number {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT;
+    }
+    return Math.min(
+      TEACHER_WORKSHEET_MAX_QUESTIONS,
+      Math.max(1, parsed),
+    );
   }
 
   async function handleGenerate() {
@@ -231,6 +255,7 @@ export function TeacherWorksheetsForm({
         topic: form.topic,
         worksheetType: form.worksheetType,
         difficultyLevel: form.difficultyLevel,
+        numberOfQuestions: parseNumberOfQuestions(form.numberOfQuestions),
       });
 
       setResult(worksheet);
@@ -349,6 +374,7 @@ export function TeacherWorksheetsForm({
           topic: form.topic,
           worksheetType: form.worksheetType,
           difficultyLevel: form.difficultyLevel,
+          numberOfQuestions: parseNumberOfQuestions(form.numberOfQuestions),
         },
         result,
       };
@@ -605,6 +631,24 @@ export function TeacherWorksheetsForm({
               value={form.worksheetType}
               onChange={(e) =>
                 setForm((f) => ({ ...f, worksheetType: e.target.value }))
+              }
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <TeacherFieldLabel
+              htmlFor="numberOfQuestions"
+              label="Number of Questions"
+              help="How many practice questions to include (1–50). If you ask for more than the deck has cards, AI creates extra questions from the deck content."
+            />
+            <Input
+              id="numberOfQuestions"
+              type="number"
+              min={1}
+              max={TEACHER_WORKSHEET_MAX_QUESTIONS}
+              value={form.numberOfQuestions}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, numberOfQuestions: e.target.value }))
               }
               required
             />

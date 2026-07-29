@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useSession } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, ChevronDown, Info, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Info, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,7 +25,7 @@ import { buildTeamAdminPath } from "@/lib/team-admin-url";
 import { buildTeacherPath } from "@/lib/teacher-url";
 import { shouldHidePlatformAdminNav } from "@/lib/hide-platform-admin-nav";
 import { cn } from "@/lib/utils";
-import { isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
+import { isWorkspaceSubscriptionPlanSlug, hasEducationPlan } from "@/lib/education-plans";
 import { FREE_PERSONAL_WORKSPACE_NAV_TEAM_LIMIT } from "@/lib/workspace-nav-limits";
 
 export type WorkspaceTeamOption = TeamWorkspaceNavTeam;
@@ -76,6 +76,10 @@ export function WorkspaceContextDropdown({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [pending, setPending] = React.useState(false);
+  /** Invited workspace row expand — Team Admin / Teacher Dash actions. */
+  const [expandedInvitedTeamId, setExpandedInvitedTeamId] = React.useState<number | null>(
+    null,
+  );
 
   const selectedTeam = teams.find((t) => t.id === activeTeamId);
   const personalPrimaryLabel = "Personal Dash";
@@ -255,24 +259,29 @@ export function WorkspaceContextDropdown({
   function onOpenChange(next: boolean) {
     if (!pending) {
       setOpen(next);
-      if (!next) setQuery("");
+      if (!next) {
+        setQuery("");
+        setExpandedInvitedTeamId(null);
+      }
     }
   }
 
   function goToTeamAdmin(href: string) {
     setOpen(false);
     setQuery("");
+    setExpandedInvitedTeamId(null);
     requestAnimationFrame(() => {
       router.push(href);
       router.refresh();
     });
   }
 
-  function goToTeacherDash() {
+  function goToTeacherDash(teamId?: number, teamMemberUrlParam?: number) {
     setOpen(false);
     setQuery("");
+    setExpandedInvitedTeamId(null);
     requestAnimationFrame(() => {
-      router.push(buildTeacherPath());
+      router.push(buildTeacherPath(teamId, teamMemberUrlParam));
       router.refresh();
     });
   }
@@ -280,58 +289,133 @@ export function WorkspaceContextDropdown({
   function teamWorkspaceMenuItem(t: TeamWorkspaceNavTeam) {
     const isActive = t.id === activeTeamId;
     const teamAdminHref = buildTeamAdminPath(t.id, t.teamMemberUrlParam);
+    const showAdminExpand =
+      t.canAccessTeamAdmin &&
+      !t.isSubscriberOwned &&
+      isWorkspaceSubscriptionPlanSlug(t.planUrlValue) &&
+      !shouldHidePlatformAdminNav(pathname);
+    const showTeacherAction = showAdminExpand && hasEducationPlan(t.planUrlValue);
+    const isExpanded = expandedInvitedTeamId === t.id;
+
     return (
-      <DropdownMenuItem
-        key={t.id}
-        onClick={(e) => {
-          if ((e.target as HTMLElement).closest("[data-team-admin-dash-link]")) return;
-          void selectTeam(t);
-        }}
-        className="cursor-pointer gap-2 items-start py-2 pr-1.5"
-        disabled={pending || !sessionLoaded}
-      >
-        <Check
-          className={cn(
-            "mt-0.5 size-4 shrink-0",
-            isActive ? "opacity-100" : "opacity-0",
-          )}
-          aria-hidden
-        />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-          <span className="truncate text-sm font-medium leading-tight">
-            Team: {t.name}
-          </span>
-          <span className="truncate text-xs text-muted-foreground">
-            <span>{t.planLabel}</span>
-            <span className="mx-1" aria-hidden>
-              ·
+      <div key={t.id} className="flex flex-col">
+        <DropdownMenuItem
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("[data-invited-admin-expand]")) return;
+            if ((e.target as HTMLElement).closest("[data-team-admin-dash-link]")) return;
+            if ((e.target as HTMLElement).closest("[data-teacher-dash-link]")) return;
+            void selectTeam(t);
+          }}
+          className="cursor-pointer gap-2 items-start py-2 pr-1.5"
+          disabled={pending || !sessionLoaded}
+          // Native title — do not nest Tooltip inside DropdownMenuContent (portal teardown bug).
+          title={`Opens Team Dashboard Decks for “${t.name}” — team flashcard decks for this workspace`}
+          aria-label={`Team Dashboard Decks for ${t.name}`}
+        >
+          <Check
+            className={cn(
+              "mt-0.5 size-4 shrink-0",
+              isActive ? "opacity-100" : "opacity-0",
+            )}
+            aria-hidden
+          />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+            <span className="truncate text-sm font-medium leading-tight">
+              Team: {t.name}
             </span>
-            <span>{t.ownerDisplayName}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              <span>{t.planLabel}</span>
+              <span className="mx-1" aria-hidden>
+                ·
+              </span>
+              <span>{t.ownerDisplayName}</span>
+            </span>
           </span>
-        </span>
-        {t.canAccessTeamAdmin &&
-        !t.isSubscriberOwned &&
-        !shouldHidePlatformAdminNav(pathname) ? (
-          <Button
-            data-team-admin-dash-link
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="h-8 shrink-0 px-2 text-xs whitespace-nowrap"
-            disabled={pending || !sessionLoaded}
-            // Native title — do not nest Tooltip inside DropdownMenuContent (portal teardown bug).
-            title="This Workspace Admin Dashboard"
-            aria-label="WS Admin Dash. This Workspace Admin Dashboard"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              goToTeamAdmin(teamAdminHref);
-            }}
-          >
-            WS Admin Dash
-          </Button>
+          {showAdminExpand ? (
+            <Button
+              data-invited-admin-expand
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={cn(
+                "size-8 shrink-0 text-muted-foreground hover:text-foreground",
+                !isExpanded && "animate-pulse motion-reduce:animate-none",
+              )}
+              disabled={pending || !sessionLoaded}
+              title={
+                isExpanded
+                  ? "Hide dashboard links for this workspace"
+                  : showTeacherAction
+                    ? "Show links: Team Admin Dashboard and Teacher Dashboard"
+                    : "Show link: Team Admin Dashboard"
+              }
+              aria-label={
+                isExpanded
+                  ? "Hide dashboard links for this workspace"
+                  : showTeacherAction
+                    ? "Show Team Admin Dashboard and Teacher Dashboard links"
+                    : "Show Team Admin Dashboard link"
+              }
+              aria-expanded={isExpanded}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedInvitedTeamId((current) =>
+                  current === t.id ? null : t.id,
+                );
+              }}
+            >
+              <ChevronRight
+                className={cn(
+                  "size-4 transition-transform",
+                  isExpanded && "rotate-90",
+                )}
+                aria-hidden
+              />
+            </Button>
+          ) : null}
+        </DropdownMenuItem>
+        {showAdminExpand && isExpanded ? (
+          <div className="grid gap-1.5 px-2 pb-2 pl-10">
+            <Button
+              data-team-admin-dash-link
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-8 w-full text-xs font-medium"
+              disabled={pending || !sessionLoaded}
+              title={`Opens Team Admin Dashboard for “${t.name}” — members, decks, and quiz settings`}
+              aria-label={`Team Admin Dashboard for ${t.name}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToTeamAdmin(teamAdminHref);
+              }}
+            >
+              Team Admin Dash
+            </Button>
+            {showTeacherAction ? (
+              <Button
+                data-teacher-dash-link
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 w-full text-xs font-medium"
+                disabled={pending || !sessionLoaded}
+                title={`Opens Teacher Dashboard for “${t.name}” — AI lesson plans, quizzes, and classroom tools`}
+                aria-label={`Teacher Dashboard for ${t.name}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToTeacherDash(t.id, t.teamMemberUrlParam);
+                }}
+              >
+                Teacher Dash
+              </Button>
+            ) : null}
+          </div>
         ) : null}
-      </DropdownMenuItem>
+      </div>
     );
   }
 
@@ -344,9 +428,9 @@ export function WorkspaceContextDropdown({
             {...props}
             variant="outline"
             size="sm"
-            title="Switch workspace — personal dashboard or a team workspace"
+            title="Switch workspace — open Personal Deck Dashboard or a Team Dashboard"
             className="h-9 w-full min-w-0 max-w-none justify-between gap-1.5 px-2.5 font-normal sm:min-w-[10.5rem] sm:max-w-[14rem] lg:min-w-[10.5rem] lg:max-w-[14rem]"
-            aria-label={`Workspace: ${triggerLabel}. Switch workspace.`}
+            aria-label={`Workspace: ${triggerLabel}. Switch between Personal Deck Dashboard and team dashboards.`}
           >
             <span
               className="workspace-context-trigger-label truncate text-left"
@@ -404,6 +488,8 @@ export function WorkspaceContextDropdown({
                 <Link
                   href="/pricing"
                   className="block text-center text-xs font-medium text-primary underline underline-offset-4 hover:opacity-90"
+                  title="Opens Pricing — view and upgrade Pro plans"
+                  aria-label="Opens Pricing — view and upgrade Pro plans"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => {
                     setOpen(false);
@@ -423,6 +509,9 @@ export function WorkspaceContextDropdown({
                   onClick={() => void selectPersonal()}
                   className="cursor-pointer gap-2 items-start py-2"
                   disabled={pending || !sessionLoaded}
+                  // Native title — do not nest Tooltip inside DropdownMenuContent (portal teardown bug).
+                  title="Opens Personal Deck Dashboard — your personal flashcard decks"
+                  aria-label="Personal Deck Dashboard — your personal flashcard decks"
                 >
                   <Check
                     className={cn(
@@ -450,6 +539,8 @@ export function WorkspaceContextDropdown({
                         size="sm"
                         className="h-8 w-full text-xs font-medium"
                         disabled={pending || !sessionLoaded}
+                        title="Opens Teacher Dashboard — AI lesson plans, quizzes, and classroom tools"
+                        aria-label="Teacher Dashboard — AI lesson plans, quizzes, and classroom tools"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -466,6 +557,8 @@ export function WorkspaceContextDropdown({
                         size="sm"
                         className="h-8 w-full text-xs font-medium"
                         disabled={pending || !sessionLoaded}
+                        title="Opens Team Admin Dashboard — manage members, deck access, and quiz settings for your subscription"
+                        aria-label="Team Admin Dashboard — manage members, deck access, and quiz settings"
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => {
                           goToTeamAdmin(

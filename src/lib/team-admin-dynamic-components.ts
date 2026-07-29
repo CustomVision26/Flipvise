@@ -11,12 +11,6 @@ export const TeamAdminPanelScroll = dynamic(
   { loading: clientLoading },
 );
 
-export const TeamAdminQuickNavPanel = dynamic(
-  () =>
-    import("@/components/team-admin-quick-nav-panel").then((mod) => mod.TeamAdminQuickNavPanel),
-  { loading: clientLoading },
-);
-
 export const TeamAdminWorkspaceStatsPanel = dynamic(
   () =>
     import("@/components/team-admin-workspace-stats-panel").then(

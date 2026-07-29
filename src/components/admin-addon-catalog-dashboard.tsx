@@ -22,6 +22,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -44,16 +49,31 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  ChevronsUpDown,
+  Loader2,
+  Search,
+} from "lucide-react";
 
 export type AdminAddonCatalogItem = AddonCatalogRow & {
   stripePriceConfigured: boolean;
 };
 
+export type AdminAddonAssignableUser = {
+  userId: string;
+  name: string;
+  email: string | null;
+};
+
 type AdminAddonCatalogDashboardProps = {
   pricingCatalogVisible: boolean;
   items: AdminAddonCatalogItem[];
+  users: AdminAddonAssignableUser[];
 };
 
 function planLabel(slug: string): string {
@@ -67,6 +87,7 @@ function planLabel(slug: string): string {
 export function AdminAddonCatalogDashboard({
   pricingCatalogVisible,
   items,
+  users,
 }: AdminAddonCatalogDashboardProps) {
   const router = useRouter();
   const [pending, setPending] = React.useState<string | null>(null);
@@ -74,6 +95,8 @@ export function AdminAddonCatalogDashboard({
   const [success, setSuccess] = React.useState<string | null>(null);
   const [assignUserId, setAssignUserId] = React.useState("");
   const [assignAddonKey, setAssignAddonKey] = React.useState(items[0]?.key ?? "");
+  const [userPickerOpen, setUserPickerOpen] = React.useState(false);
+  const [userSearch, setUserSearch] = React.useState("");
 
   async function run(label: string, fn: () => Promise<void>) {
     setError(null);
@@ -89,6 +112,20 @@ export function AdminAddonCatalogDashboard({
       setPending(null);
     }
   }
+
+  const selectedUser = React.useMemo(
+    () => users.find((user) => user.userId === assignUserId) ?? null,
+    [users, assignUserId],
+  );
+
+  const filteredUsers = React.useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    if (!query) return users;
+    return users.filter((user) => {
+      const haystack = `${user.name} ${user.email ?? ""}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [users, userSearch]);
 
   const assignDisabled =
     Boolean(pending) || !assignUserId.trim() || !assignAddonKey.trim();
@@ -323,17 +360,120 @@ export function AdminAddonCatalogDashboard({
           <CardContent className="space-y-5 pt-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="assign-user-id" className="text-sm font-medium">
-                  Clerk user ID
+                <Label htmlFor="assign-user-picker" className="text-sm font-medium">
+                  User
                 </Label>
-                <Input
-                  id="assign-user-id"
-                  value={assignUserId}
-                  onChange={(e) => setAssignUserId(e.target.value)}
-                  placeholder="user_…"
-                  autoComplete="off"
-                  className="font-mono text-sm"
-                />
+                <Popover
+                  open={userPickerOpen}
+                  onOpenChange={(open) => {
+                    setUserPickerOpen(open);
+                    if (!open) setUserSearch("");
+                  }}
+                >
+                  <PopoverTrigger
+                    nativeButton
+                    render={(props) => (
+                      <Button
+                        {...props}
+                        id="assign-user-picker"
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={userPickerOpen}
+                        className={cn(
+                          "h-8 w-full justify-between border-input bg-transparent px-2.5 font-normal dark:bg-input/30 dark:hover:bg-input/50",
+                          props.className,
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "truncate text-left",
+                            !selectedUser && "text-muted-foreground",
+                          )}
+                        >
+                          {selectedUser
+                            ? selectedUser.email
+                              ? `${selectedUser.name} · ${selectedUser.email}`
+                              : selectedUser.name
+                            : "Search registered users…"}
+                        </span>
+                        <ChevronsUpDown
+                          className="size-4 shrink-0 text-muted-foreground"
+                          aria-hidden
+                        />
+                      </Button>
+                    )}
+                  />
+                  <PopoverContent
+                    align="start"
+                    className="w-[min(100vw-2rem,24rem)] p-2"
+                  >
+                    <div className="relative mb-2">
+                      <Search
+                        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <Input
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder="Filter by name or email…"
+                        autoComplete="off"
+                        className="h-8 pl-8"
+                        aria-label="Filter registered users by name"
+                      />
+                    </div>
+                    <div
+                      className="max-h-56 overflow-y-auto overscroll-contain"
+                      role="listbox"
+                      aria-label="Registered users"
+                    >
+                      {filteredUsers.length === 0 ? (
+                        <p className="px-2 py-3 text-sm text-muted-foreground">
+                          No users match that search.
+                        </p>
+                      ) : (
+                        filteredUsers.map((user) => {
+                          const selected = user.userId === assignUserId;
+                          return (
+                            <button
+                              key={user.userId}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              className={cn(
+                                "flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/60",
+                                selected && "bg-primary/10",
+                              )}
+                              onClick={() => {
+                                setAssignUserId(user.userId);
+                                setUserPickerOpen(false);
+                                setUserSearch("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mt-0.5 size-3.5 shrink-0",
+                                  selected ? "opacity-100" : "opacity-0",
+                                )}
+                                aria-hidden
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium text-foreground">
+                                  {user.name}
+                                </span>
+                                {user.email ? (
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {user.email}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="assign-addon-key" className="text-sm font-medium">

@@ -7,7 +7,7 @@ import {
   type AddonCatalogSettingsRow,
   type UserAddonEntitlementRow,
 } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 const SETTINGS_ID = 1;
 
@@ -202,6 +202,7 @@ export async function upsertActiveStripeAddonEntitlement(input: {
       stripeSubscriptionId: input.stripeSubscriptionId,
       stripeSubscriptionItemId: input.stripeSubscriptionItemId ?? null,
       grantedByAdminUserId: null,
+      teamId: null,
       startsAt: now,
       endsAt: null,
       createdAt: now,
@@ -214,6 +215,8 @@ export async function upsertActiveStripeAddonEntitlement(input: {
         status: "active",
         stripeSubscriptionId: input.stripeSubscriptionId,
         stripeSubscriptionItemId: input.stripeSubscriptionItemId ?? null,
+        grantedByAdminUserId: null,
+        teamId: null,
         endsAt: null,
         updatedAt: now,
       },
@@ -239,6 +242,7 @@ export async function assignAdminAddonEntitlement(input: {
       stripeSubscriptionId: null,
       stripeSubscriptionItemId: null,
       grantedByAdminUserId: input.grantedByAdminUserId,
+      teamId: null,
       startsAt: now,
       endsAt: null,
       createdAt: now,
@@ -250,6 +254,7 @@ export async function assignAdminAddonEntitlement(input: {
         source: "admin",
         status: "active",
         grantedByAdminUserId: input.grantedByAdminUserId,
+        teamId: null,
         endsAt: null,
         updatedAt: now,
       },
@@ -257,6 +262,116 @@ export async function assignAdminAddonEntitlement(input: {
     .returning();
   if (!row) throw new Error("Failed to assign admin add-on entitlement");
   return row;
+}
+
+/**
+ * Team-admin grant. Does not overwrite an active Stripe or platform-admin entitlement.
+ * Returns the existing row when access is already covered by a higher-priority source.
+ */
+export async function assignTeamAddonEntitlement(input: {
+  userId: string;
+  addonKey: string;
+  grantedByTeamAdminUserId: string;
+  teamId: number;
+}): Promise<{ entitlement: UserAddonEntitlementRow; createdOrUpdated: boolean }> {
+  const existing = await getUserAddonEntitlement(input.userId, input.addonKey);
+  if (
+    existing?.status === "active" &&
+    (existing.source === "stripe" || existing.source === "admin")
+  ) {
+    return { entitlement: existing, createdOrUpdated: false };
+  }
+
+  const now = new Date();
+  const [row] = await db
+    .insert(userAddonEntitlements)
+    .values({
+      userId: input.userId,
+      addonKey: input.addonKey,
+      source: "team",
+      status: "active",
+      stripeSubscriptionId: null,
+      stripeSubscriptionItemId: null,
+      grantedByAdminUserId: input.grantedByTeamAdminUserId,
+      teamId: input.teamId,
+      startsAt: now,
+      endsAt: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [userAddonEntitlements.userId, userAddonEntitlements.addonKey],
+      set: {
+        source: "team",
+        status: "active",
+        grantedByAdminUserId: input.grantedByTeamAdminUserId,
+        teamId: input.teamId,
+        stripeSubscriptionId: null,
+        stripeSubscriptionItemId: null,
+        endsAt: null,
+        updatedAt: now,
+      },
+    })
+    .returning();
+  if (!row) throw new Error("Failed to assign team add-on entitlement");
+  return { entitlement: row, createdOrUpdated: true };
+}
+
+/** Revoke only team-sourced entitlements for a member (never Stripe / platform admin). */
+export async function revokeTeamAddonEntitlement(input: {
+  userId: string;
+  addonKey: string;
+  teamId: number;
+}): Promise<UserAddonEntitlementRow | null> {
+  const existing = await getUserAddonEntitlement(input.userId, input.addonKey);
+  if (!existing || existing.status !== "active" || existing.source !== "team") {
+    return null;
+  }
+  if (existing.teamId != null && existing.teamId !== input.teamId) {
+    return null;
+  }
+  return revokeUserAddonEntitlement({
+    userId: input.userId,
+    addonKey: input.addonKey,
+    status: "revoked",
+  });
+}
+
+export async function listActiveEntitlementsForAddon(
+  addonKey: string,
+): Promise<UserAddonEntitlementRow[]> {
+  return db
+    .select()
+    .from(userAddonEntitlements)
+    .where(
+      and(
+        eq(userAddonEntitlements.addonKey, addonKey),
+        eq(userAddonEntitlements.status, "active"),
+      ),
+    )
+    .orderBy(desc(userAddonEntitlements.updatedAt));
+}
+
+export async function listTeamMemberAddonKeys(
+  userIds: string[],
+  addonKey: string,
+): Promise<Map<string, UserAddonEntitlementRow>> {
+  const map = new Map<string, UserAddonEntitlementRow>();
+  if (userIds.length === 0) return map;
+  const rows = await db
+    .select()
+    .from(userAddonEntitlements)
+    .where(
+      and(
+        inArray(userAddonEntitlements.userId, userIds),
+        eq(userAddonEntitlements.addonKey, addonKey),
+        eq(userAddonEntitlements.status, "active"),
+      ),
+    );
+  for (const row of rows) {
+    map.set(row.userId, row);
+  }
+  return map;
 }
 
 export async function revokeUserAddonEntitlement(input: {

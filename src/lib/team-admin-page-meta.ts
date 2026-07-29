@@ -1,4 +1,5 @@
 import {
+  isTeamAdminAddonsPath,
   isTeamAdminAssignDecksToMembersPath,
   isTeamAdminInviteHistoryPath,
   isTeamAdminInvitePendingPath,
@@ -93,6 +94,16 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
       section: "Deck manager",
       title: "Study privileges",
       description: "Control which study modes regular members may use for each assigned deck.",
+      isOverview: false,
+    };
+  }
+
+  if (isTeamAdminAddonsPath(pathname)) {
+    return {
+      section: "Add-ons",
+      title: "Member add-ons",
+      description:
+        "Assign or remove optional premium add-ons such as AI Essay for workspace members.",
       isOverview: false,
     };
   }

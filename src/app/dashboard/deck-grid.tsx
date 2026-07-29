@@ -129,6 +129,11 @@ interface DeckGridProps {
   hasAiReading?: boolean;
   /** Education / teacher-tools — detailed permanent-delete warning. */
   detailedDeleteWarning?: boolean;
+  /**
+   * Education Gold/Enterprise team admin — decks this admin created vs owner-set
+   * (or plan) create allowance. Shown beside the “Showing …” range on Team Dash.
+   */
+  createQuota?: { used: number; max: number } | null;
 }
 
 export function DeckGrid({
@@ -140,6 +145,7 @@ export function DeckGrid({
   teamTierPreviewPromo = false,
   hasAiReading = false,
   detailedDeleteWarning = false,
+  createQuota = null,
 }: DeckGridProps) {
   const [sort, setSort] = useState<SortOption>("newest");
   const [pageSize, setPageSize] = useState<PageSize>(9);
@@ -177,6 +183,11 @@ export function DeckGrid({
           {sorted.length === 0
             ? "No decks"
             : `Showing ${startIndex + 1}–${endIndex} of ${sorted.length} deck${sorted.length !== 1 ? "s" : ""}`}
+          {createQuota != null ? (
+            <span className="ml-2 text-foreground/90">
+              · Created {createQuota.used} / {createQuota.max}
+            </span>
+          ) : null}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <ViewModeDropdown

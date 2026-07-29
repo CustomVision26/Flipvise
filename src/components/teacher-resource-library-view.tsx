@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Pencil, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
@@ -32,7 +32,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   deleteTeacherResourceAction,
+  renameTeacherResourceAction,
 } from "@/actions/teacher-resources";
 import type {
   TeacherResourceLibraryItem,
@@ -130,24 +140,24 @@ function formatSavedDate(value: string): string {
   });
 }
 
-function isDeletableSection(
+function isManageableSection(
   sectionId: TeacherResourceLibrarySection["id"],
-): sectionId is "lessonPlans" | "homework" | "worksheets" | "quizzes" {
+): sectionId is "lessonPlans" | "homework" | "worksheets" | "studyGuides" {
   return (
     sectionId === "lessonPlans" ||
     sectionId === "homework" ||
     sectionId === "worksheets" ||
-    sectionId === "quizzes"
+    sectionId === "studyGuides"
   );
 }
 
-function canDeleteItem(
+function canManageItem(
   item: TeacherResourceLibraryItem,
   sectionId: TeacherResourceLibrarySection["id"],
   viewerUserId: string,
   isWorkspaceOwner: boolean,
 ): boolean {
-  if (!isDeletableSection(sectionId) || item.isPlaceholder) return false;
+  if (!isManageableSection(sectionId) || item.isPlaceholder) return false;
   return item.creatorUserId === viewerUserId || isWorkspaceOwner;
 }
 
@@ -158,7 +168,7 @@ function resolveResourceId(
   if (sectionId === "lessonPlans") return item.lessonPlanId;
   if (sectionId === "homework") return item.homeworkId;
   if (sectionId === "worksheets") return item.worksheetId;
-  if (sectionId === "quizzes") return item.savedQuizId;
+  if (sectionId === "studyGuides") return item.studyGuideId;
   return null;
 }
 
@@ -277,6 +287,117 @@ function FilterSelect({
   );
 }
 
+function ResourceRenameButton({
+  item,
+  sectionId,
+  teamId,
+  onRenamed,
+}: {
+  item: TeacherResourceLibraryItem;
+  sectionId: TeacherResourceLibrarySection["id"];
+  teamId: number | null;
+  onRenamed: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(item.title);
+  const [isPending, startTransition] = useTransition();
+  const resourceId = resolveResourceId(item, sectionId);
+
+  if (!isManageableSection(sectionId) || resourceId == null) return null;
+
+  const resourceType = sectionId;
+  const resolvedResourceId = resourceId;
+
+  function handleOpenChange(next: boolean) {
+    if (isPending) return;
+    setOpen(next);
+    if (next) setTitle(item.title);
+  }
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      toast.error("Enter a name for this resource.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await renameTeacherResourceAction({
+          resourceType,
+          resourceId: resolvedResourceId,
+          teamId,
+          title: nextTitle,
+        });
+        toast.success("Resource renamed", {
+          description: `Saved as “${nextTitle}”.`,
+        });
+        setOpen(false);
+        onRenamed();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not rename resource.",
+        );
+      }
+    });
+  }
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        onClick={() => handleOpenChange(true)}
+        disabled={isPending}
+        aria-label={`Rename ${item.title}`}
+      >
+        <Pencil className="size-3.5" aria-hidden />
+        {isPending ? "…" : "Rename"}
+      </Button>
+
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename resource</DialogTitle>
+            <DialogDescription>
+              Choose any name you want for this saved resource. It only changes the
+              library title.
+            </DialogDescription>
+          </DialogHeader>
+          <form id={`rename-resource-${item.key}`} onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor={`rename-title-${item.key}`}>Name</Label>
+              <Input
+                id={`rename-title-${item.key}`}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={sectionId === "lessonPlans" ? 512 : 255}
+                disabled={isPending}
+                autoFocus
+                placeholder="Resource name"
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" type="button" />} disabled={isPending}>
+              Cancel
+            </DialogClose>
+            <Button
+              type="submit"
+              form={`rename-resource-${item.key}`}
+              disabled={isPending || !title.trim()}
+            >
+              {isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ResourceDeleteButton({
   item,
   sectionId,
@@ -292,7 +413,7 @@ function ResourceDeleteButton({
   const [isPending, startTransition] = useTransition();
   const resourceId = resolveResourceId(item, sectionId);
 
-  if (!isDeletableSection(sectionId) || resourceId == null) return null;
+  if (!isManageableSection(sectionId) || resourceId == null) return null;
 
   const resourceType = sectionId;
   const resolvedResourceId = resourceId;
@@ -361,14 +482,14 @@ function ResourceItemCard({
   item,
   sectionId,
   teamId,
-  canDelete,
-  onDeleted,
+  canManage,
+  onChanged,
 }: {
   item: TeacherResourceLibraryItem;
   sectionId: TeacherResourceLibrarySection["id"];
   teamId: number | null;
-  canDelete: boolean;
-  onDeleted: () => void;
+  canManage: boolean;
+  onChanged: (kind: "deleted" | "renamed") => void;
 }) {
   const creatorLabel = item.creatorName ?? item.creatorEmail ?? "Unknown creator";
   const savedLabel = formatSavedDate(item.savedAt);
@@ -410,14 +531,10 @@ function ResourceItemCard({
             rel="noopener noreferrer"
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
-            {sectionId === "worksheets"
-              ? "Worksheet PDF"
-              : sectionId === "quizzes"
-                ? "Question sheet"
-                : "PDF"}
+            {sectionId === "worksheets" ? "Worksheet PDF" : "PDF"}
           </a>
         ) : null}
-        {(sectionId === "worksheets" || sectionId === "quizzes") && item.answerKeyPdfUrl ? (
+        {sectionId === "worksheets" && item.answerKeyPdfUrl ? (
           <a
             href={item.answerKeyPdfUrl}
             target="_blank"
@@ -471,12 +588,20 @@ function ResourceItemCard({
             Create Quiz
           </Link>
         ) : null}
-        {canDelete ? (
+        {canManage ? (
+          <ResourceRenameButton
+            item={item}
+            sectionId={sectionId}
+            teamId={teamId}
+            onRenamed={() => onChanged("renamed")}
+          />
+        ) : null}
+        {canManage ? (
           <ResourceDeleteButton
             item={item}
             sectionId={sectionId}
             teamId={teamId}
-            onDeleted={onDeleted}
+            onDeleted={() => onChanged("deleted")}
           />
         ) : null}
         {item.isPlaceholder ? (
@@ -763,7 +888,7 @@ function GroupedResourceSection({
   teamId,
   viewerUserId,
   isWorkspaceOwner,
-  onItemDeleted,
+  onItemChanged,
 }: {
   section: TeacherResourceLibrarySection;
   items: TeacherResourceLibraryItem[];
@@ -776,7 +901,7 @@ function GroupedResourceSection({
   teamId: number | null;
   viewerUserId: string;
   isWorkspaceOwner: boolean;
-  onItemDeleted: (itemKey: string) => void;
+  onItemChanged: (itemKey: string, kind: "deleted" | "renamed") => void;
 }) {
   const [collapsedAdminKeys, setCollapsedAdminKeys] = useState<Set<string>>(
     () => new Set(),
@@ -933,13 +1058,13 @@ function GroupedResourceSection({
                               item={item}
                               sectionId={section.id}
                               teamId={teamId}
-                              canDelete={canDeleteItem(
+                              canManage={canManageItem(
                                 item,
                                 section.id,
                                 viewerUserId,
                                 isWorkspaceOwner,
                               )}
-                              onDeleted={() => onItemDeleted(item.key)}
+                              onChanged={(kind) => onItemChanged(item.key, kind)}
                             />
                           ))}
                         </div>
@@ -990,7 +1115,7 @@ function SubjectGroupedResourceList({
   isWorkspaceOwner,
   sortKey,
   sortDir,
-  onItemDeleted,
+  onItemChanged,
 }: {
   sectionId: TeacherResourceLibrarySection["id"];
   items: TeacherResourceLibraryItem[];
@@ -999,7 +1124,7 @@ function SubjectGroupedResourceList({
   isWorkspaceOwner: boolean;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
-  onItemDeleted: (itemKey: string) => void;
+  onItemChanged: (itemKey: string, kind: "deleted" | "renamed") => void;
 }) {
   const [collapsedSubjectKeys, setCollapsedSubjectKeys] = useState<Set<string>>(
     () => new Set(),
@@ -1058,13 +1183,13 @@ function SubjectGroupedResourceList({
                     item={item}
                     sectionId={sectionId}
                     teamId={teamId}
-                    canDelete={canDeleteItem(
+                    canManage={canManageItem(
                       item,
                       sectionId,
                       viewerUserId,
                       isWorkspaceOwner,
                     )}
-                    onDeleted={() => onItemDeleted(item.key)}
+                    onChanged={(kind) => onItemChanged(item.key, kind)}
                   />
                 ))}
               </div>
@@ -1108,7 +1233,7 @@ function SubjectGroupedResourceSection({
   isWorkspaceOwner,
   sortKey,
   sortDir,
-  onItemDeleted,
+  onItemChanged,
   lessonPlanOriginTotals,
 }: {
   section: TeacherResourceLibrarySection;
@@ -1120,7 +1245,7 @@ function SubjectGroupedResourceSection({
   isWorkspaceOwner: boolean;
   sortKey: SortKey;
   sortDir: "asc" | "desc";
-  onItemDeleted: (itemKey: string) => void;
+  onItemChanged: (itemKey: string, kind: "deleted" | "renamed") => void;
   /** Full filtered totals for origin headers (may exceed current page item counts). */
   lessonPlanOriginTotals?: { assigned: number; mine: number } | null;
 }) {
@@ -1194,7 +1319,7 @@ function SubjectGroupedResourceSection({
               isWorkspaceOwner={isWorkspaceOwner}
               sortKey={sortKey}
               sortDir={sortDir}
-              onItemDeleted={onItemDeleted}
+              onItemChanged={onItemChanged}
             />
           </div>
         ) : null}
@@ -1216,7 +1341,7 @@ function SubjectGroupedResourceSection({
               isWorkspaceOwner={isWorkspaceOwner}
               sortKey={sortKey}
               sortDir={sortDir}
-              onItemDeleted={onItemDeleted}
+              onItemChanged={onItemChanged}
             />
           </div>
         ) : null}
@@ -1233,7 +1358,7 @@ function SubjectGroupedResourceSection({
       isWorkspaceOwner={isWorkspaceOwner}
       sortKey={sortKey}
       sortDir={sortDir}
-      onItemDeleted={onItemDeleted}
+      onItemChanged={onItemChanged}
     />
   );
 }
@@ -1249,7 +1374,7 @@ function ResourceSectionPanel({
   homeworkHref,
   teamId,
   viewerUserId,
-  onItemDeleted,
+  onItemChanged,
 }: {
   section: TeacherResourceLibrarySection;
   ownerUserId: string;
@@ -1261,7 +1386,11 @@ function ResourceSectionPanel({
   homeworkHref: string;
   teamId: number | null;
   viewerUserId: string;
-  onItemDeleted: (sectionId: TeacherResourceLibrarySection["id"], itemKey: string) => void;
+  onItemChanged: (
+    sectionId: TeacherResourceLibrarySection["id"],
+    itemKey: string,
+    kind: "deleted" | "renamed",
+  ) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<ResourceFilters>(INITIAL_RESOURCE_FILTERS);
@@ -1358,7 +1487,7 @@ function ResourceSectionPanel({
           teamId={teamId}
           viewerUserId={viewerUserId}
           isWorkspaceOwner={isWorkspaceOwner}
-          onItemDeleted={(itemKey) => onItemDeleted(section.id, itemKey)}
+          onItemChanged={(itemKey, kind) => onItemChanged(section.id, itemKey, kind)}
         />
       ) : (
         <SubjectGroupedResourceSection
@@ -1371,7 +1500,7 @@ function ResourceSectionPanel({
           isWorkspaceOwner={isWorkspaceOwner}
           sortKey={sortKey}
           sortDir={sortDir}
-          onItemDeleted={(itemKey) => onItemDeleted(section.id, itemKey)}
+          onItemChanged={(itemKey, kind) => onItemChanged(section.id, itemKey, kind)}
           lessonPlanOriginTotals={lessonPlanOriginTotals}
         />
       )}
@@ -1406,17 +1535,20 @@ export function TeacherResourceLibraryView({
 
   const defaultTab = sections[0]?.id ?? "lessonPlans";
 
-  function handleItemDeleted(
+  function handleItemChanged(
     sectionId: TeacherResourceLibrarySection["id"],
     itemKey: string,
+    kind: "deleted" | "renamed",
   ) {
-    setSections((current) =>
-      current.map((section) =>
-        section.id === sectionId
-          ? { ...section, items: section.items.filter((item) => item.key !== itemKey) }
-          : section,
-      ),
-    );
+    if (kind === "deleted") {
+      setSections((current) =>
+        current.map((section) =>
+          section.id === sectionId
+            ? { ...section, items: section.items.filter((item) => item.key !== itemKey) }
+            : section,
+        ),
+      );
+    }
     router.refresh();
   }
 
@@ -1471,7 +1603,7 @@ export function TeacherResourceLibraryView({
                 homeworkHref={homeworkHref}
                 teamId={teamId}
                 viewerUserId={viewerUserId}
-                onItemDeleted={handleItemDeleted}
+                onItemChanged={handleItemChanged}
               />
             </CardContent>
           </Card>

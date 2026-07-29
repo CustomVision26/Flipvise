@@ -224,7 +224,7 @@ function HomeworkEditable({
             }
 
             patch({
-              passages: [{ body: raw }],
+              passages: [{ body: raw, title: null }],
               passage: raw,
               passageTitle: null,
             });
@@ -289,16 +289,17 @@ export function HomeworkPreviewEditor({
 export function cloneHomeworkResult(result: HomeworkResult): HomeworkResult {
   return {
     ...result,
-    passages: result.passages?.map((passage) => ({ ...passage })),
+    passages: result.passages?.map((passage) => ({ ...passage })) ?? null,
     passageQuestionCounts: result.passageQuestionCounts
       ? [...result.passageQuestionCounts]
-      : result.passageQuestionCounts,
+      : null,
     questions: [...result.questions],
     answerKey: [...result.answerKey],
-    answerGraphs: result.answerGraphs?.map((graph) => ({
-      ...graph,
-      points: graph.points?.map((point) => ({ ...point })) ?? null,
-      lines: graph.lines?.map((line) => ({ ...line })) ?? null,
-    })),
+    answerGraphs:
+      result.answerGraphs?.map((graph) => ({
+        ...graph,
+        points: graph.points?.map((point) => ({ ...point })) ?? null,
+        lines: graph.lines?.map((line) => ({ ...line })) ?? null,
+      })) ?? null,
   };
 }

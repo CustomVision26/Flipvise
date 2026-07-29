@@ -1,12 +1,10 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  LayoutDashboard,
   PanelLeft,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -32,7 +30,12 @@ const WORKFLOW_STEPS = [
   },
 ] as const;
 
-function toolHref(suffix: string, queryString: string): string {
+function toolHref(
+  suffix: string,
+  queryString: string,
+  absoluteHref?: string,
+): string {
+  if (absoluteHref) return absoluteHref;
   const normalized = suffix.startsWith("/") ? suffix : `/${suffix}`;
   return withTeacherQuery(`/teacher${normalized}`, queryString);
 }
@@ -40,15 +43,10 @@ function toolHref(suffix: string, queryString: string): string {
 export function TeacherDashboardHome({
   planLabel,
   workspaceNote,
-  teamAdminHref = null,
-  personalDashboardHref = null,
   teacherQueryString = "",
 }: {
   planLabel: string;
   workspaceNote: string;
-  teamAdminHref?: string | null;
-  /** Education Plus only — link to /dashboard for deck creation. */
-  personalDashboardHref?: string | null;
   teacherQueryString?: string;
 }) {
   const toolCount = TEACHER_DASHBOARD_NAV.reduce(
@@ -65,51 +63,21 @@ export function TeacherDashboardHome({
         )}
       >
         <CardHeader className="gap-4 pb-4 sm:pb-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 space-y-3">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Teacher workspace
-              </p>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                  Teacher Dashboard
-                </h1>
-                <Badge variant="outline" className="h-6 px-2.5 text-xs font-medium">
-                  {planLabel}
-                </Badge>
-              </div>
-              <CardDescription className="max-w-3xl text-sm leading-relaxed sm:text-[0.9375rem]">
-                {workspaceNote}
-              </CardDescription>
+          <div className="min-w-0 space-y-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Teacher workspace
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Teacher Dashboard
+              </h1>
+              <Badge variant="outline" className="h-6 px-2.5 text-xs font-medium">
+                {planLabel}
+              </Badge>
             </div>
-            <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row sm:flex-wrap">
-              {personalDashboardHref ? (
-                <Link
-                  href={personalDashboardHref}
-                  className={cn(
-                    buttonVariants({ variant: "default", size: "default" }),
-                    "inline-flex h-9 items-center gap-2 font-medium",
-                  )}
-                >
-                  <LayoutDashboard className="size-4" aria-hidden />
-                  Personal Dashboard
-                  <ArrowRight className="size-4 opacity-70" aria-hidden />
-                </Link>
-              ) : null}
-              {teamAdminHref ? (
-                <Link
-                  href={teamAdminHref}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "default" }),
-                    "inline-flex h-9 items-center gap-2 font-medium",
-                  )}
-                >
-                  <LayoutDashboard className="size-4" aria-hidden />
-                  Team Admin Dashboard
-                  <ArrowRight className="size-4 opacity-70" aria-hidden />
-                </Link>
-              ) : null}
-            </div>
+            <CardDescription className="max-w-3xl text-sm leading-relaxed sm:text-[0.9375rem]">
+              {workspaceNote}
+            </CardDescription>
           </div>
         </CardHeader>
       </Card>
@@ -169,23 +137,44 @@ export function TeacherDashboardHome({
                 Sidebar
               </p>
               <div className="space-y-3">
-                <div className="rounded-md bg-primary/15 px-2.5 py-2 text-xs font-medium text-foreground">
-                  Dashboard
-                </div>
+                <Link
+                  href={withTeacherQuery("/teacher", teacherQueryString)}
+                  className="block rounded-md bg-primary/15 px-2.5 py-2 text-xs font-medium text-foreground transition-colors hover:bg-primary/20"
+                >
+                  <span className="block truncate">Dashboard</span>
+                  <span className="block truncate text-[10px] font-normal text-muted-foreground">
+                    /teacher
+                  </span>
+                </Link>
                 {TEACHER_DASHBOARD_NAV.map((section) => (
                   <div key={section.title} className="space-y-1">
                     <p className="px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       {section.title}
                     </p>
                     <ul className="space-y-0.5">
-                      {section.items.map((item) => (
-                        <li
-                          key={item.title}
-                          className="truncate rounded-md px-2.5 py-1.5 text-xs text-muted-foreground"
-                        >
-                          {item.title}
-                        </li>
-                      ))}
+                      {section.items.map((item) => {
+                        const path =
+                          item.absoluteHref ??
+                          `/teacher${item.suffix.startsWith("/") ? item.suffix : `/${item.suffix}`}`;
+                        return (
+                          <li key={item.title}>
+                            <Link
+                              href={toolHref(
+                                item.suffix,
+                                teacherQueryString,
+                                item.absoluteHref,
+                              )}
+                              className="block truncate rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                              title={path}
+                            >
+                              <span className="block truncate">{item.title}</span>
+                              <span className="block truncate text-[10px] text-muted-foreground/70">
+                                {path}
+                              </span>
+                            </Link>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 ))}
@@ -208,7 +197,11 @@ export function TeacherDashboardHome({
                   <ul className="space-y-2">
                     {section.items.map((item) => {
                       const Icon = item.icon;
-                      const href = toolHref(item.suffix, teacherQueryString);
+                      const href = toolHref(
+                        item.suffix,
+                        teacherQueryString,
+                        item.absoluteHref,
+                      );
                       return (
                         <li key={item.title}>
                           <Link

@@ -119,7 +119,7 @@ export function QuizResultSheetsDialog({
           label: `${row.deckName} Quiz Sheet`,
         });
         toast.success("Quiz sheets saved", {
-          description: "Question sheet and answer key are now in Teacher → Saved Quizzes.",
+          description: "Question sheet and answer key PDFs were saved.",
         });
         onOpenChange(false);
       } catch (error) {

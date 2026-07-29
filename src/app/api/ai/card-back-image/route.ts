@@ -5,6 +5,10 @@ import { canUseDeckAiFeatures, DECK_AI_PLAN_REQUIREMENT } from "@/lib/deck-ai-ac
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import { generateAnswerBackImage } from "@/lib/generate-answer-back-image";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 
 const bodySchema = z.object({
   deckId: z.number().int().positive(),
@@ -36,18 +40,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: DECK_AI_PLAN_REQUIREMENT }, { status: 403 });
   }
 
-  const image = await generateAnswerBackImage(bundle.deck, question, answer);
-  if (!image) {
-    return NextResponse.json(
-      { error: "Image generation failed" },
-      { status: 502 },
-    );
-  }
+  try {
+    const image = await generateAnswerBackImage(bundle.deck, question, answer, {
+      userId: access.userId,
+      teamId: bundle.deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    });
+    if (!image) {
+      return NextResponse.json(
+        { error: "Image generation failed" },
+        { status: 502 },
+      );
+    }
 
-  return new Response(Buffer.from(image.data), {
-    headers: {
-      "Content-Type": image.mediaType,
-      "Cache-Control": "no-store",
-    },
-  });
+    return new Response(Buffer.from(image.data), {
+      headers: {
+        "Content-Type": image.mediaType,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    throw error;
+  }
 }

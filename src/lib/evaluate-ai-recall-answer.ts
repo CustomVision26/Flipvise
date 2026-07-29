@@ -1,6 +1,9 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
+import "server-only";
+
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { trackedGenerateText } from "@/lib/ai-usage/track";
 import type {
   RecallAnswerModality,
   RecallEvaluationResult,
@@ -104,7 +107,7 @@ export async function evaluateAiRecallAnswer(
   ].join("\n");
 
   const { output } = hasDrawing
-    ? await generateText({
+    ? await trackedGenerateText({
         model: openai("gpt-4o"),
         output: Output.object({ schema: aiRecallEvaluationSchema }),
         system,
@@ -118,7 +121,7 @@ export async function evaluateAiRecallAnswer(
           },
         ],
       })
-    : await generateText({
+    : await trackedGenerateText({
         model: openai("gpt-4o"),
         output: Output.object({ schema: aiRecallEvaluationSchema }),
         system,

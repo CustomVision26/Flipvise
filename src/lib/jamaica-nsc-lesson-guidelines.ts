@@ -1,8 +1,13 @@
 import "server-only";
 
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { trackedGenerateText } from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import {
   JAMAICA_NSC_LESSON_GUIDELINES,
   type JamaicaNscLessonGuidelines,
@@ -32,7 +37,7 @@ export async function confirmLearningStandardLinkedToJamaica(
   if (!process.env.OPENAI_API_KEY?.trim()) return false;
 
   try {
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({ schema: jamaicaLinkedLearningStandardSchema }),
       system: `You classify whether a teacher-entered learning standard / curriculum framework text is linked to the country Jamaica.
@@ -57,6 +62,9 @@ Be conservative: if unsure, return false with low confidence.`,
 
     return output?.isJamaicaLinked === true;
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw error;
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[confirmLearningStandardLinkedToJamaica] Classification failed; skipping Jamaica NSC guidelines.",

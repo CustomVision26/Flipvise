@@ -159,6 +159,35 @@ export async function updateSavedWorksheetById(
   return row ?? null;
 }
 
+export async function renameSavedWorksheetLabelById(
+  worksheetId: number,
+  title: string,
+): Promise<SavedWorksheetRow | null> {
+  const existing = await getSavedWorksheetById(worksheetId);
+  if (!existing) return null;
+
+  const nextTitle = title.trim().slice(0, 255);
+  if (!nextTitle) return null;
+
+  const nextResult: DeckWorksheetResult = {
+    ...existing.result,
+    worksheetTitle: nextTitle,
+  };
+
+  const [row] = await db
+    .update(savedWorksheets)
+    .set({
+      label: nextTitle,
+      worksheetTitle: nextTitle,
+      result: nextResult,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedWorksheets.id, worksheetId))
+    .returning();
+
+  return row ?? null;
+}
+
 export type SavedWorksheetEditItem = {
   id: number;
   label: string;

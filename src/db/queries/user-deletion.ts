@@ -22,6 +22,7 @@ import {
   cardMastery,
   savedHomeworkAssignments,
   savedLessonPlans,
+  userAddonEntitlements,
   stripeSubscriptions,
   userPlanTrials,
   billingNoticeInboxMessages,
@@ -37,6 +38,8 @@ import { deleteFromS3 } from "@/lib/s3";
 import { recordDeletionProrationAndCancel } from "@/lib/account-deletion-proration-ledger";
 import type { DeletedUserSnapshot } from "@/lib/account-deletion-proration-ledger";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import { deleteAiUsageDataForUser } from "@/db/queries/ai-usage";
+import { deleteEssayDataForUser } from "@/db/queries/essays";
 import { eq, inArray, or } from "drizzle-orm";
 
 function collectUrl(url: string | null | undefined, bucket: Set<string>) {
@@ -188,6 +191,9 @@ export async function purgeAllUserData(
 
   await db.delete(savedHomeworkAssignments).where(eq(savedHomeworkAssignments.userId, userId));
   await db.delete(savedLessonPlans).where(eq(savedLessonPlans.userId, userId));
+  await deleteEssayDataForUser(userId);
+  await deleteAiUsageDataForUser(userId);
+  await db.delete(userAddonEntitlements).where(eq(userAddonEntitlements.userId, userId));
 
   await db.delete(supportTickets).where(eq(supportTickets.userId, userId));
   await db.delete(billingInvoices).where(eq(billingInvoices.userId, userId));

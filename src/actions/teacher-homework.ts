@@ -1,11 +1,19 @@
 "use server";
 
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 import { getDeckRowById } from "@/db/queries/decks";
 import {
@@ -46,6 +54,7 @@ import {
 import { detectQuizSubjectArea } from "@/lib/teacher-quiz-reading-passage";
 import {
   buildGenerationTitleSourceSuffix,
+  parseLessonScopeLabelFromDeckName,
   parseLessonScopeLabelFromDescription,
   shortenTeacherTitleSegment,
   withTitleSourceSuffix,
@@ -61,7 +70,9 @@ async function applyHomeworkSourceTitle(
   if (input.sourceType === "deck" && input.deckId != null) {
     const deck = await getDeckRowById(input.deckId);
     deckName = deck?.name ?? null;
-    deckLessonScopeLabel = parseLessonScopeLabelFromDescription(deck?.description);
+    deckLessonScopeLabel =
+      parseLessonScopeLabelFromDescription(deck?.description) ??
+      parseLessonScopeLabelFromDeckName(deck?.name);
   }
 
   const includeDayScope =
@@ -234,7 +245,7 @@ export async function generateHomeworkAction(
   data: TeacherHomeworkActionInput,
 ): Promise<HomeworkResult> {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Homework Generator requires an education plan.",
   );
@@ -246,10 +257,20 @@ export async function generateHomeworkAction(
   }
 
   const input = parsed.data;
+
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "homework",
+      teamId: input.teamId ?? null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    async () => {
   const {
     context: sourceContext,
     vocabularyTerms,
-  } = await resolveHomeworkSourceContext(input, ctx.userId!);
+  } = await resolveHomeworkSourceContext(input, userId);
   const needsPassage = homeworkNeedsReadingPassage(input.subject, input.topic);
   const numberOfPassages = input.numberOfPassages ?? (needsPassage ? 1 : 1);
   const questionsPerPassage =
@@ -282,7 +303,7 @@ export async function generateHomeworkAction(
   }
 
   try {
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({
         schema: homeworkResultSchema,
@@ -344,6 +365,9 @@ ${passageRules}`,
 
     return applyHomeworkSourceTitle(input, normalized);
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw new Error(error.message);
+    }
     if (
       error instanceof Error &&
       (error.message.includes("omitted the reading passage") ||
@@ -358,6 +382,8 @@ ${passageRules}`,
       generateHomework(toTemplateInput(input, vocabularyTerms)),
     );
   }
+    },
+  );
 }
 
 const saveHomeworkSchema = z.object({

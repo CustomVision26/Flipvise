@@ -46,7 +46,7 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Shell and navigation",
         bullets: [
           "Sticky left sidebar (same layout pattern as Teacher Dashboard) switches sections without leaving the admin shell.",
-          "Overview → Dashboard opens All Users; other groups cover Billing, Access & support, Plans & growth, and Documentation.",
+          "Overview → Dashboard opens All Users; other groups cover Billing, AI & analytics, Access & support, Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
           "Support notifications bell in the page header surfaces unread Help Center tickets and Contact Us thread alerts.",
           "Section routes map to dedicated URLs (e.g. /admin/all-users, /admin/plans) for deep linking.",
@@ -541,6 +541,32 @@ const ALL_ARTICLES: DocArticle[] = [
     ],
   ),
   a(
+    "admin-add-ons",
+    "Add-on Catalog — In-Depth Guide",
+    "Manage optional premium add-ons at /admin/add-ons — enablement, pricing visibility, grants, and AI Essay usage.",
+    [
+      {
+        id: "controls",
+        title: "Catalog controls",
+        bullets: [
+          "Master toggle shows or hides /pricing/add-ons for everyone.",
+          "Per-add-on Active and On pricing switches control purchase and listing.",
+          "Assign or revoke complimentary grants by searching registered users by name (source: admin).",
+          "AI Essay usage panel shows active entitlements, activity users, event counts, and tracked tokens.",
+        ],
+      },
+      {
+        id: "architecture",
+        title: "Permission model",
+        bullets: [
+          "Gate features with accessHasAddon / canAccessAddon — never plan slug alone.",
+          "Stripe prices come from STRIPE_ADDON_<KEY>_PRICE_ID (optional yearly companion).",
+          "Team Admins assign the same catalog keys from Team Admin → Add-ons.",
+        ],
+      },
+    ],
+  ),
+  a(
     "pricing-plans",
     "Pricing Plans — In-Depth Guide",
     "Edit plans-config.json tiers, prices, features, and promotion windows at /admin/plans.",
@@ -796,6 +822,55 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Search panel finds matches across quick reference and in-depth content for both audiences.",
           "Useful for verifying coverage before shipping a feature change.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "admin-ai-usage",
+    "AI Usage Analytics — In-Depth Guide",
+    "Monitor AI generations, token/cost estimates, plan limits, and per-user activity at /admin/analytics/ai-usage.",
+    [
+      {
+        id: "overview",
+        title: "Dashboard overview",
+        bullets: [
+          "Summary KPIs compare the selected date range with the prior equivalent period.",
+          "Charts: generations over time, usage by feature, tokens & estimated cost, by subscription plan, request outcomes, and model usage.",
+          "Near-limit counts highlight users at ≥80% and ≥100% of their period allowance.",
+          "Timezone is America/Jamaica by default; override with AI_USAGE_TIMEZONE.",
+        ],
+      },
+      {
+        id: "filters",
+        title: "Filters and export",
+        bullets: [
+          "Date presets: Today, Last 7/30 days, Current billing period, Current month, Custom range.",
+          "Additional filters: plan, team, feature, model, request status, usage status, and name/email search.",
+          "Filters persist in URL query params for deep linking and refresh-safe state.",
+          "Export CSV downloads the current filter slice (metadata only — no prompts).",
+        ],
+      },
+      {
+        id: "user-detail",
+        title: "User detail and admin actions",
+        paragraphs: [
+          "Open a user from the table to inspect identity, plan/team, period window, allowance source, used/remaining generations, tokens, estimated cost, daily history, feature/model breakdowns, outcomes, and recent request metadata. Prompts are never stored or displayed.",
+        ],
+        bullets: [
+          "Set custom or unlimited allowance with a required reason (audited).",
+          "Remove override to fall back to team/plan defaults.",
+          "Disable or restore AI access (reason required when disabling).",
+          "Reset the period counter via adjustment — historical events remain.",
+          "Configure 80/90/100% warning thresholds and clear abuse flags.",
+        ],
+      },
+      {
+        id: "cautions",
+        title: "Do not",
+        bullets: [
+          "Do not treat estimated cost as a Stripe invoice — costs use configured model rates in micros.",
+          "Do not reset counters expecting event history to disappear — events are retained for analytics and audit.",
         ],
       },
     ],

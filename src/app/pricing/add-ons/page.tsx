@@ -46,7 +46,10 @@ export default async function PricingAddOnsPage() {
       access.effectivePlanSlug,
     );
     const stripePriceConfigured = Boolean(
-      resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey),
+      resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "monthly"),
+    );
+    const yearlyPriceConfigured = Boolean(
+      resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "yearly"),
     );
 
     cards.push({
@@ -59,6 +62,7 @@ export default async function PricingAddOnsPage() {
       entitlementSource: entitled ? entitledRow?.source ?? null : null,
       canPurchase: eligible && !entitled && stripePriceConfigured && row.active,
       stripePriceConfigured,
+      yearlyPriceConfigured,
     });
   }
 
@@ -78,8 +82,9 @@ export default async function PricingAddOnsPage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">Add-on Catalog</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Optional monthly features for eligible paid plans. Add-ons stack on top
-            of your current plan and can also be granted by a platform admin.
+            Optional features for eligible paid plans (monthly or yearly where
+            configured). Add-ons stack on top of your current plan and can also
+            be granted by a Team Admin or platform admin.
           </p>
         </div>
       </div>

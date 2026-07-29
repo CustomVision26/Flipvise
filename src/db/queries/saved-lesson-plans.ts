@@ -411,6 +411,35 @@ export async function updateSavedLessonPlanById(
   return row ?? null;
 }
 
+/** Rename only — does not rewrite plan content (safe for assigned/frozen deck-linked plans). */
+export async function renameSavedLessonPlanTitleById(
+  planId: number,
+  title: string,
+): Promise<SavedLessonPlanRow | null> {
+  const existing = await getSavedLessonPlanById(planId);
+  if (!existing) return null;
+
+  const nextTitle = title.trim().slice(0, 512);
+  if (!nextTitle) return null;
+
+  const nextResult: LessonPlanResult = {
+    ...existing.result,
+    lessonTitle: nextTitle,
+  };
+
+  const [row] = await db
+    .update(savedLessonPlans)
+    .set({
+      lessonTitle: nextTitle,
+      result: nextResult,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedLessonPlans.id, planId))
+    .returning();
+
+  return row ?? null;
+}
+
 /**
  * Update an assignee personal copy only.
  * Requires ownership (`userId`) and an unlinked row (`deckId` null) so
@@ -532,16 +561,32 @@ function lessonPlanCreatorRoleSuffix(
 
 /**
  * Compact Select labels for quiz/homework/study-guide/worksheet pickers.
- * Personal: `{title} · {grade}`
- * Assigned originals: `{title} · {grade} · {creatorName} (Owner|Team Admin)`
+ * Personal: `{title} · Lesson Plan · N days · {grade}` (days when scheduled)
+ * Assigned originals: same + `· {creatorName} (Owner|Team Admin)`
  */
+function formatLessonPlanPickerDayLabel(
+  result: SavedLessonPlanRow["result"] | null | undefined,
+): string | null {
+  const dayCount = result?.weeklySchedule?.length ?? 0;
+  if (dayCount >= 2) return `Lesson Plan · ${dayCount} days`;
+  if (dayCount === 1) return "Lesson Plan Day 1";
+  return null;
+}
+
 function formatLessonPlanPickerOptionLabel(
-  row: Pick<SavedLessonPlanRow, "lessonTitle" | "gradeLevel" | "userId">,
+  row: Pick<
+    SavedLessonPlanRow,
+    "lessonTitle" | "gradeLevel" | "userId" | "result"
+  >,
   assigned?: AssignedPickerLabelContext,
 ): string {
   const title = row.lessonTitle.trim() || "Untitled lesson";
   const grade = row.gradeLevel.trim();
-  const shortBase = grade ? `${title} · ${grade}` : title;
+  const dayLabel = formatLessonPlanPickerDayLabel(row.result);
+  const parts = [title];
+  if (dayLabel) parts.push(dayLabel);
+  if (grade) parts.push(grade);
+  const shortBase = parts.join(" · ");
   if (!assigned) return shortBase;
 
   const creatorLine = assigned.creatorPrimaryLine?.trim();
@@ -828,6 +873,41 @@ export async function findPersonalLessonPlanCopyForAssignedContext(
 
 /** Marker written into quiz deck descriptions when saving from a lesson plan. */
 export { lessonPlanDeckDescriptionMarker } from "@/lib/lesson-plan-deck-marker";
+
+export type LessonPlanTaggedDeck = {
+  id: number;
+  name: string;
+  description: string | null;
+};
+
+/**
+ * Live decks owned by `ownerUserId` (optional workspace `teamId`) whose description
+ * contains `Lesson plan #${lessonPlanId}`.
+ */
+export async function findDecksTaggedWithLessonPlanForOwner(
+  lessonPlanId: number,
+  ownerUserId: string,
+  teamId?: number | null,
+): Promise<LessonPlanTaggedDeck[]> {
+  if (!Number.isFinite(lessonPlanId) || lessonPlanId <= 0) return [];
+  if (!ownerUserId.trim()) return [];
+
+  const marker = lessonPlanDeckDescriptionMarker(lessonPlanId);
+  const ownership =
+    teamId != null && Number.isFinite(teamId) && teamId > 0
+      ? and(eq(decks.userId, ownerUserId), eq(decks.teamId, teamId))
+      : and(eq(decks.userId, ownerUserId), isNull(decks.teamId));
+
+  return db
+    .select({
+      id: decks.id,
+      name: decks.name,
+      description: decks.description,
+    })
+    .from(decks)
+    .where(and(ownership, like(decks.description, `%${marker}%`)))
+    .orderBy(desc(decks.updatedAt));
+}
 
 export type LessonPlanAlternateDeck = {
   deckId: number;

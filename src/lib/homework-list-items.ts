@@ -80,7 +80,20 @@ export function getHomeworkPassageSections(
   return sections;
 }
 
-function normalizePassagesList(result: HomeworkResult): Array<{
+/** Accepts AI/schema results and looser template fallbacks (`undefined` optional fields). */
+export type HomeworkResultInput = {
+  assignmentTitle: string;
+  instructions: string;
+  passages?: HomeworkPassage[] | null;
+  passageQuestionCounts?: number[] | null;
+  passageTitle?: string | null;
+  passage?: string | null;
+  questions: string[];
+  answerKey: string[];
+  answerGraphs?: HomeworkResult["answerGraphs"];
+};
+
+function normalizePassagesList(result: HomeworkResultInput): Array<{
   title?: string;
   body: string;
 }> {
@@ -104,7 +117,7 @@ function normalizePassagesList(result: HomeworkResult): Array<{
 }
 
 function resolvePassageQuestionCounts(
-  result: HomeworkResult,
+  result: HomeworkResultInput,
   passageCount: number,
   questionCount: number,
 ): number[] {
@@ -123,7 +136,7 @@ function resolvePassageQuestionCounts(
   );
 }
 
-export function normalizeHomeworkResult(result: HomeworkResult): HomeworkResult {
+export function normalizeHomeworkResult(result: HomeworkResultInput): HomeworkResult {
   const questions = normalizeHomeworkListItems(result.questions);
   const answerKey = normalizeHomeworkListItems(result.answerKey);
 

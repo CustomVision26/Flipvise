@@ -22,8 +22,8 @@ interface PageProps {
  * **Workspace main dashboard** (for co-admins; hidden for the subscriber owner) uses:
  * `/dashboard?team=<workspaceId>&userid=<ownerClerkId>&plan=<team.planSlug>&teamMemberId=<viewerRowId>`
  *
- * Quick navigation with Personal dashboard, plan badge, and “To workspace” lives in
- * `team-admin-dashboard-view.tsx` and deck-manager pages.
+ * Dashboard switchers (Personal / Team / Team Admin) live in
+ * `TeamAdminTopDashboardBar` on the team-admin layout.
  */
 export default async function TeamAdminDashboardRootPage({ searchParams }: PageProps) {
   const { userId } = await auth();

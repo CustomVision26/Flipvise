@@ -25,9 +25,6 @@ export function TeamAdminToolPageLayout({
   }
 
   const meta = teamAdminPageMetaForPath(pathname);
-  const quickNavDescription = ctx.isOwner
-    ? "Return to your personal dashboard to create and edit decks."
-    : "Open your personal dashboard or the workspace-scoped main dashboard.";
 
   return (
     <TeamAdminPageChrome
@@ -36,14 +33,6 @@ export function TeamAdminToolPageLayout({
       description={meta.description}
       workspaceName={ctx.selected.name}
       planLabel={ctx.planLabel}
-      quickNavDescription={quickNavDescription}
-      mainDashboardHref={ctx.mainDashboardHref}
-      workspaceDashboardHref={ctx.workspaceDashboardHref}
-      workspaceTeamId={ctx.selected.id}
-      workspaceTeamMemberUrlParam={ctx.viewerTeamMemberUrlParam}
-      isOwner={ctx.isOwner}
-      workspacePlanSlug={ctx.selected.planSlug}
-      showTeacherDashboard={ctx.showTeacherDashboard}
     >
       {children}
     </TeamAdminPageChrome>

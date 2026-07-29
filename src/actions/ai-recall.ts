@@ -4,6 +4,11 @@ import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { resolveAiRecallAccess } from "@/lib/ai-recall-eligibility";
 import { evaluateAiRecallAnswer } from "@/lib/evaluate-ai-recall-answer";
+import { runWithAiUsageContext } from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import {
   applyMasteryUpdatesForSession,
   computeSessionAnalytics,
@@ -18,9 +23,9 @@ import type {
 } from "@/lib/ai-recall-types";
 import {
   fallbackAiRecallMotivation,
-  generateAiRecallMotivation,
   type AiRecallMotivation,
 } from "@/lib/ai-recall-motivation";
+import { generateAiRecallMotivation } from "@/lib/ai-recall-motivation-ai";
 
 const evaluateSchema = z.object({
   deckId: z.number().int().positive(),
@@ -91,18 +96,31 @@ export async function evaluateAiRecallAnswerAction(
   }
 
   try {
-    const evaluation = await evaluateAiRecallAnswer({
-      question: parsed.data.question,
-      correctAnswer: parsed.data.correctAnswer,
-      studentAnswer: parsed.data.studentAnswer,
-      modality: parsed.data.modality,
-      drawingImageDataUrl: parsed.data.drawingImageDataUrl ?? null,
-      deckSubject: deckCtx?.description ?? deckCtx?.name ?? null,
-      difficulty: deckCtx?.difficultyLevel ?? null,
-      cardMetadata: `cardId=${parsed.data.cardId}; modality=${parsed.data.modality}`,
-    });
+    const evaluation = await runWithAiUsageContext(
+      {
+        userId: access.userId,
+        feature: "ai_recall",
+        teamId: parsed.data.teamId ?? bundle.deck.teamId ?? null,
+        subscriptionPlan: access.effectivePlanSlug,
+        isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+      },
+      () =>
+        evaluateAiRecallAnswer({
+          question: parsed.data.question,
+          correctAnswer: parsed.data.correctAnswer,
+          studentAnswer: parsed.data.studentAnswer,
+          modality: parsed.data.modality,
+          drawingImageDataUrl: parsed.data.drawingImageDataUrl ?? null,
+          deckSubject: deckCtx?.description ?? deckCtx?.name ?? null,
+          difficulty: deckCtx?.difficultyLevel ?? null,
+          cardMetadata: `cardId=${parsed.data.cardId}; modality=${parsed.data.modality}`,
+        }),
+    );
     return { ok: true, evaluation };
   } catch (err) {
+    if (isAiUsageLimitError(err) || isAiAccessDisabledError(err)) {
+      throw new Error(err.message);
+    }
     console.error("[evaluateAiRecallAnswerAction]", err);
     return { ok: false, error: "offline_or_unavailable" };
   }
@@ -245,14 +263,27 @@ export async function generateAiRecallMotivationAction(
   if (!bundle) return { ok: false, error: "forbidden" };
 
   try {
-    const motivation = await generateAiRecallMotivation({
-      percentCorrect: parsed.data.percentCorrect,
-      correct: parsed.data.correct,
-      reviewed: parsed.data.reviewed,
-      deckName: parsed.data.deckName,
-    });
+    const motivation = await runWithAiUsageContext(
+      {
+        userId: access.userId,
+        feature: "ai_recall",
+        teamId: parsed.data.teamId ?? bundle.deck.teamId ?? null,
+        subscriptionPlan: access.effectivePlanSlug,
+        isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+      },
+      () =>
+        generateAiRecallMotivation({
+          percentCorrect: parsed.data.percentCorrect,
+          correct: parsed.data.correct,
+          reviewed: parsed.data.reviewed,
+          deckName: parsed.data.deckName,
+        }),
+    );
     return { ok: true, motivation };
   } catch (err) {
+    if (isAiUsageLimitError(err) || isAiAccessDisabledError(err)) {
+      throw new Error(err.message);
+    }
     console.error("[generateAiRecallMotivationAction]", err);
     return {
       ok: true,

@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   assignAdminAddonEntitlement,
+  assignTeamAddonEntitlement,
   getAddonCatalogByKey,
   getUserAddonEntitlement,
   isPlanEligibleForAddon,
+  revokeTeamAddonEntitlement,
   revokeUserAddonEntitlement,
   setAddonCatalogPricingVisible,
   updateAddonCatalogFlags,
@@ -15,12 +17,16 @@ import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
 } from "@/db/queries/stripe-subscriptions";
+import { getTeamById, getTeamsForTeamDashboard, listTeamMembers } from "@/db/queries/teams";
 import { getAccessContext } from "@/lib/access";
 import { assertAdminDashboardAccess } from "@/lib/admin/assert-admin-access";
 import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { STRIPE_ADDON_META_TYPE } from "@/lib/stripe-addon-metadata";
-import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
+import {
+  resolveStripeAddonPriceIdFromEnvKey,
+  type AddonBillingPeriod,
+} from "@/lib/stripe-addon-price-env";
 import {
   attachAddonItemToSubscription,
   cancelStripeAddonBilling,
@@ -70,11 +76,12 @@ async function resolveCheckoutCustomerParams(userId: string) {
 
 const createAddonCheckoutSchema = z.object({
   addonKey: addonKeySchema,
+  period: z.enum(["monthly", "yearly"]).optional().default("monthly"),
 });
 
 /**
- * Purchase a monthly add-on. Attaches a subscription item when a base plan sub exists;
- * otherwise opens Checkout for an add-on-only subscription.
+ * Purchase an add-on (monthly or yearly). Attaches a subscription item when a base plan
+ * sub exists; otherwise opens Checkout for an add-on-only subscription.
  */
 export async function createAddonCheckoutSessionAction(
   data: z.infer<typeof createAddonCheckoutSchema>,
@@ -105,10 +112,18 @@ export async function createAddonCheckoutSessionAction(
     throw new Error("You already have this add-on.");
   }
 
-  const priceId = resolveStripeAddonPriceIdFromEnvKey(catalog.stripePriceEnvKey);
+  const period: AddonBillingPeriod = parsed.data.period;
+  const priceId = resolveStripeAddonPriceIdFromEnvKey(
+    catalog.stripePriceEnvKey,
+    period,
+  );
   if (!priceId) {
+    const hint =
+      period === "yearly"
+        ? catalog.stripePriceEnvKey.replace(/_PRICE_ID$/, "_YEARLY_PRICE_ID")
+        : catalog.stripePriceEnvKey;
     throw new Error(
-      `Stripe price not configured for add-on "${catalog.key}". Set ${catalog.stripePriceEnvKey}.`,
+      `Stripe price not configured for add-on "${catalog.key}" (${period}). Set ${hint}.`,
     );
   }
 
@@ -139,6 +154,7 @@ export async function createAddonCheckoutSessionAction(
     type: STRIPE_ADDON_META_TYPE,
     addonKey: catalog.key,
     clerkUserId: access.userId,
+    period,
   };
 
   const checkoutCustomer = await resolveCheckoutCustomerParams(access.userId);
@@ -278,4 +294,72 @@ export async function revokeAddonFromUserAction(data: z.infer<typeof revokeAddon
   revalidatePath("/admin/add-ons");
   revalidatePath("/admin/all-users");
   revalidatePath("/pricing/add-ons");
+  revalidatePath("/dashboard", "layout");
+}
+
+const teamAddonSchema = z.object({
+  teamId: z.number().int().positive(),
+  memberUserId: z.string().min(1),
+  addonKey: addonKeySchema,
+  enabled: z.boolean(),
+});
+
+/**
+ * Team Admin assign/remove an add-on for a workspace member.
+ * Does not cancel Stripe billing or revoke platform-admin grants.
+ */
+export async function setTeamMemberAddonAction(
+  data: z.infer<typeof teamAddonSchema>,
+) {
+  const parsed = teamAddonSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+
+  const manageable = await getTeamsForTeamDashboard(access.userId);
+  const teamRow = manageable.find((t) => t.id === parsed.data.teamId);
+  if (!teamRow) throw new Error("You cannot manage add-ons for this workspace.");
+
+  const team = await getTeamById(parsed.data.teamId);
+  if (!team) throw new Error("Workspace not found.");
+
+  const members = await listTeamMembers(parsed.data.teamId);
+  const member = members.find((m) => m.userId === parsed.data.memberUserId);
+  if (!member && team.ownerUserId !== parsed.data.memberUserId) {
+    throw new Error("Member is not in this workspace.");
+  }
+
+  const catalog = await getAddonCatalogByKey(parsed.data.addonKey);
+  if (!catalog || !catalog.active) {
+    throw new Error("This add-on is not available for assignment.");
+  }
+
+  if (parsed.data.enabled) {
+    await assignTeamAddonEntitlement({
+      userId: parsed.data.memberUserId,
+      addonKey: catalog.key,
+      grantedByTeamAdminUserId: access.userId,
+      teamId: parsed.data.teamId,
+    });
+  } else {
+    const existing = await getUserAddonEntitlement(
+      parsed.data.memberUserId,
+      catalog.key,
+    );
+    if (existing?.status === "active" && existing.source !== "team") {
+      throw new Error(
+        "This member’s add-on was purchased or granted outside Team Admin and cannot be removed here.",
+      );
+    }
+    await revokeTeamAddonEntitlement({
+      userId: parsed.data.memberUserId,
+      addonKey: catalog.key,
+      teamId: parsed.data.teamId,
+    });
+  }
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/essay", "layout");
 }

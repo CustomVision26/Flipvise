@@ -22,6 +22,7 @@ import {
 import { limitsForPersonalIndividualTier } from "@/lib/personal-plan-limits";
 import { resolveDeckCardCap } from "@/lib/deck-limits";
 import type { TeacherDeckQuota } from "@/lib/teacher-deck-quota";
+import { resolveEducationTeamAdminCreateQuota } from "@/db/queries/education-team-admin-deck-quota";
 
 export type { TeacherDeckQuota } from "@/lib/teacher-deck-quota";
 
@@ -88,11 +89,33 @@ function workspaceQuota(
   workspace: { id: number; name: string; ownerUserId: string } | null,
   /** Full workspace deck set — used for quota / at-limit (not the picker subset). */
   quotaDecks: DeckRow[],
+  /** When set, team-admin create quota (created-by count vs owner cap). */
+  teamAdminCreate?: { createdCount: number; maxCreateDecks: number } | null,
 ): TeacherDeckQuota {
   const limits = limitsForEducationTeamPlan(planSlug);
-  const maxDecks = limits.maxDecksPerWorkspace;
-  const deckCount = quotaDecks.length;
+  const workspaceMax = limits.maxDecksPerWorkspace;
   const planLabel = EDUCATION_PLAN_LABELS[planSlug];
+
+  if (teamAdminCreate != null) {
+    const maxDecks = Math.min(teamAdminCreate.maxCreateDecks, workspaceMax);
+    const deckCount = teamAdminCreate.createdCount;
+    return {
+      deckCount,
+      maxDecks,
+      maxCardsPerDeck: workspaceMaxCardsPerDeck(),
+      scope: "workspace",
+      workspaceName: workspace?.name ?? null,
+      planSlug,
+      planLabel,
+      needsWorkspace: workspace == null,
+      atLimit:
+        maxDecks > 0 &&
+        (deckCount >= maxDecks || quotaDecks.length >= workspaceMax),
+    };
+  }
+
+  const maxDecks = workspaceMax;
+  const deckCount = quotaDecks.length;
 
   return {
     deckCount,
@@ -138,27 +161,46 @@ function personalQuota(
 async function loadPickerDecksForEducationWorkspace(
   userId: string,
   workspace: EducationWorkspaceTeam,
-): Promise<{ pickerDecks: DeckRow[]; quotaDecks: DeckRow[] }> {
+): Promise<{
+  pickerDecks: DeckRow[];
+  quotaDecks: DeckRow[];
+  teamAdminCreate: { createdCount: number; maxCreateDecks: number } | null;
+}> {
   const quotaDecks = await getDecksForTeam(workspace.id, workspace.ownerUserId);
 
   if (workspace.ownerUserId === userId) {
-    return { pickerDecks: quotaDecks, quotaDecks };
+    return { pickerDecks: quotaDecks, quotaDecks, teamAdminCreate: null };
   }
 
   if (isEducationTeamPlanId(workspace.planSlug)) {
     const member = await getMemberRecord(workspace.id, userId);
     if (member?.role === "team_admin") {
-      const pickerDecks = await getEducationTeamAdminWorkspaceDecks(
-        workspace.id,
-        workspace.ownerUserId,
-        userId,
-      );
-      return { pickerDecks, quotaDecks };
+      const [pickerDecks, createQuota] = await Promise.all([
+        getEducationTeamAdminWorkspaceDecks(
+          workspace.id,
+          workspace.ownerUserId,
+          userId,
+        ),
+        resolveEducationTeamAdminCreateQuota(
+          workspace.id,
+          workspace.ownerUserId,
+          userId,
+          workspace.planSlug,
+        ),
+      ]);
+      return {
+        pickerDecks,
+        quotaDecks,
+        teamAdminCreate: {
+          createdCount: createQuota.createdCount,
+          maxCreateDecks: createQuota.maxCreateDecks,
+        },
+      };
     }
   }
 
   const assigned = await getAssignedDecksForMember(workspace.id, userId);
-  return { pickerDecks: assigned, quotaDecks };
+  return { pickerDecks: assigned, quotaDecks, teamAdminCreate: null };
 }
 
 /**
@@ -178,12 +220,10 @@ export async function loadTeacherDeckContext(
     const workspace = resolveEducationWorkspace(teams, userId, preferredTeamId);
 
     if (workspace) {
-      const { pickerDecks, quotaDecks } = await loadPickerDecksForEducationWorkspace(
-        userId,
-        workspace,
-      );
+      const { pickerDecks, quotaDecks, teamAdminCreate } =
+        await loadPickerDecksForEducationWorkspace(userId, workspace);
       return {
-        quota: workspaceQuota(planSlug, workspace, quotaDecks),
+        quota: workspaceQuota(planSlug, workspace, quotaDecks, teamAdminCreate),
         decks: sortDecksNewestFirst(pickerDecks),
         teamId: workspace.id,
         teamOwnerUserId: workspace.ownerUserId,
@@ -191,7 +231,7 @@ export async function loadTeacherDeckContext(
     }
 
     return {
-      quota: workspaceQuota(planSlug, null, []),
+      quota: workspaceQuota(planSlug, null, [], null),
       decks: [],
       teamId: null,
       teamOwnerUserId: userId,
@@ -206,12 +246,10 @@ export async function loadTeacherDeckContext(
 
   if (memberWorkspace && isEducationTeamPlanId(memberWorkspace.planSlug)) {
     const planSlug = memberWorkspace.planSlug;
-    const { pickerDecks, quotaDecks } = await loadPickerDecksForEducationWorkspace(
-      userId,
-      memberWorkspace,
-    );
+    const { pickerDecks, quotaDecks, teamAdminCreate } =
+      await loadPickerDecksForEducationWorkspace(userId, memberWorkspace);
     return {
-      quota: workspaceQuota(planSlug, memberWorkspace, quotaDecks),
+      quota: workspaceQuota(planSlug, memberWorkspace, quotaDecks, teamAdminCreate),
       decks: sortDecksNewestFirst(pickerDecks),
       teamId: memberWorkspace.id,
       teamOwnerUserId: memberWorkspace.ownerUserId,

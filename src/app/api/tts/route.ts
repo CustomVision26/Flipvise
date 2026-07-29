@@ -4,6 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import { getAccessContext } from "@/lib/access";
 import { resolveSyncUserId } from "@/lib/offline-api-auth";
 import { resolveHasAiReadingForUserId } from "@/lib/offline-tts-access";
+import { trackRawAiCall } from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 
 /**
  * Flashcard TTS.
@@ -61,8 +66,13 @@ export async function POST(req: NextRequest) {
 
   const { userId: sessionUserId } = await auth();
   let hasAiReading = false;
+  let subscriptionPlan: string | null = null;
+  let isPlatformAdmin: boolean | undefined;
   if (sessionUserId === userId) {
-    hasAiReading = (await getAccessContext()).hasAiReading;
+    const access = await getAccessContext();
+    hasAiReading = access.hasAiReading;
+    subscriptionPlan = access.effectivePlanSlug;
+    isPlatformAdmin = access.isAdmin || access.isSuperadmin;
   } else {
     hasAiReading = await resolveHasAiReadingForUserId(userId);
   }
@@ -85,30 +95,52 @@ export async function POST(req: NextRequest) {
 
   const { text, voice } = parsed.data;
 
-  const openaiRes = await fetch("https://api.openai.com/v1/audio/speech", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: "tts-1", voice, input: text }),
-  });
+  try {
+    const audio = await trackRawAiCall(
+      {
+        userId,
+        feature: "tts",
+        model: "tts-1",
+        subscriptionPlan,
+        isPlatformAdmin,
+      },
+      async () => {
+        const openaiRes = await fetch("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ model: "tts-1", voice, input: text }),
+        });
 
-  if (!openaiRes.ok) {
-    const err = await openaiRes.text().catch(() => "unknown");
-    console.error("[TTS] OpenAI error:", err);
+        if (!openaiRes.ok) {
+          const err = await openaiRes.text().catch(() => "unknown");
+          console.error("[TTS] OpenAI error:", err);
+          throw new Error("TTS generation failed");
+        }
+
+        return { value: await openaiRes.arrayBuffer() };
+      },
+    );
+
+    return new Response(audio, {
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "no-store",
+        ...cors,
+      },
+    });
+  } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 403, headers: cors },
+      );
+    }
     return NextResponse.json(
       { error: "TTS generation failed" },
       { status: 502, headers: cors },
     );
   }
-
-  const audio = await openaiRes.arrayBuffer();
-  return new Response(audio, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-store",
-      ...cors,
-    },
-  });
 }

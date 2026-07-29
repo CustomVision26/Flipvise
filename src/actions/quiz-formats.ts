@@ -3,6 +3,11 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getAccessContext } from "@/lib/access";
+import { runWithAiUsageContext } from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import {
   assertDeckInWorkspaceForFormats,
   getDeckQuizFormatAssignmentsForStudy,
@@ -303,6 +308,15 @@ export async function generateDeckQuizVariantsAction(
   let failed = 0;
   let skipped = 0;
 
+  await runWithAiUsageContext(
+    {
+      userId,
+      feature: "quiz",
+      teamId: parsed.data.teamId ?? bundle.deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    async () => {
   // Keep generating until the mix can actually be assigned to distinct cards
   // (count thresholds alone are not enough when T/F and FIB share the same cards).
   for (const card of eligible) {
@@ -353,10 +367,15 @@ export async function generateDeckQuizVariantsAction(
       await mergeCardQuizVariants(card.id, parsed.data.deckId, variants);
       syncPreparedVariants(card.id, variants);
       generated++;
-    } catch {
+    } catch (error) {
+      if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+        throw new Error(error.message);
+      }
       failed++;
     }
   }
+    },
+  );
 
   revalidatePath(`/decks/${parsed.data.deckId}`);
   revalidatePath(`/decks/${parsed.data.deckId}/study`);

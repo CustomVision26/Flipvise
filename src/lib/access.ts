@@ -114,6 +114,19 @@ export function accessHasAddon(ctx: AccessContext, addonKey: string): boolean {
   return ctx.activeAddonKeys.includes(addonKey);
 }
 
+/**
+ * Alias of {@link accessHasAddon} — reusable add-on permission check.
+ * Prefer this (or `accessHasAddon`) over feature-specific flags like `canUseEssayFeature`.
+ */
+export function canAccessAddon(ctx: AccessContext, addonKey: string): boolean {
+  return accessHasAddon(ctx, addonKey);
+}
+
+/** Alias of {@link accessHasAddon} for call sites that prefer `hasAddon("…")` naming. */
+export function hasAddon(ctx: AccessContext, addonKey: string): boolean {
+  return accessHasAddon(ctx, addonKey);
+}
+
 function withEducationFields(
   ctx: Omit<
     AccessContext,

@@ -269,6 +269,7 @@ async function extractPptxText(buffer: Buffer): Promise<string> {
 async function extractHandwritingText(buffer: Buffer, mimeType: string): Promise<string> {
   const { generateText } = await import("ai");
   const { openai } = await import("@ai-sdk/openai");
+  const { getAiUsageContext, trackRawAiCall } = await import("@/lib/ai-usage/track");
   const normalizedMime =
     mimeType === "image/png" ||
     mimeType === "image/jpeg" ||
@@ -277,25 +278,53 @@ async function extractHandwritingText(buffer: Buffer, mimeType: string): Promise
       ? mimeType
       : "image/jpeg";
 
-  const { text } = await generateText({
-    model: openai("gpt-4o"),
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Extract every word and phrase from this photo of handwritten or printed study notes. Preserve meaningful line breaks. Return only the transcribed text with no commentary.",
-          },
-          {
-            type: "image",
-            image: `data:${normalizedMime};base64,${buffer.toString("base64")}`,
-          },
-        ],
-      },
-    ],
-  });
-  return text ?? "";
+  const execute = async () => {
+    const result = await generateText({
+      model: openai("gpt-4o"),
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract every word and phrase from this photo of handwritten or printed study notes. Preserve meaningful line breaks. Return only the transcribed text with no commentary.",
+            },
+            {
+              type: "image",
+              image: `data:${normalizedMime};base64,${buffer.toString("base64")}`,
+            },
+          ],
+        },
+      ],
+    });
+    return {
+      value: result.text ?? "",
+      usage: result.usage,
+      providerRequestId:
+        (result as { response?: { id?: string } }).response?.id ?? null,
+    };
+  };
+
+  const parent = getAiUsageContext();
+  if (!parent?.userId) {
+    console.warn(
+      "[ai-usage] OCR extractHandwritingText called without runWithAiUsageContext; call is untracked",
+    );
+    const { value } = await execute();
+    return value;
+  }
+
+  return trackRawAiCall(
+    {
+      userId: parent.userId,
+      feature: "ocr",
+      teamId: parent.teamId,
+      subscriptionPlan: parent.subscriptionPlan,
+      isPlatformAdmin: parent.isPlatformAdmin,
+      model: "gpt-4o",
+    },
+    execute,
+  );
 }
 
 async function extractTextFromFileBuffer(

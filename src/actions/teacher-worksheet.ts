@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
+import { runWithAiUsageContext } from "@/lib/ai-usage/track";
 import { getDeckRowById } from "@/db/queries/decks";
 import { saveWorksheet, updateSavedWorksheetById, resolveSavedWorksheetForViewer } from "@/db/queries/saved-worksheets";
 import { getSavedLessonPlanByDeckIdForUser } from "@/db/queries/saved-lesson-plans";
@@ -22,6 +23,7 @@ import {
   type TeacherWorksheetActionInput,
 } from "@/lib/teacher-worksheet-schema";
 import { buildDeckWorksheetResult } from "@/lib/worksheet-from-deck";
+import { resolveWorksheetItemsForCount } from "@/lib/worksheet-ai";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
 
 export async function generateWorksheetFromDeckAction(
@@ -58,7 +60,36 @@ export async function generateWorksheetFromDeckAction(
   const linkedLessonPlan = await getSavedLessonPlanByDeckIdForUser(userId, input.deckId);
   const referenceMaterials = getLessonPlanReferenceMaterials(linkedLessonPlan?.input);
 
-  return buildDeckWorksheetResult(deck, cardRows, input, { referenceMaterials });
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "worksheet",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    async () => {
+      const items = await resolveWorksheetItemsForCount({
+        cardRows,
+        numberOfQuestions: input.numberOfQuestions,
+        subject: input.subject,
+        gradeLevel: input.gradeLevel,
+        topic: input.topic,
+        worksheetType: input.worksheetType,
+        difficultyLevel: input.difficultyLevel,
+        deckName: deck.name,
+      });
+
+      if (items.length === 0) {
+        throw new Error("Could not build worksheet questions from this deck.");
+      }
+
+      return buildDeckWorksheetResult(deck, cardRows, input, {
+        referenceMaterials,
+        items,
+      });
+    },
+  );
 }
 
 const saveWorksheetSchema = z.object({
@@ -176,6 +207,7 @@ export async function saveWorksheetAction(data: {
       topic: payload.input.topic,
       worksheetType: payload.input.worksheetType,
       difficultyLevel: payload.input.difficultyLevel,
+      numberOfQuestions: payload.input.numberOfQuestions,
       referenceMaterials:
         referenceMaterials.length > 0 ? referenceMaterials : undefined,
     },
@@ -281,6 +313,7 @@ export async function updateWorksheetAction(data: {
       topic: payload.input.topic,
       worksheetType: payload.input.worksheetType,
       difficultyLevel: payload.input.difficultyLevel,
+      numberOfQuestions: payload.input.numberOfQuestions,
       referenceMaterials:
         referenceMaterials.length > 0 ? referenceMaterials : undefined,
     },

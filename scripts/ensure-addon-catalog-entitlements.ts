@@ -27,7 +27,15 @@ const sql = neon(databaseUrl);
 async function main() {
   await sql`
     DO $$ BEGIN
-      CREATE TYPE "addon_entitlement_source" AS ENUM ('stripe', 'admin');
+      CREATE TYPE "addon_entitlement_source" AS ENUM ('stripe', 'admin', 'team');
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$
+  `;
+
+  await sql`
+    DO $$ BEGIN
+      ALTER TYPE "addon_entitlement_source" ADD VALUE IF NOT EXISTS 'team';
     EXCEPTION
       WHEN duplicate_object THEN NULL;
     END $$
@@ -76,11 +84,17 @@ async function main() {
       "stripeSubscriptionId" varchar(255),
       "stripeSubscriptionItemId" varchar(255),
       "grantedByAdminUserId" varchar(255),
+      "teamId" integer,
       "startsAt" timestamp DEFAULT now() NOT NULL,
       "endsAt" timestamp,
       "createdAt" timestamp DEFAULT now() NOT NULL,
       "updatedAt" timestamp DEFAULT now() NOT NULL
     )
+  `;
+
+  await sql`
+    ALTER TABLE "user_addon_entitlements"
+    ADD COLUMN IF NOT EXISTS "teamId" integer
   `;
 
   await sql`
@@ -126,6 +140,29 @@ async function main() {
       'Unlock Focus Study Mode as a monthly add-on on top of your current plan.',
       '["pro","pro_plus","pro_plus_team_basic","pro_plus_team_gold","pro_plus_platinum_plan","pro_plus_enterprise","education_plus","education_gold","education_enterprise"]'::json,
       'STRIPE_ADDON_STUDY_MODE_FOCUS_PRICE_ID',
+      true,
+      false
+    )
+    ON CONFLICT ("key") DO NOTHING
+  `;
+
+  await sql`
+    INSERT INTO "addon_catalog" (
+      "key",
+      "name",
+      "description",
+      "marketingBlurb",
+      "eligiblePlanIds",
+      "stripePriceEnvKey",
+      "active",
+      "publishedOnPricing"
+    ) VALUES (
+      'ai_essay',
+      'AI Essay',
+      'Generate essay activities, write drafts, submit work, and receive AI feedback.',
+      'Unlock AI Essay as an optional add-on on top of your current plan — monthly or yearly.',
+      '["pro","pro_plus","pro_plus_team_basic","pro_plus_team_gold","pro_plus_platinum_plan","pro_plus_enterprise","education_plus","education_gold","education_enterprise"]'::json,
+      'STRIPE_ADDON_AI_ESSAY_PRICE_ID',
       true,
       false
     )

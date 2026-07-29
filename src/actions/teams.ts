@@ -8,7 +8,10 @@ import { randomBytes } from "node:crypto";
 import { z, type input } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { syncPlatformAdminTeamTierInvitedMetadata } from "@/lib/platform-admin-team-tier-metadata";
-import { EDUCATION_TEAM_PLAN_IDS } from "@/lib/education-plans";
+import { isEducationTeamPlanId, limitsForEducationTeamPlan, EDUCATION_TEAM_PLAN_IDS } from "@/lib/education-plans";
+import {
+  updateTeamMemberMaxCreateDecks,
+} from "@/db/queries/education-team-admin-deck-quota";
 import {
   limitsForPlan,
   isTeamPlanId,
@@ -712,8 +715,14 @@ export async function assignDeckToMemberAction(data: z.infer<typeof assignDeckSc
   const team = await getTeamById(parsed.data.teamId);
   if (!team) throw new Error("Team not found");
   const teamDecks = await getDecksForTeam(team.id, team.ownerUserId);
-  if (!teamDecks.some((d) => d.id === parsed.data.deckId)) {
+  const deck = teamDecks.find((d) => d.id === parsed.data.deckId);
+  if (!deck) {
     throw new Error("Deck does not belong to this team.");
+  }
+  if (deck.createdByUserId === parsed.data.memberUserId) {
+    throw new Error(
+      "This deck was created by that co-admin and already appears on their Team Dashboard — assignment is not needed.",
+    );
   }
 
   const studyPrivilege = memberRoleQualifiesForStudyPrivileges(member.role, team.planSlug)
@@ -1023,6 +1032,54 @@ export async function updateTeamMemberRoleAction(data: z.infer<typeof roleSchema
     // best-effort
   }
 
+  revalidatePath("/dashboard/team-admin", "layout");
+}
+
+const teamAdminMaxCreateDecksSchema = z.object({
+  teamId: z.number().int().positive(),
+  memberUserId: z.string().min(1),
+  /** Null clears the owner override (falls back to the workspace plan deck limit). */
+  maxCreateDecks: z.number().int().min(1).max(500).nullable(),
+});
+
+/** Owner-only — set how many decks an Education Gold/Enterprise team admin may create. */
+export async function updateTeamAdminMaxCreateDecksAction(
+  data: z.infer<typeof teamAdminMaxCreateDecksSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = teamAdminMaxCreateDecksSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await getTeamById(parsed.data.teamId);
+  if (!team) throw new Error("Team not found");
+  if (team.ownerUserId !== userId) {
+    throw new Error("Only the workspace subscriber can set team admin deck limits.");
+  }
+  if (!isEducationTeamPlanId(team.planSlug)) {
+    throw new Error("Deck create limits apply only on Education Gold / Enterprise workspaces.");
+  }
+
+  const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
+  if (!member || member.role !== "team_admin") {
+    throw new Error("Deck create limits apply only to team admins.");
+  }
+
+  const workspaceMax = limitsForEducationTeamPlan(team.planSlug).maxDecksPerWorkspace;
+  let next = parsed.data.maxCreateDecks;
+  if (next != null) {
+    next = Math.min(next, workspaceMax);
+  }
+
+  await updateTeamMemberMaxCreateDecks(
+    parsed.data.teamId,
+    parsed.data.memberUserId,
+    next,
+  );
+
+  revalidatePath("/dashboard");
+  revalidatePath("/teacher", "layout");
   revalidatePath("/dashboard/team-admin", "layout");
 }
 

@@ -24,7 +24,6 @@ import {
 import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
 import {
   TeamAdminPanelScroll,
-  TeamAdminQuickNavPanel,
   TeamAdminWorkspaceStatsPanel,
   TeamDeckAssignListLoader,
   TeamDeckManagerSubTabs,
@@ -103,11 +102,6 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
           alreadyLinked: decksListedForWorkspace.has(d.id),
         }))
       : undefined;
-
-  const quickNavDescription = isOwner
-    ? "Return to your personal dashboard to create and edit decks."
-    : "Open your personal dashboard or the workspace-scoped main dashboard.";
-
   const assignmentCard = (
     <Card className={teamAdminActivePanelClass}>
       <CardHeader className="space-y-2 pb-4">
@@ -175,18 +169,6 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
                 Link personal decks to this workspace, then assign them to members or co-admins.
               </p>
             </div>
-            <TeamAdminQuickNavPanel
-              className="w-full shrink-0 sm:max-w-sm"
-              planLabel={ctx.planLabel}
-              description={quickNavDescription}
-              mainDashboardHref={ctx.mainDashboardHref}
-              workspaceDashboardHref={ctx.workspaceDashboardHref}
-              workspaceTeamId={selected.id}
-              workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
-              isOwner={isOwner}
-              workspacePlanSlug={selected.planSlug}
-              showTeacherDashboard={ctx.showTeacherDashboard}
-            />
           </div>
 
           <TeamAdminWorkspaceStatsPanel

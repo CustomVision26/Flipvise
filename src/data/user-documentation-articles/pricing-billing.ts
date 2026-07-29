@@ -27,6 +27,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Promotion code field above plan cards — optional; ?promo= in URL can pre-fill.",
           "Active public codes appear as quick-fill chips during sales.",
           "Signed-in users see Current plan badge and Manage subscription when applicable.",
+          "When published by a platform admin, an Add-on Catalog link leads to /pricing/add-ons for optional features such as AI Essay.",
         ],
       },
       {
@@ -48,6 +49,31 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "You must acknowledge billing terms before sliding to start the trial.",
           "When the trial ends, Stripe charges the monthly rate unless you cancel before then.",
           "Trial ending and expired notices appear in your dashboard inbox (not email).",
+        ],
+      },
+    ],
+  ),
+  a(
+    "pricing-add-ons",
+    "Add-on Catalog — In-Depth Guide",
+    "Optional premium add-ons at /pricing/add-ons stack on your current plan.",
+    [
+      {
+        id: "purchase",
+        title: "Buying an add-on",
+        bullets: [
+          "Catalog is visible only when a platform admin enables it and publishes add-ons.",
+          "Choose monthly or yearly when a yearly Stripe price is configured.",
+          "Checkout attaches a subscription item to your base plan when possible, otherwise opens an add-on-only subscription.",
+          "AI Essay unlocks /dashboard/essay after purchase or grant.",
+        ],
+      },
+      {
+        id: "other-grants",
+        title: "Other ways to unlock",
+        bullets: [
+          "Team Admin → Add-ons can assign catalog keys to members.",
+          "Platform admins can grant complimentary access at /admin/add-ons.",
         ],
       },
     ],

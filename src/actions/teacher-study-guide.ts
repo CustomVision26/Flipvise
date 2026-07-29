@@ -2,10 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import { resolveSavedHomeworkForViewer, mapSavedHomeworkRowToPickerItem } from "@/db/queries/saved-homework";
 import {
   resolveSavedLessonPlanForViewer,
@@ -187,7 +195,7 @@ export async function generateStudyGuideAction(
   data: TeacherStudyGuideActionInput,
 ): Promise<StudyGuideResult> {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Study Guide Generator requires an education plan.",
   );
@@ -199,22 +207,32 @@ export async function generateStudyGuideAction(
   }
 
   const input = parsed.data;
-  const sourceContext = await resolveStudyGuideSourceContext(input, ctx.userId!);
 
-  if (!process.env.OPENAI_API_KEY?.trim()) {
-    return generateStudyGuide({
-      ...toTemplateInput(input),
-      homeworkTitle: sourceContext.homeworkTitle ?? undefined,
-    });
-  }
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "study_guide",
+      teamId: input.teamId ?? null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    async () => {
+      const sourceContext = await resolveStudyGuideSourceContext(input, userId);
 
-  try {
-    const { output } = await generateText({
-      model: openai("gpt-4o"),
-      output: Output.object({
-        schema: studyGuideResultSchema,
-      }),
-      system: `You are an expert K–12 teacher creating student-facing study guides.
+      if (!process.env.OPENAI_API_KEY?.trim()) {
+        return generateStudyGuide({
+          ...toTemplateInput(input),
+          homeworkTitle: sourceContext.homeworkTitle ?? undefined,
+        });
+      }
+
+      try {
+        const { output } = await trackedGenerateText({
+          model: openai("gpt-4o"),
+          output: Output.object({
+            schema: studyGuideResultSchema,
+          }),
+          system: `You are an expert K–12 teacher creating student-facing study guides.
 
 Requirements:
 - Write specific, in-depth content grounded in the provided source material — never generic placeholders like "definition 1", "key term A", or "core concept 1".
@@ -230,23 +248,31 @@ Requirements:
 - studyTips: 3–5 practical, actionable study strategies for this topic.
 - Do NOT prefix list items with numbers or bullets — plain text only (formatting is added by the UI).
 - Do not use markdown formatting.`,
-      prompt: buildStudyGuidePrompt(input, sourceContext),
-    });
+          prompt: buildStudyGuidePrompt(input, sourceContext),
+        });
 
-    if (!output) {
-      throw new Error("AI study guide generation returned no output.");
-    }
+        if (!output) {
+          throw new Error("AI study guide generation returned no output.");
+        }
 
-    return output;
-  } catch (error) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[generateStudyGuideAction] AI failed; using template fallback.", error);
-    }
-    return generateStudyGuide({
-      ...toTemplateInput(input),
-      homeworkTitle: sourceContext.homeworkTitle ?? undefined,
-    });
-  }
+        return output;
+      } catch (error) {
+        if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+          throw new Error(error.message);
+        }
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            "[generateStudyGuideAction] AI failed; using template fallback.",
+            error,
+          );
+        }
+        return generateStudyGuide({
+          ...toTemplateInput(input),
+          homeworkTitle: sourceContext.homeworkTitle ?? undefined,
+        });
+      }
+    },
+  );
 }
 
 const saveStudyGuideSchema = z.object({

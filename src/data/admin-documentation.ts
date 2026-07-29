@@ -16,7 +16,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Central platform administration hub for monitoring users, billing, support, plans, and affiliates.",
         howItWorks: [
           "Overview metrics show total users, decks, cards, admin-granted Pro Plus, and paid subscriber counts.",
-          "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, Access & support, Plans & growth, and Documentation.",
+          "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, AI & analytics, Access & support, Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
           "Support notifications bell in the header surfaces unread ticket and contact alerts.",
         ],
@@ -257,6 +257,28 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
       },
       {
+        id: "admin-add-ons",
+        title: "Add-on Catalog",
+        route: "/admin/add-ons",
+        purpose:
+          "Enable optional premium add-ons, publish them on /pricing/add-ons, grant or revoke complimentary access, and monitor AI Essay usage.",
+        howItWorks: [
+          "Master toggle shows or hides the public Add-on Catalog page.",
+          "Per-add-on Active and On pricing switches control purchase and listing.",
+          "Assign or revoke complimentary grants by searching registered users by name (source: admin).",
+          "AI Essay usage panel shows active entitlements, users with activity, event counts, and tracked AI tokens.",
+          "Team Admins assign the same catalog keys from Team Admin → Add-ons without a separate admin product.",
+        ],
+        requirements: [
+          "Platform admin access.",
+          "STRIPE_ADDON_<KEY>_PRICE_ID (and optional yearly companion) for self-serve purchase.",
+        ],
+        doNots: [
+          "Do not hardcode Stripe price_* IDs — use catalog stripePriceEnvKey env vars.",
+          "Do not gate add-on features on plan slug alone — use accessHasAddon / canAccessAddon.",
+        ],
+      },
+      {
         id: "plan-history",
         title: "Plan Assignment History",
         route: "/admin/plan-history",
@@ -316,6 +338,35 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not publish trials with 0 days — the toggle is disabled until days > 0.",
           "Do not expect yearly checkout to offer trials — monthly only.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "ai-analytics",
+    title: "AI & Analytics",
+    description: "Monitor AI generations, usage limits, and estimated costs.",
+    pages: [
+      {
+        id: "admin-ai-usage",
+        title: "AI Usage Analytics",
+        route: "/admin/analytics/ai-usage",
+        purpose:
+          "Monitor platform-wide AI generations, token consumption, estimated costs, plan limits, and per-user activity.",
+        howItWorks: [
+          "Summary cards compare the selected range to the prior equivalent period (generations, active users, tokens, cost, success/fail, latency).",
+          "Charts cover generations over time, usage by feature, tokens/cost, subscription plan mix, request outcomes, and model usage.",
+          "Filters (date preset, plan, team, feature, model, status, usage status, search) stay in the URL query string.",
+          "User table is searchable, sortable, and paginated; View details opens /admin/analytics/ai-usage/[userId].",
+          "User detail shows identity, plan/team, period allowance, used/remaining, tokens/cost, daily history, features/models, outcomes, and recent request metadata (no prompts).",
+          "Admin actions: custom/unlimited allowance, remove override, disable/restore AI access, reset period counter, warning thresholds, clear abuse flag — all audited with reason.",
+          "CSV export downloads the current filter slice via a server action.",
+          "Timezone defaults to America/Jamaica (override with AI_USAGE_TIMEZONE).",
+        ],
+        requirements: ["Platform admin access."],
+        doNots: [
+          "Do not expect prompts or model inputs in analytics — only metadata (feature, model, tokens, status, latency, errors) is stored.",
+          "Do not reset counters to erase history — reset adjusts the period counter only; events remain for audit.",
         ],
       },
     ],

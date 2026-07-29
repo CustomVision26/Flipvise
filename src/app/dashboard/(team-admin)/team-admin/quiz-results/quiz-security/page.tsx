@@ -27,7 +27,6 @@ import {
 import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
 import {
   TeamAdminPanelScroll,
-  TeamAdminQuickNavPanel,
   TeamAdminWorkspaceStatsPanel,
   TeamQuizResultsSubTabs,
   TeamQuizSecuritySessionsTable,
@@ -55,7 +54,7 @@ interface PageProps {
 
 export default async function TeamAdminQuizSecurityPage({ searchParams }: PageProps) {
   const ctx = await loadTeamAdminPageContext(buildTeamAdminQuizSecurityPath, searchParams);
-  const { selected, teamsForSubscriber, viewerTeamMemberUrlParam, isOwner } = ctx;
+  const { selected, teamsForSubscriber, viewerTeamMemberUrlParam } = ctx;
 
   const [workspaceSnapshots, lockedSessions, teamDecksWithCardCounts, members, decksByWorkspaceEntries] =
     await Promise.all([
@@ -78,11 +77,6 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
   ];
   const userFieldDisplayById =
     sessionUserIds.length > 0 ? await getClerkUserFieldDisplaysByIds(sessionUserIds) : {};
-
-  const quickNavDescription = isOwner
-    ? "Return to your personal dashboard to create and edit decks."
-    : "Open your personal dashboard or the workspace-scoped main dashboard.";
-
   return (
     <TeamAdminToolPageLayout
       pathname={TEAM_ADMIN_QUIZ_SECURITY_PATH}
@@ -122,18 +116,6 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
                 resume access when needed.
               </p>
             </div>
-            <TeamAdminQuickNavPanel
-              className="w-full shrink-0 sm:max-w-sm"
-              planLabel={ctx.planLabel}
-              description={quickNavDescription}
-              mainDashboardHref={ctx.mainDashboardHref}
-              workspaceDashboardHref={ctx.workspaceDashboardHref}
-              workspaceTeamId={selected.id}
-              workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
-              isOwner={isOwner}
-              workspacePlanSlug={selected.planSlug}
-              showTeacherDashboard={ctx.showTeacherDashboard}
-            />
           </div>
 
           <TeamAdminWorkspaceStatsPanel

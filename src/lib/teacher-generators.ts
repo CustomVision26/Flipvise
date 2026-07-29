@@ -11,6 +11,9 @@ import {
 import { buildTopicVocabularyLines } from "@/lib/lesson-plan-vocabulary-banks";
 import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-material";
 import { PRO_PLUS_CARDS_PER_DECK_LIMIT } from "@/lib/personal-plan-limits";
+import type { HomeworkResult } from "@/lib/teacher-homework-ai-schema";
+
+export type { HomeworkResult } from "@/lib/teacher-homework-ai-schema";
 
 export type LessonPlanInput = {
   subject: string;
@@ -74,18 +77,6 @@ export type HomeworkInput = {
   questionsPerPassage?: number;
   /** Lesson-plan / deck vocabulary terms to drive concrete practice items. */
   vocabularyTerms?: string[];
-};
-
-export type HomeworkResult = {
-  assignmentTitle: string;
-  instructions: string;
-  passages?: Array<{ title: string | null; body: string }> | null;
-  passageQuestionCounts?: number[] | null;
-  passageTitle?: string | null;
-  passage?: string | null;
-  questions: string[];
-  answerKey: string[];
-  answerGraphs?: import("@/lib/homework-answer-graph").HomeworkAnswerGraph[] | null;
 };
 
 export type StudyGuideInput = {

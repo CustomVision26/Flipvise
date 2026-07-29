@@ -1,5 +1,6 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { trackedGenerateText } from "@/lib/ai-usage/track";
 import { z } from "zod";
 import {
   formatMcqContextForAiPrompt,
@@ -155,7 +156,7 @@ export async function generateQuizVariantsForCard(input: {
                 : "You must return a valid trueFalse statement and correctAnswer.",
           ];
 
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({ schema }),
       prompt: attemptParts.join("\n"),

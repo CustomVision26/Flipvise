@@ -160,6 +160,35 @@ export async function updateSavedHomeworkById(
   return row ?? null;
 }
 
+export async function renameSavedHomeworkLabelById(
+  homeworkId: number,
+  title: string,
+): Promise<SavedHomeworkRow | null> {
+  const existing = await getSavedHomeworkAssignmentById(homeworkId);
+  if (!existing) return null;
+
+  const nextTitle = title.trim().slice(0, 255);
+  if (!nextTitle) return null;
+
+  const nextResult: HomeworkResult = {
+    ...existing.result,
+    assignmentTitle: nextTitle,
+  };
+
+  const [row] = await db
+    .update(savedHomeworkAssignments)
+    .set({
+      label: nextTitle,
+      assignmentTitle: nextTitle,
+      result: nextResult,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedHomeworkAssignments.id, homeworkId))
+    .returning();
+
+  return row ?? null;
+}
+
 export type SavedHomeworkEditItem = {
   id: number;
   label: string;

@@ -253,6 +253,20 @@
       "when": 1779100000000,
       "tag": "0064_addon_catalog_entitlements",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0065_team_member_max_create_decks",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0066_ai_usage_analytics",
+      "breakpoints": true
     }
   ]
 }

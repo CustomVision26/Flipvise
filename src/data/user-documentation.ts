@@ -63,6 +63,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "Click a deck to edit cards or start studying.",
+          "The AI Essay premium add-on card appears above your decks — locked users can unlock via Stripe; unlocked users get Create Essay, My Essays, Drafts, and Assignments shortcuts to /dashboard/essay.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
         ],
@@ -80,6 +81,29 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
       },
       {
+        id: "ai-essay",
+        title: "AI Essay",
+        route: "/dashboard/essay",
+        purpose:
+          "Premium add-on for generating essay activities, writing drafts, submitting work, and receiving AI feedback.",
+        howItWorks: [
+          "Unlock via Stripe purchase, Team Admin assignment, or platform admin grant — then open /dashboard/essay.",
+          "Overview shows recent essays, continue draft, generate, recent AI feedback, and assigned essays.",
+          "Generate Essay creates a prompt, objectives, optional outline/vocabulary/rubric, and an optional hidden model essay.",
+          "Writing workspace includes word count, optional timer, save draft (local cache when offline), submit, and AI feedback.",
+          "Assignments lists Team Admin–created essay activities assigned to you.",
+          "AI generation and AI feedback require internet; reading prompts and drafting can continue offline with local draft sync.",
+        ],
+        requirements: [
+          "Active AI Essay add-on entitlement (Stripe, team, or admin).",
+          "Eligible paid plan for self-serve purchase.",
+        ],
+        doNots: [
+          "Do not expect the model essay to appear automatically — owners must reveal it.",
+          "Do not treat AI Essay as a separate subscription plan.",
+        ],
+      },
+      {
         id: "team-workspace-dashboard",
         title: "Team Workspace View",
         route: "/dashboard?team=…",
@@ -89,6 +113,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
           "Assigned members see only decks assigned to them.",
+          "The AI Essay add-on card appears for members too — unlock via purchase, Team Admin assignment, or platform admin grant.",
           "Team context is stored in a cookie when invited members switch workspaces.",
         ],
         requirements: [
@@ -596,6 +621,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Enter a promotion code in the field above the plan cards (optional). Codes can also pre-fill from ?promo= in the URL.",
           "Active public codes appear as quick-fill chips under the promo field when a tier’s general sale is running.",
           "Signed-in users see a Current plan badge; active subscribers also get Manage subscription.",
+          "When the platform admin publishes the Add-on Catalog, /pricing/add-ons lists optional features (such as AI Essay) that stack on your current plan — monthly or yearly where configured.",
           "Choose a plan → review on /pricing/checkout → pay on Stripe Embedded Checkout.",
         ],
         requirements: [
@@ -606,6 +632,28 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not complete checkout signed in as the wrong Clerk account.",
           "Do not enter a Pro promo when buying Pro Plus — each code is tier-specific.",
           "Team-tier subscribers: workspace switcher is hidden on /pricing — return to dashboard first if needed.",
+          "Do not expect add-ons without an eligible paid plan — Free accounts cannot purchase catalog add-ons.",
+        ],
+      },
+      {
+        id: "pricing-add-ons",
+        title: "Add-on Catalog",
+        route: "/pricing/add-ons",
+        purpose:
+          "Purchase optional premium add-ons (for example AI Essay) that attach to your existing subscription.",
+        howItWorks: [
+          "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
+          "Eligible paid plans can buy monthly (and yearly when configured) prices via Stripe — items attach to your base subscription when possible.",
+          "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",
+          "AI Essay unlocks /dashboard/essay for generation, drafts, submissions, and AI feedback.",
+        ],
+        requirements: [
+          "Signed-in account on an eligible paid plan (or a team/admin grant).",
+          "Matching STRIPE_ADDON_*_PRICE_ID environment variables for self-serve purchase.",
+        ],
+        doNots: [
+          "Do not treat add-ons as separate subscription plans — they stack on your current plan.",
+          "Do not expect Team Admin to cancel a Stripe-paid add-on — only team-sourced grants can be removed there.",
         ],
       },
       {
@@ -903,6 +951,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Access via workspace switcher → WS Admin Dash (invited workspaces) or Team Admin Dash (personal), or direct URL with ?team= and teamMemberId=.",
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
+          "Add-ons → Member add-ons assigns optional premium features (AI Essay) to members without a separate admin product.",
         ],
         requirements: [
           "Team owner or invited team_admin role.",
@@ -911,6 +960,24 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Plain team members cannot access Team Admin.",
           "Do not create decks here — author on Personal Dashboard, then assign in Deck Manager.",
+        ],
+      },
+      {
+        id: "team-admin-add-ons",
+        title: "Member Add-ons",
+        route: "/dashboard/team-admin/add-ons",
+        purpose:
+          "Assign or remove optional premium add-ons such as AI Essay for workspace members.",
+        howItWorks: [
+          "Open Add-ons → Member add-ons for the selected workspace.",
+          "Check AI Essay beside a member to grant access; uncheck to revoke a team-sourced grant.",
+          "Members who purchased the add-on or received a platform admin grant show a locked source badge — Team Admin cannot remove those entitlements.",
+          "Future add-ons use the same checklist UI without a new admin system.",
+        ],
+        requirements: ["Team owner or team_admin.", "Add-on must be active in the catalog."],
+        doNots: [
+          "Do not expect Team Admin grants to cancel Stripe billing for a purchased add-on.",
+          "Do not create a separate Education Admin — Team Admin is the only team feature-assignment surface.",
         ],
       },
       {
@@ -1090,19 +1157,22 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "AI Lesson Builder (/teacher/lesson-builder) — multi-day lesson plans with objectives, activities, and vocabulary; Jamaica NSC guidelines (including 5E class timelines) apply only when Learning Standard is confirmed Jamaica-linked. Existing deck lists workspace decks you can use (including assigned team decks) that do not already have a linked lesson plan. In edit mode, leaving via Back, sidebar/tabs, other in-app links, or browser Back with unsaved Input/Preview changes (or intake vs preview mismatches) prompts you to stay, generate a new plan (AI runs only on Generate), or keep the current preview and auto-save both intake and preview — creators overwrite their plan only while the deck is unassigned; once the deck is assigned to any member, the linked original stays frozen and creator edits save as a personal copy. Assignees never overwrite an assigned original (personal copy, with skip when already similar). Assignees editing a creator-linked assigned plan are prompted before Generate (and from the leave-dialog Generate action) to either run a completely new AI generation or create their own lesson plan from the linked plan without a new AI call (original stays unchanged; personal copy is created or updated, with content restructured to match changed intake details).",
           "AI Quiz/Test Generator (/teacher/quizzes) — classroom assessments with review before saving to a deck. Optionally Include reading passage: set Number of passages, then for each passage set how many questions it should get (0 skips that passage). AI generates only passages with ≥1 questions; each passage is a short informational text that teaches the lesson vocabulary in context (not a summary of classroom activities), and each question becomes a card with its passage on the front. For Mathematics topics, reading passages use a Passage Title plus a real-world story (e.g. Selling Fruit Juice, Buying Movie Tickets) with linked questions about variables, expressions, equations, and evaluation. For English / Literature / Language Arts, passages use a Jamaica PEP–style titled short story (e.g. The Mango Tree) woven from that day’s lesson vocabulary, with questions on main idea, detail, vocabulary in context, character traits, theme/moral, and textual evidence. For math and problem-solving answers, the card back can include a Step 1: … Answer: … breakdown so Standard Review study mode shows the worked solution; Quiz mode still displays only the final Answer: value beside short wrong answers. Regular quiz cards + all passage questions must stay within the deck card limit. When a multi-day saved lesson plan is selected, AI Generate opens a day-scope dialog: All Days (full plan) or a single day (Day 1 (Monday) / Day 2 … when weekday labels exist), each with a short caption from that day’s daily focus or vocabulary when available; generation uses only the chosen scope’s vocab/focus/outline. Single-day plans skip the dialog. In a team workspace, assignees can pick original lesson plans linked to decks assigned to them (labeled title · grade · creator, with (Owner)/(Team Admin) when applicable; personal saves use title · grade) in addition to their own saved plans; generation uses the plan id with the workspace team id.",
           "Homework Generator (/teacher/homework) — take-home assignments aligned to deck content. The same assigned-deck original lesson plans appear in the From saved lesson plan picker for team members. Multi-day lesson plans use the same All Days / single-day scope dialog (with day captions) as Quiz before generation. Reading / Language Arts homework lets you set Number of passages and Questions per passage, then includes titled reading passages in Preview, Edit, and PDF so questions link to the full text. Math graph answers (number line / coordinate plane) render as figures in the Answer Key.",
-          "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export. The lesson plan picker includes assigned-deck originals for team members the same way as Quiz and Homework. Multi-day lesson plans use the same day-scope dialog (with day captions) before generation.",
+          "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export. The lesson plan picker includes assigned-deck originals for team members the same way as Quiz and Homework. Multi-day lesson plans generate from the full plan (All Days) without a day-scope dialog.",
           "Worksheet Generator (/teacher/worksheets) — printable practice sheets with answer keys.",
-          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage.",
+          "Generate AI Essay (/dashboard/essay/generate) — premium add-on listed beside other AI tools; requires AI Essay entitlement (purchase, Team Admin, or platform admin).",
+          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage (Essay uses its own topic form under /dashboard/essay).",
           "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library.",
         ],
         requirements: [
           "Education plan access.",
           "At least one deck with cards linked as source material.",
           "Internet connection for AI generation.",
+          "AI Essay also requires the AI Essay add-on entitlement.",
         ],
         doNots: [
           "Do not run AI tools offline — generation requires a connection.",
           "Do not skip deck linking — AI output quality depends on your flashcard content.",
+          "Do not expect Generate AI Essay without the add-on — locked users are sent to the Essay unlock flow.",
         ],
       },
       {

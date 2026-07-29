@@ -41,11 +41,21 @@ import {
   getTeamsByOwner,
   teamWorkspaceAllowsViewerAccess,
 } from "@/db/queries/teams";
+import { resolveEducationTeamAdminCreateQuota } from "@/db/queries/education-team-admin-deck-quota";
+import type { EducationTeamPlanId } from "@/lib/education-plans";
 import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-banner";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialogLoader as AddDeckDialog } from "@/components/add-deck-dialog-loader";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
+import { DashboardAiEssayCard } from "@/components/dashboard-ai-essay-card";
+import { canAccessAddon } from "@/lib/access";
+import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import {
+  getAddonCatalogByKey,
+  isPlanEligibleForAddon,
+} from "@/db/queries/addons";
+import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
@@ -198,6 +208,7 @@ interface DashboardPageProps {
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const access = await getAccessContext();
   const {
     userId,
     hasUnlimitedDecks,
@@ -211,7 +222,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     hasAiReading,
     hasClerkPersonalPro,
     hasClerkPersonalProPlus,
-  } = await getAccessContext();
+    effectivePlanSlug,
+  } = access;
   if (!userId) {
     if (await isNativeShellRequest()) {
       redirect(nativeSignInPath("/dashboard"));
@@ -307,14 +319,30 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ownSubscriberTeamTierExtras,
       workspaceHeadingRow,
     );
-    const [workspaceDecks, workspaceHeadingOwnerName] = await Promise.all([
-      teamWorkspaceTierExtras
-        ? mergePreviewThumbsForDecks(workspaceDecksRaw)
-        : Promise.resolve(workspaceDecksRaw),
-      workspaceHeadingRow
-        ? getClerkUserDisplayNameById(workspaceHeadingRow.ownerUserId)
-        : Promise.resolve(null),
-    ]);
+    const [workspaceDecks, workspaceHeadingOwnerName, teamAdminCreateQuota] =
+      await Promise.all([
+        teamWorkspaceTierExtras
+          ? mergePreviewThumbsForDecks(workspaceDecksRaw)
+          : Promise.resolve(workspaceDecksRaw),
+        workspaceHeadingRow
+          ? getClerkUserDisplayNameById(workspaceHeadingRow.ownerUserId)
+          : Promise.resolve(null),
+        isEducationTeamAdminViewer && workspaceHeadingRow
+          ? resolveEducationTeamAdminCreateQuota(
+              tw.teamId,
+              tw.ownerUserId,
+              userId,
+              workspaceHeadingRow.planSlug as EducationTeamPlanId,
+            )
+          : Promise.resolve(null),
+      ]);
+    const createQuotaDisplay =
+      teamAdminCreateQuota != null
+        ? {
+            used: teamAdminCreateQuota.createdCount,
+            max: teamAdminCreateQuota.maxCreateDecks,
+          }
+        : null;
     const workspaceHeadingGroupName = workspaceHeadingRow?.name ?? null;
     const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
     return (
@@ -363,6 +391,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   ? "Create decks from Teacher tools or wait for your workspace owner to assign decks to you."
                   : "Your workspace owner has not assigned any decks to you yet. Check back soon."}
               </p>
+              {createQuotaDisplay != null ? (
+                <p className="text-muted-foreground text-xs tabular-nums">
+                  Created {createQuotaDisplay.used} / {createQuotaDisplay.max}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : (
@@ -377,6 +410,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             detailedDeleteWarning={
               detailedDeleteWarning || isEducationTeamAdminViewer
             }
+            createQuota={createQuotaDisplay}
           />
         )}
       </div>
@@ -541,6 +575,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ? await getClerkUserDisplayNameById(cookieTeamHeadingRow.ownerUserId)
       : null;
     const cookieTeamHeadingGroupName = cookieTeamHeadingRow?.name ?? null;
+    const memberEssayUnlocked = canAccessAddon(access, AI_ESSAY_ADDON_KEY);
+    const memberEssayCatalog = await getAddonCatalogByKey(AI_ESSAY_ADDON_KEY);
+    const memberEssayCanPurchase =
+      !!memberEssayCatalog?.active &&
+      isPlanEligibleForAddon(
+        memberEssayCatalog.eligiblePlanIds,
+        effectivePlanSlug,
+      ) &&
+      !!resolveStripeAddonPriceIdFromEnvKey(memberEssayCatalog.stripePriceEnvKey);
+
     return (
       <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -567,6 +611,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
           </div>
         </div>
+        <DashboardAiEssayCard
+          unlocked={memberEssayUnlocked}
+          canPurchase={memberEssayCanPurchase}
+          signedIn
+        />
         {assigned.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
@@ -668,6 +717,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     showEducationWorkspaceSections &&
     (personalOnlyDecks.length > 0 || workspaceDeckSections.length > 0);
 
+  const essayUnlocked = canAccessAddon(access, AI_ESSAY_ADDON_KEY);
+  const essayCatalog = await getAddonCatalogByKey(AI_ESSAY_ADDON_KEY);
+  const essayCanPurchase =
+    !!essayCatalog?.active &&
+    isPlanEligibleForAddon(essayCatalog.eligiblePlanIds, effectivePlanSlug) &&
+    !!resolveStripeAddonPriceIdFromEnvKey(essayCatalog.stripePriceEnvKey);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -725,6 +781,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           />
         </div>
       </div>
+      </section>
+
+      <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-50 fill-mode-both">
+        <DashboardAiEssayCard
+          unlocked={essayUnlocked}
+          canPurchase={essayCanPurchase}
+          signedIn
+        />
       </section>
 
       {/* Free plan usage banner */}

@@ -1,13 +1,24 @@
 "use server";
 
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import { createDeck } from "@/db/queries/decks";
-import { createMultipleChoiceCard } from "@/db/queries/cards";
+import {
+  createMultipleChoiceCard,
+  getCardsByDeckUnscoped,
+} from "@/db/queries/cards";
 import { linkDeckToTeamWorkspace } from "@/db/queries/teams";
 import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
 import {
@@ -16,7 +27,7 @@ import {
 } from "@/lib/lesson-plan-day-scope";
 import { buildLessonPlanQuizContext, buildLessonPlanPassageQuizContext, buildLessonPlanPassageFallbackQuestions } from "@/lib/lesson-plan-quiz-context";
 import {
-  buildTeacherQuizDeckMetadata,
+  resolveLessonPlanQuizDeckSaveTarget,
   resolveTeacherQuizSaveTarget,
 } from "@/lib/teacher-quiz-deck-save";
 import {
@@ -76,7 +87,7 @@ async function generateTeacherQuizDistractors(input: {
     ];
   }
 
-  const { output } = await generateText({
+  const { output } = await trackedGenerateText({
     model: openai("gpt-4o"),
     output: Output.object({
       schema: z.object({
@@ -480,7 +491,7 @@ async function generateReadingPassageQuizForDeck(
   }
 
   try {
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({
         schema: teacherQuizMultiPassageResultSchema,
@@ -501,6 +512,9 @@ async function generateReadingPassageQuizForDeck(
 
     return expanded;
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw new Error(error.message);
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[generateReadingPassageQuizForDeck] AI failed; using template fallback.",
@@ -543,7 +557,7 @@ async function generateQuizForDeck(
   }
 
   try {
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({
         schema: teacherQuizResultSchema,
@@ -586,6 +600,9 @@ ${lessonContext}`
 
     return output;
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw new Error(error.message);
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[generateQuizForDeck] AI failed; using template fallback.",
@@ -623,19 +640,29 @@ export async function generateTeacherQuizAction(
     activePassageQuestionCounts(passageQuestionCounts),
   );
   const standardCount = parsed.data.numberOfQuestions;
+  const usageBase = {
+    userId,
+    teamId: parsed.data.teamId ?? null,
+    subscriptionPlan: ctx.effectivePlanSlug,
+    isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+  };
 
   const [standardQuiz, passageQuestions] = await Promise.all([
     standardCount > 0
-      ? generateQuizForDeck(
-          { ...parsed.data, numberOfQuestions: standardCount },
-          userId,
+      ? runWithAiUsageContext({ ...usageBase, feature: "quiz" }, () =>
+          generateQuizForDeck(
+            { ...parsed.data, numberOfQuestions: standardCount },
+            userId,
+          ),
         )
       : Promise.resolve(null),
     passageCount > 0
-      ? generateReadingPassageQuizForDeck(
-          parsed.data,
-          userId,
-          passageQuestionCounts,
+      ? runWithAiUsageContext({ ...usageBase, feature: "passage" }, () =>
+          generateReadingPassageQuizForDeck(
+            parsed.data,
+            userId,
+            passageQuestionCounts,
+          ),
         )
       : Promise.resolve([] as TeacherQuizPassageQuestion[]),
   ]);
@@ -650,7 +677,7 @@ export async function previewTeacherQuizDistractorsAction(
   data: z.infer<typeof previewTeacherQuizDistractorsSchema>,
 ): Promise<{ distractors: [string, string, string] }> {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Quiz generator requires an education plan.",
   );
@@ -660,13 +687,27 @@ export async function previewTeacherQuizDistractorsAction(
     throw new Error("Invalid input");
   }
 
-  const distractors = await generateTeacherQuizDistractors(parsed.data);
+  const distractors = await runWithAiUsageContext(
+    {
+      userId,
+      feature: "quiz",
+      teamId: null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    () => generateTeacherQuizDistractors(parsed.data),
+  );
   return { distractors };
 }
 
 export async function saveTeacherQuizDeckAction(
   data: SaveTeacherQuizDeckInput,
-): Promise<{ deckId: number; deckName: string; cardCount: number }> {
+): Promise<{
+  deckId: number;
+  deckName: string;
+  cardCount: number;
+  created: boolean;
+}> {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -687,14 +728,6 @@ export async function saveTeacherQuizDeckAction(
     );
   }
 
-  if (saveTarget.maxDecks > 0 && saveTarget.deckCount >= saveTarget.maxDecks) {
-    const scopeLabel =
-      saveTarget.scope === "workspace" ? "workspace" : "personal";
-    throw new Error(
-      `Deck limit reached — up to ${saveTarget.maxDecks} ${scopeLabel} deck(s) on your ${saveTarget.planLabel} plan.`,
-    );
-  }
-
   const cards = input.cards;
   if (cards.length > saveTarget.maxCardsPerDeck) {
     throw new Error(
@@ -702,31 +735,56 @@ export async function saveTeacherQuizDeckAction(
     );
   }
 
-  const { name: deckName, description: deckDescription } = buildTeacherQuizDeckMetadata(
-    {
-      subject: input.subject,
-      topic: input.topic,
-      gradeLevel: input.gradeLevel,
-      difficultyLevel: input.difficultyLevel,
-      savedLessonPlanId: input.savedLessonPlanId,
-      dayScope:
-        input.savedLessonPlanId != null ? input.dayScope : undefined,
-    },
-  );
+  const resolved = await resolveLessonPlanQuizDeckSaveTarget({
+    viewerUserId: userId,
+    saveTarget,
+    savedLessonPlanId: input.savedLessonPlanId,
+    dayScope: input.savedLessonPlanId != null ? input.dayScope : undefined,
+    subject: input.subject,
+    topic: input.topic,
+    gradeLevel: input.gradeLevel,
+    difficultyLevel: input.difficultyLevel,
+    teamId: input.teamId,
+  });
 
-  const deckId = await createDeck(
-    saveTarget.deckOwnerUserId,
-    deckName,
-    deckDescription,
-    saveTarget.teamId,
-    null,
-    input.gradeLevel,
-    input.difficultyLevel,
-    userId,
-  );
+  let deckId: number;
+  let deckName: string;
+  let created = false;
 
-  if (saveTarget.teamId != null) {
-    await linkDeckToTeamWorkspace(saveTarget.teamId, deckId);
+  if (resolved.mode === "append") {
+    const existingCards = await getCardsByDeckUnscoped(resolved.deckId);
+    if (existingCards.length + cards.length > saveTarget.maxCardsPerDeck) {
+      throw new Error(
+        `This deck already has ${existingCards.length} card(s). Adding ${cards.length} would exceed the ${saveTarget.maxCardsPerDeck}-card limit on your ${saveTarget.planLabel} plan.`,
+      );
+    }
+    deckId = resolved.deckId;
+    deckName = resolved.deckName;
+  } else {
+    if (saveTarget.maxDecks > 0 && saveTarget.deckCount >= saveTarget.maxDecks) {
+      const scopeLabel =
+        saveTarget.scope === "workspace" ? "workspace" : "personal";
+      throw new Error(
+        `Deck limit reached — up to ${saveTarget.maxDecks} ${scopeLabel} deck(s) on your ${saveTarget.planLabel} plan.`,
+      );
+    }
+
+    deckId = await createDeck(
+      saveTarget.deckOwnerUserId,
+      resolved.name,
+      resolved.description,
+      saveTarget.teamId,
+      null,
+      input.gradeLevel,
+      input.difficultyLevel,
+      userId,
+    );
+    deckName = resolved.name;
+    created = true;
+
+    if (saveTarget.teamId != null) {
+      await linkDeckToTeamWorkspace(saveTarget.teamId, deckId);
+    }
   }
 
   for (const card of cards) {
@@ -750,5 +808,6 @@ export async function saveTeacherQuizDeckAction(
     deckId,
     deckName,
     cardCount: cards.length,
+    created,
   };
 }

@@ -35,6 +35,10 @@ import {
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import { CARDS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { getGradientBySlug } from "@/lib/deck-gradients";
+import {
+  formatDeckCardDisplayName,
+  formatLessonPlanDayCardLabel,
+} from "@/lib/teacher-generation-titles";
 import { cn } from "@/lib/utils";
 
 interface DeckPageProps {
@@ -108,6 +112,11 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
 
   const deckGradient = getGradientBySlug(deck.gradient);
   const hasGradient = deckGradient.slug !== "none";
+  const displayName = formatDeckCardDisplayName(deck.name);
+  const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
+    deck.description,
+    deck.name,
+  );
   const updatedLabel = deck.updatedAt.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -209,6 +218,19 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                       <Layers3 className="size-3" />
                       {canEdit ? "Deck editor" : "Deck cards"}
                     </Badge>
+                    {lessonPlanDayLabel ? (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "max-w-full truncate text-[10px] font-medium uppercase tracking-wide",
+                          hasGradient
+                            ? "border-white/25 bg-white/10 text-white"
+                            : "border-border/70 bg-muted/40 text-muted-foreground",
+                        )}
+                      >
+                        {lessonPlanDayLabel}
+                      </Badge>
+                    ) : null}
                     {canEdit && effectiveAI ? (
                       <Badge
                         variant="outline"
@@ -230,7 +252,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                       hasGradient && "text-white",
                     )}
                   >
-                    {deck.name}
+                    {displayName}
                   </h1>
                   {deck.description ? (
                     <p

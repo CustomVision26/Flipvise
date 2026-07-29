@@ -19,9 +19,10 @@ export type PricingAddonCard = {
   marketingBlurb: string;
   eligible: boolean;
   entitled: boolean;
-  entitlementSource: "stripe" | "admin" | null;
+  entitlementSource: "stripe" | "admin" | "team" | null;
   canPurchase: boolean;
   stripePriceConfigured: boolean;
+  yearlyPriceConfigured?: boolean;
 };
 
 type PricingAddonsCatalogProps = {
@@ -37,6 +38,9 @@ export function PricingAddonsCatalog({
 }: PricingAddonsCatalogProps) {
   const router = useRouter();
   const [pendingKey, setPendingKey] = React.useState<string | null>(null);
+  const [periodByKey, setPeriodByKey] = React.useState<
+    Record<string, "monthly" | "yearly">
+  >({});
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
@@ -45,7 +49,8 @@ export function PricingAddonsCatalog({
     setSuccess(null);
     setPendingKey(addonKey);
     try {
-      const result = await createAddonCheckoutSessionAction({ addonKey });
+      const period = periodByKey[addonKey] ?? "monthly";
+      const result = await createAddonCheckoutSessionAction({ addonKey, period });
       if (result.mode === "attached") {
         setSuccess("Add-on added to your subscription.");
         router.refresh();
@@ -86,7 +91,9 @@ export function PricingAddonsCatalog({
             ctaLabel =
               addon.entitlementSource === "admin"
                 ? "Included (admin)"
-                : "Already owned";
+                : addon.entitlementSource === "team"
+                  ? "Included (team)"
+                  : "Already owned";
             disabled = true;
             tip = "You already have access to this add-on";
           } else if (!addon.eligible) {
@@ -110,6 +117,36 @@ export function PricingAddonsCatalog({
                   {addon.marketingBlurb || addon.description}
                 </p>
               </div>
+              {!disabled && addon.yearlyPriceConfigured ? (
+                <div className="flex gap-2 text-xs">
+                  <button
+                    type="button"
+                    className={
+                      (periodByKey[addon.key] ?? "monthly") === "monthly"
+                        ? "font-semibold text-foreground underline"
+                        : "text-muted-foreground"
+                    }
+                    onClick={() =>
+                      setPeriodByKey((prev) => ({ ...prev, [addon.key]: "monthly" }))
+                    }
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      periodByKey[addon.key] === "yearly"
+                        ? "font-semibold text-foreground underline"
+                        : "text-muted-foreground"
+                    }
+                    onClick={() =>
+                      setPeriodByKey((prev) => ({ ...prev, [addon.key]: "yearly" }))
+                    }
+                  >
+                    Yearly
+                  </button>
+                </div>
+              ) : null}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={<span className="inline-flex w-fit" />}>

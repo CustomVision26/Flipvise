@@ -7,7 +7,6 @@ import {
   getSavedLessonPlansByUserIds,
   type SavedLessonPlanRow,
 } from "@/db/queries/saved-lesson-plans";
-import { getSavedQuizzesByUserIds } from "@/db/queries/saved-quizzes";
 import { getSavedStudyGuidesByUserIds } from "@/db/queries/saved-study-guides";
 import { getSavedWorksheetsByUserIds } from "@/db/queries/saved-worksheets";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
@@ -175,7 +174,7 @@ function resolveSourceDeckStaleState(
 }
 
 export type TeacherResourceLibrarySection = {
-  id: "lessonPlans" | "homework" | "quizzes" | "worksheets" | "studyGuides";
+  id: "lessonPlans" | "homework" | "worksheets" | "studyGuides";
   title: string;
   emptyMessage: string;
   items: TeacherResourceLibraryItem[];
@@ -322,16 +321,6 @@ function mapLessonPlanToLibraryItem(
   };
 }
 
-function formatSavedQuizSourceLabel(quiz: {
-  sourceDeckName: string;
-  memberLabel: string | null;
-}): string {
-  const member = quiz.memberLabel?.trim();
-  return member
-    ? `From quiz attempt · ${quiz.sourceDeckName} · ${member}`
-    : `From quiz attempt · ${quiz.sourceDeckName}`;
-}
-
 export async function loadTeacherResourceLibrary(
   viewerUserId: string,
   teamId: number | null,
@@ -378,14 +367,12 @@ export async function loadTeacherResourceLibrary(
     homeworkAssignments,
     studyGuides,
     worksheets,
-    savedQuizzes,
   ] = await Promise.all([
     getSavedLessonPlansByUserIds(workspaceUserIds),
     assignedLessonPlansPromise,
     getSavedHomeworkAssignmentsByUserIds(workspaceUserIds),
     getSavedStudyGuidesByUserIds(workspaceUserIds),
     getSavedWorksheetsByUserIds(workspaceUserIds),
-    getSavedQuizzesByUserIds(workspaceUserIds),
   ]);
 
   const assignedCreatorIds = assignedLessonPlans.map((plan) => plan.userId);
@@ -560,39 +547,6 @@ export async function loadTeacherResourceLibrary(
     };
   });
 
-  const quizItems: TeacherResourceLibraryItem[] = savedQuizzes.map((quiz) => {
-    const creatorDisplay = userDisplayById[quiz.userId];
-    return {
-      key: `quiz:${quiz.id}`,
-      title: quiz.label,
-      subject: quiz.subject,
-      gradeLevel: quiz.gradeLevel,
-      difficultyLevel: null,
-      creatorUserId: quiz.userId,
-      creatorName: creatorDisplay?.primaryLine ?? null,
-      creatorEmail: creatorDisplay?.primaryEmail ?? null,
-      savedAt: quiz.createdAt.toISOString(),
-      pdfUrl: quiz.questionSheetPdfUrl,
-      answerKeyPdfUrl: quiz.answerKeyPdfUrl,
-      lessonPlanId: null,
-      lessonPlanEditHref: null,
-      homeworkEditHref: null,
-      worksheetEditHref: null,
-      studyGuideEditHref: null,
-      homeworkId: null,
-      worksheetId: null,
-      studyGuideId: null,
-      savedQuizId: quiz.id,
-      quizHref: null,
-      sourceLabel: formatSavedQuizSourceLabel(quiz),
-      sourceDeckUpdatedAt: null,
-      isOutdatedVsSourceDeck: false,
-      isSourceDeckDeleted: false,
-      isPlaceholder: false,
-      lessonPlanOrigin: null,
-    };
-  });
-
   const ownerName = ownerDisplay?.primaryLine ?? null;
   const ownerEmail = ownerDisplay?.primaryEmail ?? null;
   const placeholderCreatorId = isWorkspaceOwner ? ownerUserId : viewerUserId;
@@ -618,13 +572,6 @@ export async function loadTeacherResourceLibrary(
       emptyMessage:
         "No saved homework yet. Generate one in the Homework Generator and click Save Homework.",
       items: homeworkItems,
-    },
-    {
-      id: "quizzes",
-      title: "Saved Quizzes",
-      emptyMessage:
-        "No saved quizzes yet. Double-click a quiz result in Team Admin or Student Progress to save a question sheet and answer key.",
-      items: quizItems,
     },
     {
       id: "worksheets",

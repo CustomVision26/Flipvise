@@ -1,6 +1,11 @@
 import "server-only";
 
 import type { LessonPlanActionInput } from "@/lib/lesson-plan-ai-schema";
+import { trackRawAiCall } from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 
 export type CurriculumResearchContext = {
   summary: string;
@@ -107,6 +112,12 @@ export async function fetchCurriculumContextForLessonPlan(
     LessonPlanActionInput,
     "learningStandard" | "subject" | "gradeLevel" | "topic"
   >,
+  usage: {
+    userId: string;
+    teamId?: number | null;
+    subscriptionPlan?: string | null;
+    isPlatformAdmin?: boolean;
+  },
 ): Promise<CurriculumResearchContext | null> {
   const learningStandard = input.learningStandard?.trim();
   if (!learningStandard) return null;
@@ -115,47 +126,66 @@ export async function fetchCurriculumContextForLessonPlan(
   if (!apiKey) return null;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    return await trackRawAiCall(
+      {
+        userId: usage.userId,
+        feature: "curriculum_research",
+        teamId: usage.teamId ?? null,
+        subscriptionPlan: usage.subscriptionPlan,
+        isPlatformAdmin: usage.isPlatformAdmin,
         model: "gpt-4o",
-        tools: [{ type: "web_search", search_context_size: "medium" }],
-        tool_choice: "required",
-        input: buildCurriculumResearchPrompt({
-          learningStandard,
-          subject: input.subject.trim(),
-          gradeLevel: input.gradeLevel.trim(),
-          topic: input.topic.trim(),
-        }),
-      }),
-      signal: AbortSignal.timeout(45_000),
-    });
+      },
+      async () => {
+        const response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            tools: [{ type: "web_search", search_context_size: "medium" }],
+            tool_choice: "required",
+            input: buildCurriculumResearchPrompt({
+              learningStandard,
+              subject: input.subject.trim(),
+              gradeLevel: input.gradeLevel.trim(),
+              topic: input.topic.trim(),
+            }),
+          }),
+          signal: AbortSignal.timeout(45_000),
+        });
 
-    if (!response.ok) {
-      if (process.env.NODE_ENV !== "production") {
-        const body = await response.text().catch(() => "");
-        console.warn(
-          "[fetchCurriculumContextForLessonPlan] OpenAI Responses API error",
-          response.status,
-          body.slice(0, 300),
-        );
-      }
-      return null;
-    }
+        if (!response.ok) {
+          if (process.env.NODE_ENV !== "production") {
+            const body = await response.text().catch(() => "");
+            console.warn(
+              "[fetchCurriculumContextForLessonPlan] OpenAI Responses API error",
+              response.status,
+              body.slice(0, 300),
+            );
+          }
+          return { value: null };
+        }
 
-    const data = (await response.json()) as Record<string, unknown>;
-    const summary = extractOutputText(data);
-    if (!summary) return null;
+        const data = (await response.json()) as Record<string, unknown>;
+        const summary = extractOutputText(data);
+        if (!summary) return { value: null };
 
-    return {
-      summary,
-      sources: extractSources(data),
-    };
+        return {
+          value: {
+            summary,
+            sources: extractSources(data),
+          },
+          providerRequestId:
+            typeof data.id === "string" ? data.id : null,
+        };
+      },
+    );
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw error;
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[fetchCurriculumContextForLessonPlan] Curriculum research skipped.",

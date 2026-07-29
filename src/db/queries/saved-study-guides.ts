@@ -151,6 +151,40 @@ export async function updateSavedStudyGuideById(
   return row ?? null;
 }
 
+export async function renameSavedStudyGuideLabelById(
+  studyGuideId: number,
+  title: string,
+): Promise<SavedStudyGuideRow | null> {
+  const existing = await getSavedStudyGuideById(studyGuideId);
+  if (!existing) return null;
+
+  const nextTitle = title.trim().slice(0, 255);
+  if (!nextTitle) return null;
+
+  const [row] = await db
+    .update(savedStudyGuides)
+    .set({
+      label: nextTitle,
+      guideTitle: nextTitle,
+      updatedAt: new Date(),
+    })
+    .where(eq(savedStudyGuides.id, studyGuideId))
+    .returning();
+
+  return row ?? null;
+}
+
+export async function deleteSavedStudyGuideById(
+  id: number,
+): Promise<SavedStudyGuideRow | null> {
+  const [row] = await db
+    .delete(savedStudyGuides)
+    .where(eq(savedStudyGuides.id, id))
+    .returning();
+
+  return row ?? null;
+}
+
 export type SavedStudyGuideEditItem = {
   id: number;
   label: string;

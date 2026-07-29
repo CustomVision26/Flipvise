@@ -1,9 +1,7 @@
 import { getAccessContext } from "@/lib/access";
 import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
-import { getTeamsForTeamDashboard } from "@/db/queries/teams";
-import { EDUCATION_PLAN_LABELS, isEducationTeamPlanId } from "@/lib/education-plans";
-import { buildTeamAdminPath } from "@/lib/team-admin-url";
+import { EDUCATION_PLAN_LABELS } from "@/lib/education-plans";
 import { resolveTeacherWorkspaceContext } from "@/lib/resolve-teacher-workspace-url";
 import { redirectIfPlanReconciliationPending } from "@/lib/plan-reconciliation-gate";
 import { TeacherDashboardHome } from "@/components/teacher-dashboard-home";
@@ -37,34 +35,10 @@ export default async function TeacherDashboardPage({
       ? "Team admins on Education Gold and Education Enterprise can create decks for assigned workspaces. Decks appear on the plan owner's personal dashboard, grouped by workspace."
       : "Education Plus teachers create decks from their personal dashboard. Link decks here to build lesson plans, quizzes, and classroom materials.";
 
-  let teamAdminHref: string | null = null;
-  const manageTeams = await getTeamsForTeamDashboard(userId);
-
-  if (workspace.teamId != null) {
-    const canManageWorkspace = manageTeams.some((team) => team.id === workspace.teamId);
-    if (canManageWorkspace) {
-      teamAdminHref = buildTeamAdminPath(workspace.teamId, workspace.teamMemberId);
-    }
-  } else {
-    const pick =
-      manageTeams.find((team) => team.ownerUserId === userId) ?? manageTeams[0] ?? null;
-    if (
-      pick &&
-      (ctx.activeEducationTeamPlan != null || isEducationTeamPlanId(pick.planSlug))
-    ) {
-      teamAdminHref = buildTeamAdminPath(
-        pick.id,
-        pick.ownerUserId === userId ? 0 : workspace.teamMemberId,
-      );
-    }
-  }
-
   return (
     <TeacherDashboardHome
       planLabel={planLabel}
       workspaceNote={workspaceNote}
-      teamAdminHref={teamAdminHref}
-      personalDashboardHref={planSlug === "education_plus" ? "/dashboard" : null}
       teacherQueryString={workspace.queryString}
     />
   );

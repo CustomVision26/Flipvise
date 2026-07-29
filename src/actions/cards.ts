@@ -4,8 +4,16 @@ import { auth } from "@/lib/clerk-auth";
 import { revalidatePath } from "next/cache";
 import { getAccessContext } from "@/lib/access";
 import { z } from "zod";
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
 import {
   createCard,
@@ -333,7 +341,7 @@ async function generateStandardDistractors(
 ): Promise<[string, string, string]> {
   const fullContext = buildDeckContext(deck, existingCards);
 
-  const { output } = await generateText({
+  const { output } = await trackedGenerateText({
     model: openai("gpt-4o"),
     output: Output.object({
       schema: z.object({
@@ -485,13 +493,26 @@ export async function createCardAction(data: CreateCardInput) {
     backText
   ) {
     try {
-      resolvedDistractors = await generateStandardDistractors(
-        deck,
-        existingCards,
-        frontText,
-        backText,
+      resolvedDistractors = await runWithAiUsageContext(
+        {
+          userId,
+          feature: "flashcards",
+          teamId: deck.teamId ?? null,
+          subscriptionPlan: access.effectivePlanSlug,
+          isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+        },
+        () =>
+          generateStandardDistractors(
+            deck,
+            existingCards,
+            frontText,
+            backText,
+          ),
       );
-    } catch {
+    } catch (error) {
+      if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+        throw new Error(error.message);
+      }
       // Best-effort — card still saves without stored wrong answers.
     }
   }
@@ -864,25 +885,34 @@ export async function generateCardsAction(data: GenerateCardsInput) {
     includeForDuplicateCheck: true,
   });
 
-  const { output } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({
-      schema: z.object({
-        cards: z.array(
-          z.object({
-            front: z.string(),
-            back: z.string(),
-            /**
-             * 3 plausible but incorrect alternatives for this card's answer.
-             * Stored on the card but hidden from the regular front/back
-             * preview and study view.
-             */
-            distractors: z.array(z.string().min(1)).length(3),
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "flashcards",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    async () => {
+      const { output } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({
+          schema: z.object({
+            cards: z.array(
+              z.object({
+                front: z.string(),
+                back: z.string(),
+                /**
+                 * 3 plausible but incorrect alternatives for this card's answer.
+                 * Stored on the card but hidden from the regular front/back
+                 * preview and study view.
+                 */
+                distractors: z.array(z.string().min(1)).length(3),
+              }),
+            ),
           }),
-        ),
-      }),
-    }),
-    system: `You are a flashcard generation assistant. Infer the subject matter and purpose of the deck from its name, description, AND the existing cards already in the deck. Use the existing cards as the authoritative reference for the deck's style, format, depth, and scope — your generated cards must feel like they belong in the same deck.
+        }),
+        system: `You are a flashcard generation assistant. Infer the subject matter and purpose of the deck from its name, description, AND the existing cards already in the deck. Use the existing cards as the authoritative reference for the deck's style, format, depth, and scope — your generated cards must feel like they belong in the same deck.
 
 For **problem-solving, mathematical, or computational topics** (e.g. algebra, calculus, geometry, trigonometry, statistics, physics, chemistry, programming algorithms, logic puzzles, financial calculations):
 - Put a clear problem or question on the front
@@ -916,27 +946,29 @@ Rules:
 - NEVER duplicate or trivially rephrase any of the existing cards
 - Stay strictly within the subject matter and scope established by the deck
 - Always return exactly 3 distractors per card — no more, no less`,
-    prompt: `${deckContext}
+        prompt: `${deckContext}
 
 Generate exactly ${count} new flashcards for this deck. They must be genuinely new (no duplicates of the existing cards above), match the established style, and stay within the deck's topic. For each card also return 3 plausible wrong-answer distractors.`,
-  });
+      });
 
-  const trimmed = output.cards.slice(0, count).map((c) => ({
-    front: cleanAiText(c.front),
-    back: cleanAiText(c.back),
-    distractors: [
-      cleanAiText(c.distractors[0]),
-      cleanAiText(c.distractors[1]),
-      cleanAiText(c.distractors[2]),
-    ],
-  }));
-  if (trimmed.length === 0) {
-    throw new Error("The model did not return any cards. Please try again.");
-  }
+      const trimmed = output.cards.slice(0, count).map((c) => ({
+        front: cleanAiText(c.front),
+        back: cleanAiText(c.back),
+        distractors: [
+          cleanAiText(c.distractors[0]),
+          cleanAiText(c.distractors[1]),
+          cleanAiText(c.distractors[2]),
+        ],
+      }));
+      if (trimmed.length === 0) {
+        throw new Error("The model did not return any cards. Please try again.");
+      }
 
-  await bulkCreateCards(deckId, trimmed, true);
+      await bulkCreateCards(deckId, trimmed, true);
 
-  revalidatePath(`/decks/${deckId}`);
+      revalidatePath(`/decks/${deckId}`);
+    },
+  );
 }
 
 export async function getCardsForPreviewAction(deckId: number) {
@@ -1025,7 +1057,7 @@ async function generateDiagramPairOnly(args: {
   question: string;
   answer: string;
 }): Promise<{ front: MathDiagram | null; back: MathDiagram | null }> {
-  const { output } = await generateText({
+  const { output } = await trackedGenerateText({
     model: openai("gpt-4o"),
     output: Output.object({
       schema: z.object({
@@ -1063,7 +1095,7 @@ async function generateDistractorDiagramsOnly(args: {
   correctAnswer: string;
   distractors: [string, string, string];
 }): Promise<[MathDiagram | null, MathDiagram | null, MathDiagram | null]> {
-  const { output } = await generateText({
+  const { output } = await trackedGenerateText({
     model: openai("gpt-4o"),
     output: Output.object({
       schema: z.object({
@@ -1136,53 +1168,62 @@ export async function generateAnswerAction(
   const existingCards = await getCardsByDeckUnscoped(deckId);
   const fullContext = buildDeckContext(deck, existingCards);
 
-  const { output: validationOutput } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({
-      schema: validateQuestionRelevanceSchema,
-    }),
-    system: QUESTION_RELEVANCE_SYSTEM,
-    prompt: `${fullContext}
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "flashcards",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    async () => {
+      const { output: validationOutput } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({
+          schema: validateQuestionRelevanceSchema,
+        }),
+        system: QUESTION_RELEVANCE_SYSTEM,
+        prompt: `${fullContext}
 
 User's Question: ${question}
 
 Is this question clearly off-topic for this deck, or reasonably related (including neighboring math/science subtopics)?`,
-  });
+      });
 
-  // Soft warning only — do not block AI generation (user can still save the card).
-  const relevanceWarning =
-    validationOutput &&
-    !validationOutput.isRelevant &&
-    validationOutput.warning?.trim()
-      ? validationOutput.warning.trim()
-      : null;
+      // Soft warning only — do not block AI generation (user can still save the card).
+      const relevanceWarning =
+        validationOutput &&
+        !validationOutput.isRelevant &&
+        validationOutput.warning?.trim()
+          ? validationOutput.warning.trim()
+          : null;
 
-  const diagramAddendum = includeDiagram
-    ? `
+      const diagramAddendum = includeDiagram
+        ? `
 
 Also return frontDiagram and backDiagram (never type "none").
 ${DIAGRAM_TYPE_RULES}
 ${FRONT_DIAGRAM_RULES}
 ${BACK_DIAGRAM_RULES}
 Never invent numeric data that contradicts the question or answer.`
-    : "";
+        : "";
 
-  const answerSchema = includeDiagram
-    ? z.object({
-        answer: z.string(),
-        frontDiagram: mathDiagramRequiredAiOutputSchema,
-        backDiagram: mathDiagramRequiredAiOutputSchema,
-      })
-    : z.object({
-        answer: z.string(),
-      });
+      const answerSchema = includeDiagram
+        ? z.object({
+            answer: z.string(),
+            frontDiagram: mathDiagramRequiredAiOutputSchema,
+            backDiagram: mathDiagramRequiredAiOutputSchema,
+          })
+        : z.object({
+            answer: z.string(),
+          });
 
-  const { output } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({
-      schema: answerSchema,
-    }),
-    system: `You are a flashcard assistant helping users complete flashcards. Given a question or term on the front of a flashcard, generate an appropriate answer or definition for the back.
+      const { output } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({
+          schema: answerSchema,
+        }),
+        system: `You are a flashcard assistant helping users complete flashcards. Given a question or term on the front of a flashcard, generate an appropriate answer or definition for the back.
 
 Use the deck name, description, AND existing cards as your guide — your answer must match the established style, format, length, and depth of the existing cards in the deck.
 
@@ -1206,95 +1247,107 @@ Rules:
 - Use plain newlines between steps
 - When existing cards are provided, treat them as the source of truth for tone, length, and format
 - Stay strictly within the subject matter and scope established by the deck${diagramAddendum}`,
-    prompt: `${fullContext}
+        prompt: `${fullContext}
 
 Question/Term: ${question}
 
 Generate an appropriate answer for the back of this flashcard, matching the style of the existing cards.${
-      includeDiagram
-        ? " Also include frontDiagram (question figure, NO answer labels) and backDiagram (solution figure WITH the correct answer labeled)."
-        : ""
-    }`,
-  });
-
-  if (!output?.answer?.trim()) {
-    throw new Error("AI answer generation failed. Please try again.");
-  }
-
-  const answer = cleanAiText(output.answer);
-
-  let frontDiagram: MathDiagram | null = null;
-  let backDiagram: MathDiagram | null = null;
-  if (includeDiagram) {
-    if (output && "frontDiagram" in output) {
-      frontDiagram = parseRenderableDiagram(
-        (output as { frontDiagram?: unknown }).frontDiagram,
-        "front",
-      );
-    }
-    if (output && "backDiagram" in output) {
-      backDiagram = parseRenderableDiagram(
-        (output as { backDiagram?: unknown }).backDiagram,
-        "back",
-      );
-    }
-    if (!frontDiagram || !backDiagram) {
-      try {
-        const pair = await generateDiagramPairOnly({ fullContext, question, answer });
-        frontDiagram = frontDiagram ?? pair.front;
-        backDiagram = backDiagram ?? pair.back;
-      } catch {
-        // Keep whatever we already parsed.
-      }
-    }
-  }
-
-  const diagram = backDiagram ?? frontDiagram;
-
-  // Decorative back illustration is fetched separately via /api/ai/card-back-image
-  // so the binary payload is not limited by server-action response size.
-  let distractors: [string, string, string];
-  try {
-    distractors = await generateStandardDistractors(
-      deck,
-      existingCards,
-      question,
-      answer,
-    );
-  } catch {
-    distractors = ["", "", ""];
-  }
-
-  let distractorDiagrams: [MathDiagram | null, MathDiagram | null, MathDiagram | null] = [
-    null,
-    null,
-    null,
-  ];
-  if (
-    includeDiagram &&
-    distractors.every((d) => d.trim().length > 0)
-  ) {
-    try {
-      distractorDiagrams = await generateDistractorDiagramsOnly({
-        fullContext,
-        question,
-        correctAnswer: answer,
-        distractors,
+          includeDiagram
+            ? " Also include frontDiagram (question figure, NO answer labels) and backDiagram (solution figure WITH the correct answer labeled)."
+            : ""
+        }`,
       });
-    } catch {
-      distractorDiagrams = [null, null, null];
-    }
-  }
 
-  return {
-    answer,
-    distractors,
-    diagram,
-    frontDiagram,
-    backDiagram,
-    distractorDiagrams,
-    relevanceWarning,
-  };
+      if (!output?.answer?.trim()) {
+        throw new Error("AI answer generation failed. Please try again.");
+      }
+
+      const answer = cleanAiText(output.answer);
+
+      let frontDiagram: MathDiagram | null = null;
+      let backDiagram: MathDiagram | null = null;
+      if (includeDiagram) {
+        if (output && "frontDiagram" in output) {
+          frontDiagram = parseRenderableDiagram(
+            (output as { frontDiagram?: unknown }).frontDiagram,
+            "front",
+          );
+        }
+        if (output && "backDiagram" in output) {
+          backDiagram = parseRenderableDiagram(
+            (output as { backDiagram?: unknown }).backDiagram,
+            "back",
+          );
+        }
+        if (!frontDiagram || !backDiagram) {
+          try {
+            const pair = await generateDiagramPairOnly({
+              fullContext,
+              question,
+              answer,
+            });
+            frontDiagram = frontDiagram ?? pair.front;
+            backDiagram = backDiagram ?? pair.back;
+          } catch (error) {
+            if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+              throw new Error(error.message);
+            }
+            // Keep whatever we already parsed.
+          }
+        }
+      }
+
+      const diagram = backDiagram ?? frontDiagram;
+
+      // Decorative back illustration is fetched separately via /api/ai/card-back-image
+      // so the binary payload is not limited by server-action response size.
+      let distractors: [string, string, string];
+      try {
+        distractors = await generateStandardDistractors(
+          deck,
+          existingCards,
+          question,
+          answer,
+        );
+      } catch (error) {
+        if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+          throw new Error(error.message);
+        }
+        distractors = ["", "", ""];
+      }
+
+      let distractorDiagrams: [
+        MathDiagram | null,
+        MathDiagram | null,
+        MathDiagram | null,
+      ] = [null, null, null];
+      if (includeDiagram && distractors.every((d) => d.trim().length > 0)) {
+        try {
+          distractorDiagrams = await generateDistractorDiagramsOnly({
+            fullContext,
+            question,
+            correctAnswer: answer,
+            distractors,
+          });
+        } catch (error) {
+          if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+            throw new Error(error.message);
+          }
+          distractorDiagrams = [null, null, null];
+        }
+      }
+
+      return {
+        answer,
+        distractors,
+        diagram,
+        frontDiagram,
+        backDiagram,
+        distractorDiagrams,
+        relevanceWarning,
+      };
+    },
+  );
 }
 
 const multipleChoiceAnswerRefine = (data: {
@@ -1540,31 +1593,40 @@ export async function generateMultipleChoiceAction(
   const existingCards = await getCardsByDeckUnscoped(deckId);
   const fullContext = buildDeckContext(deck, existingCards);
 
-  const { output: validationOutput } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({
-      schema: validateQuestionRelevanceSchema,
-    }),
-    system: QUESTION_RELEVANCE_SYSTEM,
-    prompt: `${fullContext}
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "flashcards",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    async () => {
+      const { output: validationOutput } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({
+          schema: validateQuestionRelevanceSchema,
+        }),
+        system: QUESTION_RELEVANCE_SYSTEM,
+        prompt: `${fullContext}
 
 User's Question: ${question}
 
 Is this question clearly off-topic for this deck, or reasonably related (including neighboring math/science subtopics)?`,
-  });
+      });
 
-  // Soft warning only — do not block AI generation (user can still save the card).
-  const relevanceWarning =
-    validationOutput &&
-    !validationOutput.isRelevant &&
-    validationOutput.warning?.trim()
-      ? validationOutput.warning.trim()
-      : null;
+      // Soft warning only — do not block AI generation (user can still save the card).
+      const relevanceWarning =
+        validationOutput &&
+        !validationOutput.isRelevant &&
+        validationOutput.warning?.trim()
+          ? validationOutput.warning.trim()
+          : null;
 
-  const hasCorrect = !!correctAnswer && correctAnswer.trim().length > 0;
+      const hasCorrect = !!correctAnswer && correctAnswer.trim().length > 0;
 
-  const systemPrompt = hasCorrect
-    ? `You generate plausible but definitively incorrect multiple-choice distractors for a flashcard.
+      const systemPrompt = hasCorrect
+        ? `You generate plausible but definitively incorrect multiple-choice distractors for a flashcard.
 
 You will receive a deck context (name, description, and existing cards), a question, and the correct answer. Produce exactly 3 wrong answers that:
 - Are clearly incorrect to someone who knows the subject
@@ -1579,7 +1641,7 @@ Rules:
 - Return exactly 3 distractors, no more, no less
 - The "correctAnswer" field in your response MUST be the exact correct answer the user provided, unchanged
 - Stay strictly within the subject matter and scope of the deck`
-    : `You generate a multiple-choice flashcard answer set.
+        : `You generate a multiple-choice flashcard answer set.
 
 You will receive a deck context (name, description, and existing cards) and a question. Produce:
 - correctAnswer: the accurate, concise answer to the question, matching the style and depth of the existing cards
@@ -1595,48 +1657,50 @@ Rules:
 - Return exactly 3 distractors
 - Stay strictly within the subject matter and scope of the deck`;
 
-  const userPrompt = hasCorrect
-    ? `${fullContext}
+      const userPrompt = hasCorrect
+        ? `${fullContext}
 
 Question: ${question}
 Correct answer: ${correctAnswer!.trim()}
 
 Generate 3 plausible wrong answers that match the deck's style and scope.`
-    : `${fullContext}
+        : `${fullContext}
 
 Question: ${question}
 
 Generate the correct answer and 3 plausible wrong answers that match the deck's style and scope.`;
 
-  const { output } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({
-      schema: z.object({
-        correctAnswer: z.string(),
-        distractors: z.array(z.string()).length(3),
-      }),
-    }),
-    system: systemPrompt,
-    prompt: userPrompt,
-  });
+      const { output } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({
+          schema: z.object({
+            correctAnswer: z.string(),
+            distractors: z.array(z.string()).length(3),
+          }),
+        }),
+        system: systemPrompt,
+        prompt: userPrompt,
+      });
 
-  if (!output?.distractors || output.distractors.length !== 3) {
-    throw new Error("AI multiple-choice generation failed. Please try again.");
-  }
+      if (!output?.distractors || output.distractors.length !== 3) {
+        throw new Error("AI multiple-choice generation failed. Please try again.");
+      }
 
-  const finalCorrect = hasCorrect
-    ? cleanUserText(correctAnswer!)
-    : cleanAiText(output.correctAnswer);
-  if (!finalCorrect) {
-    throw new Error("AI multiple-choice generation failed. Please try again.");
-  }
-  const [d1, d2, d3] = output.distractors.map((d) => cleanAiText(d));
+      const finalCorrect = hasCorrect
+        ? cleanUserText(correctAnswer!)
+        : cleanAiText(output.correctAnswer);
+      if (!finalCorrect) {
+        throw new Error("AI multiple-choice generation failed. Please try again.");
+      }
+      const [d1, d2, d3] = output.distractors.map((d) => cleanAiText(d));
 
-  return {
-    correctAnswer: finalCorrect,
-    distractors: [d1, d2, d3],
-    relevanceWarning,
-  };
+      return {
+        correctAnswer: finalCorrect,
+        distractors: [d1, d2, d3] as [string, string, string],
+        relevanceWarning,
+      };
+    },
+  );
 }
 
 const previewImportDistractorsSchema = z.object({
@@ -1776,71 +1840,84 @@ export async function generateCardsFromExtractedSource(
     includeForDuplicateCheck: true,
   });
 
-  const { output: relevance } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({ schema: validateSourceRelevanceSchema }),
-    system: `You validate whether uploaded or linked study material fits a flashcard deck's topic.
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "flashcards",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    async () => {
+      const { output: relevance } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({ schema: validateSourceRelevanceSchema }),
+        system: `You validate whether uploaded or linked study material fits a flashcard deck's topic.
 
 Use the deck name, description, and existing cards to understand the deck scope. Compare the source excerpt to that scope.
 
 Return isRelevant=false only when the material is clearly unrelated (wrong subject, wrong language course, etc.). Return a short, helpful warning when false.`,
-    prompt: `${deckContext}
+        prompt: `${deckContext}
 
 Source material excerpt (first portion):
 ${extracted.text.slice(0, 4000)}
 
 Is this source material appropriate for generating flashcards in this deck?`,
-  });
+      });
 
-  if (!relevance?.isRelevant && !skipRelevanceCheck) {
-    return {
-      status: "relevance_warning",
-      warning:
-        relevance?.warning ??
-        "This source does not appear to match your deck topic. Try a different file or URL, or generate anyway if you are sure.",
-    };
-  }
+      if (!relevance?.isRelevant && !skipRelevanceCheck) {
+        return {
+          status: "relevance_warning" as const,
+          warning:
+            relevance?.warning ??
+            "This source does not appear to match your deck topic. Try a different file or URL, or generate anyway if you are sure.",
+        };
+      }
 
-  const { output } = await generateText({
-    model: openai("gpt-4o"),
-    output: Output.object({
-      schema: z.object({
-        cards: z.array(importedCardPreviewSchema),
-      }),
-    }),
-    system: `${FLASHCARD_GENERATION_SYSTEM_PROMPT}
+      const { output } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({
+          schema: z.object({
+            cards: z.array(importedCardPreviewSchema),
+          }),
+        }),
+        system: `${FLASHCARD_GENERATION_SYSTEM_PROMPT}
 ${readingPassageMultipleChoice ? `\n\n${READING_PASSAGE_MC_GENERATION_PROMPT}` : ""}
 
 You will also receive an excerpt of source material (notes, article, document, etc.). Ground every card in facts from that source while matching the deck's established style and scope. Prefer the most important concepts from the source.`,
-    prompt: `${deckContext}
+        prompt: `${deckContext}
 
 Source material:
 ${extracted.text}
 
 Generate exactly ${count} new flashcards from the source material above. They must be genuinely new (no duplicates of existing cards), match the deck style, and stay within the deck topic. For each card return front, back, and 3 distractors.${
-      readingPassageMultipleChoice
-        ? " Use reading passage + multiple choice format on every card (Passage and Question only on front; back = correct answer text; distractors = three wrong answer texts — no A–D labels on front)."
-        : ""
-    }`,
-  });
+          readingPassageMultipleChoice
+            ? " Use reading passage + multiple choice format on every card (Passage and Question only on front; back = correct answer text; distractors = three wrong answer texts — no A–D labels on front)."
+            : ""
+        }`,
+      });
 
-  const trimmed = (output?.cards ?? []).slice(0, count).map((c) => ({
-    front: cleanAiText(
-      readingPassageMultipleChoice ? cleanReadingPassageFront(c.front) : c.front,
-    ),
-    back: cleanAiText(c.back),
-    distractors: [
-      cleanAiText(c.distractors[0]),
-      cleanAiText(c.distractors[1]),
-      cleanAiText(c.distractors[2]),
-    ],
-  }));
+      const trimmed = (output?.cards ?? []).slice(0, count).map((c) => ({
+        front: cleanAiText(
+          readingPassageMultipleChoice
+            ? cleanReadingPassageFront(c.front)
+            : c.front,
+        ),
+        back: cleanAiText(c.back),
+        distractors: [
+          cleanAiText(c.distractors[0]),
+          cleanAiText(c.distractors[1]),
+          cleanAiText(c.distractors[2]),
+        ],
+      }));
 
-  if (trimmed.length === 0) {
-    throw new Error("The model did not return any cards. Please try again.");
-  }
+      if (trimmed.length === 0) {
+        throw new Error("The model did not return any cards. Please try again.");
+      }
 
-  return { status: "ok", cards: trimmed };
+      return { status: "ok" as const, cards: trimmed };
+    },
+  );
 }
 
 /**
@@ -1899,7 +1976,16 @@ export async function generateCardsFromSourceAction(
     const uploadFile = file as File;
     const format = resolveFileSourceFormat(uploadFile);
     assertFormatAllowedForPlan(format, advancedImport);
-    extracted = await extractTextFromFile(uploadFile);
+    extracted = await runWithAiUsageContext(
+      {
+        userId,
+        feature: "ocr",
+        teamId: deck.teamId ?? null,
+        subscriptionPlan: access.effectivePlanSlug,
+        isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+      },
+      () => extractTextFromFile(uploadFile),
+    );
   }
 
   return generateCardsFromExtractedSource(userId, {
@@ -1930,11 +2016,21 @@ export async function previewImportDistractorsAction(
   }
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
-  const distractors = await generateStandardDistractors(
-    deck,
-    existingCards,
-    distractorQuestion.trim(),
-    distractorAnswer.trim(),
+  const distractors = await runWithAiUsageContext(
+    {
+      userId,
+      feature: "flashcards",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    () =>
+      generateStandardDistractors(
+        deck,
+        existingCards,
+        distractorQuestion.trim(),
+        distractorAnswer.trim(),
+      ),
   );
   return { distractors };
 }
@@ -1961,32 +2057,45 @@ export async function commitImportedCardsAction(
   await assertSourceImportLimits(deckId, cards.length, maxCardsPerDeck, teamTierPro);
 
   const existingCards = await getCardsByDeckUnscoped(deckId);
-  const payload: { front: string; back: string; distractors: string[] }[] = [];
 
-  for (const card of cards) {
-    const front = card.front.trim();
-    const back = card.back.trim();
-    let distractors: [string, string, string];
-    if (card.distractors?.length === 3) {
-      distractors = [
-        cleanAiText(card.distractors[0]),
-        cleanAiText(card.distractors[1]),
-        cleanAiText(card.distractors[2]),
-      ];
-    } else {
-      const distractorQuestion = card.distractorQuestion?.trim() ?? front;
-      const distractorAnswer = card.distractorAnswer?.trim() ?? back;
-      distractors = await generateStandardDistractors(
-        deck,
-        existingCards,
-        distractorQuestion,
-        distractorAnswer,
-      );
-    }
-    payload.push({ front, back, distractors: [...distractors] });
-  }
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "flashcards",
+      teamId: deck.teamId ?? null,
+      subscriptionPlan: access.effectivePlanSlug,
+      isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+    },
+    async () => {
+      const payload: { front: string; back: string; distractors: string[] }[] =
+        [];
 
-  await bulkCreateCards(deckId, payload, true);
-  revalidatePath(`/decks/${deckId}`);
-  return { added: payload.length };
+      for (const card of cards) {
+        const front = card.front.trim();
+        const back = card.back.trim();
+        let distractors: [string, string, string];
+        if (card.distractors?.length === 3) {
+          distractors = [
+            cleanAiText(card.distractors[0]),
+            cleanAiText(card.distractors[1]),
+            cleanAiText(card.distractors[2]),
+          ];
+        } else {
+          const distractorQuestion = card.distractorQuestion?.trim() ?? front;
+          const distractorAnswer = card.distractorAnswer?.trim() ?? back;
+          distractors = await generateStandardDistractors(
+            deck,
+            existingCards,
+            distractorQuestion,
+            distractorAnswer,
+          );
+        }
+        payload.push({ front, back, distractors: [...distractors] });
+      }
+
+      await bulkCreateCards(deckId, payload, true);
+      revalidatePath(`/decks/${deckId}`);
+      return { added: payload.length };
+    },
+  );
 }

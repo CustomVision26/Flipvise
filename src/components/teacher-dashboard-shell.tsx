@@ -27,7 +27,14 @@ function TeacherNavSkeleton() {
   );
 }
 
-export function TeacherDashboardShell({ children }: { children: ReactNode }) {
+export function TeacherDashboardShell({
+  children,
+  topBar,
+}: {
+  children: ReactNode;
+  /** Server-rendered Personal / Team / Team Admin dashboard shortcuts. */
+  topBar?: ReactNode;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -47,6 +54,8 @@ export function TeacherDashboardShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {topBar}
+
         <div className="flex items-center lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger

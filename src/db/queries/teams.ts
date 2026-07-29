@@ -286,6 +286,7 @@ function withDefaultTeamMemberAudit(
     addedByUserId: null,
     addedByAsOwner: null,
     inactiveAt: null,
+    maxCreateDecks: null,
   };
 }
 

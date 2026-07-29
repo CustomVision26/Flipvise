@@ -1,11 +1,19 @@
 "use server";
 
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { requireTeacherToolsAccess } from "@/lib/teacher-access";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 import {
   coerceLessonPlanDayVocabularyDetail,
   coerceLessonPlanResultAi,
@@ -327,7 +335,7 @@ export async function generateLessonPlanAction(
   data: LessonPlanActionInput,
 ): Promise<LessonPlanResult> {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Lesson Builder requires an education plan.",
   );
@@ -339,13 +347,24 @@ export async function generateLessonPlanAction(
 
   const input = parsed.data;
   const learningStandard = input.learningStandard?.trim() ?? "";
+  const usageCtx = {
+    userId,
+    feature: "lesson_plan" as const,
+    teamId: null as number | null,
+    subscriptionPlan: ctx.effectivePlanSlug,
+    isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+  };
 
+  return runWithAiUsageContext(usageCtx, async () => {
   let curriculumContext: CurriculumResearchContext | null = null;
   let applyJamaicaNscGuidelines = false;
 
   if (learningStandard) {
     const [researchResult, jamaicaLinked] = await Promise.all([
-      fetchCurriculumContextForLessonPlan(input).catch((error) => {
+      fetchCurriculumContextForLessonPlan(input, usageCtx).catch((error) => {
+        if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+          throw error;
+        }
         if (process.env.NODE_ENV !== "production") {
           console.warn(
             "[generateLessonPlanAction] Curriculum research failed; continuing without it.",
@@ -369,7 +388,7 @@ export async function generateLessonPlanAction(
   }
 
   try {
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({
         schema: lessonPlanResultAiSchema,
@@ -412,6 +431,9 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
       applyJamaicaNscGuidelines,
     });
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw new Error(error.message);
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[generateLessonPlanAction] AI failed; using template fallback.",
@@ -424,6 +446,7 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
       jamaicaNscGuidelinesApplied: applyJamaicaNscGuidelines,
     };
   }
+  });
 }
 
 const generateDayVocabularyDetailSchema = z.object({
@@ -482,7 +505,7 @@ async function generateDayVocabularyDetailCore(
     : `- fiveEBreakdown: MUST be null. Do not invent Engage/Explore/Explain/Elaborate/Evaluate phases — Jamaica NSC guidelines do not apply for this Learning Standard. Expand instructional guidance via process steps that follow the provided class timeline labels (warm-up, instruction, practice, etc.).`;
 
   try {
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({
         schema: lessonPlanDayVocabularyDetailAiSchema,
@@ -535,6 +558,9 @@ ${fiveERequirement}
 
     return finalize(coerceLessonPlanDayVocabularyDetail(output));
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw new Error(error.message);
+    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[generateDayVocabularyDetailAction] AI failed; using template fallback.",
@@ -549,7 +575,7 @@ export async function generateDayVocabularyDetailAction(
   data: z.infer<typeof generateDayVocabularyDetailSchema>,
 ) {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Lesson Builder requires an education plan.",
   );
@@ -559,7 +585,16 @@ export async function generateDayVocabularyDetailAction(
     throw new Error(lessonPlanValidationError(parsed.error));
   }
 
-  return generateDayVocabularyDetailCore(parsed.data);
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "lesson_plan",
+      teamId: null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    () => generateDayVocabularyDetailCore(parsed.data),
+  );
 }
 
 const generateAllDaysVocabularyDetailSchema = z.object({
@@ -587,7 +622,7 @@ export async function generateAllDaysVocabularyDetailAction(
   data: z.infer<typeof generateAllDaysVocabularyDetailSchema>,
 ) {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Lesson Builder requires an education plan.",
   );
@@ -597,21 +632,32 @@ export async function generateAllDaysVocabularyDetailAction(
     throw new Error(lessonPlanValidationError(parsed.error));
   }
 
-  const { days, ...lessonContext } = parsed.data;
-  const jamaicaNscGuidelinesApplied =
-    await resolveApplyJamaicaNscForDetail(lessonContext);
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "lesson_plan",
+      teamId: null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    async () => {
+      const { days, ...lessonContext } = parsed.data;
+      const jamaicaNscGuidelinesApplied =
+        await resolveApplyJamaicaNscForDetail(lessonContext);
 
-  return Promise.all(
-    days.map((day) =>
-      generateDayVocabularyDetailCore({
-        ...lessonContext,
-        jamaicaNscGuidelinesApplied,
-        dayLabel: day.dayLabel,
-        dailyFocus: day.dailyFocus,
-        vocabulary: day.vocabulary,
-        lessonTimeline: day.lessonTimeline,
-      }),
-    ),
+      return Promise.all(
+        days.map((day) =>
+          generateDayVocabularyDetailCore({
+            ...lessonContext,
+            jamaicaNscGuidelinesApplied,
+            dayLabel: day.dayLabel,
+            dailyFocus: day.dailyFocus,
+            vocabulary: day.vocabulary,
+            lessonTimeline: day.lessonTimeline,
+          }),
+        ),
+      );
+    },
   );
 }
 
@@ -1008,7 +1054,7 @@ export async function extractLessonPlanReferenceAction(
   formData: FormData,
 ): Promise<{ text: string; summary: string }> {
   const ctx = await getAccessContext();
-  await requireTeacherToolsAccess(
+  const { userId } = await requireTeacherToolsAccess(
     ctx,
     "Lesson Builder requires an education plan.",
   );
@@ -1046,7 +1092,16 @@ export async function extractLessonPlanReferenceAction(
   }
 
   const file = fileEntry as File;
-  const extracted = await extractTextFromFile(file);
+  const extracted = await runWithAiUsageContext(
+    {
+      userId,
+      feature: "ocr",
+      teamId: null,
+      subscriptionPlan: ctx.effectivePlanSlug,
+      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+    },
+    () => extractTextFromFile(file),
+  );
   assertFormatAllowedForPlan(extracted.format, advancedImport);
   return {
     text: truncateSourceImportText(extracted.text),

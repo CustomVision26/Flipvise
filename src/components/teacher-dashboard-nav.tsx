@@ -36,7 +36,7 @@ function useTeacherNavWorkspace(): TeacherWorkspaceContext {
 
 function navLinkClass(active: boolean) {
   return cn(
-    "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+    "flex items-start gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
     active
       ? "bg-primary/15 font-medium text-foreground"
       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -68,9 +68,15 @@ export function TeacherDashboardNav({
           className={navLinkClass(overviewActive)}
           onClick={onNavigate}
           aria-current={overviewActive ? "page" : undefined}
+          title="/teacher"
         >
-          <LayoutDashboard className="size-4 shrink-0" aria-hidden />
-          Dashboard
+          <LayoutDashboard className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">Dashboard</span>
+            <span className="block truncate text-[10px] font-normal text-muted-foreground/70">
+              /teacher
+            </span>
+          </span>
         </Link>
       </div>
 
@@ -87,18 +93,32 @@ export function TeacherDashboardNav({
           </div>
           <ul className="flex flex-col gap-0.5">
             {section.items.map((item) => {
-              const active = isTeacherNavItemActive(pathname, item.suffix);
+              const active = isTeacherNavItemActive(
+                pathname,
+                item.suffix,
+                item.absoluteHref,
+              );
               const Icon = item.icon;
+              const path =
+                item.absoluteHref ??
+                `/teacher${item.suffix.startsWith("/") ? item.suffix : `/${item.suffix}`}`;
+              const href = item.absoluteHref ?? buildTeacherToolHref(item.suffix, workspace);
               return (
                 <li key={`${section.title}-${item.title}`}>
                   <Link
-                    href={buildTeacherToolHref(item.suffix, workspace)}
+                    href={href}
                     className={navLinkClass(active)}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
+                    title={path}
                   >
-                    <Icon className="size-4 shrink-0 opacity-80" aria-hidden />
-                    <span className="min-w-0 truncate">{item.title}</span>
+                    <Icon className="mt-0.5 size-4 shrink-0 opacity-80" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{item.title}</span>
+                      <span className="block truncate text-[10px] font-normal text-muted-foreground/70">
+                        {path}
+                      </span>
+                    </span>
                   </Link>
                 </li>
               );

@@ -5,6 +5,7 @@ import {
   History,
   Layers,
   Mail,
+  Puzzle,
   Send,
   Shield,
   Timer,
@@ -12,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import {
+  isTeamAdminAddonsPath,
   isTeamAdminAssignDecksToMembersPath,
   isTeamAdminInviteHistoryPath,
   isTeamAdminInvitePendingPath,
@@ -24,6 +26,7 @@ import {
   isTeamAdminQuizTimerPath,
   isTeamAdminStudyPrivilegesPath,
   isTeamAdminWsHistoryPath,
+  TEAM_ADMIN_ADDONS_PATH,
   TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH,
   TEAM_ADMIN_INVITE_HISTORY_PATH,
   TEAM_ADMIN_INVITE_PENDING_PATH,
@@ -111,6 +114,18 @@ export const TEAM_ADMIN_DASHBOARD_NAV: TeamAdminNavSection[] = [
         path: TEAM_ADMIN_STUDY_PRIVILEGES_PATH,
         icon: Shield,
         isActive: isTeamAdminStudyPrivilegesPath,
+      },
+    ],
+  },
+  {
+    title: "Add-ons",
+    description: "Assign premium add-on features to members.",
+    items: [
+      {
+        title: "Member add-ons",
+        path: TEAM_ADMIN_ADDONS_PATH,
+        icon: Puzzle,
+        isActive: isTeamAdminAddonsPath,
       },
     ],
   },

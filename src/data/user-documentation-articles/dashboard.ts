@@ -24,7 +24,17 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "Edit deck updates the same metadata and first card front image from a deck card menu.",
           "Delete deck confirms first. Education plans get a detailed impact list: linked lesson plans stay in the Resource Library; Edit and Create Quiz stay available when another related deck (for example a quiz deck from that plan) can take over the link, and become unavailable only when this is the last linked deck. On a non-Education plan with leftover Education lesson-plan links, the dialog warns that the Education link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "Each deck card links to the deck editor and study session.",
+          "AI Essay premium add-on card sits above the deck library — Unlock Feature opens checkout, or shortcuts appear when entitled.",
           "Usage banners show deck count and cards-per-deck limits for your plan.",
+        ],
+      },
+      {
+        id: "ai-essay-card",
+        title: "AI Essay add-on card",
+        bullets: [
+          "Locked: shows Premium Add-on and Unlock Feature (monthly/yearly Stripe add-on).",
+          "Unlocked: Create Essay, My Essays, Drafts, and Assignments link to /dashboard/essay.",
+          "Access also comes from Team Admin assignment or a platform admin grant.",
         ],
       },
       {
@@ -80,6 +90,41 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
     ],
   ),
   a(
+    "ai-essay",
+    "AI Essay — In-Depth Guide",
+    "AI Essay is an optional premium add-on at /dashboard/essay. It stacks on your current plan — it is not a separate subscription.",
+    [
+      {
+        id: "access",
+        title: "How access is granted",
+        bullets: [
+          "Purchase from the Add-on Catalog or the Unlock Feature dialog (monthly or yearly Stripe prices).",
+          "Team Admin → Add-ons can assign AI Essay to members.",
+          "Platform admins can grant or revoke complimentary access at /admin/add-ons.",
+          "Server-side checks use canAccessAddon(access, \"ai_essay\") — never trust the client alone.",
+        ],
+      },
+      {
+        id: "surfaces",
+        title: "Screens",
+        bullets: [
+          "Overview — recent essays, continue draft, generate, recent feedback, assignments summary.",
+          "Generate Essay — subject, grade, type, difficulty, topic, optional learning standard, word count, timer, and include flags.",
+          "My Essays / Drafts / Assignments — library of generated activities, open drafts, and Team Admin assignments.",
+          "Writing workspace — prompt, instructions, word counter, optional timer, save, submit, AI feedback; model essay stays hidden until revealed.",
+        ],
+      },
+      {
+        id: "offline",
+        title: "Offline behavior",
+        bullets: [
+          "Prompts and writing area remain usable offline; drafts cache in localStorage and sync when online.",
+          "AI generation and AI feedback require an internet connection.",
+        ],
+      },
+    ],
+  ),
+  a(
     "team-workspace-dashboard",
     "Team Workspace View — In-Depth Guide",
     "Invited members and co-admins switch to a team workspace dashboard (/dashboard?team=…). Plan owners keep decks on Personal Dash and manage workspaces in Team Admin.",
@@ -103,6 +148,14 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
             ["Team member (invited)", "Assigned decks only on Team Dashboard", "Study only — no deck editor"],
           ],
         },
+      },
+      {
+        id: "ai-essay",
+        title: "AI Essay on Team Dashboard",
+        bullets: [
+          "The same AI Essay add-on card appears for invited members.",
+          "Unlocked members can open /dashboard/essay even while studying assigned decks.",
+        ],
       },
       {
         id: "switching",

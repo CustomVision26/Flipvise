@@ -14,7 +14,7 @@ import {
 } from "@/lib/personal-workspace-plan-label";
 import { shouldHideHelpCenter } from "@/lib/team-help";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
-import { showTeacherDashboardFromShell } from "@/lib/show-teacher-dashboard";
+import { showPersonalTeacherDashFromShell, showTeacherDashboardFromShell } from "@/lib/show-teacher-dashboard";
 import { isTeamPlanId } from "@/lib/team-plans";
 import { isEducationTeamPlanId, isWorkspaceSubscriptionPlanSlug } from "@/lib/education-plans";
 import {
@@ -51,6 +51,8 @@ export type RootLayoutShellData = {
   showWorkspaceSwitcher: boolean;
   teamDashFallback: RootLayoutTeamDashFallback;
   showTeacherDashboard: boolean;
+  /** Personal-row Teacher Dash — education plan owners only. */
+  showPersonalTeacherDash: boolean;
 };
 
 function resolveTeamDashFallback(
@@ -148,6 +150,7 @@ export async function loadRootLayoutShellData(input: {
     showWorkspaceSwitcher: false,
     teamDashFallback: null,
     showTeacherDashboard: false,
+    showPersonalTeacherDash: false,
   };
 
   if (profile === "guest" || userId == null) {
@@ -240,6 +243,11 @@ export async function loadRootLayoutShellData(input: {
       teamAdminHeaderTeams,
     ),
     showTeacherDashboard: showTeacherDashboardFromShell({
+      access,
+      teamAdminHeaderTeams,
+    }),
+    showPersonalTeacherDash: showPersonalTeacherDashFromShell({
+      userId,
       access,
       teamAdminHeaderTeams,
     }),

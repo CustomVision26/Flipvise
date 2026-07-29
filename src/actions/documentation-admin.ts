@@ -4,8 +4,12 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
 import {
   deleteDocumentationOverride,
   upsertDocumentationOverride,
@@ -134,16 +138,24 @@ export async function clearDocumentationOverrideAction(
 export async function aiImproveDocumentationAction(
   data: z.infer<typeof aiImproveSchema>,
 ): Promise<z.infer<typeof docPagePayloadSchema> | z.infer<typeof docArticlePayloadSchema>> {
-  await requireAdmin();
+  const { userId } = await requireAdmin();
   const parsed = aiImproveSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
   const { audience, contentKind, instruction, payload } = parsed.data;
   const audienceLabel = audience === "user" ? "end-user" : "platform administrator";
 
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "documentation",
+      isPlatformAdmin: true,
+      skipLimitEnforcement: true,
+    },
+    async () => {
   if (contentKind === "quick_reference_page") {
     const pagePayload = docPagePayloadSchema.parse(payload);
-    const { output } = await generateText({
+    const { output } = await trackedGenerateText({
       model: openai("gpt-4o"),
       output: Output.object({ schema: docPagePayloadSchema }),
       system: `You improve Flipvise product documentation for ${audienceLabel}s.
@@ -167,7 +179,7 @@ Return the improved documentation JSON only.`,
   }
 
   const articlePayload = docArticlePayloadSchema.parse(payload);
-  const { output } = await generateText({
+  const { output } = await trackedGenerateText({
     model: openai("gpt-4o"),
     output: Output.object({ schema: docArticlePayloadSchema }),
     system: `You improve Flipvise product documentation for ${audienceLabel}s.
@@ -192,4 +204,6 @@ Return the improved documentation JSON only.`,
   }
 
   return output;
+    },
+  );
 }

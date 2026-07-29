@@ -4,8 +4,12 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/clerk-auth";
 import { createClerkClient } from "@clerk/backend";
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { openai } from "@ai-sdk/openai";
+import {
+  runWithAiUsageContext,
+  trackedGenerateText,
+} from "@/lib/ai-usage/track";
 import {
   upsertDocumentationOverride,
   type DocumentationAudience,
@@ -109,7 +113,7 @@ export async function uploadDocumentationAgentImageAction(
 export async function runDocumentationAgentAction(
   data: z.infer<typeof runAgentSchema>,
 ): Promise<DocumentationAgentResult> {
-  await requireAdmin();
+  const { userId } = await requireAdmin();
   const parsed = runAgentSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
   if (!parsed.data.updateAdmin && !parsed.data.updateUser) {
@@ -117,6 +121,15 @@ export async function runDocumentationAgentAction(
   }
 
   const { instruction, updateAdmin, updateUser, imageUrls } = parsed.data;
+
+  return runWithAiUsageContext(
+    {
+      userId,
+      feature: "documentation",
+      isPlatformAdmin: true,
+      skipLimitEnforcement: true,
+    },
+    async () => {
   const contextBlocks: string[] = [];
 
   if (updateUser) {
@@ -154,7 +167,7 @@ Return a summary of what you will change and the list of operations to apply.`;
     userContent.push({ type: "image", image: url });
   }
 
-  const { output } = await generateText({
+  const { output } = await trackedGenerateText({
     model: openai("gpt-4o"),
     output: Output.object({ schema: documentationAgentResultSchema }),
     messages: [
@@ -170,6 +183,8 @@ Return a summary of what you will change and the list of operations to apply.`;
   }
 
   return output;
+    },
+  );
 }
 
 async function applyOperation(

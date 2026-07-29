@@ -7,9 +7,13 @@ export const teacherWorksheetInputSchema = z.object({
   topic: z.string().min(1),
   worksheetType: z.string().min(1),
   difficultyLevel: z.string().min(1),
+  numberOfQuestions: z.number().int().min(1).max(50).default(10),
 });
 
 export type TeacherWorksheetActionInput = z.infer<typeof teacherWorksheetInputSchema>;
+
+export const TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT = 10;
+export const TEACHER_WORKSHEET_MAX_QUESTIONS = 50;
 
 export type WorksheetItem = {
   questionNumber: number;

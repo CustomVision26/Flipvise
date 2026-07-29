@@ -1,0 +1,32 @@
+{
+  "timezone": "America/Jamaica",
+  "pricingVersion": "2026-07-01",
+  "warningThresholds": [80, 90, 100],
+  "blockAtLimitDefault": true,
+  "allowOverageDefault": false,
+  "maxDateRangeDays": 366,
+  "abuse": {
+    "maxRequestsPerMinute": 30,
+    "maxFailuresPerHour": 20,
+    "maxBlockedAttemptsPerHour": 10,
+    "costSpikeMicros": 5000000
+  },
+  "planAllowances": {
+    "free": 20,
+    "pro": 150,
+    "pro_plus": 500,
+    "education_plus": 500,
+    "education_gold": 1500,
+    "education_enterprise": null,
+    "pro_plus_team_basic": 800,
+    "pro_plus_team_gold": 1500,
+    "pro_plus_platinum_plan": 3000,
+    "pro_plus_enterprise": null,
+    "pro_team_basic": 800,
+    "pro_team_gold": 1500,
+    "pro_platinum_plan": 3000,
+    "pro_enterprise": null
+  },
+  "fallbackAllowance": 20,
+  "platformAdminUnlimited": true
+}

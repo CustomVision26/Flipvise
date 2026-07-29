@@ -24,7 +24,6 @@ import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
 import { toClientJson } from "@/lib/to-client-json";
 import {
   TeamAdminPanelScroll,
-  TeamAdminQuickNavPanel,
   TeamAdminWorkspaceStatsPanel,
   TeamDeckManagerSubTabs,
   TeamQuizFormatsSettings,
@@ -55,7 +54,7 @@ interface PageProps {
 
 export default async function TeamAdminStudyPrivilegesPage({ searchParams }: PageProps) {
   const ctx = await loadTeamAdminPageContext(buildTeamAdminStudyPrivilegesPath, searchParams);
-  const { userId, selected, teamsForSubscriber, viewerTeamMemberUrlParam, isOwner } = ctx;
+  const { userId, selected, teamsForSubscriber, viewerTeamMemberUrlParam } = ctx;
 
   const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
     Promise.all(
@@ -104,11 +103,6 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
       ? selected.id
       : (quizFormatWorkspaces[0]?.id ?? selected.id);
   const showQuizFormatSettings = quizFormatWorkspaces.length > 0;
-
-  const quickNavDescription = isOwner
-    ? "Return to your personal dashboard to create and edit decks."
-    : "Open your personal dashboard or the workspace-scoped main dashboard.";
-
   return (
     <TeamAdminToolPageLayout
       pathname={TEAM_ADMIN_STUDY_PRIVILEGES_PATH}
@@ -147,18 +141,6 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
                 Control study modes per assignment and quiz question formats for your workspaces.
               </p>
             </div>
-            <TeamAdminQuickNavPanel
-              className="w-full shrink-0 sm:max-w-sm"
-              planLabel={ctx.planLabel}
-              description={quickNavDescription}
-              mainDashboardHref={ctx.mainDashboardHref}
-              workspaceDashboardHref={ctx.workspaceDashboardHref}
-              workspaceTeamId={selected.id}
-              workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
-              isOwner={isOwner}
-              workspacePlanSlug={selected.planSlug}
-              showTeacherDashboard={ctx.showTeacherDashboard}
-            />
           </div>
 
           <TeamAdminWorkspaceStatsPanel

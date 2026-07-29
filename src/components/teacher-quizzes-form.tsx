@@ -65,6 +65,11 @@ import {
   type LessonPlanDayScope,
 } from "@/lib/lesson-plan-day-scope";
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
+import {
+  formatDeckCardDisplayName,
+  formatLessonPlanDayCardLabel,
+} from "@/lib/teacher-generation-titles";
+import { previewTeacherQuizDeckSaveDestination } from "@/lib/teacher-quiz-deck-save-preview";
 import { cn } from "@/lib/utils";
 import { ADMIN_NONE, adminDisplayLabel } from "@/lib/owner-team-admin-picker";
 import { toast } from "sonner";
@@ -234,6 +239,40 @@ export function TeacherQuizzesForm({
     () => getLessonPlanDayScopeOptions(selectedPlan?.result),
     [selectedPlan],
   );
+
+  const saveDestination = useMemo(() => {
+    const linkedMainDeck =
+      selectedPlan?.deckId != null
+        ? decks.find((deck) => deck.id === selectedPlan.deckId) ?? null
+        : null;
+    return previewTeacherQuizDeckSaveDestination({
+      savedLessonPlanId: form.savedLessonPlanId,
+      dayScope:
+        form.savedLessonPlanId != null && dayScopeOptions.length > 0
+          ? generationDayScope
+          : form.savedLessonPlanId != null
+            ? "all"
+            : null,
+      subject: form.subject,
+      topic: form.topic,
+      linkedMainDeckId: selectedPlan?.deckId ?? null,
+      linkedMainDeckName: linkedMainDeck?.name ?? selectedPlan?.sourceDeckName ?? null,
+      sourceDeckName: selectedPlan?.sourceDeckName ?? null,
+      decks: decks.map((deck) => ({
+        id: deck.id,
+        name: deck.name,
+        description: deck.description,
+      })),
+    });
+  }, [
+    decks,
+    dayScopeOptions.length,
+    form.savedLessonPlanId,
+    form.subject,
+    form.topic,
+    generationDayScope,
+    selectedPlan,
+  ]);
 
   useEffect(() => {
     if (!initialLessonPlanId) return;
@@ -420,10 +459,13 @@ export function TeacherQuizzesForm({
       const openDeckHref = teacherWorkspace?.queryString
         ? withTeamWorkspaceQuery(`/decks/${saved.deckId}`, teacherWorkspace.queryString)
         : `/decks/${saved.deckId}`;
-      toast.success("Deck saved", {
+      toast.success(saved.created ? "Deck created" : "Cards saved", {
         description: (
           <span>
-            {saved.deckName} was created with {saved.cardCount} quiz cards. Open it from your{" "}
+            {saved.created
+              ? `${saved.deckName} was created with ${saved.cardCount} quiz cards.`
+              : `${saved.cardCount} quiz card${saved.cardCount === 1 ? "" : "s"} added to ${saved.deckName}.`}{" "}
+            Open it from your{" "}
             <Link href={openDeckHref} className="underline underline-offset-2">
               deck
             </Link>{" "}
@@ -547,6 +589,7 @@ export function TeacherQuizzesForm({
               topic: form.topic,
               difficultyLevel: form.difficultyLevel,
             }}
+            saveDestination={saveDestination}
             onRowsChange={setReviewRows}
             disabled={isBusy}
           />
@@ -583,7 +626,9 @@ export function TeacherQuizzesForm({
                     ? "Select at least one card to save."
                     : anyDistractorsLoading
                       ? "Wait for wrong answers to finish generating."
-                      : `Save ${selectedCount} selected card(s) as a new deck with one correct answer and three wrong answers each.`
+                      : saveDestination.mode === "append"
+                        ? `Save ${selectedCount} selected card(s) to ${saveDestination.deckName} with one correct answer and three wrong answers each.`
+                        : `Save ${selectedCount} selected card(s) to the new deck ${saveDestination.deckName} with one correct answer and three wrong answers each.`
               }
             >
               {isSaving ? "Saving…" : `Save ${selectedCount} selected`}
@@ -647,13 +692,23 @@ export function TeacherQuizzesForm({
                             teacherWorkspace.queryString,
                           )
                         : `/decks/${deck.id}`;
+                      const displayName = formatDeckCardDisplayName(deck.name);
+                      const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
+                        deck.description,
+                        deck.name,
+                      );
                       return (
                       <div
                         key={deck.id}
                         className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 px-4 py-3"
                       >
                         <div className="min-w-0">
-                          <p className="font-medium text-foreground">{deck.name}</p>
+                          {lessonPlanDayLabel ? (
+                            <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {lessonPlanDayLabel}
+                            </p>
+                          ) : null}
+                          <p className="font-medium text-foreground">{displayName}</p>
                           {deck.description ? (
                             <p className="text-sm text-muted-foreground">{deck.description}</p>
                           ) : null}

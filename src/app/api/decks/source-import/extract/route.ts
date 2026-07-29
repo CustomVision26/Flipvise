@@ -5,6 +5,11 @@ import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import { canUseDeckAiFeatures, DECK_AI_PLAN_REQUIREMENT } from "@/lib/deck-ai-access";
 import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
+import { runWithAiUsageContext } from "@/lib/ai-usage/track";
+import {
+  isAiAccessDisabledError,
+  isAiUsageLimitError,
+} from "@/lib/ai-usage/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,9 +61,21 @@ export async function POST(req: Request) {
     const format = resolveFileSourceFormat(file);
     assertFormatAllowedForPlan(format, advancedImport);
 
-    const extracted = await extractTextFromFile(file);
+    const extracted = await runWithAiUsageContext(
+      {
+        userId,
+        feature: "ocr",
+        teamId: bundle.deck.teamId ?? null,
+        subscriptionPlan: access.effectivePlanSlug,
+        isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+      },
+      () => extractTextFromFile(file),
+    );
     return NextResponse.json({ text: extracted.text, format: extracted.format });
   } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     console.error("[api/decks/source-import/extract]", error);
     const message =
       error instanceof Error ? error.message : "Could not read the file. Please try again.";

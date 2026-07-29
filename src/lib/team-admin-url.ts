@@ -62,6 +62,9 @@ export const TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH =
 export const TEAM_ADMIN_STUDY_PRIVILEGES_PATH =
   "/dashboard/team-admin/deck-manager/study-privileges";
 
+/** Member add-on feature assignments (AI Essay, future add-ons). */
+export const TEAM_ADMIN_ADDONS_PATH = "/dashboard/team-admin/add-ons";
+
 /** True when `pathname` is under Deck Manager. */
 export function isTeamAdminDeckManagerPath(pathname: string): boolean {
   return pathname.startsWith("/dashboard/team-admin/deck-manager");
@@ -311,4 +314,19 @@ export function buildTeamAdminStudyPrivilegesPath(
 ): string {
   const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_STUDY_PRIVILEGES_PATH}?${qs}` : TEAM_ADMIN_STUDY_PRIVILEGES_PATH;
+}
+
+export function isTeamAdminAddonsPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_ADDONS_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_ADDONS_PATH}/`)
+  );
+}
+
+export function buildTeamAdminAddonsPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs ? `${TEAM_ADMIN_ADDONS_PATH}?${qs}` : TEAM_ADMIN_ADDONS_PATH;
 }

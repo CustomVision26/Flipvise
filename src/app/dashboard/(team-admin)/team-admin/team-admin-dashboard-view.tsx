@@ -43,7 +43,6 @@ import {
 import {
   AddTeamDialog,
   TeamAdminManageTabs,
-  TeamAdminQuickNavPanel,
   TeamAdminWorkspaceStatsPanel,
 } from "@/lib/team-admin-dynamic-components";
 import { TeamAdminHome } from "@/components/team-admin-home";
@@ -75,9 +74,6 @@ export default async function TeamAdminDashboardView({
     viewerTeamMemberUrlParam,
     isOwner,
     planLabel,
-    mainDashboardHref,
-    workspaceDashboardHref,
-    showTeacherDashboard,
   } = ctx;
 
   const pageMeta = teamAdminPageMetaForPath(buildCanonicalPath(0, 0).split("?")[0] ?? "");
@@ -262,10 +258,6 @@ export default async function TeamAdminDashboardView({
         )
       : undefined;
 
-  const quickNavDescription = isOwner
-    ? "Return to your personal dashboard to create and edit decks."
-    : "Open your personal dashboard or the workspace-scoped main dashboard.";
-
   const manageTabs = (
     <TeamAdminManageTabs
       key={selected.id}
@@ -346,14 +338,6 @@ export default async function TeamAdminDashboardView({
         description={pageMeta.description}
         workspaceName={selected.name}
         planLabel={planLabel}
-        quickNavDescription={quickNavDescription}
-        mainDashboardHref={mainDashboardHref}
-        workspaceDashboardHref={workspaceDashboardHref}
-        workspaceTeamId={selected.id}
-        workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
-        isOwner={isOwner}
-        workspacePlanSlug={selected.planSlug}
-        showTeacherDashboard={showTeacherDashboard}
         headerAside={pageMeta.isOverview ? addTeamAside : undefined}
       >
         {pageMeta.isOverview ? (
@@ -406,18 +390,6 @@ export default async function TeamAdminDashboardView({
           </div>
           {addTeamAside}
         </div>
-
-        <TeamAdminQuickNavPanel
-          planLabel={planLabel}
-          description={quickNavDescription}
-          mainDashboardHref={mainDashboardHref}
-          workspaceDashboardHref={workspaceDashboardHref}
-          workspaceTeamId={selected.id}
-          workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
-          isOwner={isOwner}
-          workspacePlanSlug={selected.planSlug}
-          showTeacherDashboard={showTeacherDashboard}
-        />
       </div>
 
       <TeamAdminWorkspaceStatsPanel

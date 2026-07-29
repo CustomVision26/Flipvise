@@ -15,9 +15,20 @@ function arrayToLines(items: string[]): string {
   return items.join("\n");
 }
 
-function StudyGuideReadOnly({ result }: { result: StudyGuideResult }) {
+function StudyGuideReadOnly({
+  result,
+  sourceTitle,
+}: {
+  result: StudyGuideResult;
+  sourceTitle?: string | null;
+}) {
   return (
     <div className="space-y-4 text-foreground">
+      {sourceTitle?.trim() ? (
+        <p className="text-sm font-semibold leading-snug text-foreground">
+          {sourceTitle.trim()}
+        </p>
+      ) : null}
       <p>{result.summary}</p>
       <div>
         <p className="font-medium text-foreground">Key Vocabulary</p>
@@ -74,9 +85,11 @@ function StudyGuideReadOnly({ result }: { result: StudyGuideResult }) {
 function StudyGuideEditable({
   draft,
   onChange,
+  sourceTitle,
 }: {
   draft: StudyGuideResult;
   onChange: (next: StudyGuideResult) => void;
+  sourceTitle?: string | null;
 }) {
   function patch(partial: Partial<StudyGuideResult>) {
     onChange({ ...draft, ...partial });
@@ -84,6 +97,11 @@ function StudyGuideEditable({
 
   return (
     <div className="space-y-4 text-foreground">
+      {sourceTitle?.trim() ? (
+        <p className="text-sm font-semibold leading-snug text-foreground">
+          {sourceTitle.trim()}
+        </p>
+      ) : null}
       <div className="space-y-2">
         <Label htmlFor="edit-study-guide-summary">Summary</Label>
         <Textarea
@@ -169,16 +187,24 @@ export function StudyGuidePreviewEditor({
   isEditing,
   editDraft,
   onEditDraftChange,
+  sourceTitle,
 }: {
   result: StudyGuideResult;
   isEditing: boolean;
   editDraft: StudyGuideResult | null;
   onEditDraftChange: (next: StudyGuideResult) => void;
+  sourceTitle?: string | null;
 }) {
   if (isEditing && editDraft) {
-    return <StudyGuideEditable draft={editDraft} onChange={onEditDraftChange} />;
+    return (
+      <StudyGuideEditable
+        draft={editDraft}
+        onChange={onEditDraftChange}
+        sourceTitle={sourceTitle}
+      />
+    );
   }
-  return <StudyGuideReadOnly result={result} />;
+  return <StudyGuideReadOnly result={result} sourceTitle={sourceTitle} />;
 }
 
 export function cloneStudyGuideResult(result: StudyGuideResult): StudyGuideResult {

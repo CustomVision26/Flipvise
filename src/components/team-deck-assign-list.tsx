@@ -31,8 +31,10 @@ import {
   unassignDeckFromMemberAction,
   linkPersonalDeckToTeamWorkspaceAction,
   unlinkPersonalDeckFromTeamWorkspaceAction,
+  updateTeamAdminMaxCreateDecksAction,
 } from "@/actions/teams";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import type { DeckRow, TeamMemberRow } from "@/db/schema";
 import type { TeamDeckAssignmentListRow } from "@/db/queries/teams";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
@@ -43,6 +45,10 @@ import {
   memberRoleQualifiesForStudyPrivileges,
   type TeamMemberStudyPrivilege,
 } from "@/lib/team-study-privilege";
+import {
+  isEducationTeamPlanId,
+  limitsForEducationTeamPlan,
+} from "@/lib/education-plans";
 
 type MemberRow = TeamMemberRow;
 type AssignmentRow = TeamDeckAssignmentListRow;
@@ -61,6 +67,11 @@ type AssignmentTableDisplayRow = {
   createdAt: Date | string | null;
   studyPrivilege: TeamMemberStudyPrivilege;
   memberRole: MemberRow["role"] | null;
+  /**
+   * `assignment` — row from `team_deck_assignments`.
+   * `creator` — Education Gold/Enterprise co-admin created the deck (Team Dashboard access).
+   */
+  accessSource: "assignment" | "creator";
 };
 
 export type TeamAssignWorkspaceSnapshot = {
@@ -166,8 +177,11 @@ const CAPTION_TEAM_WORKSPACE =
 const CAPTION_NORMAL_MEMBER =
   "Choose who should see the deck in their workspace Study view — invited team members and team admins (co-admins).";
 
+const CAPTION_TEAM_ADMIN_MAX_CREATE_DECKS =
+  "Owner only — how many decks this team admin may create in this Education Gold / Enterprise workspace (Teacher tools and Team Dashboard). Leave blank to use the workspace plan limit. Cannot exceed the workspace plan maximum.";
+
 const CAPTION_DECK =
-  "Only decks linked to this workspace appear here — create on your Personal Dashboard, then link deck to this workspace below, or create a deck directly scoped to this workspace.";
+  "Only decks linked to this workspace appear here — create on your Personal Dashboard, then link deck to this workspace below, or create a deck directly scoped to this workspace. Decks the selected co-admin already created for this workspace are omitted; they already appear on that admin’s Team Dashboard.";
 
 const CAPTION_STUDY_PRIVILEGE =
   "Choose whether the assignee may use Standard Review, AI Recall™, Quiz, or a combination on the study page for this deck. Team admins on Education Gold / Enterprise can be limited here; on other plans team admins always have full study access.";
@@ -232,6 +246,9 @@ export function TeamDeckAssignList({
   const [removeAccessRow, setRemoveAccessRow] = React.useState<AssignmentTableDisplayRow | null>(
     null,
   );
+  const [adminMaxCreateDraft, setAdminMaxCreateDraft] = React.useState("");
+  const [adminMaxCreateBusy, setAdminMaxCreateBusy] = React.useState(false);
+  const [adminMaxCreateError, setAdminMaxCreateError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setWorkspaceId(String(defaultWorkspaceId));
@@ -288,6 +305,79 @@ export function TeamDeckAssignList({
       workspace?.planSlug ?? "",
     );
 
+  const educationWorkspaceMaxDecks =
+    workspace != null && isEducationTeamPlanId(workspace.planSlug)
+      ? limitsForEducationTeamPlan(workspace.planSlug).maxDecksPerWorkspace
+      : 0;
+
+  const showOwnerTeamAdminCreateLimit =
+    viewerIsSubscriberOwner &&
+    viewerOwnsSelectedWorkspace &&
+    workspace != null &&
+    isEducationTeamPlanId(workspace.planSlug) &&
+    selectedMember?.role === "team_admin";
+
+  React.useEffect(() => {
+    if (!showOwnerTeamAdminCreateLimit || selectedMember == null) {
+      setAdminMaxCreateDraft("");
+      setAdminMaxCreateError(null);
+      return;
+    }
+    const saved = selectedMember.maxCreateDecks;
+    setAdminMaxCreateDraft(
+      saved != null && Number.isFinite(saved) && saved > 0 ? String(saved) : "",
+    );
+    setAdminMaxCreateError(null);
+  }, [showOwnerTeamAdminCreateLimit, selectedMember?.userId, selectedMember?.maxCreateDecks]);
+
+  async function onSaveTeamAdminCreateLimit() {
+    if (!workspace || !selectedMember || !showOwnerTeamAdminCreateLimit) return;
+    setAdminMaxCreateError(null);
+    const trimmed = adminMaxCreateDraft.trim();
+    let next: number | null = null;
+    if (trimmed !== "") {
+      const parsed = Number.parseInt(trimmed, 10);
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        setAdminMaxCreateError("Enter a whole number of at least 1, or leave blank for the plan default.");
+        return;
+      }
+      next = Math.min(parsed, educationWorkspaceMaxDecks);
+    }
+    setAdminMaxCreateBusy(true);
+    try {
+      await updateTeamAdminMaxCreateDecksAction({
+        teamId: workspace.id,
+        memberUserId: selectedMember.userId,
+        maxCreateDecks: next,
+      });
+      router.refresh();
+    } catch (e) {
+      setAdminMaxCreateError(
+        e instanceof Error ? e.message : "Could not save deck create limit.",
+      );
+    } finally {
+      setAdminMaxCreateBusy(false);
+    }
+  }
+
+  /**
+   * Decks the selected assignee already created for this workspace (Education
+   * co-admin Team Dashboard) — omit from assign picker; they already have them.
+   */
+  const assignableDecks = React.useMemo(() => {
+    if (memberUserId === NO_MEMBER) return decks;
+    return decks.filter((d) => d.createdByUserId !== memberUserId);
+  }, [decks, memberUserId]);
+
+  const omittedCreatorDeckCount = decks.length - assignableDecks.length;
+
+  React.useEffect(() => {
+    if (deckId === NO_DECK) return;
+    if (!assignableDecks.some((d) => String(d.id) === deckId)) {
+      setDeckId(NO_DECK);
+    }
+  }, [assignableDecks, deckId]);
+
   const assignmentTableWorkspaces = React.useMemo(() => {
     if (viewerIsSubscriberOwner) return workspaces;
     return workspaces.filter((w) => w.id === defaultWorkspaceId);
@@ -297,6 +387,8 @@ export function TeamDeckAssignList({
     const out: AssignmentTableDisplayRow[] = [];
     for (const w of assignmentTableWorkspaces) {
       const workspaceMemberIds = new Set(w.allMembers.map((m) => m.userId));
+      const assignmentKeys = new Set<string>();
+
       for (const a of w.assignments) {
         if (!viewerIsSubscriberOwner && !workspaceMemberIds.has(a.memberUserId)) {
           continue;
@@ -308,8 +400,10 @@ export function TeamDeckAssignList({
           byId,
           byId ? userFieldDisplayById[byId] : undefined,
         );
+        const key = `${a.teamId}-${a.deckId}-${a.memberUserId}`;
+        assignmentKeys.add(key);
         out.push({
-          key: `${a.teamId}-${a.deckId}-${a.memberUserId}`,
+          key,
           teamId: a.teamId,
           deckId: a.deckId,
           memberUserId: a.memberUserId,
@@ -328,7 +422,50 @@ export function TeamDeckAssignList({
           createdAt: a.createdAt ?? null,
           studyPrivilege: a.studyPrivilege ?? defaultTeamMemberStudyPrivilege(),
           memberRole: memberRecord?.role ?? null,
+          accessSource: "assignment",
         });
+      }
+
+      // Education Gold / Enterprise — co-admin-created decks already appear on that
+      // admin’s Team Dashboard; surface them here even without a formal assignment row.
+      if (isEducationTeamPlanId(w.planSlug)) {
+        for (const deck of w.decks) {
+          const creatorId = deck.createdByUserId?.trim();
+          if (!creatorId) continue;
+          if (creatorId === w.ownerUserId) continue;
+          const memberRecord = w.allMembers.find((m) => m.userId === creatorId);
+          if (
+            !memberRecord ||
+            (memberRecord.role !== "team_admin" && memberRecord.role !== "team_member")
+          ) {
+            continue;
+          }
+          if (!viewerIsSubscriberOwner && !workspaceMemberIds.has(creatorId)) {
+            continue;
+          }
+          const key = `${w.id}-${deck.id}-${creatorId}`;
+          if (assignmentKeys.has(key)) continue;
+
+          const creatorLabel = memberOptionLabel(
+            creatorId,
+            userFieldDisplayById[creatorId],
+          );
+          out.push({
+            key: `creator:${key}`,
+            teamId: w.id,
+            deckId: deck.id,
+            memberUserId: creatorId,
+            memberLabel: creatorLabel,
+            deckName: deck.name,
+            workspaceName: w.name,
+            signedByLabel: creatorLabel,
+            signedByTitle: `${creatorLabel} created this deck — it appears on their Team Dashboard`,
+            createdAt: deck.createdAt ?? null,
+            studyPrivilege: defaultTeamMemberStudyPrivilege(),
+            memberRole: memberRecord.role,
+            accessSource: "creator",
+          });
+        }
       }
     }
     out.sort((a, b) => {
@@ -371,7 +508,14 @@ export function TeamDeckAssignList({
           header: "Deck",
           className: "min-w-[8rem]",
           cell: (row: AssignmentTableDisplayRow) => (
-            <span className="text-sm text-foreground">{row.deckName}</span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-sm text-foreground">{row.deckName}</span>
+              {row.accessSource === "creator" ? (
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Created by member
+                </span>
+              ) : null}
+            </span>
           ),
         },
         ...(viewerIsSubscriberOwner
@@ -392,7 +536,7 @@ export function TeamDeckAssignList({
           className: "min-w-[6rem]",
           cell: (row: AssignmentTableDisplayRow) => (
             <span className="text-sm text-foreground" title={row.signedByTitle}>
-              {row.signedByLabel}
+              {row.accessSource === "creator" ? `${row.signedByLabel} (creator)` : row.signedByLabel}
             </span>
           ),
         },
@@ -402,11 +546,17 @@ export function TeamDeckAssignList({
           className: "whitespace-nowrap",
           cell: (row: AssignmentTableDisplayRow) => (
             <span className="text-sm text-muted-foreground">
-              {row.createdAt ? formatAssignmentRecordedAt(row.createdAt) : "—"}
+              {row.createdAt
+                ? formatAssignmentRecordedAt(row.createdAt)
+                : "—"}
+              {row.accessSource === "creator" ? (
+                <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                  Created
+                </span>
+              ) : null}
             </span>
           ),
-        },
-      ] as const,
+        },      ] as const,
     [userFieldDisplayById, viewerIsSubscriberOwner],
   );
 
@@ -571,11 +721,17 @@ export function TeamDeckAssignList({
       setWorkspaceId(nextWorkspace);
     }
     setMemberUserId(row.memberUserId);
-    setDeckId(String(row.deckId));
-    if (row.memberRole === "team_member") {
-      setStudyPrivilege(row.studyPrivilege);
-    } else {
+    // Creator-access decks are not assignable to their creator — keep member loaded, clear deck.
+    if (row.accessSource === "creator") {
+      setDeckId(NO_DECK);
       setStudyPrivilege(defaultTeamMemberStudyPrivilege());
+    } else {
+      setDeckId(String(row.deckId));
+      if (row.memberRole === "team_member") {
+        setStudyPrivilege(row.studyPrivilege);
+      } else {
+        setStudyPrivilege(defaultTeamMemberStudyPrivilege());
+      }
     }
     setError(null);
   }
@@ -586,6 +742,21 @@ export function TeamDeckAssignList({
   }
 
   function renderAssignmentAccessPanel(row: AssignmentTableDisplayRow) {
+    if (row.accessSource === "creator") {
+      return (
+        <div className="rounded-lg border border-border/80 bg-muted/20 px-4 py-3 space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Access management
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            This deck was created by this co-admin and already appears on their Team Dashboard.
+            There is no separate assignment to remove — unlink or delete the deck if you need to
+            revoke access.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border border-border/80 bg-muted/20 px-4 py-3 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -616,7 +787,13 @@ export function TeamDeckAssignList({
 
   async function handleConfirmRemoveAccess() {
     const target = removeAccessRow;
-    if (!target || !isAssignmentRowWorkspaceOwner(target)) return;
+    if (
+      !target ||
+      !isAssignmentRowWorkspaceOwner(target) ||
+      target.accessSource === "creator"
+    ) {
+      return;
+    }
     const collapseKey = target.key;
     setError(null);
     setBusy("unassign");
@@ -852,6 +1029,56 @@ export function TeamDeckAssignList({
             </Select>
           </div>
 
+          {showOwnerTeamAdminCreateLimit ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1">
+                <Label htmlFor="assign-deck-admin-max-create">
+                  Decks this team admin may create
+                </Label>
+                <HintBalloon
+                  fieldLabel="Team admin deck create limit"
+                  caption={CAPTION_TEAM_ADMIN_MAX_CREATE_DECKS}
+                />
+              </div>
+              <span id="assign-deck-admin-max-create-caption" className="sr-only">
+                {CAPTION_TEAM_ADMIN_MAX_CREATE_DECKS}
+              </span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  id="assign-deck-admin-max-create"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={educationWorkspaceMaxDecks}
+                  placeholder={`Plan default (${educationWorkspaceMaxDecks})`}
+                  value={adminMaxCreateDraft}
+                  onChange={(e) => setAdminMaxCreateDraft(e.target.value)}
+                  aria-describedby="assign-deck-admin-max-create-caption"
+                  className="sm:max-w-[14rem]"
+                  disabled={adminMaxCreateBusy}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-10 w-full sm:w-auto"
+                  disabled={adminMaxCreateBusy}
+                  onClick={() => void onSaveTeamAdminCreateLimit()}
+                >
+                  {adminMaxCreateBusy ? "Saving…" : "Save create limit"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Workspace plan maximum: {educationWorkspaceMaxDecks}. Blank uses the plan default.
+                Applies to Teacher tools and this admin’s Team Dashboard create count.
+              </p>
+              {adminMaxCreateError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {adminMaxCreateError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           {decks.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {subscriberPersonalUnlinkedDecks === undefined
@@ -859,6 +1086,12 @@ export function TeamDeckAssignList({
                 : subscriberPersonalUnlinkedDecks.length > 0
                   ? "No workspace-linked decks yet — link a Personal Dashboard deck above, then assign members here."
                   : "Create decks on your Personal Dashboard first, link them above, then assign members here."}
+            </p>
+          ) : assignableDecks.length === 0 && memberUserId !== NO_MEMBER ? (
+            <p className="text-sm text-muted-foreground">
+              Every workspace deck was created by this co-admin, so they already appear on that
+              admin’s Team Dashboard. Pick another member, or link a different Personal Dashboard
+              deck to assign.
             </p>
           ) : (
             <>
@@ -886,7 +1119,7 @@ export function TeamDeckAssignList({
                             <span className="text-muted-foreground">{PLACEHOLDER_DECK}</span>
                           );
                         }
-                        const d = decks.find((x) => String(x.id) === String(value));
+                        const d = assignableDecks.find((x) => String(x.id) === String(value));
                         return (
                           d?.name ?? (
                             <span className="text-muted-foreground">{PLACEHOLDER_DECK}</span>
@@ -899,13 +1132,20 @@ export function TeamDeckAssignList({
                     <SelectItem value={NO_DECK} className="text-muted-foreground">
                       {PLACEHOLDER_DECK}
                     </SelectItem>
-                    {decks.map((d) => (
+                    {assignableDecks.map((d) => (
                       <SelectItem key={d.id} value={String(d.id)}>
                         <span className="truncate">{d.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {omittedCreatorDeckCount > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {omittedCreatorDeckCount === 1
+                      ? "1 deck created by this co-admin is hidden — it already shows on their Team Dashboard."
+                      : `${omittedCreatorDeckCount} decks created by this co-admin are hidden — they already show on their Team Dashboard.`}
+                  </p>
+                ) : null}
               </div>
 
               {selectedMemberQualifiesForStudyPrivileges ? (
@@ -1000,8 +1240,8 @@ export function TeamDeckAssignList({
           <h3 className="text-sm font-semibold text-foreground">Assignments by member</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
             {viewerIsSubscriberOwner
-              ? "All members and deck assignments across your workspaces. Click a row to load it into the form above. Only you can remove assignments."
-              : "Members and deck assignments for this workspace only. Click a row to load it into the form above. Only the workspace owner can remove assignments."}
+              ? "All members and deck assignments across your workspaces, including decks co-admins created for Education Gold / Enterprise workspaces. Click a row to load it into the form above. Only you can remove formal assignments."
+              : "Members and deck assignments for this workspace only, including decks you or other co-admins created. Click a row to load it into the form above. Only the workspace owner can remove formal assignments."}
           </p>
         </div>
 
@@ -1018,8 +1258,8 @@ export function TeamDeckAssignList({
           getSortDate={(row) => toAssignmentDate(row.createdAt)?.getTime() ?? null}
           emptyMessage={
             viewerIsSubscriberOwner
-              ? "No deck assignments yet."
-              : "No deck assignments for this workspace yet."
+              ? "No deck assignments or co-admin-created decks yet."
+              : "No deck assignments or co-admin-created decks for this workspace yet."
           }
           noResultsMessage="No assignments match your search or filters."
           tableColumns={[...assignmentTableColumns]}

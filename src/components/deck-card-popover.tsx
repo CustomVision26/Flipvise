@@ -37,6 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,10 @@ import { deleteDeckAction, getDeckDeleteImpactAction } from "@/actions/decks";
 import type { DeckDeleteImpact } from "@/db/queries/deck-delete-impact";
 import { DeckDeleteWarningBody } from "@/components/deck-delete-warning-body";
 import { getGradientBySlug } from "@/lib/deck-gradients";
+import {
+  formatDeckCardDisplayName,
+  formatLessonPlanDayCardLabel,
+} from "@/lib/teacher-generation-titles";
 import {
   getCardsForDeckViewerPreviewAction,
   getCardsForPreviewAction,
@@ -127,6 +132,12 @@ export function DeckCardPopover({
   const [deleteImpact, setDeleteImpact] =
     React.useState<DeckDeleteImpact | null>(null);
   const [deleteImpactLoading, setDeleteImpactLoading] = React.useState(false);
+
+  const displayName = formatDeckCardDisplayName(deck.name);
+  const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
+    deck.description,
+    deck.name,
+  );
 
   async function handlePreview() {
     if (variant === "team-preview") {
@@ -468,6 +479,19 @@ export function DeckCardPopover({
       {view === "compact" ? (
         <>
           <CardHeader className="px-3 py-3 gap-1">
+            {lessonPlanDayLabel ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "w-fit max-w-full truncate text-[10px] font-medium uppercase tracking-wide",
+                  hasGradient
+                    ? "border-white/25 bg-white/10 text-white"
+                    : "border-border/70 bg-muted/40 text-muted-foreground",
+                )}
+              >
+                {lessonPlanDayLabel}
+              </Badge>
+            ) : null}
             <CardTitle
               className={cn(
                 "line-clamp-2 text-sm font-semibold leading-snug tracking-tight text-balance sm:text-base",
@@ -475,7 +499,7 @@ export function DeckCardPopover({
                 hasGradient && "text-white",
               )}
             >
-              {deck.name}
+              {displayName}
             </CardTitle>
             <CardDescription
               className={cn(
@@ -502,6 +526,16 @@ export function DeckCardPopover({
         <>
           {coverThumbList}
           <div className="flex-1 min-w-0">
+            {lessonPlanDayLabel ? (
+              <p
+                className={cn(
+                  "mb-0.5 truncate text-[10px] font-medium uppercase tracking-wide",
+                  hasGradient ? "text-white/70" : "text-muted-foreground",
+                )}
+              >
+                {lessonPlanDayLabel}
+              </p>
+            ) : null}
             <p
               className={cn(
                 "line-clamp-1 text-sm font-semibold leading-snug tracking-tight",
@@ -509,7 +543,7 @@ export function DeckCardPopover({
                 hasGradient && "text-white",
               )}
             >
-              {deck.name}
+              {displayName}
             </p>
           </div>
           <span className={cn("shrink-0 text-xs tabular-nums", deckMetaClass)}>
@@ -523,6 +557,19 @@ export function DeckCardPopover({
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
           <div className="min-w-0 flex-1 flex flex-col gap-1">
+            {lessonPlanDayLabel ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "w-fit max-w-full truncate text-[10px] font-medium uppercase tracking-wide",
+                  hasGradient
+                    ? "border-white/25 bg-white/10 text-white"
+                    : "border-border/70 bg-muted/40 text-muted-foreground",
+                )}
+              >
+                {lessonPlanDayLabel}
+              </Badge>
+            ) : null}
             <p
               className={cn(
                 "text-base font-semibold leading-snug tracking-tight text-balance text-foreground [overflow-wrap:anywhere] [word-break:normal] sm:text-lg",
@@ -530,7 +577,7 @@ export function DeckCardPopover({
                 hasGradient && "text-white",
               )}
             >
-              {deck.name}
+              {displayName}
             </p>
             <p
               className={cn(

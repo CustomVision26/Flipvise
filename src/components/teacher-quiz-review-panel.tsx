@@ -14,6 +14,7 @@ import {
   distractorContextForTeacherQuizRow,
   type TeacherQuizReviewRow,
 } from "@/lib/teacher-quiz-review";
+import type { TeacherQuizDeckSaveDestinationPreview } from "@/lib/teacher-quiz-deck-save-preview";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ArrowUpDown, Loader2, RefreshCw } from "lucide-react";
@@ -25,20 +26,31 @@ type QuizContext = {
   difficultyLevel: string;
 };
 
+function formatSaveDestinationPhrase(
+  destination: TeacherQuizDeckSaveDestinationPreview | null | undefined,
+): string {
+  if (!destination?.deckName.trim()) return "the deck";
+  const name = destination.deckName.trim();
+  return destination.mode === "append" ? name : `the new deck ${name}`;
+}
+
 export function TeacherQuizReviewPanel({
   rows,
   quizContext,
+  saveDestination,
   onRowsChange,
   disabled = false,
 }: {
   rows: TeacherQuizReviewRow[];
   quizContext: QuizContext;
+  saveDestination?: TeacherQuizDeckSaveDestinationPreview | null;
   onRowsChange: (rows: TeacherQuizReviewRow[]) => void;
   disabled?: boolean;
 }) {
   const hasPassageCards = rows.some((row) => row.isReadingPassage);
   const hasRegularCards = rows.some((row) => !row.isReadingPassage);
   const mixedReview = hasPassageCards && hasRegularCards;
+  const destinationPhrase = formatSaveDestinationPhrase(saveDestination);
   async function fetchDistractorsForRow(row: TeacherQuizReviewRow) {
     const ctx = distractorContextForTeacherQuizRow(row);
     try {
@@ -140,10 +152,10 @@ export function TeacherQuizReviewPanel({
         <div className="flex items-start gap-1.5">
           <p className="text-xs leading-relaxed text-muted-foreground">
             {mixedReview
-              ? "Review regular quiz cards and reading-passage questions before saving. Passage cards show their own reading passage on the front with a comprehension question; regular cards use a single question prompt."
+              ? `Review regular quiz cards and reading-passage questions before saving to ${destinationPhrase}. Passage cards show their own reading passage on the front with a comprehension question; regular cards use a single question prompt.`
               : hasPassageCards
-                ? "Review reading-passage quiz cards before saving. Each front shows that card’s reading passage (math stories include a Passage Title) with a comprehension question; the back holds the correct answer with three wrong answers for quiz mode."
-                : "Review AI-generated quiz cards before saving. Check the boxes for cards you want in the deck, edit any field, then click Save selected."}
+                ? `Review reading-passage quiz cards before saving to ${destinationPhrase}. Each front shows that card’s reading passage (math stories include a Passage Title) with a comprehension question; the back holds the correct answer with three wrong answers for quiz mode.`
+                : `Review AI-generated quiz cards before saving. Check the boxes for cards you want in ${destinationPhrase}, edit any field, then click Save selected.`}
           </p>
           <TeacherHelpBalloon
             label="Quiz card review"

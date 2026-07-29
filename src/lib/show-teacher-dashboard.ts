@@ -13,3 +13,22 @@ export function showTeacherDashboardFromShell(input: {
       t.workspacePlanQuery != null && hasEducationPlan(t.workspacePlanQuery),
   );
 }
+
+/**
+ * Teacher Dash under Personal in the workspace switcher — education plan owners only
+ * (Education Plus personal, or owner of an Education Gold/Enterprise workspace).
+ * Invited co-admins use the invited-workspace expand actions instead.
+ */
+export function showPersonalTeacherDashFromShell(input: {
+  userId: string;
+  access: Pick<AccessContext, "canAccessTeacherTools">;
+  teamAdminHeaderTeams: RootLayoutTeamAdminHeaderTeam[];
+}): boolean {
+  if (input.access.canAccessTeacherTools) return true;
+  return input.teamAdminHeaderTeams.some(
+    (t) =>
+      t.ownerUserId === input.userId &&
+      t.workspacePlanQuery != null &&
+      hasEducationPlan(t.workspacePlanQuery),
+  );
+}

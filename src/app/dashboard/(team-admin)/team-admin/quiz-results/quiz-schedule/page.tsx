@@ -23,7 +23,6 @@ import {
 import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
 import {
   TeamAdminPanelScroll,
-  TeamAdminQuickNavPanel,
   TeamAdminWorkspaceStatsPanel,
   TeamQuizResultsSubTabs,
   TeamQuizScheduleSettings,
@@ -49,7 +48,7 @@ interface PageProps {
 
 export default async function TeamAdminQuizSchedulePage({ searchParams }: PageProps) {
   const ctx = await loadTeamAdminPageContext(buildTeamAdminQuizSchedulePath, searchParams);
-  const { selected, teamsForSubscriber, viewerTeamMemberUrlParam, isOwner } = ctx;
+  const { selected, teamsForSubscriber, viewerTeamMemberUrlParam } = ctx;
 
   const [workspaceSnapshots, teamDecksWithCardCounts, decksByWorkspaceEntries] =
     await Promise.all([
@@ -64,11 +63,6 @@ export default async function TeamAdminQuizSchedulePage({ searchParams }: PagePr
     ]);
 
   const decksByWorkspaceId = Object.fromEntries(decksByWorkspaceEntries);
-
-  const quickNavDescription = isOwner
-    ? "Return to your personal dashboard to create and edit decks."
-    : "Open your personal dashboard or the workspace-scoped main dashboard.";
-
   return (
     <TeamAdminToolPageLayout
       pathname={TEAM_ADMIN_QUIZ_SCHEDULE_PATH}
@@ -108,18 +102,6 @@ export default async function TeamAdminQuizSchedulePage({ searchParams }: PagePr
                 per deck.
               </p>
             </div>
-            <TeamAdminQuickNavPanel
-              className="w-full shrink-0 sm:max-w-sm"
-              planLabel={ctx.planLabel}
-              description={quickNavDescription}
-              mainDashboardHref={ctx.mainDashboardHref}
-              workspaceDashboardHref={ctx.workspaceDashboardHref}
-              workspaceTeamId={selected.id}
-              workspaceTeamMemberUrlParam={viewerTeamMemberUrlParam}
-              isOwner={isOwner}
-              workspacePlanSlug={selected.planSlug}
-              showTeacherDashboard={ctx.showTeacherDashboard}
-            />
           </div>
 
           <TeamAdminWorkspaceStatsPanel

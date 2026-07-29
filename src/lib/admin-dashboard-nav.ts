@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  BrainCircuit,
   Building2,
   LayoutList,
   LifeBuoy,
@@ -60,6 +61,18 @@ export const ADMIN_DASHBOARD_NAV: AdminNavSection[] = [
         path: "/admin/invoices",
         icon: ReceiptText,
         isActive: (pathname) => pathname === "/admin/invoices",
+      },
+    ],
+  },
+  {
+    title: "AI & analytics",
+    description: "Monitor AI generations, usage limits, and costs.",
+    items: [
+      {
+        title: "AI Usage",
+        path: "/admin/analytics/ai-usage",
+        icon: BrainCircuit,
+        isActive: (pathname) => pathMatches(pathname, "/admin/analytics/ai-usage"),
       },
     ],
   },

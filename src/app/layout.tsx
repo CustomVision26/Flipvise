@@ -285,6 +285,7 @@ export default async function RootLayout({
                         inboxUnreadCount={shell.inboxUnreadCount}
                         showHelpCenter={!shell.hideHelpCenter}
                         showTeacherDashboard={shell.showTeacherDashboard}
+                        showPersonalTeacherDash={shell.showPersonalTeacherDash}
                       />
                     </div>
                   )}

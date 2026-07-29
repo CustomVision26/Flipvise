@@ -45,7 +45,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Quick navigation — personal dashboard vs workspace dashboard.",
           "Workspace overview stats — workspaces, members, decks, cards vs plan limits.",
           "Add workspace button for owners at plan cap check.",
-          "Main tabs: Members, Deck Manager, Workspace history, Invite members, Quiz results.",
+          "Main tabs: Members, Deck Manager, Add-ons, Workspace history, Invite members, Quiz results.",
         ],
       },
       {
@@ -53,6 +53,23 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Core workflow",
         paragraphs: [
           "Create decks on Personal Dashboard → link in Deck Manager → assign to members → configure study privileges and quiz policies.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "team-admin-add-ons",
+    "Member Add-ons — In-Depth Guide",
+    "Assign optional premium add-ons to workspace members at /dashboard/team-admin/add-ons.",
+    [
+      {
+        id: "assign",
+        title: "Assigning features",
+        bullets: [
+          "Check AI Essay beside a member to grant the add-on (source: team).",
+          "Uncheck to revoke only team-sourced grants.",
+          "Stripe-purchased or platform-admin grants show a source badge and cannot be removed here.",
+          "Future add-ons (AI Recall, Battle Mode, etc.) reuse the same checklist architecture.",
         ],
       },
     ],

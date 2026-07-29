@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
-import { TeamAdminQuickNavPanel } from "@/lib/team-admin-dynamic-components";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import { cn } from "@/lib/utils";
 
@@ -11,14 +10,6 @@ type TeamAdminPageChromeProps = {
   description: string;
   workspaceName: string;
   planLabel: string;
-  quickNavDescription: string;
-  mainDashboardHref: string;
-  workspaceDashboardHref: string;
-  workspaceTeamId: number;
-  workspaceTeamMemberUrlParam: number;
-  isOwner: boolean;
-  workspacePlanSlug: string;
-  showTeacherDashboard?: boolean;
   headerAside?: ReactNode;
   children?: ReactNode;
 };
@@ -29,14 +20,6 @@ export function TeamAdminPageChrome({
   description,
   workspaceName,
   planLabel,
-  quickNavDescription,
-  mainDashboardHref,
-  workspaceDashboardHref,
-  workspaceTeamId,
-  workspaceTeamMemberUrlParam,
-  isOwner,
-  workspacePlanSlug,
-  showTeacherDashboard = false,
   headerAside,
   children,
 }: TeamAdminPageChromeProps) {
@@ -72,18 +55,6 @@ export function TeamAdminPageChrome({
                 <div className="flex shrink-0 justify-stretch sm:justify-end">{headerAside}</div>
               ) : null}
             </div>
-            <TeamAdminQuickNavPanel
-              className="w-full overflow-visible"
-              planLabel={planLabel}
-              description={quickNavDescription}
-              mainDashboardHref={mainDashboardHref}
-              workspaceDashboardHref={workspaceDashboardHref}
-              workspaceTeamId={workspaceTeamId}
-              workspaceTeamMemberUrlParam={workspaceTeamMemberUrlParam}
-              isOwner={isOwner}
-              workspacePlanSlug={workspacePlanSlug}
-              showTeacherDashboard={showTeacherDashboard}
-            />
           </div>
         </CardHeader>
       </Card>
