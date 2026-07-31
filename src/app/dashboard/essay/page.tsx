@@ -6,7 +6,6 @@ import {
   isPlanEligibleForAddon,
 } from "@/db/queries/addons";
 import {
-  listEssayAssignmentsForUser,
   listRecentEssayDocumentsForUser,
   listEssayDraftsForUser,
   listRecentEssayFeedbackForUser,
@@ -47,10 +46,9 @@ export default async function EssayOverviewPage() {
   }
 
   const userId = access.userId!;
-  const [recent, drafts, assignments, feedback] = await Promise.all([
+  const [recent, drafts, feedback] = await Promise.all([
     listRecentEssayDocumentsForUser(userId, 5),
     listEssayDraftsForUser(userId),
-    listEssayAssignmentsForUser(userId),
     listRecentEssayFeedbackForUser(userId, 5),
   ]);
 
@@ -60,15 +58,18 @@ export default async function EssayOverviewPage() {
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>AI Essay</CardTitle>
-          <CardDescription>Generate activities, write, and get AI feedback.</CardDescription>
+          <CardTitle>Essay Generator</CardTitle>
+          <CardDescription>
+            Document Generation Studio — generate activities, write, and get AI
+            feedback.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Link
             href="/dashboard/essay/generate"
             className={cn(buttonVariants())}
           >
-            Generate Essay
+            Open Essay Generator
           </Link>
           {continueDraft ? (
             <Link
@@ -128,23 +129,6 @@ export default async function EssayOverviewPage() {
               </Link>
             ))
           )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>My Assigned Essays</CardTitle>
-          <CardDescription>
-            {assignments.length} assignment{assignments.length === 1 ? "" : "s"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link
-            href="/dashboard/essay/assignments"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            View assignments
-          </Link>
         </CardContent>
       </Card>
     </div>

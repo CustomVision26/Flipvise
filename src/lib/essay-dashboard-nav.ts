@@ -1,10 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  ClipboardList,
   FilePenLine,
   FolderOpen,
   LayoutDashboard,
+  Scale,
   Sparkles,
+  Type,
 } from "lucide-react";
 
 export type EssayNavItem = {
@@ -22,10 +23,10 @@ export const ESSAY_DASHBOARD_NAV: EssayNavItem[] = [
     summary: "Recent essays, drafts, and quick actions.",
   },
   {
-    title: "Generate Essay",
+    title: "Essay Generator",
     href: "/dashboard/essay/generate",
     icon: Sparkles,
-    summary: "Create a new AI essay activity.",
+    summary: "Create a new AI essay activity in Document Generation Studio.",
   },
   {
     title: "My Essays",
@@ -40,10 +41,16 @@ export const ESSAY_DASHBOARD_NAV: EssayNavItem[] = [
     summary: "Continue unfinished writing.",
   },
   {
-    title: "Assignments",
-    href: "/dashboard/essay/assignments",
-    icon: ClipboardList,
-    summary: "Essays assigned by your Team Admin.",
+    title: "Citation & Formatting",
+    href: "/dashboard/essay/citation-formatting",
+    icon: Type,
+    summary: "Select a saved essay and apply a citation format.",
+  },
+  {
+    title: "Academic Integrity",
+    href: "/dashboard/essay/academic-integrity",
+    icon: Scale,
+    summary: "Browse saved essays that have been cited and formatted.",
   },
 ];
 

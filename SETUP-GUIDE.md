@@ -105,7 +105,7 @@ BLOB_READ_WRITE_TOKEN=YOUR_PRODUCTION_TOKEN
 ### 4. Set Node Version on Render
 In your Render service settings:
 - **Environment**: `Node`
-- **Build Command**: `npm install && npm run build`
+- **Build Command**: `npm ci --include=dev && npm run build`
 - **Start Command**: `npm start`
 
 ### 5. First Deployment

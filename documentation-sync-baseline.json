@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-07-29T12:14:40.566Z",
+  "updatedAt": "2026-07-29T12:49:01.073Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "bb35485aa372631d738d2951bc1ad9fd5855e656f18dc3cc57e7a2836213b4c9",
@@ -11,16 +11,16 @@
       "docFingerprint": "ef6f6cc80973d79bc56ccaf304de0f4c76eadfee927032be489aef26b9031319"
     },
     "personal-dashboard": {
-      "watchFingerprint": "540fcd63cf5f680c49d748da7418bd8aac1d663d28c5d1ef2e39843b43bdd263",
-      "docFingerprint": "3c164ff561058572ba33ecef8cbcae6b0a1f09234d590471f514ab28e30e22a6"
+      "watchFingerprint": "aa677ee39008f43ca0a2ff1ef6bf2f810ddb373a91a50c829c2f8e6a0cfccc7b",
+      "docFingerprint": "ab10a89f953517f0429cbcbdc4460f77ba33f69080d2b2a262d5024d912e9a9e"
     },
     "ai-essay": {
       "watchFingerprint": "3800fd7f1e1634ce5a3d799e872c90a90a902ed3ea7be020476bd86c653149ae",
       "docFingerprint": "b70729dbf7869aedfeade51b18115053c6b388ef11c99e2ccb77893612466458"
     },
     "team-workspace-dashboard": {
-      "watchFingerprint": "6c2366a32bc55fe515dba51ad357021c7deda5b7249f73d639b005dad4230591",
-      "docFingerprint": "1c06852228c719acbb7d58513a501b2eff0c2d21aac748f06e30a20108b13868"
+      "watchFingerprint": "1759879b10dc8d258678f80f1c5c0d16bab3efff74c47b9bff524639185a2c15",
+      "docFingerprint": "b66011a7ea2bdf758644c76a436daa996d7e07a171f4ea9ba14afca9f9785f5f"
     },
     "manage-workspaces": {
       "watchFingerprint": "760959c948b76d439d2aca9a91466d5dc8fa47a39410c9a97a6264517bbf783d",
@@ -103,8 +103,8 @@
       "docFingerprint": "4706e6f3cba93a3e01d152656d35635ab797479c96362b2bd9746e8fd9c4f025"
     },
     "pricing-add-ons": {
-      "watchFingerprint": "2956a062ba3c0488cab5dd966fe4221359256dbe2d3f58e128ad3e56060b83e6",
-      "docFingerprint": "b740cd8cfea978cd44fe039cf2c1b7d7839fd48c823db87ad1d519b84ca14c7f"
+      "watchFingerprint": "b97f71fa3e59da48a069c205e5c3a0a7b4bc277b1030b40467edde9af2f59113",
+      "docFingerprint": "735e717ffa0f55da63de75065af1780a4824f6294274201b2c0853e901bb63fa"
     },
     "stripe-billing-payment": {
       "watchFingerprint": "c70f519aab9555b6e98233e49680c7715fbcfadb0bd9590da9c383f746c5d0e3",

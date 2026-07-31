@@ -15,6 +15,7 @@ import type {
   EssayGenerateInput,
   EssayGenerationResult,
 } from "@/lib/essay-ai-schema";
+import { isEssayCitationFormattedSaved } from "@/lib/document-generation-studio";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 export type { EssayAssignmentRow, EssayDocumentRow, EssayDraftRow, EssayFeedbackRow };
@@ -120,8 +121,10 @@ export async function upsertEssayDraft(input: {
   userId: string;
   body: string;
   wordCount: number;
+  sectionsContent?: Record<string, string>;
 }): Promise<EssayDraftRow> {
   const now = new Date();
+  const sectionsContent = input.sectionsContent ?? {};
   const [row] = await db
     .insert(essayDrafts)
     .values({
@@ -129,6 +132,7 @@ export async function upsertEssayDraft(input: {
       userId: input.userId,
       body: input.body,
       wordCount: input.wordCount,
+      sectionsContent,
       status: "draft",
       createdAt: now,
       updatedAt: now,
@@ -138,6 +142,7 @@ export async function upsertEssayDraft(input: {
       set: {
         body: input.body,
         wordCount: input.wordCount,
+        sectionsContent,
         // Keep submitted status if already submitted — callers should use submit instead.
         updatedAt: now,
       },
@@ -152,8 +157,10 @@ export async function submitEssayDraft(input: {
   userId: string;
   body: string;
   wordCount: number;
+  sectionsContent?: Record<string, string>;
 }): Promise<EssayDraftRow> {
   const now = new Date();
+  const sectionsContent = input.sectionsContent ?? {};
   const [row] = await db
     .insert(essayDrafts)
     .values({
@@ -161,6 +168,7 @@ export async function submitEssayDraft(input: {
       userId: input.userId,
       body: input.body,
       wordCount: input.wordCount,
+      sectionsContent,
       status: "submitted",
       submittedAt: now,
       createdAt: now,
@@ -171,6 +179,7 @@ export async function submitEssayDraft(input: {
       set: {
         body: input.body,
         wordCount: input.wordCount,
+        sectionsContent,
         status: "submitted",
         submittedAt: now,
         updatedAt: now,
@@ -195,6 +204,55 @@ export async function getEssayDraftForUser(
   return row ?? null;
 }
 
+/** Reopen a submitted (or existing) draft for editing; upserts content when provided. */
+export async function reopenEssayDraftForEdit(input: {
+  documentId: number;
+  userId: string;
+  body?: string;
+  wordCount?: number;
+  sectionsContent?: Record<string, string>;
+}): Promise<EssayDraftRow> {
+  const existing = await getEssayDraftForUser(input.documentId, input.userId);
+  const now = new Date();
+  const body = input.body ?? existing?.body ?? "";
+  const sectionsContent =
+    input.sectionsContent ??
+    (existing?.sectionsContent as Record<string, string> | undefined) ??
+    {};
+  const wordCount =
+    input.wordCount ??
+    existing?.wordCount ??
+    (body.trim() ? body.trim().split(/\s+/).length : 0);
+
+  const [row] = await db
+    .insert(essayDrafts)
+    .values({
+      documentId: input.documentId,
+      userId: input.userId,
+      body,
+      wordCount,
+      sectionsContent,
+      status: "draft",
+      submittedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [essayDrafts.userId, essayDrafts.documentId],
+      set: {
+        body,
+        wordCount,
+        sectionsContent,
+        status: "draft",
+        submittedAt: null,
+        updatedAt: now,
+      },
+    })
+    .returning();
+  if (!row) throw new Error("Failed to reopen essay draft");
+  return row;
+}
+
 export async function listEssayDraftsForUser(userId: string): Promise<
   Array<EssayDraftRow & { documentTitle: string }>
 > {
@@ -208,6 +266,148 @@ export async function listEssayDraftsForUser(userId: string): Promise<
     .where(and(eq(essayDrafts.userId, userId), eq(essayDrafts.status, "draft")))
     .orderBy(desc(essayDrafts.updatedAt));
   return rows.map((r) => ({ ...r.draft, documentTitle: r.documentTitle }));
+}
+
+/**
+ * Essays available for the Citation & Formatting pool — same set as My Essays
+ * (all generated documents owned by the user), with optional draft metadata.
+ */
+export async function listEssaysForCitationFormattingPool(userId: string): Promise<
+  Array<{
+    documentId: number;
+    title: string;
+    subject: string;
+    gradeLevel: string;
+    essayType: string;
+    wordCount: number;
+    submittedAt: Date | null;
+    input: EssayDocumentRow["input"];
+  }>
+> {
+  const rows = await db
+    .select({
+      documentId: essayDocuments.id,
+      title: essayDocuments.title,
+      subject: essayDocuments.subject,
+      gradeLevel: essayDocuments.gradeLevel,
+      essayType: essayDocuments.essayType,
+      wordCount: essayDrafts.wordCount,
+      submittedAt: essayDrafts.submittedAt,
+      input: essayDocuments.input,
+    })
+    .from(essayDocuments)
+    .leftJoin(
+      essayDrafts,
+      and(
+        eq(essayDrafts.documentId, essayDocuments.id),
+        eq(essayDrafts.userId, userId),
+      ),
+    )
+    .where(eq(essayDocuments.userId, userId))
+    .orderBy(desc(essayDocuments.updatedAt));
+
+  return rows.map((row) => ({
+    ...row,
+    wordCount: row.wordCount ?? 0,
+  }));
+}
+
+/** Persist citation / Document Studio formatting on an owned essay. */
+export async function updateEssayDocumentStudioForOwner(input: {
+  documentId: number;
+  userId: string;
+  generationInput: EssayGenerateInput;
+}): Promise<EssayDocumentRow | null> {
+  const existing = await getEssayDocumentByIdForUser(
+    input.documentId,
+    input.userId,
+  );
+  if (!existing || existing.userId !== input.userId) return null;
+
+  const [row] = await db
+    .update(essayDocuments)
+    .set({
+      input: input.generationInput,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(essayDocuments.id, input.documentId),
+        eq(essayDocuments.userId, input.userId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Persist formatting input + cited generation result for an owned essay. */
+export async function updateEssayDocumentCitationApplyForOwner(input: {
+  documentId: number;
+  userId: string;
+  generationInput: EssayGenerateInput;
+  result: EssayGenerationResult;
+}): Promise<EssayDocumentRow | null> {
+  const existing = await getEssayDocumentByIdForUser(
+    input.documentId,
+    input.userId,
+  );
+  if (!existing || existing.userId !== input.userId) return null;
+
+  const [row] = await db
+    .update(essayDocuments)
+    .set({
+      input: input.generationInput,
+      result: input.result,
+      title: input.result.title.slice(0, 512),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(essayDocuments.id, input.documentId),
+        eq(essayDocuments.userId, input.userId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Persist an edited generation result (and optional input) for an owned essay. */
+export async function updateEssayDocumentResultForOwner(input: {
+  documentId: number;
+  userId: string;
+  result: EssayGenerationResult;
+  generationInput?: EssayGenerateInput;
+}): Promise<EssayDocumentRow | null> {
+  const existing = await getEssayDocumentByIdForUser(
+    input.documentId,
+    input.userId,
+  );
+  if (!existing || existing.userId !== input.userId) return null;
+
+  const [row] = await db
+    .update(essayDocuments)
+    .set({
+      result: input.result,
+      ...(input.generationInput ? { input: input.generationInput } : {}),
+      title: input.result.title.slice(0, 512),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(essayDocuments.id, input.documentId),
+        eq(essayDocuments.userId, input.userId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Essays the user saved from Citation & Formatting (Formatted papers tab). */
+export async function listCitationFormattedEssaysForUser(
+  userId: string,
+): Promise<EssayDocumentRow[]> {
+  const rows = await listEssayDocumentsForUser(userId);
+  return rows.filter((doc) => isEssayCitationFormattedSaved(doc.input));
 }
 
 export async function createEssayFeedback(input: {
@@ -386,4 +586,86 @@ export async function getEssayDocumentsByIds(
 ): Promise<EssayDocumentRow[]> {
   if (ids.length === 0) return [];
   return db.select().from(essayDocuments).where(inArray(essayDocuments.id, ids));
+}
+
+export async function renameEssayDocumentForOwner(
+  documentId: number,
+  userId: string,
+  title: string,
+): Promise<EssayDocumentRow | null> {
+  const existing = await getEssayDocumentByIdForUser(documentId, userId);
+  if (!existing || existing.userId !== userId) return null;
+
+  const nextResult = {
+    ...existing.result,
+    title,
+  };
+
+  const [row] = await db
+    .update(essayDocuments)
+    .set({
+      title,
+      result: nextResult,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(essayDocuments.id, documentId), eq(essayDocuments.userId, userId)),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Owner updates title + generation result (prompt, outline, objectives, etc.). */
+export async function updateEssayDocumentInstructionsForOwner(input: {
+  documentId: number;
+  userId: string;
+  title: string;
+  result: EssayGenerationResult;
+}): Promise<EssayDocumentRow | null> {
+  const existing = await getEssayDocumentByIdForUser(
+    input.documentId,
+    input.userId,
+  );
+  if (!existing || existing.userId !== input.userId) return null;
+
+  const [row] = await db
+    .update(essayDocuments)
+    .set({
+      title: input.title,
+      result: {
+        ...input.result,
+        title: input.title,
+      },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(essayDocuments.id, input.documentId),
+        eq(essayDocuments.userId, input.userId),
+      ),
+    )
+    .returning();
+  return row ?? null;
+}
+
+/** Permanently delete an owned essay document and related drafts/feedback/assignments. */
+export async function deleteEssayDocumentForOwner(
+  documentId: number,
+  userId: string,
+): Promise<boolean> {
+  const existing = await getEssayDocumentByIdForUser(documentId, userId);
+  if (!existing || existing.userId !== userId) return false;
+
+  await db.delete(essayFeedback).where(eq(essayFeedback.documentId, documentId));
+  await db
+    .delete(essayAssignments)
+    .where(eq(essayAssignments.documentId, documentId));
+  await db.delete(essayDrafts).where(eq(essayDrafts.documentId, documentId));
+  const deleted = await db
+    .delete(essayDocuments)
+    .where(
+      and(eq(essayDocuments.id, documentId), eq(essayDocuments.userId, userId)),
+    )
+    .returning({ id: essayDocuments.id });
+  return deleted.length > 0;
 }

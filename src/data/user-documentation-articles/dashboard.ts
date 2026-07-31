@@ -24,16 +24,17 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "Edit deck updates the same metadata and first card front image from a deck card menu.",
           "Delete deck confirms first. Education plans get a detailed impact list: linked lesson plans stay in the Resource Library; Edit and Create Quiz stay available when another related deck (for example a quiz deck from that plan) can take over the link, and become unavailable only when this is the last linked deck. On a non-Education plan with leftover Education lesson-plan links, the dialog warns that the Education link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "Each deck card links to the deck editor and study session.",
-          "AI Essay premium add-on card sits above the deck library — Unlock Feature opens checkout, or shortcuts appear when entitled.",
+          "Premium add-ons appear as a running colored banner above the workspace header (not a large mid-page card).",
           "Usage banners show deck count and cards-per-deck limits for your plan.",
         ],
       },
       {
         id: "ai-essay-card",
-        title: "AI Essay add-on card",
+        title: "Add-ons running banner",
         bullets: [
-          "Locked: shows Premium Add-on and Unlock Feature (monthly/yearly Stripe add-on).",
-          "Unlocked: Create Essay, My Essays, Drafts, and Assignments link to /dashboard/essay.",
+          "Chips scroll horizontally; each add-on has a distinct color (e.g. teal for AI Essay, amber for Focus Study Mode).",
+          "Locked chips open Unlock Feature (monthly/yearly Stripe add-on checkout).",
+          "Unlocked AI Essay opens /dashboard/essay; hover pauses the marquee.",
           "Access also comes from Team Admin assignment or a platform admin grant.",
         ],
       },
@@ -151,10 +152,10 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
       },
       {
         id: "ai-essay",
-        title: "AI Essay on Team Dashboard",
+        title: "Add-ons on Team Dashboard",
         bullets: [
-          "The same AI Essay add-on card appears for invited members.",
-          "Unlocked members can open /dashboard/essay even while studying assigned decks.",
+          "The same premium add-ons running banner appears above the workspace heading.",
+          "Unlocked members can open /dashboard/essay from the AI Essay chip.",
         ],
       },
       {

@@ -9,7 +9,7 @@
  *    stale or cross-user authenticated data.
  */
 
-const CACHE_VERSION = "flipvise-v4";
+const CACHE_VERSION = "flipvise-v5";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline.html";
 

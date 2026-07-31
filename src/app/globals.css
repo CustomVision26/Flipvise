@@ -1058,6 +1058,28 @@
 }
 
 /* ========================================
+   DASHBOARD ADD-ONS RUNNING BANNER
+   ======================================== */
+@keyframes addons-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-addons-marquee {
+  animation: addons-marquee 28s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-addons-marquee {
+    animation: none;
+  }
+}
+
+/* ========================================
    RETRO VAPORWAVE GRID
    ======================================== */
 .perspective-grid {

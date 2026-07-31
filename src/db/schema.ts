@@ -1546,6 +1546,8 @@ export const essayDrafts = pgTable(
     userId: varchar({ length: 255 }).notNull(),
     body: text().notNull().default(''),
     wordCount: integer().notNull().default(0),
+    /** Per-section draft text keyed by section id (dynamic essay builder v2). */
+    sectionsContent: json().$type<Record<string, string>>().notNull().default({}),
     status: varchar({ length: 32 }).notNull().default('draft'),
     submittedAt: timestamp(),
     createdAt: timestamp().notNull().defaultNow(),

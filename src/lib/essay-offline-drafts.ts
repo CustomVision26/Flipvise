@@ -9,6 +9,8 @@ export type LocalEssayDraft = {
   documentId: number;
   body: string;
   wordCount: number;
+  /** Per-section draft text keyed by section id (essay builder v2). */
+  sectionsContent?: Record<string, string>;
   updatedAt: string;
 };
 

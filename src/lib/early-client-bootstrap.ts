@@ -32,23 +32,22 @@ function runEarlyClientBootstrap(): void {
     (isLocal || isNativeShell) &&
     "serviceWorker" in navigator
   ) {
-    const hadController = Boolean(navigator.serviceWorker.controller);
-    const reloadKey = "flipvise-dev-sw-reset";
+    const reloadKey = "flipvise-dev-sw-reset-v5";
+    if (sessionStorage.getItem(reloadKey)) return;
 
     navigator.serviceWorker
       .getRegistrations()
       .then(async (registrations) => {
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        const cacheKeys =
+          "caches" in window ? await caches.keys() : ([] as string[]);
         await Promise.all(
           registrations.map((registration) => registration.unregister()),
         );
-        if ("caches" in window) {
-          // Wipe all Cache Storage — Turbopack HMR leaves stale module factories
-          // when only flipvise* caches are cleared.
-          const keys = await caches.keys();
-          await Promise.all(keys.map((key) => caches.delete(key)));
-        }
-        if (hadController && !sessionStorage.getItem(reloadKey)) {
-          sessionStorage.setItem(reloadKey, "1");
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+        sessionStorage.setItem(reloadKey, "1");
+        // Reload only when something was actually controlling/caching the page.
+        if (hadController || registrations.length > 0 || cacheKeys.length > 0) {
           window.location.reload();
         }
       })

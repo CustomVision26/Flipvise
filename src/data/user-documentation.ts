@@ -62,8 +62,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional first card front image, and background gradient.",
           "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
+          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/essay.",
           "Click a deck to edit cards or start studying.",
-          "The AI Essay premium add-on card appears above your decks — locked users can unlock via Stripe; unlocked users get Create Essay, My Essays, Drafts, and Assignments shortcuts to /dashboard/essay.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
         ],
@@ -112,8 +112,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
+          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/essay.",
           "Assigned members see only decks assigned to them.",
-          "The AI Essay add-on card appears for members too — unlock via purchase, Team Admin assignment, or platform admin grant.",
           "Team context is stored in a cookie when invited members switch workspaces.",
         ],
         requirements: [
@@ -643,7 +643,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Purchase optional premium add-ons (for example AI Essay) that attach to your existing subscription.",
         howItWorks: [
           "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
-          "Eligible paid plans can buy monthly (and yearly when configured) prices via Stripe — items attach to your base subscription when possible.",
+          "Each card shows the live Stripe price (monthly, and yearly when configured) with a period toggle.",
+          "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe.",
           "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",
           "AI Essay unlocks /dashboard/essay for generation, drafts, submissions, and AI feedback.",
         ],

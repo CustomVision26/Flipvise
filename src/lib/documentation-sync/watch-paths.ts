@@ -37,7 +37,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/deck-delete-warning-body.tsx",
     "src/lib/deck-delete-warning-copy.ts",
     "src/db/queries/deck-delete-impact.ts",
-    "src/components/dashboard-ai-essay-card.tsx",
+    "src/components/dashboard-addons-banner.tsx",
   ],
   "ai-essay": [
     "src/app/dashboard/essay/page.tsx",
@@ -52,6 +52,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/pricing/add-ons/page.tsx",
     "src/components/pricing-addons-catalog.tsx",
     "src/actions/addons.ts",
+    "src/lib/stripe-addon-price-display.ts",
   ],
   "team-admin-add-ons": [
     "src/app/dashboard/(team-admin)/team-admin/add-ons/page.tsx",

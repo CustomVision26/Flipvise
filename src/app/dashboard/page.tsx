@@ -48,12 +48,14 @@ import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialogLoader as AddDeckDialog } from "@/components/add-deck-dialog-loader";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
-import { DashboardAiEssayCard } from "@/components/dashboard-ai-essay-card";
-import { canAccessAddon } from "@/lib/access";
+import {
+  DashboardAddonsBanner,
+  type DashboardAddonBannerItem,
+} from "@/components/dashboard-addons-banner";
 import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
 import {
-  getAddonCatalogByKey,
   isPlanEligibleForAddon,
+  listAddonCatalog,
 } from "@/db/queries/addons";
 import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
@@ -96,6 +98,38 @@ function teamWorkspaceHasTierExtras(
     (teamRow != null &&
       (isTeamPlanId(teamRow.planSlug) || isEducationTeamPlanId(teamRow.planSlug)))
   );
+}
+
+function addonFeatureHref(addonKey: string): string | null {
+  if (addonKey === AI_ESSAY_ADDON_KEY) return "/dashboard/essay";
+  return null;
+}
+
+async function buildDashboardAddonBannerItems(input: {
+  activeAddonKeys: string[];
+  effectivePlanSlug: string | null;
+}): Promise<DashboardAddonBannerItem[]> {
+  const catalog = await listAddonCatalog();
+  return catalog
+    .filter((row) => row.active)
+    .map((row) => {
+      const unlocked = input.activeAddonKeys.includes(row.key);
+      const eligible = isPlanEligibleForAddon(
+        row.eligiblePlanIds,
+        input.effectivePlanSlug,
+      );
+      const stripePriceConfigured = Boolean(
+        resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "monthly"),
+      );
+      return {
+        key: row.key,
+        name: row.name,
+        blurb: row.marketingBlurb || row.description,
+        unlocked,
+        canPurchase: eligible && !unlocked && stripePriceConfigured,
+        href: unlocked ? addonFeatureHref(row.key) : null,
+      };
+    });
 }
 
 function DashboardPersonalHeading({
@@ -575,18 +609,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ? await getClerkUserDisplayNameById(cookieTeamHeadingRow.ownerUserId)
       : null;
     const cookieTeamHeadingGroupName = cookieTeamHeadingRow?.name ?? null;
-    const memberEssayUnlocked = canAccessAddon(access, AI_ESSAY_ADDON_KEY);
-    const memberEssayCatalog = await getAddonCatalogByKey(AI_ESSAY_ADDON_KEY);
-    const memberEssayCanPurchase =
-      !!memberEssayCatalog?.active &&
-      isPlanEligibleForAddon(
-        memberEssayCatalog.eligiblePlanIds,
-        effectivePlanSlug,
-      ) &&
-      !!resolveStripeAddonPriceIdFromEnvKey(memberEssayCatalog.stripePriceEnvKey);
+    const addonBannerItems = await buildDashboardAddonBannerItems({
+      activeAddonKeys: access.activeAddonKeys,
+      effectivePlanSlug,
+    });
 
     return (
       <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+        <DashboardAddonsBanner addons={addonBannerItems} signedIn />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -611,11 +641,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
           </div>
         </div>
-        <DashboardAiEssayCard
-          unlocked={memberEssayUnlocked}
-          canPurchase={memberEssayCanPurchase}
-          signedIn
-        />
         {assigned.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
@@ -717,12 +742,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     showEducationWorkspaceSections &&
     (personalOnlyDecks.length > 0 || workspaceDeckSections.length > 0);
 
-  const essayUnlocked = canAccessAddon(access, AI_ESSAY_ADDON_KEY);
-  const essayCatalog = await getAddonCatalogByKey(AI_ESSAY_ADDON_KEY);
-  const essayCanPurchase =
-    !!essayCatalog?.active &&
-    isPlanEligibleForAddon(essayCatalog.eligiblePlanIds, effectivePlanSlug) &&
-    !!resolveStripeAddonPriceIdFromEnvKey(essayCatalog.stripePriceEnvKey);
+  const addonBannerItems = await buildDashboardAddonBannerItems({
+    activeAddonKeys: access.activeAddonKeys,
+    effectivePlanSlug,
+  });
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -733,6 +756,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
+      <DashboardAddonsBanner addons={addonBannerItems} signedIn />
       <Suspense fallback={null}>
         <TeamInviteAcceptedBanner />
         <StripeCheckoutToast />
@@ -781,14 +805,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           />
         </div>
       </div>
-      </section>
-
-      <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 delay-50 fill-mode-both">
-        <DashboardAiEssayCard
-          unlocked={essayUnlocked}
-          canPurchase={essayCanPurchase}
-          signedIn
-        />
       </section>
 
       {/* Free plan usage banner */}

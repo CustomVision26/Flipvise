@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { SignInButton, useAuth } from "@clerk/nextjs";
 import { createAddonCheckoutSessionAction } from "@/actions/addons";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
+import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 
 export type PricingAddonCard = {
   key: string;
@@ -23,6 +25,10 @@ export type PricingAddonCard = {
   canPurchase: boolean;
   stripePriceConfigured: boolean;
   yearlyPriceConfigured?: boolean;
+  /** e.g. "$9.99/mo" from Stripe */
+  monthlyPriceLabel?: string | null;
+  /** e.g. "$99.00/yr" from Stripe */
+  yearlyPriceLabel?: string | null;
 };
 
 type PricingAddonsCatalogProps = {
@@ -37,6 +43,8 @@ export function PricingAddonsCatalog({
   effectivePlanSlug,
 }: PricingAddonsCatalogProps) {
   const router = useRouter();
+  const { isLoaded: authLoaded } = useAuth();
+  const keepMounted = useKeepClerkAuthButtonsMounted();
   const [pendingKey, setPendingKey] = React.useState<string | null>(null);
   const [periodByKey, setPeriodByKey] = React.useState<
     Record<string, "monthly" | "yearly">
@@ -79,14 +87,25 @@ export function PricingAddonsCatalog({
       <ul className="grid gap-4 sm:grid-cols-2">
         {addons.map((addon) => {
           const pending = pendingKey === addon.key;
+          const period = periodByKey[addon.key] ?? "monthly";
+          const showYearlyToggle = Boolean(
+            addon.yearlyPriceConfigured && addon.yearlyPriceLabel,
+          );
+          const priceLabel =
+            period === "yearly" && addon.yearlyPriceLabel
+              ? addon.yearlyPriceLabel
+              : addon.monthlyPriceLabel;
+
           let ctaLabel = "Get add-on";
           let disabled = false;
-          let tip = "Start monthly billing for this add-on";
+          let tip = "Start billing for this add-on";
+          let useSignInCta = false;
 
           if (!signedIn) {
             ctaLabel = "Sign in to purchase";
-            disabled = true;
-            tip = "Sign in from the homepage, then return here";
+            disabled = false;
+            useSignInCta = true;
+            tip = "Sign in to purchase this add-on";
           } else if (addon.entitled) {
             ctaLabel =
               addon.entitlementSource === "admin"
@@ -106,6 +125,22 @@ export function PricingAddonsCatalog({
             tip = "This add-on is not available for self-serve purchase yet";
           }
 
+          const purchaseButton = (
+            <Button
+              type="button"
+              disabled={disabled || pending || (useSignInCta && !authLoaded)}
+              onClick={
+                useSignInCta ? undefined : () => void handlePurchase(addon.key)
+              }
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                ctaLabel
+              )}
+            </Button>
+          );
+
           return (
             <li
               key={addon.key}
@@ -117,12 +152,23 @@ export function PricingAddonsCatalog({
                   {addon.marketingBlurb || addon.description}
                 </p>
               </div>
-              {!disabled && addon.yearlyPriceConfigured ? (
+
+              {priceLabel ? (
+                <p className="text-2xl font-semibold tracking-tight text-foreground">
+                  {priceLabel}
+                </p>
+              ) : addon.stripePriceConfigured ? (
+                <p className="text-sm text-muted-foreground">Price unavailable</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Price not configured</p>
+              )}
+
+              {showYearlyToggle ? (
                 <div className="flex gap-2 text-xs">
                   <button
                     type="button"
                     className={
-                      (periodByKey[addon.key] ?? "monthly") === "monthly"
+                      period === "monthly"
                         ? "font-semibold text-foreground underline"
                         : "text-muted-foreground"
                     }
@@ -131,11 +177,14 @@ export function PricingAddonsCatalog({
                     }
                   >
                     Monthly
+                    {addon.monthlyPriceLabel
+                      ? ` · ${addon.monthlyPriceLabel}`
+                      : ""}
                   </button>
                   <button
                     type="button"
                     className={
-                      periodByKey[addon.key] === "yearly"
+                      period === "yearly"
                         ? "font-semibold text-foreground underline"
                         : "text-muted-foreground"
                     }
@@ -144,23 +193,23 @@ export function PricingAddonsCatalog({
                     }
                   >
                     Yearly
+                    {addon.yearlyPriceLabel
+                      ? ` · ${addon.yearlyPriceLabel}`
+                      : ""}
                   </button>
                 </div>
               ) : null}
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger render={<span className="inline-flex w-fit" />}>
-                    <Button
-                      type="button"
-                      disabled={disabled || pending}
-                      onClick={() => void handlePurchase(addon.key)}
-                    >
-                      {pending ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                      ) : (
-                        ctaLabel
-                      )}
-                    </Button>
+                    {useSignInCta && authLoaded && keepMounted ? (
+                      <SignInButton mode="modal" forceRedirectUrl="/pricing/add-ons">
+                        {purchaseButton}
+                      </SignInButton>
+                    ) : (
+                      purchaseButton
+                    )}
                   </TooltipTrigger>
                   <TooltipContent>{tip}</TooltipContent>
                 </Tooltip>

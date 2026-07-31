@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import {
   Area,
   AreaChart,
@@ -20,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Download, ExternalLink, Loader2, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Search, X } from "lucide-react";
 import { exportAiUsageCsvAction } from "@/actions/ai-usage-admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +40,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -59,7 +67,6 @@ import {
   adminFilterInputClass,
   adminSupportChartCardClass,
   adminSupportEmptyStateClass,
-  adminSupportFilterBarClass,
   adminSupportKpiCardClass,
   adminSupportKpiGridClass,
   adminSupportSectionLabelClass,
@@ -68,6 +75,25 @@ import { AI_USAGE_FEATURES, AI_USAGE_STATUSES } from "@/lib/ai-usage/types";
 import { formatMicrosAsUsd } from "@/lib/ai-usage/pricing";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { cn } from "@/lib/utils";
+
+const FILTER_ALL = "__all__";
+
+const USAGE_STATUS_OPTIONS = [
+  { value: "normal", label: "Normal" },
+  { value: "approaching", label: "Approaching limit" },
+  { value: "critical", label: "Critical" },
+  { value: "limit_reached", label: "Limit reached" },
+  { value: "disabled", label: "AI disabled" },
+  { value: "flagged", label: "Flagged" },
+  { value: "unlimited", label: "Unlimited" },
+] as const;
+
+const SORT_OPTIONS = [
+  { value: "generations", label: "Generations" },
+  { value: "tokens", label: "Tokens" },
+  { value: "cost", label: "Estimated cost" },
+  { value: "lastUsed", label: "Last used" },
+] as const;
 
 export type AdminAiUsageDashboardProps = {
   timezone: string;
@@ -205,6 +231,48 @@ function formatFeature(feature: string): string {
   return feature.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function formatStatusLabel(status: string): string {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatRangeLabel(startIso: string, endIso: string): string {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "";
+  }
+  const opts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  };
+  return `${start.toLocaleDateString("en-US", opts)} – ${end.toLocaleDateString("en-US", opts)}`;
+}
+
+function FilterField({
+  label,
+  htmlFor,
+  children,
+  className,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("min-w-0 space-y-1.5", className)}>
+      <Label
+        htmlFor={htmlFor}
+        className="text-xs font-medium text-muted-foreground"
+      >
+        {label}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
 function UsageStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     normal: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -222,7 +290,7 @@ function UsageStatusBadge({ status }: { status: string }) {
         styles[status] ?? styles.normal,
       )}
     >
-      {status.replace(/_/g, " ")}
+      {formatStatusLabel(status)}
     </span>
   );
 }
@@ -311,6 +379,7 @@ function KpiWithDelta({
 export function AdminAiUsageDashboard(props: AdminAiUsageDashboardProps) {
   const {
     filters,
+    range,
     summary,
     previousSummary,
     nearLimit,
@@ -405,7 +474,7 @@ export function AdminAiUsageDashboard(props: AdminAiUsageDashboardProps) {
     () =>
       outcomes.map((row) => ({
         ...row,
-        label: row.status.replace(/_/g, " "),
+        label: formatStatusLabel(row.status),
       })),
     [outcomes],
   );
@@ -454,236 +523,340 @@ export function AdminAiUsageDashboard(props: AdminAiUsageDashboardProps) {
           isPending && "pointer-events-none opacity-50",
         )}
       >
-        <div className={adminSupportFilterBarClass}>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={filters.preset}
-              onValueChange={(v) =>
-                update({
-                  preset: v,
-                  ...(v !== "custom" ? { from: null, to: null } : {}),
-                })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-52")}>
-                <SelectValue placeholder="Date range" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRESETS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {filters.preset === "custom" ? (
-              <>
-                <Input
-                  type="date"
-                  value={filters.from}
-                  onChange={(e) => update({ from: e.target.value, preset: "custom" })}
-                  className={cn(adminFilterInputClass, "w-40")}
-                  aria-label="From date"
-                />
-                <Input
-                  type="date"
-                  value={filters.to}
-                  onChange={(e) => update({ to: e.target.value, preset: "custom" })}
-                  className={cn(adminFilterInputClass, "w-40")}
-                  aria-label="To date"
-                />
-              </>
-            ) : null}
-
-            <Input
-              placeholder="Search name or email…"
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              className={cn(adminFilterInputClass, "w-56")}
-            />
-
-            <Select
-              value={filters.plan || "__all__"}
-              onValueChange={(v) =>
-                update({ plan: v === "__all__" ? null : v })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-40")}>
-                <SelectValue placeholder="Plan" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All plans</SelectItem>
-                {planOptions.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {displayNameForBillingPlanSlug(p)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.teamId || "__all__"}
-              onValueChange={(v) =>
-                update({ teamId: v === "__all__" ? null : v })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-44")}>
-                <SelectValue placeholder="Team" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All teams</SelectItem>
-                {teams.map((t) => (
-                  <SelectItem key={t.id} value={String(t.id)}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.feature || "__all__"}
-              onValueChange={(v) =>
-                update({ feature: v === "__all__" ? null : v })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-40")}>
-                <SelectValue placeholder="Feature" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All features</SelectItem>
-                {AI_USAGE_FEATURES.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {formatFeature(f)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.model || "__all__"}
-              onValueChange={(v) =>
-                update({ model: v === "__all__" ? null : v })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-44")}>
-                <SelectValue placeholder="Model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All models</SelectItem>
-                {modelOptions.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.status || "__all__"}
-              onValueChange={(v) =>
-                update({ status: v === "__all__" ? null : v })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-36")}>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All statuses</SelectItem>
-                {AI_USAGE_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.usageStatus || "__all__"}
-              onValueChange={(v) =>
-                update({ usageStatus: v === "__all__" ? null : v })
-              }
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-40")}>
-                <SelectValue placeholder="Usage status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All usage</SelectItem>
-                {[
-                  "normal",
-                  "approaching",
-                  "critical",
-                  "limit_reached",
-                  "disabled",
-                  "flagged",
-                  "unlimited",
-                ].map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters.sort}
-              onValueChange={(v) => update({ sort: v })}
-            >
-              <SelectTrigger className={cn(adminFilterInputClass, "w-40")}>
-                <SelectValue placeholder="Sort" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="generations">Sort: Generations</SelectItem>
-                <SelectItem value="tokens">Sort: Tokens</SelectItem>
-                <SelectItem value="cost">Sort: Cost</SelectItem>
-                <SelectItem value="lastUsed">Sort: Last used</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9"
-              onClick={() => void handleExport()}
-              disabled={exporting}
-            >
-              {exporting ? (
-                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-              ) : (
-                <Download className="mr-1.5 size-3.5" />
-              )}
-              Export CSV
-            </Button>
-
-            {hasFilters ? (
+        <Card className="border-border/70 bg-card/80">
+          <CardHeader className="gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Filters</CardTitle>
+              <CardDescription>
+                Narrow the report by date, user, plan, feature, and outcome.
+                {formatRangeLabel(range.start, range.end) ? (
+                  <>
+                    {" "}
+                    Showing{" "}
+                    <span className="font-medium text-foreground">
+                      {formatRangeLabel(range.start, range.end)}
+                    </span>
+                    .
+                  </>
+                ) : null}
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-9 text-muted-foreground"
-                onClick={() => {
-                  setSearchValue("");
-                  startTransition(() => {
-                    router.push(pathname, { scroll: false });
-                  });
-                }}
+                className="h-9"
+                onClick={() => void handleExport()}
+                disabled={exporting}
               >
-                <X className="mr-1 size-3.5" />
-                Clear
+                {exporting ? (
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                ) : (
+                  <Download className="mr-1.5 size-3.5" />
+                )}
+                Export CSV
               </Button>
-            ) : null}
-          </div>
-          {exportError ? (
-            <p className="mt-2 text-sm text-destructive">{exportError}</p>
-          ) : null}
-          {isPending ? (
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              Updating filters…
+              {hasFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-muted-foreground"
+                  onClick={() => {
+                    setSearchValue("");
+                    startTransition(() => {
+                      router.push(pathname, { scroll: false });
+                    });
+                  }}
+                >
+                  <X className="mr-1 size-3.5" />
+                  Clear filters
+                </Button>
+              ) : null}
             </div>
-          ) : null}
-        </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <FilterField label="Date range">
+                <Select
+                  value={filters.preset}
+                  onValueChange={(v) =>
+                    update({
+                      preset: v,
+                      ...(v !== "custom" ? { from: null, to: null } : {}),
+                    })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="Date range">
+                      {PRESETS.find((p) => p.value === filters.preset)?.label ??
+                        "Date range"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              {filters.preset === "custom" ? (
+                <>
+                  <FilterField label="From" htmlFor="ai-usage-from">
+                    <Input
+                      id="ai-usage-from"
+                      type="date"
+                      value={filters.from}
+                      onChange={(e) =>
+                        update({ from: e.target.value, preset: "custom" })
+                      }
+                      className={cn(adminFilterInputClass, "h-9 w-full")}
+                    />
+                  </FilterField>
+                  <FilterField label="To" htmlFor="ai-usage-to">
+                    <Input
+                      id="ai-usage-to"
+                      type="date"
+                      value={filters.to}
+                      onChange={(e) =>
+                        update({ to: e.target.value, preset: "custom" })
+                      }
+                      className={cn(adminFilterInputClass, "h-9 w-full")}
+                    />
+                  </FilterField>
+                </>
+              ) : null}
+
+              <FilterField
+                label="Search users"
+                htmlFor="ai-usage-search"
+                className={
+                  filters.preset === "custom"
+                    ? "sm:col-span-2 xl:col-span-1"
+                    : "sm:col-span-1 xl:col-span-1"
+                }
+              >
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    id="ai-usage-search"
+                    placeholder="Name or email…"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    className={cn(adminFilterInputClass, "h-9 w-full pl-9")}
+                  />
+                </div>
+              </FilterField>
+
+              <FilterField label="Plan">
+                <Select
+                  value={filters.plan || FILTER_ALL}
+                  onValueChange={(v) =>
+                    update({ plan: v === FILTER_ALL ? null : v })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="All plans">
+                      {filters.plan
+                        ? displayNameForBillingPlanSlug(filters.plan)
+                        : "All plans"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>All plans</SelectItem>
+                    {planOptions.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {displayNameForBillingPlanSlug(p)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Team">
+                <Select
+                  value={filters.teamId || FILTER_ALL}
+                  onValueChange={(v) =>
+                    update({ teamId: v === FILTER_ALL ? null : v })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="All teams">
+                      {filters.teamId
+                        ? (teams.find((t) => String(t.id) === filters.teamId)
+                            ?.name ?? "Selected team")
+                        : "All teams"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>All teams</SelectItem>
+                    {teams.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Feature">
+                <Select
+                  value={filters.feature || FILTER_ALL}
+                  onValueChange={(v) =>
+                    update({ feature: v === FILTER_ALL ? null : v })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="All features">
+                      {filters.feature
+                        ? formatFeature(filters.feature)
+                        : "All features"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>All features</SelectItem>
+                    {AI_USAGE_FEATURES.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {formatFeature(f)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Model">
+                <Select
+                  value={filters.model || FILTER_ALL}
+                  onValueChange={(v) =>
+                    update({ model: v === FILTER_ALL ? null : v })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="All models">
+                      {filters.model || "All models"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>All models</SelectItem>
+                    {modelOptions.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Request status">
+                <Select
+                  value={filters.status || FILTER_ALL}
+                  onValueChange={(v) =>
+                    update({ status: v === FILTER_ALL ? null : v })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="All statuses">
+                      {filters.status
+                        ? formatStatusLabel(filters.status)
+                        : "All statuses"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>All statuses</SelectItem>
+                    {AI_USAGE_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {formatStatusLabel(s)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Usage status">
+                <Select
+                  value={filters.usageStatus || FILTER_ALL}
+                  onValueChange={(v) =>
+                    update({ usageStatus: v === FILTER_ALL ? null : v })
+                  }
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="All usage levels">
+                      {filters.usageStatus
+                        ? (USAGE_STATUS_OPTIONS.find(
+                            (s) => s.value === filters.usageStatus,
+                          )?.label ?? formatStatusLabel(filters.usageStatus))
+                        : "All usage levels"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>All usage levels</SelectItem>
+                    {USAGE_STATUS_OPTIONS.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Sort users by">
+                <Select
+                  value={filters.sort}
+                  onValueChange={(v) => update({ sort: v })}
+                >
+                  <SelectTrigger
+                    className={cn(adminFilterInputClass, "h-9 w-full")}
+                  >
+                    <SelectValue placeholder="Sort by">
+                      {SORT_OPTIONS.find((s) => s.value === filters.sort)
+                        ?.label ?? "Generations"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+
+            {exportError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {exportError}
+              </p>
+            ) : null}
+            {isPending ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin" />
+                Updating filters…
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
 
         <section aria-labelledby="ai-usage-summary">
           <p id="ai-usage-summary" className={adminSupportSectionLabelClass}>

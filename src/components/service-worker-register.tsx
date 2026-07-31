@@ -52,11 +52,14 @@ export function ServiceWorkerRegister() {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
     if (isDevOrLocalOrNativeHost()) {
-      const reloadKey = "flipvise-dev-sw-reset";
+      // Bump this key when Turbopack "module factory is not available" returns.
+      const reloadKey = "flipvise-dev-sw-reset-v5";
+      if (sessionStorage.getItem(reloadKey)) return;
+
       void clearControllingServiceWorkersAndCaches()
         .then((hadController) => {
-          if (hadController && !sessionStorage.getItem(reloadKey)) {
-            sessionStorage.setItem(reloadKey, "1");
+          sessionStorage.setItem(reloadKey, "1");
+          if (hadController) {
             window.location.reload();
           }
         })

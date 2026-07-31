@@ -61,12 +61,6 @@ export function DashboardAiEssayCard({
           >
             Drafts
           </Link>
-          <Link
-            href="/dashboard/essay/assignments"
-            className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
-          >
-            Assignments
-          </Link>
         </CardContent>
       </Card>
     );

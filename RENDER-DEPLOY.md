@@ -29,9 +29,13 @@ Root Directory: . (leave blank if project is at root)
 ### Build & Deploy Settings
 ```
 Runtime: Node
-Build Command: npm install && npm run build
+Build Command: npm ci --include=dev && npm run build
 Start Command: npm start
 ```
+
+> Use `&&` (not `;`) so a failed install never continues into build.
+> `--include=dev` is required when `NODE_ENV=production` so `tsx` / TypeScript install for `prebuild` and `next build`.
+> If install fails with `napi-postinstall: Permission denied`, clear the Render build cache and redeploy (fixed by `unrs-resolver` ≥ 1.12 via package overrides).
 
 ### Instance Type
 ```

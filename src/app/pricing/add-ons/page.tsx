@@ -12,7 +12,7 @@ import {
   listPublishedActiveAddonsForPricing,
 } from "@/db/queries/addons";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
-import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
+import { resolveAddonStripePriceLabels } from "@/lib/stripe-addon-price-display";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { toClientJson } from "@/lib/to-client-json";
@@ -45,12 +45,9 @@ export default async function PricingAddOnsPage() {
       row.eligiblePlanIds,
       access.effectivePlanSlug,
     );
-    const stripePriceConfigured = Boolean(
-      resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "monthly"),
-    );
-    const yearlyPriceConfigured = Boolean(
-      resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "yearly"),
-    );
+    const priceLabels = await resolveAddonStripePriceLabels(row.stripePriceEnvKey);
+    const stripePriceConfigured = priceLabels.monthlyConfigured;
+    const yearlyPriceConfigured = priceLabels.yearlyConfigured;
 
     cards.push({
       key: row.key,
@@ -60,9 +57,12 @@ export default async function PricingAddOnsPage() {
       eligible,
       entitled,
       entitlementSource: entitled ? entitledRow?.source ?? null : null,
-      canPurchase: eligible && !entitled && stripePriceConfigured && row.active,
+      canPurchase:
+        eligible && !entitled && stripePriceConfigured && row.active,
       stripePriceConfigured,
       yearlyPriceConfigured,
+      monthlyPriceLabel: priceLabels.monthlyLabel,
+      yearlyPriceLabel: priceLabels.yearlyLabel,
     });
   }
 

@@ -63,6 +63,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Buying an add-on",
         bullets: [
           "Catalog is visible only when a platform admin enables it and publishes add-ons.",
+          "Cards show Stripe monthly/yearly amounts; guests sign in via modal to purchase.",
           "Choose monthly or yearly when a yearly Stripe price is configured.",
           "Checkout attaches a subscription item to your base plan when possible, otherwise opens an add-on-only subscription.",
           "AI Essay unlocks /dashboard/essay after purchase or grant.",

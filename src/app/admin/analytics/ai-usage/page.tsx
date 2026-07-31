@@ -265,23 +265,27 @@ export default async function AdminAiUsageAnalyticsPage({
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1.5 border-b border-border/60 pb-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          AI &amp; analytics
-        </p>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-          AI Usage Analytics
-        </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Monitor AI generations, token consumption, estimated costs, plan
-          limits, and user activity.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Timezone:{" "}
-          <span className="font-medium text-foreground">
-            {AI_USAGE_PLATFORM_TIMEZONE}
-          </span>
-        </p>
+      <header className="space-y-3 border-b border-border/60 pb-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              AI &amp; analytics
+            </p>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              AI Usage Analytics
+            </h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Monitor AI generations, token consumption, estimated costs, plan
+              limits, and user activity.
+            </p>
+          </div>
+          <p className="inline-flex items-center rounded-md border border-border/70 bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground">
+            Timezone{" "}
+            <span className="ml-1.5 font-medium text-foreground">
+              {AI_USAGE_PLATFORM_TIMEZONE}
+            </span>
+          </p>
+        </div>
       </header>
 
       <AdminAiUsageDashboard {...toClientJson(props)} />

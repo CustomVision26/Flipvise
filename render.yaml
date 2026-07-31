@@ -7,7 +7,9 @@ services:
     runtime: node
     plan: free
     branch: main
-    buildCommand: npm ci && npm run build
+    # --include=dev: NODE_ENV=production would otherwise skip tsx/typescript (needed by prebuild/build)
+    # unrs-resolver >=1.12 fixes napi-postinstall "Permission denied" on Render
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /
     envVars:
@@ -15,6 +17,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
 
       # Clerk Authentication
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
