@@ -1,3 +1,7 @@
+import {
+  displayNameForAddonBillingPlanSlug,
+  isAddonBillingPlanSlug,
+} from "@/lib/addon-plan-slug";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { canonicalTeamPlanId } from "@/lib/team-plans";
 
@@ -86,6 +90,9 @@ export function receiptPlanTitleForSlug(
   planSlug: string | null | undefined,
 ): string {
   if (!planSlug?.trim() || planSlug === "free") return "Subscription";
+  if (isAddonBillingPlanSlug(planSlug)) {
+    return displayNameForAddonBillingPlanSlug(planSlug.trim());
+  }
   const canonical = canonicalTeamPlanId(planSlug.trim());
   const key = canonical ?? planSlug.trim();
   return RECEIPT_TITLE_BY_SLUG[key] ?? RECEIPT_TITLE_BY_SLUG[planSlug.trim()] ?? planSlug;

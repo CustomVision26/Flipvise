@@ -5,12 +5,22 @@ import {
   isClerkPlatformAdminRole,
 } from "@/lib/clerk-platform-admin-role";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
+import {
+  getAddonCatalogByKey,
+  listActiveUserAddonEntitlements,
+} from "@/db/queries/addons";
 import { listBillingInvoicesForUser } from "@/db/queries/billing";
 import {
   listProrationLinesWithReceiptForUser,
   type ProrationLineWithReceipt,
 } from "@/db/queries/billing-proration";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
+import {
+  addonBillingPlanSlug,
+  addonKeyFromBillingPlanSlug,
+  displayNameForAddonBillingPlanSlug,
+  isAddonBillingPlanSlug,
+} from "@/lib/addon-plan-slug";
 import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-types";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { formatUserInvoicePromoDisplay, parsePromoFromDiscountLabel } from "@/lib/admin-invoice-promo-display";
@@ -166,6 +176,96 @@ function closeAdminSegmentsSupersededByPaidSubscription(
   }
 }
 
+/** Mark active add-on entitlements as Active / Canceling in plan history. */
+async function reconcileActiveAddonStatusInHistory(
+  userId: string,
+  rows: PlanHistoryRow[],
+  invoices: StoredBillingInvoice[],
+): Promise<void> {
+  let entitlements: Awaited<ReturnType<typeof listActiveUserAddonEntitlements>>;
+  try {
+    entitlements = await listActiveUserAddonEntitlements(userId);
+  } catch (error) {
+    console.error("[plan-history] list active add-on entitlements:", error);
+    return;
+  }
+  if (entitlements.length === 0) return;
+
+  for (const entitlement of entitlements) {
+    const slug = addonBillingPlanSlug(entitlement.addonKey);
+    let cancelAtPeriodEnd = false;
+    let periodEndIso: string | null = null;
+    if (
+      entitlement.source === "stripe" &&
+      entitlement.stripeSubscriptionId
+    ) {
+      try {
+        const { stripe } = await import("@/lib/stripe");
+        const addonSub = await stripe.subscriptions.retrieve(
+          entitlement.stripeSubscriptionId,
+        );
+        cancelAtPeriodEnd = addonSub.cancel_at_period_end === true;
+        const item = addonSub.items.data[0] as
+          | { current_period_end?: number }
+          | undefined;
+        if (typeof item?.current_period_end === "number") {
+          periodEndIso = new Date(item.current_period_end * 1000).toISOString();
+        }
+      } catch (error) {
+        console.error(
+          "[plan-history] addon cancel_at_period_end:",
+          entitlement.addonKey,
+          error,
+        );
+      }
+    }
+    const statusLabel = cancelAtPeriodEnd ? "Canceling" : "Active";
+
+    const matchingInvoiceRows = rows.filter(
+      (row) =>
+        row.planType === "Add-on" &&
+        row.id.startsWith("inv-") &&
+        invoices.some(
+          (inv) =>
+            `inv-${inv.externalId}` === row.id &&
+            inv.planSlug?.trim().toLowerCase() === slug.toLowerCase(),
+        ),
+    );
+
+    if (matchingInvoiceRows.length === 0) {
+      let catalogName = "";
+      try {
+        const catalog = await getAddonCatalogByKey(entitlement.addonKey);
+        catalogName = catalog?.name?.trim() || "";
+      } catch {
+        catalogName = "";
+      }
+      const startIso =
+        toIsoString(entitlement.startsAt ?? entitlement.createdAt) ??
+        new Date().toISOString();
+      rows.push({
+        id: `addon-active-${entitlement.addonKey}`,
+        planName: displayNameForAddonBillingPlanSlug(slug, catalogName),
+        planType: "Add-on",
+        statusLabel,
+        startAt: startIso,
+        endAt: periodEndIso,
+        receiptUrl: null,
+        receiptLabel: null,
+        promoDisplay: null,
+      });
+      continue;
+    }
+
+    matchingInvoiceRows.sort(
+      (a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+    );
+    const latest = matchingInvoiceRows[0]!;
+    latest.statusLabel = statusLabel;
+    if (periodEndIso) latest.endAt = periodEndIso;
+  }
+}
+
 /** Mark the current paid subscription period as Active in history (not just Paid). */
 function reconcileActivePaidPlanStatusInHistory(
   rows: PlanHistoryRow[],
@@ -279,6 +379,7 @@ function latestPaidInvoiceForPlan(
 ): StoredBillingInvoice | undefined {
   const paid = invoices.filter(
     (inv) =>
+      !isAddonBillingPlanSlug(inv.planSlug) &&
       inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase() &&
       inv.status?.toLowerCase() === "paid",
   );
@@ -295,8 +396,8 @@ function latestPaidInvoiceForPlan(
 
 /**
  * Best paid invoice with a stored receipt for an Active plan row.
- * Plan-change (`subscription_update`) invoices are often missing/wrong planSlug
- * and are omitted from history rows — still use them for the Active receipt link.
+ * Never uses add-on invoices. Prefer same-plan matches; fall back to
+ * plan-change (`subscription_update`) invoices that target this plan.
  */
 function latestReceiptInvoiceForActivePlan(
   invoices: StoredBillingInvoice[],
@@ -306,6 +407,7 @@ function latestReceiptInvoiceForActivePlan(
   const paidWithReceipt = invoices
     .filter(
       (inv) =>
+        !isAddonBillingPlanSlug(inv.planSlug) &&
         inv.status?.toLowerCase() === "paid" &&
         !!receiptUrlFromStoredInvoice(inv),
     )
@@ -313,22 +415,23 @@ function latestReceiptInvoiceForActivePlan(
 
   if (paidWithReceipt.length === 0) return undefined;
 
-  if (activePeriodEndIso) {
-    const samePeriod = paidWithReceipt.find(
-      (inv) => toIsoString(inv.periodEnd) === activePeriodEndIso,
-    );
-    if (samePeriod) return samePeriod;
-  }
-
-  const forPlan = paidWithReceipt.find(
+  const forPlan = paidWithReceipt.filter(
     (inv) => inv.planSlug?.trim().toLowerCase() === planSlug.toLowerCase(),
   );
-  if (forPlan) return forPlan;
+
+  if (activePeriodEndIso) {
+    const samePeriodAndPlan = forPlan.find(
+      (inv) => toIsoString(inv.periodEnd) === activePeriodEndIso,
+    );
+    if (samePeriodAndPlan) return samePeriodAndPlan;
+  }
+
+  if (forPlan[0]) return forPlan[0];
 
   const upgrade = paidWithReceipt.find((inv) => isSubscriptionUpdateInvoice(inv));
   if (upgrade) return upgrade;
 
-  return paidWithReceipt[0];
+  return undefined;
 }
 
 function rowCoversActiveSubscriptionPeriod(
@@ -390,6 +493,7 @@ function pushPaidInvoiceHistoryRow(
   rows: PlanHistoryRow[],
   inv: StoredBillingInvoice,
   planType: PlanHistoryTypeLabel = "Paid subscription",
+  planNameOverride?: string | null,
 ) {
   const receiptUrl = receiptUrlFromStoredInvoice(inv);
   const startIso = toIsoString(inv.periodStart ?? inv.paidAt ?? inv.createdAt);
@@ -397,7 +501,7 @@ function pushPaidInvoiceHistoryRow(
 
   rows.push({
     id: `inv-${inv.externalId}`,
-    planName: receiptPlanTitle(inv.planSlug),
+    planName: planNameOverride?.trim() || receiptPlanTitle(inv.planSlug),
     planType,
     statusLabel: invoiceStatusLabel(inv.status),
     startAt: startIso,
@@ -498,23 +602,33 @@ function latestUpgradeReceiptForPlanSlug(
   return null;
 }
 
+/**
+ * Drop Proration rows only when they duplicate the Active plan receipt URL.
+ * Keep distinct plan-change receipts so they are not overwritten by a later add-on.
+ */
 function removeRedundantProrationRows(
   rows: PlanHistoryRow[],
   activeSub: ActiveStripeSubRow | null,
 ): void {
   if (!activeSub?.planSlug?.trim()) return;
   const planSlug = activeSub.planSlug.trim();
-  const activeHasReceipt = rows.some(
-    (row) =>
-      row.planType === "Paid subscription" &&
-      (row.statusLabel === "Active" || row.statusLabel === "Trialing") &&
-      planNamesMatch(row.planName, planSlug) &&
-      !!row.receiptUrl,
+  const activeReceiptUrls = new Set(
+    rows
+      .filter(
+        (row) =>
+          row.planType === "Paid subscription" &&
+          (row.statusLabel === "Active" || row.statusLabel === "Trialing") &&
+          planNamesMatch(row.planName, planSlug) &&
+          !!row.receiptUrl,
+      )
+      .map((row) => row.receiptUrl),
   );
-  if (!activeHasReceipt) return;
+  if (activeReceiptUrls.size === 0) return;
 
   for (let i = rows.length - 1; i >= 0; i--) {
-    if (rows[i]!.planType === "Proration") {
+    const row = rows[i]!;
+    if (row.planType !== "Proration") continue;
+    if (row.receiptUrl && activeReceiptUrls.has(row.receiptUrl)) {
       rows.splice(i, 1);
     }
   }
@@ -1037,18 +1151,47 @@ async function buildMergedPlanHistoryForUser(
   }
 
   const rows: PlanHistoryRow[] = [];
+  const addonCatalogNameByKey = new Map<string, string>();
 
   for (const inv of invoices) {
+    const addonKey = addonKeyFromBillingPlanSlug(inv.planSlug);
+    if (addonKey) {
+      let catalogName = addonCatalogNameByKey.get(addonKey);
+      if (catalogName === undefined) {
+        try {
+          const catalog = await getAddonCatalogByKey(addonKey);
+          catalogName = catalog?.name?.trim() || "";
+          addonCatalogNameByKey.set(addonKey, catalogName);
+        } catch {
+          catalogName = "";
+          addonCatalogNameByKey.set(addonKey, "");
+        }
+      }
+      pushPaidInvoiceHistoryRow(
+        rows,
+        inv,
+        "Add-on",
+        displayNameForAddonBillingPlanSlug(inv.planSlug!, catalogName),
+      );
+      continue;
+    }
+
     if (isSubscriptionUpdateInvoice(inv)) {
-      // Plan-change proration — receipt belongs on the active upgraded plan row only.
+      // Keep plan-change invoices as their own history rows so the plan receipt
+      // remains visible when a later add-on checkout also creates a receipt.
+      pushPaidInvoiceHistoryRow(rows, inv, "Proration");
       continue;
     }
 
     pushPaidInvoiceHistoryRow(rows, inv, "Paid subscription");
   }
 
+  const invoiceHistoryIds = new Set(rows.map((row) => row.id));
   const prorationByInvoice = groupProrationLinesByInvoice(prorationLines);
   for (const [stripeInvoiceId, lines] of prorationByInvoice) {
+    // Prefer the persisted invoice row (includes hosted receipt URL) when present.
+    if (invoiceHistoryIds.has(`inv-${stripeInvoiceId}`)) continue;
+
     const { start, end } = prorationInvoicePeriod(lines);
     const startIso = toIsoString(start);
     if (!startIso) continue;
@@ -1142,6 +1285,8 @@ async function buildMergedPlanHistoryForUser(
   await appendActiveStripeSubscriptionRow(userId, rows, invoices, prorationLines);
 
   reconcileActivePaidPlanStatusInHistory(rows, activeSubForHistory);
+
+  await reconcileActiveAddonStatusInHistory(userId, rows, invoices);
 
   await enrichActivePaidRowsWithBillingReceipts(
     userId,

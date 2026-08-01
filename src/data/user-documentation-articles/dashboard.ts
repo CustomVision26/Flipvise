@@ -34,7 +34,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         bullets: [
           "Chips scroll horizontally; each add-on has a distinct color (e.g. teal for AI Essay, amber for Focus Study Mode).",
           "Locked chips open Unlock Feature (monthly/yearly Stripe add-on checkout).",
-          "Unlocked AI Essay opens /dashboard/essay; hover pauses the marquee.",
+          "Unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay; hover pauses the marquee.",
           "Access also comes from Team Admin assignment or a platform admin grant.",
         ],
       },
@@ -93,7 +93,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
   a(
     "ai-essay",
     "AI Essay — In-Depth Guide",
-    "AI Essay is an optional premium add-on at /dashboard/essay. It stacks on your current plan — it is not a separate subscription.",
+    "AI Essay is an optional premium add-on at /dashboard/ai-doc-studio/ai-essay. It stacks on your current plan — it is not a separate subscription.",
     [
       {
         id: "access",
@@ -155,7 +155,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Add-ons on Team Dashboard",
         bullets: [
           "The same premium add-ons running banner appears above the workspace heading.",
-          "Unlocked members can open /dashboard/essay from the AI Essay chip.",
+          "Unlocked members can open /dashboard/ai-doc-studio/ai-essay from the AI Essay chip.",
         ],
       },
       {

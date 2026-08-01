@@ -330,7 +330,7 @@ function PlanEditor({
               </div>
               {draft.discontinueAt && (
                 <p className="text-xs text-rose-400 bg-rose-500/10 rounded-md px-3 py-2 border border-rose-500/20 mt-1">
-                  This plan will be discontinued on{" "}
+                  After{" "}
                   <strong>
                     {new Date(draft.discontinueAt + "T00:00:00").toLocaleDateString(undefined, {
                       year: "numeric",
@@ -338,7 +338,8 @@ function PlanEditor({
                       day: "numeric",
                     })}
                   </strong>
-                  .
+                  , this plan will no longer be available for new purchases. Current subscribers keep
+                  their access until they change or cancel.
                 </p>
               )}
             </div>

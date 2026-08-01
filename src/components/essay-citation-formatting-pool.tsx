@@ -445,7 +445,7 @@ export function EssayCitationFormattingPool({
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push(`/dashboard/essay/${selectedId}`)}
+              onClick={() => router.push(`/dashboard/ai-doc-studio/ai-essay/${selectedId}`)}
             >
               Open essay
             </Button>

@@ -8,6 +8,7 @@ import { isWithinPaymentGracePeriod } from "@/lib/billing-grace-period";
 import { loopsSendEvent, loopsUpdateContact } from "@/lib/loops";
 import { recordBillingNoticeInboxMessage } from "@/lib/record-billing-notice-inbox";
 import { asPaidPlanId, setStripeBillingState } from "@/lib/stripe-billing-sync";
+import { revokeStripeAddonsAfterPaidPlanLoss } from "@/lib/stripe-addon-sync";
 import { stripe } from "@/lib/stripe";
 
 const clerkClient = createClerkClient({
@@ -81,6 +82,16 @@ export async function cancelSubscriptionAfterPaymentGraceExpired(input: {
   });
 
   await setStripeBillingState(input.userId, null, "canceled");
+
+  try {
+    await revokeStripeAddonsAfterPaidPlanLoss(input.userId);
+  } catch (error) {
+    console.error(
+      "[billing-grace] revoke add-ons after plan loss",
+      input.userId,
+      error,
+    );
+  }
 
   void (async () => {
     const email = await clerkUserEmail(input.userId);

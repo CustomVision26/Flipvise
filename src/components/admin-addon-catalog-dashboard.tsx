@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   assignAddonToUserAction,
@@ -12,6 +13,9 @@ import type { AddonCatalogRow } from "@/db/queries/addons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import { AI_ESSAY_STUDIO_BASE } from "@/lib/ai-document-studio-paths";
 import {
   Card,
   CardContent,
@@ -56,6 +60,7 @@ import {
   Check,
   CheckCircle2,
   ChevronsUpDown,
+  ExternalLink,
   Loader2,
   Search,
 } from "lucide-react";
@@ -239,8 +244,28 @@ export function AdminAddonCatalogDashboard({
                       <TableRow key={item.key} className="align-top">
                         <TableCell className="pl-6 py-4">
                           <div className="space-y-1.5">
-                            <div className="font-medium text-foreground">
-                              {item.name}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">
+                                {item.name}
+                              </span>
+                              {item.key === AI_ESSAY_ADDON_KEY ? (
+                                <Link
+                                  href={AI_ESSAY_STUDIO_BASE}
+                                  className={cn(
+                                    buttonVariants({
+                                      variant: "outline",
+                                      size: "sm",
+                                    }),
+                                    "h-7 gap-1.5 px-2.5 text-xs",
+                                  )}
+                                >
+                                  Open AI Essay
+                                  <ExternalLink
+                                    className="size-3 opacity-80"
+                                    aria-hidden
+                                  />
+                                </Link>
+                              ) : null}
                             </div>
                             <code className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                               {item.key}

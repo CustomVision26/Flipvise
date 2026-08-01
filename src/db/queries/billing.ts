@@ -207,13 +207,32 @@ export async function upsertBillingInvoiceRecord(input: {
           source: input.source,
           userId: input.userId,
           userEmail: input.userEmail ?? null,
-          planSlug: input.planSlug ?? null,
-          invoiceNumber: input.invoiceNumber ?? null,
+          // Never wipe a resolved plan/add-on slug with null on a partial upsert.
+          planSlug:
+            input.planSlug != null
+              ? input.planSlug
+              : sql`${billingInvoices.planSlug}`,
+          invoiceNumber:
+            input.invoiceNumber != null
+              ? input.invoiceNumber
+              : sql`${billingInvoices.invoiceNumber}`,
           status: input.status ?? "unknown",
-          amountCents: input.amountCents ?? null,
-          subtotalCents: input.subtotalCents ?? null,
-          taxAmountCents: input.taxAmountCents ?? null,
-          currency: input.currency ?? null,
+          amountCents:
+            input.amountCents != null
+              ? input.amountCents
+              : sql`${billingInvoices.amountCents}`,
+          subtotalCents:
+            input.subtotalCents != null
+              ? input.subtotalCents
+              : sql`${billingInvoices.subtotalCents}`,
+          taxAmountCents:
+            input.taxAmountCents != null
+              ? input.taxAmountCents
+              : sql`${billingInvoices.taxAmountCents}`,
+          currency:
+            input.currency != null
+              ? input.currency
+              : sql`${billingInvoices.currency}`,
           // Keep existing receipt/promo when a later Stripe sync has not populated them yet.
           hostedInvoiceUrl:
             input.hostedInvoiceUrl != null
@@ -223,9 +242,18 @@ export async function upsertBillingInvoiceRecord(input: {
             input.invoicePdfUrl != null
               ? input.invoicePdfUrl
               : sql`${billingInvoices.invoicePdfUrl}`,
-          periodStart: input.periodStart ?? null,
-          periodEnd: input.periodEnd ?? null,
-          paidAt: input.paidAt ?? null,
+          periodStart:
+            input.periodStart != null
+              ? input.periodStart
+              : sql`${billingInvoices.periodStart}`,
+          periodEnd:
+            input.periodEnd != null
+              ? input.periodEnd
+              : sql`${billingInvoices.periodEnd}`,
+          paidAt:
+            input.paidAt != null
+              ? input.paidAt
+              : sql`${billingInvoices.paidAt}`,
           discountAmountCents:
             input.discountAmountCents != null
               ? input.discountAmountCents
@@ -242,7 +270,10 @@ export async function upsertBillingInvoiceRecord(input: {
             input.promoKind != null
               ? input.promoKind
               : sql`${billingInvoices.promoKind}`,
-          stripeBillingReason: input.stripeBillingReason ?? null,
+          stripeBillingReason:
+            input.stripeBillingReason != null
+              ? input.stripeBillingReason
+              : sql`${billingInvoices.stripeBillingReason}`,
           updatedAt: now,
         },
       });

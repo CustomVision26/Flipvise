@@ -64,7 +64,7 @@ export function EssayCitationFormattedTable({
 
   function openEdit(documentId: number) {
     router.push(
-      `/dashboard/essay/citation-formatting?tab=format&essayId=${documentId}&edit=1`,
+      `/dashboard/ai-doc-studio/ai-essay/citation-formatting?tab=format&essayId=${documentId}&edit=1`,
     );
   }
 

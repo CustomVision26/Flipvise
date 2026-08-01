@@ -45,6 +45,7 @@ type ProrationFilter = "all" | "owed" | "refunded" | "receipt_pending";
 const CATEGORY_LABELS: Record<AdminBillingMonitorRow["category"], string> = {
   active_trial: "Active trial",
   trial_ending_soon: "Trial ending soon",
+  trial_expired: "Trial expired",
   subscription_expiring: "Subscription expiring",
   payment_failed_grace: "Payment failed (grace)",
   payment_failed_lapsed: "Payment grace expired",
@@ -68,6 +69,7 @@ function categoryBadgeVariant(
     case "payment_failed_grace":
     case "trial_ending_soon":
       return "destructive";
+    case "trial_expired":
     case "payment_failed_lapsed":
       return "outline";
     case "active_trial":

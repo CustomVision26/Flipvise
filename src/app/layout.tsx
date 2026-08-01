@@ -9,8 +9,10 @@ import { AppTopNav } from "@/components/app-top-nav";
 import { AuthenticatedShellChrome } from "@/components/authenticated-shell-chrome";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { HelpCenter } from "@/components/help-center";
+import { DashboardAddonsBanner } from "@/components/dashboard-addons-banner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
+import { buildDashboardAddonBannerItems } from "@/lib/dashboard-addon-banner-items";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { loadRootLayoutShellData } from "@/lib/load-root-layout-shell-data";
 import { getManageableStripeSubscription } from "@/db/queries/stripe-subscriptions";
@@ -113,6 +115,8 @@ export default async function RootLayout({
     canAccessTeacherTools,
     activeEducationTeamPlan,
     isAdmin,
+    activeAddonKeys,
+    effectivePlanSlug,
   } = access;
 
   const teamContext = cookieStore.get(TEAM_CONTEXT_COOKIE)?.value;
@@ -201,6 +205,14 @@ export default async function RootLayout({
     isTeamInviteRoute || isAccountRecoveryOnboardingRoute;
   const isTeamAdminRoute = shell.profile === "team-admin";
   const showHeaderChrome = Boolean(userId) || isTeamInviteRoute;
+  const addonBannerItems =
+    userId && !isMinimalHeaderRoute
+      ? await buildDashboardAddonBannerItems({
+          activeAddonKeys,
+          effectivePlanSlug,
+        })
+      : [];
+  const showHeaderAddons = addonBannerItems.length > 0;
 
   return (
     <html
@@ -226,32 +238,57 @@ export default async function RootLayout({
                           "grid items-center gap-x-2 gap-y-2",
                           "grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto]",
                           "lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-rows-1",
-                          shell.teamAdminHeaderTeams.length > 0 && "has-team-admin",
+                          (shell.teamAdminHeaderTeams.length > 0 ||
+                            showHeaderAddons) &&
+                            "has-team-admin",
                         )
                   }
                 >
                   <div
                     data-header-brand
-                    className="col-start-1 row-start-1 flex min-w-0 items-center gap-2 sm:gap-4 justify-self-start"
+                    className="col-start-1 row-start-1 flex min-w-0 max-w-full items-center gap-2 sm:gap-3 justify-self-start"
                   >
                     <HeaderLogo dashboardHref={dashboardHrefWithUserQuery} />
                     {!isMinimalHeaderRoute && !userId && (
                       <AppTopNav homeHref={dashboardHrefWithUserQuery} />
                     )}
+                    {showHeaderAddons ? (
+                      <div className="hidden min-w-0 flex-1 sm:block sm:max-w-[min(22rem,42vw)] lg:max-w-[min(28rem,36vw)]">
+                        <DashboardAddonsBanner
+                          addons={addonBannerItems}
+                          signedIn
+                          variant="header"
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                  {!isMinimalHeaderRoute &&
-                    userId &&
-                    shell.teamAdminHeaderTeams.length > 0 && (
+                  {showHeaderAddons ? (
+                    <div className="col-span-2 row-start-2 min-w-0 sm:hidden">
+                      <DashboardAddonsBanner
+                        addons={addonBannerItems}
+                        signedIn
+                        variant="header"
+                      />
+                    </div>
+                  ) : null}
+                  {userId &&
+                  !isMinimalHeaderRoute &&
+                  shell.teamAdminHeaderTeams.length > 0 ? (
                     <div
-                      data-header-team-admin
-                      className="col-span-2 row-start-2 flex min-w-0 justify-center px-1 sm:px-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-center"
+                      data-header-center
+                      className={cn(
+                        "col-span-2 flex min-w-0 justify-center px-1 sm:px-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-center",
+                        showHeaderAddons
+                          ? "row-start-3 sm:row-start-2"
+                          : "row-start-2",
+                      )}
                     >
                       <TeamAdminHeaderSwitcherClient
                         teams={shell.teamAdminHeaderTeams}
                         userId={userId}
                       />
                     </div>
-                  )}
+                  ) : null}
                   {userId && !isMinimalHeaderRoute && (
                     <div
                       data-header-user

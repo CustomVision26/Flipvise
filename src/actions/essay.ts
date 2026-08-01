@@ -206,12 +206,12 @@ export async function generateEssayAction(
     tokensUsed,
   });
 
-  revalidatePath("/dashboard/essay");
-  revalidatePath("/dashboard/essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
   // Navigate via server redirect — avoids Next.js App Router
   // "Rendered more hooks than during the previous render" when
   // client code calls router.push() immediately after a Server Action.
-  redirect(`/dashboard/essay/${doc.id}`);
+  redirect(`/dashboard/ai-doc-studio/ai-essay/${doc.id}`);
 }
 
 export async function saveEssayDraftAction(
@@ -250,8 +250,8 @@ export async function saveEssayDraftAction(
     draftId: draft.id,
   });
 
-  revalidatePath("/dashboard/essay/drafts");
-  revalidatePath(`/dashboard/essay/${doc.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${doc.id}`);
   return { draftId: draft.id, wordCount: draft.wordCount };
 }
 
@@ -278,9 +278,9 @@ export async function reopenEssayForEditAction(
     userId: access.userId,
   });
 
-  revalidatePath("/dashboard/essay/drafts");
-  revalidatePath("/dashboard/essay/my-essays");
-  revalidatePath(`/dashboard/essay/${doc.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${doc.id}`);
   return { draftId: draft.id, status: draft.status as "draft" | "submitted" };
 }
 
@@ -328,11 +328,11 @@ export async function submitEssayAction(
     draftId: draft.id,
   });
 
-  revalidatePath("/dashboard/essay");
-  revalidatePath("/dashboard/essay/my-essays");
-  revalidatePath("/dashboard/essay/drafts");
-  revalidatePath("/dashboard/essay/assignments");
-  revalidatePath(`/dashboard/essay/${doc.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/assignments");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${doc.id}`);
   return {
     draftId: draft.id,
     feedbackSaved: Boolean(latestFeedback),
@@ -544,8 +544,8 @@ export async function generateEssayFeedbackAction(
     tokensUsed,
   });
 
-  revalidatePath(`/dashboard/essay/${doc.id}`);
-  revalidatePath("/dashboard/essay");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${doc.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
   return result;
 }
 
@@ -563,7 +563,7 @@ export async function revealModelEssayAction(documentId: number) {
     documentId: row.id,
   });
 
-  revalidatePath(`/dashboard/essay/${row.id}`);
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${row.id}`);
   return { revealed: true as const };
 }
 
@@ -625,8 +625,8 @@ export async function assignEssayToMemberAction(
     assignedByUserId: access.userId,
   });
 
-  revalidatePath("/dashboard/essay/assignments");
-  revalidatePath(`/dashboard/essay/${parsed.data.documentId}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/assignments");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${parsed.data.documentId}`);
 }
 
 const renameEssayDocumentSchema = z.object({
@@ -655,10 +655,10 @@ export async function renameEssayDocumentAction(
   );
   if (!row) throw new Error("Essay not found or you cannot rename it.");
 
-  revalidatePath("/dashboard/essay");
-  revalidatePath("/dashboard/essay/my-essays");
-  revalidatePath("/dashboard/essay/drafts");
-  revalidatePath(`/dashboard/essay/${row.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${row.id}`);
   return { documentId: row.id, title: row.title };
 }
 
@@ -675,10 +675,10 @@ export async function deleteEssayDocumentAction(
   );
   if (!ok) throw new Error("Essay not found or you cannot delete it.");
 
-  revalidatePath("/dashboard/essay");
-  revalidatePath("/dashboard/essay/my-essays");
-  revalidatePath("/dashboard/essay/drafts");
-  revalidatePath("/dashboard/essay/assignments");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/assignments");
   return { ok: true as const };
 }
 
@@ -849,10 +849,10 @@ export async function updateEssayInstructionsAction(
     throw new Error("Essay not found or you cannot edit these instructions.");
   }
 
-  revalidatePath("/dashboard/essay");
-  revalidatePath("/dashboard/essay/my-essays");
-  revalidatePath("/dashboard/essay/drafts");
-  revalidatePath(`/dashboard/essay/${row.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${row.id}`);
   return {
     documentId: row.id,
     title: row.title,
@@ -944,8 +944,8 @@ export async function saveEssayFormattedPreviewAction(
   });
   if (!row) throw new Error("Could not save formatted essay preview.");
 
-  revalidatePath("/dashboard/essay/citation-formatting");
-  revalidatePath("/dashboard/essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/citation-formatting");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
 
   return { documentId: row.id, savedAt };
 }
@@ -1109,11 +1109,11 @@ export async function applyEssayCitationFormatAction(
   });
   if (!row) throw new Error("Could not save citation format.");
 
-  revalidatePath("/dashboard/essay");
-  revalidatePath("/dashboard/essay/citation-formatting");
-  revalidatePath("/dashboard/essay/academic-integrity");
-  revalidatePath("/dashboard/essay/my-essays");
-  revalidatePath(`/dashboard/essay/${row.id}`);
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/citation-formatting");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/academic-integrity");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath(`/dashboard/ai-doc-studio/ai-essay/${row.id}`);
 
   return {
     documentId: row.id,

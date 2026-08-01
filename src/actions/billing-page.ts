@@ -32,11 +32,25 @@ import {
   type CancelSubscriptionPreview,
 } from "@/lib/stripe-cancel-subscription";
 import type { PlanHistoryRow } from "@/lib/plan-history-types";
+import { stripe } from "@/lib/stripe";
+import {
+  getAddonCatalogByKey,
+  listActiveUserAddonEntitlements,
+} from "@/db/queries/addons";
+
+export type BillingCancelAddonOption = {
+  addonKey: string;
+  label: string;
+  cancelAtPeriodEnd: boolean;
+  periodEnd: string | null;
+};
 
 export type BillingTabData = {
   planHistory: PlanHistoryRow[];
   canCancelStripe: boolean;
   cancelPreview: CancelSubscriptionPreview | null;
+  /** Active Stripe-billed add-ons eligible for renewal cancel from Billing. */
+  cancelableAddons: BillingCancelAddonOption[];
   /** Resolved current plan slug (Stripe, metadata, or complimentary unlock). */
   currentPlanSlug: string | null;
   planLabel: string;
@@ -75,6 +89,7 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
         planHistory: [],
         canCancelStripe: false,
         cancelPreview: null,
+        cancelableAddons: [],
         currentPlanSlug: null,
         planLabel: "Free",
         billingStatus: null,
@@ -145,16 +160,61 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
         cancelPreview = await fetchCancelSubscriptionPreview(
           sub.stripeSubscriptionId,
           sub.planSlug,
+          { clerkUserId: userId },
         );
       } catch (error) {
         console.error("[billing-page] cancel preview:", error);
       }
     }
 
+    const cancelableAddons: BillingCancelAddonOption[] = [];
+    try {
+      const entitlements = await listActiveUserAddonEntitlements(userId);
+      for (const row of entitlements) {
+        if (row.source !== "stripe" || !row.stripeSubscriptionId) continue;
+        let label = row.addonKey;
+        try {
+          const catalog = await getAddonCatalogByKey(row.addonKey);
+          if (catalog?.name?.trim()) label = catalog.name.trim();
+        } catch {
+          // keep key
+        }
+        let cancelAtPeriodEnd = false;
+        let periodEnd: string | null = null;
+        try {
+          const addonSub = await stripe.subscriptions.retrieve(
+            row.stripeSubscriptionId,
+          );
+          cancelAtPeriodEnd = addonSub.cancel_at_period_end === true;
+          const item = addonSub.items.data[0] as
+            | { current_period_end?: number }
+            | undefined;
+          if (typeof item?.current_period_end === "number") {
+            periodEnd = new Date(item.current_period_end * 1000).toISOString();
+          }
+        } catch (error) {
+          console.error(
+            "[billing-page] addon cancel preview:",
+            row.addonKey,
+            error,
+          );
+        }
+        cancelableAddons.push({
+          addonKey: row.addonKey,
+          label,
+          cancelAtPeriodEnd,
+          periodEnd,
+        });
+      }
+    } catch (error) {
+      console.error("[billing-page] cancelable addons:", error);
+    }
+
     return {
       planHistory,
       canCancelStripe: sub != null && planDisplay.showPaidStripeControls,
       cancelPreview,
+      cancelableAddons,
       currentPlanSlug: planDisplay.planSlug,
       planLabel: planDisplay.planLabel,
       billingStatus: planDisplay.billingStatus,
@@ -169,6 +229,7 @@ export async function loadBillingTabDataAction(): Promise<BillingTabData> {
       planHistory: [],
       canCancelStripe: false,
       cancelPreview: null,
+      cancelableAddons: [],
       currentPlanSlug: null,
       planLabel: "Free",
       billingStatus: null,
@@ -245,12 +306,25 @@ export async function syncBillingAfterCheckoutAction(
     planSlug: null,
   };
 
+  let preferAddon = false;
+  let addonKey: string | null = null;
+
   if (isStripeCheckoutSessionId(checkoutSessionId)) {
     result = await syncBillingFromCheckoutSession(userId, checkoutSessionId);
     try {
       await syncCheckoutSessionInvoicesForUser(userId, checkoutSessionId);
     } catch (error) {
       console.error("[syncBillingAfterCheckoutAction] checkout session:", error);
+    }
+    try {
+      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+      preferAddon = session.metadata?.type === "addon";
+      addonKey = session.metadata?.addonKey?.trim() || null;
+    } catch (error) {
+      console.error(
+        "[syncBillingAfterCheckoutAction] session metadata:",
+        error,
+      );
     }
   }
 
@@ -269,7 +343,10 @@ export async function syncBillingAfterCheckoutAction(
     isProration: false,
   };
   try {
-    receipt = await resolveLatestBillingReceiptForUser(userId, email);
+    receipt = await resolveLatestBillingReceiptForUser(userId, email, {
+      preferAddon,
+      addonKey,
+    });
   } catch (error) {
     console.error("[syncBillingAfterCheckoutAction] receipt resolve:", error);
   }

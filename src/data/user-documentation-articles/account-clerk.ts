@@ -105,8 +105,9 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         bullets: [
           "Effective plan label and access subtitle.",
           "Manage billing → Stripe Customer Portal (card, address, invoices).",
-          "Cancel subscription with prorated refund preview when eligible.",
-          "Plan history table of past plan changes.",
+          "Cancel subscription: with active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both. Access continues until period end.",
+          "Add-on-only cancel keeps the base plan renewing and writes an Inbox notice. If plan renewal was canceled, use Keep renewing plan to resume.",
+          "Plan history lists plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is ending).",
         ],
       },
       {
@@ -114,6 +115,20 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         title: "Complimentary access",
         paragraphs: [
           "Admin-granted or affiliate complimentary plans hide paid Stripe controls — contact support for billing questions.",
+        ],
+      },
+      {
+        id: "zero-dollar-invoices",
+        title: "Plan changes paid from credit",
+        paragraphs: [
+          "Downgrades and some add-on first invoices can settle at $0 using Stripe customer credit/balance. Those appear as paid invoices (and in Plan history receipts), not as new card charges under Stripe Payments.",
+        ],
+      },
+      {
+        id: "renewal-cancel",
+        title: "Ending renewal (no new charge)",
+        paragraphs: [
+          "Scheduling cancel at period end does not create a Stripe Payment or receipt. Stripe marks the subscription to stop renewing; Flipvise confirms in Inbox and Plan history.",
         ],
       },
     ],

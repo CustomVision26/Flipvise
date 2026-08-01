@@ -69,10 +69,25 @@ export default async function AddonCheckoutPayPage({
 
   const savedMailingAddress = await getSavedMailingAddressForCheckout(userId);
   const stripeAmounts = checkoutSessionAmountsMajor(session);
+  const period =
+    session.metadata?.period === "yearly" ? "yearly" : "monthly";
+  const alignIso = session.metadata?.alignsWithBasePeriodEnd?.trim() || null;
+  let billingNote: string | null = null;
+  if (alignIso) {
+    const alignDate = new Date(alignIso);
+    if (!Number.isNaN(alignDate.getTime())) {
+      const formatted = alignDate.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      billingNote = `Today’s charge is prorated through ${formatted}, aligned with your plan’s renewal date. After that, this add-on renews on its own (cancel anytime without affecting your plan).`;
+    }
+  }
 
   const summary: PricingCheckoutSummary = {
     planLabel: catalog?.name ?? "Add-on",
-    period: "monthly",
+    period,
     customerEmail,
     campaignLabel: null,
     promo: null,
@@ -80,6 +95,7 @@ export default async function AddonCheckoutPayPage({
     trialDays: null,
     monthlyRateAfterTrial: stripeAmounts?.subtotalMajor ?? null,
     stripeAmounts,
+    billingNote,
   };
 
   return (

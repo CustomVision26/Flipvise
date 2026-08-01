@@ -1,5 +1,6 @@
 import { listBillingInvoicesForAdmin } from "@/db/queries/billing";
 import type { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
+import type { listAllActiveAddonEntitlements } from "@/db/queries/addons";
 import type {
   SerializedAdminInvoice,
   SerializedAdminSubscription,
@@ -12,6 +13,7 @@ import {
   type AdminPlanAccessMeta,
 } from "@/lib/admin-user-plan-label";
 import { canonicalTeamPlanId, isTeamPlanId } from "@/lib/team-plans";
+import { displayNameForAddonBillingPlanSlug } from "@/lib/addon-plan-slug";
 
 export type AdminBillingUserMeta = {
   id: string;
@@ -136,11 +138,22 @@ export function countPaidSubscribersFromMeta(users: AdminBillingUserMeta[]): num
   return users.filter((u) => u.isPaidPro).length;
 }
 
+type AddonEntitlementRow = Awaited<
+  ReturnType<typeof listAllActiveAddonEntitlements>
+>[number];
+
 export function buildAdminBillingSnapshot(input: {
   users: AdminBillingUserMeta[];
   persistedBillingInvoices: Awaited<ReturnType<typeof listBillingInvoicesForAdmin>>;
   stripeSubscriptions?: StripeSubscriptionRow[];
   activeAffiliateUserIds?: Set<string>;
+  /** Stripe subscription id → cancel_at_period_end + period end */
+  renewalFlagsBySubscriptionId?: Map<
+    string,
+    { cancelAtPeriodEnd: boolean; currentPeriodEndIso: string | null }
+  >;
+  activeAddonEntitlements?: AddonEntitlementRow[];
+  addonCatalogNameByKey?: Map<string, string>;
 }): {
   paidSubscriberCount: number;
   subscriptions: SerializedAdminSubscription[];
@@ -148,6 +161,7 @@ export function buildAdminBillingSnapshot(input: {
 } {
   const { users, persistedBillingInvoices } = input;
   const affiliateIds = input.activeAffiliateUserIds ?? new Set<string>();
+  const renewalBySub = input.renewalFlagsBySubscriptionId ?? new Map();
   const stripeByUser = new Map(
     (input.stripeSubscriptions ?? []).map((row) => [row.userId, row]),
   );
@@ -262,7 +276,14 @@ export function buildAdminBillingSnapshot(input: {
         latestInv?.periodEnd?.toISOString() ??
         null;
 
+      const subId = stripeRow?.stripeSubscriptionId?.trim() ?? "";
+      const renewal = subId ? renewalBySub.get(subId) : undefined;
+      const cancelAtPeriodEnd = renewal?.cancelAtPeriodEnd ?? false;
+      const resolvedPeriodEnd =
+        renewal?.currentPeriodEndIso ?? periodEnd;
+
       return {
+        rowId: uid,
         userId: uid,
         userName:
           user?.fullName ??
@@ -274,6 +295,7 @@ export function buildAdminBillingSnapshot(input: {
           latestInv?.userEmail ??
           periodInv?.userEmail ??
           null,
+        kind: "plan" as const,
         planSlug,
         planLabel: displayNameForBillingPlanSlug(planSlug),
         status:
@@ -281,9 +303,13 @@ export function buildAdminBillingSnapshot(input: {
           (user?.stripeAuthoritative ? (user.billingStatus ?? "active") : "active"),
         currency: periodInv?.currency ?? latestInv?.currency ?? null,
         currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-        nextPaymentDate: stripeRow?.currentPeriodEnd?.toISOString() ?? null,
-        cancelAtPeriodEnd: false,
+        currentPeriodEnd: resolvedPeriodEnd,
+        nextPaymentDate: cancelAtPeriodEnd
+          ? null
+          : (resolvedPeriodEnd ??
+            stripeRow?.currentPeriodEnd?.toISOString() ??
+            null),
+        cancelAtPeriodEnd,
         sourceUpdatedAt:
           stripeRow?.updatedAt?.toISOString() ??
           user?.billingPlanUpdatedAt ??
@@ -291,8 +317,46 @@ export function buildAdminBillingSnapshot(input: {
           periodInv?.createdAt.toISOString() ??
           null,
       };
-    })
-    .sort((a, b) => a.userName.localeCompare(b.userName));
+    });
+
+  const addonCatalogNames = input.addonCatalogNameByKey ?? new Map();
+  for (const entitlement of input.activeAddonEntitlements ?? []) {
+    const user = userById.get(entitlement.userId);
+    const catalogName = addonCatalogNames.get(entitlement.addonKey) ?? "";
+    const planSlug = `addon:${entitlement.addonKey}`;
+    const subId = entitlement.stripeSubscriptionId?.trim() ?? "";
+    const renewal = subId ? renewalBySub.get(subId) : undefined;
+    const cancelAtPeriodEnd = renewal?.cancelAtPeriodEnd ?? false;
+    const periodEnd =
+      renewal?.currentPeriodEndIso ??
+      entitlement.endsAt?.toISOString() ??
+      stripeByUser.get(entitlement.userId)?.currentPeriodEnd?.toISOString() ??
+      null;
+
+    subscriptions.push({
+      rowId: `${entitlement.userId}:addon:${entitlement.addonKey}`,
+      userId: entitlement.userId,
+      userName: user?.fullName ?? entitlement.userId,
+      email: user?.email ?? null,
+      kind: "addon",
+      planSlug,
+      planLabel: displayNameForAddonBillingPlanSlug(planSlug, catalogName),
+      status: cancelAtPeriodEnd ? "canceling" : entitlement.status,
+      currency: null,
+      currentPeriodStart: entitlement.startsAt?.toISOString() ?? null,
+      currentPeriodEnd: periodEnd,
+      nextPaymentDate: cancelAtPeriodEnd ? null : periodEnd,
+      cancelAtPeriodEnd,
+      sourceUpdatedAt: entitlement.updatedAt?.toISOString() ?? null,
+    });
+  }
+
+  subscriptions.sort((a, b) => {
+    const nameCmp = a.userName.localeCompare(b.userName);
+    if (nameCmp !== 0) return nameCmp;
+    if (a.kind !== b.kind) return a.kind === "plan" ? -1 : 1;
+    return a.planLabel.localeCompare(b.planLabel);
+  });
 
   return { paidSubscriberCount, subscriptions, invoices };
 }

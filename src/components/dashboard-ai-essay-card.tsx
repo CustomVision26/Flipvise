@@ -44,19 +44,19 @@ export function DashboardAiEssayCard({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Link
-            href="/dashboard/essay/generate"
+            href="/dashboard/ai-doc-studio/ai-essay/generate"
             className={cn(buttonVariants({ size: "sm" }))}
           >
             Create Essay
           </Link>
           <Link
-            href="/dashboard/essay/my-essays"
+            href="/dashboard/ai-doc-studio/ai-essay/my-essays"
             className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
           >
             My Essays
           </Link>
           <Link
-            href="/dashboard/essay/drafts"
+            href="/dashboard/ai-doc-studio/ai-essay/drafts"
             className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
           >
             Drafts

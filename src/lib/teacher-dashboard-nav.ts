@@ -66,12 +66,12 @@ export const TEACHER_DASHBOARD_NAV: TeacherNavSection[] = [
         summary: "Create printable practice worksheets and answer keys from your deck vocabulary and concepts.",
       },
       {
-        title: "Generate AI Essay",
+        title: "AI Document Studio",
         suffix: "/essay",
         icon: Sparkles,
-        absoluteHref: "/dashboard/essay/generate",
+        absoluteHref: "/dashboard/ai-doc-studio",
         summary:
-          "Premium add-on: generate essay activities, drafts, and AI feedback from /dashboard/essay.",
+          "Premium add-ons for essays and future document types under AI Document Studio.",
       },
     ],
   },
@@ -113,7 +113,11 @@ export function isTeacherNavItemActive(
   absoluteHref?: string,
 ): boolean {
   if (absoluteHref) {
-    return pathname === absoluteHref || pathname.startsWith(`${absoluteHref}/`) || pathname.startsWith("/dashboard/essay");
+    return (
+      pathname === absoluteHref ||
+      pathname.startsWith(`${absoluteHref}/`) ||
+      pathname.startsWith("/dashboard/ai-doc-studio")
+    );
   }
   const normalized = suffix.startsWith("/") ? suffix : `/${suffix}`;
   const target = `/teacher${normalized}`;

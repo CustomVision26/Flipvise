@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { isGeneralDiscountEffectivelyActive } from "@/lib/plan-promo-window";
 import {
   canUserStartPlanTrial,
   isPublishedPlanTrial,
@@ -62,6 +61,7 @@ function PlanCard({
   hasActiveSubscription,
   onCheckout,
   onTrialCheckout,
+  hasActiveDiscount,
 }: {
   plan: PlanConfig;
   period: BillingPeriod;
@@ -72,10 +72,13 @@ function PlanCard({
   hasActiveSubscription: boolean;
   onCheckout: (planId: PaidPlanId) => void;
   onTrialCheckout: (planId: PaidPlanId) => void;
+  /** Server-computed — avoids promo-window TZ mismatch on hydrate. */
+  hasActiveDiscount: boolean;
 }) {
-  const periodPricing = computePlanPeriodPricing(plan, period);
+  const periodPricing = computePlanPeriodPricing(plan, period, {
+    hasActiveDiscount,
+  });
   const discount = plan.discount;
-  const hasActiveDiscount = periodPricing?.hasActiveDiscount ?? false;
   const isFree = plan.id === "free";
   const isEducation = isEducationPlanId(plan.id);
   const educationBadge = isEducation
@@ -286,19 +289,6 @@ function PlanCard({
   );
 }
 
-function activePublicPromoCodes(plans: PlanConfig[]): Array<{ planName: string; code: string }> {
-  const seen = new Set<string>();
-  const rows: Array<{ planName: string; code: string }> = [];
-  for (const plan of plans) {
-    if (!isGeneralDiscountEffectivelyActive(plan)) continue;
-    const code = plan.discount?.stripeCouponId?.trim();
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    rows.push({ planName: plan.name, code });
-  }
-  return rows;
-}
-
 export function PricingContent({
   userId,
   currentPlanHighlightId,
@@ -306,6 +296,9 @@ export function PricingContent({
   initialPromotionCode = "",
   hasUsedTrial = false,
   hasActiveSubscription = false,
+  showPromotionCodeUi,
+  publicPromoCodes,
+  activeDiscountPlanIds,
 }: {
   userId: string | null;
   /**
@@ -319,6 +312,12 @@ export function PricingContent({
   initialPromotionCode?: string;
   hasUsedTrial?: boolean;
   hasActiveSubscription?: boolean;
+  /** Server-computed — do not derive on the client (avoids TZ hydration mismatch). */
+  showPromotionCodeUi: boolean;
+  /** Server-computed active public codes for the promo block. */
+  publicPromoCodes: Array<{ planName: string; code: string }>;
+  /** Server-computed plan ids with an effectively active general discount. */
+  activeDiscountPlanIds: string[];
 }) {
   const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -326,8 +325,6 @@ export function PricingContent({
   const [promotionCode, setPromotionCode] = useState(initialPromotionCode.trim());
   const router = useRouter();
   const promoSectionRef = useRef<HTMLDivElement>(null);
-
-  const publicPromoCodes = activePublicPromoCodes(plans);
 
   const visiblePlans = selectedPlanId
     ? plans.filter((p) => p.id === selectedPlanId)
@@ -341,7 +338,7 @@ export function PricingContent({
       plan: planId,
       period,
     });
-    if (!startTrial && promotionCode.trim()) {
+    if (!startTrial && showPromotionCodeUi && promotionCode.trim()) {
       params.set("promo", promotionCode.trim());
     }
     if (startTrial) {
@@ -423,55 +420,57 @@ export function PricingContent({
 
       </div>
 
-      <div
-        ref={promoSectionRef}
-        className="rounded-xl border border-border/80 bg-card/50 px-4 py-4 sm:px-5"
-      >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="checkout-promo" className="text-sm font-medium text-foreground">
-              Promotion code
-            </Label>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Optional. Enter a public promo or combined affiliate code before you choose a plan.
+      {showPromotionCodeUi ? (
+        <div
+          ref={promoSectionRef}
+          className="rounded-xl border border-border/80 bg-card/50 px-4 py-4 sm:px-5"
+        >
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="checkout-promo" className="text-sm font-medium text-foreground">
+                Promotion code
+              </Label>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Optional. Enter a public sale code or an affiliate code before you choose a plan.
+              </p>
+            </div>
+            <Input
+              id="checkout-promo"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="e.g. SUMMER26 or SummerLaunchusera1276"
+              value={promotionCode}
+              onChange={(e) => setPromotionCode(e.target.value)}
+              className="h-10 max-w-md bg-background/80 text-sm font-mono"
+            />
+            {publicPromoCodes.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="shrink-0">Active codes:</span>
+                {publicPromoCodes.map(({ code }) => (
+                  <Button
+                    key={code}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 font-mono text-xs"
+                    onClick={() => setPromotionCode(code)}
+                  >
+                    <span className="font-sans text-muted-foreground">Promo</span>
+                    {code}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
+            <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Public codes apply to the matching plan during an active sale. Affiliate codes appear
+              on plan cards while an affiliate sale is running. One redemption per account on new
+              subscriptions only — plan changes are prorated in Stripe and do not accept a promo.
+              Sign in before checkout if you have not already.
             </p>
           </div>
-          <Input
-            id="checkout-promo"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="e.g. SUMMER26 or SummerLaunchusera1276"
-            value={promotionCode}
-            onChange={(e) => setPromotionCode(e.target.value)}
-            className="h-10 max-w-md bg-background/80 text-sm font-mono"
-          />
-          {publicPromoCodes.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="shrink-0">Active codes:</span>
-              {publicPromoCodes.map(({ code }) => (
-                <Button
-                  key={code}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1.5 px-2 font-mono text-xs"
-                  onClick={() => setPromotionCode(code)}
-                >
-                  <span className="font-sans text-muted-foreground">Promo</span>
-                  {code}
-                </Button>
-              ))}
-            </div>
-          ) : null}
-          <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            General codes apply to the matching tier. Affiliate codes combine the tier&apos;s base
-            promo with an affiliate ID (shown on each plan card when a sale is running). Each promo
-            can only be used once per account. Plan upgrades and downgrades use Stripe proration
-            without an additional promo. Sign in before checkout if you have not already.
-          </p>
         </div>
-      </div>
+      ) : null}
 
       {/* Plan cards grid */}
       <div
@@ -494,6 +493,7 @@ export function PricingContent({
             hasActiveSubscription={hasActiveSubscription}
             onCheckout={(planId) => handleCheckout(planId, false)}
             onTrialCheckout={(planId) => handleCheckout(planId, true)}
+            hasActiveDiscount={activeDiscountPlanIds.includes(plan.id)}
           />
         ))}
       </div>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AppTopNav } from "@/components/app-top-nav";
-import { ForceDarkTheme } from "@/components/force-dark-theme";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +18,7 @@ export function PublicMarketingPageChrome({
   children,
 }: PublicMarketingPageChromeProps) {
   return (
-    <ForceDarkTheme>
+    <div className="dark min-h-full w-full">
       <div className="min-h-screen bg-gradient-to-b from-muted/10 via-background to-background">
         <header className="border-b border-border/50 bg-card/20 backdrop-blur-md">
           <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto] items-center gap-3 px-4 py-3.5 sm:px-6">
@@ -50,6 +49,6 @@ export function PublicMarketingPageChrome({
           {children}
         </main>
       </div>
-    </ForceDarkTheme>
+    </div>
   );
 }

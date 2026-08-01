@@ -106,6 +106,13 @@ import {
   ACCOUNT_TYPE_VALUES,
   type AccountType,
 } from "@/lib/account-recovery-profile";
+import {
+  DEFAULT_TEACHER_PAGE_SIZE,
+  TeacherRecordPagination,
+  TeacherRecordsCountBar,
+  paginateTeacherRecords,
+  type TeacherPageSize,
+} from "@/components/teacher-record-pagination";
 
 const AdminContactUsPanel = dynamic(
   () => import("@/components/admin-contact-us-panel").then((mod) => mod.AdminContactUsPanel),
@@ -270,6 +277,10 @@ export function AdminTabs({
   const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPageSize, setUsersPageSize] = useState<TeacherPageSize>(
+    DEFAULT_TEACHER_PAGE_SIZE,
+  );
   const [paidOnlyFilter, setPaidOnlyFilter] = useState<PaidOnlyFilter>("all");
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] =
     useState<BillingSubscriptionStatusFilter>("all");
@@ -402,6 +413,21 @@ export function AdminTabs({
     });
   }, [rosterUsers, search, planFilter, roleFilter, statusFilter]);
 
+  useEffect(() => {
+    setUsersPage(1);
+  }, [search, planFilter, roleFilter, statusFilter, usersPageSize]);
+
+  const usersTablePage = useMemo(
+    () => paginateTeacherRecords(filteredUsers, usersPage, usersPageSize),
+    [filteredUsers, usersPage, usersPageSize],
+  );
+
+  useEffect(() => {
+    if (usersPage > usersTablePage.totalPages) {
+      setUsersPage(usersTablePage.totalPages);
+    }
+  }, [usersPage, usersTablePage.totalPages]);
+
   const subscriptionRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return subscriptions.filter((row) => {
@@ -415,12 +441,20 @@ export function AdminTabs({
       }
       if (paidOnlyFilter === "paid-only") {
         const status = row.status.toLowerCase();
-        const looksPaid = status === "active" || status === "trialing";
+        const looksPaid =
+          status === "active" ||
+          status === "trialing" ||
+          status === "canceling";
         if (!looksPaid) return false;
       }
       if (
         subscriptionStatusFilter !== "all" &&
-        row.status.toLowerCase() !== subscriptionStatusFilter
+        row.status.toLowerCase() !== subscriptionStatusFilter &&
+        !(
+          subscriptionStatusFilter === "active" &&
+          row.cancelAtPeriodEnd &&
+          (row.status === "active" || row.status === "canceling")
+        )
       ) {
         return false;
       }
@@ -482,8 +516,6 @@ export function AdminTabs({
               <div className="min-w-0 space-y-1">
                 <CardTitle className={adminSectionTitleClass}>All Users</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {filteredUsers.length} of {rosterUsers.length} users
-                  <span className="hidden sm:inline"> · </span>
                   <span className="block sm:inline text-xs sm:text-sm">
                     Double-click a row to view profile, security Q&A, and plan details
                   </span>
@@ -548,7 +580,20 @@ export function AdminTabs({
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
+          <CardContent className="space-y-0 p-0">
+            <div className="border-b border-border/50 px-4 py-3 sm:px-6">
+              <TeacherRecordsCountBar
+                idPrefix="admin-all-users"
+                pageStart={usersTablePage.pageStart}
+                pageEnd={usersTablePage.pageEnd}
+                filteredCount={filteredUsers.length}
+                totalCount={rosterUsers.length}
+                recordLabel="user"
+                pageSize={usersPageSize}
+                onPageSizeChange={setUsersPageSize}
+              />
+            </div>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -577,7 +622,7 @@ export function AdminTabs({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsers.map((user) => (
+                  usersTablePage.paginatedItems.map((user) => (
                     <TableRow
                       key={user.id}
                       onDoubleClick={() => void openUserProfileDialog(user)}
@@ -685,6 +730,16 @@ export function AdminTabs({
                 )}
               </TableBody>
             </Table>
+            </div>
+            {usersTablePage.totalPages > 1 ? (
+              <div className="border-t border-border/50 px-4 py-3 sm:px-6">
+                <TeacherRecordPagination
+                  page={usersTablePage.safePage}
+                  totalPages={usersTablePage.totalPages}
+                  onPageChange={setUsersPage}
+                />
+              </div>
+            ) : null}
           </CardContent>
           <Dialog
             open={profileDialogUser != null}
@@ -1250,8 +1305,10 @@ export function AdminTabs({
                           subscriptionRows.map((row) => [
                             row.userName,
                             row.email,
-                            row.planLabel,
-                            row.status,
+                            `${row.kind === "addon" ? "Add-on: " : ""}${row.planLabel}`,
+                            row.cancelAtPeriodEnd && row.status !== "canceling"
+                              ? `${row.status} (canceling)`
+                              : row.status,
                             row.currentPeriodStart,
                             row.currentPeriodEnd,
                             row.nextPaymentDate,
@@ -1329,7 +1386,7 @@ export function AdminTabs({
                           </TableRow>
                         ) : (
                           subscriptionRows.map((row) => (
-                            <TableRow key={row.userId}>
+                            <TableRow key={row.rowId}>
                               <TableCell className="font-medium whitespace-nowrap">
                                 {row.userName}
                               </TableCell>
@@ -1337,20 +1394,41 @@ export function AdminTabs({
                                 {row.email ?? "—"}
                               </TableCell>
                               <TableCell>
-                                <Badge variant={row.planSlug === "free" ? "secondary" : "default"}>
-                                  {row.planLabel}
-                                </Badge>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant={
+                                      row.kind === "addon"
+                                        ? "outline"
+                                        : row.planSlug === "free"
+                                          ? "secondary"
+                                          : "default"
+                                    }
+                                  >
+                                    {row.planLabel}
+                                  </Badge>
+                                  {row.kind === "addon" ? (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      Add-on
+                                    </Badge>
+                                  ) : null}
+                                </div>
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                {row.status}
+                                {row.cancelAtPeriodEnd && row.status !== "canceling"
+                                  ? `${row.status} (canceling)`
+                                  : row.status}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                                 {row.currentPeriodStart
                                   ? `${formatDate(row.currentPeriodStart)} - ${formatDate(row.currentPeriodEnd)}`
-                                  : "—"}
+                                  : row.currentPeriodEnd
+                                    ? `Until ${formatDate(row.currentPeriodEnd)}`
+                                    : "—"}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                {formatDate(row.nextPaymentDate)}
+                                {row.cancelAtPeriodEnd
+                                  ? "—"
+                                  : formatDate(row.nextPaymentDate)}
                               </TableCell>
                               <TableCell className="text-sm whitespace-nowrap">
                                 <Badge variant={row.cancelAtPeriodEnd ? "outline" : "secondary"}>

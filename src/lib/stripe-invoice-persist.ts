@@ -21,6 +21,7 @@ import { stripe } from "@/lib/stripe";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { asPaidPlanId, upsertStripeSubscriptionFromStripeSub } from "@/lib/stripe-billing-sync";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
+import { addonBillingPlanSlug } from "@/lib/addon-plan-slug";
 import { planSlugFromStripeLineDescription } from "@/lib/stripe-receipt-plan-title";
 import { planSlugFromStripePriceId } from "@/lib/stripe-plan-price-env";
 import { readPlansConfigFromDisk } from "@/lib/plans-config-disk";
@@ -281,6 +282,147 @@ async function resolvePlanSlugForInvoice(
   return null;
 }
 
+async function resolveAddonKeyFromCatalogPriceId(
+  priceId: string | null | undefined,
+): Promise<string | null> {
+  const id = priceId?.trim();
+  if (!id?.startsWith("price_")) return null;
+  try {
+    const { listAddonCatalog } = await import("@/db/queries/addons");
+    const { resolveStripeAddonPriceIdFromEnvKey } = await import(
+      "@/lib/stripe-addon-price-env"
+    );
+    const catalog = await listAddonCatalog();
+    for (const row of catalog) {
+      const monthly = resolveStripeAddonPriceIdFromEnvKey(
+        row.stripePriceEnvKey,
+        "monthly",
+      );
+      const yearly = resolveStripeAddonPriceIdFromEnvKey(
+        row.stripePriceEnvKey,
+        "yearly",
+      );
+      if (id === monthly || id === yearly) return row.key;
+    }
+  } catch (error) {
+    console.error("[resolveAddonKeyFromCatalogPriceId]", id, error);
+  }
+  return null;
+}
+
+function invoiceLinePriceId(line: Stripe.InvoiceLineItem): string | null {
+  const raw = line as unknown as {
+    price?: string | { id?: string } | null;
+    pricing?: { price_details?: { price?: string } };
+  };
+  if (typeof raw.price === "string" && raw.price.startsWith("price_")) {
+    return raw.price;
+  }
+  if (
+    raw.price &&
+    typeof raw.price === "object" &&
+    typeof raw.price.id === "string" &&
+    raw.price.id.startsWith("price_")
+  ) {
+    return raw.price.id;
+  }
+  const nested = raw.pricing?.price_details?.price;
+  if (typeof nested === "string" && nested.startsWith("price_")) return nested;
+  return null;
+}
+
+async function resolveAddonKeyFromInvoice(
+  invoice: Stripe.Invoice,
+): Promise<string | null> {
+  const metaKey = invoice.metadata?.addonKey?.trim();
+  if (invoice.metadata?.type === "addon" && metaKey) return metaKey;
+  if (metaKey && !asPaidPlanId(metaKey)) return metaKey;
+
+  for (const line of invoice.lines?.data ?? []) {
+    const lineMeta = (line as { metadata?: Record<string, string> }).metadata;
+    if (lineMeta?.type === "addon") {
+      const key = lineMeta.addonKey?.trim();
+      if (key) return key;
+    }
+    const fromPrice = await resolveAddonKeyFromCatalogPriceId(
+      invoiceLinePriceId(line),
+    );
+    if (fromPrice) return fromPrice;
+  }
+
+  const raw = invoice as unknown as Record<string, unknown>;
+  const subscriptionRef = raw.subscription;
+  const subId =
+    typeof subscriptionRef === "string"
+      ? subscriptionRef
+      : typeof subscriptionRef === "object" &&
+          subscriptionRef !== null &&
+          typeof (subscriptionRef as { id?: string }).id === "string"
+        ? (subscriptionRef as { id: string }).id
+        : null;
+  if (!subId) return null;
+
+  try {
+    const {
+      addonKeyFromStripeSubscription,
+      addonKeyFromStripeSubscriptionItem,
+      isStripeAddonSubscription,
+    } = await import("@/lib/stripe-addon-metadata");
+    const sub =
+      typeof subscriptionRef === "object" &&
+      subscriptionRef !== null &&
+      "metadata" in subscriptionRef
+        ? (subscriptionRef as Stripe.Subscription)
+        : await stripe.subscriptions.retrieve(subId, {
+            expand: ["items.data.price"],
+          });
+    if (isStripeAddonSubscription(sub)) {
+      return addonKeyFromStripeSubscription(sub);
+    }
+    for (const item of sub.items?.data ?? []) {
+      const fromItem = addonKeyFromStripeSubscriptionItem(item);
+      if (fromItem) return fromItem;
+      const priceId =
+        typeof item.price === "string" ? item.price : item.price?.id ?? null;
+      const fromPrice = await resolveAddonKeyFromCatalogPriceId(priceId);
+      if (fromPrice) return fromPrice;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function invoiceBelongsToAddonSubscription(
+  invoice: Stripe.Invoice,
+): Promise<boolean> {
+  const raw = invoice as unknown as Record<string, unknown>;
+  const subscriptionRef = raw.subscription;
+  const subId =
+    typeof subscriptionRef === "string"
+      ? subscriptionRef
+      : typeof subscriptionRef === "object" &&
+          subscriptionRef !== null &&
+          typeof (subscriptionRef as { id?: string }).id === "string"
+        ? (subscriptionRef as { id: string }).id
+        : null;
+  if (!subId) return false;
+  try {
+    const { isStripeAddonSubscription } = await import(
+      "@/lib/stripe-addon-metadata"
+    );
+    const sub =
+      typeof subscriptionRef === "object" &&
+      subscriptionRef !== null &&
+      "metadata" in subscriptionRef
+        ? (subscriptionRef as Stripe.Subscription)
+        : await stripe.subscriptions.retrieve(subId);
+    return isStripeAddonSubscription(sub);
+  } catch {
+    return false;
+  }
+}
+
 async function resolvePromoPercentFromPlanConfig(input: {
   promoCode: string;
   promoKind: AdminInvoicePromoKind;
@@ -446,6 +588,13 @@ export async function syncCheckoutSessionInvoicesForUser(
 
   const email = await resolveUserEmail(userId);
   const selectedPlan = asPaidPlanId(session.metadata?.plan);
+  const sessionAddonKey =
+    session.metadata?.type === "addon"
+      ? session.metadata?.addonKey?.trim() || null
+      : null;
+  const sessionPlanSlug = sessionAddonKey
+    ? addonBillingPlanSlug(sessionAddonKey)
+    : selectedPlan;
 
   const subscriptionRef = session.subscription;
   const subscriptionId =
@@ -460,7 +609,7 @@ export async function syncCheckoutSessionInvoicesForUser(
       const sub = await stripe.subscriptions.retrieve(subscriptionId, {
         expand: ["latest_invoice.payment_intent.latest_charge"],
       });
-      if (selectedPlan) {
+      if (selectedPlan && !sessionAddonKey) {
         await upsertStripeSubscriptionFromStripeSub(userId, sub, selectedPlan);
       }
       await persistInvoiceRefForUser(userId, email, sub.latest_invoice);
@@ -487,7 +636,7 @@ export async function syncCheckoutSessionInvoicesForUser(
           source: "invoice",
           userId,
           userEmail: email,
-          planSlug: selectedPlan,
+          planSlug: sessionPlanSlug,
           status: existing.status ?? "paid",
           hostedInvoiceUrl: chargeReceipt,
         });
@@ -508,14 +657,31 @@ export async function persistStripeInvoiceForUser(
   userEmail: string | null,
   invoice: Stripe.Invoice,
 ): Promise<void> {
-  let invoicePlan = await resolvePlanSlugForInvoice(invoice);
-  if (!invoicePlan) {
+  const addonKey = await resolveAddonKeyFromInvoice(invoice);
+  let invoicePlanSlug: string | null = addonKey
+    ? addonBillingPlanSlug(addonKey)
+    : null;
+
+  if (!invoicePlanSlug) {
+    // Never tag an add-on-only subscription invoice with the base plan slug —
+    // that causes Plan History to attach the add-on receipt to the Active plan row.
+    if (await invoiceBelongsToAddonSubscription(invoice)) {
+      console.error(
+        "[persistStripeInvoiceForUser] add-on invoice missing addonKey",
+        invoice.id,
+      );
+      return;
+    }
+    invoicePlanSlug = await resolvePlanSlugForInvoice(invoice);
+  }
+
+  if (!invoicePlanSlug) {
     const activeSub =
       (await getActiveStripeSubscription(userId)) ??
       (await getManageableStripeSubscription(userId));
-    invoicePlan = asPaidPlanId(activeSub?.planSlug);
+    invoicePlanSlug = asPaidPlanId(activeSub?.planSlug);
   }
-  if (!invoicePlan) {
+  if (!invoicePlanSlug) {
     console.error(
       "[persistStripeInvoiceForUser] could not resolve plan slug",
       invoice.id,
@@ -548,11 +714,14 @@ export async function persistStripeInvoiceForUser(
         : null;
 
   const rawDiscountLabel = invoiceDiscountLabel(invoice);
-  const { promoCode, promoKind, percentOff } = await resolveInvoicePromoFromStripe(
-    invoice,
-    rawDiscountLabel,
-    invoicePlan,
-  );
+  const paidPlanSlug = asPaidPlanId(invoicePlanSlug);
+  const { promoCode, promoKind, percentOff } = paidPlanSlug
+    ? await resolveInvoicePromoFromStripe(
+        invoice,
+        rawDiscountLabel,
+        paidPlanSlug,
+      )
+    : { promoCode: null, promoKind: null, percentOff: null };
   const discountLabel = normalizeBillingInvoiceDiscountLabel({
     promoCode,
     promoKind,
@@ -583,7 +752,7 @@ export async function persistStripeInvoiceForUser(
     source: "invoice",
     userId,
     userEmail,
-    planSlug: invoicePlan,
+    planSlug: invoicePlanSlug,
     invoiceNumber: stringOrNull(invoice.number),
     status: invoice.status ?? "unknown",
     amountCents: invoiceAmountCents(invoice),
@@ -711,6 +880,34 @@ export async function syncBillingInvoicesForUser(userId: string): Promise<void> 
     }
   }
 
+  // Add-on subscriptions are separate Stripe subs — sync their latest invoices too.
+  try {
+    const { listActiveUserAddonEntitlements } = await import(
+      "@/db/queries/addons"
+    );
+    const entitlements = await listActiveUserAddonEntitlements(userId);
+    for (const row of entitlements) {
+      if (row.source !== "stripe" || !row.stripeSubscriptionId) continue;
+      try {
+        const addonSub = await stripe.subscriptions.retrieve(
+          row.stripeSubscriptionId,
+          { expand: ["latest_invoice.payment_intent.latest_charge"] },
+        );
+        if (addonSub.latest_invoice) {
+          await persistInvoiceRefForUser(userId, email, addonSub.latest_invoice);
+        }
+      } catch (error) {
+        console.error(
+          "[syncBillingInvoicesForUser] addon latest_invoice:",
+          row.addonKey,
+          error,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[syncBillingInvoicesForUser] addon entitlements:", error);
+  }
+
   await syncRecentStripeInvoicesForUser(userId, {
     customerId: subRow?.stripeCustomerId,
     limit: 36,
@@ -729,11 +926,16 @@ export async function refreshLatestPaidInvoiceForUser(
   userId: string,
   planSlug?: string | null,
 ): Promise<Awaited<ReturnType<typeof listBillingInvoicesForUser>>[number] | null> {
+  const { isAddonBillingPlanSlug } = await import("@/lib/addon-plan-slug");
   await syncBillingInvoicesForUser(userId);
   const email = await resolveUserEmail(userId);
   const invoices = await listBillingInvoicesForUser(userId, email);
   const paid = invoices
-    .filter((inv) => inv.status?.toLowerCase() === "paid")
+    .filter(
+      (inv) =>
+        inv.status?.toLowerCase() === "paid" &&
+        !isAddonBillingPlanSlug(inv.planSlug),
+    )
     .sort((a, b) => {
       const aMs = a.paidAt?.getTime() ?? a.createdAt.getTime();
       const bMs = b.paidAt?.getTime() ?? b.createdAt.getTime();

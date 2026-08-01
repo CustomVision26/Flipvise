@@ -29,13 +29,21 @@ export function computePlanPeriodPricing(
   plan: Pick<PlanConfig, "monthlyPrice" | "yearlyMonthlyPrice" | "discount"> &
     Parameters<typeof isGeneralDiscountEffectivelyActive>[0],
   period: PricingBillingPeriod,
+  options?: {
+    nowMs?: number;
+    /** When set (e.g. from RSC), skips local promo-window re-evaluation. */
+    hasActiveDiscount?: boolean;
+  },
 ): PlanPeriodPricing | null {
   const basePeriodicRate =
     period === "monthly" ? plan.monthlyPrice : plan.yearlyMonthlyPrice;
   if (basePeriodicRate == null) return null;
 
   const hasActiveDiscount =
-    isGeneralDiscountEffectivelyActive(plan) && plan.discount != null;
+    typeof options?.hasActiveDiscount === "boolean"
+      ? options.hasActiveDiscount
+      : isGeneralDiscountEffectivelyActive(plan, options?.nowMs) &&
+        plan.discount != null;
   const discountedPeriodicRate =
     hasActiveDiscount && plan.discount
       ? applyDiscount(basePeriodicRate, plan.discount)

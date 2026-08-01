@@ -24,16 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import type { DashboardAddonBannerItem } from "@/lib/dashboard-addon-banner-items";
 
-export type DashboardAddonBannerItem = {
-  key: string;
-  name: string;
-  blurb: string;
-  unlocked: boolean;
-  canPurchase: boolean;
-  /** Destination when unlocked; omit to open unlock flow. */
-  href?: string | null;
-};
+export type { DashboardAddonBannerItem };
 
 /** Distinct chip colors (readable on dark UI). */
 const ADDON_CHIP_STYLES = [
@@ -62,11 +55,50 @@ function chipClassForAddon(key: string, index: number): string {
 type DashboardAddonsBannerProps = {
   addons: DashboardAddonBannerItem[];
   signedIn: boolean;
+  /**
+   * `marquee` — full-bleed scrolling strip.
+   * `header` — compact running marquee for the app top bar.
+   * `inline` — static centered chip row.
+   */
+  variant?: "marquee" | "header" | "inline";
 };
+
+function AddonChipButton({
+  item,
+  color,
+  onActivate,
+}: {
+  item: DashboardAddonBannerItem;
+  color: string;
+  onActivate: (item: DashboardAddonBannerItem) => void;
+}) {
+  const label = item.unlocked
+    ? `${item.name} · Open`
+    : `${item.name} · Unlock`;
+  return (
+    <button
+      type="button"
+      onClick={() => onActivate(item)}
+      className={cn(
+        "inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-md transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm",
+        color,
+      )}
+      title={item.blurb || item.name}
+    >
+      {item.unlocked ? (
+        <Sparkles className="size-3.5 opacity-90" aria-hidden />
+      ) : (
+        <Lock className="size-3.5 opacity-90" aria-hidden />
+      )}
+      <span>{label}</span>
+    </button>
+  );
+}
 
 export function DashboardAddonsBanner({
   addons,
   signedIn,
+  variant = "marquee",
 }: DashboardAddonsBannerProps) {
   const router = useRouter();
   const [unlockTarget, setUnlockTarget] =
@@ -89,11 +121,6 @@ export function DashboardAddonsBanner({
         addonKey: unlockTarget.key,
         period,
       });
-      if (result.mode === "attached") {
-        setUnlockTarget(null);
-        router.refresh();
-        return;
-      }
       router.push(
         `/pricing/add-ons/pay?session_id=${encodeURIComponent(result.sessionId)}`,
       );
@@ -118,8 +145,47 @@ export function DashboardAddonsBanner({
     setUnlockTarget(item);
   }
 
-  return (
-    <>
+  const marqueeTrack = (
+    <div className="flex w-max animate-addons-marquee hover:[animation-play-state:paused] motion-reduce:animate-none">
+      {strip.map((item, index) => (
+        <span key={`${item.key}-${index}`} className="m-1.5 inline-flex">
+          <AddonChipButton
+            item={item}
+            color={chipClassForAddon(item.key, index % addons.length)}
+            onActivate={onChipActivate}
+          />
+        </span>
+      ))}
+    </div>
+  );
+
+  const chips =
+    variant === "inline" ? (
+      <div
+        className="flex flex-wrap items-center justify-center gap-2"
+        role="region"
+        aria-label="Premium add-ons"
+      >
+        {addons.map((item, index) => (
+          <AddonChipButton
+            key={item.key}
+            item={item}
+            color={chipClassForAddon(item.key, index)}
+            onActivate={onChipActivate}
+          />
+        ))}
+      </div>
+    ) : variant === "header" ? (
+      <div
+        className="relative w-full max-w-full overflow-hidden rounded-full border border-border/50 bg-card/50"
+        role="region"
+        aria-label="Premium add-ons"
+      >
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-card to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-card to-transparent" />
+        {marqueeTrack}
+      </div>
+    ) : (
       <div
         className="relative -mx-4 overflow-hidden border-y border-border/50 bg-card/40 sm:-mx-8"
         role="region"
@@ -127,35 +193,13 @@ export function DashboardAddonsBanner({
       >
         <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-background to-transparent sm:w-12" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background to-transparent sm:w-12" />
-
-        <div className="flex w-max animate-addons-marquee hover:[animation-play-state:paused] motion-reduce:animate-none">
-          {strip.map((item, index) => {
-            const color = chipClassForAddon(item.key, index % addons.length);
-            const label = item.unlocked
-              ? `${item.name} · Open`
-              : `${item.name} · Unlock`;
-            return (
-              <button
-                key={`${item.key}-${index}`}
-                type="button"
-                onClick={() => onChipActivate(item)}
-                className={cn(
-                  "m-1.5 inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-md transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm",
-                  color,
-                )}
-                title={item.blurb || item.name}
-              >
-                {item.unlocked ? (
-                  <Sparkles className="size-3.5 opacity-90" aria-hidden />
-                ) : (
-                  <Lock className="size-3.5 opacity-90" aria-hidden />
-                )}
-                <span>{label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {marqueeTrack}
       </div>
+    );
+
+  return (
+    <>
+      {chips}
 
       <Dialog
         open={unlockTarget != null}

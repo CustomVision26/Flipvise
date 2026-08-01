@@ -4,7 +4,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createAddonCheckoutSessionAction } from "@/actions/addons";
+import { PricingBillingPeriodToggle } from "@/components/pricing-billing-period-toggle";
 import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,13 +17,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type EssayUnlockDialogProps = {
   open: boolean;
@@ -37,7 +32,8 @@ export function EssayUnlockDialog({
   signedIn,
 }: EssayUnlockDialogProps) {
   const router = useRouter();
-  const [period, setPeriod] = React.useState<"monthly" | "yearly">("monthly");
+  const [period, setPeriod] =
+    React.useState<PricingBillingPeriod>("monthly");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -49,11 +45,6 @@ export function EssayUnlockDialog({
         addonKey: AI_ESSAY_ADDON_KEY,
         period,
       });
-      if (result.mode === "attached") {
-        onOpenChange(false);
-        router.refresh();
-        return;
-      }
       router.push(
         `/pricing/add-ons/pay?session_id=${encodeURIComponent(result.sessionId)}`,
       );
@@ -77,19 +68,11 @@ export function EssayUnlockDialog({
 
         <div className="space-y-3 py-2">
           <div className="space-y-2">
-            <Label htmlFor="essay-period">Billing period</Label>
-            <Select
-              value={period}
-              onValueChange={(v) => setPeriod(v as "monthly" | "yearly")}
-            >
-              <SelectTrigger id="essay-period">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Billing period</Label>
+            <PricingBillingPeriodToggle
+              period={period}
+              onPeriodChange={setPeriod}
+            />
           </div>
           {!signedIn ? (
             <p className="text-sm text-muted-foreground">

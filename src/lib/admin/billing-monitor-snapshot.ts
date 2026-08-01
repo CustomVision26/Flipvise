@@ -18,6 +18,7 @@ export type AdminBillingMonitorRow = {
   category:
     | "active_trial"
     | "trial_ending_soon"
+    | "trial_expired"
     | "subscription_expiring"
     | "payment_failed_grace"
     | "payment_failed_lapsed";
@@ -135,15 +136,26 @@ export function buildAdminBillingMonitorRows(input: {
       continue;
     }
     const user = usersById.get(trial.userId);
+    const endsAtMs = trial.trialEndsAt.getTime();
+    const ended = endsAtMs <= nowMs;
+    const endingSoon =
+      !ended && endsAtMs - nowMs <= TRIAL_ENDING_SOON_MS;
+    const category = ended
+      ? "trial_expired"
+      : endingSoon
+        ? "trial_ending_soon"
+        : "active_trial";
     pushRow({
       userId: trial.userId,
       userName: user?.fullName ?? trial.userId,
       email: user?.email ?? null,
       planLabel: displayNameForBillingPlanSlug(trial.planSlug),
-      category: trial.trialEndsAt.getTime() > nowMs ? "active_trial" : "trial_ending_soon",
+      category,
       status: "trial_record",
       eventAt: trial.trialEndsAt.toISOString(),
-      detail: `Trial record — ends ${trial.trialEndsAt.toLocaleDateString(undefined, { dateStyle: "long" })}`,
+      detail: ended
+        ? `Trial record — ended ${trial.trialEndsAt.toLocaleDateString(undefined, { dateStyle: "long" })}`
+        : `Trial record — ends ${trial.trialEndsAt.toLocaleDateString(undefined, { dateStyle: "long" })}`,
     });
   }
 

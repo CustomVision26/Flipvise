@@ -387,6 +387,11 @@ export async function syncBillingFromCheckoutSession(
       return { synced: false, planSlug: null };
     }
 
+    // Add-on checkouts must not rewrite base-plan subscription rows.
+    if (session.metadata?.type === "addon") {
+      return { synced: false, planSlug: null };
+    }
+
     const selectedPlan = asPaidPlanId(session.metadata?.plan);
     const customerId =
       typeof session.customer === "string"

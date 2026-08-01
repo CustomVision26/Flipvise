@@ -12,6 +12,10 @@ import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { resolveLatestBillingReceiptForUser } from "@/lib/billing-receipt-url";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
+  resolvePlanChangeSelectedAddonLine,
+  type PlanChangeSelectedAddonLine,
+} from "@/lib/plan-change-locked-addons";
+import {
   fetchPlanChangeProrationPreview,
   resolvePlanChangeCheckoutContext,
   type PlanChangeCheckoutContext,
@@ -30,6 +34,8 @@ import {
 const planChangeSchema = z.object({
   plan: z.enum(STRIPE_PAID_PLAN_IDS),
   period: z.enum(["monthly", "yearly"]),
+  /** Optional locked add-on to checkout immediately after plan change succeeds. */
+  addonKey: z.string().min(1).max(128).optional(),
 });
 
 const planChangeFinalizeSchema = z.object({
@@ -117,6 +123,28 @@ export async function getPlanChangeProrationPreviewAction(
   });
 }
 
+const planChangeAddonPreviewSchema = z.object({
+  addonKey: z.string().min(1).max(128),
+  period: z.enum(["monthly", "yearly"]),
+});
+
+/** Prorated (when aligned) add-on first-charge preview for plan-change dialog. */
+export async function getPlanChangeSelectedAddonLineAction(
+  data: z.infer<typeof planChangeAddonPreviewSchema>,
+): Promise<PlanChangeSelectedAddonLine | null> {
+  const parsed = planChangeAddonPreviewSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  return resolvePlanChangeSelectedAddonLine({
+    userId,
+    addonKey: parsed.data.addonKey,
+    period: parsed.data.period,
+  });
+}
+
 /** Pay page: save / confirm payment method before applying prorated plan swap. */
 export async function createPlanChangeSetupIntentAction(
   data: z.infer<typeof planChangeSchema>,
@@ -127,7 +155,7 @@ export async function createPlanChangeSetupIntentAction(
   const { userId } = await auth();
   if (!userId) throw new Error("Unauthorized");
 
-  const { plan, period } = parsed.data;
+  const { plan, period, addonKey } = parsed.data;
   assertPlanChangeTargetPriceConfigured(plan, period);
 
   const live = await fetchUpgradableStripeSubscription(userId);
@@ -136,6 +164,8 @@ export async function createPlanChangeSetupIntentAction(
       "No active subscription found to change. Start a new subscription from the pricing page.",
     );
   }
+
+  const pendingAddonKey = addonKey?.trim() || "";
 
   const setupIntent = await stripe.setupIntents.create({
     customer: live.customerId,
@@ -148,6 +178,7 @@ export async function createPlanChangeSetupIntentAction(
       period,
       subscriptionId: live.subscriptionId,
       subscriptionItemId: live.itemId,
+      ...(pendingAddonKey ? { pendingAddonKey } : {}),
     },
   });
 
@@ -156,6 +187,18 @@ export async function createPlanChangeSetupIntentAction(
   }
 
   const appUrl = resolveAppUrl();
+  if (pendingAddonKey) {
+    const continueParams = new URLSearchParams({
+      plan,
+      period,
+      addon: pendingAddonKey,
+    });
+    return {
+      clientSecret: setupIntent.client_secret,
+      returnUrl: `${appUrl}/pricing/checkout/plan-change/continue?${continueParams.toString()}`,
+    };
+  }
+
   const returnUrl = `${appUrl}${personalDashboardHrefAfterPlanChangeSuccess({
     userId,
     purchasedPlanSlug: plan,
@@ -240,6 +283,7 @@ export async function finalizePlanChangePaymentAction(
   const receipt = await resolveLatestBillingReceiptForUser(
     userId,
     primaryEmail?.trim().toLowerCase() ?? null,
+    { preferAddon: false },
   );
 
   return {

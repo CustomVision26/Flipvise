@@ -62,7 +62,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional first card front image, and background gradient.",
           "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
-          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/essay.",
+          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
@@ -83,11 +83,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
       {
         id: "ai-essay",
         title: "AI Essay",
-        route: "/dashboard/essay",
+        route: "/dashboard/ai-doc-studio/ai-essay",
         purpose:
           "Premium add-on for generating essay activities, writing drafts, submitting work, and receiving AI feedback.",
         howItWorks: [
-          "Unlock via Stripe purchase, Team Admin assignment, or platform admin grant — then open /dashboard/essay.",
+          "Unlock via Stripe purchase, Team Admin assignment, or platform admin grant — then open /dashboard/ai-doc-studio/ai-essay.",
           "Overview shows recent essays, continue draft, generate, recent AI feedback, and assigned essays.",
           "Generate Essay creates a prompt, objectives, optional outline/vocabulary/rubric, and an optional hidden model essay.",
           "Writing workspace includes word count, optional timer, save draft (local cache when offline), submit, and AI feedback.",
@@ -112,7 +112,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
-          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/essay.",
+          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
           "Assigned members see only decks assigned to them.",
           "Team context is stored in a cookie when invited members switch workspaces.",
         ],
@@ -645,8 +645,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
           "Each card shows the live Stripe price (monthly, and yearly when configured) with a period toggle.",
           "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe.",
+          "During a plan change, if the catalog is published, locked add-ons may also be offered in a checkout dialog before payment.",
           "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",
-          "AI Essay unlocks /dashboard/essay for generation, drafts, submissions, and AI feedback.",
+          "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay for generation, drafts, submissions, and AI feedback.",
         ],
         requirements: [
           "Signed-in account on an eligible paid plan (or a team/admin grant).",
@@ -692,7 +693,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Review selected plan name, monthly vs yearly period, and list price.",
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",
-          "Slide to confirm or continue → /pricing/checkout/pay (new sub) or plan-change payment (existing sub).",
+          "Plan change with a published Add-on Catalog: after you slide to confirm, a dialog lists locked add-ons only (features you do not already have). Skip, or select one, review the plan + add-on breakdown, acknowledge, then continue.",
+          "Slide to confirm → plan-change payment. If you selected an add-on, Stripe redirects through a continue bridge that finalizes the plan change then opens add-on checkout in the same session (two separate receipts).",
+          "Promotion code field appears only when a promo window is active on Pricing — never on plan-change checkout when Pricing has no promo UI.",
           "Stripe Embedded Checkout collects card + billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Slide to subscribe enables when card details, Card Name, and billing address are complete.",
           "Success redirects to /dashboard?checkout=success with a confirmation toast.",
         ],
@@ -700,6 +703,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not abandon checkout and retry with a different Clerk account — metadata is tied to your user.",
           "Do not apply a promo on plan-change checkout — remove the code and rely on proration.",
+          "Do not expect already-owned add-ons in the plan-change dialog — only locked catalog add-ons appear.",
         ],
       },
       {
@@ -730,6 +734,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "If you already subscribe, choosing another paid tier on /pricing routes to plan-change checkout — not a second full-price subscription.",
           "Stripe calculates proration: credit for unused time on the old plan and charge for the new plan for the remainder of the billing period.",
           "Checkout shows line items (credits as negative amounts, charges as positive) and Amount due today.",
+          "When the Add-on Catalog is published, you may optionally pick one locked add-on before plan-change payment; the dialog shows plan proration plus the add-on list price, then opens add-on checkout after the plan swap succeeds.",
           "Badge on plan-change payment: “Prorated adjustment — no additional promo discount”.",
           "Previous promotion discounts do not carry over to plan changes — only the prorated difference is billed.",
           "Switching monthly ↔ yearly on the same tier also reprices with proration.",
@@ -739,6 +744,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not enter a promo code when changing plans — the app rejects it; use proration only.",
           "Do not expect a second introductory discount after you already used a campaign on first purchase.",
           "Do not purchase the same plan and period again — checkout blocks duplicate selections.",
+          "Do not expect plan and add-on to bill on one Stripe Checkout session — the add-on is a separate checkout after the plan change.",
         ],
       },
       {
@@ -902,12 +908,13 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Billing (Custom Tab)",
         clerkTab: "billing",
         purpose:
-          "View current plan, Stripe portal access, cancellation, and plan history.",
+          "View current plan, Stripe portal access, cancellation, and plan history (plans and add-ons listed separately with their own receipts).",
         howItWorks: [
           "Shows effective plan label and access subtitle.",
           "Manage billing opens Stripe Customer Portal — update overseas billing address, card, download invoices.",
-          "Cancel subscription with prorated refund preview when eligible.",
-          "Plan history table lists past plan changes.",
+          "Cancel subscription: if you have active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both — access continues until period end.",
+          "Add-on-only cancel leaves your base plan renewing; an Inbox billing notice confirms that. Plan cancel shows Keep renewing plan if you need to reverse it.",
+          "Plan history lists paid plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is scheduled to end).",
           "See Pricing & Billing docs for prorations, promos, and first-time checkout.",
         ],
         requirements: [
@@ -917,6 +924,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not cancel via Stripe portal alone without reviewing in-app plan impact.",
           "Complimentary plans: contact support instead of expecting Stripe charges.",
+          "Do not expect $0 invoices or cancel-at-period-end to appear under Stripe Payments — check Invoices / the subscription / Plan history / Inbox instead.",
         ],
       },
       {
@@ -1160,8 +1168,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Homework Generator (/teacher/homework) — take-home assignments aligned to deck content. The same assigned-deck original lesson plans appear in the From saved lesson plan picker for team members. Multi-day lesson plans use the same All Days / single-day scope dialog (with day captions) as Quiz before generation. Reading / Language Arts homework lets you set Number of passages and Questions per passage, then includes titled reading passages in Preview, Edit, and PDF so questions link to the full text. Math graph answers (number line / coordinate plane) render as figures in the Answer Key.",
           "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export. The lesson plan picker includes assigned-deck originals for team members the same way as Quiz and Homework. Multi-day lesson plans generate from the full plan (All Days) without a day-scope dialog.",
           "Worksheet Generator (/teacher/worksheets) — printable practice sheets with answer keys.",
-          "Generate AI Essay (/dashboard/essay/generate) — premium add-on listed beside other AI tools; requires AI Essay entitlement (purchase, Team Admin, or platform admin).",
-          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage (Essay uses its own topic form under /dashboard/essay).",
+          "Generate AI Essay (/dashboard/ai-doc-studio/ai-essay/generate) — premium add-on listed beside other AI tools; requires AI Essay entitlement (purchase, Team Admin, or platform admin).",
+          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage (Essay uses its own topic form under /dashboard/ai-doc-studio/ai-essay).",
           "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library.",
         ],
         requirements: [

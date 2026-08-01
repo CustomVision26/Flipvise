@@ -1,13 +1,11 @@
 "use client";
 
 import { UserButton, useAuth, useUser } from "@clerk/nextjs";
-import { UserBillingPage } from "@/components/user-billing-page";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { UserAppearanceSettingsPage } from "@/components/user-appearance-settings-page";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
 import { type TeamPlanId, isTeamPlanId } from "@/lib/team-plans";
@@ -32,8 +30,11 @@ import {
 } from "@/lib/offline/is-flipvise-native-app";
 import { useClientMounted } from "@/lib/use-client-mounted";
 import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
-import { AccountDeleteDialog } from "@/components/account-delete-dialog";
 import { CreditCard, IdCard, Megaphone, Palette, Shield } from "lucide-react";
+
+const profilePageLoading = () => (
+  <p className="px-1 py-4 text-sm text-muted-foreground">Loading…</p>
+);
 
 /** Lazy-load so Turbopack server-action chunk glitches cannot take down the whole shell. */
 const UserAccountDetailsPage = dynamic(
@@ -41,12 +42,29 @@ const UserAccountDetailsPage = dynamic(
     import("@/components/user-account-details-page").then(
       (mod) => mod.UserAccountDetailsPage,
     ),
-  {
-    ssr: false,
-    loading: () => (
-      <p className="px-1 py-4 text-sm text-muted-foreground">Loading…</p>
+  { ssr: false, loading: profilePageLoading },
+);
+
+const UserAppearanceSettingsPage = dynamic(
+  () =>
+    import("@/components/user-appearance-settings-page").then(
+      (mod) => mod.UserAppearanceSettingsPage,
     ),
-  },
+  { ssr: false, loading: profilePageLoading },
+);
+
+const UserBillingPage = dynamic(
+  () =>
+    import("@/components/user-billing-page").then((mod) => mod.UserBillingPage),
+  { ssr: false, loading: profilePageLoading },
+);
+
+const AccountDeleteDialog = dynamic(
+  () =>
+    import("@/components/account-delete-dialog").then(
+      (mod) => mod.AccountDeleteDialog,
+    ),
+  { ssr: false },
 );
 
 const NATIVE_AFTER_SIGN_OUT_URL = "/native-signout";
@@ -265,7 +283,7 @@ export function HeaderUserSection({
     (activeTeamPlan != null && isTeamPlanId(activeTeamPlan)) ||
     resolvedActiveEducationTeamPlan != null ||
     teamDashFallback != null ||
-    isPro;
+    showPersonalTeacherDash;
 
   const showWorkspaceSwitcherUi =
     showWorkspaceSwitcher &&
@@ -294,39 +312,20 @@ export function HeaderUserSection({
               <TeacherNavIconButton />
             </span>
           ) : null}
-          {(isAdmin && !hidePlatformAdminLink) || showAffiliatePortal ? (
-            <div className="flex items-center gap-1">
-              {isAdmin && !hidePlatformAdminLink && (
-                <HeaderNavTooltip label="Platform Admin">
-                  <Link
-                    href="/admin/all-users"
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" }),
-                      "inline-flex h-8 items-center gap-1.5 px-2.5 text-xs sm:px-3",
-                    )}
-                    aria-label="Platform Admin"
-                  >
-                    <Shield className="size-3.5 shrink-0" aria-hidden />
-                    <span className="hidden xl:inline">Platform Admin</span>
-                  </Link>
-                </HeaderNavTooltip>
-              )}
-              {showAffiliatePortal && (
-                <HeaderNavTooltip label="Affiliate portal">
-                  <Link
-                    href="/dashboard/affiliate"
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" }),
-                      "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
-                    )}
-                    aria-label="Affiliate portal"
-                  >
-                    <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
-                    <span className="hidden xl:inline">Affiliate</span>
-                  </Link>
-                </HeaderNavTooltip>
-              )}
-            </div>
+          {showAffiliatePortal ? (
+            <HeaderNavTooltip label="Affiliate portal">
+              <Link
+                href="/dashboard/affiliate"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "inline-flex h-8 items-center gap-1.5 border-violet-500/30 px-2.5 text-xs sm:px-3",
+                )}
+                aria-label="Affiliate portal"
+              >
+                <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
+                <span className="hidden xl:inline">Affiliate</span>
+              </Link>
+            </HeaderNavTooltip>
           ) : null}
         </div>
         <div
@@ -354,6 +353,15 @@ export function HeaderUserSection({
               title="Account — profile, account details, appearance, and billing"
             >
               <UserButton>
+                {isAdmin && !hidePlatformAdminLink ? (
+                  <UserButton.MenuItems>
+                    <UserButton.Link
+                      label="Platform Admin"
+                      labelIcon={<Shield className="size-4" />}
+                      href="/admin/all-users"
+                    />
+                  </UserButton.MenuItems>
+                ) : null}
                 {/* Custom pages first so Manage account opens on phone / type / security Q&A */}
                 <UserButton.UserProfilePage
                   label="Account details"

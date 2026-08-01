@@ -308,24 +308,19 @@ export default async function PaidSubscribersPage({
       const periodInv = latestInvWithPeriodByUser.get(uid) ?? latestInv;
       const isMetaActive =
         user?.billingStatus === "active" || user?.billingStatus === "trialing";
+      const planSlug =
+        (isMetaActive ? user?.planDisplayName : null) ??
+        latestInv?.planSlug ??
+        periodInv?.planSlug ??
+        "pro";
       return {
+        rowId: uid,
         userId: uid,
         userName: user?.fullName ?? latestInv?.userEmail ?? periodInv?.userEmail ?? uid,
         email: user?.email ?? latestInv?.userEmail ?? periodInv?.userEmail ?? null,
-        planSlug: (() => {
-          const slug =
-            (isMetaActive ? user?.planDisplayName : null) ??
-            latestInv?.planSlug ??
-            periodInv?.planSlug ??
-            "pro";
-          return slug;
-        })(),
-        planLabel: displayNameForBillingPlanSlug(
-          (isMetaActive ? user?.planDisplayName : null) ??
-            latestInv?.planSlug ??
-            periodInv?.planSlug ??
-            "pro",
-        ),
+        kind: "plan" as const,
+        planSlug,
+        planLabel: displayNameForBillingPlanSlug(planSlug),
         status: isMetaActive ? (user?.billingStatus ?? "active") : "active",
         currency: periodInv?.currency ?? latestInv?.currency ?? null,
         currentPeriodStart: periodInv?.periodStart?.toISOString() ?? null,

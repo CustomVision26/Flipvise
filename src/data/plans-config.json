@@ -34,7 +34,7 @@
       "Standard reviews and quiz",
       "Multiple interface colors"
     ],
-    "highlighted": false,
+    "highlighted": true,
     "discount": {
       "active": false,
       "type": "percentage",
@@ -47,9 +47,9 @@
       "value": 10,
       "label": " "
     },
-    "discontinueAt": "2026-06-14",
+    "discontinueAt": "2026-08-07",
     "promoStartsAt": "2026-06-01T00:00",
-    "promoEndsAt": "2026-06-14T23:59"
+    "promoEndsAt": "2026-08-07T23:59"
   },
   {
     "id": "pro_plus",

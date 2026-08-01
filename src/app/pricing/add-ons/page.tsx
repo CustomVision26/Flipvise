@@ -12,12 +12,80 @@ import {
   listPublishedActiveAddonsForPricing,
 } from "@/db/queries/addons";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
+import { isStripeAddonSubscription } from "@/lib/stripe-addon-metadata";
 import { resolveAddonStripePriceLabels } from "@/lib/stripe-addon-price-display";
+import { stripe } from "@/lib/stripe";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { toClientJson } from "@/lib/to-client-json";
+import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
+
+async function resolveStripeAddonRenewalState(
+  stripeSubscriptionId: string | null | undefined,
+): Promise<{
+  canCancelRenewal: boolean;
+  renewalCancelScheduled: boolean;
+  accessUntilLabel: string | null;
+}> {
+  const subId = stripeSubscriptionId?.trim();
+  if (!subId) {
+    return {
+      canCancelRenewal: false,
+      renewalCancelScheduled: false,
+      accessUntilLabel: null,
+    };
+  }
+
+  try {
+    const sub = await stripe.subscriptions.retrieve(subId, {
+      expand: ["items.data"],
+    });
+    if (!isStripeAddonSubscription(sub)) {
+      return {
+        canCancelRenewal: false,
+        renewalCancelScheduled: false,
+        accessUntilLabel: null,
+      };
+    }
+
+    const item = sub.items.data[0] as
+      | (Stripe.SubscriptionItem & { current_period_end?: number })
+      | undefined;
+    const periodEndUnix =
+      typeof item?.current_period_end === "number"
+        ? item.current_period_end
+        : (sub as Stripe.Subscription & { current_period_end?: number })
+            .current_period_end;
+    const accessUntilLabel =
+      typeof periodEndUnix === "number"
+        ? new Date(periodEndUnix * 1000).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : null;
+
+    const renewing =
+      sub.status === "active" ||
+      sub.status === "trialing" ||
+      sub.status === "past_due";
+    const renewalCancelScheduled = sub.cancel_at_period_end === true;
+
+    return {
+      canCancelRenewal: renewing && !renewalCancelScheduled,
+      renewalCancelScheduled,
+      accessUntilLabel,
+    };
+  } catch {
+    return {
+      canCancelRenewal: false,
+      renewalCancelScheduled: false,
+      accessUntilLabel: null,
+    };
+  }
+}
 
 export default async function PricingAddOnsPage() {
   const settings = await getAddonCatalogSettings();
@@ -48,6 +116,14 @@ export default async function PricingAddOnsPage() {
     const priceLabels = await resolveAddonStripePriceLabels(row.stripePriceEnvKey);
     const stripePriceConfigured = priceLabels.monthlyConfigured;
     const yearlyPriceConfigured = priceLabels.yearlyConfigured;
+    const renewalState =
+      entitled && entitledRow?.source === "stripe"
+        ? await resolveStripeAddonRenewalState(entitledRow.stripeSubscriptionId)
+        : {
+            canCancelRenewal: false,
+            renewalCancelScheduled: false,
+            accessUntilLabel: null,
+          };
 
     cards.push({
       key: row.key,
@@ -63,6 +139,10 @@ export default async function PricingAddOnsPage() {
       yearlyPriceConfigured,
       monthlyPriceLabel: priceLabels.monthlyLabel,
       yearlyPriceLabel: priceLabels.yearlyLabel,
+      yearlyMonthlyEquivalentLabel: priceLabels.yearlyMonthlyEquivalentLabel,
+      canCancelRenewal: renewalState.canCancelRenewal,
+      renewalCancelScheduled: renewalState.renewalCancelScheduled,
+      accessUntilLabel: renewalState.accessUntilLabel,
     });
   }
 
@@ -83,8 +163,10 @@ export default async function PricingAddOnsPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Add-on Catalog</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
             Optional features for eligible paid plans (monthly or yearly where
-            configured). Add-ons stack on top of your current plan and can also
-            be granted by a Team Admin or platform admin.
+            configured). Add-ons bill separately from your plan — first charge is
+            prorated to your plan’s renewal date, then renewals stay aligned but
+            can be canceled independently. Team Admin or platform admin grants
+            are also supported.
           </p>
         </div>
       </div>

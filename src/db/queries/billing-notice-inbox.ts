@@ -15,7 +15,9 @@ export type BillingNoticeKind =
   | "trial_ending"
   | "trial_expired"
   | "payment_grace"
-  | "payment_grace_expired";
+  | "payment_grace_expired"
+  | "addon_renewal_canceled"
+  | "plan_renewal_canceled";
 
 export async function insertBillingNoticeInboxMessage(input: {
   recipientUserId: string;

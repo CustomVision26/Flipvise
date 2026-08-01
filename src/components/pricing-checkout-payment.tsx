@@ -100,6 +100,8 @@ export type PricingCheckoutSummary = {
   monthlyRateAfterTrial: number | null;
   /** Stripe Checkout Session amounts — same source as the slide button total. */
   stripeAmounts: CheckoutSessionAmountsMajor | null;
+  /** Optional note under the period label (e.g. add-on proration alignment). */
+  billingNote?: string | null;
 };
 
 function roundMoney(amount: number): number {
@@ -211,6 +213,11 @@ function OrderSummary({
             : `Subscribe to ${summary.planLabel}`}
         </h1>
         <p className="text-sm text-[#6b7280]">{periodLabel}</p>
+        {summary.billingNote ? (
+          <p className="text-sm leading-relaxed text-[#6b7280]">
+            {summary.billingNote}
+          </p>
+        ) : null}
       </div>
 
       {summary.isTrial && summary.trialDays != null && summary.trialDays > 0 ? (

@@ -14,6 +14,8 @@ import {
   fetchPlanChangeProrationPreview,
   resolvePlanChangeCheckoutContext,
 } from "@/lib/plan-change-proration-preview";
+import { loadPlanChangeLockedAddonOffers } from "@/lib/plan-change-locked-addons";
+import { pricingHasActivePromoUi } from "@/lib/plan-promo-window";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +67,7 @@ export default async function PricingCheckoutPage({
   }
 
   const initialPeriod = parsePricingBillingPeriod(period);
+  const showPromotionCodeUi = pricingHasActivePromoUi(plans);
   const planChangeBase = await resolvePlanChangeCheckoutContext(
     access.userId,
     planId,
@@ -86,6 +89,14 @@ export default async function PricingCheckoutPage({
     }
   }
 
+  const lockedAddonOffers =
+    planChangeContext != null
+      ? await loadPlanChangeLockedAddonOffers({
+          userId: access.userId,
+          targetPlanSlug: planId,
+        })
+      : [];
+
   return (
     <div className="min-h-screen bg-background px-4 py-10 sm:px-6 sm:py-14">
       <PricingCheckoutStep
@@ -96,6 +107,8 @@ export default async function PricingCheckoutPage({
         checkoutCanceled={checkout === "canceled"}
         planChangeContext={planChangeContext ? toClientJson(planChangeContext) : null}
         startTrial={trial === "1"}
+        showPromotionCodeUi={showPromotionCodeUi}
+        lockedAddonOffers={toClientJson(lockedAddonOffers)}
       />
     </div>
   );

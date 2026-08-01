@@ -753,7 +753,7 @@ export function EssayWritingWorkspace({
         // local draft already persisted
       }
     }
-    router.push(`/dashboard/essay/generate?fromEssay=${documentId}`);
+    router.push(`/dashboard/ai-doc-studio/ai-essay/generate?fromEssay=${documentId}`);
   }
 
   async function handleSubmit() {

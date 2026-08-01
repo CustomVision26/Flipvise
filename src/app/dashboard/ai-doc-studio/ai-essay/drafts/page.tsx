@@ -26,7 +26,7 @@ export default async function EssayDraftsPage() {
           drafts.map((draft) => (
             <Link
               key={draft.id}
-              href={`/dashboard/essay/${draft.documentId}`}
+              href={`/dashboard/ai-doc-studio/ai-essay/${draft.documentId}`}
               className="block rounded-md border border-border/60 px-3 py-3 text-sm hover:bg-muted/40"
             >
               <p className="font-medium">{draft.documentTitle}</p>

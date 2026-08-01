@@ -27,9 +27,14 @@ import {
 } from "@/lib/stripe-checkout-discount";
 import {
   fetchCancelSubscriptionPreview,
+  resumeSubscriptionRenewal,
   scheduleSubscriptionCancelAtPeriodEnd,
   type CancelSubscriptionPreview,
 } from "@/lib/stripe-cancel-subscription";
+import {
+  scheduleStripeAddonCancelAtPeriodEnd,
+  scheduleStripeAddonsCancelAtPeriodEndForUser,
+} from "@/lib/stripe-addon-sync";
 import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { fetchUpgradableStripeSubscription } from "@/lib/apply-plan-upgrade";
 import { checkoutPlanChangeRequiredError } from "@/lib/checkout-promo-errors";
@@ -42,6 +47,16 @@ import {
 import { resolveCatalogAlignedStripePriceId } from "@/lib/stripe-catalog-price";
 import { hasUserConsumedPlanTrial } from "@/db/queries/user-plan-trials";
 import { resolveCheckoutTrialDays } from "@/lib/plan-trial";
+import {
+  getAddonCatalogByKey,
+  getUserAddonEntitlement,
+} from "@/db/queries/addons";
+import { revalidatePath } from "next/cache";
+import {
+  recordAddonRenewalCanceledInboxMessage,
+  recordPlanRenewalCanceledInboxMessage,
+} from "@/lib/record-renewal-cancel-inbox";
+import { syncActiveSubscriptionFromStripeForUser } from "@/lib/stripe-billing-sync";
 
 const PAID_PLAN_IDS = STRIPE_PAID_PLAN_IDS;
 type PaidPlanId = StripePaidPlanId;
@@ -534,6 +549,7 @@ export async function getCancelSubscriptionPreviewAction(): Promise<CancelSubscr
   return fetchCancelSubscriptionPreview(
     sub.stripeSubscriptionId,
     sub.planSlug,
+    { clerkUserId: userId },
   );
 }
 
@@ -560,6 +576,12 @@ export async function createSubscriptionCancelPortalSessionAction(): Promise<{
     throw new Error("No active subscription found.");
   }
 
+  const preview = await fetchCancelSubscriptionPreview(
+    sub.stripeSubscriptionId,
+    sub.planSlug,
+    { clerkUserId: userId },
+  );
+
   const appUrl = resolveAppUrl();
 
   const session = await stripe.billingPortal.sessions.create({
@@ -568,7 +590,7 @@ export async function createSubscriptionCancelPortalSessionAction(): Promise<{
     flow_data: {
       type: "subscription_cancel",
       subscription_cancel: {
-        subscription: sub.stripeSubscriptionId,
+        subscription: preview.stripeSubscriptionId,
       },
     },
   });
@@ -589,13 +611,201 @@ export async function cancelSubscriptionAtPeriodEndAction(): Promise<{
   const preview = await fetchCancelSubscriptionPreview(
     sub.stripeSubscriptionId,
     sub.planSlug,
+    { clerkUserId: userId },
   );
   if (preview.cancelAtPeriodEnd) {
     return { periodEnd: preview.periodEnd };
   }
 
   const result = await scheduleSubscriptionCancelAtPeriodEnd(
-    sub.stripeSubscriptionId,
+    preview.stripeSubscriptionId,
   );
+  // Add-ons are not valid on Free — stop their renewals with the plan.
+  await scheduleStripeAddonsCancelAtPeriodEndForUser(userId).catch((error) => {
+    console.error(
+      "[cancelSubscriptionAtPeriodEndAction] schedule add-on cancels",
+      userId,
+      error,
+    );
+  });
+  await recordPlanRenewalCanceledInboxMessage({
+    recipientUserId: userId,
+    stripeSubscriptionId: preview.stripeSubscriptionId,
+    planSlug: sub.planSlug,
+    periodEnd: new Date(result.periodEnd),
+    addonsAlsoCanceled: true,
+  }).catch((error) => {
+    console.error(
+      "[cancelSubscriptionAtPeriodEndAction] inbox",
+      userId,
+      error,
+    );
+  });
   return { periodEnd: result.periodEnd };
+}
+
+/** Resume base-plan renewals when cancel_at_period_end was scheduled by mistake. */
+export async function resumePlanRenewalAction(): Promise<{
+  periodEnd: string;
+}> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const sub = await getManageableStripeSubscription(userId);
+  if (!sub) throw new Error("No active subscription found.");
+
+  const preview = await fetchCancelSubscriptionPreview(
+    sub.stripeSubscriptionId,
+    sub.planSlug,
+    { clerkUserId: userId },
+  );
+  if (!preview.cancelAtPeriodEnd) {
+    return { periodEnd: preview.periodEnd };
+  }
+
+  const result = await resumeSubscriptionRenewal(preview.stripeSubscriptionId);
+  await syncActiveSubscriptionFromStripeForUser(userId).catch((error) => {
+    console.error("[resumePlanRenewalAction] sync", userId, error);
+  });
+  revalidatePath("/dashboard", "layout");
+  return { periodEnd: result.periodEnd };
+}
+
+const cancelBillingRenewalsSchema = z.object({
+  scope: z.enum(["addons", "plan", "both"]),
+  addonKeys: z.array(z.string().min(1).max(64)).max(20).optional(),
+});
+
+/**
+ * End renewal for selected add-on(s), the active plan, or both.
+ * Plan cancel always schedules add-on cancels (add-ons require a paid plan).
+ */
+export async function cancelBillingRenewalsAction(
+  data: z.infer<typeof cancelBillingRenewalsSchema>,
+): Promise<{
+  periodEnd: string;
+  canceledPlan: boolean;
+  canceledAddonKeys: string[];
+}> {
+  const parsed = cancelBillingRenewalsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid cancel selection.");
+
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const { scope } = parsed.data;
+  const requestedAddonKeys = [
+    ...new Set(
+      (parsed.data.addonKeys ?? [])
+        .map((key) => key.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  const canceledAddonKeys: string[] = [];
+  let periodEnd = new Date().toISOString();
+  let canceledPlan = false;
+
+  const baseSub = await getManageableStripeSubscription(userId);
+  const basePlanSlug = baseSub?.planSlug ?? null;
+
+  if (scope === "addons" || scope === "both") {
+    if (requestedAddonKeys.length === 0) {
+      throw new Error("Select at least one add-on to cancel.");
+    }
+    for (const addonKey of requestedAddonKeys) {
+      const existing = await getUserAddonEntitlement(userId, addonKey);
+      if (!existing || existing.status !== "active") {
+        throw new Error(`No active entitlement for add-on “${addonKey}”.`);
+      }
+      if (existing.source !== "stripe" || !existing.stripeSubscriptionId) {
+        throw new Error(
+          `Add-on “${addonKey}” is not billed on Stripe, so renewal cannot be canceled here.`,
+        );
+      }
+      const result = await scheduleStripeAddonCancelAtPeriodEnd({
+        stripeSubscriptionId: existing.stripeSubscriptionId,
+      });
+      periodEnd = result.periodEndIso;
+      canceledAddonKeys.push(addonKey);
+
+      let addonLabel = addonKey;
+      try {
+        const catalog = await getAddonCatalogByKey(addonKey);
+        if (catalog?.name?.trim()) addonLabel = catalog.name.trim();
+      } catch {
+        // keep key
+      }
+
+      await recordAddonRenewalCanceledInboxMessage({
+        recipientUserId: userId,
+        stripeSubscriptionId: existing.stripeSubscriptionId,
+        addonKey,
+        addonLabel,
+        planSlug: basePlanSlug,
+        periodEnd: new Date(result.periodEndIso),
+      }).catch((error) => {
+        console.error(
+          "[cancelBillingRenewalsAction] addon inbox",
+          addonKey,
+          error,
+        );
+      });
+    }
+  }
+
+  if (scope === "plan" || scope === "both") {
+    if (!baseSub) throw new Error("No active subscription found.");
+
+    const preview = await fetchCancelSubscriptionPreview(
+      baseSub.stripeSubscriptionId,
+      baseSub.planSlug,
+      { clerkUserId: userId },
+    );
+    periodEnd = preview.periodEnd;
+    if (!preview.cancelAtPeriodEnd) {
+      const result = await scheduleSubscriptionCancelAtPeriodEnd(
+        preview.stripeSubscriptionId,
+      );
+      periodEnd = result.periodEnd;
+    }
+    canceledPlan = true;
+
+    // Free cannot keep add-ons — stop their renewals with the plan.
+    await scheduleStripeAddonsCancelAtPeriodEndForUser(userId).catch((error) => {
+      console.error(
+        "[cancelBillingRenewalsAction] schedule add-on cancels",
+        userId,
+        error,
+      );
+    });
+
+    await recordPlanRenewalCanceledInboxMessage({
+      recipientUserId: userId,
+      stripeSubscriptionId: preview.stripeSubscriptionId,
+      planSlug: baseSub.planSlug,
+      periodEnd: new Date(periodEnd),
+      addonsAlsoCanceled: true,
+    }).catch((error) => {
+      console.error("[cancelBillingRenewalsAction] plan inbox", userId, error);
+    });
+  }
+
+  // Add-on-only cancel must leave the base plan renewing. Re-sync so Billing
+  // never shows "Renewal canceled" from a stale/wrong subscription row.
+  if (scope === "addons") {
+    await syncActiveSubscriptionFromStripeForUser(userId).catch((error) => {
+      console.error(
+        "[cancelBillingRenewalsAction] sync base plan after add-on cancel",
+        userId,
+        error,
+      );
+    });
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/inbox");
+  revalidatePath("/pricing/add-ons");
+
+  return { periodEnd, canceledPlan, canceledAddonKeys };
 }

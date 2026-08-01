@@ -110,11 +110,15 @@ export type SerializedLog = {
 };
 
 export type SerializedAdminSubscription = {
+  /** Stable table key — `userId` for base plans, `userId:addon:key` for add-ons. */
+  rowId: string;
   userId: string;
   userName: string;
   email: string | null;
+  /** Base plan vs Stripe / admin / team add-on entitlement. */
+  kind: "plan" | "addon";
   planSlug: string;
-  /** Human-readable plan name for admin tables. */
+  /** Human-readable plan or add-on name for admin tables. */
   planLabel: string;
   status: string;
   currency: string | null;

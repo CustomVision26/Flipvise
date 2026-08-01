@@ -11,6 +11,10 @@ import {
   validatePlanChangeTargetPriceAction,
   type PlanChangeCheckoutContextResult,
 } from "@/actions/plan-change-checkout";
+import {
+  formatPlanChangeRecurringLabel,
+  PlanChangeAddonsDialog,
+} from "@/components/plan-change-addons-dialog";
 import { SlideToSubmitButton } from "@/components/slide-to-submit-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -31,6 +35,11 @@ import {
   formatPlanMoney,
 } from "@/lib/pricing-period-display";
 import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
+import type { PlanChangeLockedAddonOffer } from "@/lib/plan-change-locked-addons";
+import {
+  clearPlanChangePendingAddon,
+  writePlanChangePendingAddon,
+} from "@/lib/plan-change-pending-addon";
 import { formatCentsMoney } from "@/lib/money-math";
 import { navigateAfterCheckoutSessionCreated } from "@/lib/navigate-checkout-session";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
@@ -44,6 +53,8 @@ export function PricingCheckoutStep({
   checkoutCanceled,
   planChangeContext,
   startTrial = false,
+  showPromotionCodeUi = false,
+  lockedAddonOffers = [],
 }: {
   planId: StripePaidPlanId;
   plan: PlanConfig;
@@ -52,6 +63,10 @@ export function PricingCheckoutStep({
   checkoutCanceled: boolean;
   planChangeContext: PlanChangeCheckoutContextResult | null;
   startTrial?: boolean;
+  /** Same gate as `/pricing` — plan-change promo notice only when promo UI is live. */
+  showPromotionCodeUi?: boolean;
+  /** Locked published add-ons for plan-change continue dialog. */
+  lockedAddonOffers?: PlanChangeLockedAddonOffer[];
 }) {
   const isPlanChange = planChangeContext != null;
   const [period, setPeriod] = useState<PricingBillingPeriod>(initialPeriod);
@@ -61,6 +76,7 @@ export function PricingCheckoutStep({
   );
   const [previewLoading, setPreviewLoading] = useState(false);
   const [trialAcknowledged, setTrialAcknowledged] = useState(false);
+  const [addonsDialogOpen, setAddonsDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -105,21 +121,43 @@ export function PricingCheckoutStep({
     });
   }
 
+  function proceedToPlanChangePay(addonKey: string | null) {
+    startTransition(async () => {
+      try {
+        if (addonKey) {
+          writePlanChangePendingAddon({ addonKey, period });
+        } else {
+          clearPlanChangePendingAddon();
+        }
+        await validatePlanChangeTargetPriceAction({ plan: planId, period });
+        const params = new URLSearchParams({ plan: planId, period });
+        if (addonKey) params.set("addon", addonKey);
+        router.push(`/pricing/checkout/plan-change/pay?${params.toString()}`);
+      } catch (e) {
+        clearPlanChangePendingAddon();
+        handleCheckoutError(e);
+      }
+    });
+  }
+
   function continueToStripe() {
     if (isPlanChange && promotionCode.trim()) {
       handleCheckoutError(checkoutPlanChangeNoPromoError());
       return;
     }
 
+    if (isPlanChange && lockedAddonOffers.length > 0) {
+      setAddonsDialogOpen(true);
+      return;
+    }
+
+    if (isPlanChange) {
+      proceedToPlanChangePay(null);
+      return;
+    }
+
     startTransition(async () => {
       try {
-        if (isPlanChange) {
-          await validatePlanChangeTargetPriceAction({ plan: planId, period });
-          const params = new URLSearchParams({ plan: planId, period });
-          router.push(`/pricing/checkout/plan-change/pay?${params.toString()}`);
-          return;
-        }
-
         const result = await createStripeCheckoutSessionAction({
           plan: planId,
           period,
@@ -141,8 +179,39 @@ export function PricingCheckoutStep({
       ? `Slide to start free trial — Monthly`
       : `Slide to continue — ${period === "yearly" ? "Yearly" : "Monthly"}`;
 
+  const planRecurringLabel =
+    pricing != null
+      ? formatPlanChangeRecurringLabel({
+          period,
+          discountedPeriodicRate: pricing.discountedPeriodicRate,
+          discountedAnnualTotal: pricing.discountedAnnualTotal,
+        })
+      : "—";
+
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+      {isPlanChange && lockedAddonOffers.length > 0 && planChangeContext ? (
+        <PlanChangeAddonsDialog
+          open={addonsDialogOpen}
+          onOpenChange={setAddonsDialogOpen}
+          offers={lockedAddonOffers}
+          period={period}
+          targetPlanLabel={planChangeContext.targetPlanLabel}
+          planRecurringLabel={planRecurringLabel}
+          prorationPreview={prorationPreview}
+          previewLoading={previewLoading}
+          pending={isPending}
+          onSkip={() => {
+            setAddonsDialogOpen(false);
+            proceedToPlanChangePay(null);
+          }}
+          onContinue={(addonKey) => {
+            setAddonsDialogOpen(false);
+            proceedToPlanChangePay(addonKey);
+          }}
+        />
+      ) : null}
+
       <Link
         href="/pricing"
         className={cn(
@@ -311,11 +380,13 @@ export function PricingCheckoutStep({
           ) : null}
 
           {isPlanChange ? (
-            <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-              Promotion codes cannot be applied when changing plans. If you already used a
-              campaign discount on your current subscription, it cannot be applied again on
-              upgrade or downgrade.
-            </div>
+            showPromotionCodeUi ? (
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                Promotion codes cannot be applied when changing plans. If you already used a
+                campaign discount on your current subscription, it cannot be applied again on
+                upgrade or downgrade.
+              </div>
+            ) : null
           ) : startTrial && trialDays > 0 && pricing ? (
             <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm leading-relaxed">
               <p className="font-medium text-foreground">
@@ -334,7 +405,7 @@ export function PricingCheckoutStep({
                 then from your account to avoid being charged.
               </p>
             </div>
-          ) : !startTrial ? (
+          ) : !startTrial && showPromotionCodeUi ? (
             <div className="space-y-2">
               <Label htmlFor="checkout-step-promo">Promotion code</Label>
               <Input

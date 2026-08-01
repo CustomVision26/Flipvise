@@ -28,8 +28,13 @@ import {
   type AddonBillingPeriod,
 } from "@/lib/stripe-addon-price-env";
 import {
-  attachAddonItemToSubscription,
+  addonCheckoutSubscriptionAlignParams,
+  resolveAddonCheckoutAlignment,
+} from "@/lib/stripe-addon-billing-align";
+import {
   cancelStripeAddonBilling,
+  resumeStripeAddonRenewal,
+  scheduleStripeAddonCancelAtPeriodEnd,
 } from "@/lib/stripe-addon-sync";
 import { stripeCheckoutElementsSessionParams } from "@/lib/stripe-checkout-branding";
 import { createClerkClient } from "@clerk/backend";
@@ -80,15 +85,12 @@ const createAddonCheckoutSchema = z.object({
 });
 
 /**
- * Purchase an add-on (monthly or yearly). Attaches a subscription item when a base plan
- * sub exists; otherwise opens Checkout for an add-on-only subscription.
+ * Purchase an add-on (monthly or yearly) via Stripe Checkout (subscription mode).
+ * Always opens checkout — never silently attaches a line item to an existing plan.
  */
 export async function createAddonCheckoutSessionAction(
   data: z.infer<typeof createAddonCheckoutSchema>,
-): Promise<
-  | { mode: "attached"; addonKey: string }
-  | { mode: "checkout"; sessionId: string; clientSecret: string }
-> {
+): Promise<{ mode: "checkout"; sessionId: string; clientSecret: string }> {
   const parsed = createAddonCheckoutSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid add-on checkout input");
 
@@ -127,34 +129,19 @@ export async function createAddonCheckoutSessionAction(
     );
   }
 
-  const baseSub =
-    (await getActiveStripeSubscription(access.userId)) ??
-    (await getManageableStripeSubscription(access.userId));
-
-  if (baseSub?.stripeSubscriptionId) {
-    try {
-      await attachAddonItemToSubscription({
-        subscriptionId: baseSub.stripeSubscriptionId,
-        priceId,
-        userId: access.userId,
-        addonKey: catalog.key,
-      });
-      revalidatePath("/pricing/add-ons");
-      revalidatePath("/pricing");
-      revalidatePath("/dashboard", "layout");
-      return { mode: "attached", addonKey: catalog.key };
-    } catch (error) {
-      console.error("[createAddonCheckoutSessionAction] attach item failed:", error);
-      // Fall through to Checkout for a standalone add-on subscription.
-    }
-  }
-
   const appUrl = resolveAppUrl();
+  const alignment = await resolveAddonCheckoutAlignment(access.userId, period);
   const subscriptionMetadata: Record<string, string> = {
     type: STRIPE_ADDON_META_TYPE,
     addonKey: catalog.key,
     clerkUserId: access.userId,
     period,
+    ...(alignment
+      ? {
+          alignsWithBasePeriodEnd: alignment.alignsWithPeriodEndIso,
+          usesBasePeriodEnd: alignment.usesBasePeriodEnd ? "true" : "false",
+        }
+      : {}),
   };
 
   const checkoutCustomer = await resolveCheckoutCustomerParams(access.userId);
@@ -168,6 +155,7 @@ export async function createAddonCheckoutSessionAction(
     subscription_data: {
       description: `Flipvise add-on: ${catalog.name}`,
       metadata: subscriptionMetadata,
+      ...(alignment ? addonCheckoutSubscriptionAlignParams(alignment) : {}),
     },
     automatic_tax: { enabled: true },
     billing_address_collection: "required",
@@ -361,5 +349,109 @@ export async function setTeamMemberAddonAction(
 
   revalidatePath("/dashboard/team-admin", "layout");
   revalidatePath("/dashboard", "layout");
-  revalidatePath("/dashboard/essay", "layout");
+  revalidatePath("/dashboard/ai-doc-studio", "layout");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay", "layout");
+}
+
+const cancelOwnAddonSchema = z.object({
+  addonKey: addonKeySchema,
+});
+
+/**
+ * Cancel only the signed-in user's add-on renewal (cancel_at_period_end).
+ * Does not cancel or change their base plan subscription.
+ */
+export async function cancelOwnAddonRenewalAction(
+  data: z.infer<typeof cancelOwnAddonSchema>,
+): Promise<{ periodEndIso: string }> {
+  const parsed = cancelOwnAddonSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+
+  const existing = await getUserAddonEntitlement(
+    access.userId,
+    parsed.data.addonKey,
+  );
+  if (!existing || existing.status !== "active") {
+    throw new Error("You do not have an active entitlement for this add-on.");
+  }
+  if (existing.source !== "stripe" || !existing.stripeSubscriptionId) {
+    throw new Error(
+      "This add-on is not billed on Stripe for your account, so renewal cannot be canceled here.",
+    );
+  }
+
+  const result = await scheduleStripeAddonCancelAtPeriodEnd({
+    stripeSubscriptionId: existing.stripeSubscriptionId,
+  });
+
+  try {
+    const { getManageableStripeSubscription } = await import(
+      "@/db/queries/stripe-subscriptions"
+    );
+    const { recordAddonRenewalCanceledInboxMessage } = await import(
+      "@/lib/record-renewal-cancel-inbox"
+    );
+    const baseSub = await getManageableStripeSubscription(access.userId);
+    const catalog = await getAddonCatalogByKey(parsed.data.addonKey);
+    await recordAddonRenewalCanceledInboxMessage({
+      recipientUserId: access.userId,
+      stripeSubscriptionId: existing.stripeSubscriptionId,
+      addonKey: parsed.data.addonKey,
+      addonLabel: catalog?.name?.trim() || parsed.data.addonKey,
+      planSlug: baseSub?.planSlug ?? null,
+      periodEnd: new Date(result.periodEndIso),
+    });
+  } catch (error) {
+    console.error("[cancelOwnAddonRenewalAction] inbox", error);
+  }
+
+  revalidatePath("/pricing/add-ons");
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/inbox");
+  return { periodEndIso: result.periodEndIso };
+}
+
+const resumeOwnAddonsSchema = z.object({
+  addonKeys: z.array(addonKeySchema).min(1).max(20),
+});
+
+/**
+ * Resume auto-renewal for add-ons that were scheduled to cancel at period end.
+ * Does not change the base plan subscription.
+ */
+export async function resumeOwnAddonRenewalsAction(
+  data: z.infer<typeof resumeOwnAddonsSchema>,
+): Promise<{ resumedAddonKeys: string[]; periodEndIso: string }> {
+  const parsed = resumeOwnAddonsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+
+  const resumedAddonKeys: string[] = [];
+  let periodEndIso = new Date().toISOString();
+
+  for (const addonKey of [...new Set(parsed.data.addonKeys)]) {
+    const existing = await getUserAddonEntitlement(access.userId, addonKey);
+    if (!existing || existing.status !== "active") {
+      throw new Error(`No active entitlement for add-on “${addonKey}”.`);
+    }
+    if (existing.source !== "stripe" || !existing.stripeSubscriptionId) {
+      throw new Error(
+        `Add-on “${addonKey}” is not billed on Stripe, so renewal cannot be resumed here.`,
+      );
+    }
+    const result = await resumeStripeAddonRenewal({
+      stripeSubscriptionId: existing.stripeSubscriptionId,
+    });
+    periodEndIso = result.periodEndIso;
+    resumedAddonKeys.push(addonKey);
+  }
+
+  revalidatePath("/pricing/add-ons");
+  revalidatePath("/dashboard", "layout");
+  return { resumedAddonKeys, periodEndIso };
 }

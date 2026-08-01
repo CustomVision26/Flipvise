@@ -43,7 +43,7 @@ import {
   type EducationTeamPlanId,
 } from "@/lib/education-plans";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
-import { listActiveAddonKeysForUser } from "@/db/queries/addons";
+import { listAccessibleAddonKeysForUser } from "@/db/queries/addons";
 import { enforceExpiredPaymentGraceIfNeeded } from "@/lib/billing-grace-enforcement";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
@@ -475,7 +475,10 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   const ctx = await resolveAccessContextCore();
   if (!ctx.userId) return ctx;
   try {
-    const activeAddonKeys = await listActiveAddonKeysForUser(ctx.userId);
+    const activeAddonKeys = await listAccessibleAddonKeysForUser(
+      ctx.userId,
+      ctx.effectivePlanSlug,
+    );
     if (activeAddonKeys.length === 0) return ctx;
     return { ...ctx, activeAddonKeys };
   } catch {

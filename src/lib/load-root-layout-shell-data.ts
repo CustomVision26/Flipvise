@@ -111,19 +111,22 @@ function resolveTeamDashFallback(
   };
 }
 
-function resolveShowWorkspaceSwitcher(
-  workspaceTeamsTotalEligible: number,
-  activeTeamPlan: AccessContext["activeTeamPlan"],
-  activeEducationTeamPlan: AccessContext["activeEducationTeamPlan"],
-  isPro: boolean,
-  hasTeamMembership: boolean,
-): boolean {
+function resolveShowWorkspaceSwitcher(input: {
+  workspaceTeamsTotalEligible: number;
+  activeTeamPlan: AccessContext["activeTeamPlan"];
+  activeEducationTeamPlan: AccessContext["activeEducationTeamPlan"];
+  hasTeamMembership: boolean;
+  teamDashFallback: RootLayoutTeamDashFallback;
+  showPersonalTeacherDash: boolean;
+}): boolean {
+  // Personal-only Pro / complimentary admins should not see a one-item switcher.
   return (
-    workspaceTeamsTotalEligible > 0 ||
-    hasTeamMembership ||
-    (activeTeamPlan != null && isTeamPlanId(activeTeamPlan)) ||
-    activeEducationTeamPlan != null ||
-    isPro
+    input.workspaceTeamsTotalEligible > 0 ||
+    input.hasTeamMembership ||
+    (input.activeTeamPlan != null && isTeamPlanId(input.activeTeamPlan)) ||
+    input.activeEducationTeamPlan != null ||
+    input.teamDashFallback != null ||
+    input.showPersonalTeacherDash
   );
 }
 
@@ -218,6 +221,23 @@ export async function loadRootLayoutShellData(input: {
       }
     : personalWorkspaceLabelsFromAccessContext(access);
 
+  const teamDashFallback = resolveTeamDashFallback(
+    userId,
+    activeTeamPlan,
+    activeEducationTeamPlan,
+    workspaceTeams,
+    teamAdminHeaderTeams,
+  );
+  const showTeacherDashboard = showTeacherDashboardFromShell({
+    access,
+    teamAdminHeaderTeams,
+  });
+  const showPersonalTeacherDash = showPersonalTeacherDashFromShell({
+    userId,
+    access,
+    teamAdminHeaderTeams,
+  });
+
   return {
     profile,
     teamAdminHeaderTeams,
@@ -228,28 +248,16 @@ export async function loadRootLayoutShellData(input: {
     showAffiliatePortal: activeAffiliateRow != null,
     personalPlanLabelForWorkspace: planLabels.personalPlanLabelForWorkspace,
     personalAccountPlanLabel: planLabels.personalAccountPlanLabel,
-    showWorkspaceSwitcher: resolveShowWorkspaceSwitcher(
+    showWorkspaceSwitcher: resolveShowWorkspaceSwitcher({
       workspaceTeamsTotalEligible,
       activeTeamPlan,
       activeEducationTeamPlan,
-      isPro,
       hasTeamMembership,
-    ),
-    teamDashFallback: resolveTeamDashFallback(
-      userId,
-      activeTeamPlan,
-      activeEducationTeamPlan,
-      workspaceTeams,
-      teamAdminHeaderTeams,
-    ),
-    showTeacherDashboard: showTeacherDashboardFromShell({
-      access,
-      teamAdminHeaderTeams,
+      teamDashFallback,
+      showPersonalTeacherDash,
     }),
-    showPersonalTeacherDash: showPersonalTeacherDashFromShell({
-      userId,
-      access,
-      teamAdminHeaderTeams,
-    }),
+    teamDashFallback,
+    showTeacherDashboard,
+    showPersonalTeacherDash,
   };
 }

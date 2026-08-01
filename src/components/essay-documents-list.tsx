@@ -66,7 +66,7 @@ export function EssayDocumentsList({ documents }: EssayDocumentsListProps) {
   const deleteDoc = documents.find((d) => d.id === deleteId) ?? null;
 
   function openEssay(documentId: number) {
-    router.push(`/dashboard/essay/${documentId}?edit=1`);
+    router.push(`/dashboard/ai-doc-studio/ai-essay/${documentId}?edit=1`);
   }
 
   function openRename(doc: EssayDocumentListItem) {
@@ -144,7 +144,7 @@ export function EssayDocumentsList({ documents }: EssayDocumentsListProps) {
         <button
           type="button"
           className="underline"
-          onClick={() => router.push("/dashboard/essay/generate")}
+          onClick={() => router.push("/dashboard/ai-doc-studio/ai-essay/generate")}
         >
           Generate one
         </button>

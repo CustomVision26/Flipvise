@@ -1,5 +1,6 @@
 export type PlanHistoryTypeLabel =
   | "Paid subscription"
+  | "Add-on"
   | "Proration"
   | "Complimentary (admin)"
   | "Complimentary (affiliate)";

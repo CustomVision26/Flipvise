@@ -1,9 +1,13 @@
 /**
- * Document Generation Studio — registry + shared citation/formatting/integrity defaults.
- * Essay Generator is the only enabled document type today; others are Coming Soon.
+ * AI Document Studio — registry + shared citation/formatting/integrity defaults.
+ * Each document type is (or will be) a premium add-on. Essay is the only enabled
+ * type today; others are Coming Soon until catalog + Stripe keys ship.
  */
 
-export const DOCUMENT_STUDIO_TITLE = "Document Generation Studio";
+import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import { AI_ESSAY_STUDIO_BASE } from "@/lib/ai-document-studio-paths";
+
+export const DOCUMENT_STUDIO_TITLE = "AI Document Studio";
 
 export type DocumentStudioTypeId =
   | "essay"
@@ -21,9 +25,14 @@ export type DocumentStudioType = {
   id: DocumentStudioTypeId;
   label: string;
   enabled: boolean;
-  /** Existing essay routes stay under /dashboard/essay */
+  /** Route when enabled; null while Coming Soon. */
   href: string | null;
   summary: string;
+  /**
+   * Add-on catalog key required to use this document type.
+   * Null = not sellable yet (Coming Soon placeholder).
+   */
+  addonKey: string | null;
 };
 
 export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
@@ -31,8 +40,9 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     id: "essay",
     label: "Essay Generator",
     enabled: true,
-    href: "/dashboard/essay/generate",
+    href: `${AI_ESSAY_STUDIO_BASE}/generate`,
     summary: "AI essay activities with prompts, sections, and rubrics.",
+    addonKey: AI_ESSAY_ADDON_KEY,
   },
   {
     id: "research_paper",
@@ -40,6 +50,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "book_report",
@@ -47,6 +58,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "lab_report",
@@ -54,6 +66,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "literature_review",
@@ -61,6 +74,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "reflection_journal",
@@ -68,6 +82,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "speech",
@@ -75,6 +90,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "debate",
@@ -82,6 +98,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "business_report",
@@ -89,6 +106,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
   {
     id: "custom_document",
@@ -96,6 +114,7 @@ export const DOCUMENT_STUDIO_TYPES: DocumentStudioType[] = [
     enabled: false,
     href: null,
     summary: "Coming Soon",
+    addonKey: null,
   },
 ];
 

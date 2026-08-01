@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { SlideToSubmitButton } from "@/components/slide-to-submit-button";
 import { formatCentsMoney } from "@/lib/money-math";
+import type { PlanChangeSelectedAddonLine } from "@/lib/plan-change-locked-addons";
 import type {
   PlanChangeCheckoutContext,
   PlanChangeProrationPreview,
@@ -33,6 +34,8 @@ export type PlanChangeCheckoutSummary = {
   preview: PlanChangeProrationPreview;
   /** False when Stripe returned a full proration invoice preview. */
   previewEstimated: boolean;
+  /** Locked add-on selected on the prior checkout step (charged after plan change). */
+  selectedAddon?: PlanChangeSelectedAddonLine | null;
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -44,8 +47,12 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function PlanChangeOrderSummary({ summary }: { summary: PlanChangeCheckoutSummary }) {
-  const { context, preview, period, previewEstimated } = summary;
+  const { context, preview, period, previewEstimated, selectedAddon } = summary;
   const periodLabel = period === "yearly" ? "Annual billing" : "Monthly billing";
+  const currency = selectedAddon?.currency ?? preview.currency;
+  const planDueCents = Math.max(0, preview.amountDueCents);
+  const addonCents = selectedAddon?.amountCents ?? 0;
+  const combinedDueCents = planDueCents + addonCents;
 
   return (
     <section className="space-y-4">
@@ -59,6 +66,7 @@ function PlanChangeOrderSummary({ summary }: { summary: PlanChangeCheckoutSummar
         </h1>
         <p className="text-sm text-[#6b7280]">
           {context.currentPlanLabel} → {context.targetPlanLabel} · {periodLabel}
+          {selectedAddon ? ` · + ${selectedAddon.name}` : ""}
         </p>
       </div>
 
@@ -103,26 +111,79 @@ function PlanChangeOrderSummary({ summary }: { summary: PlanChangeCheckoutSummar
           </p>
         )}
 
+        {selectedAddon ? (
+          <>
+            <Separator className="bg-[#e0e4e8]" />
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6b7280]">
+              Add-ons
+            </p>
+            <ul className="space-y-2.5">
+              <li className="flex items-start justify-between gap-4">
+                <span className="min-w-0 text-[#6b7280] leading-snug">
+                  {selectedAddon.description}
+                </span>
+                <span className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums text-[#30313d]">
+                  {selectedAddon.isProrated &&
+                  selectedAddon.listPriceCents > selectedAddon.amountCents ? (
+                    <span className="text-xs text-[#6b7280] line-through">
+                      {formatCentsMoney(
+                        selectedAddon.listPriceCents,
+                        selectedAddon.currency,
+                      )}
+                    </span>
+                  ) : null}
+                  <span>
+                    {formatCentsMoney(
+                      selectedAddon.amountCents,
+                      selectedAddon.currency,
+                    )}
+                  </span>
+                </span>
+              </li>
+            </ul>
+            <p className="text-xs leading-relaxed text-[#6b7280]">
+              {selectedAddon.isProrated
+                ? "Add-on first charge is prorated to align with your plan renewal, then renews at the list rate. Charged on a separate checkout after this plan change."
+                : "Add-on is charged on a separate checkout after this plan change."}
+            </p>
+          </>
+        ) : null}
+
         <Separator className="bg-[#e0e4e8]" />
 
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <span className="font-medium text-[#1a2332]">
-            {previewEstimated ? "Estimated due today" : "Estimated due today"}
-          </span>
+          <span className="font-medium text-[#1a2332]">Estimated due today</span>
           <span className="font-serif text-2xl font-semibold tabular-nums text-[#1a2332]">
-            {previewEstimated
+            {previewEstimated && !selectedAddon
               ? "Calculated at confirmation"
-              : formatCentsMoney(preview.amountDueCents, preview.currency)}
+              : formatCentsMoney(combinedDueCents, currency)}
           </span>
         </div>
+        {selectedAddon && !previewEstimated ? (
+          <p className="text-xs text-[#6b7280]">
+            Plan change{" "}
+            <span className="tabular-nums">
+              {formatCentsMoney(planDueCents, preview.currency)}
+            </span>
+            {" + "}
+            add-on{" "}
+            <span className="tabular-nums">
+              {formatCentsMoney(addonCents, selectedAddon.currency)}
+            </span>
+          </p>
+        ) : null}
       </div>
 
       <p className="text-xs leading-relaxed text-[#6b7280]">
-        Amounts are estimated from your current billing period. Each line is prorated for
-        unused or remaining time in this cycle only — not the full list price for a new
+        Amounts are estimated from your current billing period. Each plan line is prorated
+        for unused or remaining time in this cycle only — not the full list price for a new
         billing period; renewal after this period is at the plan&apos;s standard rate.
         Previous promotion discounts do not apply to this plan change. Your payment method
-        below will be charged or credited when you confirm.
+        below will be charged or credited for the plan change when you confirm
+        {selectedAddon
+          ? "; the selected add-on continues to its own checkout next"
+          : ""}
+        .
       </p>
     </section>
   );
@@ -140,10 +201,18 @@ function PlanChangePaymentForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const totalLabel = summary.previewEstimated
-    ? "plan change"
-    : formatCentsMoney(summary.preview.amountDueCents, summary.preview.currency);
-  const slideLabel = `Slide to confirm plan change${summary.previewEstimated ? "" : ` — ${totalLabel}`}`;
+  const addonCents = summary.selectedAddon?.amountCents ?? 0;
+  const planDueCents = Math.max(0, summary.preview.amountDueCents);
+  const combinedDueCents = planDueCents + addonCents;
+  const totalCurrency =
+    summary.selectedAddon?.currency ?? summary.preview.currency;
+  const totalLabel =
+    summary.previewEstimated && !summary.selectedAddon
+      ? "plan change"
+      : formatCentsMoney(combinedDueCents, totalCurrency);
+  const slideLabel = `Slide to confirm plan change${
+    summary.previewEstimated && !summary.selectedAddon ? "" : ` — ${totalLabel}`
+  }`;
 
   async function handleConfirm() {
     if (!stripe || !elements) return;

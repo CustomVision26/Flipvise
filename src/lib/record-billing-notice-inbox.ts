@@ -56,6 +56,14 @@ function noticeCopy(input: {
           `Open Pricing to subscribe again and restore paid features.`,
         requiresAction: true,
       };
+    case "addon_renewal_canceled":
+    case "plan_renewal_canceled":
+      // Dedicated helpers in record-renewal-cancel-inbox.ts build full copy.
+      return {
+        title: planLabel,
+        description: "",
+        requiresAction: false,
+      };
   }
 }
 

@@ -68,7 +68,7 @@ export function EssayCitedFormattedPool({
         <button
           type="button"
           className="underline"
-          onClick={() => router.push("/dashboard/essay/citation-formatting")}
+          onClick={() => router.push("/dashboard/ai-doc-studio/ai-essay/citation-formatting")}
         >
           Citation &amp; Formatting
         </button>{" "}
@@ -142,7 +142,7 @@ export function EssayCitedFormattedPool({
                 type="button"
                 size="sm"
                 onClick={() =>
-                  router.push(`/dashboard/essay/${essay.documentId}`)
+                  router.push(`/dashboard/ai-doc-studio/ai-essay/${essay.documentId}`)
                 }
               >
                 Open

@@ -158,6 +158,48 @@ export async function listActiveAddonKeysForUser(userId: string): Promise<string
   return rows.map((r) => r.addonKey);
 }
 
+/** Active entitlements for a user (full rows — source, Stripe ids, etc.). */
+export async function listActiveUserAddonEntitlements(
+  userId: string,
+): Promise<UserAddonEntitlementRow[]> {
+  return db
+    .select()
+    .from(userAddonEntitlements)
+    .where(
+      and(
+        eq(userAddonEntitlements.userId, userId),
+        eq(userAddonEntitlements.status, "active"),
+      ),
+    );
+}
+
+/**
+ * Add-on keys the user may use given their effective plan.
+ * Stripe/team entitlements require plan eligibility (Free → none).
+ * Platform-admin grants remain available regardless of plan.
+ */
+export async function listAccessibleAddonKeysForUser(
+  userId: string,
+  effectivePlanSlug: string | null | undefined,
+): Promise<string[]> {
+  const entitlements = await listActiveUserAddonEntitlements(userId);
+  if (entitlements.length === 0) return [];
+
+  const keys: string[] = [];
+  for (const row of entitlements) {
+    if (row.source === "admin") {
+      keys.push(row.addonKey);
+      continue;
+    }
+    const catalog = await getAddonCatalogByKey(row.addonKey);
+    if (!catalog) continue;
+    if (isPlanEligibleForAddon(catalog.eligiblePlanIds, effectivePlanSlug)) {
+      keys.push(row.addonKey);
+    }
+  }
+  return keys;
+}
+
 export async function getUserAddonEntitlement(
   userId: string,
   addonKey: string,
@@ -349,6 +391,17 @@ export async function listActiveEntitlementsForAddon(
         eq(userAddonEntitlements.status, "active"),
       ),
     )
+    .orderBy(desc(userAddonEntitlements.updatedAt));
+}
+
+/** All active add-on entitlements (admin subscription tables). */
+export async function listAllActiveAddonEntitlements(): Promise<
+  UserAddonEntitlementRow[]
+> {
+  return db
+    .select()
+    .from(userAddonEntitlements)
+    .where(eq(userAddonEntitlements.status, "active"))
     .orderBy(desc(userAddonEntitlements.updatedAt));
 }
 

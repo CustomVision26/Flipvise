@@ -3,14 +3,21 @@ import { stripe } from "@/lib/stripe";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
   basePlanPriceIdFromSubscription,
+  isStripeAddonSubscription,
   isStripeAddonSubscriptionItem,
 } from "@/lib/stripe-addon-metadata";
+import {
+  findActiveSubscriptionForClerkUser,
+  syncActiveSubscriptionFromStripeForUser,
+} from "@/lib/stripe-billing-sync";
 
 export type CancelSubscriptionPreview = {
   planLabel: string;
   periodEnd: string;
   billingInterval: "month" | "year" | null;
   cancelAtPeriodEnd: boolean;
+  /** Stripe subscription id used for the base plan preview (never an add-on sub). */
+  stripeSubscriptionId: string;
 };
 
 function basePlanSubscriptionItem(
@@ -49,10 +56,31 @@ function billingIntervalFromSubscription(
 export async function fetchCancelSubscriptionPreview(
   stripeSubscriptionId: string,
   planSlug: string | null,
+  options?: { clerkUserId?: string | null },
 ): Promise<CancelSubscriptionPreview> {
-  const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+  let subId = stripeSubscriptionId.trim();
+  let sub = await stripe.subscriptions.retrieve(subId, {
     expand: ["items.data.price"],
   });
+
+  // Never treat an add-on subscription as the base plan (would show false "Renewal canceled").
+  if (isStripeAddonSubscription(sub) && options?.clerkUserId) {
+    const resolved = await findActiveSubscriptionForClerkUser(options.clerkUserId);
+    if (resolved) {
+      sub = await stripe.subscriptions.retrieve(resolved.sub.id, {
+        expand: ["items.data.price"],
+      });
+      subId = sub.id;
+      await syncActiveSubscriptionFromStripeForUser(options.clerkUserId).catch(
+        (error) => {
+          console.error(
+            "[fetchCancelSubscriptionPreview] repair base plan row",
+            error,
+          );
+        },
+      );
+    }
+  }
 
   const periodEndDate = subscriptionPeriodEnd(sub);
   const planLabel = planSlug
@@ -64,6 +92,21 @@ export async function fetchCancelSubscriptionPreview(
     periodEnd: periodEndDate?.toISOString() ?? new Date().toISOString(),
     billingInterval: billingIntervalFromSubscription(sub),
     cancelAtPeriodEnd: sub.cancel_at_period_end === true,
+    stripeSubscriptionId: subId,
+  };
+}
+
+/** Resume base-plan renewals after cancel_at_period_end was scheduled. */
+export async function resumeSubscriptionRenewal(
+  stripeSubscriptionId: string,
+): Promise<{ periodEnd: string; cancelAtPeriodEnd: boolean }> {
+  const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
+    cancel_at_period_end: false,
+  });
+  const periodEndDate = subscriptionPeriodEnd(updated);
+  return {
+    periodEnd: periodEndDate?.toISOString() ?? new Date().toISOString(),
+    cancelAtPeriodEnd: updated.cancel_at_period_end === true,
   };
 }
 

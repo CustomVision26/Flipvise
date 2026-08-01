@@ -18,8 +18,13 @@ import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { evaluateAllActiveAffiliateQuotas } from "@/lib/affiliate-quota-renewal";
 import { listStripeSubscriptionsForAdmin } from "@/db/queries/stripe-subscriptions";
 import { listUserPlanTrialsForAdmin } from "@/db/queries/user-plan-trials";
+import {
+  listAddonCatalog,
+  listAllActiveAddonEntitlements,
+} from "@/db/queries/addons";
 import { buildAdminBillingMonitorRows } from "@/lib/admin/billing-monitor-snapshot";
 import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
+import { fetchStripeRenewalFlagsBySubscriptionId } from "@/lib/admin/stripe-cancel-at-period-end";
 import { listAccountDeletionProrationLedgerForAdmin } from "@/db/queries/account-deletion-proration";
 import {
   serializeDeletionProrationRows,
@@ -380,13 +385,21 @@ export async function loadAdminTabsData(
     case "invoices": {
       const { data: clerkUsers } = await getAdminClerkUserList();
       const invoiceLimit = section === "invoices" ? INVOICES_TAB_LIMIT : OVERVIEW_INVOICE_LIMIT;
-      const [persistedBillingInvoices, rawAffiliates, stripeSubscriptions, trialRows] =
-        await runDbTasksWithConcurrencyLimit(
+      const [
+        persistedBillingInvoices,
+        rawAffiliates,
+        stripeSubscriptions,
+        trialRows,
+        activeAddonEntitlements,
+        addonCatalog,
+      ] = await runDbTasksWithConcurrencyLimit(
           [
             () => listBillingInvoicesForAdmin(invoiceLimit),
             () => listAffiliates(),
             () => listStripeSubscriptionsForAdmin(),
             () => listUserPlanTrialsForAdmin(),
+            () => listAllActiveAddonEntitlements(),
+            () => listAddonCatalog(),
           ] as const,
           ADMIN_DASHBOARD_DB_CONCURRENCY,
         );
@@ -395,11 +408,31 @@ export async function loadAdminTabsData(
         rawAffiliates,
         billingUsers,
       );
+
+      const renewalSubIds = [
+        ...stripeSubscriptions.map((row) => row.stripeSubscriptionId),
+        ...activeAddonEntitlements
+          .map((row) => row.stripeSubscriptionId)
+          .filter((id): id is string => Boolean(id)),
+      ];
+      const renewalFlagsBySubscriptionId =
+        section === "subscription"
+          ? await fetchStripeRenewalFlagsBySubscriptionId(renewalSubIds)
+          : new Map();
+
+      const addonCatalogNameByKey = new Map(
+        addonCatalog.map((row) => [row.key, row.name?.trim() || row.key]),
+      );
+
       const { subscriptions, invoices } = buildAdminBillingSnapshot({
         users: billingUsers,
         persistedBillingInvoices,
         stripeSubscriptions,
         activeAffiliateUserIds,
+        renewalFlagsBySubscriptionId,
+        activeAddonEntitlements:
+          section === "subscription" ? activeAddonEntitlements : [],
+        addonCatalogNameByKey,
       });
 
       if (section === "subscription") {

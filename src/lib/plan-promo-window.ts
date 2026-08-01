@@ -93,6 +93,45 @@ export function isAffiliateDiscountEffectivelyActive(
   return isPromoWindowActive(startsAt, endsAt, nowMs);
 }
 
+/** Whether `/pricing` should render the promotion-code block. */
+export function pricingHasActivePromoUi(
+  plans: PlanConfig[],
+  nowMs: number = Date.now(),
+): boolean {
+  return plans.some(
+    (plan) =>
+      isGeneralDiscountEffectivelyActive(plan, nowMs) ||
+      isAffiliateDiscountEffectivelyActive(plan, nowMs),
+  );
+}
+
+/** Public coupon codes for plans with an effectively active general discount. */
+export function activePublicPromoCodes(
+  plans: PlanConfig[],
+  nowMs: number = Date.now(),
+): Array<{ planName: string; code: string }> {
+  const seen = new Set<string>();
+  const rows: Array<{ planName: string; code: string }> = [];
+  for (const plan of plans) {
+    if (!isGeneralDiscountEffectivelyActive(plan, nowMs)) continue;
+    const code = plan.discount?.stripeCouponId?.trim();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    rows.push({ planName: plan.name, code });
+  }
+  return rows;
+}
+
+/** Plan ids with an effectively active general discount (for catalog price UI). */
+export function activeGeneralDiscountPlanIds(
+  plans: PlanConfig[],
+  nowMs: number = Date.now(),
+): string[] {
+  return plans
+    .filter((plan) => isGeneralDiscountEffectivelyActive(plan, nowMs))
+    .map((plan) => plan.id);
+}
+
 /** Stripe `redeem_by` — last second of the configured promo end datetime (local → UTC unix). */
 export function promoEndsAtToRedeemByUnix(promoEndsAt: string): number {
   return Math.floor(parsePromoDateTimeMs(promoEndsAt) / 1000);

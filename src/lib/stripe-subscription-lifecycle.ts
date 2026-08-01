@@ -21,6 +21,10 @@ import {
   upsertStripeSubscriptionFromStripeSub,
 } from "@/lib/stripe-billing-sync";
 import { loopsSendEvent, loopsUpdateContact } from "@/lib/loops";
+import {
+  revokeStripeAddonsAfterPaidPlanLoss,
+  scheduleStripeAddonsCancelAtPeriodEndForUser,
+} from "@/lib/stripe-addon-sync";
 import { stripe } from "@/lib/stripe";
 import { createClerkClient } from "@clerk/backend";
 
@@ -131,8 +135,36 @@ export async function syncSubscriptionLifecycleEvent(
 
   const retainsAccess = isPaidAccessBillingStatus(billingStatus);
   const activePlan = retainsAccess ? plan : null;
+  const previouslyRetainedAccess =
+    previousStatus === "active" ||
+    previousStatus === "trialing" ||
+    previousStatus === "past_due";
 
   await setStripeBillingState(resolution.userId, activePlan, billingStatus);
+
+  // Free plan cannot keep Stripe add-ons — stop billing + revoke when paid access ends.
+  if (!retainsAccess && previouslyRetainedAccess) {
+    try {
+      await revokeStripeAddonsAfterPaidPlanLoss(resolution.userId);
+    } catch (error) {
+      console.error(
+        "[syncSubscriptionLifecycleEvent] revoke add-ons after plan loss",
+        resolution.userId,
+        error,
+      );
+    }
+  } else if (retainsAccess && sub.cancel_at_period_end === true) {
+    // Plan will not renew (in-app or Customer Portal) — align add-on cancel at period end.
+    try {
+      await scheduleStripeAddonsCancelAtPeriodEndForUser(resolution.userId);
+    } catch (error) {
+      console.error(
+        "[syncSubscriptionLifecycleEvent] schedule add-on cancels with plan",
+        resolution.userId,
+        error,
+      );
+    }
+  }
 
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;

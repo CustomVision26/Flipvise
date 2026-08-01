@@ -5,7 +5,11 @@ import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
 import { resolvePricingBackToDashboardHref } from "@/lib/pricing-back-dashboard-href";
 import { PricingContent } from "@/components/pricing-content";
-import { ManageBillingButton } from "@/components/manage-billing-button";
+import {
+  activeGeneralDiscountPlanIds,
+  activePublicPromoCodes,
+  pricingHasActivePromoUi,
+} from "@/lib/plan-promo-window";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { getActiveStripeSubscription, getManageableStripeSubscription } from "@/db/queries/stripe-subscriptions";
@@ -107,8 +111,13 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
   );
 
   const plansForUi = await loadPlansForPricingUi();
-
-  const hasStripeSubscription = stripeSubRow !== null;
+  const promoNowMs = Date.now();
+  const showPromotionCodeUi = pricingHasActivePromoUi(plansForUi, promoNowMs);
+  const publicPromoCodes = activePublicPromoCodes(plansForUi, promoNowMs);
+  const activeDiscountPlanIds = activeGeneralDiscountPlanIds(
+    plansForUi,
+    promoNowMs,
+  );
 
   let showAddonCatalogLink = false;
   try {
@@ -163,26 +172,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           </div>
         </div>
 
-        {hasStripeSubscription ? (
-          <div className="flex flex-col items-start gap-4 rounded-xl border border-border/80 bg-card/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                Active subscription
-              </p>
-              <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-                Upgrade, downgrade, cancel, or update your payment method in the
-                billing portal. Proration is applied automatically.
-              </p>
-            </div>
-            <ManageBillingButton
-              label="Manage subscription"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-            />
-          </div>
-        ) : null}
-
         <PricingContent
           userId={userId}
           currentPlanHighlightId={currentPlanHighlightId}
@@ -190,6 +179,9 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           initialPromotionCode={promoFromUrl?.trim() ?? ""}
           hasUsedTrial={hasUsedTrial}
           hasActiveSubscription={hasActiveSubscription}
+          showPromotionCodeUi={showPromotionCodeUi}
+          publicPromoCodes={publicPromoCodes}
+          activeDiscountPlanIds={activeDiscountPlanIds}
         />
       </div>
     </div>

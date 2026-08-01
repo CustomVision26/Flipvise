@@ -93,7 +93,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "Homework Generator (/teacher/homework) — take-home practice aligned to deck content. From saved lesson plan includes the same assigned-deck originals for team members. Multi-day plans show the same All Days / day picker (with day captions) before Generate. For Reading / Language Arts / Literature topics, set Number of passages and Questions per passage (total = passages × questions). Generate produces concrete practice from lesson vocabulary (math: solvable problems; reading: titled passages with linked questions) in Preview, Edit, and PDF. Math answers that require a number-line or coordinate graph include a drawn figure in the Answer Key (not only a text description).",
           "Study Guide Generator (/teacher/study-guides) — structured review materials with PDF export. Lesson plan picker includes assigned-deck originals for team members. Multi-day lesson plans generate from the full plan (All Days) without a day-scope dialog.",
           "Worksheet Generator (/teacher/worksheets) — printable sheets with answer keys.",
-          "Generate AI Essay (/dashboard/essay/generate) — premium add-on; requires AI Essay entitlement.",
+          "Generate AI Essay (/dashboard/ai-doc-studio/ai-essay/generate) — premium add-on; requires AI Essay entitlement.",
         ],
       },
       {

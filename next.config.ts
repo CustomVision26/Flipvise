@@ -1,6 +1,21 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/dashboard/essay",
+        destination: "/dashboard/ai-doc-studio/ai-essay",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/essay/:path*",
+        destination: "/dashboard/ai-doc-studio/ai-essay/:path*",
+        permanent: false,
+      },
+    ];
+  },
+
   // Android emulator reaches the Next dev server via 10.0.2.2. Without this,
   // Next 16 blocks cross-origin /_next assets and Clerk never finishes loading.
   // Include host and full origin forms — Next 16 matching varies by version.

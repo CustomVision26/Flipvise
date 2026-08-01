@@ -3,8 +3,13 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { createAddonCheckoutSessionAction } from "@/actions/addons";
 import { syncBillingAfterCheckoutAction } from "@/actions/billing-page";
 import { finalizePlanChangePaymentAction } from "@/actions/plan-change-checkout";
+import {
+  clearPlanChangePendingAddon,
+  readPlanChangePendingAddon,
+} from "@/lib/plan-change-pending-addon";
 import { showSubscriptionSuccessToast } from "@/lib/subscription-success-toast";
 
 function resolveCheckoutRedirectKind(
@@ -118,6 +123,7 @@ export function StripeCheckoutToast() {
 
     const checkoutSessionId = searchParams.get("session_id")?.trim() ?? "";
     const setupIntentId = searchParams.get("setup_intent")?.trim() ?? "";
+    const addonCheckoutFlag = searchParams.get("addon_checkout")?.trim() ?? "";
 
     const next = new URL(window.location.href);
     next.searchParams.delete("checkout");
@@ -125,6 +131,7 @@ export function StripeCheckoutToast() {
     next.searchParams.delete("setup_intent");
     next.searchParams.delete("setup_intent_client_secret");
     next.searchParams.delete("redirect_status");
+    next.searchParams.delete("addon_checkout");
     const qs = next.searchParams.toString();
     router.replace(`${next.pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
 
@@ -139,9 +146,19 @@ export function StripeCheckoutToast() {
       try {
         if (checkout === "plan_change") {
           await waitForClerkUserId();
-          const result = await finalizePlanChangePaymentAction({
-            ...(setupIntentId ? { setupIntentId } : {}),
-          });
+
+          // Continue-bridge already finalized; only finalize when Stripe redirected here.
+          const shouldFinalize = Boolean(setupIntentId);
+          const result = shouldFinalize
+            ? await finalizePlanChangePaymentAction({ setupIntentId })
+            : {
+                synced: true,
+                planSlug: null,
+                planLabel: null,
+                receiptUrl: null,
+                receiptIsProration: true,
+              };
+
           await reloadClerkUserSession();
 
           if (result.synced && result.planLabel) {
@@ -151,7 +168,7 @@ export function StripeCheckoutToast() {
               receiptUrl: result.receiptUrl,
               isProration: result.receiptIsProration,
             });
-          } else {
+          } else if (shouldFinalize || addonCheckoutFlag === "failed") {
             toast.success("Plan change recorded", {
               description:
                 "Your subscription was updated. Open Billing if your plan has not refreshed yet.",
@@ -161,6 +178,44 @@ export function StripeCheckoutToast() {
 
           window.dispatchEvent(new CustomEvent(BILLING_SYNCED_EVENT));
           router.refresh();
+
+          if (addonCheckoutFlag === "failed") {
+            toast.error("Add-on checkout did not start", {
+              description:
+                "Your plan was updated. Open Pricing → Add-ons to finish unlocking the feature.",
+              duration: 14_000,
+            });
+            return;
+          }
+
+          // Preferred handoff is `/pricing/checkout/plan-change/continue`.
+          // sessionStorage remains a fallback for older flows.
+          const pendingAddon = readPlanChangePendingAddon();
+          clearPlanChangePendingAddon();
+          if (pendingAddon) {
+            try {
+              const addonSession = await createAddonCheckoutSessionAction({
+                addonKey: pendingAddon.addonKey,
+                period: pendingAddon.period,
+              });
+              window.location.assign(
+                `/pricing/add-ons/pay?session_id=${encodeURIComponent(addonSession.sessionId)}&from_plan_change=1`,
+              );
+              return;
+            } catch (addonErr) {
+              console.error(
+                "[StripeCheckoutToast] pending add-on checkout:",
+                addonErr,
+              );
+              toast.error("Could not start add-on checkout", {
+                description:
+                  addonErr instanceof Error
+                    ? addonErr.message
+                    : "Your plan was updated. Open Pricing → Add-ons to unlock the feature.",
+                duration: 14_000,
+              });
+            }
+          }
           return;
         }
 

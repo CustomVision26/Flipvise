@@ -1,17 +1,10 @@
 import Link from "next/link";
-import { getAccessContext, canAccessAddon } from "@/lib/access";
-import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
-import {
-  getAddonCatalogByKey,
-  isPlanEligibleForAddon,
-} from "@/db/queries/addons";
+import { requireEssayAddonAccess } from "@/lib/essay-access";
 import {
   listRecentEssayDocumentsForUser,
   listEssayDraftsForUser,
   listRecentEssayFeedbackForUser,
 } from "@/db/queries/essays";
-import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
-import { DashboardAiEssayCard } from "@/components/dashboard-ai-essay-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,28 +17,9 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
 export default async function EssayOverviewPage() {
-  const access = await getAccessContext();
-  const unlocked = canAccessAddon(access, AI_ESSAY_ADDON_KEY);
-  const catalog = await getAddonCatalogByKey(AI_ESSAY_ADDON_KEY);
-  const canPurchase =
-    !!access.userId &&
-    !!catalog?.active &&
-    isPlanEligibleForAddon(catalog.eligiblePlanIds, access.effectivePlanSlug) &&
-    !!resolveStripeAddonPriceIdFromEnvKey(catalog.stripePriceEnvKey);
+  const access = await requireEssayAddonAccess("page");
+  const userId = access.userId;
 
-  if (!unlocked) {
-    return (
-      <div className="max-w-lg">
-        <DashboardAiEssayCard
-          unlocked={false}
-          canPurchase={canPurchase}
-          signedIn={!!access.userId}
-        />
-      </div>
-    );
-  }
-
-  const userId = access.userId!;
   const [recent, drafts, feedback] = await Promise.all([
     listRecentEssayDocumentsForUser(userId, 5),
     listEssayDraftsForUser(userId),
@@ -60,20 +34,20 @@ export default async function EssayOverviewPage() {
         <CardHeader>
           <CardTitle>Essay Generator</CardTitle>
           <CardDescription>
-            Document Generation Studio — generate activities, write, and get AI
+            AI Document Studio — generate activities, write, and get AI
             feedback.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Link
-            href="/dashboard/essay/generate"
+            href="/dashboard/ai-doc-studio/ai-essay/generate"
             className={cn(buttonVariants())}
           >
             Open Essay Generator
           </Link>
           {continueDraft ? (
             <Link
-              href={`/dashboard/essay/${continueDraft.documentId}`}
+              href={`/dashboard/ai-doc-studio/ai-essay/${continueDraft.documentId}`}
               className={cn(buttonVariants({ variant: "outline" }))}
             >
               Continue Draft
@@ -97,7 +71,7 @@ export default async function EssayOverviewPage() {
             recent.map((doc) => (
               <Link
                 key={doc.id}
-                href={`/dashboard/essay/${doc.id}`}
+                href={`/dashboard/ai-doc-studio/ai-essay/${doc.id}`}
                 className="block rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40"
               >
                 <span className="font-medium">{doc.title}</span>
@@ -119,7 +93,7 @@ export default async function EssayOverviewPage() {
             feedback.map((fb) => (
               <Link
                 key={fb.id}
-                href={`/dashboard/essay/${fb.documentId}`}
+                href={`/dashboard/ai-doc-studio/ai-essay/${fb.documentId}`}
                 className="block rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40"
               >
                 Score {fb.result.overallScore}/100

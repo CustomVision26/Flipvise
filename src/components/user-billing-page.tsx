@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import {
   BILLING_SYNCED_EVENT,
 } from "@/components/stripe-checkout-toast";
-import { loadBillingTabDataAction } from "@/actions/billing-page";
+import {
+  loadBillingTabDataAction,
+  type BillingCancelAddonOption,
+} from "@/actions/billing-page";
 import { resolveBillingTabPlanDisplay } from "@/lib/billing-tab-plan-display";
 import type { CancelSubscriptionPreview } from "@/lib/stripe-cancel-subscription";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +87,9 @@ export function UserBillingPage() {
   const [cancelPreview, setCancelPreview] = useState<CancelSubscriptionPreview | null>(
     null,
   );
+  const [cancelableAddons, setCancelableAddons] = useState<
+    BillingCancelAddonOption[]
+  >([]);
   const [billingLoading, setBillingLoading] = useState(false);
   const [stripeCurrentPlanSlug, setStripeCurrentPlanSlug] = useState<string | null>(
     null,
@@ -115,6 +121,7 @@ export function UserBillingPage() {
         setPlanHistory(data.planHistory);
         setCanCancelStripe(data.canCancelStripe);
         setCancelPreview(data.cancelPreview);
+        setCancelableAddons(data.cancelableAddons);
         setStripeCurrentPlanSlug(data.currentPlanSlug);
         setStripeBillingStatus(data.billingStatus);
         setServerPlanLabel(data.planLabel);
@@ -130,6 +137,7 @@ export function UserBillingPage() {
         setPlanHistory([]);
         setCanCancelStripe(false);
         setCancelPreview(null);
+        setCancelableAddons([]);
         setStripeCurrentPlanSlug(null);
         setStripeBillingStatus(null);
         setServerPlanLabel(null);
@@ -276,19 +284,23 @@ export function UserBillingPage() {
               Update your payment method, download invoices, or cancel renewal.
               You keep access until the end of the current billing period.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-3">
               {canCancelStripe ? (
                 <CancelSubscriptionButton
                   preview={cancelPreview}
                   onPreviewChange={setCancelPreview}
+                  cancelableAddons={cancelableAddons}
+                  onCancelableAddonsChange={setCancelableAddons}
                 />
               ) : null}
-              <ManageBillingButton
-                label="Open billing portal"
-                variant="outline"
-                size="sm"
-              />
-              <ViewPlansButton variant="secondary" />
+              <div className="flex flex-wrap gap-2">
+                <ManageBillingButton
+                  label="Open billing portal"
+                  variant="outline"
+                  size="sm"
+                />
+                <ViewPlansButton variant="secondary" />
+              </div>
             </div>
           </div>
         )}
@@ -323,8 +335,8 @@ export function UserBillingPage() {
             Plan history
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Paid subscriptions, complimentary access, and affiliate grants linked
-            to your account.
+            Paid subscriptions, add-ons, complimentary access, and affiliate grants
+            linked to your account. Plan and add-on receipts are listed separately.
           </p>
         </div>
 
