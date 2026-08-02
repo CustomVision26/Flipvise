@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, CreditCard } from "lucide-react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,6 +221,10 @@ function PlanChangePaymentForm({
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    const pendingToast = toast.loading("Confirming plan change…", {
+      description: `Updating your subscription to ${summary.context.targetPlanLabel}.`,
+    });
+
     const result = await stripe.confirmSetup({
       elements,
       confirmParams: {
@@ -228,9 +233,17 @@ function PlanChangePaymentForm({
     });
 
     if (result.error) {
+      toast.dismiss(pendingToast);
       setErrorMessage(result.error.message ?? "Unable to confirm payment method.");
       setIsSubmitting(false);
+      return;
     }
+
+    toast.success("Plan change confirmed", {
+      id: pendingToast,
+      description: "Opening your personal dashboard…",
+      duration: 8_000,
+    });
   }
 
   return (

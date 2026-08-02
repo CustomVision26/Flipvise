@@ -31,12 +31,15 @@ export async function fetchStripeRenewalFlagsBySubscriptionId(
         const item = sub.items.data[0] as
           | { current_period_end?: number }
           | undefined;
+        // Stripe SDK versions differ: period end may live on the item or the sub.
+        const subPeriodEnd = (
+          sub as unknown as { current_period_end?: number }
+        ).current_period_end;
         const periodEndUnix =
           typeof item?.current_period_end === "number"
             ? item.current_period_end
-            : typeof (sub as { current_period_end?: number }).current_period_end ===
-                "number"
-              ? (sub as { current_period_end: number }).current_period_end
+            : typeof subPeriodEnd === "number"
+              ? subPeriodEnd
               : null;
         return {
           id,

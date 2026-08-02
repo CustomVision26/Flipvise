@@ -8,11 +8,19 @@ import {
   getAddonCatalogByKey,
   getUserAddonEntitlement,
   isPlanEligibleForAddon,
+  listAddonCatalog,
   revokeTeamAddonEntitlement,
   revokeUserAddonEntitlement,
   setAddonCatalogPricingVisible,
   updateAddonCatalogFlags,
+  upsertAddonCatalogEntry,
 } from "@/db/queries/addons";
+import {
+  AI_ESSAY_ADDON_KEY,
+  LIVE_CLASSROOM_ADDON_KEY,
+} from "@/lib/addon-keys";
+import { LIVE_CLASSROOM_ELIGIBLE_PLAN_IDS } from "@/lib/live-classroom-eligibility";
+import { stripeAddonPriceEnvKeyForAddonKey } from "@/lib/stripe-addon-price-env";
 import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
@@ -22,6 +30,7 @@ import { getAccessContext } from "@/lib/access";
 import { assertAdminDashboardAccess } from "@/lib/admin/assert-admin-access";
 import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
+import { personalDashboardHrefAfterAddonCheckoutSuccess } from "@/lib/personal-dashboard-url";
 import { STRIPE_ADDON_META_TYPE } from "@/lib/stripe-addon-metadata";
 import {
   resolveStripeAddonPriceIdFromEnvKey,
@@ -160,7 +169,10 @@ export async function createAddonCheckoutSessionAction(
     automatic_tax: { enabled: true },
     billing_address_collection: "required",
     tax_id_collection: { enabled: true },
-    return_url: `${appUrl}/pricing/add-ons?addon_checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    return_url: `${appUrl}${personalDashboardHrefAfterAddonCheckoutSuccess({
+      userId: access.userId,
+      currentPlanSlug: planSlug,
+    })}`,
     metadata: subscriptionMetadata,
   });
 
@@ -198,6 +210,7 @@ const setCatalogFlagsSchema = z.object({
   addonKey: addonKeySchema,
   active: z.boolean().optional(),
   publishedOnPricing: z.boolean().optional(),
+  publishedOnBanner: z.boolean().optional(),
 });
 
 export async function setAddonCatalogFlagsAction(
@@ -210,11 +223,14 @@ export async function setAddonCatalogFlagsAction(
     key: parsed.data.addonKey,
     active: parsed.data.active,
     publishedOnPricing: parsed.data.publishedOnPricing,
+    publishedOnBanner: parsed.data.publishedOnBanner,
   });
   if (!row) throw new Error("Add-on not found");
   revalidatePath("/admin/add-ons");
   revalidatePath("/pricing/add-ons");
   revalidatePath("/pricing");
+  revalidatePath("/", "layout");
+  revalidatePath("/dashboard", "layout");
   return row;
 }
 
@@ -228,18 +244,43 @@ export async function assignAddonToUserAction(data: z.infer<typeof assignAddonSc
   if (!parsed.success) throw new Error("Invalid input");
   const admin = await assertAdminDashboardAccess();
 
-  const catalog = await getAddonCatalogByKey(parsed.data.addonKey);
-  if (!catalog || !catalog.active) {
-    throw new Error("This add-on is not available for assignment.");
+  const addonKey = parsed.data.addonKey.trim();
+  let catalog = await getAddonCatalogByKey(addonKey);
+  if (!catalog) {
+    // Case-insensitive recovery (Select / copy-paste quirks).
+    const all = await listAddonCatalog();
+    catalog =
+      all.find((row) => row.key.toLowerCase() === addonKey.toLowerCase()) ??
+      null;
   }
-
-  const planSlug = await resolveEffectivePlanSlugForUser(parsed.data.targetUserId);
-  if (!isPlanEligibleForAddon(catalog.eligiblePlanIds, planSlug)) {
+  // Self-heal known catalog keys if the seed row is missing (common after
+  // partial migrations) so complimentary admin grants are never blocked.
+  if (!catalog && addonKey === LIVE_CLASSROOM_ADDON_KEY) {
+    catalog = await upsertAddonCatalogEntry({
+      key: LIVE_CLASSROOM_ADDON_KEY,
+      name: "Flipvise Live Classroom™",
+      description:
+        "Run real-time interactive learning sessions with warm-up battles, team competitions, exit tickets, strategy cards, and AI session reports.",
+      marketingBlurb:
+        "Turn Flipvise into a live teaching platform for Team and Enterprise organizations.",
+      eligiblePlanIds: [...LIVE_CLASSROOM_ELIGIBLE_PLAN_IDS],
+      stripePriceEnvKey: stripeAddonPriceEnvKeyForAddonKey(LIVE_CLASSROOM_ADDON_KEY),
+      active: true,
+      publishedOnPricing: false,
+    });
+  }
+  if (!catalog && addonKey === AI_ESSAY_ADDON_KEY) {
+    catalog = await getAddonCatalogByKey(AI_ESSAY_ADDON_KEY);
+  }
+  if (!catalog) {
     throw new Error(
-      `User plan (${planSlug ?? "free"}) is not eligible for add-on "${catalog.key}".`,
+      `Add-on "${addonKey}" was not found in the catalog. Refresh the page and try again.`,
     );
   }
 
+  // Platform-admin complimentary grants may assign even when Active is off
+  // (Active mainly gates self-serve purchases / team assigns). Also bypasses
+  // plan eligibility — see listAccessibleAddonKeysForUser.
   await assignAdminAddonEntitlement({
     userId: parsed.data.targetUserId,
     addonKey: catalog.key,
@@ -248,6 +289,8 @@ export async function assignAddonToUserAction(data: z.infer<typeof assignAddonSc
   revalidatePath("/admin/add-ons");
   revalidatePath("/admin/all-users");
   revalidatePath("/pricing/add-ons");
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/live-classroom");
 }
 
 const revokeAddonSchema = z.object({

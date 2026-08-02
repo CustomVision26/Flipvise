@@ -40,6 +40,8 @@ export function EssayUnlockDialog({
   async function handlePurchase() {
     setError(null);
     setPending(true);
+    // Close first so checkout is not covered if this dialog outlives navigation.
+    onOpenChange(false);
     try {
       const result = await createAddonCheckoutSessionAction({
         addonKey: AI_ESSAY_ADDON_KEY,
@@ -50,6 +52,7 @@ export function EssayUnlockDialog({
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start checkout.");
+      onOpenChange(true);
     } finally {
       setPending(false);
     }

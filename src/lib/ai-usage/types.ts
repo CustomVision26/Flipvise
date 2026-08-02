@@ -13,6 +13,7 @@ export const AI_USAGE_FEATURES = [
   "ocr",
   "curriculum_research",
   "image_generation",
+  "live_classroom",
   "other",
 ] as const;
 

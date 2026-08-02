@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, Tag } from "lucide-react";
+import { toast } from "sonner";
 import {
   CheckoutElementsProvider,
   PaymentElement,
@@ -102,6 +103,11 @@ export type PricingCheckoutSummary = {
   stripeAmounts: CheckoutSessionAmountsMajor | null;
   /** Optional note under the period label (e.g. add-on proration alignment). */
   billingNote?: string | null;
+  /**
+   * Post-subscribe destination (personal dashboard). Defaults to
+   * `/dashboard?checkout=success` when omitted.
+   */
+  successHref?: string | null;
 };
 
 function roundMoney(amount: number): number {
@@ -345,6 +351,7 @@ function CheckoutPayBody({
         planLabel={summary.planLabel}
         trialDays={summary.trialDays}
         savedMailingAddress={savedMailingAddress}
+        successHref={summary.successHref ?? null}
       />
     </>
   );
@@ -357,6 +364,7 @@ function CheckoutPaymentFields({
   planLabel,
   trialDays,
   savedMailingAddress,
+  successHref,
 }: {
   customerEmail: string | null;
   checkoutState: ReturnType<typeof useCheckoutElements>;
@@ -364,6 +372,7 @@ function CheckoutPaymentFields({
   planLabel: string;
   trialDays: number | null;
   savedMailingAddress: CheckoutSavedMailingAddress | null;
+  successHref: string | null;
 }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -714,12 +723,26 @@ function CheckoutPaymentFields({
         return;
       }
 
-      // Session already has return_url from creation; fall back if Stripe does not navigate.
+      // Prefer personal dashboard so toast + inbox sync run via StripeCheckoutToast.
       const sessionId = result.session.id;
+      const destination = new URL(
+        successHref?.trim() || "/dashboard?checkout=success",
+        window.location.origin,
+      );
+      destination.searchParams.set("checkout", "success");
+      if (sessionId) {
+        destination.searchParams.set("session_id", sessionId);
+      }
+
+      toast.success(isTrial ? "Trial started" : "Payment received", {
+        description: isTrial
+          ? `Starting your ${planLabel} trial and opening your personal dashboard…`
+          : `Confirming ${planLabel} and opening your personal dashboard…`,
+        duration: 8_000,
+      });
+
       window.location.assign(
-        sessionId
-          ? `/dashboard?checkout=success&session_id=${encodeURIComponent(sessionId)}`
-          : "/dashboard?checkout=success",
+        `${destination.pathname}${destination.search}`,
       );
     } catch (error) {
       setErrorMessage(

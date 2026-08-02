@@ -32,7 +32,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "ai-essay-card",
         title: "Add-ons running banner",
         bullets: [
-          "Chips scroll horizontally; each add-on has a distinct color (e.g. teal for AI Essay, amber for Focus Study Mode).",
+          "Chips scroll in a soft accent ticker in the top bar; each add-on keeps a distinct tint (e.g. teal for AI Essay, amber for Focus Study Mode).",
           "Locked chips open Unlock Feature (monthly/yearly Stripe add-on checkout).",
           "Unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay; hover pauses the marquee.",
           "Access also comes from Team Admin assignment or a platform admin grant.",
@@ -109,7 +109,8 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "surfaces",
         title: "Screens",
         bullets: [
-          "Overview — recent essays, continue draft, generate, recent feedback, assignments summary.",
+          "How it work? (header) — brief workflow dialog with a link to this AI Essay user guide (/docs#ai-essay).",
+          "Overview — recent essays and recent AI feedback with counts, date/time stamps, and Clear all (confirm before delete); also continue draft, generate, and assignments summary.",
           "Generate Essay — subject, grade, type, difficulty, topic, optional learning standard, word count, timer, and include flags.",
           "My Essays / Drafts / Assignments — library of generated activities, open drafts, and Team Admin assignments.",
           "Writing workspace — prompt, instructions, word counter, optional timer, save, submit, AI feedback; model essay stays hidden until revealed.",

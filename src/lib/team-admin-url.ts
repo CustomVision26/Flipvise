@@ -65,6 +65,9 @@ export const TEAM_ADMIN_STUDY_PRIVILEGES_PATH =
 /** Member add-on feature assignments (AI Essay, future add-ons). */
 export const TEAM_ADMIN_ADDONS_PATH = "/dashboard/team-admin/add-ons";
 
+/** Live Classroom™ organization feature (absolute path under dashboard). */
+export const TEAM_ADMIN_LIVE_CLASSROOM_PATH = "/dashboard/live-classroom";
+
 /** True when `pathname` is under Deck Manager. */
 export function isTeamAdminDeckManagerPath(pathname: string): boolean {
   return pathname.startsWith("/dashboard/team-admin/deck-manager");
@@ -329,4 +332,21 @@ export function buildTeamAdminAddonsPath(
 ): string {
   const qs = buildTeamAdminQueryString(teamId, teamMemberId);
   return qs ? `${TEAM_ADMIN_ADDONS_PATH}?${qs}` : TEAM_ADMIN_ADDONS_PATH;
+}
+
+export function isTeamAdminLiveClassroomPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_LIVE_CLASSROOM_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_LIVE_CLASSROOM_PATH}/`)
+  );
+}
+
+/** Live Classroom uses `?team=` only (no teamMemberId bookmark). */
+export function buildTeamAdminLiveClassroomPath(
+  teamId?: number | null,
+): string {
+  if (teamId == null || !Number.isFinite(teamId) || teamId <= 0) {
+    return TEAM_ADMIN_LIVE_CLASSROOM_PATH;
+  }
+  return `${TEAM_ADMIN_LIVE_CLASSROOM_PATH}?team=${teamId}`;
 }

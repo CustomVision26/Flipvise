@@ -23,6 +23,7 @@ import {
 } from "@/lib/plan-change-proration-preview";
 import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import { personalDashboardHrefAfterPlanChangeSuccess } from "@/lib/personal-dashboard-url";
+import { recordPlanChangeCheckoutInboxConfirmation } from "@/lib/record-subscription-checkout-inbox";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { isStripeSetupIntentId } from "@/lib/stripe-checkout-session-id";
 import { asPaidPlanId } from "@/lib/stripe-billing-sync";
@@ -286,10 +287,27 @@ export async function finalizePlanChangePaymentAction(
     { preferAddon: false },
   );
 
+  const planLabel = displayNameForBillingPlanSlug(plan);
+  try {
+    await recordPlanChangeCheckoutInboxConfirmation({
+      userId,
+      setupIntentId,
+      planSlug: plan,
+      planLabel,
+      period,
+      receiptUrl: receipt.receiptUrl,
+    });
+  } catch (error) {
+    console.error(
+      "[finalizePlanChangePaymentAction] subscription inbox:",
+      error,
+    );
+  }
+
   return {
     synced: true,
     planSlug: plan,
-    planLabel: displayNameForBillingPlanSlug(plan),
+    planLabel,
     receiptUrl: receipt.receiptUrl,
     receiptIsProration: true,
   };

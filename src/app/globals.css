@@ -1070,7 +1070,7 @@
 }
 
 .animate-addons-marquee {
-  animation: addons-marquee 28s linear infinite;
+  animation: addons-marquee 36s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

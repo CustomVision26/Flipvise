@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { currentUser } from "@/lib/clerk-auth";
-import { getAccessContext } from "@/lib/access";
+import { accessHasAddon, getAccessContext } from "@/lib/access";
 import { redirectIfAccountRecoveryIncomplete } from "@/lib/account-recovery-gate";
 import {
   formatSessionUserDisplayName,
@@ -49,7 +49,11 @@ import { AddDeckDialogLoader as AddDeckDialog } from "@/components/add-deck-dial
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { DeckGrid } from "./deck-grid";
 import { AiDocumentStudioDashboardEntry } from "@/components/ai-document-studio-dashboard-entry";
-import { hasAnyAiDocumentStudioAddon } from "@/lib/addon-keys";
+import { LiveClassroomDashboardEntry } from "@/components/live-classroom-dashboard-entry";
+import {
+  hasAnyAiDocumentStudioAddon,
+  LIVE_CLASSROOM_ADDON_KEY,
+} from "@/lib/addon-keys";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
 import {
@@ -698,6 +702,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showAiDocumentStudio = hasAnyAiDocumentStudioAddon(
     access.activeAddonKeys,
   );
+  const showLiveClassroom = accessHasAddon(access, LIVE_CLASSROOM_ADDON_KEY);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -708,9 +713,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
-      {showAiDocumentStudio ? (
+      {showAiDocumentStudio || showLiveClassroom ? (
         <div className="flex flex-wrap items-center gap-2">
-          <AiDocumentStudioDashboardEntry />
+          {showAiDocumentStudio ? <AiDocumentStudioDashboardEntry /> : null}
+          {showLiveClassroom ? <LiveClassroomDashboardEntry /> : null}
         </div>
       ) : null}
       <Suspense fallback={null}>

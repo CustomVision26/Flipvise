@@ -88,6 +88,7 @@ async function syncBillingAfterCheckoutWithRetry(input: {
     planLabel: null,
     receiptUrl: null,
     receiptIsProration: false,
+    checkoutKind: "plan",
   };
 
   for (const delayMs of CHECKOUT_SYNC_RETRY_DELAYS_MS) {
@@ -167,6 +168,7 @@ export function StripeCheckoutToast() {
               planLabel: result.planLabel,
               receiptUrl: result.receiptUrl,
               isProration: result.receiptIsProration,
+              kind: "plan_change",
             });
           } else if (shouldFinalize || addonCheckoutFlag === "failed") {
             toast.success("Plan change recorded", {
@@ -229,6 +231,7 @@ export function StripeCheckoutToast() {
             planLabel: result.planLabel,
             receiptUrl: result.receiptUrl,
             isProration: result.receiptIsProration,
+            kind: result.checkoutKind === "addon" ? "addon" : "plan",
           });
         } else {
           toast.warning("Payment received", {

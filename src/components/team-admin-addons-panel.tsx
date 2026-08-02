@@ -112,8 +112,9 @@ export function TeamAdminAddonsPanel({ teamId, members }: TeamAdminAddonsPanelPr
             })}
           </ul>
           <p className="mt-4 text-xs text-muted-foreground">
-            Coming soon (same permission model): AI Recall · Battle Mode · Presentation
-            Generator · Math Diagram Generator
+            Organization add-on (purchased by the subscription owner via Pricing): Live
+            Classroom™. Coming soon (same member permission model): AI Recall · Battle
+            Mode · Presentation Generator · Math Diagram Generator
           </p>
         </div>
       </CardContent>

@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { requireEssayAddonAccess } from "@/lib/essay-access";
 import {
+  countEssayDocumentsForUser,
+  countEssayFeedbackForUser,
   listRecentEssayDocumentsForUser,
   listEssayDraftsForUser,
   listRecentEssayFeedbackForUser,
 } from "@/db/queries/essays";
+import { EssayOverviewRecentPanels } from "@/components/essay-overview-recent-panels";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,16 +18,20 @@ import {
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+import { toClientJson } from "@/lib/to-client-json";
 
 export default async function EssayOverviewPage() {
   const access = await requireEssayAddonAccess("page");
   const userId = access.userId;
 
-  const [recent, drafts, feedback] = await Promise.all([
-    listRecentEssayDocumentsForUser(userId, 5),
-    listEssayDraftsForUser(userId),
-    listRecentEssayFeedbackForUser(userId, 5),
-  ]);
+  const [recent, drafts, feedback, essayCount, feedbackCount] =
+    await Promise.all([
+      listRecentEssayDocumentsForUser(userId, 5),
+      listEssayDraftsForUser(userId),
+      listRecentEssayFeedbackForUser(userId, 5),
+      countEssayDocumentsForUser(userId),
+      countEssayFeedbackForUser(userId),
+    ]);
 
   const continueDraft = drafts[0] ?? null;
 
@@ -60,51 +67,29 @@ export default async function EssayOverviewPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Essays</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {recent.length === 0 ? (
-            <p className="text-muted-foreground">No essays yet.</p>
-          ) : (
-            recent.map((doc) => (
-              <Link
-                key={doc.id}
-                href={`/dashboard/ai-doc-studio/ai-essay/${doc.id}`}
-                className="block rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40"
-              >
-                <span className="font-medium">{doc.title}</span>
-                <span className="ml-2 text-muted-foreground">{doc.subject}</span>
-              </Link>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent AI Feedback</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {feedback.length === 0 ? (
-            <p className="text-muted-foreground">No feedback yet.</p>
-          ) : (
-            feedback.map((fb) => (
-              <Link
-                key={fb.id}
-                href={`/dashboard/ai-doc-studio/ai-essay/${fb.documentId}`}
-                className="block rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40"
-              >
-                Score {fb.result.overallScore}/100
-                <span className="ml-2 text-muted-foreground">
-                  {fb.result.strengths[0] ?? "View feedback"}
-                </span>
-              </Link>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <EssayOverviewRecentPanels
+        recentEssays={toClientJson(
+          recent.map((doc) => ({
+            id: doc.id,
+            title: doc.title,
+            subject: doc.subject,
+            updatedAt: doc.updatedAt,
+          })),
+        )}
+        essayCount={essayCount}
+        recentFeedback={toClientJson(
+          feedback.map((fb) => ({
+            id: fb.id,
+            documentId: fb.documentId,
+            createdAt: fb.createdAt,
+            result: {
+              overallScore: fb.result.overallScore,
+              strengths: fb.result.strengths ?? [],
+            },
+          })),
+        )}
+        feedbackCount={feedbackCount}
+      />
     </div>
   );
 }

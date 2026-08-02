@@ -1467,6 +1467,8 @@ export const addonCatalog = pgTable(
     active: boolean().notNull().default(true),
     /** When true (and settings.pricingCatalogVisible), listed on `/pricing/add-ons`. */
     publishedOnPricing: boolean().notNull().default(false),
+    /** When true (and active), shown in the top-header add-ons banner. */
+    publishedOnBanner: boolean().notNull().default(true),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },
@@ -1639,6 +1641,7 @@ export const aiUsageFeatureEnum = pgEnum('ai_usage_feature', [
   'ocr',
   'curriculum_research',
   'image_generation',
+  'live_classroom',
   'other',
 ]);
 
@@ -1815,6 +1818,379 @@ export const aiRecallSessions = pgTable(
   ],
 );
 
+/* ─── Live Classroom™ (organization add-on) ─────────────────────────────── */
+
+export const liveClassroomSessionStatusEnum = pgEnum(
+  'live_classroom_session_status',
+  ['scheduled', 'lobby', 'active', 'paused', 'completed', 'cancelled'],
+);
+
+export const liveClassroomSessionTypeEnum = pgEnum(
+  'live_classroom_session_type',
+  ['warm_up', 'team_battle', 'exit_ticket', 'review_battle'],
+);
+
+export const liveClassroomBattleModeEnum = pgEnum(
+  'live_classroom_battle_mode',
+  ['individual_team', 'collaborative_team', 'survival'],
+);
+
+export const liveClassroomTeamAssignmentEnum = pgEnum(
+  'live_classroom_team_assignment',
+  ['manual', 'random', 'saved_groups'],
+);
+
+export const liveClassroomCaptainModeEnum = pgEnum(
+  'live_classroom_captain_mode',
+  ['rotation', 'random', 'fixed'],
+);
+
+export const liveClassroomStrategyCardKindEnum = pgEnum(
+  'live_classroom_strategy_card_kind',
+  [
+    'double_points',
+    'extra_time',
+    'fifty_fifty',
+    'shield',
+    'ai_hint',
+    'score_boost',
+    'recovery',
+  ],
+);
+
+export const liveClassroomStrategyCardPolicyEnum = pgEnum(
+  'live_classroom_strategy_card_policy',
+  ['unlimited', 'limited', 'disabled'],
+);
+
+export const liveClassroomDifficultyEnum = pgEnum(
+  'live_classroom_difficulty',
+  ['easy', 'medium', 'hard'],
+);
+
+export const liveClassroomOrgRoleEnum = pgEnum('live_classroom_org_role', [
+  'subscription_owner',
+  'team_administrator',
+  'teacher',
+  'student',
+]);
+
+/** Per-team Live Classroom organization settings (defaults + concurrent caps). */
+export const liveClassroomTeamSettings = pgTable(
+  'live_classroom_team_settings',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    enabled: boolean().notNull().default(true),
+    defaultBattleType: liveClassroomSessionTypeEnum().notNull().default('warm_up'),
+    allowMusic: boolean().notNull().default(false),
+    allowStrategyCards: boolean().notNull().default(true),
+    allowAiExplanations: boolean().notNull().default(true),
+    defaultTeamAssignment: liveClassroomTeamAssignmentEnum()
+      .notNull()
+      .default('random'),
+    maxConcurrentSessions: integer().notNull().default(1),
+    strategyCardPolicy: liveClassroomStrategyCardPolicyEnum()
+      .notNull()
+      .default('limited'),
+    strategyCardLimitPerTeam: integer().notNull().default(2),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('live_classroom_team_settings_team_uidx').on(t.teamId)],
+);
+
+/** Teacher permission grants beyond owner / team_admin. */
+export const liveClassroomTeacherGrants = pgTable(
+  'live_classroom_teacher_grants',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    userId: varchar({ length: 255 }).notNull(),
+    grantedByUserId: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_classroom_teacher_grants_team_user_uidx').on(
+      t.teamId,
+      t.userId,
+    ),
+    index('live_classroom_teacher_grants_user_idx').on(t.userId),
+  ],
+);
+
+/** Reusable classroom groups for Saved Groups team assignment. */
+export const liveClassroomSavedGroups = pgTable(
+  'live_classroom_saved_groups',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    name: varchar({ length: 255 }).notNull(),
+    /** Array of { teamName, userIds[] }. */
+    groups: json()
+      .$type<Array<{ teamName: string; userIds: string[] }>>()
+      .notNull()
+      .default([]),
+    createdByUserId: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('live_classroom_saved_groups_team_idx').on(t.teamId)],
+);
+
+export const liveClassroomSessions = pgTable(
+  'live_classroom_sessions',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    hostUserId: varchar({ length: 255 }).notNull(),
+    name: varchar({ length: 255 }).notNull(),
+    status: liveClassroomSessionStatusEnum().notNull().default('lobby'),
+    sessionType: liveClassroomSessionTypeEnum().notNull().default('warm_up'),
+    battleMode: liveClassroomBattleModeEnum()
+      .notNull()
+      .default('individual_team'),
+    deckId: integer().references(() => decks.id, { onDelete: 'set null' }),
+    savedGroupId: integer(),
+    config: json()
+      .$type<import('@/lib/live-classroom-types').LiveClassroomSessionConfig>()
+      .notNull(),
+    currentQuestionIndex: integer().notNull().default(0),
+    questionStartedAt: timestamp(),
+    musicMuted: boolean().notNull().default(false),
+    teamsLocked: boolean().notNull().default(false),
+    scheduledFor: timestamp(),
+    startedAt: timestamp(),
+    endedAt: timestamp(),
+    joinCode: varchar({ length: 16 }).notNull(),
+    /** Future-ready: voice, polls, screen share flags without migrations. */
+    extensions: json().$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('live_classroom_sessions_team_status_idx').on(t.teamId, t.status),
+    index('live_classroom_sessions_host_idx').on(t.hostUserId),
+    uniqueIndex('live_classroom_sessions_join_code_uidx').on(t.joinCode),
+  ],
+);
+
+export const liveClassroomTeams = pgTable(
+  'live_classroom_teams',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    name: varchar({ length: 128 }).notNull(),
+    colorKey: varchar({ length: 32 }).notNull().default('blue'),
+    score: integer().notNull().default(0),
+    hearts: integer().notNull().default(3),
+    eliminated: boolean().notNull().default(false),
+    captainUserId: varchar({ length: 255 }),
+    sortOrder: integer().notNull().default(0),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('live_classroom_teams_session_idx').on(t.sessionId)],
+);
+
+export const liveClassroomParticipants = pgTable(
+  'live_classroom_participants',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    userId: varchar({ length: 255 }).notNull(),
+    displayName: varchar({ length: 255 }).notNull().default(''),
+    liveTeamId: integer().references(() => liveClassroomTeams.id, {
+      onDelete: 'set null',
+    }),
+    connected: boolean().notNull().default(true),
+    lastSeenAt: timestamp().notNull().defaultNow(),
+    correctCount: integer().notNull().default(0),
+    incorrectCount: integer().notNull().default(0),
+    totalResponseTimeMs: integer().notNull().default(0),
+    answersSubmitted: integer().notNull().default(0),
+    removed: boolean().notNull().default(false),
+    joinedAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_classroom_participants_session_user_uidx').on(
+      t.sessionId,
+      t.userId,
+    ),
+    index('live_classroom_participants_user_idx').on(t.userId),
+  ],
+);
+
+export const liveBattleQuestions = pgTable(
+  'live_battle_questions',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    sortOrder: integer().notNull().default(0),
+    prompt: text().notNull(),
+    choices: json().$type<string[]>().notNull().default([]),
+    correctIndex: integer().notNull().default(0),
+    explanation: text().notNull().default(''),
+    distractorExplanations: json().$type<string[]>().notNull().default([]),
+    topic: varchar({ length: 255 }).notNull().default(''),
+    cardId: integer().references(() => cards.id, { onDelete: 'set null' }),
+    media: json()
+      .$type<{
+        kind: 'none' | 'image' | 'drawing' | 'math_whiteboard' | 'video';
+        url?: string;
+      }>()
+      .notNull()
+      .default({ kind: 'none' }),
+    revealed: boolean().notNull().default(false),
+    aiExplanationShown: boolean().notNull().default(false),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('live_battle_questions_session_idx').on(t.sessionId),
+    uniqueIndex('live_battle_questions_session_order_uidx').on(
+      t.sessionId,
+      t.sortOrder,
+    ),
+  ],
+);
+
+export const liveBattleAnswers = pgTable(
+  'live_battle_answers',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    questionId: integer()
+      .notNull()
+      .references(() => liveBattleQuestions.id, { onDelete: 'cascade' }),
+    userId: varchar({ length: 255 }).notNull(),
+    liveTeamId: integer().references(() => liveClassroomTeams.id, {
+      onDelete: 'set null',
+    }),
+    choiceIndex: integer().notNull(),
+    correct: boolean().notNull().default(false),
+    pointsAwarded: integer().notNull().default(0),
+    speedBonus: integer().notNull().default(0),
+    responseTimeMs: integer().notNull().default(0),
+    submittedAsCaptain: boolean().notNull().default(false),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_battle_answers_question_user_uidx').on(
+      t.questionId,
+      t.userId,
+    ),
+    index('live_battle_answers_session_idx').on(t.sessionId),
+  ],
+);
+
+export const liveBattleStrategyCards = pgTable(
+  'live_battle_strategy_cards',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    liveTeamId: integer()
+      .notNull()
+      .references(() => liveClassroomTeams.id, { onDelete: 'cascade' }),
+    kind: liveClassroomStrategyCardKindEnum().notNull(),
+    usedByUserId: varchar({ length: 255 }),
+    questionId: integer().references(() => liveBattleQuestions.id, {
+      onDelete: 'set null',
+    }),
+    usedAt: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [index('live_battle_strategy_cards_session_idx').on(t.sessionId)],
+);
+
+export const liveBattleReports = pgTable(
+  'live_battle_reports',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    hostUserId: varchar({ length: 255 }).notNull(),
+    sessionName: varchar({ length: 255 }).notNull(),
+    stats: json()
+      .$type<import('@/lib/live-classroom-types').LiveClassroomReportStats>()
+      .notNull(),
+    winnerTeamName: varchar({ length: 128 }),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_battle_reports_session_uidx').on(t.sessionId),
+    index('live_battle_reports_team_idx').on(t.teamId),
+    index('live_battle_reports_host_idx').on(t.hostUserId),
+  ],
+);
+
+export const liveTeacherAnalytics = pgTable(
+  'live_teacher_analytics',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    teacherUserId: varchar({ length: 255 }).notNull(),
+    sessionsHosted: integer().notNull().default(0),
+    totalAttendance: integer().notNull().default(0),
+    averageAccuracyPercent: integer().notNull().default(0),
+    battleWins: integer().notNull().default(0),
+    strategyCardsUsed: integer().notNull().default(0),
+    lastSessionAt: timestamp(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_teacher_analytics_team_teacher_uidx').on(
+      t.teamId,
+      t.teacherUserId,
+    ),
+  ],
+);
+
+export const liveOrganizationAnalytics = pgTable(
+  'live_organization_analytics',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    totalSessions: integer().notNull().default(0),
+    totalAttendance: integer().notNull().default(0),
+    averageAttendance: integer().notNull().default(0),
+    averageAccuracyPercent: integer().notNull().default(0),
+    averageResponseTimeSec: integer().notNull().default(0),
+    mostActiveTeacherUserId: varchar({ length: 255 }),
+    strategyCardsUsed: integer().notNull().default(0),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_organization_analytics_team_uidx').on(t.teamId),
+  ],
+);
+
 /** Row shapes for client `import type` — avoids bundling table refs into client runtime chunks. */
 export type TeamInvitationRow = InferSelectModel<typeof teamInvitations>;
 export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
@@ -1837,3 +2213,27 @@ export type AiUsagePeriodCounterRow = InferSelectModel<typeof aiUsagePeriodCount
 export type AiUsageUserLimitRow = InferSelectModel<typeof aiUsageUserLimits>;
 export type AiUsageTeamLimitRow = InferSelectModel<typeof aiUsageTeamLimits>;
 export type AiUsageAdminAuditLogRow = InferSelectModel<typeof aiUsageAdminAuditLogs>;
+export type LiveClassroomTeamSettingsRow = InferSelectModel<
+  typeof liveClassroomTeamSettings
+>;
+export type LiveClassroomTeacherGrantRow = InferSelectModel<
+  typeof liveClassroomTeacherGrants
+>;
+export type LiveClassroomSavedGroupRow = InferSelectModel<
+  typeof liveClassroomSavedGroups
+>;
+export type LiveClassroomSessionRow = InferSelectModel<typeof liveClassroomSessions>;
+export type LiveClassroomTeamRow = InferSelectModel<typeof liveClassroomTeams>;
+export type LiveClassroomParticipantRow = InferSelectModel<
+  typeof liveClassroomParticipants
+>;
+export type LiveBattleQuestionRow = InferSelectModel<typeof liveBattleQuestions>;
+export type LiveBattleAnswerRow = InferSelectModel<typeof liveBattleAnswers>;
+export type LiveBattleStrategyCardRow = InferSelectModel<
+  typeof liveBattleStrategyCards
+>;
+export type LiveBattleReportRow = InferSelectModel<typeof liveBattleReports>;
+export type LiveTeacherAnalyticsRow = InferSelectModel<typeof liveTeacherAnalytics>;
+export type LiveOrganizationAnalyticsRow = InferSelectModel<
+  typeof liveOrganizationAnalytics
+>;

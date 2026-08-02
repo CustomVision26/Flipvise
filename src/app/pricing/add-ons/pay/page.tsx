@@ -48,7 +48,12 @@ export default async function AddonCheckoutPayPage({
   }
 
   if (session.status === "complete") {
-    redirect("/pricing/add-ons?addon_checkout=success");
+    const params = new URLSearchParams({
+      userid: userId,
+      checkout: "success",
+      session_id: sessionId,
+    });
+    redirect(`/dashboard?${params.toString()}`);
   }
 
   if (!session.client_secret) {
@@ -85,6 +90,10 @@ export default async function AddonCheckoutPayPage({
     }
   }
 
+  const successParams = new URLSearchParams({
+    userid: userId,
+    checkout: "success",
+  });
   const summary: PricingCheckoutSummary = {
     planLabel: catalog?.name ?? "Add-on",
     period,
@@ -96,6 +105,7 @@ export default async function AddonCheckoutPayPage({
     monthlyRateAfterTrial: stripeAmounts?.subtotalMajor ?? null,
     stripeAmounts,
     billingNote,
+    successHref: `/dashboard?${successParams.toString()}`,
   };
 
   return (

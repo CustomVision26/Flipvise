@@ -37,6 +37,7 @@ import {
   getAddonCatalogByKey,
   listActiveUserAddonEntitlements,
 } from "@/db/queries/addons";
+import { syncAddonEntitlementsFromStripeSubscription } from "@/lib/stripe-addon-sync";
 
 export type BillingCancelAddonOption = {
   addonKey: string;
@@ -277,7 +278,8 @@ const emptyCheckoutSyncResult = {
   planLabel: null,
   receiptUrl: null,
   receiptIsProration: false,
-} as const;
+  checkoutKind: "plan" as const,
+};
 
 export async function syncBillingAfterCheckoutAction(
   data: z.infer<typeof syncBillingAfterCheckoutSchema> = {},
@@ -287,6 +289,7 @@ export async function syncBillingAfterCheckoutAction(
   planLabel: string | null;
   receiptUrl: string | null;
   receiptIsProration: boolean;
+  checkoutKind: "plan" | "addon";
 }> {
   const parsed = syncBillingAfterCheckoutSchema.safeParse(data);
   if (!parsed.success) {
@@ -308,6 +311,7 @@ export async function syncBillingAfterCheckoutAction(
 
   let preferAddon = false;
   let addonKey: string | null = null;
+  let addonSynced = false;
 
   if (isStripeCheckoutSessionId(checkoutSessionId)) {
     result = await syncBillingFromCheckoutSession(userId, checkoutSessionId);
@@ -317,12 +321,28 @@ export async function syncBillingAfterCheckoutAction(
       console.error("[syncBillingAfterCheckoutAction] checkout session:", error);
     }
     try {
-      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId, {
+        expand: ["subscription"],
+      });
       preferAddon = session.metadata?.type === "addon";
       addonKey = session.metadata?.addonKey?.trim() || null;
+
+      if (preferAddon) {
+        const subscriptionId =
+          typeof session.subscription === "string"
+            ? session.subscription
+            : session.subscription?.id ?? null;
+        if (subscriptionId) {
+          const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+            expand: ["items.data"],
+          });
+          await syncAddonEntitlementsFromStripeSubscription(sub, userId);
+          addonSynced = true;
+        }
+      }
     } catch (error) {
       console.error(
-        "[syncBillingAfterCheckoutAction] session metadata:",
+        "[syncBillingAfterCheckoutAction] session metadata / addon sync:",
         error,
       );
     }
@@ -351,10 +371,19 @@ export async function syncBillingAfterCheckoutAction(
     console.error("[syncBillingAfterCheckoutAction] receipt resolve:", error);
   }
 
-  const planLabel =
+  let planLabel: string | null =
     result.planSlug != null
       ? displayNameForBillingPlanSlug(result.planSlug)
       : null;
+
+  if (preferAddon && addonKey) {
+    try {
+      const catalog = await getAddonCatalogByKey(addonKey);
+      if (catalog?.name) planLabel = catalog.name;
+    } catch (error) {
+      console.error("[syncBillingAfterCheckoutAction] addon catalog:", error);
+    }
+  }
 
   try {
     await refreshBillingPlanHistoryAction();
@@ -373,10 +402,11 @@ export async function syncBillingAfterCheckoutAction(
   }
 
   return {
-    synced: result.synced,
+    synced: preferAddon ? addonSynced || result.synced || Boolean(planLabel) : result.synced,
     planSlug: result.planSlug,
     planLabel,
     receiptUrl: receipt.receiptUrl,
     receiptIsProration: receipt.isProration,
+    checkoutKind: preferAddon ? "addon" : "plan",
   };
 }

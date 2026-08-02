@@ -2,8 +2,12 @@ import {
   isPlanEligibleForAddon,
   listAddonCatalog,
 } from "@/db/queries/addons";
-import { isAiDocumentStudioAddonKey } from "@/lib/addon-keys";
+import {
+  isAiDocumentStudioAddonKey,
+  LIVE_CLASSROOM_ADDON_KEY,
+} from "@/lib/addon-keys";
 import { AI_DOC_STUDIO_BASE } from "@/lib/ai-document-studio-paths";
+import { LIVE_CLASSROOM_ROOT_PATH } from "@/lib/live-classroom-url";
 import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
 
 export type DashboardAddonBannerItem = {
@@ -19,6 +23,7 @@ export type DashboardAddonBannerItem = {
 function addonFeatureHref(addonKey: string): string | null {
   // Unlocked document-type add-ons open via the AI Document Studio entry button.
   if (isAiDocumentStudioAddonKey(addonKey)) return AI_DOC_STUDIO_BASE;
+  if (addonKey === LIVE_CLASSROOM_ADDON_KEY) return LIVE_CLASSROOM_ROOT_PATH;
   return null;
 }
 
@@ -28,7 +33,7 @@ export async function buildDashboardAddonBannerItems(input: {
 }): Promise<DashboardAddonBannerItem[]> {
   const catalog = await listAddonCatalog();
   return catalog
-    .filter((row) => row.active)
+    .filter((row) => row.active && row.publishedOnBanner !== false)
     .map((row) => {
       const unlocked = input.activeAddonKeys.includes(row.key);
       const eligible = isPlanEligibleForAddon(

@@ -62,7 +62,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional first card front image, and background gradient.",
           "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
-          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
+          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
@@ -88,7 +88,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Premium add-on for generating essay activities, writing drafts, submitting work, and receiving AI feedback.",
         howItWorks: [
           "Unlock via Stripe purchase, Team Admin assignment, or platform admin grant — then open /dashboard/ai-doc-studio/ai-essay.",
-          "Overview shows recent essays, continue draft, generate, recent AI feedback, and assigned essays.",
+          "How it work? next to Unlocked opens a short overview of the Essay Generator workflow and links to the in-depth AI Essay guide in Documentation (/docs#ai-essay).",
+          "Overview shows recent essays and recent AI feedback with total counts and date/time on each row; Clear all removes every essay you own or every feedback record after confirmation.",
+          "Overview also shows continue draft, generate, and assigned essays.",
           "Generate Essay creates a prompt, objectives, optional outline/vocabulary/rubric, and an optional hidden model essay.",
           "Writing workspace includes word count, optional timer, save draft (local cache when offline), submit, and AI feedback.",
           "Assignments lists Team Admin–created essay activities assigned to you.",
@@ -112,7 +114,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
-          "The premium add-ons running banner sits above the workspace header — each add-on uses a distinct color; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
+          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
           "Assigned members see only decks assigned to them.",
           "Team context is stored in a cookie when invited members switch workspaces.",
         ],
@@ -297,6 +299,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "New accounts receive a formal Welcome to Flipvise message with getting-started tips.",
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
           "Team workspace invites use a formal message with the workspace name, role (Team Admin or Member), plan owner, and inviting team admin when available — accept or decline from the inbox.",
+          "After a successful plan subscribe, plan change, or add-on purchase, Inbox receives a formal written confirmation (separate from the on-screen toast).",
           "Accept team invites, review billing receipts, open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",
@@ -645,17 +648,21 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
           "Each card shows the live Stripe price (monthly, and yearly when configured) with a period toggle.",
           "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe.",
+          "After you slide to subscribe, a success toast appears and you return to your personal dashboard; Inbox receives a formal add-on confirmation.",
           "During a plan change, if the catalog is published, locked add-ons may also be offered in a checkout dialog before payment.",
           "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",
           "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay for generation, drafts, submissions, and AI feedback.",
+          "Live Classroom™ is an organization add-on for Team and Enterprise plans — purchased by the subscription owner; participant limits inherit licensed seats.",
         ],
         requirements: [
           "Signed-in account on an eligible paid plan (or a team/admin grant).",
           "Matching STRIPE_ADDON_*_PRICE_ID environment variables for self-serve purchase.",
+          "Live Classroom requires a Team Basic/Gold/Platinum/Enterprise or Education Gold/Enterprise plan.",
         ],
         doNots: [
           "Do not treat add-ons as separate subscription plans — they stack on your current plan.",
           "Do not expect Team Admin to cancel a Stripe-paid add-on — only team-sourced grants can be removed there.",
+          "Do not expect Live Classroom on individual Free/Pro/Pro Plus/Education Plus plans.",
         ],
       },
       {
@@ -697,7 +704,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Slide to confirm → plan-change payment. If you selected an add-on, Stripe redirects through a continue bridge that finalizes the plan change then opens add-on checkout in the same session (two separate receipts).",
           "Promotion code field appears only when a promo window is active on Pricing — never on plan-change checkout when Pricing has no promo UI.",
           "Stripe Embedded Checkout collects card + billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Slide to subscribe enables when card details, Card Name, and billing address are complete.",
-          "Success redirects to /dashboard?checkout=success with a confirmation toast.",
+          "Success redirects to /dashboard?checkout=success with a confirmation toast; Inbox also receives a formal subscription or plan-change confirmation.",
         ],
         requirements: ["Signed-in account.", "Valid paid plan slug in the URL."],
         doNots: [
@@ -961,6 +968,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
           "Add-ons → Member add-ons assigns optional premium features (AI Essay) to members without a separate admin product.",
+          "Live Classroom™ opens from Team Admin → Live Classroom when the organization owns the Live Classroom add-on.",
         ],
         requirements: [
           "Team owner or invited team_admin role.",
@@ -976,17 +984,46 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Member Add-ons",
         route: "/dashboard/team-admin/add-ons",
         purpose:
-          "Assign or remove optional premium add-ons such as AI Essay for workspace members.",
+          "Assign or remove optional premium add-ons such as AI Essay for workspace members, and learn about organization add-ons such as Live Classroom™.",
         howItWorks: [
           "Open Add-ons → Member add-ons for the selected workspace.",
           "Check AI Essay beside a member to grant access; uncheck to revoke a team-sourced grant.",
           "Members who purchased the add-on or received a platform admin grant show a locked source badge — Team Admin cannot remove those entitlements.",
+          "Live Classroom™ is an organization add-on purchased by the subscription owner — participant limits inherit licensed seats.",
           "Future add-ons use the same checklist UI without a new admin system.",
         ],
         requirements: ["Team owner or team_admin.", "Add-on must be active in the catalog."],
         doNots: [
           "Do not expect Team Admin grants to cancel Stripe billing for a purchased add-on.",
           "Do not create a separate Education Admin — Team Admin is the only team feature-assignment surface.",
+          "Do not buy separate Live Classroom participant packages — seats always match the organization plan.",
+        ],
+      },
+      {
+        id: "live-classroom",
+        title: "Live Classroom™",
+        route: "/dashboard/live-classroom",
+        purpose:
+          "Run real-time interactive sessions with warm-up battles, team competitions, exit tickets, strategy cards, projector mode, and AI session reports.",
+        howItWorks: [
+          "Visible when the organization owns the Live Classroom™ add-on (subscription owner purchase or platform admin grant).",
+          "Sidebar: Dashboard, Start Session, Scheduled Sessions, Battle History, Reports, Settings.",
+          "Start Session configures name, deck or AI warm-up, battle type/mode, timing, strategy cards, and team assignment.",
+          "Students join the lobby; the host assigns teams (manual, random, or saved groups), then starts the battle.",
+          "Teacher host controls pause, resume, add time, skip, reveal answer, mute music, and end session.",
+          "Projector mode shows question, timer, leaderboard, and lives without private student details.",
+          "After the session, Flipvise generates an AI teacher summary, team/individual stats, and recommendations.",
+          "Participant capacity always equals the organization's licensed seat count.",
+        ],
+        requirements: [
+          "Eligible workspace plan: Pro Plus Team Basic/Gold/Platinum/Enterprise or Education Gold/Enterprise.",
+          "Active Live Classroom™ organization add-on on the subscription owner.",
+          "Teacher permission (owner, team admin, or granted teacher) to host; members can join as students.",
+        ],
+        doNots: [
+          "Not available on Free, Pro, Pro Plus Individual, or Education Plus Individual.",
+          "Do not exceed licensed seats or the organization's concurrent session limit.",
+          "Do not expect Live Classroom without the organization add-on entitlement.",
         ],
       },
       {

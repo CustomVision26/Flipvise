@@ -53,6 +53,8 @@ import {
   createEssayAssignment,
   createEssayDocument,
   createEssayFeedback,
+  deleteAllEssayDocumentsForOwner,
+  deleteAllEssayFeedbackForUser,
   deleteEssayDocumentForOwner,
   getEssayDocumentByIdForUser,
   getEssayDraftForUser,
@@ -680,6 +682,28 @@ export async function deleteEssayDocumentAction(
   revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
   revalidatePath("/dashboard/ai-doc-studio/ai-essay/assignments");
   return { ok: true as const };
+}
+
+export async function clearAllEssayDocumentsAction() {
+  const access = await requireEssayAddonAccess("action");
+  const deleted = await deleteAllEssayDocumentsForOwner(access.userId);
+
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/assignments");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/citation-formatting");
+  return { ok: true as const, deleted };
+}
+
+export async function clearAllEssayFeedbackAction() {
+  const access = await requireEssayAddonAccess("action");
+  const deleted = await deleteAllEssayFeedbackForUser(access.userId);
+
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/my-essays");
+  revalidatePath("/dashboard/ai-doc-studio/ai-essay/drafts");
+  return { ok: true as const, deleted };
 }
 
 function mapSplitPartsToSectionsContent(

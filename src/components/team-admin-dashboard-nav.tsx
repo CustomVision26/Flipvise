@@ -10,9 +10,11 @@ import {
   TEAM_ADMIN_DASHBOARD_NAV,
 } from "@/lib/team-admin-dashboard-nav";
 import {
+  buildTeamAdminLiveClassroomPath,
   buildTeamAdminMembersPath,
   buildTeamAdminNavHref,
   buildTeamAdminQueryString,
+  TEAM_ADMIN_LIVE_CLASSROOM_PATH,
 } from "@/lib/team-admin-url";
 import { cn } from "@/lib/utils";
 
@@ -87,10 +89,14 @@ export function TeamAdminDashboardNav({
             {section.items.map((item) => {
               const active = item.isActive(pathname);
               const Icon = item.icon;
+              const href =
+                item.path === TEAM_ADMIN_LIVE_CLASSROOM_PATH
+                  ? buildTeamAdminLiveClassroomPath(teamId)
+                  : buildTeamAdminNavHref(item.path, teamId, teamMemberId);
               return (
                 <li key={`${section.title}-${item.title}`}>
                   <Link
-                    href={buildTeamAdminNavHref(item.path, teamId, teamMemberId)}
+                    href={href}
                     className={navLinkClass(active)}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}

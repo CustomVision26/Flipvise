@@ -40,6 +40,7 @@ import type { DeletedUserSnapshot } from "@/lib/account-deletion-proration-ledge
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { deleteAiUsageDataForUser } from "@/db/queries/ai-usage";
 import { deleteEssayDataForUser } from "@/db/queries/essays";
+import { deleteLiveClassroomDataForUser } from "@/db/queries/live-classroom-deletion";
 import { eq, inArray, or } from "drizzle-orm";
 
 function collectUrl(url: string | null | undefined, bucket: Set<string>) {
@@ -193,6 +194,7 @@ export async function purgeAllUserData(
   await db.delete(savedLessonPlans).where(eq(savedLessonPlans.userId, userId));
   await deleteEssayDataForUser(userId);
   await deleteAiUsageDataForUser(userId);
+  await deleteLiveClassroomDataForUser(userId);
   await db.delete(userAddonEntitlements).where(eq(userAddonEntitlements.userId, userId));
 
   await db.delete(supportTickets).where(eq(supportTickets.userId, userId));

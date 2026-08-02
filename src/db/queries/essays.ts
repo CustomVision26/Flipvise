@@ -116,6 +116,14 @@ export async function listRecentEssayDocumentsForUser(
     .limit(limit);
 }
 
+export async function countEssayDocumentsForUser(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(essayDocuments)
+    .where(eq(essayDocuments.userId, userId));
+  return row?.count ?? 0;
+}
+
 export async function upsertEssayDraft(input: {
   documentId: number;
   userId: string;
@@ -440,6 +448,53 @@ export async function listRecentEssayFeedbackForUser(
     .where(eq(essayFeedback.userId, userId))
     .orderBy(desc(essayFeedback.createdAt))
     .limit(limit);
+}
+
+export async function countEssayFeedbackForUser(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(essayFeedback)
+    .where(eq(essayFeedback.userId, userId));
+  return row?.count ?? 0;
+}
+
+/** Delete every AI feedback row owned by this user (essays/drafts kept). */
+export async function deleteAllEssayFeedbackForUser(
+  userId: string,
+): Promise<number> {
+  const deleted = await db
+    .delete(essayFeedback)
+    .where(eq(essayFeedback.userId, userId))
+    .returning({ id: essayFeedback.id });
+  return deleted.length;
+}
+
+/**
+ * Permanently delete every essay document owned by this user, plus related
+ * drafts, feedback, and assignments for those documents.
+ */
+export async function deleteAllEssayDocumentsForOwner(
+  userId: string,
+): Promise<number> {
+  const docs = await db
+    .select({ id: essayDocuments.id })
+    .from(essayDocuments)
+    .where(eq(essayDocuments.userId, userId));
+  if (docs.length === 0) return 0;
+
+  const docIds = docs.map((d) => d.id);
+  await db
+    .delete(essayFeedback)
+    .where(inArray(essayFeedback.documentId, docIds));
+  await db
+    .delete(essayAssignments)
+    .where(inArray(essayAssignments.documentId, docIds));
+  await db.delete(essayDrafts).where(inArray(essayDrafts.documentId, docIds));
+  const deleted = await db
+    .delete(essayDocuments)
+    .where(eq(essayDocuments.userId, userId))
+    .returning({ id: essayDocuments.id });
+  return deleted.length;
 }
 
 export async function getLatestEssayFeedbackForDraft(

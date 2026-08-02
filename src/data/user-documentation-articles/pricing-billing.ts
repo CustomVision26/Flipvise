@@ -68,14 +68,16 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Checkout opens an add-on subscription (separate from your base plan subscription).",
           "Plan-change checkout can offer locked published add-ons in a dialog before payment.",
           "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay after purchase or grant.",
+          "Live Classroom™ is an organization add-on for Team/Enterprise plans — purchased by the subscription owner; participant limits inherit licensed seats.",
         ],
       },
       {
         id: "other-grants",
         title: "Other ways to unlock",
         bullets: [
-          "Team Admin → Add-ons can assign catalog keys to members.",
+          "Team Admin → Add-ons can assign member add-ons (for example AI Essay) to members.",
           "Platform admins can grant complimentary access at /admin/add-ons.",
+          "Live Classroom™ organization ownership is granted to the subscription owner (Stripe or platform admin).",
         ],
       },
     ],
@@ -122,7 +124,8 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Plan change + published Add-on Catalog: dialog lists locked add-ons only; skip or select one, review plan + add-on breakdown, then continue.",
           "Selected add-on: after plan-change payment, a continue bridge finalizes the plan then opens add-on checkout in the same session (two receipts).",
           "Promotion code field only when Pricing has an active promo window; hidden on plan change when Pricing shows no promo UI.",
-          "Success → /dashboard?checkout=success with confirmation toast.",
+          "Success → personal dashboard with confirmation toast; Inbox receives a formal plan or plan-change confirmation.",
+          "Add-on checkout (catalog or Unlock Feature) also returns to the personal dashboard with an add-on toast and a formal Inbox confirmation.",
         ],
       },
       {

@@ -1,0 +1,96 @@
+import type { LiveClassroomBattleMode } from "@/lib/live-classroom-types";
+
+export type ScoreAnswerInput = {
+  battleMode: LiveClassroomBattleMode;
+  correct: boolean;
+  /** Elapsed ms from question start to answer. */
+  responseTimeMs: number;
+  timeLimitSec: number;
+  /** Active strategy multipliers already resolved for this answer. */
+  doublePoints?: boolean;
+  scoreBoostBonus?: number;
+  shielded?: boolean;
+};
+
+export type ScoreAnswerResult = {
+  points: number;
+  speedBonus: number;
+  participation: number;
+  eliminated: boolean;
+};
+
+const BASE_CORRECT = 100;
+const COLLAB_CORRECT = 500;
+const PARTICIPATION = 10;
+const MAX_SPEED_BONUS = 50;
+
+/**
+ * Pure scoring — used by server actions and unit tests.
+ * Individual: 100 + speed bonus + participation per correct answer.
+ * Collaborative captain submit: 500 flat when correct.
+ * Survival: scoring still awards points; hearts handled separately.
+ */
+export function scoreLiveClassroomAnswer(
+  input: ScoreAnswerInput,
+): ScoreAnswerResult {
+  const participation = PARTICIPATION;
+  if (!input.correct) {
+    return {
+      points: input.shielded ? participation : 0,
+      speedBonus: 0,
+      participation: input.shielded ? participation : 0,
+      eliminated: input.battleMode === "survival" && !input.shielded,
+    };
+  }
+
+  if (input.battleMode === "collaborative_team") {
+    let points = COLLAB_CORRECT;
+    if (input.doublePoints) points *= 2;
+    points += input.scoreBoostBonus ?? 0;
+    return {
+      points,
+      speedBonus: 0,
+      participation,
+      eliminated: false,
+    };
+  }
+
+  const limitMs = Math.max(1, input.timeLimitSec * 1000);
+  const ratio = Math.max(0, Math.min(1, 1 - input.responseTimeMs / limitMs));
+  const speedBonus = Math.round(MAX_SPEED_BONUS * ratio);
+  let points = BASE_CORRECT + speedBonus + participation;
+  if (input.doublePoints) points *= 2;
+  points += input.scoreBoostBonus ?? 0;
+
+  return {
+    points,
+    speedBonus,
+    participation,
+    eliminated: false,
+  };
+}
+
+/** Evenly distribute participant ids across team slots (random assignment). */
+export function distributeParticipantsRandomly(
+  participantUserIds: string[],
+  teamCount: number,
+): string[][] {
+  const count = Math.max(1, Math.min(4, teamCount));
+  const shuffled = [...participantUserIds];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  const buckets: string[][] = Array.from({ length: count }, () => []);
+  shuffled.forEach((id, index) => {
+    buckets[index % count]!.push(id);
+  });
+  return buckets;
+}
+
+export function canStartWithParticipantCount(
+  connectedCount: number,
+  licensedSeats: number,
+): boolean {
+  return connectedCount >= 1 && connectedCount <= licensedSeats;
+}

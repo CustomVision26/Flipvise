@@ -41,8 +41,17 @@ async function main() {
         'ocr',
         'curriculum_research',
         'image_generation',
+        'live_classroom',
         'other'
       );
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$
+  `;
+
+  await sql`
+    DO $$ BEGIN
+      ALTER TYPE "ai_usage_feature" ADD VALUE IF NOT EXISTS 'live_classroom';
     EXCEPTION
       WHEN duplicate_object THEN NULL;
     END $$

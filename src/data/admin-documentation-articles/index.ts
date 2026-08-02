@@ -549,10 +549,11 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "controls",
         title: "Catalog controls",
         bullets: [
+          "Header summary shows registered, active, and Pricing-listed counts.",
           "Master toggle shows or hides /pricing/add-ons for everyone.",
-          "Per-add-on Active and On pricing switches control purchase and listing.",
-          "Assign or revoke complimentary grants by searching registered users by name (source: admin).",
-          "AI Essay usage panel shows active entitlements, activity users, event counts, and tracked tokens.",
+          "Per-add-on Active controls purchase/team assign; Published shows or hides the add-on in the top header banner; On pricing lists it on /pricing/add-ons.",
+          "Complimentary assignment searches by name or email, shows a selection summary, then assign or revoke.",
+          "AI Essay usage section uses metric cards plus an event breakdown list.",
         ],
       },
       {

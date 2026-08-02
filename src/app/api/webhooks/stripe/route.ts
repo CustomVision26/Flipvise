@@ -169,6 +169,15 @@ export async function POST(req: NextRequest) {
                 error,
               );
             }
+            try {
+              await recordSubscriptionCheckoutInboxForSession(userId, session.id);
+            } catch (error) {
+              console.error(
+                "[stripe webhook] addon subscription inbox",
+                session.id,
+                error,
+              );
+            }
           }
           break;
         }

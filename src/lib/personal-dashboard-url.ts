@@ -75,3 +75,22 @@ export function personalDashboardHrefAfterPlanChangeSuccess(input: {
   if (slug) params.set("plan", slug);
   return `/dashboard?${params.toString()}`;
 }
+
+/**
+ * Stripe Checkout `return_url` after add-on subscribe — personal dashboard with
+ * `checkout=success` toast/sync. Keeps `session_id={CHECKOUT_SESSION_ID}` literal
+ * for Stripe to substitute.
+ */
+export function personalDashboardHrefAfterAddonCheckoutSuccess(input: {
+  userId: string;
+  /** Current base plan slug (not the add-on key). */
+  currentPlanSlug?: string | null;
+}): string {
+  const params = new URLSearchParams({
+    userid: input.userId,
+    checkout: "success",
+  });
+  const slug = input.currentPlanSlug?.trim();
+  if (slug) params.set("plan", slug);
+  return `/dashboard?${params.toString()}&session_id={CHECKOUT_SESSION_ID}`;
+}

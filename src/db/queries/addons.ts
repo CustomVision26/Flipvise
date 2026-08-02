@@ -7,7 +7,10 @@ import {
   type AddonCatalogSettingsRow,
   type UserAddonEntitlementRow,
 } from "@/db/schema";
+import { isPlanEligibleForAddon } from "@/lib/addon-plan-eligibility";
 import { and, desc, eq, inArray } from "drizzle-orm";
+
+export { isPlanEligibleForAddon };
 
 const SETTINGS_ID = 1;
 
@@ -88,11 +91,15 @@ export async function updateAddonCatalogFlags(input: {
   key: string;
   active?: boolean;
   publishedOnPricing?: boolean;
+  publishedOnBanner?: boolean;
 }): Promise<AddonCatalogRow | null> {
   const patch: Partial<AddonCatalogRow> = { updatedAt: new Date() };
   if (typeof input.active === "boolean") patch.active = input.active;
   if (typeof input.publishedOnPricing === "boolean") {
     patch.publishedOnPricing = input.publishedOnPricing;
+  }
+  if (typeof input.publishedOnBanner === "boolean") {
+    patch.publishedOnBanner = input.publishedOnBanner;
   }
   const [row] = await db
     .update(addonCatalog)
@@ -111,6 +118,7 @@ export async function upsertAddonCatalogEntry(input: {
   stripePriceEnvKey?: string;
   active?: boolean;
   publishedOnPricing?: boolean;
+  publishedOnBanner?: boolean;
 }): Promise<AddonCatalogRow> {
   const now = new Date();
   const [row] = await db
@@ -124,6 +132,7 @@ export async function upsertAddonCatalogEntry(input: {
       stripePriceEnvKey: input.stripePriceEnvKey ?? "",
       active: input.active ?? true,
       publishedOnPricing: input.publishedOnPricing ?? false,
+      publishedOnBanner: input.publishedOnBanner ?? true,
       createdAt: now,
       updatedAt: now,
     })
@@ -137,6 +146,9 @@ export async function upsertAddonCatalogEntry(input: {
         stripePriceEnvKey: input.stripePriceEnvKey ?? "",
         active: input.active ?? true,
         publishedOnPricing: input.publishedOnPricing ?? false,
+        ...(typeof input.publishedOnBanner === "boolean"
+          ? { publishedOnBanner: input.publishedOnBanner }
+          : {}),
         updatedAt: now,
       },
     })
@@ -470,10 +482,3 @@ export async function cancelStripeAddonEntitlementBySubscription(
     .returning();
 }
 
-export function isPlanEligibleForAddon(
-  eligiblePlanIds: string[],
-  effectivePlanSlug: string | null | undefined,
-): boolean {
-  if (!effectivePlanSlug) return false;
-  return eligiblePlanIds.includes(effectivePlanSlug);
-}

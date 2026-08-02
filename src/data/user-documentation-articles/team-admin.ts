@@ -69,7 +69,8 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Check AI Essay beside a member to grant the add-on (source: team).",
           "Uncheck to revoke only team-sourced grants.",
           "Stripe-purchased or platform-admin grants show a source badge and cannot be removed here.",
-          "Future add-ons (AI Recall, Battle Mode, etc.) reuse the same checklist architecture.",
+          "Live Classroom™ is an organization add-on purchased by the subscription owner — it is not assigned per-member like AI Essay.",
+          "Future member add-ons reuse the same checklist architecture.",
         ],
       },
     ],
@@ -327,6 +328,54 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Notes",
         paragraphs: [
           "History cannot be edited or deleted by users. Empty until the first administrative change.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "live-classroom",
+    "Live Classroom™ — In-Depth Guide",
+    "Flipvise Live Classroom™ turns eligible Team and Enterprise organizations into a live teaching platform with battles, strategy cards, projector mode, and AI reports.",
+    [
+      {
+        id: "eligibility",
+        title: "Who can use it",
+        table: {
+          headers: ["Plan", "Live Classroom"],
+          rows: [
+            ["Pro Plus Team Basic / Gold / Platinum / Enterprise", "Eligible organization add-on"],
+            ["Education Gold / Education Enterprise", "Eligible organization add-on"],
+            ["Free / Pro / Pro Plus / Education Plus", "Not available"],
+          ],
+        },
+      },
+      {
+        id: "seats",
+        title: "Licensing",
+        paragraphs: [
+          "Live Classroom is an organization add-on purchased by the subscription owner. There are no separate participant packages — maximum participants always equal the organization's licensed seats (for example Team Basic = 5).",
+        ],
+      },
+      {
+        id: "workflow",
+        title: "Typical session flow",
+        bullets: [
+          "Open /dashboard/live-classroom?team=<id> (also linked from Team Admin → Live Classroom).",
+          "Start Session: choose deck or AI warm-up, battle type/mode, timing, and team assignment.",
+          "Students join the lobby; host assigns or randomizes teams, then starts.",
+          "Host dashboard: pause, resume, add time, skip, reveal, mute music, end session.",
+          "Projector mode hides private student names while showing question, timer, and leaderboard.",
+          "End of session generates AI summary, recommendations, and report exports actions.",
+        ],
+      },
+      {
+        id: "roles",
+        title: "Permissions",
+        bullets: [
+          "Subscription owner: purchase/cancel, org settings, teacher grants, reports.",
+          "Team administrator: create sessions, configure battles, view reports.",
+          "Teacher (granted): host sessions, assign teams, monitor battles.",
+          "Student (member): join, answer, view own results.",
         ],
       },
     ],

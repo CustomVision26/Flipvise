@@ -41,7 +41,10 @@ import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
 import { supportNotificationsToInboxItems } from "@/lib/support-ticket-inbox";
-import { subscriptionCheckoutConfirmationDescription } from "@/lib/record-subscription-checkout-inbox";
+import {
+  subscriptionCheckoutConfirmationDescription,
+  subscriptionCheckoutConfirmationTitle,
+} from "@/lib/record-subscription-checkout-inbox";
 import { normalizeBroadcastMessageForDisplay } from "@/lib/affiliate-broadcast-messaging";
 
 // UI
@@ -269,8 +272,16 @@ export default async function DashboardInboxPage() {
     items.push({
       type: "subscription_confirmed",
       key,
-      title: `Subscription confirmed — ${row.planLabel}`,
+      title: subscriptionCheckoutConfirmationTitle({
+        planLabel: row.planLabel,
+        planSlug: row.planSlug,
+        checkoutSessionId: row.checkoutSessionId,
+        promoDisplay: row.promoDisplay ?? null,
+      }),
       description: subscriptionCheckoutConfirmationDescription({
+        planLabel: row.planLabel,
+        planSlug: row.planSlug,
+        checkoutSessionId: row.checkoutSessionId,
         period: row.period,
         amountCents: row.amountCents ?? null,
         currency: row.currency ?? null,

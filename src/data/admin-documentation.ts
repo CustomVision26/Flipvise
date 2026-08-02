@@ -263,10 +263,11 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Enable optional premium add-ons, publish them on /pricing/add-ons, grant or revoke complimentary access, and monitor AI Essay usage.",
         howItWorks: [
+          "Page header summarizes registered, active, and Pricing-listed add-ons.",
           "Master toggle shows or hides the public Add-on Catalog page.",
-          "Per-add-on Active and On pricing switches control purchase and listing.",
-          "Assign or revoke complimentary grants by searching registered users by name (source: admin).",
-          "AI Essay usage panel shows active entitlements, users with activity, event counts, and tracked AI tokens.",
+          "Per-add-on Active, Published (header banner), and On pricing switches control purchase, banner chips, and catalog listing.",
+          "Complimentary assignment searches registered users by name or email, shows a selection summary, then assign or revoke.",
+          "AI Essay usage section shows entitlement, activity, and token metric cards plus an event breakdown list.",
           "Team Admins assign the same catalog keys from Team Admin → Add-ons without a separate admin product.",
         ],
         requirements: [

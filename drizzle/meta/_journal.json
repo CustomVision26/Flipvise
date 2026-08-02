@@ -267,6 +267,20 @@
       "when": 1779300000000,
       "tag": "0066_ai_usage_analytics",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1779400000000,
+      "tag": "0068_live_classroom",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0069_addon_published_on_banner",
+      "breakpoints": true
     }
   ]
 }
