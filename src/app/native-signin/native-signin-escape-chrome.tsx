@@ -28,7 +28,7 @@ export function NativeSignInEscapeChrome() {
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="size-11 border-border/50 bg-background/40 touch-manipulation backdrop-blur-md transition-transform active:scale-[0.98]"
+                  className="size-11 border-border/50 bg-background/90 touch-manipulation transition-transform active:scale-[0.98]"
                   aria-label="Try again"
                   onClick={() => {
                     window.location.href = "/api/auth/clear-stale-session";
@@ -46,7 +46,7 @@ export function NativeSignInEscapeChrome() {
       <nav
         id="native-signin-escape"
         aria-label="Return to offline study"
-        className="fixed inset-x-0 bottom-0 z-[200] border-t border-border/40 bg-background/55 p-4 pb-[calc(1rem+var(--flipvise-safe-bottom,16px))] backdrop-blur-md"
+        className="fixed inset-x-0 bottom-0 z-[200] border-t border-border/40 bg-background/95 p-4 pb-[calc(1rem+var(--flipvise-safe-bottom,16px))]"
       >
         <TooltipProvider>
           <Tooltip>

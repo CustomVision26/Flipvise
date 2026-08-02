@@ -200,19 +200,30 @@ export default async function RootLayout({
   const isAccountRecoveryOnboardingRoute = pathnameHeader.startsWith(
     ACCOUNT_RECOVERY_ONBOARDING_PATH,
   );
+  const isNativeSignInRoute = pathnameHeader.startsWith("/native-signin");
   /** Logo-only chrome — hide workspace switcher, plan, account, docs, help, inbox. */
   const isMinimalHeaderRoute =
     isTeamInviteRoute || isAccountRecoveryOnboardingRoute;
+  /**
+   * Capacitor `/native-signin` can still have a server session during session_retry /
+   * sign-out lag. Keep the add-on banner, but never show account chrome beside the
+   * Welcome-back form (plan label, avatar, Personal Dash, inbox, etc.).
+   */
+  const hideAuthenticatedAccountChrome =
+    isMinimalHeaderRoute || isNativeSignInRoute;
   const isTeamAdminRoute = shell.profile === "team-admin";
-  const showHeaderChrome = Boolean(userId) || isTeamInviteRoute;
   const addonBannerItems =
-    userId && !isMinimalHeaderRoute
+    !isMinimalHeaderRoute && (userId || isNativeSignInRoute)
       ? await buildDashboardAddonBannerItems({
-          activeAddonKeys,
-          effectivePlanSlug,
+          activeAddonKeys: userId ? activeAddonKeys : [],
+          effectivePlanSlug: userId ? effectivePlanSlug : null,
         })
       : [];
   const showHeaderAddons = addonBannerItems.length > 0;
+  const showHeaderChrome =
+    Boolean(userId) ||
+    isTeamInviteRoute ||
+    (isNativeSignInRoute && showHeaderAddons);
 
   return (
     <html
@@ -272,7 +283,7 @@ export default async function RootLayout({
                     </div>
                   ) : null}
                   {userId &&
-                  !isMinimalHeaderRoute &&
+                  !hideAuthenticatedAccountChrome &&
                   shell.teamAdminHeaderTeams.length > 0 ? (
                     <div
                       data-header-center
@@ -289,7 +300,7 @@ export default async function RootLayout({
                       />
                     </div>
                   ) : null}
-                  {userId && !isMinimalHeaderRoute && (
+                  {userId && !hideAuthenticatedAccountChrome && (
                     <div
                       data-header-user
                       className="contents lg:col-start-3 lg:flex lg:min-w-0 lg:max-w-full lg:items-center lg:justify-end lg:gap-2"
@@ -327,24 +338,29 @@ export default async function RootLayout({
                     </div>
                   )}
                 </header>
-                {userId && !isMinimalHeaderRoute && !shell.hideHelpCenter ? (
+                {userId &&
+                !hideAuthenticatedAccountChrome &&
+                !shell.hideHelpCenter ? (
                   <HelpCenter
                     showPrioritySupport={hasPrioritySupport}
                     showTrigger={false}
                     isPlatformAdmin={isAdmin}
                   />
                 ) : null}
-                <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
-                  <Image
-                    src={LOGO_PUBLIC_URL}
-                    alt=""
-                    width={800}
-                    height={300}
-                    className="object-contain opacity-[0.08] select-none"
-                    priority={false}
-                    unoptimized
-                  />
-                </div>
+                {/* Skip watermark in Capacitor — large fixed layers + opacity can corrupt Android WebView GPU. */}
+                {!nativeShell.isNativeShell ? (
+                  <div className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center">
+                    <Image
+                      src={LOGO_PUBLIC_URL}
+                      alt=""
+                      width={800}
+                      height={300}
+                      className="object-contain opacity-[0.08] select-none"
+                      priority={false}
+                      unoptimized
+                    />
+                  </div>
+                ) : null}
               </AuthenticatedShellChrome>
             )}
             <div
@@ -352,7 +368,10 @@ export default async function RootLayout({
               data-shell={isTeamAdminRoute ? "team-admin" : undefined}
               suppressHydrationWarning
             >
-              {billingReminder && userId && !isTeamInviteRoute ? (
+              {billingReminder &&
+              userId &&
+              !isTeamInviteRoute &&
+              !isNativeSignInRoute ? (
                 <BillingReminderBanner reminder={billingReminder} />
               ) : null}
               <TooltipProvider>{children}</TooltipProvider>

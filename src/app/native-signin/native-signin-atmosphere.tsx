@@ -1,8 +1,28 @@
 /**
- * Animated backdrop for native sign-in — floating study-card shapes drift
- * around the form so the scene feels alive without overpowering the UI.
+ * Backdrop for native sign-in.
+ * Capacitor Android WebViews (especially emulators) corrupt when many
+ * blur / 3D-transform animations promote GPU layers — use a static scene there.
  */
-export function NativeSignInAtmosphere() {
+export function NativeSignInAtmosphere({
+  isNativeContext = false,
+}: {
+  isNativeContext?: boolean;
+}) {
+  if (isNativeContext) {
+    return (
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-background" />
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/18 via-background to-teal-500/14" />
+        <div className="absolute -left-20 top-[12%] size-[18rem] rounded-full bg-cyan-500/12" />
+        <div className="absolute -right-16 bottom-[18%] size-[16rem] rounded-full bg-teal-500/10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-transparent to-background/50" />
+      </div>
+    );
+  }
+
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       <div className="absolute inset-0 bg-background" />

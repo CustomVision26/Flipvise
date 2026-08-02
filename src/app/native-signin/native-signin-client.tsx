@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
-import { saveAccountRecoveryProfileAction } from "@/actions/account-recovery-profile";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
 import { Eye, EyeOff, Loader2, ShieldAlert, Wifi, WifiOff } from "lucide-react";
-import { AccountRecoveryFields } from "@/components/account-recovery-fields";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -30,11 +28,6 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
-import {
-  emptyAccountRecoveryFieldsValue,
-  parseAccountRecoveryFieldsValue,
-  type AccountRecoveryFieldsValue,
-} from "@/lib/account-recovery-form-helpers";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import { authContinueUrl, safeRedirectPath } from "@/lib/safe-redirect-path";
 import { markClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
@@ -1374,9 +1367,6 @@ function SignUpForm({
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [recovery, setRecovery] = useState<AccountRecoveryFieldsValue>(
-    emptyAccountRecoveryFieldsValue,
-  );
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(notice);
@@ -1412,17 +1402,7 @@ function SignUpForm({
       return false;
     }
 
-    if (isNativeContext) {
-      const parsed = await parseAccountRecoveryFieldsValue(recovery);
-      if (parsed.success) {
-        try {
-          await saveAccountRecoveryProfileAction(parsed.data);
-        } catch {
-          // auth/continue will send the user to account details onboarding
-        }
-      }
-    }
-
+    // Contact / account type / security questions → /onboarding/account-recovery
     void ensureWelcomeInboxMessageAction().catch(() => {});
     await onFinishSignUp();
     return true;
@@ -1440,16 +1420,9 @@ function SignUpForm({
       setError("Please enter your first name, last name, and password.");
       return;
     }
-    if (isNativeContext) {
-      if (password !== passwordConfirmation) {
-        setError("Password confirmation does not match.");
-        return;
-      }
-      const parsed = await parseAccountRecoveryFieldsValue(recovery);
-      if (!parsed.success) {
-        setError(parsed.error);
-        return;
-      }
+    if (isNativeContext && password !== passwordConfirmation) {
+      setError("Password confirmation does not match.");
+      return;
     }
     setBusy(true);
     setError(null);
@@ -1461,18 +1434,6 @@ function SignUpForm({
               firstName: firstName.trim(),
               lastName: lastName.trim(),
               password,
-              unsafeMetadata: {
-                accountType: recovery.accountType,
-                organizationName: recovery.organizationName || undefined,
-                recoveryPhone: recovery.phoneNumber.trim(),
-                mailingAddress: {
-                  streetAddress: recovery.mailingAddress.streetAddress.trim(),
-                  city: recovery.mailingAddress.city.trim(),
-                  stateProvince: recovery.mailingAddress.stateProvince.trim(),
-                  postalCode: recovery.mailingAddress.postalCode.trim(),
-                  country: recovery.mailingAddress.country.trim(),
-                },
-              },
             }
           : {
               emailAddress: email.trim(),
@@ -1559,7 +1520,7 @@ function SignUpForm({
             {step === "code"
               ? `Enter the verification code we sent to ${email}.`
               : isNativeContext
-                ? "Add your name, phone, account type, email, and password. We’ll email a verification code to finish setup."
+                ? "Add your name, email, and password. After verification you’ll complete contact details and security questions."
                 : "Use your email to create an account and open the dashboard."}
           </CardDescription>
         </div>
@@ -1624,12 +1585,6 @@ function SignUpForm({
             </div>
             {isNativeContext ? (
               <>
-                <AccountRecoveryFields
-                  idPrefix="native-signup"
-                  value={recovery}
-                  onChange={setRecovery}
-                  disabled={busy || !clerkReady}
-                />
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="signup-password">Password</Label>
                   <PasswordInput

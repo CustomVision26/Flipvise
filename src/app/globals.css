@@ -1079,6 +1079,26 @@
   }
 }
 
+/*
+ * Android Capacitor WebViews (esp. emulators) often corrupt the compositor when
+ * continuous translateX marquees + blur/3D layers run together. Keep chips, drop motion.
+ */
+html[data-flipvise-native-shell][data-platform="android"] .animate-addons-marquee {
+  animation: none;
+}
+
+html[data-flipvise-native-shell][data-platform="android"] [data-addons-banner="header"] {
+  overflow-x: auto;
+}
+
+html[data-flipvise-native-shell][data-platform="android"] .backdrop-blur-md,
+html[data-flipvise-native-shell][data-platform="android"] .backdrop-blur-sm,
+html[data-flipvise-native-shell][data-platform="android"] .backdrop-blur,
+html[data-flipvise-native-shell][data-platform="android"] [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 /* ========================================
    RETRO VAPORWAVE GRID
    ======================================== */

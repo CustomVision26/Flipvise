@@ -131,6 +131,7 @@ export function DashboardAddonsBanner({
   if (addons.length === 0) return null;
 
   // Duplicate the strip so the CSS marquee can loop seamlessly.
+  // Android native disables the animation via globals.css (GPU corruption).
   const strip = [...addons, ...addons];
 
   async function handlePurchase() {
@@ -203,6 +204,7 @@ export function DashboardAddonsBanner({
       </div>
     ) : variant === "header" ? (
       <div
+        data-addons-banner="header"
         className="relative w-full max-w-full overflow-hidden rounded-md border border-border/60 bg-muted/25"
         role="region"
         aria-label="Premium add-ons"

@@ -3,9 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, useSignUp } from "@clerk/nextjs";
 import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
-import { saveAccountRecoveryProfileAction } from "@/actions/account-recovery-profile";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
-import { AccountRecoveryFields } from "@/components/account-recovery-fields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,11 +20,6 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
-import {
-  emptyAccountRecoveryFieldsValue,
-  parseAccountRecoveryFieldsValue,
-  type AccountRecoveryFieldsValue,
-} from "@/lib/account-recovery-form-helpers";
 import { markClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
 import { authContinueUrl, DEFAULT_AUTH_REDIRECT } from "@/lib/safe-redirect-path";
 
@@ -122,9 +115,6 @@ export function SignUpDialog({
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [recovery, setRecovery] = useState<AccountRecoveryFieldsValue>(
-    emptyAccountRecoveryFieldsValue,
-  );
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,23 +145,8 @@ export function SignUpDialog({
       return false;
     }
 
-    const parsed = await parseAccountRecoveryFieldsValue(recovery);
-    if (!parsed.success) {
-      fail(parsed.error);
-      return false;
-    }
-
-    try {
-      await saveAccountRecoveryProfileAction(parsed.data);
-    } catch {
-      // Session exists — finish via onboarding so recovery details are not skipped.
-      void ensureWelcomeInboxMessageAction().catch(() => {});
-      markClerkAuthHandoff();
-      setOpen(false);
-      window.location.assign(authContinueUrl(redirectPath));
-      return true;
-    }
-
+    // Contact / account type / security questions are collected on
+    // /onboarding/account-recovery after the account exists.
     void ensureWelcomeInboxMessageAction().catch(() => {});
     markClerkAuthHandoff();
     setOpen(false);
@@ -188,12 +163,6 @@ export function SignUpDialog({
       return;
     }
 
-    const parsed = await parseAccountRecoveryFieldsValue(recovery);
-    if (!parsed.success) {
-      setError(parsed.error);
-      return;
-    }
-
     setBusy(true);
     setError(null);
     try {
@@ -202,18 +171,6 @@ export function SignUpDialog({
         password,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        unsafeMetadata: {
-          accountType: parsed.data.accountType,
-          organizationName: parsed.data.organizationName,
-          recoveryPhone: parsed.data.phoneNumber,
-          mailingAddress: {
-            streetAddress: parsed.data.mailingAddress.streetAddress,
-            city: parsed.data.mailingAddress.city,
-            stateProvince: parsed.data.mailingAddress.stateProvince,
-            postalCode: parsed.data.mailingAddress.postalCode,
-            country: parsed.data.mailingAddress.country,
-          },
-        },
       });
       if (createErr) {
         fail("Couldn't start sign-up", createErr);
@@ -272,7 +229,7 @@ export function SignUpDialog({
           <DialogDescription>
             {step === "code"
               ? `Enter the verification code we sent to ${email}.`
-              : "Welcome! Add phone, type/status, 3 security questions, and password confirmation. These are required before your personal dashboard unlocks."}
+              : "Welcome! Enter your name, email, and password. After verification you’ll complete contact details and security questions."}
           </DialogDescription>
         </DialogHeader>
 
@@ -328,14 +285,6 @@ export function SignUpDialog({
                 onChange={(event) => setEmail(event.target.value)}
               />
             </div>
-
-            <AccountRecoveryFields
-              idPrefix="signup"
-              value={recovery}
-              onChange={setRecovery}
-              disabled={busy}
-              nestedInModal
-            />
 
             <PasswordField
               id="signup-password"
