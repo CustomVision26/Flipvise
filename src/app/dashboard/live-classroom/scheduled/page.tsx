@@ -12,6 +12,7 @@ import {
   liveClassroomLobbyPath,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
+import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,10 @@ export default async function LiveClassroomScheduledPage({
 
   if (!ctx.owns) {
     return <LiveClassroomUnlock teamName={ctx.team.name} />;
+  }
+
+  if (!ctx.hasAccess) {
+    return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
 
   const sessions = await listLiveClassroomSessionsForTeam(ctx.teamId, {

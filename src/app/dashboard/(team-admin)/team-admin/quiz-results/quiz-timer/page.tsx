@@ -17,6 +17,7 @@ import {
 import {
   TEAM_ADMIN_QUIZ_TIMER_PATH,
   buildTeamAdminPath,
+  buildTeamAdminQuizFormatsPath,
   buildTeamAdminQuizResultsPath,
   buildTeamAdminQuizSchedulePath,
   buildTeamAdminQuizSecurityPath,
@@ -125,6 +126,10 @@ export default async function TeamAdminQuizTimerPage({ searchParams }: PageProps
 
           <TeamQuizResultsSubTabs
             quizResultsHref={buildTeamAdminQuizResultsPath(
+              selected.id,
+              viewerTeamMemberUrlParam,
+            )}
+            quizFormatsHref={buildTeamAdminQuizFormatsPath(
               selected.id,
               viewerTeamMemberUrlParam,
             )}

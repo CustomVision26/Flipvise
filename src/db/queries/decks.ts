@@ -107,6 +107,7 @@ export function withNullCover<
     | "quizSecurityApplyToMembers"
     | "quizSecurityApplyToTeamAdmins"
     | "quizCardOrderShuffledAt"
+    | "aiRecallSessionCardCount"
   >,
 >(row: T): DeckRow {
   return {
@@ -134,6 +135,11 @@ export function withNullCover<
       "quizCardOrderShuffledAt" in row
         ? ((row as { quizCardOrderShuffledAt?: Date | null }).quizCardOrderShuffledAt ??
           null)
+        : null,
+    aiRecallSessionCardCount:
+      "aiRecallSessionCardCount" in row
+        ? ((row as { aiRecallSessionCardCount?: number | null })
+            .aiRecallSessionCardCount ?? null)
         : null,
   };
 }

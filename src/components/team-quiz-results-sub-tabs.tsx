@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  isTeamAdminQuizFormatsPath,
   isTeamAdminQuizResultsPath,
   isTeamAdminQuizSchedulePath,
   isTeamAdminQuizSecurityPath,
@@ -13,6 +14,7 @@ import { teamAdminSubTabClass } from "@/components/team-admin-panel-styles";
 
 export type TeamQuizResultsSubTabsProps = {
   quizResultsHref: string;
+  quizFormatsHref: string;
   quizTimerHref: string;
   quizScheduleHref: string;
   quizSecurityHref: string;
@@ -20,6 +22,7 @@ export type TeamQuizResultsSubTabsProps = {
 
 export function TeamQuizResultsSubTabs({
   quizResultsHref,
+  quizFormatsHref,
   quizTimerHref,
   quizScheduleHref,
   quizSecurityHref,
@@ -32,8 +35,10 @@ export function TeamQuizResultsSubTabs({
   const onQuizResultsSubRoute =
     isTeamAdminQuizTimerPath(pathname) ||
     isTeamAdminQuizSchedulePath(pathname) ||
-    isTeamAdminQuizSecurityPath(pathname);
+    isTeamAdminQuizSecurityPath(pathname) ||
+    isTeamAdminQuizFormatsPath(pathname);
   const resultsActive = isTeamAdminQuizResultsPath(pathname) && !onQuizResultsSubRoute;
+  const formatsActive = isTeamAdminQuizFormatsPath(pathname);
   const timerActive = isTeamAdminQuizTimerPath(pathname);
   const scheduleActive = isTeamAdminQuizSchedulePath(pathname);
   const securityActive = isTeamAdminQuizSecurityPath(pathname);
@@ -52,6 +57,14 @@ export function TeamQuizResultsSubTabs({
           aria-selected={resultsActive}
         >
           Results
+        </Link>
+        <Link
+          href={quizFormatsHref}
+          className={teamAdminSubTabClass(formatsActive)}
+          role="tab"
+          aria-selected={formatsActive}
+        >
+          Quiz formats
         </Link>
         <Link
           href={quizTimerHref}

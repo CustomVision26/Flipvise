@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   CalendarClock,
+  KeyRound,
   LayoutDashboard,
   Play,
   Settings,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   LIVE_CLASSROOM_HISTORY_PATH,
+  LIVE_CLASSROOM_JOIN_PATH,
   LIVE_CLASSROOM_REPORTS_PATH,
   LIVE_CLASSROOM_ROOT_PATH,
   LIVE_CLASSROOM_SCHEDULED_PATH,
@@ -37,6 +39,14 @@ export const LIVE_CLASSROOM_NAV: LiveClassroomNavItem[] = [
     isActive: (pathname) =>
       pathname === LIVE_CLASSROOM_START_PATH ||
       pathname.startsWith(`${LIVE_CLASSROOM_START_PATH}/`),
+  },
+  {
+    title: "Join with code",
+    path: LIVE_CLASSROOM_JOIN_PATH,
+    icon: KeyRound,
+    isActive: (pathname) =>
+      pathname === LIVE_CLASSROOM_JOIN_PATH ||
+      pathname.startsWith(`${LIVE_CLASSROOM_JOIN_PATH}/`),
   },
   {
     title: "Scheduled Sessions",

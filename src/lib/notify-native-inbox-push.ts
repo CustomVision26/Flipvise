@@ -9,7 +9,9 @@ export type NativeInboxPushCategory =
   | "contact_us"
   | "admin_plan_invite"
   | "quiz_result"
-  | "welcome";
+  | "ai_recall_result"
+  | "welcome"
+  | "live_classroom_lobby";
 
 const CATEGORY_TITLES: Record<NativeInboxPushCategory, string> = {
   team_invite: "Workspace invitation",
@@ -20,7 +22,9 @@ const CATEGORY_TITLES: Record<NativeInboxPushCategory, string> = {
   contact_us: "Contact Us update",
   admin_plan_invite: "Plan assignment request",
   quiz_result: "Quiz result",
+  ai_recall_result: "AI Recall™ result",
   welcome: "Welcome to Flipvise",
+  live_classroom_lobby: "Live Classroom™ invitation",
 };
 
 /** Fire-and-forget native push for a single inbox recipient. */

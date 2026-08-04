@@ -1,10 +1,14 @@
-import { listLiveClassroomTeacherGrants } from "@/db/queries/live-classroom";
+import {
+  listLiveClassroomParticipantGrants,
+  listLiveClassroomTeacherGrants,
+} from "@/db/queries/live-classroom";
 import { listTeamMembers } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { liveClassroomAllowsConcurrentOverride } from "@/lib/live-classroom-eligibility";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import { LIVE_CLASSROOM_SETTINGS_PATH } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
+import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { LiveClassroomSettingsForm } from "@/components/live-classroom-settings-form";
 import {
@@ -27,6 +31,10 @@ export default async function LiveClassroomSettingsPage({
     return <LiveClassroomUnlock teamName={ctx.team.name} />;
   }
 
+  if (!ctx.hasAccess) {
+    return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
+  }
+
   if (!ctx.canManage || !ctx.settings) {
     return (
       <LiveClassroomShell teamId={ctx.teamId}>
@@ -34,8 +42,8 @@ export default async function LiveClassroomSettingsPage({
           <CardHeader>
             <CardTitle>Admin access required</CardTitle>
             <CardDescription>
-              Only the subscription owner or team administrators can change Live
-              Classroom™ settings.
+              Only the subscription owner or assigned team administrators can
+              change Live Classroom™ settings.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -43,15 +51,17 @@ export default async function LiveClassroomSettingsPage({
     );
   }
 
-  const [members, grants] = await Promise.all([
+  const [members, teacherGrants, participantGrants] = await Promise.all([
     listTeamMembers(ctx.teamId),
     listLiveClassroomTeacherGrants(ctx.teamId),
+    listLiveClassroomParticipantGrants(ctx.teamId),
   ]);
 
-  const grantSet = new Set(grants.map((g) => g.userId));
+  const teacherSet = new Set(teacherGrants.map((g) => g.userId));
+  const assignedSet = new Set(participantGrants.map((g) => g.userId));
   const eligibleMembers = members.filter(
     (m) =>
-      m.role === "team_member" &&
+      (m.role === "team_member" || m.role === "team_admin") &&
       m.userId !== ctx.team.ownerUserId,
   );
   const displays = await getClerkUserFieldDisplaysByIds(
@@ -66,7 +76,7 @@ export default async function LiveClassroomSettingsPage({
             Settings
           </h1>
           <p className="text-sm text-muted-foreground">
-            Organization defaults and teacher host grants
+            Organization defaults and Live Classroom™ team assignments
           </p>
         </div>
         <LiveClassroomSettingsForm
@@ -90,7 +100,10 @@ export default async function LiveClassroomSettingsPage({
             userId: m.userId,
             displayName:
               displays[m.userId]?.primaryLine ?? m.userId.slice(0, 12),
-            hasTeacherGrant: grantSet.has(m.userId),
+            workspaceRole:
+              m.role === "team_admin" ? "team_admin" : "team_member",
+            isAssigned: assignedSet.has(m.userId),
+            hasTeacherGrant: teacherSet.has(m.userId),
           }))}
         />
       </div>

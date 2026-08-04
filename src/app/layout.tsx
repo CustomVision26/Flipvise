@@ -13,6 +13,7 @@ import { DashboardAddonsBanner } from "@/components/dashboard-addons-banner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
 import { buildDashboardAddonBannerItems } from "@/lib/dashboard-addon-banner-items";
+import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { loadRootLayoutShellData } from "@/lib/load-root-layout-shell-data";
 import { getManageableStripeSubscription } from "@/db/queries/stripe-subscriptions";
@@ -212,11 +213,21 @@ export default async function RootLayout({
   const hideAuthenticatedAccountChrome =
     isMinimalHeaderRoute || isNativeSignInRoute;
   const isTeamAdminRoute = shell.profile === "team-admin";
+  const aiEssayComingSoonForUser =
+    userId != null
+      ? await isAiEssayComingSoonForTeamMember(userId, {
+          isAdmin,
+          hasClerkPersonalPro,
+          hasClerkPersonalProPlus,
+          activeAddonKeys,
+        })
+      : false;
   const addonBannerItems =
     !isMinimalHeaderRoute && (userId || isNativeSignInRoute)
       ? await buildDashboardAddonBannerItems({
           activeAddonKeys: userId ? activeAddonKeys : [],
           effectivePlanSlug: userId ? effectivePlanSlug : null,
+          aiEssayComingSoonForUser,
         })
       : [];
   const showHeaderAddons = addonBannerItems.length > 0;

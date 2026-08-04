@@ -99,8 +99,8 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "access",
         title: "How access is granted",
         bullets: [
-          "Purchase from the Add-on Catalog or the Unlock Feature dialog (monthly or yearly Stripe prices).",
-          "Team Admin → Add-ons can assign AI Essay to members.",
+          "Purchase from the Add-on Catalog or the Unlock Feature dialog (monthly or yearly Stripe prices) — plan owner / personal paid subscriber only for now.",
+          "Workspace member assignment of AI Essay is coming soon; members see Coming soon instead of unlock.",
           "Platform admins can grant or revoke complimentary access at /admin/add-ons.",
           "Server-side checks use canAccessAddon(access, \"ai_essay\") — never trust the client alone.",
         ],

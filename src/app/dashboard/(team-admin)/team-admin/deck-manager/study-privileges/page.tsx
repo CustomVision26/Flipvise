@@ -13,7 +13,6 @@ import {
   listAssignmentsForTeam,
   listTeamMembers,
 } from "@/db/queries/teams";
-import { Separator } from "@/components/ui/separator";
 import {
   TEAM_ADMIN_STUDY_PRIVILEGES_PATH,
   buildTeamAdminAssignDecksToMembersPath,
@@ -26,7 +25,6 @@ import {
   TeamAdminPanelScroll,
   TeamAdminWorkspaceStatsPanel,
   TeamDeckManagerSubTabs,
-  TeamQuizFormatsSettings,
   TeamStudyPrivilegesTable,
 } from "@/lib/team-admin-dynamic-components";
 import {
@@ -38,10 +36,6 @@ import {
 import { TeamAdminToolPageLayout } from "@/components/team-admin-tool-page-layout";
 import { cn } from "@/lib/utils";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
-import {
-  buildQuizFormatsWorkspaceSnapshots,
-  listQuizFormatsDecksForWorkspace,
-} from "@/db/queries/quiz-formats";
 
 interface PageProps {
   searchParams: Promise<{
@@ -54,7 +48,7 @@ interface PageProps {
 
 export default async function TeamAdminStudyPrivilegesPage({ searchParams }: PageProps) {
   const ctx = await loadTeamAdminPageContext(buildTeamAdminStudyPrivilegesPath, searchParams);
-  const { userId, selected, teamsForSubscriber, viewerTeamMemberUrlParam } = ctx;
+  const { selected, teamsForSubscriber, viewerTeamMemberUrlParam } = ctx;
 
   const [privilegeWorkspaceSnapshots, teamDecksWithCardCounts] = await Promise.all([
     Promise.all(
@@ -77,20 +71,6 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
     getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
   ]);
 
-  const quizFormatWorkspaces = buildQuizFormatsWorkspaceSnapshots(teamsForSubscriber);
-  const decksByWorkspaceId: Record<
-    number,
-    Awaited<ReturnType<typeof listQuizFormatsDecksForWorkspace>>
-  > = {};
-  await Promise.all(
-    teamsForSubscriber.map(async (t) => {
-      decksByWorkspaceId[t.id] = await listQuizFormatsDecksForWorkspace(
-        t.id,
-        t.ownerUserId,
-      );
-    }),
-  );
-
   const memberUserIds = privilegeWorkspaceSnapshots.flatMap((w) =>
     w.teamMembers.map((m) => m.userId),
   );
@@ -98,11 +78,6 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
     ...new Set(memberUserIds),
   ]);
 
-  const defaultQuizWorkspaceId =
-    quizFormatWorkspaces.some((w) => w.id === selected.id)
-      ? selected.id
-      : (quizFormatWorkspaces[0]?.id ?? selected.id);
-  const showQuizFormatSettings = quizFormatWorkspaces.length > 0;
   return (
     <TeamAdminToolPageLayout
       pathname={TEAM_ADMIN_STUDY_PRIVILEGES_PATH}
@@ -138,7 +113,7 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
                 </p>
               </div>
               <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Control study modes per assignment and quiz question formats for your workspaces.
+                Control which study modes members may use for each assigned deck.
               </p>
             </div>
           </div>
@@ -168,23 +143,12 @@ export default async function TeamAdminStudyPrivilegesPage({ searchParams }: Pag
             Member study modes
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Set Standard Review, Quiz, or both per assigned member or team admin. Configure quiz
-            question formats below (workspace defaults and per-deck overrides). Changes apply on the
-            next study session.
+            Set Standard Review, Quiz, or both per assigned member or team admin. Changes apply on
+            the next study session. Configure quiz question formats under Study Modes → Quiz Mode → Quiz
+            formats.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-8">
-          {showQuizFormatSettings ? (
-            <>
-              <TeamQuizFormatsSettings
-                embedded
-                workspaces={toClientJson(quizFormatWorkspaces)}
-                decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
-                defaultWorkspaceId={defaultQuizWorkspaceId}
-              />
-              <Separator />
-            </>
-          ) : null}
+        <CardContent>
           <TeamStudyPrivilegesTable
             workspaces={toClientJson(privilegeWorkspaceSnapshots)}
             defaultWorkspaceId={selected.id}

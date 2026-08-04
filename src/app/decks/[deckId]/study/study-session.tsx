@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -9,6 +9,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ListChecks } from "lucide-react";
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
 import type { DeckQuizFormatAssignments } from "@/lib/quiz-format-assignments";
@@ -57,6 +67,8 @@ export interface StudySessionProps {
   hasAiReading?: boolean;
   /** Pro Plus / education / team tiers — AI Recall™. Not Free or Pro. */
   hasAiRecall?: boolean;
+  /** Workspace AI Recall session card limit (null = all cards). */
+  aiRecallSessionCardLimit?: number | null;
   /** Leave study — team workspace dashboard or deck detail. */
   exitHref: string;
   exitLabel: string;
@@ -142,6 +154,7 @@ export function StudySession({
   quizDurationSeconds,
   hasAiReading = false,
   hasAiRecall = false,
+  aiRecallSessionCardLimit = null,
   exitHref,
   exitLabel,
   ownerInboxAvailable = false,
@@ -180,6 +193,14 @@ export function StudySession({
       showAiRecallTab,
     }),
   );
+  const [aiRecallBusy, setAiRecallBusy] = useState(false);
+  const [pendingLeaveTab, setPendingLeaveTab] = useState<StudyModeTab | null>(
+    null,
+  );
+
+  const handleAiRecallBusyChange = useCallback((busy: boolean) => {
+    setAiRecallBusy(busy);
+  }, []);
 
   useEffect(() => {
     writeStoredStudyMode(tab);
@@ -214,13 +235,50 @@ export function StudySession({
 
   return (
     <TooltipProvider>
+      <AlertDialog
+        open={pendingLeaveTab != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingLeaveTab(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave AI Recall™ session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have an AI Recall™ session in progress. Leaving this Study Mode
+              tab will discard unsaved progress for the current card.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingLeaveTab) setTab(pendingLeaveTab);
+                setPendingLeaveTab(null);
+              }}
+            >
+              Leave session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Tabs
         value={effectiveTab}
         onValueChange={(v) => {
           if (v === "quiz" && !showQuizTab) return;
           if (v === "review" && !showReviewTab) return;
           if (v === "ai_recall" && !showAiRecallTab) return;
-          setTab(v as StudyModeTab);
+          const next = v as StudyModeTab;
+          if (
+            effectiveTab === "ai_recall" &&
+            aiRecallBusy &&
+            next !== "ai_recall"
+          ) {
+            setPendingLeaveTab(next);
+            return;
+          }
+          setTab(next);
         }}
         className="flex flex-1 flex-col gap-5 sm:gap-7"
       >
@@ -306,7 +364,15 @@ export function StudySession({
               teamId={teamId}
               deckGradient={deckGradient ?? null}
               hasAiRecall={hasAiRecall}
-              onSwitchToStandardReview={() => setTab("review")}
+              sessionCardLimit={aiRecallSessionCardLimit}
+              onSessionBusyChange={handleAiRecallBusyChange}
+              onSwitchToStandardReview={() => {
+                if (aiRecallBusy) {
+                  setPendingLeaveTab("review");
+                  return;
+                }
+                setTab("review");
+              }}
             />
           ) : null}
 

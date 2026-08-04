@@ -3,6 +3,7 @@ import {
   listAddonCatalog,
 } from "@/db/queries/addons";
 import {
+  AI_ESSAY_ADDON_KEY,
   isAiDocumentStudioAddonKey,
   LIVE_CLASSROOM_ADDON_KEY,
 } from "@/lib/addon-keys";
@@ -16,6 +17,8 @@ export type DashboardAddonBannerItem = {
   blurb: string;
   unlocked: boolean;
   canPurchase: boolean;
+  /** Workspace members cannot unlock AI Essay yet. */
+  comingSoon?: boolean;
   /** Destination when unlocked; omit to open unlock flow. */
   href?: string | null;
 };
@@ -30,12 +33,18 @@ function addonFeatureHref(addonKey: string): string | null {
 export async function buildDashboardAddonBannerItems(input: {
   activeAddonKeys: string[];
   effectivePlanSlug: string | null;
+  /** When true, AI Essay shows Coming soon instead of Unlock. */
+  aiEssayComingSoonForUser?: boolean;
 }): Promise<DashboardAddonBannerItem[]> {
   const catalog = await listAddonCatalog();
   return catalog
     .filter((row) => row.active && row.publishedOnBanner !== false)
     .map((row) => {
       const unlocked = input.activeAddonKeys.includes(row.key);
+      const essayComingSoon =
+        row.key === AI_ESSAY_ADDON_KEY &&
+        Boolean(input.aiEssayComingSoonForUser) &&
+        !unlocked;
       const eligible = isPlanEligibleForAddon(
         row.eligiblePlanIds,
         input.effectivePlanSlug,
@@ -48,7 +57,9 @@ export async function buildDashboardAddonBannerItems(input: {
         name: row.name,
         blurb: row.marketingBlurb || row.description,
         unlocked,
-        canPurchase: eligible && !unlocked && stripePriceConfigured,
+        comingSoon: essayComingSoon,
+        canPurchase:
+          !essayComingSoon && eligible && !unlocked && stripePriceConfigured,
         href: unlocked ? addonFeatureHref(row.key) : null,
       };
     })

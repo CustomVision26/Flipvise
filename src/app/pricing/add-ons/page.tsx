@@ -12,6 +12,8 @@ import {
   listPublishedActiveAddonsForPricing,
 } from "@/db/queries/addons";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
+import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { isStripeAddonSubscription } from "@/lib/stripe-addon-metadata";
 import { resolveAddonStripePriceLabels } from "@/lib/stripe-addon-price-display";
 import { stripe } from "@/lib/stripe";
@@ -102,13 +104,22 @@ export default async function PricingAddOnsPage() {
 
   const published = await listPublishedActiveAddonsForPricing();
   const cards: PricingAddonCard[] = [];
+  const essayComingSoon =
+    access.userId != null
+      ? await isAiEssayComingSoonForTeamMember(access.userId, access)
+      : false;
 
   for (const row of published) {
     const entitledRow =
       access.userId != null
         ? await getUserAddonEntitlement(access.userId, row.key)
         : null;
-    const entitled = entitledRow?.status === "active";
+    // Team-sourced AI Essay grants do not grant access (owner-only for now).
+    const entitled =
+      entitledRow?.status === "active" &&
+      !(
+        row.key === AI_ESSAY_ADDON_KEY && entitledRow.source === "team"
+      );
     const eligible = isPlanEligibleForAddon(
       row.eligiblePlanIds,
       access.effectivePlanSlug,
@@ -124,6 +135,8 @@ export default async function PricingAddOnsPage() {
             renewalCancelScheduled: false,
             accessUntilLabel: null,
           };
+    const memberEssayComingSoon =
+      row.key === AI_ESSAY_ADDON_KEY && essayComingSoon && !entitled;
 
     cards.push({
       key: row.key,
@@ -134,7 +147,12 @@ export default async function PricingAddOnsPage() {
       entitled,
       entitlementSource: entitled ? entitledRow?.source ?? null : null,
       canPurchase:
-        eligible && !entitled && stripePriceConfigured && row.active,
+        !memberEssayComingSoon &&
+        eligible &&
+        !entitled &&
+        stripePriceConfigured &&
+        row.active,
+      comingSoon: memberEssayComingSoon,
       stripePriceConfigured,
       yearlyPriceConfigured,
       monthlyPriceLabel: priceLabels.monthlyLabel,

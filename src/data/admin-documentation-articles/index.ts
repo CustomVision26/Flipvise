@@ -348,7 +348,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "subscriber-features",
         title: "Subscriber-managed study & quiz settings",
         bullets: [
-          "Team owners and co-admins configure quiz question formats per workspace or deck in Team Admin → Deck Manager → Study privileges.",
+          "Team owners and co-admins configure quiz question formats per workspace or deck in Team Admin → Study Modes → Quiz Mode → Quiz formats.",
           "Study privileges also gate Standard Review, AI Recall™, and Quiz per member per assigned deck (single modes or combinations; default: all three).",
           "Formats: multiple choice (from card content), true/false, and fill-in-the-blank (AI-generated sentences).",
           "After setup, admins can Reshuffle format questions to change which format each card uses in team quizzes.",

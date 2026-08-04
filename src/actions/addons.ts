@@ -28,6 +28,7 @@ import {
 import { getTeamById, getTeamsForTeamDashboard, listTeamMembers } from "@/db/queries/teams";
 import { getAccessContext } from "@/lib/access";
 import { assertAdminDashboardAccess } from "@/lib/admin/assert-admin-access";
+import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { personalDashboardHrefAfterAddonCheckoutSuccess } from "@/lib/personal-dashboard-url";
@@ -111,6 +112,18 @@ export async function createAddonCheckoutSessionAction(
     throw new Error("This add-on is not available.");
   }
 
+  if (catalog.key === AI_ESSAY_ADDON_KEY) {
+    const comingSoon = await isAiEssayComingSoonForTeamMember(
+      access.userId,
+      access,
+    );
+    if (comingSoon) {
+      throw new Error(
+        "AI Essay for workspace members is coming soon. Only the plan owner can unlock it on their personal dashboard right now.",
+      );
+    }
+  }
+
   const planSlug =
     access.effectivePlanSlug ??
     (await resolveEffectivePlanSlugForUser(access.userId));
@@ -119,7 +132,10 @@ export async function createAddonCheckoutSessionAction(
   }
 
   const existing = await getUserAddonEntitlement(access.userId, catalog.key);
-  if (existing?.status === "active") {
+  if (
+    existing?.status === "active" &&
+    !(existing.source === "team" && catalog.key === AI_ESSAY_ADDON_KEY)
+  ) {
     throw new Error("You already have this add-on.");
   }
 
@@ -364,6 +380,12 @@ export async function setTeamMemberAddonAction(
   const catalog = await getAddonCatalogByKey(parsed.data.addonKey);
   if (!catalog || !catalog.active) {
     throw new Error("This add-on is not available for assignment.");
+  }
+
+  if (catalog.key === AI_ESSAY_ADDON_KEY) {
+    throw new Error(
+      "AI Essay cannot be assigned to workspace members yet. It is available only to the plan owner on their personal dashboard. Member access is coming soon.",
+    );
   }
 
   if (parsed.data.enabled) {

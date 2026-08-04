@@ -3,6 +3,10 @@
 import * as React from "react";
 import { ListChecks, Send, Shuffle } from "lucide-react";
 import { QuizFormatPreviewButton } from "@/components/quiz-format-preview-dialog";
+import {
+  QuizPublishFlowDialog,
+  type QuizPublishFlowResult,
+} from "@/components/quiz-publish-flow-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -41,6 +45,7 @@ import {
   explainQuizFormatContentBlock,
   explainQuizFormatReshuffleBlock,
   quizFormatDistributionsEqual,
+  quizFormatDistributionSum,
   validateQuizFormatDistribution,
   type QuizFormatDistribution,
 } from "@/lib/quiz-format-assignments";
@@ -205,6 +210,7 @@ export function TeamQuizFormatsSettings({
   const [generateMessageById, setGenerateMessageById] = React.useState<
     Record<number, string>
   >({});
+  const [publishFlowDeckId, setPublishFlowDeckId] = React.useState<number | null>(null);
   const autoApplyInFlightRef = React.useRef<Set<number>>(new Set());
 
   const decks = React.useMemo(
@@ -584,6 +590,24 @@ export function TeamQuizFormatsSettings({
     }
   }
 
+  function handlePublishFlowResult(deckId: number, result: QuizPublishFlowResult) {
+    setLocalHasAssignmentsById((prev) => ({ ...prev, [deckId]: true }));
+    setLocalAppliedDistributionById((prev) => ({
+      ...prev,
+      [deckId]: { ...result.distribution },
+    }));
+    setDistributionByDeckId((prev) => ({
+      ...prev,
+      [deckId]: { ...result.distribution },
+    }));
+    setReshuffledAtById((prev) => ({ ...prev, [deckId]: result.shuffledAt }));
+    setDeckErrorById((prev) => ({ ...prev, [deckId]: "" }));
+    setReshuffleTooltipOpenById((prev) => ({ ...prev, [deckId]: true }));
+    window.setTimeout(() => {
+      setReshuffleTooltipOpenById((prev) => ({ ...prev, [deckId]: false }));
+    }, 4000);
+  }
+
   async function shuffleCardOrderForDeck(deckId: number) {
     if (!selected) return;
     setCardOrderShufflingDeckId(deckId);
@@ -674,6 +698,10 @@ export function TeamQuizFormatsSettings({
       );
       if (!validation.valid) continue;
 
+      // Only auto-publish full-deck mixes. Subset sizes go through Publish → all/choose.
+      const distributionSum = quizFormatDistributionSum(distribution);
+      if (distributionSum !== deck.eligibleCardCount) continue;
+
       const formatReadyCounts =
         localFormatCountsById[deck.id] ?? fallbackFormatReadyCounts(deck);
       const publishBlockReason = explainQuizFormatReshuffleBlock(
@@ -742,9 +770,8 @@ export function TeamQuizFormatsSettings({
         {embedded ? null : (
           <p className="text-sm text-muted-foreground">
             Choose which question types appear in quizzes for this workspace or individual decks.
-            Save your format choices, set how many questions of each type (must match the deck card
-            total), generate AI sentences when needed, then publish to quiz so members see that exact
-            mix.
+            Save your format choices, set how many questions of each type (up to the deck card total),
+            generate AI sentences when needed, then publish to quiz — all cards or a chosen subset.
           </p>
         )}
       </div>
@@ -1076,8 +1103,11 @@ export function TeamQuizFormatsSettings({
                             </p>
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              Counts must add up to {deck.eligibleCardCount} before generating AI
-                              content or publishing to quiz.
+                              Counts may total up to {deck.eligibleCardCount} cards before generating
+                              AI content or publishing to quiz
+                              {distributionSum < deck.eligibleCardCount
+                                ? ` (${deck.eligibleCardCount - distributionSum} unused).`
+                                : "."}
                             </p>
                           )}
                           {distributionValid && contentBlockReason && showGenerate ? (
@@ -1163,7 +1193,7 @@ export function TeamQuizFormatsSettings({
                                   }
                                   onClick={(event) => {
                                     props.onClick?.(event);
-                                    void reshuffleForDeck(deck.id, distribution);
+                                    setPublishFlowDeckId(deck.id);
                                   }}
                                 >
                                   <Send className="h-3.5 w-3.5" aria-hidden />
@@ -1180,7 +1210,7 @@ export function TeamQuizFormatsSettings({
                                 ? publishBlockReason
                                 : distributionApplied
                                   ? "Update the published quiz mix for members on their next quiz session."
-                                  : "Publish these question counts so members see this exact mix in quiz."}
+                                  : "Publish all cards or choose a specific subset for the quiz."}
                             </TooltipContent>
                           </Tooltip>
                         ) : null}
@@ -1214,6 +1244,13 @@ export function TeamQuizFormatsSettings({
     </>
   );
 
+  const publishFlowDeck =
+    publishFlowDeckId != null ? decks.find((d) => d.id === publishFlowDeckId) : null;
+  const publishFlowFormats =
+    publishFlowDeck && selected
+      ? (deckOverrideById[publishFlowDeck.id] ??
+        formatsFromDeck(publishFlowDeck, selected))
+      : null;
   return (
     <TooltipProvider>
       {embedded ? (
@@ -1223,6 +1260,22 @@ export function TeamQuizFormatsSettings({
           {body}
         </section>
       )}
+
+      {selected && publishFlowDeck && publishFlowFormats ? (
+        <QuizPublishFlowDialog
+          open={publishFlowDeckId != null}
+          onOpenChange={(open) => {
+            if (!open) setPublishFlowDeckId(null);
+          }}
+          deckId={publishFlowDeck.id}
+          teamId={selected.id}
+          deckName={publishFlowDeck.name}
+          eligibleCardCount={publishFlowDeck.eligibleCardCount}
+          formats={publishFlowFormats}
+          distribution={getDeckDistribution(publishFlowDeck.id)}
+          onPublished={(result) => handlePublishFlowResult(publishFlowDeck.id, result)}
+        />
+      ) : null}
     </TooltipProvider>
   );
 }

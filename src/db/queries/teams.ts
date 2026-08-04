@@ -339,9 +339,15 @@ function withDefaultTeamQuizSchedule(
     | "quizStartAt"
     | "quizSecurityApplyToMembers"
     | "quizSecurityApplyToTeamAdmins"
+    | "aiRecallSessionCardCount"
   > &
     Partial<
-      Pick<TeamRow, "quizSecurityApplyToMembers" | "quizSecurityApplyToTeamAdmins">
+      Pick<
+        TeamRow,
+        | "quizSecurityApplyToMembers"
+        | "quizSecurityApplyToTeamAdmins"
+        | "aiRecallSessionCardCount"
+      >
     >,
 ): TeamRow {
   return {
@@ -351,6 +357,7 @@ function withDefaultTeamQuizSchedule(
     inactiveAt: row.inactiveAt ?? null,
     quizSecurityApplyToMembers: row.quizSecurityApplyToMembers !== false,
     quizSecurityApplyToTeamAdmins: Boolean(row.quizSecurityApplyToTeamAdmins),
+    aiRecallSessionCardCount: row.aiRecallSessionCardCount ?? null,
   };
 }
 
@@ -2458,6 +2465,59 @@ export async function getTeamQuizDurationContext(
 export async function getTeamQuizDurationMinutes(teamId: number): Promise<number> {
   const ctx = await getTeamQuizDurationContext(teamId);
   return ctx?.effectiveMinutes ?? DEFAULT_TEAM_QUIZ_DURATION_MINUTES;
+}
+
+/** Null clears the workspace AI Recall session card limit (use full deck). */
+export async function updateTeamAiRecallSessionCardCount(
+  teamId: number,
+  cardCount: number | null,
+): Promise<void> {
+  await db
+    .update(teams)
+    .set({ aiRecallSessionCardCount: cardCount })
+    .where(eq(teams.id, teamId));
+}
+
+export async function listAiRecallSessionCardDeckSnapshots(
+  teamId: number,
+  ownerUserId: string,
+): Promise<
+  {
+    id: number;
+    name: string;
+    aiRecallSessionCardCount: number | null;
+  }[]
+> {
+  const teamDecks = await getDecksForTeam(teamId, ownerUserId);
+  if (teamDecks.length === 0) return [];
+
+  return teamDecks
+    .map((deck) => ({
+      id: deck.id,
+      name: deck.name,
+      aiRecallSessionCardCount:
+        deck.aiRecallSessionCardCount == null
+          ? null
+          : Math.floor(deck.aiRecallSessionCardCount),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Null = inherit workspace. 0 = all cards. 1–100 = fixed count.
+ */
+export async function updateDeckAiRecallSessionCardCount(
+  deckId: number,
+  ownerUserId: string,
+  cardCount: number | null,
+): Promise<void> {
+  await db
+    .update(decks)
+    .set({
+      aiRecallSessionCardCount: cardCount,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(decks.id, deckId), eq(decks.userId, ownerUserId)));
 }
 
 export async function updateTeamQuizDurationMinutes(

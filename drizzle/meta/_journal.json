@@ -281,6 +281,13 @@
       "when": 1779500000000,
       "tag": "0069_addon_published_on_banner",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1779600000000,
+      "tag": "0070_live_classroom_participant_grants",
+      "breakpoints": true
     }
   ]
 }

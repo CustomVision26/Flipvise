@@ -19,6 +19,7 @@ import {
 import {
   TEAM_ADMIN_QUIZ_SECURITY_PATH,
   buildTeamAdminPath,
+  buildTeamAdminQuizFormatsPath,
   buildTeamAdminQuizResultsPath,
   buildTeamAdminQuizSchedulePath,
   buildTeamAdminQuizSecurityPath,
@@ -126,6 +127,10 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
 
           <TeamQuizResultsSubTabs
             quizResultsHref={buildTeamAdminQuizResultsPath(
+              selected.id,
+              viewerTeamMemberUrlParam,
+            )}
+            quizFormatsHref={buildTeamAdminQuizFormatsPath(
               selected.id,
               viewerTeamMemberUrlParam,
             )}

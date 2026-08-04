@@ -1,10 +1,12 @@
 import { db } from "@/db";
 import {
+  aiRecallResultInboxMessages,
   aiRecallSessions,
   cardMastery,
   decks,
 } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import type {
   AiRecallPerCardSnapshot,
   AiRecallSessionAnalytics,
@@ -220,6 +222,8 @@ export async function getTeacherAiRecallStatsForWorkspace(
 }
 
 export type TeamAiRecallDashboardStats = {
+  /** Saved AI Recall™ sessions included in the rollup (capped query window). */
+  sessionCount: number;
   teamRecallAccuracy: number | null;
   averageAiScore: number | null;
   averageSessionTimeMs: number | null;
@@ -241,6 +245,7 @@ export async function getTeamAiRecallStats(
 
   if (sessions.length === 0) {
     return {
+      sessionCount: 0,
       teamRecallAccuracy: null,
       averageAiScore: null,
       averageSessionTimeMs: null,
@@ -341,6 +346,7 @@ export async function getTeamAiRecallStats(
     .sort((a, b) => a.averageScore - b.averageScore);
 
   return {
+    sessionCount: sessions.length,
     teamRecallAccuracy,
     averageAiScore,
     averageSessionTimeMs,
@@ -412,4 +418,95 @@ export async function getDeckSubjectContext(deckId: number): Promise<{
     .where(eq(decks.id, deckId))
     .limit(1);
   return row ?? null;
+}
+
+export {
+  AI_RECALL_SESSION_CARD_COUNT_ALL,
+  AI_RECALL_SESSION_CARD_COUNT_MAX,
+  AI_RECALL_SESSION_CARD_COUNT_MIN,
+  clampAiRecallSessionCardCount,
+  resolveEffectiveAiRecallSessionCardCount,
+  type AiRecallSessionCardDeckSnapshot,
+} from "@/lib/ai-recall-session-cards";
+
+export async function deliverAiRecallSessionInbox(input: {
+  sessionId: number;
+  recipientUserId: string;
+  deckName: string;
+  correct: number;
+  cardsReviewed: number;
+  averageAiScore: number | null;
+}): Promise<void> {
+  const percent =
+    input.cardsReviewed > 0
+      ? Math.round((input.correct / input.cardsReviewed) * 100)
+      : 0;
+  const scorePart =
+    input.averageAiScore != null
+      ? ` · AI score ${input.averageAiScore}%`
+      : "";
+  const title = `AI Recall™ — ${input.deckName}`;
+  const description = `${percent}% correct (${input.correct}/${input.cardsReviewed})${scorePart}`;
+
+  await db
+    .insert(aiRecallResultInboxMessages)
+    .values({
+      recipientUserId: input.recipientUserId,
+      sessionId: input.sessionId,
+      title,
+      description,
+    })
+    .onConflictDoNothing({
+      target: [
+        aiRecallResultInboxMessages.recipientUserId,
+        aiRecallResultInboxMessages.sessionId,
+      ],
+    });
+
+  notifyNativeInboxPush({
+    recipientUserId: input.recipientUserId,
+    category: "ai_recall_result",
+    body: `${title}: ${description}`,
+  });
+}
+
+export async function getAiRecallResultInboxForUser(userId: string) {
+  return db
+    .select({
+      id: aiRecallResultInboxMessages.id,
+      title: aiRecallResultInboxMessages.title,
+      description: aiRecallResultInboxMessages.description,
+      read: aiRecallResultInboxMessages.read,
+      createdAt: aiRecallResultInboxMessages.createdAt,
+      sessionId: aiRecallResultInboxMessages.sessionId,
+      deckName: aiRecallSessions.deckName,
+      correct: aiRecallSessions.correct,
+      incorrect: aiRecallSessions.incorrect,
+      cardsReviewed: aiRecallSessions.cardsReviewed,
+      averageAiScore: aiRecallSessions.averageAiScore,
+      sessionDurationMs: aiRecallSessions.sessionDurationMs,
+      teamId: aiRecallSessions.teamId,
+    })
+    .from(aiRecallResultInboxMessages)
+    .innerJoin(
+      aiRecallSessions,
+      eq(aiRecallResultInboxMessages.sessionId, aiRecallSessions.id),
+    )
+    .where(eq(aiRecallResultInboxMessages.recipientUserId, userId))
+    .orderBy(desc(aiRecallResultInboxMessages.createdAt));
+}
+
+export async function markAiRecallResultInboxRead(
+  messageId: number,
+  recipientUserId: string,
+): Promise<void> {
+  await db
+    .update(aiRecallResultInboxMessages)
+    .set({ read: true })
+    .where(
+      and(
+        eq(aiRecallResultInboxMessages.id, messageId),
+        eq(aiRecallResultInboxMessages.recipientUserId, recipientUserId),
+      ),
+    );
 }

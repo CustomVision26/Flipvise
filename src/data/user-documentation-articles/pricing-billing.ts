@@ -75,7 +75,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "other-grants",
         title: "Other ways to unlock",
         bullets: [
-          "Team Admin → Add-ons can assign member add-ons (for example AI Essay) to members.",
+          "Team Admin → Add-ons will assign member add-ons later; AI Essay member assignment is coming soon (plan owner personal use only for now).",
           "Platform admins can grant complimentary access at /admin/add-ons.",
           "Live Classroom™ organization ownership is granted to the subscription owner (Stripe or platform admin).",
         ],

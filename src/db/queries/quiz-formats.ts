@@ -385,6 +385,84 @@ export async function reshuffleDeckQuizFormatAssignments(
   return payload;
 }
 
+/** Publish quiz formats for an explicit subset of deck cards. */
+export async function publishDeckQuizFormatAssignmentsForCards(
+  deckId: number,
+  ownerUserId: string,
+  teamId: number | null,
+  distribution: QuizFormatDistribution,
+  cardIds: number[],
+): Promise<DeckQuizFormatAssignments> {
+  const uniqueCardIds = [...new Set(cardIds)];
+  const expected =
+    distribution.multipleChoice + distribution.trueFalse + distribution.fillInBlank;
+  if (uniqueCardIds.length === 0) {
+    throw new Error("Select at least one card to publish.");
+  }
+  if (uniqueCardIds.length !== expected) {
+    throw new Error(
+      `Select exactly ${expected} card${expected === 1 ? "" : "s"} to match Questions per format.`,
+    );
+  }
+
+  const formats = await resolveQuizFormatsForStudy(deckId, teamId);
+  const cardRows = await getCardsByDeckUnscoped(deckId);
+  const preparedAll: QuizCardInput[] = cardRows.map((c) => ({
+    id: c.id,
+    front: c.front,
+    back: c.back,
+    choices: c.choices,
+    correctChoiceIndex: c.correctChoiceIndex,
+    quizVariants: parseCardQuizVariants(c.quizVariants),
+  }));
+
+  const deckCardIds = new Set(preparedAll.map((c) => c.id));
+  for (const id of uniqueCardIds) {
+    if (!deckCardIds.has(id)) {
+      throw new Error("One or more selected cards are not in this deck.");
+    }
+  }
+
+  const selected = preparedAll.filter((c) => uniqueCardIds.includes(c.id));
+  const eligibleSelected = selected.filter(
+    (c) => (c.front ?? "").trim() && (c.back ?? "").trim(),
+  );
+  if (eligibleSelected.length !== uniqueCardIds.length) {
+    throw new Error("Selected cards must have front and back text.");
+  }
+
+  const counts = countCardsReadyForQuizFormats(eligibleSelected, formats);
+  const reshuffleBlock = explainQuizFormatReshuffleBlock(
+    formats,
+    counts,
+    distribution,
+    eligibleSelected,
+  );
+  if (reshuffleBlock) {
+    throw new Error(reshuffleBlock);
+  }
+
+  const byCardId = reshuffleQuizFormatAssignments(eligibleSelected, formats, distribution);
+  if (Object.keys(byCardId).length !== expected) {
+    throw new Error(
+      "Could not assign question formats to the selected cards. Regenerate AI content and try again.",
+    );
+  }
+
+  const payload: DeckQuizFormatAssignments = {
+    distribution,
+    byCardId,
+    shuffledAt: new Date().toISOString(),
+  };
+
+  await db
+    .update(decks)
+    .set({ quizFormatAssignments: payload, updatedAt: new Date() })
+    .where(and(eq(decks.id, deckId), eq(decks.userId, ownerUserId)));
+
+  return payload;
+}
+
 export async function resolveQuizFormatsForStudy(
   deckId: number,
   teamId: number | null,

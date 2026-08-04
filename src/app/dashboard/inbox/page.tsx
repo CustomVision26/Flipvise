@@ -6,6 +6,7 @@ import { auth } from "@clerk/nextjs/server";
 
 // Data sources
 import { getQuizResultInboxForUser } from "@/db/queries/quiz-results";
+import { getAiRecallResultInboxForUser } from "@/db/queries/ai-recall";
 import { getTeamsByIds, listTeamMembersByTeamIds } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { listTeamInvitationsForInviteeEmail } from "@/db/queries/teams";
@@ -35,6 +36,8 @@ import { buildAffiliateNoticeInboxItems } from "@/lib/affiliate-inbox-notices";
 import { billingNoticeRowsToInboxItems } from "@/lib/billing-inbox-notices";
 import { welcomeInboxRowsToInboxItems } from "@/lib/welcome-inbox";
 import { ensureWelcomeInboxForUserIfMissing } from "@/lib/record-welcome-inbox";
+import { liveClassroomLobbyInboxRowsToInboxItems } from "@/lib/live-classroom-lobby-inbox";
+import { listLiveClassroomLobbyInboxMessagesForUser } from "@/db/queries/live-classroom-lobby-inbox";
 import { listBillingNoticeInboxMessagesForUser } from "@/db/queries/billing-notice-inbox";
 import { listWelcomeInboxMessagesForUser } from "@/db/queries/welcome-inbox";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
@@ -85,6 +88,7 @@ export default async function DashboardInboxPage() {
   // ── Fetch everything in parallel ──────────────────────────────────────────
   const [
     quizEntries,
+    aiRecallEntries,
     teamInviteRows,
     billingRows,
     subscriptionCheckoutRows,
@@ -98,8 +102,10 @@ export default async function DashboardInboxPage() {
     readSet,
     billingNoticeRows,
     welcomeInboxRows,
+    liveClassroomLobbyInboxRows,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
+    getAiRecallResultInboxForUser(userId).catch(() => []),
     tryTeamQuery(() => listTeamInvitationsForInviteeEmail(inboxEmail), []),
     listBillingInvoicesForUser(userId, inboxEmail),
     listSubscriptionCheckoutConfirmationsForUser(userId),
@@ -115,6 +121,7 @@ export default async function DashboardInboxPage() {
     getInboxReadsForUser(userId),
     listBillingNoticeInboxMessagesForUser(userId),
     listWelcomeInboxMessagesForUser(userId),
+    listLiveClassroomLobbyInboxMessagesForUser(userId).catch(() => []),
   ]);
 
   // ── Resolve team context for quiz results ─────────────────────────────────
@@ -210,6 +217,30 @@ export default async function DashboardInboxPage() {
       isRead,
       requiresAction: false,
       payload,
+    });
+  }
+
+  for (const entry of aiRecallEntries) {
+    const key = `ai_recall_result:${entry.id}`;
+    const isRead = readSet.has(key) || entry.read;
+    items.push({
+      type: "ai_recall_result",
+      key,
+      title: entry.title,
+      description: entry.description,
+      dateIso: entry.createdAt.toISOString(),
+      isRead,
+      requiresAction: false,
+      payload: {
+        messageId: entry.id,
+        sessionId: entry.sessionId,
+        deckName: entry.deckName,
+        correct: entry.correct,
+        incorrect: entry.incorrect,
+        cardsReviewed: entry.cardsReviewed,
+        averageAiScore: entry.averageAiScore,
+        sessionDurationMs: entry.sessionDurationMs,
+      },
     });
   }
 
@@ -511,6 +542,12 @@ export default async function DashboardInboxPage() {
   items.push(...buildAffiliateNoticeInboxItems(affiliateRows, readSet));
   items.push(...billingNoticeRowsToInboxItems(billingNoticeRows, readSet));
   items.push(...welcomeInboxRowsToInboxItems(welcomeInboxRows, readSet));
+  items.push(
+    ...liveClassroomLobbyInboxRowsToInboxItems(
+      liveClassroomLobbyInboxRows,
+      readSet,
+    ),
+  );
 
   for (const row of adminPlanInviteRows) {
     if (row.status === "accepted") continue;

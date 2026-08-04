@@ -1,11 +1,15 @@
 import {
+  isTeamAdminActiveRecallAnalyticsPath,
+  isTeamAdminActiveRecallSessionCardsPath,
   isTeamAdminAddonsPath,
   isTeamAdminAssignDecksToMembersPath,
   isTeamAdminInviteHistoryPath,
   isTeamAdminInvitePendingPath,
   isTeamAdminInviteSendPath,
+  isTeamAdminLiveClassroomPath,
   isTeamAdminMembersHistoryPath,
   isTeamAdminMembersPath,
+  isTeamAdminQuizFormatsPath,
   isTeamAdminQuizResultsPath,
   isTeamAdminQuizSchedulePath,
   isTeamAdminQuizSecurityPath,
@@ -103,7 +107,37 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
       section: "Add-ons",
       title: "Member add-ons",
       description:
-        "Assign or remove optional premium add-ons such as AI Essay for workspace members.",
+        "Review optional member add-ons. AI Essay is plan-owner personal only for now; member assignment is coming soon.",
+      isOverview: false,
+    };
+  }
+
+  if (isTeamAdminLiveClassroomPath(pathname)) {
+    return {
+      section: "Add-ons",
+      title: "Live Classroom™",
+      description:
+        "Host live team battles for your organization when the Live Classroom add-on is active.",
+      isOverview: false,
+    };
+  }
+
+  if (isTeamAdminActiveRecallSessionCardsPath(pathname)) {
+    return {
+      section: "Active Recall Mode",
+      title: "Session cards",
+      description:
+        "Set a workspace default and optional per-deck overrides for how many cards members see in each AI Recall™ session.",
+      isOverview: false,
+    };
+  }
+
+  if (isTeamAdminActiveRecallAnalyticsPath(pathname)) {
+    return {
+      section: "Active Recall Mode",
+      title: "Performance",
+      description:
+        "Review saved AI Recall™ performance for this workspace — accuracy, session time, missed material, and top learners.",
       isOverview: false,
     };
   }
@@ -112,19 +146,30 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
     isTeamAdminQuizResultsPath(pathname) &&
     !isTeamAdminQuizTimerPath(pathname) &&
     !isTeamAdminQuizSchedulePath(pathname) &&
-    !isTeamAdminQuizSecurityPath(pathname)
+    !isTeamAdminQuizSecurityPath(pathname) &&
+    !isTeamAdminQuizFormatsPath(pathname)
   ) {
     return {
-      section: "Quiz administration",
+      section: "Quiz Mode",
       title: "Quiz results",
       description: "Review member quiz attempts across your workspaces.",
       isOverview: false,
     };
   }
 
+  if (isTeamAdminQuizFormatsPath(pathname)) {
+    return {
+      section: "Quiz Mode",
+      title: "Quiz formats",
+      description:
+        "Choose question types, set questions per format, and publish the quiz mix for workspace decks.",
+      isOverview: false,
+    };
+  }
+
   if (isTeamAdminQuizTimerPath(pathname)) {
     return {
-      section: "Quiz administration",
+      section: "Quiz Mode",
       title: "Quiz timer",
       description:
         "Set a general quiz time for linked decks, or choose timed-quiz minutes for each deck.",
@@ -134,7 +179,7 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
 
   if (isTeamAdminQuizSchedulePath(pathname)) {
     return {
-      section: "Quiz administration",
+      section: "Quiz Mode",
       title: "Quiz schedule",
       description: "Configure when quizzes may start for this workspace.",
       isOverview: false,
@@ -143,7 +188,7 @@ export function teamAdminPageMetaForPath(pathname: string): TeamAdminPageMeta {
 
   if (isTeamAdminQuizSecurityPath(pathname)) {
     return {
-      section: "Quiz administration",
+      section: "Quiz Mode",
       title: "Exam Mode",
       description: "Manage quiz lock settings and review locked sessions.",
       isOverview: false,

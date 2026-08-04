@@ -1,25 +1,25 @@
 {
   "version": 2,
-  "updatedAt": "2026-08-02T13:40:12.223Z",
+  "updatedAt": "2026-08-02T22:01:10.096Z",
   "pages": {
     "homepage": {
-      "watchFingerprint": "bb35485aa372631d738d2951bc1ad9fd5855e656f18dc3cc57e7a2836213b4c9",
-      "docFingerprint": "1163770390595b3a30e663cfec27418f7214c2446290b9932d74b3f18e4031a7"
+      "watchFingerprint": "1937d7ff0be9ee2a9af7ad653830504e966035745fd4d7132683694d50fc5c6f",
+      "docFingerprint": "c0228ebe039556a902484ed1b616a725b48015f87c0a2aec4b65eb0825b82875"
     },
     "header-navigation": {
       "watchFingerprint": "74ccd341b3ff001d0193ab9cd045aa1f6074eaef866ef58a5387325b15ee1d53",
       "docFingerprint": "ef6f6cc80973d79bc56ccaf304de0f4c76eadfee927032be489aef26b9031319"
     },
     "personal-dashboard": {
-      "watchFingerprint": "a47101e826165acee86356d8044737e59bcf935af687cdea9c188c588d6281f9",
+      "watchFingerprint": "b30f9fda481af26ff8b4797a440e761169e90d22e9452c5412b6c4c264f4c294",
       "docFingerprint": "9c36c24cab56ebb89570235fa6ba3369de393d0c93503fc1e6353bf574a3a9b0"
     },
     "ai-essay": {
-      "watchFingerprint": "db743691d42ef2ef4e85424d317d229111db809aaf7f9531b33cc4b2319082ab",
-      "docFingerprint": "87603764388633bdf8472a19d72a5f96a5addbc69f7e3dea39769e2f072b04cd"
+      "watchFingerprint": "eb6bd61007d71c88eb13029912225e100e0817b3579ae77fde142607f12e0ea4",
+      "docFingerprint": "34250364c2b8302cdc9633b1299db65db4ded518bd1f08f783ea725aba47adfc"
     },
     "team-workspace-dashboard": {
-      "watchFingerprint": "b4239a93e71bc3bc9bed33d3a27a21523d5ee5e4b730b0a30acd384a00bc35eb",
+      "watchFingerprint": "eb88bae4ffef8297001a61ebcc71c18124e245d91f5da8accbc13f5415747979",
       "docFingerprint": "9eb71190aab8b0221e607d085b981f4617e9c2f6feb5849a201762705766ab86"
     },
     "manage-workspaces": {
@@ -31,19 +31,19 @@
       "docFingerprint": "7a09742aceacc09f7981ec73939d65a01f8322552b5f986ac5d029153970f608"
     },
     "study-session": {
-      "watchFingerprint": "655eac93e22fa71ddab1888304a6094e3d90c9323000d7177fc1f5fc2800d234",
-      "docFingerprint": "568992e7da5c154e27cf989e1fae05af30cdbfade95b9ceb9b88316ac7172541"
+      "watchFingerprint": "ad86d5f0016552b04eaa9b08aaa52858ff7f96efb713368874c6ca04ee50f412",
+      "docFingerprint": "51fd2f7fe7b646ce1582d30ea60c25507cce22b0fbc808d7ed821e24bb5746eb"
     },
     "quiz-result-detail": {
       "watchFingerprint": "b132a4bc7de1c6b87dc4783a702ecfea7ad25030c35f241242122a6639df961f",
       "docFingerprint": "3ea0c3de962ce007b376358c0449dd99744c08f3bb56fc992c7f347688552868"
     },
     "offline-mobile": {
-      "watchFingerprint": "7ca2526f0547db5a91f312fd0c554e8307176f249a28422de7a8f7f1fef14e1d",
+      "watchFingerprint": "8a3fb4dc03a8ec72d2b87b933c49931d6a29c6b25ef40dbd791fc06f7883c21d",
       "docFingerprint": "0a6b3c730bb8d1c67347ef185447f369519c1807d4b5a1a80902e3822b0fe890"
     },
     "inbox": {
-      "watchFingerprint": "b44436e555990efc536a41bdad84bb6bb5140cabcb0aefe7d38f8d5636252675",
+      "watchFingerprint": "5d74b3d6728eb7507605c9b6b1054a58035de7195363045dc0949e936a3a25ab",
       "docFingerprint": "fe6c80325f8a41d08dd5860dcc52eb677a52f1f02c7bd1816e6519cfc308ee48"
     },
     "help-center-overview": {
@@ -103,8 +103,8 @@
       "docFingerprint": "4706e6f3cba93a3e01d152656d35635ab797479c96362b2bd9746e8fd9c4f025"
     },
     "pricing-add-ons": {
-      "watchFingerprint": "36faab44d22abe01c03899487e95fdc2c2ae3bc813ffdd111aee179c66a7acda",
-      "docFingerprint": "230d540bf1765daecb7087deb4c518470cc518c109826c8967da1954ee3cc7d1"
+      "watchFingerprint": "8e4050082b44a4597f4c1c43538f80486d5bae6f105800643be5e29ecace2554",
+      "docFingerprint": "577124e3e95673a95293c4d95c39c0aadf9d87fcd1177afbe951bab455da2d38"
     },
     "stripe-billing-payment": {
       "watchFingerprint": "bf55387840f69992326e558ece3dbbe1e4c0d1c68b9c4115f862805e90256771",
@@ -159,32 +159,32 @@
       "docFingerprint": "7566f9ba03902c638d1c395233e8c8dce2300b147a75f73df1fb06464dfbf88a"
     },
     "team-admin-overview": {
-      "watchFingerprint": "9c2a9b69db29a841949537f2a4128946a07d7ae179da8fb2b9ed85560fedd889",
-      "docFingerprint": "67cb2810bc8fc2b5ea614d286725d789fb96f0d3118b29455edff85ddd92b089"
+      "watchFingerprint": "f7cc587f1adde5272e2135b3b5ef7b95b6d4783ac86c3a3494c5769dba4b86e0",
+      "docFingerprint": "b8c681f3fb1259570ea21c0615c782da8f04485c4a17b515979e1ece35cbc71b"
     },
     "team-admin-add-ons": {
-      "watchFingerprint": "a903ea5845e60c8cd983863004a27c977fc846bd81e9c483e6cec3d6f6a7daaf",
-      "docFingerprint": "d1f59f9bff0980062e4b946f069a0801bcf4b9e17a028378f07a14d0f5334f59"
+      "watchFingerprint": "5f7080537fe01686b451e847662218415c9c4f93ff7ef1337d9118840751797c",
+      "docFingerprint": "0de70b4dc199d5f876c26649d9f076308438832e7d5466b7424dfcc110f1f85a"
     },
     "live-classroom": {
-      "watchFingerprint": "2dac2e095085f4cece1a2993711aeed82ca460c43eadb090d4946ded58510aed",
+      "watchFingerprint": "3ab1f78a2b0ffff72a8aafb13d4cc471fd6f0fa95b77c03414ad5861987a659d",
       "docFingerprint": "41f5c794a48cfc7545d73102a48c909354ba9b2509f94602fa8c17c7aab81e83"
     },
     "members": {
-      "watchFingerprint": "86a079b373153ba3b853ad8793e5e409555f9798a57b29a11c8efc75e0abc2a5",
+      "watchFingerprint": "317c474baa0bf2b1249dff10b179de9eb656c13a2e05f62dd3be8c7945a15b09",
       "docFingerprint": "d37c76f2c4f05e3c6d67040d395d96ce2e331e328e4c5c90de33757ec5eda055"
     },
     "deck-manager": {
-      "watchFingerprint": "42126227e8d496162955cd238b7fe65176fb4b8c134808ac6249cd51f9a1a576",
-      "docFingerprint": "3744c1cd009774aa593130d30d05b5acf4687fce344a6ba9db4b27b6ce38a489"
+      "watchFingerprint": "b34217638d35b3fc1bbd57c2e66f5205b6d0d7196983471d4ca9f19663cfda83",
+      "docFingerprint": "08317c7894674d4d93e0e1040c261f9ab4234130932a6376fef7bde9ee96752d"
     },
     "invite-members": {
-      "watchFingerprint": "d9bbd2346058877d8f778137a83caca2d3bb93323fdcb4cfd4a15e8ed1b55dc9",
+      "watchFingerprint": "29e6eb2df06f5682678a45a74493dfd2e6cfae09ad5fb73eff7fa2d7a0b9595b",
       "docFingerprint": "1ac67d9660f1a1fab626a83c42f8f0d96762c51cae0d82f7f8db3480f81b6883"
     },
     "quiz-results-admin": {
-      "watchFingerprint": "51b26f839aeee7db07f2368ee2d9950557fd7f255e430b3b3007111bac483de1",
-      "docFingerprint": "3a078666035fde3357b5943994f269afcfe43d62101c45886d5519d35cdb30be"
+      "watchFingerprint": "30de331b8a7268e8b291e64f44b5515a7b59a3dd7e9f2a00be9e4b2bfc493373",
+      "docFingerprint": "c74ae459d3756f99e14de3a0733597c80c004387563b0a4b0b9a4662335a7a98"
     },
     "ws-history": {
       "watchFingerprint": "ef6a5bce2f9002f7345e670a451907e6218bc74b970b3e09a362c75d567dfd36",
@@ -208,7 +208,7 @@
     },
     "teacher-ai-content-tools": {
       "watchFingerprint": "559264befde14ee7c3c27e446cf25a248db381c6e9fe7a828e98560673f065c0",
-      "docFingerprint": "4541b30771512ad73145277f76a3de8e7cbed998166e681f6747e8e617d7adcb"
+      "docFingerprint": "e0a07ba7191f120416302392c9ec85a9f05934c456d865ea66d522ccf7c4c668"
     },
     "teacher-classroom": {
       "watchFingerprint": "3c49f67e8911bdf103ddf7fc858e2a920c07ae9b6db49ee4eeb255361d90d006",
@@ -251,8 +251,8 @@
       "docFingerprint": "559662dbd1f2620fd0ef270c773e7c92bccd5ce650519f65217c6d7c4e54458e"
     },
     "team-workspaces": {
-      "watchFingerprint": "3c5ea2f661239aec071c6be84ff7ca889ca85799a6ba4a9ab155f66453c16ec0",
-      "docFingerprint": "0d87718f801bd7f1731ef0b313ebe5f815ce89a8a75ab2bdf2f2fb2dc1a1b8a9"
+      "watchFingerprint": "ed348d44343d1153904205a6fc97544c3ecbc5b2ea30fc71fe9f6252bd3db3f3",
+      "docFingerprint": "3d4eac14a93c95c508046810b97ffcc38cc6b87b1d28b2569088914c387845e5"
     },
     "admin-roles": {
       "watchFingerprint": "b55485e58a1e0d5ca48a277b767c680b1a0320a895b80dacd1ebf714ea7608b2",
@@ -275,7 +275,7 @@
       "docFingerprint": "6532736ebdab4d1286e673300d78fe04f4b563976db1c90d6b8a4709c8f93565"
     },
     "admin-add-ons": {
-      "watchFingerprint": "57108ce1acc687e1e80f61e606ad0b1ba2e9bdcc7ce1889d7566b2523fa8a869",
+      "watchFingerprint": "8bad3ad5673e375c0356bce7f2ff51042b4a2d97fbd9a44fa68a541872a01088",
       "docFingerprint": "becd2939581f7fb2eb353b1ba9d6cf242f514dd5dae10d94d00ea2cb650c06d9"
     },
     "plan-history": {

@@ -38,6 +38,10 @@ export const TEAM_ADMIN_QUIZ_SECURITY_PATH =
 export const TEAM_ADMIN_QUIZ_SCHEDULE_PATH =
   "/dashboard/team-admin/quiz-results/quiz-schedule";
 
+/** Quiz question formats — workspace defaults and per-deck overrides (`?team=`). */
+export const TEAM_ADMIN_QUIZ_FORMATS_PATH =
+  "/dashboard/team-admin/quiz-results/quiz-formats";
+
 /** Invite members — send invite form (`?team=`). */
 export const TEAM_ADMIN_INVITE_SEND_PATH =
   "/dashboard/team-admin/invite-members/send-invite";
@@ -67,6 +71,14 @@ export const TEAM_ADMIN_ADDONS_PATH = "/dashboard/team-admin/add-ons";
 
 /** Live Classroom™ organization feature (absolute path under dashboard). */
 export const TEAM_ADMIN_LIVE_CLASSROOM_PATH = "/dashboard/live-classroom";
+
+/** Study Modes — Team AI Recall™ / Active Recall analytics (`?team=`). */
+export const TEAM_ADMIN_ACTIVE_RECALL_PATH =
+  "/dashboard/team-admin/study-modes/active-recall";
+
+/** Active Recall Mode — session card count setting for AI Recall™. */
+export const TEAM_ADMIN_ACTIVE_RECALL_SESSION_CARDS_PATH =
+  "/dashboard/team-admin/study-modes/active-recall/session-cards";
 
 /** True when `pathname` is under Deck Manager. */
 export function isTeamAdminDeckManagerPath(pathname: string): boolean {
@@ -134,6 +146,13 @@ export function isTeamAdminQuizSchedulePath(pathname: string): boolean {
   return (
     pathname === TEAM_ADMIN_QUIZ_SCHEDULE_PATH ||
     pathname.startsWith(`${TEAM_ADMIN_QUIZ_SCHEDULE_PATH}/`)
+  );
+}
+
+export function isTeamAdminQuizFormatsPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_QUIZ_FORMATS_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_QUIZ_FORMATS_PATH}/`)
   );
 }
 
@@ -265,6 +284,14 @@ export function buildTeamAdminQuizSchedulePath(
   return qs ? `${TEAM_ADMIN_QUIZ_SCHEDULE_PATH}?${qs}` : TEAM_ADMIN_QUIZ_SCHEDULE_PATH;
 }
 
+export function buildTeamAdminQuizFormatsPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs ? `${TEAM_ADMIN_QUIZ_FORMATS_PATH}?${qs}` : TEAM_ADMIN_QUIZ_FORMATS_PATH;
+}
+
 export function buildTeamAdminInviteSendPath(
   teamId?: number | null,
   teamMemberId?: number | null,
@@ -324,6 +351,54 @@ export function isTeamAdminAddonsPath(pathname: string): boolean {
     pathname === TEAM_ADMIN_ADDONS_PATH ||
     pathname.startsWith(`${TEAM_ADMIN_ADDONS_PATH}/`)
   );
+}
+
+export function isTeamAdminActiveRecallPath(pathname: string): boolean {
+  return (
+    pathname === TEAM_ADMIN_ACTIVE_RECALL_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_ACTIVE_RECALL_PATH}/`)
+  );
+}
+
+/** True when pathname is Active Recall analytics (not session-cards). */
+export function isTeamAdminActiveRecallAnalyticsPath(pathname: string): boolean {
+  return (
+    isTeamAdminActiveRecallPath(pathname) &&
+    !isTeamAdminActiveRecallSessionCardsPath(pathname)
+  );
+}
+
+export function isTeamAdminActiveRecallSessionCardsPath(
+  pathname: string,
+): boolean {
+  return (
+    pathname === TEAM_ADMIN_ACTIVE_RECALL_SESSION_CARDS_PATH ||
+    pathname.startsWith(`${TEAM_ADMIN_ACTIVE_RECALL_SESSION_CARDS_PATH}/`)
+  );
+}
+
+export function isTeamAdminStudyModesPath(pathname: string): boolean {
+  return pathname.startsWith("/dashboard/team-admin/study-modes");
+}
+
+export function buildTeamAdminActiveRecallPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs
+    ? `${TEAM_ADMIN_ACTIVE_RECALL_PATH}?${qs}`
+    : TEAM_ADMIN_ACTIVE_RECALL_PATH;
+}
+
+export function buildTeamAdminActiveRecallSessionCardsPath(
+  teamId?: number | null,
+  teamMemberId?: number | null,
+): string {
+  const qs = buildTeamAdminQueryString(teamId, teamMemberId);
+  return qs
+    ? `${TEAM_ADMIN_ACTIVE_RECALL_SESSION_CARDS_PATH}?${qs}`
+    : TEAM_ADMIN_ACTIVE_RECALL_SESSION_CARDS_PATH;
 }
 
 export function buildTeamAdminAddonsPath(

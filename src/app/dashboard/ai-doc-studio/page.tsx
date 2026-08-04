@@ -8,6 +8,7 @@ import {
 import { AI_ESSAY_STUDIO_BASE } from "@/lib/ai-document-studio-paths";
 import { canAccessAiEssayInStudio } from "@/lib/ai-document-studio-access";
 import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -21,6 +22,10 @@ import { cn } from "@/lib/utils";
 
 export default async function AiDocumentStudioHubPage() {
   const access = await getAccessContext();
+  const essayComingSoon =
+    access.userId != null
+      ? await isAiEssayComingSoonForTeamMember(access.userId, access)
+      : false;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:gap-8 sm:p-8">
@@ -54,6 +59,8 @@ export default async function AiDocumentStudioHubPage() {
               (type.addonKey === AI_ESSAY_ADDON_KEY
                 ? canAccessAiEssayInStudio(access)
                 : canAccessAddon(access, type.addonKey));
+            const memberComingSoon =
+              type.addonKey === AI_ESSAY_ADDON_KEY && essayComingSoon && !entitled;
             const openHref =
               type.enabled && entitled && type.href
                 ? type.id === "essay"
@@ -77,6 +84,10 @@ export default async function AiDocumentStudioHubPage() {
                           <Sparkles className="size-3" aria-hidden />
                           Open
                         </Badge>
+                      ) : type.enabled && memberComingSoon ? (
+                        <Badge variant="outline" className="shrink-0">
+                          Coming Soon
+                        </Badge>
                       ) : type.enabled ? (
                         <Badge variant="outline" className="shrink-0 gap-1">
                           <Lock className="size-3" aria-hidden />
@@ -98,6 +109,15 @@ export default async function AiDocumentStudioHubPage() {
                       >
                         <FileText className="size-3.5" aria-hidden />
                         Open {type.label}
+                      </Link>
+                    ) : type.enabled && memberComingSoon ? (
+                      <Link
+                        href={AI_ESSAY_STUDIO_BASE}
+                        className={cn(
+                          buttonVariants({ size: "sm", variant: "outline" }),
+                        )}
+                      >
+                        View details
                       </Link>
                     ) : type.enabled ? (
                       <Link

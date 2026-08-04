@@ -1,7 +1,8 @@
-import { getDecksByUser } from "@/db/queries/decks";
+import { getDecksForTeam } from "@/db/queries/teams";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import { LIVE_CLASSROOM_START_PATH } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
+import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { LiveClassroomStartForm } from "@/components/live-classroom-start-form";
 import {
@@ -24,6 +25,10 @@ export default async function LiveClassroomStartPage({
     return <LiveClassroomUnlock teamName={ctx.team.name} />;
   }
 
+  if (!ctx.hasAccess) {
+    return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
+  }
+
   if (!ctx.canHost) {
     return (
       <LiveClassroomShell teamId={ctx.teamId}>
@@ -40,7 +45,7 @@ export default async function LiveClassroomStartPage({
     );
   }
 
-  const decks = await getDecksByUser(ctx.userId);
+  const decks = await getDecksForTeam(ctx.teamId, ctx.team.ownerUserId);
   const deckOptions = decks
     .map((d) => ({ id: d.id, name: d.name }))
     .sort((a, b) => a.name.localeCompare(b.name));

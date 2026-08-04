@@ -1,6 +1,8 @@
 import { db } from "@/db";
 import {
   liveBattleAnswers,
+  liveClassroomLobbyInboxMessages,
+  liveClassroomParticipantGrants,
   liveClassroomParticipants,
   liveClassroomSessions,
   liveClassroomTeacherGrants,
@@ -24,6 +26,12 @@ export async function deleteLiveClassroomDataForUser(
   await db
     .delete(liveClassroomTeacherGrants)
     .where(eq(liveClassroomTeacherGrants.userId, userId));
+  await db
+    .delete(liveClassroomParticipantGrants)
+    .where(eq(liveClassroomParticipantGrants.userId, userId));
+  await db
+    .delete(liveClassroomLobbyInboxMessages)
+    .where(eq(liveClassroomLobbyInboxMessages.recipientUserId, userId));
   await db
     .delete(liveTeacherAnalytics)
     .where(eq(liveTeacherAnalytics.teacherUserId, userId));

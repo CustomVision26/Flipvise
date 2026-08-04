@@ -20,6 +20,10 @@ import {
   updateLobbyTeamAction,
 } from "@/actions/live-classroom";
 import { useLiveClassroomRealtime } from "@/components/live-classroom-realtime-poller";
+import {
+  LiveClassroomSessionSettingsDialog,
+  type LiveClassroomWorkspaceMemberOption,
+} from "@/components/live-classroom-session-settings-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,15 +47,21 @@ import {
 type LiveClassroomLobbyProps = {
   sessionId: number;
   userId: string;
+  ownerUserId: string;
   canHost: boolean;
   licensedSeats: number;
+  workspaceMembers?: LiveClassroomWorkspaceMemberOption[];
+  assignedUserIds?: string[];
 };
 
 export function LiveClassroomLobby({
   sessionId,
   userId,
+  ownerUserId,
   canHost,
   licensedSeats,
+  workspaceMembers = [],
+  assignedUserIds = [],
 }: LiveClassroomLobbyProps) {
   const router = useRouter();
   const { state, error } = useLiveClassroomRealtime(sessionId);
@@ -120,6 +130,31 @@ export function LiveClassroomLobby({
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {canHost ? (
+              <LiveClassroomSessionSettingsDialog
+                sessionId={sessionId}
+                canHost={canHost}
+                teamsLocked={session.teamsLocked}
+                ownerUserId={ownerUserId}
+                session={{
+                  name: session.name,
+                  sessionType: session.sessionType,
+                  battleMode: session.battleMode,
+                  config: session.config,
+                }}
+                teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+                participants={participants.map((p) => ({
+                  id: p.id,
+                  userId: p.userId,
+                  displayName: p.displayName,
+                  liveTeamId: p.liveTeamId,
+                  connected: p.connected,
+                }))}
+                workspaceMembers={workspaceMembers}
+                assignedUserIds={assignedUserIds}
+                currentUserId={userId}
+              />
+            ) : null}
             <Badge variant="outline" className="font-mono text-base tracking-widest">
               {session.joinCode}
             </Badge>
@@ -134,7 +169,7 @@ export function LiveClassroomLobby({
               }}
             >
               <Copy className="size-3.5" aria-hidden />
-              Copy
+              Copy code
             </Button>
             <Badge variant="secondary" className="gap-1">
               <Users className="size-3" aria-hidden />
@@ -153,8 +188,16 @@ export function LiveClassroomLobby({
             )}
           </div>
         </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Share the join code above with members assigned to the Live
+            Classroom™ team. They open{" "}
+            <span className="text-foreground">Join with code</span> and enter
+            it — there is no lobby link. Workspace membership alone is not
+            enough.
+          </p>
         {canHost ? (
-          <CardContent className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               disabled={pending || session.teamsLocked}
@@ -227,14 +270,13 @@ export function LiveClassroomLobby({
             >
               Open projector
             </Button>
-          </CardContent>
+          </div>
         ) : (
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Waiting for the host to start the battle…
-            </p>
-          </CardContent>
+          <p className="text-sm text-muted-foreground">
+            Waiting for the host to start the battle…
+          </p>
         )}
+        </CardContent>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">

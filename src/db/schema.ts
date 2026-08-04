@@ -201,6 +201,11 @@ export const teams = pgTable('teams', {
   quizFormatTrueFalse: boolean().notNull().default(false),
   /** When true, quizzes may include AI-generated fill-in-the-blank sentences. */
   quizFormatFillInBlank: boolean().notNull().default(false),
+  /**
+   * Max cards shown in an AI Recall™ session for this workspace.
+   * Null = use every card in the deck.
+   */
+  aiRecallSessionCardCount: integer(),
   createdAt: timestamp().notNull().defaultNow(),
   /** Set when owner marks workspace inactive during plan reconciliation (restorable on upgrade). */
   inactiveAt: timestamp(),
@@ -263,6 +268,12 @@ export const decks = pgTable('decks', {
   quizCardOrderShuffledAt: timestamp(),
   /** Personal timed-quiz length in minutes. Null uses auto duration from card count. */
   quizDurationMinutes: integer(),
+  /**
+   * Per-deck AI Recall™ session card limit.
+   * Null = inherit workspace {@link teams.aiRecallSessionCardCount}.
+   * 0 = all cards (explicit override). 1–100 = fixed count.
+   */
+  aiRecallSessionCardCount: integer(),
   /** Clerk user id of who created the deck row (co-admin on education workspaces; owner on personal/owner-created). */
   createdByUserId: varchar({ length: 255 }),
   /** Set when owner marks deck inactive during plan reconciliation. */
@@ -1818,6 +1829,30 @@ export const aiRecallSessions = pgTable(
   ],
 );
 
+/** In-app inbox delivery for completed AI Recall™ sessions. */
+export const aiRecallResultInboxMessages = pgTable(
+  'ai_recall_result_inbox_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    sessionId: integer()
+      .notNull()
+      .references(() => aiRecallSessions.id, { onDelete: 'cascade' }),
+    title: varchar({ length: 200 }).notNull(),
+    description: text().notNull(),
+    read: boolean().notNull().default(false),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('ai_recall_result_inbox_recipient_idx').on(t.recipientUserId),
+    index('ai_recall_result_inbox_session_idx').on(t.sessionId),
+    uniqueIndex('ai_recall_result_inbox_recipient_session_uidx').on(
+      t.recipientUserId,
+      t.sessionId,
+    ),
+  ],
+);
+
 /* ─── Live Classroom™ (organization add-on) ─────────────────────────────── */
 
 export const liveClassroomSessionStatusEnum = pgEnum(
@@ -1920,6 +1955,30 @@ export const liveClassroomTeacherGrants = pgTable(
       t.userId,
     ),
     index('live_classroom_teacher_grants_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * Explicit Live Classroom™ roster assignment.
+ * Workspace membership alone does not grant access — members must be assigned here.
+ */
+export const liveClassroomParticipantGrants = pgTable(
+  'live_classroom_participant_grants',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    userId: varchar({ length: 255 }).notNull(),
+    grantedByUserId: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('live_classroom_participant_grants_team_user_uidx').on(
+      t.teamId,
+      t.userId,
+    ),
+    index('live_classroom_participant_grants_user_idx').on(t.userId),
   ],
 );
 
@@ -2191,6 +2250,33 @@ export const liveOrganizationAnalytics = pgTable(
   ],
 );
 
+/** Formal in-app lobby invite with join code for assigned Live Classroom™ members. */
+export const liveClassroomLobbyInboxMessages = pgTable(
+  'live_classroom_lobby_inbox_messages',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    recipientUserId: varchar({ length: 255 }).notNull(),
+    teamId: integer()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    sessionId: integer()
+      .notNull()
+      .references(() => liveClassroomSessions.id, { onDelete: 'cascade' }),
+    title: varchar({ length: 200 }).notNull(),
+    description: text().notNull(),
+    joinCode: varchar({ length: 16 }).notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('live_classroom_lobby_inbox_recipient_idx').on(t.recipientUserId),
+    index('live_classroom_lobby_inbox_session_idx').on(t.sessionId),
+    uniqueIndex('live_classroom_lobby_inbox_recipient_session_uidx').on(
+      t.recipientUserId,
+      t.sessionId,
+    ),
+  ],
+);
+
 /** Row shapes for client `import type` — avoids bundling table refs into client runtime chunks. */
 export type TeamInvitationRow = InferSelectModel<typeof teamInvitations>;
 export type TeamMemberRow = InferSelectModel<typeof teamMembers>;
@@ -2199,6 +2285,9 @@ export type TeamDeckAssignmentRow = InferSelectModel<typeof teamDeckAssignments>
 export type PlanReconciliationSession = InferSelectModel<typeof planReconciliationSessions>;
 export type TeacherClassRow = InferSelectModel<typeof teacherClasses>;
 export type AiRecallSessionRow = InferSelectModel<typeof aiRecallSessions>;
+export type AiRecallResultInboxMessageRow = InferSelectModel<
+  typeof aiRecallResultInboxMessages
+>;
 export type CardMasteryRow = InferSelectModel<typeof cardMastery>;
 export type AddonCatalogRow = InferSelectModel<typeof addonCatalog>;
 export type AddonCatalogSettingsRow = InferSelectModel<typeof addonCatalogSettings>;
@@ -2219,6 +2308,9 @@ export type LiveClassroomTeamSettingsRow = InferSelectModel<
 export type LiveClassroomTeacherGrantRow = InferSelectModel<
   typeof liveClassroomTeacherGrants
 >;
+export type LiveClassroomParticipantGrantRow = InferSelectModel<
+  typeof liveClassroomParticipantGrants
+>;
 export type LiveClassroomSavedGroupRow = InferSelectModel<
   typeof liveClassroomSavedGroups
 >;
@@ -2236,4 +2328,7 @@ export type LiveBattleReportRow = InferSelectModel<typeof liveBattleReports>;
 export type LiveTeacherAnalyticsRow = InferSelectModel<typeof liveTeacherAnalytics>;
 export type LiveOrganizationAnalyticsRow = InferSelectModel<
   typeof liveOrganizationAnalytics
+>;
+export type LiveClassroomLobbyInboxMessageRow = InferSelectModel<
+  typeof liveClassroomLobbyInboxMessages
 >;

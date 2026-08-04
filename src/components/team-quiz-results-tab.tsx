@@ -95,6 +95,7 @@ interface TeamQuizResultsTabProps {
   workspaces: TeamQuizWorkspaceSnapshot[];
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
   quizResultsHref: string;
+  quizFormatsHref: string;
   quizTimerHref: string;
   quizScheduleHref: string;
   quizSecurityHref: string;
@@ -502,6 +503,7 @@ export function TeamQuizResultsTab({
   workspaces,
   userFieldDisplayById,
   quizResultsHref,
+  quizFormatsHref,
   quizTimerHref,
   quizScheduleHref,
   quizSecurityHref,
@@ -648,6 +650,7 @@ export function TeamQuizResultsTab({
     <div className="space-y-4">
       <TeamQuizResultsSubTabs
         quizResultsHref={quizResultsHref}
+        quizFormatsHref={quizFormatsHref}
         quizTimerHref={quizTimerHref}
         quizScheduleHref={quizScheduleHref}
         quizSecurityHref={quizSecurityHref}

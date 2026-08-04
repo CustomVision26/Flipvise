@@ -24,6 +24,7 @@ import { teamQuizDurationSeconds } from "@/lib/team-quiz-duration";
 import { resolveMemberStudyModes } from "@/lib/team-study-privilege";
 import { isEducationTeamPlanId, canConfigurePersonalDeckQuizFormatsFromAccess } from "@/lib/education-plans";
 import { resolveAiRecallAccess } from "@/lib/ai-recall-eligibility";
+import { resolveEffectiveAiRecallSessionCardCount } from "@/lib/ai-recall-session-cards";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
   teamWorkspaceDeckTitleLinkClass,
@@ -42,6 +43,12 @@ import {
 } from "@/lib/team-workspace-url";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
 import { StudySessionLoader } from "./study-session-loader";
+import { LiveClassroomStudyJoinCard } from "@/components/live-classroom-study-join-card";
+import {
+  getLiveClassroomParticipantGrant,
+  listActiveOrLobbySessionsForTeam,
+} from "@/db/queries/live-classroom";
+import { teamOwnsLiveClassroom } from "@/lib/live-classroom-access";
 import { getTeamDeckContext } from "@/lib/deck-team-heading";
 import {
   CARDS_PER_DECK_LIMIT_FREE,
@@ -305,6 +312,26 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     ? await getQuizFormatsDeckSnapshotForOwner(id, userId)
     : null;
 
+  // Join-with-code on study only for members who were granted LC access
+  // (Session Settings → Members → Grant access to LC). Owners/hosts do not see it.
+  let showLiveClassroomJoin = false;
+  let liveClassroomSessionName: string | null = null;
+  if (studyTeamId != null) {
+    const [{ owns }, grant] = await Promise.all([
+      teamOwnsLiveClassroom(studyTeamId),
+      getLiveClassroomParticipantGrant(studyTeamId, userId),
+    ]);
+    if (owns && grant != null) {
+      const openSessions = await listActiveOrLobbySessionsForTeam(studyTeamId);
+      const linked =
+        openSessions.find((s) => s.deckId === id) ?? openSessions[0] ?? null;
+      if (linked != null) {
+        showLiveClassroomJoin = true;
+        liveClassroomSessionName = linked.name;
+      }
+    }
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -377,6 +404,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
                   {deck.description.trim()}
                 </p>
               ) : null}
+              {showLiveClassroomJoin ? (
+                <LiveClassroomStudyJoinCard
+                  sessionName={liveClassroomSessionName}
+                />
+              ) : null}
             </div>
           </div>
         </section>
@@ -397,6 +429,10 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
             quizDurationSeconds={quizDurationSeconds}
             hasAiReading={hasAiReading}
             hasAiRecall={studyHasAiRecall}
+            aiRecallSessionCardLimit={resolveEffectiveAiRecallSessionCardCount({
+              deckCardCount: deck.aiRecallSessionCardCount ?? null,
+              workspaceCardCount: studyTeam?.aiRecallSessionCardCount ?? null,
+            })}
             quizSecurity={quizSecurity}
             quizSchedule={quizSchedule}
             exitHref={studyBackHref}

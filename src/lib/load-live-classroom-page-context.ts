@@ -32,6 +32,8 @@ export type LiveClassroomPageContext = {
   role: LiveClassroomOrgRole | null;
   licensedSeats: number;
   owns: boolean;
+  /** Owner or assigned Live Classroom roster member. */
+  hasAccess: boolean;
   canHost: boolean;
   canManage: boolean;
   settings: LiveClassroomTeamSettingsRow | null;
@@ -87,6 +89,7 @@ export async function loadLiveClassroomPageContext(
     teamId: team.id,
     userId,
   });
+  const hasAccess = Boolean(role);
 
   const settings = ownership.owns
     ? await getOrCreateLiveClassroomTeamSettings(team.id)
@@ -99,6 +102,7 @@ export async function loadLiveClassroomPageContext(
     role,
     licensedSeats: ownership.licensedSeats,
     owns: ownership.owns,
+    hasAccess,
     canHost: liveClassroomRoleCanHost(role),
     canManage: liveClassroomRoleCanManageOrg(role),
     settings,
@@ -114,6 +118,7 @@ export type LiveClassroomSessionPageContext = {
   role: LiveClassroomOrgRole | null;
   licensedSeats: number;
   owns: boolean;
+  hasAccess: boolean;
   canHost: boolean;
   canManage: boolean;
   isAdmin: boolean;
@@ -138,6 +143,8 @@ export async function loadLiveClassroomSessionPageContext(
     userId,
   });
 
+  const hasAccess = Boolean(role);
+
   if (!ownership.owns) {
     return {
       userId,
@@ -147,14 +154,11 @@ export async function loadLiveClassroomSessionPageContext(
       role,
       licensedSeats: ownership.licensedSeats,
       owns: false,
+      hasAccess: false,
       canHost: false,
       canManage: false,
       isAdmin: access.isAdmin,
     };
-  }
-
-  if (!role && !access.isAdmin) {
-    redirect("/dashboard");
   }
 
   return {
@@ -165,8 +169,9 @@ export async function loadLiveClassroomSessionPageContext(
     role,
     licensedSeats: ownership.licensedSeats,
     owns: true,
-    canHost: liveClassroomRoleCanHost(role) || access.isAdmin,
-    canManage: liveClassroomRoleCanManageOrg(role) || access.isAdmin,
+    hasAccess,
+    canHost: liveClassroomRoleCanHost(role),
+    canManage: liveClassroomRoleCanManageOrg(role),
     isAdmin: access.isAdmin,
   };
 }

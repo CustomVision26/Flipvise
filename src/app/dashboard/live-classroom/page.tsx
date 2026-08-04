@@ -12,6 +12,7 @@ import {
 import {
   buildLiveClassroomHref,
   LIVE_CLASSROOM_HISTORY_PATH,
+  LIVE_CLASSROOM_JOIN_PATH,
   LIVE_CLASSROOM_REPORTS_PATH,
   LIVE_CLASSROOM_ROOT_PATH,
   LIVE_CLASSROOM_SCHEDULED_PATH,
@@ -20,7 +21,9 @@ import {
   liveClassroomReportPath,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
+import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
+import { LiveClassroomJoinCodeForm } from "@/components/live-classroom-join-code-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +45,10 @@ export default async function LiveClassroomDashboardPage({
 
   if (!ctx.owns) {
     return <LiveClassroomUnlock teamName={ctx.team.name} />;
+  }
+
+  if (!ctx.hasAccess) {
+    return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
 
   const [stats, recentSessions] = await Promise.all([
@@ -102,6 +109,20 @@ export default async function LiveClassroomDashboardPage({
               render={
                 <Link
                   href={buildLiveClassroomHref(
+                    LIVE_CLASSROOM_JOIN_PATH,
+                    ctx.teamId,
+                  )}
+                />
+              }
+            >
+              Join with code
+            </Button>
+            <Button
+              nativeButton={false}
+              variant="outline"
+              render={
+                <Link
+                  href={buildLiveClassroomHref(
                     LIVE_CLASSROOM_SCHEDULED_PATH,
                     ctx.teamId,
                   )}
@@ -126,6 +147,19 @@ export default async function LiveClassroomDashboardPage({
             </Button>
           </div>
         </div>
+
+        <Card className="border-border/80 bg-card/60 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Join with code</CardTitle>
+            <CardDescription>
+              Enter the host’s lobby code to join. You must be assigned to the
+              Live Classroom™ team. No lobby link is used.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LiveClassroomJoinCodeForm compact />
+          </CardContent>
+        </Card>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((stat) => (

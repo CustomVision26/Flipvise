@@ -11,6 +11,7 @@ import {
 import {
   assertDeckInWorkspaceForFormats,
   getDeckQuizFormatAssignmentsForStudy,
+  publishDeckQuizFormatAssignmentsForCards,
   resolveQuizFormatsForStudy,
   reshuffleDeckQuizFormatAssignments,
   updateDeckQuizDurationMinutes,
@@ -21,13 +22,18 @@ import { getCardsByDeckUnscoped, mergeCardQuizVariants } from "@/db/queries/card
 import { generateQuizVariantsForCard } from "@/lib/generate-quiz-variants-ai";
 import {
   countCardsReadyForQuizFormats,
+  distributionForQuizSize,
   explainQuizFormatContentBlock,
+  quizFormatDistributionSum,
   validateQuizFormatDistribution,
   type QuizFormatDistribution,
 } from "@/lib/quiz-format-assignments";
 import { parseCardQuizVariants, fillInBlankSegmentSchema } from "@/lib/card-quiz-variants";
 import { resolveCardMcqContext } from "@/lib/card-mcq-context";
-import { getAvailableQuestionTypesForCard } from "@/lib/quiz-questions";
+import {
+  getAvailableQuestionTypesForCard,
+  type QuizQuestionType,
+} from "@/lib/quiz-questions";
 import {
   buildQuizFormatPreviewItems,
   resolvePreviewAssignments,
@@ -147,6 +153,22 @@ const previewDeckQuizFormatsSchema = z.object({
   distribution: quizFormatDistributionSchema,
 });
 
+const listDeckQuizSelectableCardsSchema = z.object({
+  deckId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
+  /** Target quiz size — formats with counts in the scaled distribution are shown. */
+  quizCardLimit: z.number().int().positive(),
+  distribution: quizFormatDistributionSchema,
+});
+
+const publishSelectedDeckQuizCardsSchema = z.object({
+  deckId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
+  cardIds: z.array(z.number().int().positive()).min(1),
+  quizCardLimit: z.number().int().positive(),
+  distribution: quizFormatDistributionSchema,
+});
+
 const saveQuizFormatVariantEditSchema = z.object({
   deckId: z.number().int().positive(),
   teamId: z.number().int().positive().optional(),
@@ -183,7 +205,7 @@ export async function updateTeamQuizFormatsAction(
   }
 
   await updateTeamQuizFormats(parsed.data.teamId, team.ownerUserId, parsed.data.formats);
-  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
 }
 
 export async function updateDeckQuizFormatsAction(
@@ -221,7 +243,7 @@ export async function updateDeckQuizFormatsAction(
     parsed.data.formats,
   );
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
-  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
 }
 
 /** AI-generate true/false and fill-in-the-blank variants for all cards in a deck. */
@@ -379,7 +401,7 @@ export async function generateDeckQuizVariantsAction(
 
   revalidatePath(`/decks/${parsed.data.deckId}`);
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
-  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
 
   const afterCards = await getCardsByDeckUnscoped(parsed.data.deckId);
   const afterPrepared = afterCards.map((card) => ({
@@ -447,7 +469,7 @@ export async function reshuffleDeckQuizFormatAssignmentsAction(
   );
 
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
-  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
   return {
     cardCount: Object.keys(payload.byCardId).length,
     shuffledAt: payload.shuffledAt,
@@ -508,10 +530,159 @@ export async function publishDeckQuizFormatsAction(
 
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
   revalidatePath(`/decks/${parsed.data.deckId}`);
-  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
   return {
     cardCount: Object.keys(payload.byCardId).length,
     shuffledAt: payload.shuffledAt,
+  };
+}
+
+/**
+ * List eligible deck cards for the choose-cards publish flow.
+ * Returns quiz-taker previews for formats enabled in the (scaled) distribution.
+ */
+export async function listDeckQuizSelectableCardsAction(
+  data: z.infer<typeof listDeckQuizSelectableCardsSchema>,
+): Promise<{
+  items: QuizFormatPreviewItem[];
+  eligibleCardCount: number;
+  distribution: QuizFormatDistribution;
+  quizCardLimit: number;
+}> {
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+
+  const parsed = listDeckQuizSelectableCardsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { teamId } = await assertCanManageDeckQuizFormats(
+    access.userId,
+    parsed.data.deckId,
+    parsed.data.teamId,
+    access,
+  );
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+
+  const formats = await resolveQuizFormatsForStudy(parsed.data.deckId, teamId);
+  const cardRows = await getCardsByDeckUnscoped(parsed.data.deckId);
+  const prepared = cardRows.map((c) => ({
+    id: c.id,
+    front: c.front,
+    back: c.back,
+    choices: c.choices,
+    correctChoiceIndex: c.correctChoiceIndex,
+    quizVariants: parseCardQuizVariants(c.quizVariants),
+  }));
+
+  const eligible = prepared.filter((c) => (c.front ?? "").trim() && (c.back ?? "").trim());
+  if (eligible.length === 0) {
+    throw new Error("This deck has no cards with front and back text.");
+  }
+
+  const quizCardLimit = Math.min(parsed.data.quizCardLimit, eligible.length);
+  if (quizCardLimit < 1) {
+    throw new Error("Quiz must include at least one card.");
+  }
+
+  const distribution = distributionForQuizSize(
+    formats,
+    parsed.data.distribution,
+    quizCardLimit,
+  );
+  const distributionCheck = validateQuizFormatDistribution(
+    formats,
+    distribution,
+    eligible.length,
+  );
+  if (!distributionCheck.valid) {
+    throw new Error(distributionCheck.error);
+  }
+
+  const preferredTypes: QuizQuestionType[] = [];
+  if (distribution.multipleChoice > 0) preferredTypes.push("multiple_choice");
+  if (distribution.trueFalse > 0) preferredTypes.push("true_false");
+  if (distribution.fillInBlank > 0) preferredTypes.push("fill_in_blank");
+
+  const byCardId: Record<number, QuizQuestionType> = {};
+  for (const card of eligible) {
+    const available = getAvailableQuestionTypesForCard(card, prepared, formats);
+    const formatType =
+      preferredTypes.find((t) => available.includes(t)) ?? available[0] ?? null;
+    if (!formatType || !preferredTypes.includes(formatType)) continue;
+    byCardId[card.id] = formatType;
+  }
+
+  if (Object.keys(byCardId).length === 0) {
+    throw new Error(
+      "No cards are ready for the enabled quiz formats. Generate AI content or adjust formats.",
+    );
+  }
+
+  return {
+    items: buildQuizFormatPreviewItems(prepared, formats, byCardId),
+    eligibleCardCount: eligible.length,
+    distribution,
+    quizCardLimit,
+  };
+}
+
+/** Publish only the checked cards from the choose-cards flow. */
+export async function publishSelectedDeckQuizCardsAction(
+  data: z.infer<typeof publishSelectedDeckQuizCardsSchema>,
+) {
+  const access = await getAccessContext();
+  if (!access.userId) throw new Error("Unauthorized");
+
+  const parsed = publishSelectedDeckQuizCardsSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const { ownerUserId, teamId } = await assertCanManageDeckQuizFormats(
+    access.userId,
+    parsed.data.deckId,
+    parsed.data.teamId,
+    access,
+  );
+
+  const bundle = await getDeckWithViewerAccess(parsed.data.deckId, access.userId);
+  if (!bundle || !canEditDeckContent(bundle.access)) {
+    throw new Error("Deck not found");
+  }
+
+  const formats = await resolveQuizFormatsForStudy(parsed.data.deckId, teamId);
+  const uniqueCardIds = [...new Set(parsed.data.cardIds)];
+  if (uniqueCardIds.length !== parsed.data.quizCardLimit) {
+    throw new Error(
+      `Select exactly ${parsed.data.quizCardLimit} card${parsed.data.quizCardLimit === 1 ? "" : "s"}.`,
+    );
+  }
+
+  const distribution = distributionForQuizSize(
+    formats,
+    parsed.data.distribution,
+    parsed.data.quizCardLimit,
+  );
+  if (quizFormatDistributionSum(distribution) !== parsed.data.quizCardLimit) {
+    throw new Error("Could not build question counts for the selected quiz size.");
+  }
+
+  const payload = await publishDeckQuizFormatAssignmentsForCards(
+    parsed.data.deckId,
+    ownerUserId,
+    teamId,
+    distribution,
+    uniqueCardIds,
+  );
+
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
+  return {
+    cardCount: Object.keys(payload.byCardId).length,
+    shuffledAt: payload.shuffledAt,
+    distribution: payload.distribution ?? distribution,
   };
 }
 
@@ -619,6 +790,6 @@ export async function saveQuizFormatVariantEditAction(
   if (!merged) throw new Error("Card not found");
 
   revalidatePath(`/decks/${parsed.data.deckId}/study`);
-  revalidatePath("/dashboard/team-admin/deck-manager/study-privileges");
+  revalidatePath("/dashboard/team-admin/quiz-results/quiz-formats");
   return { ok: true };
 }

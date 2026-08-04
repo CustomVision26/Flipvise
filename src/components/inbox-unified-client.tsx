@@ -25,6 +25,7 @@ import {
   Mail,
   CheckCircle2,
   Sparkles,
+  Presentation,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -94,6 +95,7 @@ function formatAmount(cents: number | null, currency: string | null): string {
 
 const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   quiz_result: <BookCheck className="size-4 text-purple-400" aria-hidden />,
+  ai_recall_result: <Sparkles className="size-4 text-teal-400" aria-hidden />,
   team_invite: <Users className="size-4 text-blue-400" aria-hidden />,
   subscription_confirmed: (
     <CheckCircle2 className="size-4 text-emerald-400" aria-hidden />
@@ -109,6 +111,9 @@ const TYPE_ICONS: Record<InboxItemType, React.ReactNode> = {
   support_ticket: <LifeBuoy className="size-4 text-sky-400" aria-hidden />,
   contact_us_message: <Mail className="size-4 text-orange-400" aria-hidden />,
   welcome: <Sparkles className="size-4 text-primary" aria-hidden />,
+  live_classroom_lobby: (
+    <Presentation className="size-4 text-sky-400" aria-hidden />
+  ),
 };
 
 type SortKey = "newest" | "oldest" | "type";
@@ -121,16 +126,18 @@ function sortItems(items: UnifiedInboxItem[], sort: SortKey): UnifiedInboxItem[]
         admin_plan_invite: 1,
         subscription_confirmed: 2,
         quiz_result: 3,
-        billing: 4,
-        affiliate: 5,
-        affiliate_broadcast: 6,
-        affiliate_notice: 7,
-        billing_notice: 8,
-        admin_plan_log: 9,
-        quiz_security_notice: 10,
-        support_ticket: 11,
-        contact_us_message: 12,
-        welcome: 13,
+        ai_recall_result: 4,
+        billing: 5,
+        affiliate: 6,
+        affiliate_broadcast: 7,
+        affiliate_notice: 8,
+        billing_notice: 9,
+        admin_plan_log: 10,
+        quiz_security_notice: 11,
+        support_ticket: 12,
+        contact_us_message: 13,
+        welcome: 14,
+        live_classroom_lobby: 15,
       };
       const td = typeOrder[a.type] - typeOrder[b.type];
       if (td !== 0) return td;
@@ -627,6 +634,14 @@ function InboxItemRow({
                 Getting started
               </Badge>
             )}
+            {item.type === "live_classroom_lobby" && (
+              <Badge
+                variant="outline"
+                className="shrink-0 border-sky-500/35 text-xs text-sky-400"
+              >
+                Live Classroom™
+              </Badge>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground/70" suppressHydrationWarning>
@@ -644,7 +659,9 @@ function InboxItemRow({
               <p
                 className={cn(
                   "text-sm leading-relaxed text-foreground",
-                  item.type === "welcome" && "whitespace-pre-line",
+                  (item.type === "welcome" ||
+                    item.type === "live_classroom_lobby") &&
+                    "whitespace-pre-line",
                 )}
               >
                 {item.description}

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { loadLiveClassroomSessionPageContext } from "@/lib/load-live-classroom-page-context";
+import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomStudentPlay } from "@/components/live-classroom-student-play";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
@@ -16,6 +17,9 @@ export default async function LiveClassroomPlayPage({
   const ctx = await loadLiveClassroomSessionPageContext(sessionId);
   if (!ctx.owns) {
     return <LiveClassroomUnlock teamName={ctx.team.name} />;
+  }
+  if (!ctx.hasAccess) {
+    return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
 
   return (

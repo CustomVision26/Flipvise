@@ -4,6 +4,7 @@ import type { AdminPlanAssignment } from "@/lib/admin-assignable-plans";
 
 export type InboxItemType =
   | "quiz_result"
+  | "ai_recall_result"
   | "team_invite"
   | "subscription_confirmed"
   | "billing"
@@ -16,7 +17,8 @@ export type InboxItemType =
   | "quiz_security_notice"
   | "support_ticket"
   | "contact_us_message"
-  | "welcome";
+  | "welcome"
+  | "live_classroom_lobby";
 
 // ── Type-specific payload shapes ──────────────────────────────────────────────
 
@@ -161,10 +163,38 @@ export type WelcomePayload = {
   messageId: number;
 };
 
+export type LiveClassroomLobbyPayload = {
+  messageId: number;
+  sessionId: number;
+  teamId: number;
+  joinCode: string;
+};
+
+export type AiRecallResultPayload = {
+  messageId: number;
+  sessionId: number;
+  deckName: string;
+  correct: number;
+  incorrect: number;
+  cardsReviewed: number;
+  averageAiScore: number | null;
+  sessionDurationMs: number;
+};
+
 // ── Discriminated union ───────────────────────────────────────────────────────
 
 export type UnifiedInboxItem =
   | { type: "quiz_result"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: false; payload: QuizResultPayload }
+  | {
+      type: "ai_recall_result";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: false;
+      payload: AiRecallResultPayload;
+    }
   | { type: "team_invite"; key: string; title: string; description: string; dateIso: string; isRead: boolean; requiresAction: boolean; payload: TeamInvitePayload }
   | {
       type: "subscription_confirmed";
@@ -267,10 +297,21 @@ export type UnifiedInboxItem =
       isRead: boolean;
       requiresAction: false;
       payload: WelcomePayload;
+    }
+  | {
+      type: "live_classroom_lobby";
+      key: string;
+      title: string;
+      description: string;
+      dateIso: string;
+      isRead: boolean;
+      requiresAction: false;
+      payload: LiveClassroomLobbyPayload;
     };
 
 export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   quiz_result: "Quiz Result",
+  ai_recall_result: "AI Recall™",
   team_invite: "Workspace invitation",
   subscription_confirmed: "Subscription",
   billing: "Billing",
@@ -284,4 +325,5 @@ export const INBOX_TYPE_LABELS: Record<InboxItemType, string> = {
   support_ticket: "Support ticket",
   contact_us_message: "Contact Us",
   welcome: "Welcome",
+  live_classroom_lobby: "Live Classroom™",
 };

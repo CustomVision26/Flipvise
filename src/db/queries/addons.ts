@@ -7,6 +7,7 @@ import {
   type AddonCatalogSettingsRow,
   type UserAddonEntitlementRow,
 } from "@/db/schema";
+import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
 import { isPlanEligibleForAddon } from "@/lib/addon-plan-eligibility";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
@@ -199,6 +200,10 @@ export async function listAccessibleAddonKeysForUser(
 
   const keys: string[] = [];
   for (const row of entitlements) {
+    // AI Essay is plan-owner personal only for now — ignore team-sourced grants.
+    if (row.source === "team" && row.addonKey === AI_ESSAY_ADDON_KEY) {
+      continue;
+    }
     if (row.source === "admin") {
       keys.push(row.addonKey);
       continue;

@@ -38,6 +38,7 @@ import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import {
   evaluateAiRecallAnswerAction,
   generateAiRecallMotivationAction,
+  saveAiRecallSessionAction,
 } from "@/actions/ai-recall";
 import type {
   AiRecallPerCardSnapshot,
@@ -63,6 +64,7 @@ type CardData = {
 };
 
 type Phase =
+  | "intro"
   | "prompt"
   | "checking"
   | "unlocking"
@@ -77,6 +79,13 @@ export interface AiRecallStudyProps {
   teamId: number | null;
   deckGradient?: string | null;
   hasAiRecall: boolean;
+  /**
+   * Workspace setting: max cards for this AI Recall session.
+   * Null / omitted = use every card in the deck.
+   */
+  sessionCardLimit?: number | null;
+  /** True while a session is in progress (after Ready to start, before complete). */
+  onSessionBusyChange?: (busy: boolean) => void;
   /** Called when user chooses Standard Review from offline / upgrade gates. */
   onSwitchToStandardReview?: () => void;
 }
@@ -88,6 +97,15 @@ function shuffleArray<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+function buildSessionQueue(
+  allCards: CardData[],
+  limit: number | null | undefined,
+): CardData[] {
+  const shuffled = shuffleArray(allCards);
+  if (limit == null || limit <= 0) return shuffled;
+  return shuffled.slice(0, Math.min(limit, shuffled.length));
 }
 
 function insertForReviewAgain<T>(queue: T[], item: T, fromIndex: number): T[] {
@@ -106,15 +124,19 @@ export function AiRecallStudy({
   teamId,
   deckGradient,
   hasAiRecall,
+  sessionCardLimit = null,
+  onSessionBusyChange,
   onSwitchToStandardReview,
 }: AiRecallStudyProps) {
   const cardGradient = getGradientBySlug(deckGradient);
   const hasGradient = cardGradient.slug !== "none";
 
   const [online, setOnline] = useState(true);
-  const [queue, setQueue] = useState(() => shuffleArray(cards));
+  const [queue, setQueue] = useState(() =>
+    buildSessionQueue(cards, sessionCardLimit),
+  );
   const [index, setIndex] = useState(0);
-  const [phase, setPhase] = useState<Phase>("prompt");
+  const [phase, setPhase] = useState<Phase>("intro");
   const [studentAnswer, setStudentAnswer] = useState("");
   const [answerModality, setAnswerModality] =
     useState<RecallAnswerModality>("text");
@@ -128,6 +150,9 @@ export function AiRecallStudy({
   const [snapshots, setSnapshots] = useState<AiRecallPerCardSnapshot[]>([]);
   const [motivation, setMotivation] = useState<AiRecallMotivation | null>(null);
   const [motivationLoading, setMotivationLoading] = useState(false);
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [answerRevealKey, setAnswerRevealKey] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [enlargedImage, setEnlargedImage] = useState<{
@@ -137,9 +162,11 @@ export function AiRecallStudy({
   } | null>(null);
 
   const cardStartRef = useRef(Date.now());
+  const sessionStartRef = useRef<number | null>(null);
   const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawingPadRef = useRef<AiRecallDrawingPadHandle | null>(null);
   const lastSubmittedModalityRef = useRef<RecallAnswerModality>("text");
+  const savedSessionRef = useRef(false);
 
   const appendVoiceTranscript = useCallback((chunk: string) => {
     const t = chunk.trim();
@@ -165,6 +192,27 @@ export function AiRecallStudy({
       if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
     };
   }, []);
+
+  const sessionBusy =
+    hasAiRecall &&
+    online &&
+    phase !== "intro" &&
+    phase !== "complete";
+
+  useEffect(() => {
+    onSessionBusyChange?.(sessionBusy);
+    return () => onSessionBusyChange?.(false);
+  }, [sessionBusy, onSessionBusyChange]);
+
+  useEffect(() => {
+    if (!sessionBusy) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [sessionBusy]);
 
   const current = queue[index];
   const deckTotal = cards.length;
@@ -199,6 +247,7 @@ export function AiRecallStudy({
   }, []);
 
   useEffect(() => {
+    if (phase === "intro" || phase === "complete") return;
     cardStartRef.current = Date.now();
     setStudentAnswer("");
     setAnswerModality("text");
@@ -243,6 +292,27 @@ export function AiRecallStudy({
     return () => {
       cancelled = true;
     };
+  }, [phase, snapshots, deckId, deckName, teamId]);
+
+  useEffect(() => {
+    if (phase !== "complete" || snapshots.length === 0 || savedSessionRef.current) {
+      return;
+    }
+    savedSessionRef.current = true;
+    setSaveState("saving");
+    const startedAt = sessionStartRef.current ?? Date.now();
+    const sessionDurationMs = Math.max(0, Date.now() - startedAt);
+
+    void (async () => {
+      const result = await saveAiRecallSessionAction({
+        deckId,
+        deckName,
+        teamId,
+        sessionDurationMs,
+        perCard: snapshots,
+      });
+      setSaveState(result.ok ? "saved" : "error");
+    })();
   }, [phase, snapshots, deckId, deckName, teamId]);
 
   function recordSnapshot(
@@ -400,13 +470,29 @@ export function AiRecallStudy({
     goNext(updated, newQueue);
   }
 
-  function handleRestart() {
-    setQueue(shuffleArray(cards));
+  function handleReadyToStart() {
+    sessionStartRef.current = Date.now();
+    savedSessionRef.current = false;
+    setSaveState("idle");
+    setQueue(buildSessionQueue(cards, sessionCardLimit));
     setIndex(0);
     setSnapshots([]);
     setMotivation(null);
     setMotivationLoading(false);
     setPhase("prompt");
+    cardStartRef.current = Date.now();
+  }
+
+  function handleRestart() {
+    sessionStartRef.current = null;
+    savedSessionRef.current = false;
+    setSaveState("idle");
+    setQueue(buildSessionQueue(cards, sessionCardLimit));
+    setIndex(0);
+    setSnapshots([]);
+    setMotivation(null);
+    setMotivationLoading(false);
+    setPhase("intro");
   }
 
   /** Shuffle remaining cards (including current). Keeps already-reviewed order. */
@@ -512,6 +598,58 @@ export function AiRecallStudy({
     );
   }
 
+  if (cards.length === 0) {
+    return (
+      <p className="text-center text-sm text-muted-foreground">
+        No cards available for AI Recall™.
+      </p>
+    );
+  }
+
+  if (phase === "intro") {
+    const plannedCount = Math.min(
+      sessionCardLimit != null && sessionCardLimit > 0
+        ? sessionCardLimit
+        : cards.length,
+      cards.length,
+    );
+    return (
+      <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-2xl border border-border bg-card/60 p-6 text-center sm:p-8">
+        <Badge variant="secondary" className="gap-1 text-xs">
+          <Sparkles className="h-3 w-3" aria-hidden />
+          AI Recall™
+        </Badge>
+        <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+          Ready when you are
+        </h2>
+        <p className="text-sm font-medium text-foreground">{deckName}</p>
+        {deckDescription?.trim() ? (
+          <p className="max-w-md text-sm text-muted-foreground">
+            {deckDescription.trim()}
+          </p>
+        ) : null}
+        <div className="grid w-full grid-cols-2 gap-3 text-sm">
+          <Stat label="Cards this session" value={String(plannedCount)} />
+          <Stat label="Cards in deck" value={String(cards.length)} />
+        </div>
+        <p className="max-w-md text-xs text-muted-foreground">
+          Answer with Type, Voice, or Draw. Leaving Study Mode or this page during
+          the session asks for confirmation. Results save to Active Recall analytics
+          and your inbox when you finish.
+        </p>
+        <Button
+          type="button"
+          size="lg"
+          className="gap-2"
+          onClick={handleReadyToStart}
+        >
+          <Sparkles className="size-4" aria-hidden />
+          Ready to start
+        </Button>
+      </div>
+    );
+  }
+
   if (!current) {
     return (
       <p className="text-center text-sm text-muted-foreground">
@@ -591,7 +729,13 @@ export function AiRecallStudy({
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground">
-          Results are shown for this session only and are not saved automatically.
+          {saveState === "saving"
+            ? "Saving results to Active Recall analytics and your inbox…"
+            : saveState === "saved"
+              ? "Results saved to Active Recall analytics and your in-app inbox."
+              : saveState === "error"
+                ? "Could not save results automatically. You can still review the summary above."
+                : "Finishing up…"}
         </p>
         <TooltipProvider>
           <Tooltip>

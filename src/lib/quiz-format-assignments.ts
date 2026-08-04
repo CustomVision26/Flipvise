@@ -150,10 +150,16 @@ export function validateQuizFormatDistribution(
   if (eligibleCardCount === 0) {
     return { valid: false, error: "This deck has no cards with front and back text." };
   }
-  if (sum !== eligibleCardCount) {
+  if (sum < 1) {
     return {
       valid: false,
-      error: `Question counts must add up to ${eligibleCardCount} (currently ${sum}).`,
+      error: "Assign at least one question across the enabled formats.",
+    };
+  }
+  if (sum > eligibleCardCount) {
+    return {
+      valid: false,
+      error: `Question counts cannot exceed ${eligibleCardCount} cards (currently ${sum}).`,
     };
   }
 
@@ -471,4 +477,66 @@ export function distributionFromQuestionTypes(
     trueFalse: types.filter((t) => t === "true_false").length,
     fillInBlank: types.filter((t) => t === "fill_in_blank").length,
   };
+}
+
+export function quizFormatDistributionSum(distribution: QuizFormatDistribution): number {
+  return distribution.multipleChoice + distribution.trueFalse + distribution.fillInBlank;
+}
+
+/**
+ * Build a distribution that totals exactly `target` using enabled formats.
+ * Prefers the shape of `preferred` when its sum already matches; otherwise scales
+ * with the largest-remainder method, then falls back to an even split.
+ */
+export function distributionForQuizSize(
+  formats: QuizFormatsSettings,
+  preferred: QuizFormatDistribution,
+  target: number,
+): QuizFormatDistribution {
+  if (target <= 0) return { ...EMPTY_QUIZ_FORMAT_DISTRIBUTION };
+
+  const enabledKeys = (
+    [
+      ["multipleChoice", formats.multipleChoice],
+      ["trueFalse", formats.trueFalse],
+      ["fillInBlank", formats.fillInBlank],
+    ] as const
+  ).filter(([, on]) => on).map(([key]) => key);
+
+  if (enabledKeys.length === 0) return { ...EMPTY_QUIZ_FORMAT_DISTRIBUTION };
+
+  const clampedPreferred: QuizFormatDistribution = {
+    multipleChoice: formats.multipleChoice ? preferred.multipleChoice : 0,
+    trueFalse: formats.trueFalse ? preferred.trueFalse : 0,
+    fillInBlank: formats.fillInBlank ? preferred.fillInBlank : 0,
+  };
+  const preferredSum = quizFormatDistributionSum(clampedPreferred);
+  if (preferredSum === target) return clampedPreferred;
+
+  if (preferredSum > 0) {
+    const raw = enabledKeys.map((key) => ({
+      key,
+      exact: (clampedPreferred[key] / preferredSum) * target,
+    }));
+    const floors = raw.map((r) => ({ key: r.key, value: Math.floor(r.exact), frac: r.exact - Math.floor(r.exact) }));
+    let remaining = target - floors.reduce((acc, r) => acc + r.value, 0);
+    floors.sort((a, b) => b.frac - a.frac);
+    for (const row of floors) {
+      if (remaining <= 0) break;
+      row.value += 1;
+      remaining -= 1;
+    }
+    const next = { ...EMPTY_QUIZ_FORMAT_DISTRIBUTION };
+    for (const row of floors) next[row.key] = row.value;
+    return next;
+  }
+
+  const base = Math.floor(target / enabledKeys.length);
+  let rem = target - base * enabledKeys.length;
+  const next = { ...EMPTY_QUIZ_FORMAT_DISTRIBUTION };
+  for (const key of enabledKeys) {
+    next[key] = base + (rem > 0 ? 1 : 0);
+    if (rem > 0) rem -= 1;
+  }
+  return next;
 }

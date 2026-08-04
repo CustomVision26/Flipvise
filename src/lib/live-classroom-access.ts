@@ -14,6 +14,7 @@ import {
 } from "@/db/queries/addons";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import {
+  getLiveClassroomParticipantGrant,
   getLiveClassroomTeacherGrant,
   getOrCreateLiveClassroomTeamSettings,
 } from "@/db/queries/live-classroom";
@@ -27,7 +28,7 @@ import { subscriberHasActiveWorkspacePlan } from "@/lib/subscriber-team-plan-acc
 export { accessHasAddon, canAccessAddon };
 
 export function hasLiveClassroomAddon(ctx: AccessContext): boolean {
-  return ctx.isAdmin || canAccessAddon(ctx, LIVE_CLASSROOM_ADDON_KEY);
+  return canAccessAddon(ctx, LIVE_CLASSROOM_ADDON_KEY);
 }
 
 export async function redirectPathForMissingLiveClassroomAddon(): Promise<string> {
@@ -42,8 +43,8 @@ export async function redirectPathForMissingLiveClassroomAddon(): Promise<string
 
 /**
  * Organization owns Live Classroom when the subscription owner has an active
- * stripe/admin entitlement (or platform admin preview), and the workspace plan
- * is an eligible team tier.
+ * stripe/admin entitlement and the workspace plan is an eligible team tier.
+ * Platform admins do not inherit product access — they monitor usage elsewhere.
  */
 export async function teamOwnsLiveClassroom(teamId: number): Promise<{
   owns: boolean;
@@ -64,11 +65,6 @@ export async function teamOwnsLiveClassroom(teamId: number): Promise<{
     ? liveClassroomParticipantLimitForPlan(team.planSlug)
     : 0;
 
-  const access = await getAccessContext();
-  if (access.isAdmin && access.userId) {
-    return { owns: true, team, licensedSeats, subscriptionActive };
-  }
-
   const ownerEntitlement = await getUserAddonEntitlement(
     team.ownerUserId,
     LIVE_CLASSROOM_ADDON_KEY,
@@ -79,8 +75,8 @@ export async function teamOwnsLiveClassroom(teamId: number): Promise<{
       ownerEntitlement.source === "admin");
 
   // Stripe purchases require an active workspace subscription.
-  // Platform-admin complimentary grants unlock the org when the workspace
-  // plan is an eligible team tier (even if billing sync is temporarily stale).
+  // Complimentary admin grants unlock the org when the workspace plan is an
+  // eligible team tier (even if billing sync is temporarily stale).
   const owns =
     ownerOwns &&
     eligible &&
@@ -110,6 +106,14 @@ export async function resolveLiveClassroomOrgRole(input: {
   const members = await listTeamMembers(input.teamId);
   const membership = members.find((m) => m.userId === input.userId);
   if (!membership) return null;
+
+  // Workspace membership alone is not enough — must be on the LC roster.
+  const assigned = await getLiveClassroomParticipantGrant(
+    input.teamId,
+    input.userId,
+  );
+  if (!assigned) return null;
+
   if (membership.role === "team_admin") return "team_administrator";
 
   const grant = await getLiveClassroomTeacherGrant(input.teamId, input.userId);
@@ -140,8 +144,9 @@ export function liveClassroomRoleCanPurchase(
 }
 
 /**
- * Page/action gate: user must belong to a team that owns Live Classroom
- * (or be a platform admin). For host actions, pass `requireHost`.
+ * Page/action gate: user must belong to a team that owns Live Classroom and
+ * have an LC role (owner or assigned roster). Platform admins do not bypass.
+ * For host actions, pass `requireHost`.
  */
 export async function requireLiveClassroomAccess(input: {
   teamId: number;
@@ -171,36 +176,32 @@ export async function requireLiveClassroomAccess(input: {
     teamId: input.teamId,
     userId: access.userId,
   });
-  if (!role && !access.isAdmin) {
-    if (mode === "page") redirect("/dashboard");
-    throw new Error("You are not a member of this organization.");
+  if (!role) {
+    if (mode === "page") redirect(`/dashboard/live-classroom?team=${input.teamId}`);
+    throw new Error(
+      "You are not assigned to Live Classroom™ for this workspace. Ask the subscription owner or a team administrator to assign you.",
+    );
   }
 
-  const effectiveRole: LiveClassroomOrgRole = role ?? "subscription_owner";
-
-  if (input.requireHost && !liveClassroomRoleCanHost(effectiveRole) && !access.isAdmin) {
+  if (input.requireHost && !liveClassroomRoleCanHost(role)) {
     if (mode === "page") redirect(`/dashboard/live-classroom?team=${input.teamId}`);
     throw new Error("Teacher permission required to host Live Classroom sessions.");
   }
 
-  if (
-    input.requireOrgManage &&
-    !liveClassroomRoleCanManageOrg(effectiveRole) &&
-    !access.isAdmin
-  ) {
+  if (input.requireOrgManage && !liveClassroomRoleCanManageOrg(role)) {
     if (mode === "page") redirect(`/dashboard/live-classroom?team=${input.teamId}`);
     throw new Error("Organization admin permission required.");
   }
 
   const settings = await getOrCreateLiveClassroomTeamSettings(input.teamId);
-  if (!settings.enabled && !access.isAdmin) {
+  if (!settings.enabled) {
     if (mode === "page") redirect(`/dashboard/live-classroom?team=${input.teamId}`);
     throw new Error("Live Classroom is disabled for this organization.");
   }
 
   return {
     access: access as AccessContext & { userId: string },
-    role: effectiveRole,
+    role,
     licensedSeats: ownership.licensedSeats,
     settings,
   };

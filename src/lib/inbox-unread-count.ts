@@ -6,6 +6,7 @@ import { countUnreadSupportNotificationsForInboxBadge } from "@/db/queries/suppo
 import { countUnreadContactUsNotificationsForRecipient } from "@/db/queries/contact-us-notifications";
 import { countUnreadQuizResultInboxForUser } from "@/db/queries/quiz-results";
 import { countUnreadWelcomeInboxForUser } from "@/db/queries/welcome-inbox";
+import { countUnreadLiveClassroomLobbyInboxForUser } from "@/db/queries/live-classroom-lobby-inbox";
 import { tryTeamQuery } from "@/lib/team-query-fallback";
 
 export async function getInboxUnreadCountForUser(input: {
@@ -24,6 +25,7 @@ export async function getInboxUnreadCountForUser(input: {
     contactUsAlerts,
     quizResults,
     welcomeMessages,
+    liveClassroomLobbyMessages,
   ] = await Promise.all([
     primaryEmail != null && primaryEmail !== ""
       ? tryTeamQuery(
@@ -40,6 +42,7 @@ export async function getInboxUnreadCountForUser(input: {
       : Promise.resolve(0),
     countUnreadQuizResultInboxForUser(userId).catch(() => 0),
     countUnreadWelcomeInboxForUser(userId).catch(() => 0),
+    countUnreadLiveClassroomLobbyInboxForUser(userId).catch(() => 0),
   ]);
 
   return (
@@ -50,6 +53,7 @@ export async function getInboxUnreadCountForUser(input: {
     supportAlerts +
     contactUsAlerts +
     quizResults +
-    welcomeMessages
+    welcomeMessages +
+    liveClassroomLobbyMessages
   );
 }

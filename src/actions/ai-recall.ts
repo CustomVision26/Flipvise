@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAccessContext } from "@/lib/access";
 import { resolveAiRecallAccess } from "@/lib/ai-recall-eligibility";
@@ -12,6 +13,7 @@ import {
 import {
   applyMasteryUpdatesForSession,
   computeSessionAnalytics,
+  deliverAiRecallSessionInbox,
   getDeckSubjectContext,
   saveAiRecallSession,
 } from "@/db/queries/ai-recall";
@@ -211,6 +213,23 @@ export async function saveAiRecallSessionAction(
     analytics,
     perCard,
   });
+
+  try {
+    await deliverAiRecallSessionInbox({
+      sessionId: row.id,
+      recipientUserId: access.userId,
+      deckName: parsed.data.deckName,
+      correct: analytics.correct,
+      cardsReviewed: analytics.cardsReviewed,
+      averageAiScore: analytics.averageAiScore,
+    });
+  } catch (err) {
+    console.error("[saveAiRecallSessionAction] inbox delivery failed", err);
+  }
+
+  revalidatePath("/dashboard/team-admin/study-modes/active-recall");
+  revalidatePath("/dashboard/inbox");
+  revalidatePath("/teacher/students");
 
   return { ok: true, sessionId: row.id };
 }

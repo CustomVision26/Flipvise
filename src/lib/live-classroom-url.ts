@@ -2,6 +2,7 @@
 
 export const LIVE_CLASSROOM_ROOT_PATH = "/dashboard/live-classroom";
 export const LIVE_CLASSROOM_START_PATH = "/dashboard/live-classroom/start";
+export const LIVE_CLASSROOM_JOIN_PATH = "/dashboard/live-classroom/join";
 export const LIVE_CLASSROOM_SCHEDULED_PATH =
   "/dashboard/live-classroom/scheduled";
 export const LIVE_CLASSROOM_HISTORY_PATH = "/dashboard/live-classroom/history";

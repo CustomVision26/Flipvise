@@ -413,7 +413,7 @@ export function FormatQuizQuestionDialog({
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Counts must add up to {eligibleCardCount} before generating AI content or
+                    Counts may total up to {eligibleCardCount} cards before generating AI content or
                     publishing.
                   </p>
                 )}

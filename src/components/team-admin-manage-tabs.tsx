@@ -115,6 +115,7 @@ export type TeamAdminManageTabsProps = {
   invitePendingHref: string;
   inviteHistoryHref: string;
   quizResultsHref: string;
+  quizFormatsHref: string;
   quizTimerHref: string;
   quizScheduleHref: string;
   quizSecurityHref: string;
@@ -195,6 +196,7 @@ export function TeamAdminManageTabs({
   invitePendingHref,
   inviteHistoryHref,
   quizResultsHref,
+  quizFormatsHref,
   quizTimerHref,
   quizScheduleHref,
   quizSecurityHref,
@@ -447,6 +449,7 @@ export function TeamAdminManageTabs({
           workspaces={workspaceQuizSnapshots}
           userFieldDisplayById={userFieldDisplayById}
           quizResultsHref={quizResultsHref}
+          quizFormatsHref={quizFormatsHref}
           quizTimerHref={quizTimerHref}
           quizScheduleHref={quizScheduleHref}
           quizSecurityHref={quizSecurityHref}

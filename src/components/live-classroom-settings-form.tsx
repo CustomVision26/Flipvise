@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  setLiveClassroomParticipantGrantAction,
   setLiveClassroomTeacherGrantAction,
   updateLiveClassroomSettingsAction,
 } from "@/actions/live-classroom";
@@ -38,9 +39,11 @@ import {
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
 
-export type LiveClassroomTeacherMember = {
+export type LiveClassroomRosterMember = {
   userId: string;
   displayName: string;
+  workspaceRole: "team_admin" | "team_member";
+  isAssigned: boolean;
   hasTeacherGrant: boolean;
 };
 
@@ -59,7 +62,7 @@ type LiveClassroomSettingsFormProps = {
     strategyCardPolicy: LiveClassroomStrategyCardPolicy;
     strategyCardLimitPerTeam: number;
   };
-  members: LiveClassroomTeacherMember[];
+  members: LiveClassroomRosterMember[];
 };
 
 export function LiveClassroomSettingsForm({
@@ -120,7 +123,36 @@ export function LiveClassroomSettingsForm({
     });
   }
 
-  async function toggleTeacher(member: LiveClassroomTeacherMember, next: boolean) {
+  async function toggleAssigned(
+    member: LiveClassroomRosterMember,
+    next: boolean,
+  ) {
+    setGrantPending(member.userId);
+    try {
+      await setLiveClassroomParticipantGrantAction({
+        teamId,
+        memberUserId: member.userId,
+        enabled: next,
+      });
+      toast.success(
+        next
+          ? `${member.displayName} assigned to Live Classroom™`
+          : `${member.displayName} removed from Live Classroom™`,
+      );
+      router.refresh();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not update assignment",
+      );
+    } finally {
+      setGrantPending(null);
+    }
+  }
+
+  async function toggleTeacher(
+    member: LiveClassroomRosterMember,
+    next: boolean,
+  ) {
     setGrantPending(member.userId);
     try {
       await setLiveClassroomTeacherGrantAction({
@@ -301,37 +333,73 @@ export function LiveClassroomSettingsForm({
 
       <Card className="border-border/80 bg-card/60 shadow-sm">
         <CardHeader>
-          <CardTitle>Teacher host grants</CardTitle>
+          <CardTitle>Live Classroom™ team</CardTitle>
           <CardDescription>
-            Grant team members permission to host Live Classroom™ sessions.
-            Owners and team admins can host by default.
+            Workspace membership does not grant Live Classroom™. Assign members
+            here so they can join with the lobby code. Team admins who are
+            assigned can host and manage; regular members need Can host to host
+            sessions. The subscription owner always has access.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {members.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No members available to grant.
+              No workspace members to assign yet.
             </p>
           ) : (
             members.map((member) => {
               const pendingGrant = grantPending === member.userId;
+              const canHostToggle =
+                member.workspaceRole === "team_member" && member.isAssigned;
               return (
                 <div key={member.userId}>
-                  <label className="flex items-center justify-between gap-3 rounded-md border border-border/40 px-3 py-2">
-                    <span className="min-w-0 truncate text-sm font-medium text-foreground">
-                      {member.displayName}
-                    </span>
-                    <span className="flex items-center gap-2">
+                  <div className="flex flex-col gap-3 rounded-md border border-border/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {member.displayName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {member.workspaceRole === "team_admin"
+                          ? "Team administrator"
+                          : "Member"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4">
                       {pendingGrant ? (
                         <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
                       ) : null}
-                      <Switch
-                        checked={member.hasTeacherGrant}
-                        disabled={pendingGrant}
-                        onCheckedChange={(v) => void toggleTeacher(member, v)}
-                      />
-                    </span>
-                  </label>
+                      <label className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          Assigned
+                        </span>
+                        <Switch
+                          checked={member.isAssigned}
+                          disabled={pendingGrant}
+                          onCheckedChange={(v) =>
+                            void toggleAssigned(member, v)
+                          }
+                        />
+                      </label>
+                      {member.workspaceRole === "team_member" ? (
+                        <label className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            Can host
+                          </span>
+                          <Switch
+                            checked={member.hasTeacherGrant}
+                            disabled={pendingGrant || !canHostToggle}
+                            onCheckedChange={(v) =>
+                              void toggleTeacher(member, v)
+                            }
+                          />
+                        </label>
+                      ) : member.isAssigned ? (
+                        <Badge variant="secondary" className="text-[10px]">
+                          Can host when assigned
+                        </Badge>
+                      ) : null}
+                    </div>
+                  </div>
                   <Separator className="my-2 bg-border/40 last:hidden" />
                 </div>
               );

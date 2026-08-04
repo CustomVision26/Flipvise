@@ -8,6 +8,7 @@ import {
   liveClassroomParticipants,
   liveClassroomSavedGroups,
   liveClassroomSessions,
+  liveClassroomParticipantGrants,
   liveClassroomTeacherGrants,
   liveClassroomTeamSettings,
   liveClassroomTeams,
@@ -17,6 +18,7 @@ import {
   type LiveBattleQuestionRow,
   type LiveBattleReportRow,
   type LiveBattleStrategyCardRow,
+  type LiveClassroomParticipantGrantRow,
   type LiveClassroomParticipantRow,
   type LiveClassroomSavedGroupRow,
   type LiveClassroomSessionRow,
@@ -53,6 +55,7 @@ export type {
   LiveBattleQuestionRow,
   LiveBattleReportRow,
   LiveBattleStrategyCardRow,
+  LiveClassroomParticipantGrantRow,
   LiveClassroomParticipantRow,
   LiveClassroomSavedGroupRow,
   LiveClassroomSessionRow,
@@ -194,6 +197,75 @@ export async function revokeLiveClassroomTeacher(
       ),
     )
     .returning({ id: liveClassroomTeacherGrants.id });
+  return deleted.length > 0;
+}
+
+export async function getLiveClassroomParticipantGrant(
+  teamId: number,
+  userId: string,
+): Promise<LiveClassroomParticipantGrantRow | null> {
+  const [row] = await db
+    .select()
+    .from(liveClassroomParticipantGrants)
+    .where(
+      and(
+        eq(liveClassroomParticipantGrants.teamId, teamId),
+        eq(liveClassroomParticipantGrants.userId, userId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function listLiveClassroomParticipantGrants(
+  teamId: number,
+): Promise<LiveClassroomParticipantGrantRow[]> {
+  return db
+    .select()
+    .from(liveClassroomParticipantGrants)
+    .where(eq(liveClassroomParticipantGrants.teamId, teamId))
+    .orderBy(desc(liveClassroomParticipantGrants.createdAt));
+}
+
+export async function grantLiveClassroomParticipant(
+  teamId: number,
+  userId: string,
+  grantedByUserId: string,
+): Promise<LiveClassroomParticipantGrantRow> {
+  const [inserted] = await db
+    .insert(liveClassroomParticipantGrants)
+    .values({ teamId, userId, grantedByUserId })
+    .onConflictDoNothing({
+      target: [
+        liveClassroomParticipantGrants.teamId,
+        liveClassroomParticipantGrants.userId,
+      ],
+    })
+    .returning();
+  if (inserted) return inserted;
+
+  const existing = await getLiveClassroomParticipantGrant(teamId, userId);
+  if (!existing) {
+    throw new Error(
+      `Failed to grant Live Classroom participant for team ${teamId}`,
+    );
+  }
+  return existing;
+}
+
+export async function revokeLiveClassroomParticipant(
+  teamId: number,
+  userId: string,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(liveClassroomParticipantGrants)
+    .where(
+      and(
+        eq(liveClassroomParticipantGrants.teamId, teamId),
+        eq(liveClassroomParticipantGrants.userId, userId),
+      ),
+    )
+    .returning({ id: liveClassroomParticipantGrants.id });
   return deleted.length > 0;
 }
 

@@ -84,7 +84,9 @@ function AddonChipButton({
 }) {
   const label = item.unlocked
     ? `${item.name} · Open`
-    : `${item.name} · Unlock`;
+    : item.comingSoon
+      ? `${item.name} · Coming soon`
+      : `${item.name} · Unlock`;
   const chip = ADDON_CHIP_STYLES[colorIndex]!;
   const icon = ADDON_ICON_STYLES[colorIndex]!;
 
@@ -166,6 +168,15 @@ export function DashboardAddonsBanner({
     }
     if (item.unlocked) {
       router.push("/pricing/add-ons");
+      return;
+    }
+    if (item.comingSoon) {
+      if (item.key === AI_ESSAY_ADDON_KEY) {
+        router.push("/dashboard/ai-doc-studio/ai-essay");
+        return;
+      }
+      setError(null);
+      setUnlockTarget(item);
       return;
     }
     setPeriod("monthly");

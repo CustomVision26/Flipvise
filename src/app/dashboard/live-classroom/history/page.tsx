@@ -10,6 +10,7 @@ import {
   liveClassroomReportPath,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
+import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,6 +32,10 @@ export default async function LiveClassroomHistoryPage({
 
   if (!ctx.owns) {
     return <LiveClassroomUnlock teamName={ctx.team.name} />;
+  }
+
+  if (!ctx.hasAccess) {
+    return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
 
   const sessions = await listLiveClassroomSessionsForTeam(ctx.teamId, {

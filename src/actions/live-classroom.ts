@@ -13,6 +13,7 @@ import {
   getLiveBattleReportBySession,
   getLiveClassroomParticipant,
   getLiveClassroomSessionById,
+  getLiveClassroomSessionByJoinCode,
   getOrCreateLiveClassroomTeamSettings,
   insertLiveBattleAnswer,
   insertLiveBattleQuestions,
@@ -31,10 +32,14 @@ import {
   updateLiveClassroomTeamSettings,
   upsertLiveBattleReport,
   upsertLiveClassroomParticipant,
+  grantLiveClassroomParticipant,
   grantLiveClassroomTeacher,
+  revokeLiveClassroomParticipant,
   revokeLiveClassroomTeacher,
 } from "@/db/queries/live-classroom";
-import { getDeckById } from "@/db/queries/decks";
+import { getDeckRowById } from "@/db/queries/decks";
+import { upsertLiveClassroomLobbyInboxMessage } from "@/db/queries/live-classroom-lobby-inbox";
+import { getDecksForTeam, getTeamById, listTeamMembers } from "@/db/queries/teams";
 import {
   liveClassroomRoleCanHost,
   liveClassroomRoleCanManageOrg,
@@ -42,6 +47,8 @@ import {
   resolveLiveClassroomOrgRole,
   teamOwnsLiveClassroom,
 } from "@/lib/live-classroom-access";
+import { buildLiveClassroomLobbyInviteCopy } from "@/lib/live-classroom-lobby-inbox";
+import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import {
   generateLiveClassroomAiExplanation,
   generateLiveClassroomTeacherSummary,
@@ -100,13 +107,8 @@ const createSessionSchema = z.object({
     .array(z.enum(LIVE_CLASSROOM_STRATEGY_CARD_KINDS))
     .optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
-  warmUp: z
-    .object({
-      subject: z.string().min(1).max(255),
-      topic: z.string().min(1).max(255),
-      grade: z.string().min(1).max(64),
-    })
-    .optional(),
+  /** When true, generate AI warm-up questions from the selected workspace deck. */
+  warmUp: z.boolean().optional(),
   teamCount: z.number().int().min(2).max(4).optional(),
 });
 
@@ -201,19 +203,29 @@ export async function createLiveClassroomSessionAction(
     cardId?: number | null;
   }> = [];
 
-  if (data.warmUp) {
+  if (!data.deckId) {
+    throw new Error("Select a deck linked to this workspace.");
+  }
+
+  const team = await getTeamById(data.teamId);
+  if (!team) throw new Error("Workspace not found.");
+  const workspaceDecks = await getDecksForTeam(data.teamId, team.ownerUserId);
+  const workspaceDeck = workspaceDecks.find((d) => d.id === data.deckId);
+  if (!workspaceDeck) {
+    throw new Error("Deck is not linked to this workspace.");
+  }
+
+  if (data.warmUp || data.sessionType === "warm_up") {
     questionRows = await generateLiveClassroomWarmUpQuestions({
       userId: access.userId,
       teamId: data.teamId,
-      subject: data.warmUp.subject,
-      topic: data.warmUp.topic,
-      grade: data.warmUp.grade,
+      subject: workspaceDeck.name,
+      topic: workspaceDeck.description?.trim() || workspaceDeck.name,
+      grade: workspaceDeck.gradeLevel?.trim() || "General",
       difficulty: data.difficulty,
       questionCount: data.questionCount,
     });
-  } else if (data.deckId) {
-    const deck = await getDeckById(data.deckId, access.userId);
-    if (!deck) throw new Error("Deck not found or not accessible.");
+  } else {
     const cards = await getCardsByDeckUnscoped(data.deckId);
     if (cards.length === 0) throw new Error("Deck has no cards.");
     questionRows = questionsFromDeckCards(
@@ -238,8 +250,6 @@ export async function createLiveClassroomSessionAction(
       }),
       data.questionCount,
     );
-  } else {
-    throw new Error("Select a deck or generate a warm-up.");
   }
 
   await insertLiveBattleQuestions(
@@ -328,6 +338,33 @@ export async function joinLiveClassroomSessionAction(raw: {
 
   revalidateLiveClassroom(session.teamId, session.id);
   return { ok: true as const };
+}
+
+/** Resolve a lobby join code and join the session (code-only — no lobby link). */
+export async function joinLiveClassroomByCodeAction(raw: { joinCode: string }) {
+  const schema = z.object({
+    joinCode: z
+      .string()
+      .trim()
+      .min(4)
+      .max(16)
+      .transform((v) => v.toUpperCase().replace(/[^A-Z0-9]/g, "")),
+  });
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Error("Enter a valid join code.");
+
+  const session = await getLiveClassroomSessionByJoinCode(parsed.data.joinCode);
+  if (!session) throw new Error("No session found for that join code.");
+  if (!["lobby", "active", "paused"].includes(session.status)) {
+    throw new Error("This session is not joinable.");
+  }
+
+  await joinLiveClassroomSessionAction({ sessionId: session.id });
+  return {
+    sessionId: session.id,
+    status: session.status,
+    teamId: session.teamId,
+  };
 }
 
 export async function heartbeatLiveClassroomAction(sessionId: number) {
@@ -519,12 +556,13 @@ export async function assignLiveClassroomTeamsAction(raw: {
 
 export async function updateLobbyTeamAction(raw: {
   sessionId: number;
-  liveTeamId: number;
+  liveTeamId?: number;
   name?: string;
   lockTeams?: boolean;
   removeUserId?: string;
   moveUserId?: string;
-  toLiveTeamId?: number;
+  /** Target team id, or null to move to Unassigned. */
+  toLiveTeamId?: number | null;
 }) {
   const schema = z.object({
     sessionId: z.number().int().positive(),
@@ -533,7 +571,7 @@ export async function updateLobbyTeamAction(raw: {
     lockTeams: z.boolean().optional(),
     removeUserId: z.string().optional(),
     moveUserId: z.string().optional(),
-    toLiveTeamId: z.number().int().positive().optional(),
+    toLiveTeamId: z.number().int().positive().nullable().optional(),
   });
   const parsed = schema.safeParse(raw);
   if (!parsed.success) throw new Error("Invalid lobby update");
@@ -568,17 +606,101 @@ export async function updateLobbyTeamAction(raw: {
       });
     }
   }
-  if (parsed.data.moveUserId && parsed.data.toLiveTeamId) {
+  if (
+    parsed.data.moveUserId &&
+    Object.prototype.hasOwnProperty.call(parsed.data, "toLiveTeamId")
+  ) {
+    if (session.teamsLocked) throw new Error("Teams are locked.");
     const p = await getLiveClassroomParticipant(
       session.id,
       parsed.data.moveUserId,
     );
     if (p) {
       await updateLiveClassroomParticipant(p.id, {
-        liveTeamId: parsed.data.toLiveTeamId,
+        liveTeamId: parsed.data.toLiveTeamId ?? null,
       });
     }
   }
+
+  revalidateLiveClassroom(session.teamId, session.id);
+  return { ok: true as const };
+}
+
+/** Update per-session lobby settings (name, type, mode, config) before battle starts. */
+export async function updateLiveClassroomSessionSettingsAction(raw: {
+  sessionId: number;
+  name?: string;
+  sessionType?: (typeof LIVE_CLASSROOM_SESSION_TYPES)[number];
+  battleMode?: (typeof LIVE_CLASSROOM_BATTLE_MODES)[number];
+  questionCount?: number;
+  timePerQuestionSec?: number;
+  difficulty?: (typeof LIVE_CLASSROOM_DIFFICULTIES)[number];
+  allowAiExplanations?: boolean;
+  allowStrategyCards?: boolean;
+  allowMusic?: boolean;
+  teamAssignment?: (typeof LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES)[number];
+  strategyCardPolicy?: (typeof LIVE_CLASSROOM_STRATEGY_CARD_POLICIES)[number];
+  strategyCardLimitPerTeam?: number;
+  survivalHearts?: number;
+}) {
+  const schema = z.object({
+    sessionId: z.number().int().positive(),
+    name: z.string().trim().min(1).max(255).optional(),
+    sessionType: z.enum(LIVE_CLASSROOM_SESSION_TYPES).optional(),
+    battleMode: z.enum(LIVE_CLASSROOM_BATTLE_MODES).optional(),
+    questionCount: z.number().int().min(1).max(30).optional(),
+    timePerQuestionSec: z.number().int().min(5).max(180).optional(),
+    difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES).optional(),
+    allowAiExplanations: z.boolean().optional(),
+    allowStrategyCards: z.boolean().optional(),
+    allowMusic: z.boolean().optional(),
+    teamAssignment: z.enum(LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES).optional(),
+    strategyCardPolicy: z.enum(LIVE_CLASSROOM_STRATEGY_CARD_POLICIES).optional(),
+    strategyCardLimitPerTeam: z.number().int().min(0).max(20).optional(),
+    survivalHearts: z.number().int().min(1).max(5).optional(),
+  });
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Error("Invalid session settings");
+
+  const session = await getLiveClassroomSessionById(parsed.data.sessionId);
+  if (!session) throw new Error("Session not found");
+  if (!["lobby", "scheduled"].includes(session.status)) {
+    throw new Error("Session settings can only be changed before the battle starts.");
+  }
+
+  const { settings } = await requireLiveClassroomAccess({
+    teamId: session.teamId,
+    requireHost: true,
+  });
+
+  const {
+    sessionId: _id,
+    name,
+    sessionType,
+    battleMode,
+    ...configPatch
+  } = parsed.data;
+
+  const nextConfig: LiveClassroomSessionConfig = {
+    ...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
+    ...session.config,
+    ...configPatch,
+    allowStrategyCards:
+      (configPatch.allowStrategyCards ?? session.config.allowStrategyCards) &&
+      settings.allowStrategyCards,
+    allowMusic:
+      (configPatch.allowMusic ?? session.config.allowMusic) &&
+      settings.allowMusic,
+    allowAiExplanations:
+      configPatch.allowAiExplanations ?? session.config.allowAiExplanations,
+  };
+
+  await updateLiveClassroomSession(session.id, {
+    ...(name ? { name } : {}),
+    ...(sessionType ? { sessionType } : {}),
+    ...(battleMode ? { battleMode } : {}),
+    config: nextConfig,
+  });
 
   revalidateLiveClassroom(session.teamId, session.id);
   return { ok: true as const };
@@ -1157,6 +1279,50 @@ export async function updateLiveClassroomSettingsAction(raw: {
   return { ok: true as const };
 }
 
+export async function setLiveClassroomParticipantGrantAction(raw: {
+  teamId: number;
+  memberUserId: string;
+  enabled: boolean;
+}) {
+  const schema = z.object({
+    teamId: teamIdSchema,
+    memberUserId: z.string().min(1),
+    enabled: z.boolean(),
+  });
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Error("Invalid Live Classroom assignment");
+
+  const { access } = await requireLiveClassroomAccess({
+    teamId: parsed.data.teamId,
+    requireOrgManage: true,
+  });
+
+  const team = await getTeamById(parsed.data.teamId);
+  if (!team) throw new Error("Workspace not found.");
+  if (parsed.data.memberUserId === team.ownerUserId) {
+    throw new Error("The subscription owner always has Live Classroom access.");
+  }
+
+  if (parsed.data.enabled) {
+    await grantLiveClassroomParticipant(
+      parsed.data.teamId,
+      parsed.data.memberUserId,
+      access.userId,
+    );
+  } else {
+    await revokeLiveClassroomTeacher(
+      parsed.data.teamId,
+      parsed.data.memberUserId,
+    );
+    await revokeLiveClassroomParticipant(
+      parsed.data.teamId,
+      parsed.data.memberUserId,
+    );
+  }
+  revalidateLiveClassroom(parsed.data.teamId);
+  return { ok: true as const };
+}
+
 export async function setLiveClassroomTeacherGrantAction(raw: {
   teamId: number;
   memberUserId: string;
@@ -1176,6 +1342,12 @@ export async function setLiveClassroomTeacherGrantAction(raw: {
   });
 
   if (parsed.data.enabled) {
+    // Host permission requires roster assignment.
+    await grantLiveClassroomParticipant(
+      parsed.data.teamId,
+      parsed.data.memberUserId,
+      access.userId,
+    );
     await grantLiveClassroomTeacher(
       parsed.data.teamId,
       parsed.data.memberUserId,
@@ -1238,6 +1410,140 @@ export async function resolveLiveClassroomViewerRoleAction(teamId: number) {
     canManage: liveClassroomRoleCanManageOrg(role),
     licensedSeats,
   };
+}
+
+export async function setLiveClassroomSessionMemberLcAccessAction(raw: {
+  sessionId: number;
+  memberUserId: string;
+  enabled: boolean;
+}) {
+  const schema = z.object({
+    sessionId: z.number().int().positive(),
+    memberUserId: z.string().min(1),
+    enabled: z.boolean(),
+  });
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Error("Invalid Live Classroom access update");
+
+  const session = await getLiveClassroomSessionById(parsed.data.sessionId);
+  if (!session) throw new Error("Session not found.");
+
+  const { access } = await requireLiveClassroomAccess({
+    teamId: session.teamId,
+    requireHost: true,
+  });
+
+  const team = await getTeamById(session.teamId);
+  if (!team) throw new Error("Workspace not found.");
+  if (parsed.data.memberUserId === team.ownerUserId) {
+    throw new Error("The subscription owner always has Live Classroom access.");
+  }
+
+  const members = await listTeamMembers(session.teamId);
+  const isMember = members.some((m) => m.userId === parsed.data.memberUserId);
+  if (!isMember) {
+    throw new Error("That person is not a member of this workspace.");
+  }
+
+  if (parsed.data.enabled) {
+    await grantLiveClassroomParticipant(
+      session.teamId,
+      parsed.data.memberUserId,
+      access.userId,
+    );
+  } else {
+    await revokeLiveClassroomParticipant(
+      session.teamId,
+      parsed.data.memberUserId,
+    );
+  }
+
+  revalidateLiveClassroom(session.teamId, session.id);
+  revalidatePath(`/decks`);
+  return { ok: true as const };
+}
+
+export async function sendLiveClassroomLobbyCodeInboxAction(raw: {
+  sessionId: number;
+  memberUserId: string;
+}) {
+  const schema = z.object({
+    sessionId: z.number().int().positive(),
+    memberUserId: z.string().min(1),
+  });
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Error("Invalid lobby code invite");
+
+  const session = await getLiveClassroomSessionById(parsed.data.sessionId);
+  if (!session) throw new Error("Session not found.");
+  if (session.status !== "lobby" && session.status !== "active") {
+    throw new Error("Lobby codes can only be sent while the session is open.");
+  }
+
+  const { access } = await requireLiveClassroomAccess({
+    teamId: session.teamId,
+    requireHost: true,
+  });
+
+  const team = await getTeamById(session.teamId);
+  if (!team) throw new Error("Workspace not found.");
+
+  const isOwner = parsed.data.memberUserId === team.ownerUserId;
+  if (!isOwner) {
+    const members = await listTeamMembers(session.teamId);
+    const isMember = members.some((m) => m.userId === parsed.data.memberUserId);
+    if (!isMember) {
+      throw new Error("That person is not a member of this workspace.");
+    }
+    await grantLiveClassroomParticipant(
+      session.teamId,
+      parsed.data.memberUserId,
+      access.userId,
+    );
+  }
+
+  const displays = await getClerkUserFieldDisplaysByIds([
+    parsed.data.memberUserId,
+    access.userId,
+  ]);
+  let deckName: string | null = null;
+  if (session.deckId != null) {
+    const deck = await getDeckRowById(session.deckId);
+    deckName = deck?.name ?? null;
+  }
+
+  const copy = buildLiveClassroomLobbyInviteCopy({
+    recipientDisplayName:
+      displays[parsed.data.memberUserId]?.primaryLine ?? null,
+    hostDisplayName: displays[access.userId]?.primaryLine ?? null,
+    sessionName: session.name,
+    sessionType: session.sessionType,
+    battleMode: session.battleMode,
+    joinCode: session.joinCode,
+    deckName,
+  });
+
+  await upsertLiveClassroomLobbyInboxMessage({
+    recipientUserId: parsed.data.memberUserId,
+    teamId: session.teamId,
+    sessionId: session.id,
+    title: copy.title,
+    description: copy.description,
+    joinCode: session.joinCode,
+  });
+
+  notifyNativeInboxPush({
+    recipientUserId: parsed.data.memberUserId,
+    category: "live_classroom_lobby",
+    body: copy.title,
+  });
+
+  revalidateLiveClassroom(session.teamId, session.id);
+  revalidatePath("/dashboard/inbox");
+  if (session.deckId != null) {
+    revalidatePath(`/decks/${session.deckId}/study`);
+  }
+  return { ok: true as const };
 }
 
 export { resolveLiveClassroomOrgRole, listLiveBattleAnswersForQuestion };

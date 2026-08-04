@@ -46,6 +46,8 @@ import {
   insertDeckAssignment,
   updateDeckAssignmentStudyPrivilege,
   updateTeamQuizDurationMinutes,
+  updateTeamAiRecallSessionCardCount,
+  updateDeckAiRecallSessionCardCount,
   updateOwnerQuizDefaultSettings,
   getOwnerQuizDefaultSettings,
   getTeamsByOwner,
@@ -791,6 +793,89 @@ const updateTeamQuizDurationSchema = z.object({
   /** Null clears the workspace override so the subscriber default applies. */
   durationMinutes: z.union([quizDurationMinutesSchema, z.null()]),
 });
+
+const updateTeamAiRecallSessionCardCountSchema = z.object({
+  teamId: z.number().int().positive(),
+  /** Null = all cards in the deck. */
+  cardCount: z.union([
+    z.number().int().min(1).max(100),
+    z.null(),
+  ]),
+});
+
+export async function updateTeamAiRecallSessionCardCountAction(
+  data: z.infer<typeof updateTeamAiRecallSessionCardCountSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateTeamAiRecallSessionCardCountSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  await assertCanManageTeam(userId, parsed.data.teamId);
+  await updateTeamAiRecallSessionCardCount(
+    parsed.data.teamId,
+    parsed.data.cardCount,
+  );
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard/team-admin/study-modes", "layout");
+  revalidatePath("/decks", "layout");
+}
+
+const updateTeamDeckAiRecallSessionCardCountSchema = z.object({
+  teamId: z.number().int().positive(),
+  deckId: z.number().int().positive(),
+  /**
+   * null = inherit workspace.
+   * 0 = all cards (override).
+   * 1–100 = fixed count.
+   */
+  cardCount: z.union([
+    z.literal(0),
+    z.number().int().min(1).max(100),
+    z.null(),
+  ]),
+});
+
+export async function updateTeamDeckAiRecallSessionCardCountAction(
+  data: z.infer<typeof updateTeamDeckAiRecallSessionCardCountSchema>,
+) {
+  const { userId } = await getAccessContext();
+  if (!userId) throw new Error("Unauthorized");
+
+  const parsed = updateTeamDeckAiRecallSessionCardCountSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid input");
+
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  const deck = await getDeckRowById(parsed.data.deckId);
+  if (!deck || deck.userId !== team.ownerUserId) {
+    throw new Error("Deck not found in this workspace.");
+  }
+  const linked =
+    deck.teamId === parsed.data.teamId ||
+    (await isDeckLinkedToWorkspace(parsed.data.teamId, parsed.data.deckId));
+  if (!linked) {
+    const workspaceDecks = await getDecksForTeam(
+      parsed.data.teamId,
+      team.ownerUserId,
+    );
+    if (!workspaceDecks.some((d) => d.id === parsed.data.deckId)) {
+      throw new Error("Deck is not linked to this workspace.");
+    }
+  }
+
+  await updateDeckAiRecallSessionCardCount(
+    parsed.data.deckId,
+    team.ownerUserId,
+    parsed.data.cardCount,
+  );
+
+  revalidatePath("/dashboard/team-admin", "layout");
+  revalidatePath("/dashboard/team-admin/study-modes", "layout");
+  revalidatePath(`/decks/${parsed.data.deckId}/study`);
+  revalidatePath("/decks", "layout");
+}
 
 export async function updateTeamQuizDurationAction(
   data: z.infer<typeof updateTeamQuizDurationSchema>,

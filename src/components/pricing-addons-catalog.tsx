@@ -28,6 +28,8 @@ export type PricingAddonCard = {
   entitled: boolean;
   entitlementSource: "stripe" | "admin" | "team" | null;
   canPurchase: boolean;
+  /** Workspace members cannot purchase AI Essay yet. */
+  comingSoon?: boolean;
   stripePriceConfigured: boolean;
   yearlyPriceConfigured?: boolean;
   /** e.g. "$9.99/mo" from Stripe */
@@ -156,6 +158,11 @@ export function PricingAddonsCatalog({
               addon.renewalCancelScheduled || cancelNoteByKey[addon.key]
                 ? "Add-on renewal is canceled; access continues until the date shown"
                 : "You already have access to this add-on";
+          } else if (addon.comingSoon) {
+            ctaLabel = "Coming soon";
+            disabled = true;
+            tip =
+              "AI Essay for workspace members is coming soon. Only the plan owner can unlock it on their personal dashboard right now.";
           } else if (!addon.eligible) {
             ctaLabel = "Not eligible";
             disabled = true;

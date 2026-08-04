@@ -60,17 +60,17 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
   a(
     "team-admin-add-ons",
     "Member Add-ons — In-Depth Guide",
-    "Assign optional premium add-ons to workspace members at /dashboard/team-admin/add-ons.",
+    "Review member add-on availability at /dashboard/team-admin/add-ons. AI Essay member assignment is coming soon.",
     [
       {
         id: "assign",
         title: "Assigning features",
         bullets: [
-          "Check AI Essay beside a member to grant the add-on (source: team).",
-          "Uncheck to revoke only team-sourced grants.",
-          "Stripe-purchased or platform-admin grants show a source badge and cannot be removed here.",
-          "Live Classroom™ is an organization add-on purchased by the subscription owner — it is not assigned per-member like AI Essay.",
-          "Future member add-ons reuse the same checklist architecture.",
+          "AI Essay is not assignable to workspace members yet — Coming soon on Member add-ons.",
+          "Only the plan owner can use AI Essay on their personal dashboard right now.",
+          "Workspace members who open AI Essay see Coming soon until member access ships.",
+          "Live Classroom™ is under Add-ons and is an organization add-on purchased by the subscription owner. After purchase, assign members to the Live Classroom team in Live Classroom™ → Settings.",
+          "Future member add-ons will reuse this Team Admin surface.",
         ],
       },
     ],
@@ -158,70 +158,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Change Standard Review, AI Recall™, and/or Quiz access per member per assigned deck.",
           "Options include single modes and combinations (e.g. AI Recall™ only, Standard Review & AI Recall™, all three).",
           "Applies to team members in the privileges table (and Education Gold / Enterprise team admins).",
-        ],
-      },
-      {
-        id: "quiz-formats",
-        title: "Quiz question formats (Study privileges)",
-        bullets: [
-          "Route: /dashboard/team-admin/deck-manager/study-privileges",
-          "Workspace selector shows the workspace name — pick the workspace before editing defaults or per-deck overrides.",
-          "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
-          "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
-          "Shuffle card order (workspace or per-deck) gives each assignee a unique quiz question sequence; the Timed quiz lobby shows when shuffle is in effect and owners/admins can reshuffle there.",
-          "Multiple choice works from card content; true/false and fill-in-the-blank need AI-generated quiz sentences.",
-          "Personal Pro Plus / Education Plus (paid, admin-assigned, or affiliate) use Format Quiz Question on /decks/[deckId]/study instead of this Team Admin panel.",
-        ],
-      },
-      {
-        id: "quiz-format-distribution",
-        title: "Questions per format (required counts)",
-        bullets: [
-          "After format checkboxes are saved, each deck shows a Questions per format panel with a live total (e.g. 7 / 10 cards).",
-          "Enter how many questions of each enabled type should appear in quizzes for that deck — counts must be whole numbers and add up to the deck’s eligible card total (cards with front and back text).",
-          "Example for a 10-card deck: Multiple choice 5, True / false 2, Fill in the blank 3 — order of entry does not matter.",
-          "Disabled formats must stay at 0; enabled formats can be 0 only if you are not using that type in the mix.",
-          "The total turns red with an error message until counts match the card total.",
-          "Saving workspace or deck format changes clears entered counts and any prior reshuffle — set counts again after saving.",
-        ],
-      },
-      {
-        id: "quiz-formats-workflow",
-        title: "Format setup workflow (save → counts → generate → reshuffle)",
-        table: {
-          headers: ["Step", "When it appears", "What it does"],
-          rows: [
-            [
-              "Save deck formats",
-              "After you change format checkboxes or toggle Use workspace defaults",
-              "Writes settings to the deck (or clears per-deck override when inheriting workspace defaults). Clears prior counts and reshuffle mix.",
-            ],
-            [
-              "Save workspace formats",
-              "After you change workspace default checkboxes",
-              "Applies defaults to inheriting decks and clears their counts and reshuffle mixes.",
-            ],
-            [
-              "Questions per format",
-              "After formats are saved and the deck has at least one eligible card",
-              "Number inputs per enabled format. Generate and Reshuffle stay hidden until counts add up to the deck total.",
-            ],
-            [
-              "Generate AI quiz sentences",
-              "After counts are valid and true/false or fill-in-the-blank is enabled but not enough cards have AI content for those counts",
-              "Creates only as many true/false and/or fill-in-the-blank variants as your counts require (not necessarily every card).",
-            ],
-            [
-              "Reshuffle format questions",
-              "After counts are valid, AI content is ready when needed, and at least two formats have a count greater than zero",
-              "Assigns exactly your requested counts across cards (e.g. 5 MCQ, 2 True/False, 3 Fill in the blank), shuffling which card gets which format. Tooltip confirms success; last reshuffled time is shown.",
-            ],
-          ],
-        },
-        bullets: [
-          "Only one action button shows at a time per deck — follow the order above.",
-          "Requires Pro Plus, team-tier workspace, or platform admin for AI generation; production needs a valid OpenAI API key.",
-          "Members see the admin’s distribution on the quiz lobby at /decks/[deckId]/study and on each question — in-progress sessions are not updated mid-quiz.",
+          "Quiz question formats (workspace defaults, per-deck overrides, publish) are under Study Modes → Quiz Mode → Quiz formats.",
         ],
       },
     ],
@@ -266,7 +203,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
   a(
     "quiz-results-admin",
     "Quiz Results & Policies — In-Depth Guide",
-    "Review scores and configure quiz timer, schedule, and Exam Mode.",
+    "Review scores and configure quiz formats, timer, schedule, and Exam Mode.",
     [
       {
         id: "results",
@@ -275,6 +212,70 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Table: workspace, member, email, deck, score, counts, time, saved date.",
           "Search and filter by workspace and deck.",
           "View full attempt detail; delete result records.",
+        ],
+      },
+      {
+        id: "quiz-formats",
+        title: "Quiz formats",
+        bullets: [
+          "Route: /dashboard/team-admin/quiz-results/quiz-formats",
+          "Workspace selector shows the workspace name — pick the workspace before editing defaults or per-deck overrides.",
+          "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
+          "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
+          "Shuffle card order (workspace or per-deck) gives each assignee a unique quiz question sequence; the Timed quiz lobby shows when shuffle is in effect and owners/admins can reshuffle there.",
+          "Multiple choice works from card content; true/false and fill-in-the-blank need AI-generated quiz sentences.",
+          "Personal Pro Plus / Education Plus (paid, admin-assigned, or affiliate) use Format Quiz Question on /decks/[deckId]/study instead of this Team Admin panel.",
+        ],
+      },
+      {
+        id: "quiz-format-distribution",
+        title: "Questions per format (required counts)",
+        bullets: [
+          "After format checkboxes are saved, each deck shows a Questions per format panel with a live total (e.g. 7 / 10 cards).",
+          "Enter how many questions of each enabled type should appear in quizzes for that deck — counts must be whole numbers totaling between 1 and the deck’s eligible card total (cards with front and back text).",
+          "Example for a 10-card deck: Multiple choice 5, True / false 2, Fill in the blank 3 — or a smaller subset such as 3 MCQ only.",
+          "Disabled formats must stay at 0; enabled formats can be 0 only if you are not using that type in the mix.",
+          "The total turns red with an error message until counts are within the allowed range.",
+          "Saving workspace or deck format changes clears entered counts and any prior published mix — set counts again after saving.",
+        ],
+      },
+      {
+        id: "quiz-formats-workflow",
+        title: "Format setup workflow (save → counts → generate → publish)",
+        table: {
+          headers: ["Step", "When it appears", "What it does"],
+          rows: [
+            [
+              "Save deck formats",
+              "After you change format checkboxes or toggle Use workspace defaults",
+              "Writes settings to the deck (or clears per-deck override when inheriting workspace defaults). Clears prior counts and published mix.",
+            ],
+            [
+              "Save workspace formats",
+              "After you change workspace default checkboxes",
+              "Applies defaults to inheriting decks and clears their counts and published mixes.",
+            ],
+            [
+              "Questions per format",
+              "After formats are saved and the deck has at least one eligible card",
+              "Number inputs per enabled format. Generate and Publish stay unavailable until counts are valid (1 through the deck total).",
+            ],
+            [
+              "Generate AI quiz sentences",
+              "After counts are valid and true/false or fill-in-the-blank is enabled but not enough cards have AI content for those counts",
+              "Creates only as many true/false and/or fill-in-the-blank variants as your counts require (not necessarily every card).",
+            ],
+            [
+              "Publish / Republish to quiz",
+              "After counts are valid and AI content is ready when needed",
+              "Choose Publish all cards (auto-assign formats for your counts) or Choose cards (enter quiz size, browse What quiz takers see previews for enabled formats, check specific cards, then Publish settings). Republish replaces the previous mix.",
+            ],
+          ],
+        },
+        bullets: [
+          "Follow the order above per deck.",
+          "Requires Pro Plus, team-tier workspace, or platform admin for AI generation; production needs a valid OpenAI API key.",
+          "Members see the admin’s published mix on the quiz lobby at /decks/[deckId]/study and on each question — in-progress sessions are not updated mid-quiz.",
         ],
       },
       {
@@ -361,8 +362,9 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Typical session flow",
         bullets: [
           "Open /dashboard/live-classroom?team=<id> (also linked from Team Admin → Live Classroom).",
+          "Assign members to the Live Classroom team under Settings before they can join.",
           "Start Session: choose deck or AI warm-up, battle type/mode, timing, and team assignment.",
-          "Students join the lobby; host assigns or randomizes teams, then starts.",
+          "Assigned members join with the lobby code (Join with code); host randomizes battle teams, then starts.",
           "Host dashboard: pause, resume, add time, skip, reveal, mute music, end session.",
           "Projector mode hides private student names while showing question, timer, and leaderboard.",
           "End of session generates AI summary, recommendations, and report exports actions.",
@@ -372,10 +374,11 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "roles",
         title: "Permissions",
         bullets: [
-          "Subscription owner: purchase/cancel, org settings, teacher grants, reports.",
-          "Team administrator: create sessions, configure battles, view reports.",
-          "Teacher (granted): host sessions, assign teams, monitor battles.",
-          "Student (member): join, answer, view own results.",
+          "Subscription owner: purchase/cancel, org settings, Live Classroom team assignments, reports. Always has access.",
+          "Workspace membership alone does not grant Live Classroom — members and team admins must be assigned under Settings → Live Classroom team.",
+          "Assigned team administrator: create sessions, configure battles, view reports, manage assignments.",
+          "Assigned teacher (Can host): host sessions, assign battle teams, monitor battles.",
+          "Assigned student (member): join with the lobby code, answer, view own results.",
         ],
       },
     ],
