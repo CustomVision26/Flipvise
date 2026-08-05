@@ -61,6 +61,7 @@ import {
   type TeacherQuizPassageBlock,
   type TeacherQuizPassageQuestion,
 } from "@/lib/teacher-quiz-ai-schema";
+import { formatTeacherQuizGenerationError } from "@/lib/teacher-quiz-generation-errors";
 import { buildCurriculumPassagePrompt } from "@/lib/teacher-quiz-reading-passage";
 import {
   extractStepFinalAnswer,
@@ -523,14 +524,6 @@ async function generateReadingPassageQuizForDeck(
     if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
       throw new Error(error.message);
     }
-    if (
-      error instanceof Error &&
-      error.message.startsWith("PASSAGE_DIVERSITY_FAILED")
-    ) {
-      throw new Error(
-        "The generator could not produce sufficiently different passages. Please try again.",
-      );
-    }
     if (process.env.NODE_ENV !== "production") {
       console.warn(
         "[generateReadingPassageQuizForDeck] AI failed; not using template fallback.",
@@ -538,11 +531,7 @@ async function generateReadingPassageQuizForDeck(
         diagnostics,
       );
     }
-    throw new Error(
-      error instanceof Error && error.message.trim()
-        ? error.message
-        : "Reading passage generation failed. Please try again.",
-    );
+    throw new Error(formatTeacherQuizGenerationError(error));
   }
 }
 
@@ -666,30 +655,37 @@ export async function generateTeacherQuizAction(
     isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
   };
 
-  const [standardQuiz, passageQuestions] = await Promise.all([
-    standardCount > 0
-      ? runWithAiUsageContext({ ...usageBase, feature: "quiz" }, () =>
-          generateQuizForDeck(
-            { ...parsed.data, numberOfQuestions: standardCount },
-            userId,
-          ),
-        )
-      : Promise.resolve(null),
-    passageCount > 0
-      ? runWithAiUsageContext({ ...usageBase, feature: "passage" }, () =>
-          generateReadingPassageQuizForDeck(
-            parsed.data,
-            userId,
-            passageQuestionCounts,
-          ),
-        )
-      : Promise.resolve([] as TeacherQuizPassageQuestion[]),
-  ]);
+  try {
+    const [standardQuiz, passageQuestions] = await Promise.all([
+      standardCount > 0
+        ? runWithAiUsageContext({ ...usageBase, feature: "quiz" }, () =>
+            generateQuizForDeck(
+              { ...parsed.data, numberOfQuestions: standardCount },
+              userId,
+            ),
+          )
+        : Promise.resolve(null),
+      passageCount > 0
+        ? runWithAiUsageContext({ ...usageBase, feature: "passage" }, () =>
+            generateReadingPassageQuizForDeck(
+              parsed.data,
+              userId,
+              passageQuestionCounts,
+            ),
+          )
+        : Promise.resolve([] as TeacherQuizPassageQuestion[]),
+    ]);
 
-  return {
-    standardQuestions: standardQuiz?.questions ?? [],
-    passageQuestions,
-  };
+    return {
+      standardQuestions: standardQuiz?.questions ?? [],
+      passageQuestions,
+    };
+  } catch (error) {
+    if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
+      throw new Error(error.message);
+    }
+    throw new Error(formatTeacherQuizGenerationError(error));
+  }
 }
 
 export async function previewTeacherQuizDistractorsAction(

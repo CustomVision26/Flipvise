@@ -94,6 +94,7 @@ import {
 import { previewTeacherQuizDeckSaveDestination } from "@/lib/teacher-quiz-deck-save-preview";
 import { cn } from "@/lib/utils";
 import { ADMIN_NONE, adminDisplayLabel } from "@/lib/owner-team-admin-picker";
+import { formatTeacherQuizGenerationError } from "@/lib/teacher-quiz-generation-errors";
 import { toast } from "sonner";
 
 type QuizDeckSliderItem = {
@@ -517,11 +518,7 @@ export function TeacherQuizzesForm({
         );
       }
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Quiz generation failed. Please try again.";
-      setErrorMessage(message);
+      setErrorMessage(formatTeacherQuizGenerationError(error));
     } finally {
       setIsGenerating(false);
     }
