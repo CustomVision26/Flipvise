@@ -25,7 +25,21 @@ import {
   isLessonPlanDayScopeAll,
   type LessonPlanDayScope,
 } from "@/lib/lesson-plan-day-scope";
-import { buildLessonPlanQuizContext, buildLessonPlanPassageQuizContext, buildLessonPlanPassageFallbackQuestions } from "@/lib/lesson-plan-quiz-context";
+import { buildLessonPlanQuizContext, buildLessonPlanPassageFallbackQuestions } from "@/lib/lesson-plan-quiz-context";
+import {
+  buildManualLessonPlanContext,
+  formatLessonPlanContextForPrompt,
+  lessonPlanContextDiagnostics,
+  normalizeLessonPlanContext,
+  vocabularyTermsFromContext,
+} from "@/lib/lesson-plan-context";
+import {
+  buildSinglePassageReplacementPrompt,
+  toDiversityMetadata,
+  validatePassageAgainstSet,
+  type PassageDiversityInput,
+} from "@/lib/passage-diversity";
+import { validatePassageGenerationQuality } from "@/lib/passage-quality";
 import {
   resolveLessonPlanQuizDeckSaveTarget,
   resolveTeacherQuizSaveTarget,
@@ -34,20 +48,20 @@ import {
   saveTeacherQuizDeckSchema,
   teacherQuizInputSchema,
   teacherQuizResultSchema,
-  teacherQuizMultiPassageResultSchema,
+  teacherQuizSinglePassageResultSchema,
   previewTeacherQuizDistractorsSchema,
   expandMultiPassageToQuizCards,
+  blockToDiversityInput,
   activePassageQuestionCounts,
+  resolveReadingPassageQuestionCounts,
+  resolvePassageGenerationToggles,
   sumPassageQuestionCounts,
-  TEACHER_QUIZ_DEFAULT_QUESTION_TYPE,
   type SaveTeacherQuizDeckInput,
   type TeacherQuizActionInput,
+  type TeacherQuizPassageBlock,
   type TeacherQuizPassageQuestion,
 } from "@/lib/teacher-quiz-ai-schema";
-import {
-  buildTeacherQuizReadingPassagePrompt,
-  detectQuizSubjectArea,
-} from "@/lib/teacher-quiz-reading-passage";
+import { buildCurriculumPassagePrompt } from "@/lib/teacher-quiz-reading-passage";
 import {
   extractStepFinalAnswer,
   isStepAnswer,
@@ -139,294 +153,138 @@ async function resolveQuizLessonPlan(
   return resolveSavedLessonPlanForViewer(viewerUserId, planId, teamId);
 }
 
+const GENERIC_FALLBACK_NAMES = [
+  "Kai",
+  "Marissa",
+  "Devon",
+  "Aaliyah",
+  "Omar",
+  "Tiana",
+] as const;
+
+const GENERIC_FALLBACK_CONTEXTS = [
+  { category: "Practical Decision", event: "must choose between a quick shortcut and the correct method" },
+  { category: "Team Observation", event: "notices a peer making an incomplete choice and must respond helpfully" },
+  { category: "Inspection Review", event: "reviews work that looks finished but misses a key requirement" },
+  { category: "Client Situation", event: "explains a recommendation when someone asks for a faster option" },
+  { category: "Planning Meeting", event: "compares two plans and selects the one that meets the learning goal" },
+  { category: "Field Observation", event: "collects evidence and revises an early assumption" },
+] as const;
+
 function buildGenericMultiPassageFallback(
   questionCounts: number[],
   input: TeacherQuizActionInput,
 ): TeacherQuizPassageQuestion[] {
   const topic = input.topic.trim() || "the topic";
-  const isMath =
-    detectQuizSubjectArea(input.subject, input.topic) === "mathematics";
-
-  if (isMath) {
-    const mathPassages: Array<{
-      title: string;
-      passage: string;
-      questions: Array<{
-        questionType: string;
-        question: string;
-        correctAnswer: string;
-        wrongAnswers: [string, string, string];
-      }>;
-    }> = [
-      {
-        title: "Selling Fruit Juice",
-        passage:
-          "A Grade 6 class is selling fruit juice to raise money for a school event. Each bottle of juice costs $5. The class already has $20 from donations. The teacher uses the variable j to represent the number of juice bottles sold.",
-        questions: [
-          {
-            questionType: "Variable Meaning",
-            question: "What does the variable j represent?",
-            correctAnswer: "The number of juice bottles sold",
-            wrongAnswers: [
-              "The total money collected",
-              "The donation amount",
-              "The cost of one bottle",
-            ],
-          },
-          {
-            questionType: "Expression",
-            question: "Which expression represents the total money collected?",
-            correctAnswer: "20 + 5j",
-            wrongAnswers: ["5 + 20j", "20 − 5j", "25j"],
-          },
-          {
-            questionType: "Evaluate",
-            question: "How much money will the class collect after selling 8 bottles?",
-            correctAnswer:
-              "Step 1: Write the expression\nTotal money = 20 + 5j\nStep 2: Substitute j = 8\n20 + 5(8) = 20 + 40\nAnswer: $60",
-            wrongAnswers: ["$45", "$50", "$65"],
-          },
-        ],
-      },
-      {
-        title: "Buying Movie Tickets",
-        passage:
-          "A family spends $12 on each movie ticket. They also pay a $6 booking fee. The total amount paid was $54, where t represents the number of movie tickets purchased.",
-        questions: [
-          {
-            questionType: "Variable Meaning",
-            question: "What does the variable t represent?",
-            correctAnswer: "Number of movie tickets",
-            wrongAnswers: ["Total money paid", "Booking fee", "Cost of popcorn"],
-          },
-          {
-            questionType: "Equation",
-            question: "Which equation represents the situation?",
-            correctAnswer: "12t + 6 = 54",
-            wrongAnswers: ["12 + 6t = 54", "54t = 12 + 6", "12t − 6 = 54"],
-          },
-          {
-            questionType: "Solve",
-            question: "How many tickets were purchased?",
-            correctAnswer:
-              "Step 1: Start with the equation\n12t + 6 = 54\nStep 2: Subtract 6 from both sides\n12t = 48\nStep 3: Divide both sides by 12\nt = 4\nAnswer: 4",
-            wrongAnswers: ["3", "5", "6"],
-          },
-        ],
-      },
-      {
-        title: "Emma's Tablet Savings",
-        passage:
-          "Emma is saving money to buy a tablet. She already has $30. Every week, she saves $12. She uses the variable w to represent the number of weeks she saves money.",
-        questions: [
-          {
-            questionType: "Variable Meaning",
-            question: "What does the variable w represent?",
-            correctAnswer: "The number of weeks Emma saves money",
-            wrongAnswers: [
-              "The total money Emma has",
-              "The cost of the tablet",
-              "The amount she already saved",
-            ],
-          },
-          {
-            questionType: "Expression",
-            question: "Which expression represents Emma's total savings?",
-            correctAnswer: "30 + 12w",
-            wrongAnswers: ["12 + 30w", "30 − 12w", "42w"],
-          },
-          {
-            questionType: "Evaluate",
-            question: "How much will Emma have after saving for 4 weeks?",
-            correctAnswer:
-              "Step 1: Write the expression\nTotal = 30 + 12w\nStep 2: Substitute w = 4\n30 + 12(4) = 30 + 48\nAnswer: $78",
-            wrongAnswers: ["$42", "$60", "$72"],
-          },
-        ],
-      },
-    ];
-
-    return questionCounts.flatMap((count, passageIndex) => {
-      const template = mathPassages[passageIndex % mathPassages.length]!;
-      return Array.from({ length: count }, (_, questionIndex) => {
-        const q = template.questions[questionIndex % template.questions.length]!;
-        return {
-          passage: template.passage,
-          passageTitle: template.title,
-          question: q.question,
-          correctAnswer: q.correctAnswer,
-          wrongAnswers: q.wrongAnswers,
-          explanation: `This answer fits the story "${template.title}" about ${topic}.`,
-          questionType: q.questionType,
-        };
-      });
-    });
-  }
-
-  const isEnglish =
-    detectQuizSubjectArea(input.subject, input.topic) === "english";
-
-  if (isEnglish) {
-    const englishStories: Array<{
-      title: string;
-      passage: string;
-      questions: Array<{
-        questionType: string;
-        question: string;
-        correctAnswer: string;
-        wrongAnswers: [string, string, string];
-      }>;
-    }> = [
-      {
-        title: "The Mango Tree",
-        passage: `Every afternoon after school, twelve-year-old Asha hurried to the large mango tree behind her grandmother's house. It was her favourite place to read and think. One afternoon, she noticed a small bird struggling with a piece of string tangled around its leg.
-
-Although Asha was afraid the bird might fly away, she slowly moved closer and gently freed it. The bird chirped softly before flying into the branches above. As she watched it disappear into the leaves, Asha smiled, knowing that even a small act of kindness could make a big difference.
-
-When her grandmother heard the story, she said, "Kindness is never wasted. It always finds its way back to the person who gives it."`,
-        questions: [
-          {
-            questionType: "Main Idea",
-            question: "What is the main idea of the passage?",
-            correctAnswer: "A small act of kindness can make a difference.",
-            wrongAnswers: [
-              "Asha enjoys climbing trees.",
-              "Birds like mango trees.",
-              "Grandmothers enjoy telling stories.",
-            ],
-          },
-          {
-            questionType: "Detail",
-            question: "Why did Asha move slowly toward the bird?",
-            correctAnswer: "She did not want to frighten the bird away.",
-            wrongAnswers: [
-              "She did not like birds.",
-              "She wanted to catch the bird.",
-              "She was looking for mangoes.",
-            ],
-          },
-          {
-            questionType: "Vocabulary in Context",
-            question: 'What does the word "struggling" mean as it is used in the passage?',
-            correctAnswer: "Having difficulty getting free",
-            wrongAnswers: [
-              "Sleeping peacefully",
-              "Singing loudly",
-              "Flying very high",
-            ],
-          },
-          {
-            questionType: "Character Trait",
-            question: "Which character trait best describes Asha?",
-            correctAnswer: "Kind",
-            wrongAnswers: ["Careless", "Selfish", "Impatient"],
-          },
-          {
-            questionType: "Theme / Moral",
-            question: "What lesson does the story teach?",
-            correctAnswer:
-              "Kindness often has a positive effect on others and ourselves.",
-            wrongAnswers: [
-              "Birds should not fly near trees.",
-              "Reading is more important than helping others.",
-              "Grandmothers always know everything.",
-            ],
-          },
-          {
-            questionType: "Textual Evidence",
-            question:
-              "Which sentence from the passage best supports the idea that Asha is caring?",
-            correctAnswer: "She slowly moved closer and gently freed it.",
-            wrongAnswers: [
-              "It was her favourite place to read.",
-              "The bird chirped softly.",
-              "Her grandmother heard the story.",
-            ],
-          },
-        ],
-      },
-      {
-        title: "Saturday Market",
-        passage: `On Saturday morning, Malik helped his mother at the busy market. He stacked baskets of sweet peppers and greeted each customer with a smile. When an elderly woman dropped her coins, Malik quickly gathered them and placed them gently in her hand.
-
-His mother whispered that courtesy and honesty matter as much as selling well. Malik nodded, proud that a small helpful action could brighten someone's day while he learned words connected to ${topic}.`,
-        questions: [
-          {
-            questionType: "Main Idea",
-            question: "What is the main idea of the passage?",
-            correctAnswer:
-              "Malik shows that helpful, honest actions matter at the market.",
-            wrongAnswers: [
-              "Markets are only about stacking peppers.",
-              "Malik refuses to help customers.",
-              "His mother forbids him from speaking.",
-            ],
-          },
-          {
-            questionType: "Detail",
-            question: "What did Malik do when the elderly woman dropped her coins?",
-            correctAnswer:
-              "He gathered them and placed them gently in her hand.",
-            wrongAnswers: [
-              "He ignored the coins and kept stacking baskets.",
-              "He asked her to leave the market.",
-              "He used the coins to buy peppers.",
-            ],
-          },
-          {
-            questionType: "Character Trait",
-            question: "Which character trait best describes Malik?",
-            correctAnswer: "Helpful",
-            wrongAnswers: ["Rude", "Careless", "Dishonest"],
-          },
-        ],
-      },
-    ];
-
-    return questionCounts.flatMap((count, passageIndex) => {
-      const template = englishStories[passageIndex % englishStories.length]!;
-      return Array.from({ length: count }, (_, questionIndex) => {
-        const q = template.questions[questionIndex % template.questions.length]!;
-        return {
-          passage: template.passage,
-          passageTitle: template.title,
-          question: q.question,
-          correctAnswer: q.correctAnswer,
-          wrongAnswers: q.wrongAnswers,
-          explanation: `This answer fits the story "${template.title}" about ${topic}.`,
-          questionType: q.questionType,
-        };
-      });
-    });
-  }
-
-  const passageTemplates = [
-    `A short informational text explains important ideas related to ${topic}. It introduces key vocabulary through a clear example, then shows how those terms work together when the details change. Readers can infer each term's role from the surrounding sentences instead of from a pasted definition list. By the end, the passage makes the main idea of ${topic} easier to understand from context.`,
-    `Another example connected to ${topic} puts the same kind of vocabulary to work in a new situation. Early sentences establish one core term, while later sentences show a related term shaping the outcome. Clues in the text help readers decide which detail best supports the writer's point about ${topic}.`,
-    `A third informational paragraph revisits ${topic} with a practical scenario. The writer uses topic vocabulary naturally so meaning comes from use, not from a glossary dump. Readers who attend to those contextual clues can answer questions about the main idea, important details, and word meaning.`,
-  ];
+  const subject = input.subject.trim() || "the subject";
+  const grade = input.gradeLevel.trim() || "Grade 10";
 
   return questionCounts.flatMap((count, passageIndex) => {
-    const passage = passageTemplates[passageIndex % passageTemplates.length]!;
-    return Array.from({ length: count }, (_, questionIndex) => ({
-      passage,
-      question:
-        questionIndex === 0
-          ? `What is the main idea of the passage?`
-          : `According to the passage, how can readers learn the vocabulary for ${topic}?`,
-      correctAnswer:
-        questionIndex === 0
-          ? `The passage explains ${topic} by using key vocabulary in a clear example.`
-          : `They infer each term's meaning from how it is used in the surrounding sentences.`,
-      wrongAnswers: [
-        `By ignoring the example and memorizing unrelated words.`,
-        `By reading only a glossary list with no context.`,
-        `By skipping the passage and guessing at random.`,
-      ] as [string, string, string],
-      explanation: `This answer best fits reading passage ${passageIndex + 1} at ${input.difficultyLevel} level.`,
-      questionType: questionIndex === 0 ? "Main Idea" : "Detail",
-    }));
+    const character =
+      GENERIC_FALLBACK_NAMES[passageIndex % GENERIC_FALLBACK_NAMES.length]!;
+    const context =
+      GENERIC_FALLBACK_CONTEXTS[passageIndex % GENERIC_FALLBACK_CONTEXTS.length]!;
+    const title = `${context.category}: ${topic}`;
+    const passage = `${character} is a ${grade} student working on ${topic} in ${subject}. In this ${context.category.toLowerCase()}, ${character} ${context.event}.
+
+At first, an incomplete choice looks acceptable. Then new information shows why that choice does not fully meet the lesson goal for ${topic}.
+
+With guidance from a peer or mentor, ${character} revises the approach and can explain which idea from the lesson made the difference.`;
+
+    const questions = [
+      {
+        questionType: "multiple_choice",
+        question: `What challenge does ${character} face in this situation?`,
+        correctAnswer: `Choosing an approach that fully meets the lesson goal for ${topic}.`,
+        wrongAnswers: [
+          "Memorizing a definition with no real situation.",
+          "Ignoring feedback because the first idea felt easier.",
+          "Leaving the task unfinished without reviewing evidence.",
+        ] as [string, string, string],
+      },
+      {
+        questionType: "critical_thinking",
+        question: `Why does ${character} need to revise the first choice?`,
+        correctAnswer: `New information shows the first choice does not fully meet the ${topic.toLowerCase()} learning goal.`,
+        wrongAnswers: [
+          "The class period ended before any work began.",
+          "A classmate asked for an unrelated homework answer.",
+          "The topic was removed from the lesson plan.",
+        ] as [string, string, string],
+      },
+      {
+        questionType: "practical_application",
+        question: `What should ${character} do next time a similar situation appears?`,
+        correctAnswer: `Check the choice against the lesson goal before acting.`,
+        wrongAnswers: [
+          "Repeat the first incomplete choice automatically.",
+          "Avoid using any lesson ideas in the response.",
+          "Ask someone else to complete the whole task alone.",
+        ] as [string, string, string],
+      },
+    ];
+
+    return Array.from({ length: count }, (_, questionIndex) => {
+      const q = questions[questionIndex % questions.length]!;
+      return {
+        passage,
+        passageTitle: title,
+        educationalContext: context.category,
+        scenarioCategory: context.category,
+        scenarioSummary: `${character} ${context.event} while studying ${topic}.`,
+        question: q.question,
+        correctAnswer: q.correctAnswer,
+        wrongAnswers: q.wrongAnswers,
+        explanation: `This answer fits the scenario "${title}" about ${topic}.`,
+        questionType: q.questionType,
+        sourceLessonPlanId: input.savedLessonPlanId,
+        passageGroupId: `fallback-passage-${passageIndex + 1}`,
+      };
+    });
   });
+}
+
+const MAX_REPLACEMENT_ATTEMPTS_PER_PASSAGE = 2;
+
+type PassageGenerationDiagnostics = {
+  requestedPassageCount: number;
+  acceptedPassageCount: number;
+  replacementAttempts: number;
+  scenarioCategories: string[];
+  centralEvents: string[];
+  duplicateValidationResults: string[];
+};
+
+async function generateSingleStructuredPassage(input: {
+  system: string;
+  prompt: string;
+}): Promise<TeacherQuizPassageBlock | null> {
+  const { output } = await trackedGenerateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: teacherQuizSinglePassageResultSchema,
+    }),
+    system: input.system,
+    prompt: input.prompt,
+  });
+  return output?.passage ?? null;
+}
+
+function validateSinglePassageQuality(
+  block: TeacherQuizPassageBlock,
+  expectedQuestions: number,
+  requireObjectiveAlignment: boolean,
+): string[] {
+  const quality = validatePassageGenerationQuality(
+    { passages: [block] },
+    {
+      expectedPassageCount: 1,
+      questionsPerPassage: [expectedQuestions],
+      requestedQuestionTypes: [],
+      requireObjectiveAlignment,
+    },
+  );
+  return quality.errors;
 }
 
 async function generateReadingPassageQuizForDeck(
@@ -439,8 +297,16 @@ async function generateReadingPassageQuizForDeck(
     return [];
   }
 
-  let lessonContext: string | null = null;
+  const toggles = resolvePassageGenerationToggles(input);
   let savedLessonPlan: Awaited<ReturnType<typeof resolveQuizLessonPlan>> = null;
+  let normalizedContext = input.savedLessonPlanId
+    ? null
+    : buildManualLessonPlanContext({
+        subject: input.subject,
+        gradeLevel: input.gradeLevel,
+        topic: input.topic,
+        difficultyLevel: String(input.difficultyLevel),
+      });
 
   if (input.savedLessonPlanId) {
     savedLessonPlan = await resolveQuizLessonPlan(
@@ -455,21 +321,37 @@ async function generateReadingPassageQuizForDeck(
       input.dayScope,
       savedLessonPlan.result.weeklySchedule?.length ?? 0,
     );
-    lessonContext = buildLessonPlanPassageQuizContext({
+    normalizedContext = normalizeLessonPlanContext({
+      lessonPlanId: input.savedLessonPlanId,
       input: savedLessonPlan.input,
       result: savedLessonPlan.result,
       dayScope: input.dayScope,
+      overrides: {
+        subject: input.subject,
+        gradeLevel: input.gradeLevel,
+        topic: input.topic,
+      },
     });
   }
 
-  const { system, user } = buildTeacherQuizReadingPassagePrompt({
-    subject: input.subject,
-    gradeLevel: input.gradeLevel,
-    topic: input.topic,
-    difficultyLevel: String(input.difficultyLevel),
-    questionCounts: activeCounts,
-    lessonPlanContext: lessonContext,
-  });
+  const curriculumText = normalizedContext
+    ? formatLessonPlanContextForPrompt(normalizedContext)
+    : null;
+  const vocabularyTerms = normalizedContext
+    ? [
+        ...vocabularyTermsFromContext(normalizedContext),
+        ...normalizedContext.vocabularyFocus,
+        normalizedContext.subject,
+        normalizedContext.topic,
+      ]
+    : [input.subject, input.topic];
+
+  if (process.env.NODE_ENV !== "production" && normalizedContext) {
+    console.info(
+      "[generateReadingPassageQuizForDeck] lessonPlanContext diagnostics",
+      lessonPlanContextDiagnostics(normalizedContext),
+    );
+  }
 
   const lessonFallback = (): TeacherQuizPassageQuestion[] =>
     savedLessonPlan
@@ -486,25 +368,151 @@ async function generateReadingPassageQuizForDeck(
         )
       : buildGenericMultiPassageFallback(activeCounts, input);
 
+  // Offline / missing-key path only. Do not use fill-in-the-blank templates after a
+  // failed live AI run — those templates only swap names/vocab and look identical.
   if (!process.env.OPENAI_API_KEY?.trim()) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[generateReadingPassageQuizForDeck] OPENAI_API_KEY missing; using template fallback.",
+      );
+    }
     return lessonFallback();
   }
 
-  try {
-    const { output } = await trackedGenerateText({
-      model: openai("gpt-4o"),
-      output: Output.object({
-        schema: teacherQuizMultiPassageResultSchema,
-      }),
-      system,
-      prompt: user,
-    });
+  const acceptedPassages: TeacherQuizPassageBlock[] = [];
+  const diagnostics: PassageGenerationDiagnostics = {
+    requestedPassageCount: activeCounts.length,
+    acceptedPassageCount: 0,
+    replacementAttempts: 0,
+    scenarioCategories: [],
+    centralEvents: [],
+    duplicateValidationResults: [],
+  };
 
-    if (!output?.passages?.length) {
-      throw new Error("AI quiz generation returned no output.");
+  const seedPrevious = toggles.avoidPreviousPassages
+    ? (input.previousPassageSummaries ?? [])
+    : [];
+
+  try {
+    for (let index = 0; index < activeCounts.length; index += 1) {
+      const questionsForThisPassage = activeCounts[index]!;
+      const previousMeta = [
+        ...seedPrevious,
+        ...acceptedPassages.map((block) =>
+          toDiversityMetadata(blockToDiversityInput(block)),
+        ),
+      ];
+
+      const { system, user } = buildCurriculumPassagePrompt({
+        lessonPlanContext: normalizedContext,
+        lessonPlanContextText: curriculumText,
+        subject: input.subject,
+        gradeLevel: input.gradeLevel,
+        topic: input.topic,
+        difficultyLevel: String(input.difficultyLevel),
+        questionsForThisPassage,
+        passageIndex: index,
+        totalPassages: activeCounts.length,
+        settings: {
+          passageType: input.passageType,
+          passageStyle: input.passageStyle,
+          readingLevel: input.readingLevel,
+          passageQuestionTypes: input.passageQuestionTypes,
+          toggles,
+        },
+        previousPassages: previousMeta,
+      });
+
+      let candidate =
+        (await generateSingleStructuredPassage({ system, prompt: user })) ??
+        (await generateSingleStructuredPassage({
+          system,
+          prompt: `${user}\n\nPrevious attempt returned no usable passage. Return one valid structured passage object.`,
+        }));
+
+      if (!candidate) {
+        throw new Error("AI quiz generation returned no output.");
+      }
+
+      const qualityErrors = validateSinglePassageQuality(
+        candidate,
+        questionsForThisPassage,
+        Boolean(input.savedLessonPlanId),
+      );
+      if (qualityErrors.length > 0) {
+        candidate =
+          (await generateSingleStructuredPassage({
+            system,
+            prompt: `${user}\n\nPrevious output failed validation:\n${qualityErrors.slice(0, 6).join("\n")}\nReturn one corrected passage.`,
+          })) ?? candidate;
+      }
+
+      let diversityInput: PassageDiversityInput = blockToDiversityInput(candidate);
+      let validation = validatePassageAgainstSet(
+        diversityInput,
+        acceptedPassages.map(blockToDiversityInput),
+        vocabularyTerms,
+      );
+
+      let replacementAttempt = 0;
+      while (!validation.valid && replacementAttempt < MAX_REPLACEMENT_ATTEMPTS_PER_PASSAGE) {
+        replacementAttempt += 1;
+        diagnostics.replacementAttempts += 1;
+        diagnostics.duplicateValidationResults.push(
+          `passage ${index + 1} attempt ${replacementAttempt}: ${validation.reasons.join("; ")}`,
+        );
+
+        const replacementPrompt = buildSinglePassageReplacementPrompt({
+          rejected: diversityInput,
+          reasons: validation.reasons,
+          previousPassages: previousMeta,
+        });
+
+        const replacement = await generateSingleStructuredPassage({
+          system,
+          prompt: `${user}\n\n${replacementPrompt}`,
+        });
+
+        if (!replacement) break;
+
+        candidate = replacement;
+        diversityInput = blockToDiversityInput(candidate);
+        validation = validatePassageAgainstSet(
+          diversityInput,
+          acceptedPassages.map(blockToDiversityInput),
+          vocabularyTerms,
+        );
+      }
+
+      if (!validation.valid) {
+        throw new Error(
+          `PASSAGE_DIVERSITY_FAILED: Could not produce a sufficiently different passage ${index + 1}. ${validation.reasons[0] ?? "Please try again."}`,
+        );
+      }
+
+      acceptedPassages.push(candidate);
+      diagnostics.scenarioCategories.push(candidate.scenarioCategory);
+      diagnostics.centralEvents.push(candidate.centralEvent);
+      diagnostics.duplicateValidationResults.push(
+        `passage ${index + 1}: accepted`,
+      );
     }
 
-    const expanded = expandMultiPassageToQuizCards(output, activeCounts);
+    diagnostics.acceptedPassageCount = acceptedPassages.length;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[generateReadingPassageQuizForDeck] diagnostics", diagnostics);
+    }
+
+    const expanded = expandMultiPassageToQuizCards(
+      { passages: acceptedPassages },
+      {
+        expectedQuestionCounts: activeCounts,
+        includeAnswerExplanations: toggles.includeAnswerExplanations,
+        includeTeacherNotes: toggles.includeTeacherNotes,
+        sourceLessonPlanId: input.savedLessonPlanId,
+      },
+    );
     const expectedTotal = sumPassageQuestionCounts(activeCounts);
     if (expanded.length < expectedTotal) {
       throw new Error("AI quiz generation returned incomplete passage questions.");
@@ -515,13 +523,26 @@ async function generateReadingPassageQuizForDeck(
     if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
       throw new Error(error.message);
     }
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        "[generateReadingPassageQuizForDeck] AI failed; using template fallback.",
-        error,
+    if (
+      error instanceof Error &&
+      error.message.startsWith("PASSAGE_DIVERSITY_FAILED")
+    ) {
+      throw new Error(
+        "The generator could not produce sufficiently different passages. Please try again.",
       );
     }
-    return lessonFallback();
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[generateReadingPassageQuizForDeck] AI failed; not using template fallback.",
+        error instanceof Error ? error.message : "unknown",
+        diagnostics,
+      );
+    }
+    throw new Error(
+      error instanceof Error && error.message.trim()
+        ? error.message
+        : "Reading passage generation failed. Please try again.",
+    );
   }
 }
 
@@ -633,9 +654,7 @@ export async function generateTeacherQuizAction(
     throw new Error(first?.message ?? "Invalid input");
   }
 
-  const passageQuestionCounts = parsed.data.readingPassageQuestions
-    ? (parsed.data.readingPassageQuestionCounts ?? [])
-    : [];
+  const passageQuestionCounts = resolveReadingPassageQuestionCounts(parsed.data);
   const passageCount = sumPassageQuestionCounts(
     activePassageQuestionCounts(passageQuestionCounts),
   );

@@ -157,6 +157,8 @@ export type TeamAdminRecordSliderProps<
   /** Optional controls rendered inside the Search & filters panel (e.g. workspace picker). */
   filterPanelExtra?: (context: { filtersOpen: boolean }) => React.ReactNode;
   filterPanelExtraActive?: boolean;
+  /** When true, Search & filters starts expanded. */
+  defaultFiltersOpen?: boolean;
   /** Card carousel (default) or scrollable table of all filtered rows. */
   layout?: "slider" | "table";
   /** Table headers — required when `layout="table"`. */
@@ -194,6 +196,7 @@ export function TeamAdminRecordSlider<
   allowedSortOptions,
   filterPanelExtra,
   filterPanelExtraActive = false,
+  defaultFiltersOpen = false,
   layout = "slider",
   tableColumns,
   tableGroupByMember = false,
@@ -202,7 +205,7 @@ export function TeamAdminRecordSlider<
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState<TeamAdminRecordSort>("member_az");
   const [deckFilter, setDeckFilter] = React.useState(FILTER_ALL_DECKS);
-  const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const [filtersOpen, setFiltersOpen] = React.useState(defaultFiltersOpen);
   const [slideIndex, setSlideIndex] = React.useState(0);
   const [tablePage, setTablePage] = React.useState(1);
   const trackRef = React.useRef<HTMLDivElement>(null);

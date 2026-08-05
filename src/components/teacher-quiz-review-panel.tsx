@@ -154,7 +154,7 @@ export function TeacherQuizReviewPanel({
             {mixedReview
               ? `Review regular quiz cards and reading-passage questions before saving to ${destinationPhrase}. Passage cards show their own reading passage on the front with a comprehension question; regular cards use a single question prompt.`
               : hasPassageCards
-                ? `Review reading-passage quiz cards before saving to ${destinationPhrase}. Each front shows that card’s reading passage (math stories include a Passage Title) with a comprehension question; the back holds the correct answer with three wrong answers for quiz mode.`
+                ? `Review reading-passage quiz cards before saving to ${destinationPhrase}. Each front shows that card’s titled scenario passage with a comprehension question; the back holds the correct answer with three wrong answers for quiz mode.`
                 : `Review AI-generated quiz cards before saving. Check the boxes for cards you want in ${destinationPhrase}, edit any field, then click Save selected.`}
           </p>
           <TeacherHelpBalloon

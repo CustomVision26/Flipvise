@@ -4,6 +4,7 @@ import {
   extractStepFinalAnswer,
   isStepAnswer,
 } from "@/lib/parse-step-answer";
+import { stripLatexArtifacts } from "@/lib/source-import-reading-passage";
 import {
   formatReadingPassageQuizFront,
   normalizePassageQuizFront,
@@ -107,12 +108,11 @@ export function teacherQuizPassageQuestionToReviewRow(
       question.passageTitle,
     ),
   );
-  const back = resolveTeacherQuizStudyBack(
-    question.correctAnswer,
-    question.explanation,
+  const back = stripLatexArtifacts(
+    resolveTeacherQuizStudyBack(question.correctAnswer, question.explanation),
   );
-  const distractors = question.wrongAnswers.map(
-    (answer) => extractStepFinalAnswer(answer) ?? answer.trim(),
+  const distractors = question.wrongAnswers.map((answer) =>
+    stripLatexArtifacts(extractStepFinalAnswer(answer) ?? answer.trim()),
   ) as [string, string, string];
   return {
     id,
@@ -121,7 +121,7 @@ export function teacherQuizPassageQuestionToReviewRow(
     back,
     originalFront: front,
     originalBack: back,
-    explanation: question.explanation.trim(),
+    explanation: stripLatexArtifacts(question.explanation.trim()),
     distractors,
     distractorsFromOriginalFront: false,
     distractorsLoading: false,

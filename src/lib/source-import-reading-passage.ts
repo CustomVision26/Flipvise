@@ -38,9 +38,33 @@ Rules:
 - Never list A., B., C., or D. on the front
 - Always return exactly 3 distractors — the three wrong answer texts`;
 
+/**
+ * Strip LaTeX / TeX artifacts that models often emit in math passages
+ * (e.g. `\\( x \\)`, `\\times`) so students see plain readable text.
+ */
+export function stripLatexArtifacts(text: string): string {
+  return text
+    .replace(/\\\(([\s\S]*?)\\\)/g, "$1")
+    .replace(/\\\[([\s\S]*?)\\\]/g, "$1")
+    .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
+    .replace(/\$([^$\n]+)\$/g, "$1")
+    .replace(/\\times\b/g, "×")
+    .replace(/\\div\b/g, "÷")
+    .replace(/\\pm\b/g, "±")
+    .replace(/\\cdot\b/g, "·")
+    .replace(/\\leq\b/g, "≤")
+    .replace(/\\geq\b/g, "≥")
+    .replace(/\\neq\b/g, "≠")
+    .replace(/\\%/g, "%")
+    .replace(/\\([a-zA-Z]+)/g, "$1")
+    .replace(/\\([{}_])/g, "$1")
+    .replace(/\\/g, "")
+    .replace(/[ \t]{2,}/g, " ");
+}
+
 /** Removes A–D option lines accidentally included on reading-passage card fronts. */
 export function cleanReadingPassageFront(front: string): string {
-  return front
+  return stripLatexArtifacts(front)
     .split("\n")
     .filter((line) => !/^\s*[A-D][.)]\s+\S/.test(line.trim()))
     .join("\n")

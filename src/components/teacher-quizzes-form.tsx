@@ -53,12 +53,34 @@ import {
   sumPassageQuestionCounts,
 } from "@/lib/teacher-quiz-ai-schema";
 import {
+  DEFAULT_PASSAGE_GENERATION_TOGGLES,
+  DEFAULT_TEACHER_QUIZ_PASSAGE_QUESTION_TYPES,
+  DEFAULT_TEACHER_QUIZ_PASSAGE_STYLE,
+  DEFAULT_TEACHER_QUIZ_PASSAGE_TYPE,
+  DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE,
+  DEFAULT_TEACHER_QUIZ_READING_LEVEL,
+  TEACHER_QUIZ_MAX_QUESTIONS_PER_PASSAGE,
+  TEACHER_QUIZ_PASSAGE_QUESTION_TYPES,
+  TEACHER_QUIZ_PASSAGE_QUESTION_TYPE_LABELS,
+  TEACHER_QUIZ_PASSAGE_STYLES,
+  TEACHER_QUIZ_PASSAGE_STYLE_LABELS,
+  TEACHER_QUIZ_PASSAGE_TYPES,
+  TEACHER_QUIZ_PASSAGE_TYPE_LABELS,
+  TEACHER_QUIZ_READING_LEVELS,
+  TEACHER_QUIZ_READING_LEVEL_LABELS,
+  type TeacherQuizPassageQuestionType,
+  type TeacherQuizPassageStyle,
+  type TeacherQuizPassageType,
+  type TeacherQuizReadingLevel,
+} from "@/lib/teacher-quiz-passage-settings";
+import {
   teacherQuizMixedResultToReviewRows,
   type TeacherQuizReviewRow,
 } from "@/lib/teacher-quiz-review";
 import { TeacherQuizReviewPanel } from "@/components/teacher-quiz-review-panel";
 import { TeacherTooltipButton } from "@/components/teacher-tooltip-button";
 import { LessonPlanDayScopeDialog } from "@/components/lesson-plan-day-scope-dialog";
+import { TeamAdminRecordSlider } from "@/components/team-admin-record-slider";
 import {
   getLessonPlanDayScopeOptions,
   shouldPromptLessonPlanDayScope,
@@ -73,6 +95,16 @@ import { previewTeacherQuizDeckSaveDestination } from "@/lib/teacher-quiz-deck-s
 import { cn } from "@/lib/utils";
 import { ADMIN_NONE, adminDisplayLabel } from "@/lib/owner-team-admin-picker";
 import { toast } from "sonner";
+
+type QuizDeckSliderItem = {
+  key: string;
+  memberLabel: string;
+  deckName: string;
+  deck: DeckRow;
+  displayName: string;
+  lessonPlanDayLabel: string | null;
+  deckHref: string;
+};
 
 const SAVED_PLAN_NONE = "__none__";
 
@@ -167,7 +199,37 @@ export function TeacherQuizzesForm({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [readingPassageQuestions, setReadingPassageQuestions] = useState(false);
   const [readingPassageCount, setReadingPassageCount] = useState("1");
-  const [passageQuestionCounts, setPassageQuestionCounts] = useState<string[]>(["5"]);
+  /** Per-passage question counts (string inputs; length follows number of passages). */
+  const [questionsPerPassageByIndex, setQuestionsPerPassageByIndex] = useState<string[]>([
+    String(DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE),
+  ]);
+  const [passageType, setPassageType] = useState<TeacherQuizPassageType>(
+    DEFAULT_TEACHER_QUIZ_PASSAGE_TYPE,
+  );
+  const [passageStyle, setPassageStyle] = useState<TeacherQuizPassageStyle>(
+    DEFAULT_TEACHER_QUIZ_PASSAGE_STYLE,
+  );
+  const [readingLevel, setReadingLevel] = useState<TeacherQuizReadingLevel>(
+    DEFAULT_TEACHER_QUIZ_READING_LEVEL,
+  );
+  const [passageQuestionTypes, setPassageQuestionTypes] = useState<
+    TeacherQuizPassageQuestionType[]
+  >(DEFAULT_TEACHER_QUIZ_PASSAGE_QUESTION_TYPES);
+  const [includeVocabulary, setIncludeVocabulary] = useState(
+    DEFAULT_PASSAGE_GENERATION_TOGGLES.includeVocabulary,
+  );
+  const [includeTeacherNotes, setIncludeTeacherNotes] = useState(
+    DEFAULT_PASSAGE_GENERATION_TOGGLES.includeTeacherNotes,
+  );
+  const [includeAnswerExplanations, setIncludeAnswerExplanations] = useState(
+    DEFAULT_PASSAGE_GENERATION_TOGGLES.includeAnswerExplanations,
+  );
+  const [useRelevantLocalContext, setUseRelevantLocalContext] = useState(
+    DEFAULT_PASSAGE_GENERATION_TOGGLES.useRelevantLocalContext,
+  );
+  const [avoidPreviousPassages, setAvoidPreviousPassages] = useState(
+    DEFAULT_PASSAGE_GENERATION_TOGGLES.avoidPreviousPassages,
+  );
   const [dayScopeDialogOpen, setDayScopeDialogOpen] = useState(false);
   const [generationDayScope, setGenerationDayScope] =
     useState<LessonPlanDayScope>("all");
@@ -295,6 +357,35 @@ export function TeacherQuizzesForm({
     }
   }, [initialLessonPlanId, savedLessonPlans, isWorkspaceOwner, ownerPicker]);
 
+  function resizeQuestionsPerPassageInputs(
+    nextPassageCount: number,
+    current: string[] = questionsPerPassageByIndex,
+  ): string[] {
+    const defaultValue = String(DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE);
+    const count = Math.max(1, nextPassageCount);
+    if (current.length === count) {
+      return current;
+    }
+    if (current.length > count) {
+      return current.slice(0, count);
+    }
+    return [
+      ...current,
+      ...Array.from({ length: count - current.length }, () => defaultValue),
+    ];
+  }
+
+  useEffect(() => {
+    if (!readingPassageQuestions) return;
+    const nextCount = Math.max(
+      1,
+      parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES) || 1,
+    );
+    setQuestionsPerPassageByIndex((current) =>
+      resizeQuestionsPerPassageInputs(nextCount, current),
+    );
+  }, [readingPassageQuestions, readingPassageCount]);
+
   function validateGenerateCounts(): {
     standardCount: number;
     passageQuestionCounts: number[];
@@ -304,25 +395,34 @@ export function TeacherQuizzesForm({
       ? parseOptionalCardCount(form.numberOfCards, deckQuota.maxCardsPerDeck)
       : parseNumberOfCards(form.numberOfCards, deckQuota.maxCardsPerDeck);
     const configuredPassageCount = readingPassageQuestions
-      ? parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES)
+      ? Math.max(1, parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES) || 1)
       : 0;
-    const perPassageCounts = readingPassageQuestions
-      ? passageQuestionCounts
-          .slice(0, Math.max(1, configuredPassageCount))
-          .map((value) => parseOptionalCardCount(value, deckQuota.maxCardsPerDeck))
+    const perPassageCap = Math.min(
+      TEACHER_QUIZ_MAX_QUESTIONS_PER_PASSAGE,
+      deckQuota.maxCardsPerDeck,
+    );
+    const sizedInputs = readingPassageQuestions
+      ? resizeQuestionsPerPassageInputs(configuredPassageCount)
       : [];
-    while (
-      readingPassageQuestions &&
-      perPassageCounts.length < Math.max(1, configuredPassageCount)
-    ) {
-      perPassageCounts.push(0);
-    }
+    const perPassageCounts = readingPassageQuestions
+      ? sizedInputs.map((value) =>
+          Math.max(
+            1,
+            parseOptionalCardCount(value, perPassageCap) ||
+              DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE,
+          ),
+        )
+      : [];
     const passageCount = sumPassageQuestionCounts(perPassageCounts);
     const totalCount = standardCount + passageCount;
 
+    if (readingPassageQuestions && passageQuestionTypes.length < 1) {
+      setErrorMessage("Select at least one passage question type.");
+      return null;
+    }
     if (readingPassageQuestions && activePassageQuestionCounts(perPassageCounts).length < 1) {
       setErrorMessage(
-        "Give at least one passage one or more questions, or turn off Include reading passage.",
+        "Set at least one question on a passage, or turn off Include reading passage.",
       );
       return null;
     }
@@ -339,7 +439,11 @@ export function TeacherQuizzesForm({
       return null;
     }
 
-    return { standardCount, passageQuestionCounts: perPassageCounts, passageCount };
+    return {
+      standardCount,
+      passageQuestionCounts: perPassageCounts,
+      passageCount,
+    };
   }
 
   async function runGenerate(dayScope: LessonPlanDayScope = "all") {
@@ -365,6 +469,25 @@ export function TeacherQuizzesForm({
         readingPassageQuestionCounts: readingPassageQuestions
           ? counts.passageQuestionCounts
           : undefined,
+        passageType: readingPassageQuestions ? passageType : undefined,
+        passageStyle: readingPassageQuestions ? passageStyle : undefined,
+        readingLevel: readingPassageQuestions ? readingLevel : undefined,
+        passageQuestionTypes: readingPassageQuestions
+          ? passageQuestionTypes
+          : undefined,
+        includeVocabulary: readingPassageQuestions ? includeVocabulary : undefined,
+        includeTeacherNotes: readingPassageQuestions
+          ? includeTeacherNotes
+          : undefined,
+        includeAnswerExplanations: readingPassageQuestions
+          ? includeAnswerExplanations
+          : undefined,
+        useRelevantLocalContext: readingPassageQuestions
+          ? useRelevantLocalContext
+          : undefined,
+        avoidPreviousPassages: readingPassageQuestions
+          ? avoidPreviousPassages
+          : undefined,
         teamId: teacherWorkspace?.teamId ?? undefined,
         dayScope: form.savedLessonPlanId != null && dayScopeOptions.length > 0
           ? dayScope
@@ -378,6 +501,21 @@ export function TeacherQuizzesForm({
         }),
       );
       setShowResult(true);
+      if (readingPassageQuestions && result.passageQuestions.length > 0) {
+        const passageTitles = new Set(
+          result.passageQuestions
+            .map((item) => item.passageTitle?.trim())
+            .filter(Boolean),
+        );
+        const lessonTitle = selectedPlan?.result.lessonTitle?.trim();
+        toast.success(
+          `Generated ${passageTitles.size || counts.passageQuestionCounts.length} passage${
+            (passageTitles.size || counts.passageQuestionCounts.length) === 1 ? "" : "s"
+          } (${result.passageQuestions.length} cards)${
+            lessonTitle ? ` from “${lessonTitle}”` : ""
+          }.`,
+        );
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -503,6 +641,33 @@ export function TeacherQuizzesForm({
   const quotaLabel = teacherDeckQuotaLabel(deckQuota);
   const cannotSaveDeck = deckQuota.atLimit || deckQuota.needsWorkspace;
 
+  const deckSliderItems = useMemo<QuizDeckSliderItem[]>(
+    () =>
+      decks.map((deck) => {
+        const displayName = formatDeckCardDisplayName(deck.name);
+        const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
+          deck.description,
+          deck.name,
+        );
+        const deckHref = teacherWorkspace?.queryString
+          ? withTeamWorkspaceQuery(
+              `/decks/${deck.id}`,
+              teacherWorkspace.queryString,
+            )
+          : `/decks/${deck.id}`;
+        return {
+          key: String(deck.id),
+          memberLabel: displayName,
+          deckName: displayName,
+          deck,
+          displayName,
+          lessonPlanDayLabel,
+          deckHref,
+        };
+      }),
+    [decks, teacherWorkspace?.queryString],
+  );
+
   const selectedCount = reviewRows?.filter((row) => row.selected).length ?? 0;
   const anyDistractorsLoading =
     reviewRows?.some((row) => row.selected && row.distractorsLoading) ?? false;
@@ -520,11 +685,27 @@ export function TeacherQuizzesForm({
         ),
       )
     : 0;
+  const maxQuestionsPerPassage = readingPassageQuestions
+    ? Math.max(
+        1,
+        Math.min(
+          TEACHER_QUIZ_MAX_QUESTIONS_PER_PASSAGE,
+          Math.max(0, deckQuota.maxCardsPerDeck - parsedStandardCount),
+        ),
+      )
+    : deckQuota.maxCardsPerDeck;
+  const sizedPassageQuestionInputs = readingPassageQuestions
+    ? resizeQuestionsPerPassageInputs(parsedPassageCountValue)
+    : [];
   const parsedPassageQuestionCounts = readingPassageQuestions
-    ? Array.from({ length: parsedPassageCountValue }, (_, index) =>
-        parseOptionalCardCount(
-          passageQuestionCounts[index] ?? "0",
-          deckQuota.maxCardsPerDeck,
+    ? sizedPassageQuestionInputs.map((value) =>
+        Math.max(
+          1,
+          Math.min(
+            maxQuestionsPerPassage,
+            parseOptionalCardCount(value, maxQuestionsPerPassage) ||
+              DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE,
+          ),
         ),
       )
     : [];
@@ -534,22 +715,29 @@ export function TeacherQuizzesForm({
   const maxStandardCount = readingPassageQuestions
     ? Math.max(0, deckQuota.maxCardsPerDeck - parsedPassageCount)
     : deckQuota.maxCardsPerDeck;
-  const maxPassageQuestionsTotal = Math.max(
-    0,
-    deckQuota.maxCardsPerDeck - parsedStandardCount,
-  );
+  const selectedPlanDefaults = selectedPlan
+    ? lessonPlanInputToQuizDefaults(selectedPlan.input)
+    : null;
+  const lessonPlanFieldOverride =
+    selectedPlanDefaults != null &&
+    (form.subject.trim() !== selectedPlanDefaults.subject.trim() ||
+      form.gradeLevel.trim() !== selectedPlanDefaults.gradeLevel.trim() ||
+      form.topic.trim() !== selectedPlanDefaults.topic.trim());
   const passageBreakdown =
     parsedPassageQuestionCounts.length > 0
       ? parsedPassageQuestionCounts.join("+")
       : "0";
   const combinedOverLimit = combinedCardCount > deckQuota.maxCardsPerDeck;
   const passageModeInvalid =
-    readingPassageQuestions && activePassageCount < 1;
+    readingPassageQuestions &&
+    (activePassageCount < 1 || passageQuestionTypes.length < 1);
 
   const generateTooltip = combinedOverLimit
     ? `Combined card count (regular + passage questions) cannot exceed ${deckQuota.maxCardsPerDeck} per deck.`
     : passageModeInvalid
-      ? "Give at least one passage one or more questions, or turn off Include reading passage."
+      ? passageQuestionTypes.length < 1
+        ? "Select at least one passage question type, or turn off Include reading passage."
+        : "Set at least one question on a passage, or turn off Include reading passage."
       : readingPassageQuestions && combinedCardCount < 1
         ? "Enter at least one regular quiz card or one question linked to a reading passage."
         : deckQuota.atLimit
@@ -557,7 +745,7 @@ export function TeacherQuizzesForm({
           : deckQuota.needsWorkspace
             ? "Select a workspace from the header to create team decks."
             : readingPassageQuestions
-              ? "AI generates regular quiz cards plus distinct vocabulary-focused reading passages with per-passage comprehension questions for review before saving."
+              ? "AI generates regular quiz cards plus curriculum-driven reading passages from the selected Lesson Plan (unique educational situations; vocabulary supports the lesson)."
               : "AI generates multiple-choice quiz cards for review before saving to a deck.";
 
   return (
@@ -567,7 +755,11 @@ export function TeacherQuizzesForm({
       showResult={showResult && reviewRows != null}
       isGenerating={isGenerating}
       generateLabel="AI Generate"
-      submittingLabel="Generating…"
+      submittingLabel={
+        readingPassageQuestions
+          ? "Generating distinct curriculum-aligned passages…"
+          : "Generating…"
+      }
       generateWithAiIcon
       generateTooltip={generateTooltip}
       errorMessage={errorMessage}
@@ -679,50 +871,59 @@ export function TeacherQuizzesForm({
               aria-hidden={!decksExpanded}
             >
               <div className="min-h-0 overflow-hidden">
-                <CardContent className="space-y-3 pt-4">
-                  {decks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No decks yet. Select a saved lesson plan and click AI Generate to create one.
-                    </p>
-                  ) : (
-                    decks.map((deck) => {
-                      const deckHref = teacherWorkspace?.queryString
-                        ? withTeamWorkspaceQuery(
-                            `/decks/${deck.id}`,
-                            teacherWorkspace.queryString,
-                          )
-                        : `/decks/${deck.id}`;
-                      const displayName = formatDeckCardDisplayName(deck.name);
-                      const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
-                        deck.description,
-                        deck.name,
-                      );
-                      return (
-                      <div
-                        key={deck.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          {lessonPlanDayLabel ? (
-                            <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              {lessonPlanDayLabel}
+                <CardContent className="space-y-4 pt-4">
+                  <TeamAdminRecordSlider
+                    items={deckSliderItems}
+                    interactiveCard
+                    defaultFiltersOpen
+                    searchLabel="Search decks"
+                    searchPlaceholder="Name, day label, or description…"
+                    allowedSortOptions={["member_az", "member_za"]}
+                    sortLabelMap={{
+                      member_az: "Deck (A–Z)",
+                      member_za: "Deck (Z–A)",
+                    }}
+                    getSearchHaystack={(item) =>
+                      [
+                        item.displayName,
+                        item.deck.name,
+                        item.deck.description,
+                        item.lessonPlanDayLabel,
+                      ]
+                        .filter((part): part is string => Boolean(part?.trim()))
+                        .join(" ")
+                    }
+                    emptyMessage="No decks yet. Select a saved lesson plan and click AI Generate to create one."
+                    noResultsMessage="No decks match your search."
+                    renderCard={(item) => (
+                      <div className="flex min-h-[7.5rem] flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                        <div className="min-w-0 space-y-1.5">
+                          {item.lessonPlanDayLabel ? (
+                            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {item.lessonPlanDayLabel}
                             </p>
                           ) : null}
-                          <p className="font-medium text-foreground">{displayName}</p>
-                          {deck.description ? (
-                            <p className="text-sm text-muted-foreground">{deck.description}</p>
+                          <p className="text-base font-semibold leading-snug text-foreground">
+                            {item.displayName}
+                          </p>
+                          {item.deck.description ? (
+                            <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                              {item.deck.description}
+                            </p>
                           ) : null}
                         </div>
                         <Link
-                          href={deckHref}
-                          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                          href={item.deckHref}
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "sm" }),
+                            "shrink-0 self-start sm:self-center",
+                          )}
                         >
                           Open Deck
                         </Link>
                       </div>
-                      );
-                    })
-                  )}
+                    )}
+                  />
                 </CardContent>
               </div>
             </div>
@@ -885,6 +1086,12 @@ export function TeacherQuizzesForm({
             <LessonPlanSavedReferenceSummary
               references={getLessonPlanReferenceMaterials(selectedPlan.input)}
             />
+          ) : null}
+          {lessonPlanFieldOverride ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Subject, grade, or topic differs from the selected lesson plan — your edits override
+              the plan values for generation.
+            </p>
           ) : null}
         </div>
         <div className="space-y-2">
@@ -1059,7 +1266,18 @@ export function TeacherQuizzesForm({
                   );
                   const remaining = Math.max(0, deckQuota.maxCardsPerDeck - regular);
                   setReadingPassageCount("1");
-                  setPassageQuestionCounts([String(Math.min(5, remaining))]);
+                  setQuestionsPerPassageByIndex([
+                    String(
+                      Math.min(
+                        DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE,
+                        Math.max(1, remaining),
+                      ),
+                    ),
+                  ]);
+                  setPassageType(DEFAULT_TEACHER_QUIZ_PASSAGE_TYPE);
+                  setPassageStyle(DEFAULT_TEACHER_QUIZ_PASSAGE_STYLE);
+                  setReadingLevel(DEFAULT_TEACHER_QUIZ_READING_LEVEL);
+                  setPassageQuestionTypes(DEFAULT_TEACHER_QUIZ_PASSAGE_QUESTION_TYPES);
                 }
               }}
               aria-label="Include reading passage"
@@ -1072,12 +1290,11 @@ export function TeacherQuizzesForm({
                 Include reading passage
               </Label>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Adds one or more short informational reading passages (PEP-style) that teach the
-                lesson vocabulary in context — not a summary of classroom activities. Set how many
-                questions each passage should get — use 0 to skip a passage row. Only passages
-                with at least one question are generated. Each question is saved as its own quiz
-                card with that passage on the front; backs store the correct answer plus three
-                wrong answers for quiz mode. Total cards must stay within your plan limit.
+                Generates curriculum-driven reading passages from the selected Lesson Plan
+                (standards, objectives, materials, activities, vocabulary as support). Each
+                passage is a unique educational situation — not one passage per vocabulary word.
+                Every question becomes its own quiz card (passage + question on the front;
+                correct answer + three distractors for quiz mode).
               </p>
               {readingPassageQuestions ? (
                 <div className="space-y-3">
@@ -1087,11 +1304,11 @@ export function TeacherQuizzesForm({
                       label="Number of passages"
                       help={
                         <>
-                          <p className="mb-1 font-semibold">Multiple passages</p>
+                          <p className="mb-1 font-semibold">Number of passages</p>
                           <p>
-                            Choose how many passage rows to configure (up to{" "}
-                            {TEACHER_QUIZ_MAX_PASSAGES}). Then set questions per passage. Rows
-                            set to 0 questions are skipped during generation.
+                            How many distinct educational situations to generate (up to{" "}
+                            {TEACHER_QUIZ_MAX_PASSAGES}). Each must have a different central
+                            event. Set questions separately for each passage below.
                           </p>
                         </>
                       }
@@ -1108,58 +1325,27 @@ export function TeacherQuizzesForm({
                           setReadingPassageCount("");
                           return;
                         }
-                        const nextCount = Number.parseInt(
-                          clampCardCountInput(raw, TEACHER_QUIZ_MAX_PASSAGES, 1),
-                          10,
-                        );
-                        setReadingPassageCount(String(nextCount));
-                        setPassageQuestionCounts((current) => {
-                          if (current.length === nextCount) return current;
-                          if (current.length < nextCount) {
-                            const remainingBudget = Math.max(
-                              0,
-                              maxPassageQuestionsTotal -
-                                sumPassageQuestionCounts(
-                                  current.map((value) =>
-                                    parseOptionalCardCount(value, deckQuota.maxCardsPerDeck),
-                                  ),
-                                ),
-                            );
-                            const defaultForNew =
-                              remainingBudget > 0
-                                ? String(Math.min(1, remainingBudget))
-                                : "0";
-                            return [
-                              ...current,
-                              ...Array.from(
-                                { length: nextCount - current.length },
-                                () => defaultForNew,
-                              ),
-                            ];
-                          }
-                          return current.slice(0, nextCount);
-                        });
+                        const next = clampCardCountInput(raw, TEACHER_QUIZ_MAX_PASSAGES, 1);
+                        setReadingPassageCount(next);
+                        const nextCount = Number.parseInt(next, 10);
+                        if (Number.isFinite(nextCount) && nextCount >= 1) {
+                          setQuestionsPerPassageByIndex(
+                            resizeQuestionsPerPassageInputs(nextCount),
+                          );
+                        }
                       }}
                       onBlur={() => {
                         const nextCount = Math.max(
                           1,
-                          parseOptionalCardCount(readingPassageCount, TEACHER_QUIZ_MAX_PASSAGES) ||
-                            1,
+                          parseOptionalCardCount(
+                            readingPassageCount,
+                            TEACHER_QUIZ_MAX_PASSAGES,
+                          ) || 1,
                         );
                         setReadingPassageCount(String(nextCount));
-                        setPassageQuestionCounts((current) => {
-                          if (current.length === nextCount) return current;
-                          if (current.length < nextCount) {
-                            return [
-                              ...current,
-                              ...Array.from(
-                                { length: nextCount - current.length },
-                                () => "0",
-                              ),
-                            ];
-                          }
-                          return current.slice(0, nextCount);
-                        });
+                        setQuestionsPerPassageByIndex(
+                          resizeQuestionsPerPassageInputs(nextCount),
+                        );
                       }}
                       className="w-full sm:w-28"
                       disabled={isBusy}
@@ -1167,72 +1353,245 @@ export function TeacherQuizzesForm({
                   </div>
 
                   <div className="space-y-2">
-                    {Array.from({ length: parsedPassageCountValue }, (_, index) => {
-                      const otherPassageTotal = parsedPassageQuestionCounts.reduce(
-                        (sum, count, countIndex) =>
-                          countIndex === index ? sum : sum + count,
-                        0,
-                      );
-                      const maxForThisPassage = Math.max(
-                        0,
-                        deckQuota.maxCardsPerDeck - parsedStandardCount - otherPassageTotal,
-                      );
-                      const fieldId = `passageQuestionCount-${index + 1}`;
-                      return (
-                        <div key={fieldId} className="space-y-1">
-                          <TeacherFieldLabel
-                            htmlFor={fieldId}
-                            label={`Passage ${index + 1} — questions`}
-                            help={
-                              <>
-                                <p className="mb-1 font-semibold">Questions for this passage</p>
-                                <p>
-                                  AI writes a distinct informational passage and this many
-                                  comprehension questions about it. Set 0 to skip generating
-                                  this passage. Each question counts as one card toward the deck
-                                  limit.
-                                </p>
-                              </>
-                            }
-                          />
-                          <Input
-                            id={fieldId}
-                            type="number"
-                            min={0}
-                            max={maxForThisPassage}
-                            value={passageQuestionCounts[index] ?? "0"}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              setPassageQuestionCounts((current) => {
-                                const next = [...current];
-                                while (next.length < parsedPassageCountValue) next.push("0");
-                                if (raw === "") {
-                                  next[index] = "";
-                                  return next;
-                                }
-                                next[index] = clampCardCountInput(raw, maxForThisPassage, 0);
-                                return next;
-                              });
-                            }}
-                            onBlur={() => {
-                              setPassageQuestionCounts((current) => {
-                                const next = [...current];
-                                while (next.length < parsedPassageCountValue) next.push("0");
-                                next[index] = String(
-                                  parseOptionalCardCount(
-                                    next[index] ?? "0",
-                                    maxForThisPassage,
-                                  ),
-                                );
-                                return next;
-                              });
-                            }}
-                            className="w-full sm:w-28"
+                    <TeacherFieldLabel
+                      htmlFor="questions-per-passage-0"
+                      label="Questions for each passage"
+                      help={
+                        <>
+                          <p className="mb-1 font-semibold">Questions for each passage</p>
+                          <p>
+                            Set how many comprehension questions each passage should have.
+                            Total passage cards = the sum of these values.
+                          </p>
+                        </>
+                      }
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {sizedPassageQuestionInputs.map((value, index) => {
+                        const fieldId = `questions-per-passage-${index}`;
+                        return (
+                          <div key={fieldId} className="space-y-1.5">
+                            <Label htmlFor={fieldId} className="text-sm font-normal">
+                              Passage {index + 1}
+                            </Label>
+                            <Input
+                              id={fieldId}
+                              type="number"
+                              min={1}
+                              max={maxQuestionsPerPassage}
+                              value={value}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setQuestionsPerPassageByIndex((current) => {
+                                  const next = resizeQuestionsPerPassageInputs(
+                                    parsedPassageCountValue,
+                                  );
+                                  const copy = [...next];
+                                  copy[index] =
+                                    raw === ""
+                                      ? ""
+                                      : clampCardCountInput(raw, maxQuestionsPerPassage, 1);
+                                  return copy;
+                                });
+                              }}
+                              onBlur={() => {
+                                setQuestionsPerPassageByIndex((current) => {
+                                  const next = resizeQuestionsPerPassageInputs(
+                                    parsedPassageCountValue,
+                                  );
+                                  const copy = [...next];
+                                  copy[index] = String(
+                                    Math.max(
+                                      1,
+                                      parseOptionalCardCount(
+                                        copy[index] ?? "",
+                                        maxQuestionsPerPassage,
+                                      ) || DEFAULT_TEACHER_QUIZ_QUESTIONS_PER_PASSAGE,
+                                    ),
+                                  );
+                                  return copy;
+                                });
+                              }}
+                              className="w-full sm:w-28"
+                              disabled={isBusy}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="passageType" className="text-sm">
+                        Passage type
+                      </Label>
+                      <Select
+                        value={passageType}
+                        onValueChange={(value) => {
+                          if (value != null) setPassageType(value as TeacherQuizPassageType);
+                        }}
+                        disabled={isBusy}
+                      >
+                        <SelectTrigger id="passageType" className="h-10 w-full bg-background">
+                          <SelectValue>
+                            {TEACHER_QUIZ_PASSAGE_TYPE_LABELS[passageType]}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TEACHER_QUIZ_PASSAGE_TYPES.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {TEACHER_QUIZ_PASSAGE_TYPE_LABELS[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="passageStyle" className="text-sm">
+                        Passage style
+                      </Label>
+                      <Select
+                        value={passageStyle}
+                        onValueChange={(value) => {
+                          if (value != null) setPassageStyle(value as TeacherQuizPassageStyle);
+                        }}
+                        disabled={isBusy}
+                      >
+                        <SelectTrigger id="passageStyle" className="h-10 w-full bg-background">
+                          <SelectValue>
+                            {TEACHER_QUIZ_PASSAGE_STYLE_LABELS[passageStyle]}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TEACHER_QUIZ_PASSAGE_STYLES.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {TEACHER_QUIZ_PASSAGE_STYLE_LABELS[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="readingLevel" className="text-sm">
+                        Reading level
+                      </Label>
+                      <Select
+                        value={readingLevel}
+                        onValueChange={(value) => {
+                          if (value != null) setReadingLevel(value as TeacherQuizReadingLevel);
+                        }}
+                        disabled={isBusy}
+                      >
+                        <SelectTrigger id="readingLevel" className="h-10 w-full bg-background">
+                          <SelectValue>
+                            {TEACHER_QUIZ_READING_LEVEL_LABELS[readingLevel]}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TEACHER_QUIZ_READING_LEVELS.map((value) => (
+                            <SelectItem key={value} value={value}>
+                              {TEACHER_QUIZ_READING_LEVEL_LABELS[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Question types</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {TEACHER_QUIZ_PASSAGE_QUESTION_TYPES.map((type) => {
+                        const checked = passageQuestionTypes.includes(type);
+                        const id = `passage-qtype-${type}`;
+                        return (
+                          <div key={type} className="flex items-center gap-2">
+                            <Checkbox
+                              id={id}
+                              checked={checked}
+                              disabled={isBusy}
+                              onCheckedChange={(value) => {
+                                const on = value === true;
+                                setPassageQuestionTypes((current) => {
+                                  if (on) {
+                                    return current.includes(type) ? current : [...current, type];
+                                  }
+                                  return current.filter((item) => item !== type);
+                                });
+                              }}
+                              aria-label={TEACHER_QUIZ_PASSAGE_QUESTION_TYPE_LABELS[type]}
+                            />
+                            <Label htmlFor={id} className="cursor-pointer text-sm font-normal">
+                              {TEACHER_QUIZ_PASSAGE_QUESTION_TYPE_LABELS[type]}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {passageQuestionTypes.length < 1 ? (
+                      <p className="text-xs text-destructive">
+                        Select at least one question type.
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Passage options</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {(
+                        [
+                          {
+                            id: "includeVocabulary",
+                            label: "Include key vocabulary naturally",
+                            checked: includeVocabulary,
+                            onChange: setIncludeVocabulary,
+                          },
+                          {
+                            id: "includeTeacherNotes",
+                            label: "Include teacher notes",
+                            checked: includeTeacherNotes,
+                            onChange: setIncludeTeacherNotes,
+                          },
+                          {
+                            id: "includeAnswerExplanations",
+                            label: "Include explanation for correct answers",
+                            checked: includeAnswerExplanations,
+                            onChange: setIncludeAnswerExplanations,
+                          },
+                          {
+                            id: "useRelevantLocalContext",
+                            label: "Use local or culturally relevant context",
+                            checked: useRelevantLocalContext,
+                            onChange: setUseRelevantLocalContext,
+                          },
+                          {
+                            id: "avoidPreviousPassages",
+                            label: "Avoid repeating previously generated passages",
+                            checked: avoidPreviousPassages,
+                            onChange: setAvoidPreviousPassages,
+                          },
+                        ] as const
+                      ).map((option) => (
+                        <div key={option.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={option.id}
+                            checked={option.checked}
                             disabled={isBusy}
+                            onCheckedChange={(value) => option.onChange(value === true)}
+                            aria-label={option.label}
                           />
+                          <Label
+                            htmlFor={option.id}
+                            className="cursor-pointer text-sm font-normal"
+                          >
+                            {option.label}
+                          </Label>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
 
                   <p
@@ -1248,7 +1607,7 @@ export function TeacherQuizzesForm({
                     {combinedOverLimit
                       ? " — reduce one count to continue."
                       : passageModeInvalid
-                        ? " — set at least one passage to 1 or more questions."
+                        ? " — set questions for each passage and at least one question type."
                         : null}
                   </p>
                 </div>
