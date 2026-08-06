@@ -786,6 +786,68 @@ export async function listLiveBattleStrategyCards(
     .orderBy(asc(liveBattleStrategyCards.createdAt));
 }
 
+/**
+ * Return an in-progress battle to the lobby without deleting the session.
+ * Clears answer progress so the battle can be started again cleanly.
+ */
+export async function returnLiveClassroomSessionToLobby(
+  sessionId: number,
+  options?: { survivalHearts?: number },
+): Promise<LiveClassroomSessionRow | null> {
+  const hearts =
+    options?.survivalHearts != null && options.survivalHearts > 0
+      ? options.survivalHearts
+      : 3;
+
+  await db
+    .delete(liveBattleAnswers)
+    .where(eq(liveBattleAnswers.sessionId, sessionId));
+
+  await db
+    .update(liveBattleQuestions)
+    .set({ revealed: false, aiExplanationShown: false })
+    .where(eq(liveBattleQuestions.sessionId, sessionId));
+
+  await db
+    .update(liveBattleStrategyCards)
+    .set({
+      usedAt: null,
+      usedByUserId: null,
+      questionId: null,
+    })
+    .where(eq(liveBattleStrategyCards.sessionId, sessionId));
+
+  await db
+    .update(liveClassroomParticipants)
+    .set({
+      correctCount: 0,
+      incorrectCount: 0,
+      totalResponseTimeMs: 0,
+      answersSubmitted: 0,
+      updatedAt: new Date(),
+    })
+    .where(eq(liveClassroomParticipants.sessionId, sessionId));
+
+  await db
+    .update(liveClassroomTeams)
+    .set({
+      score: 0,
+      hearts,
+      eliminated: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(liveClassroomTeams.sessionId, sessionId));
+
+  return updateLiveClassroomSession(sessionId, {
+    status: "lobby",
+    currentQuestionIndex: 0,
+    questionStartedAt: null,
+    teamsLocked: false,
+    startedAt: null,
+    endedAt: null,
+  });
+}
+
 export async function markStrategyCardUsed(
   id: number,
   input: { usedByUserId: string; questionId: number },

@@ -258,7 +258,7 @@ export function LiveClassroomStartForm({
   return (
     <Card className="border-border/80 bg-card/60 shadow-sm">
       <CardHeader>
-        <CardTitle>Start Session</CardTitle>
+        <CardTitle>Create Session</CardTitle>
         <CardDescription>
           Configure a Live Classroom™ battle, then open the lobby for students
           to join.

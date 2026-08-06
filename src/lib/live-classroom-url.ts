@@ -33,6 +33,16 @@ export function liveClassroomReportPath(sessionId: number): string {
   return `${LIVE_CLASSROOM_REPORTS_PATH}/${sessionId}`;
 }
 
+/** Study page where the Join with code Live Classroom Battle strip appears. */
+export function liveClassroomDeckStudyPath(
+  deckId: number,
+  teamId?: number | null,
+): string {
+  const base = `/decks/${deckId}/study`;
+  if (teamId == null || !Number.isFinite(teamId) || teamId <= 0) return base;
+  return `${base}?team=${teamId}`;
+}
+
 export function isLiveClassroomPath(pathname: string): boolean {
   return (
     pathname === LIVE_CLASSROOM_ROOT_PATH ||

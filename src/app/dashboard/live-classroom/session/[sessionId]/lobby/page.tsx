@@ -63,6 +63,7 @@ export default async function LiveClassroomLobbyPage({
         userId={ctx.userId}
         ownerUserId={ctx.team.ownerUserId}
         canHost={ctx.canHost}
+        canManage={ctx.canManage}
         licensedSeats={ctx.licensedSeats}
         workspaceMembers={workspaceMembers}
         assignedUserIds={participantGrants.map((g) => g.userId)}

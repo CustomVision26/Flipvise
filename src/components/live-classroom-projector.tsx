@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Loader2, Trophy } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Heart, Loader2, Trophy } from "lucide-react";
 import { useLiveClassroomRealtime } from "@/components/live-classroom-realtime-poller";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { liveClassroomLobbyPath } from "@/lib/live-classroom-url";
 
 type LiveClassroomProjectorProps = {
   sessionId: number;
@@ -70,6 +73,16 @@ export function LiveClassroomProjector({
     <div className="mx-auto flex min-h-[70vh] w-full max-w-5xl flex-col gap-6 px-2 py-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
+          <Button
+            nativeButton={false}
+            variant="ghost"
+            size="sm"
+            className="mb-1 -ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
+            render={<Link href={liveClassroomLobbyPath(sessionId)} />}
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            Back to lobby
+          </Button>
           <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
             Live Classroom™
           </p>

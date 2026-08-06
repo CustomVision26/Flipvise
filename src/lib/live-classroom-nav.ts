@@ -33,7 +33,7 @@ export const LIVE_CLASSROOM_NAV: LiveClassroomNavItem[] = [
     isActive: (pathname) => pathname === LIVE_CLASSROOM_ROOT_PATH,
   },
   {
-    title: "Start Session",
+    title: "Create Session",
     path: LIVE_CLASSROOM_START_PATH,
     icon: Play,
     isActive: (pathname) =>

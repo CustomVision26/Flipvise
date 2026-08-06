@@ -92,6 +92,11 @@ export function LiveClassroomHostDashboard({
           action,
           extraSeconds,
         });
+        if (result.returnedToLobby) {
+          toast.success("Returned to lobby");
+          router.push(liveClassroomLobbyPath(sessionId));
+          return;
+        }
         if (result.ended) {
           toast.success("Session ended");
           router.push(liveClassroomReportPath(sessionId));
@@ -231,7 +236,7 @@ export function LiveClassroomHostDashboard({
             ) : (
               <XCircle className="size-3.5" aria-hidden />
             )}
-            End session
+            Back to lobby
           </Button>
         </CardContent>
       </Card>

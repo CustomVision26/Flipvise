@@ -13,6 +13,7 @@ import {
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
+import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export default async function LiveClassroomScheduledPage({
   return (
     <LiveClassroomShell teamId={ctx.teamId}>
       <div className="space-y-4">
+        <LiveClassroomBackLink teamId={ctx.teamId} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -69,7 +71,7 @@ export default async function LiveClassroomScheduledPage({
                 />
               }
             >
-              New session
+              Create Session
             </Button>
           ) : null}
         </div>

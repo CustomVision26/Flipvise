@@ -6,7 +6,7 @@ import {
   type LiveClassroomBattleMode,
   type LiveClassroomSessionType,
 } from "@/lib/live-classroom-types";
-import { LIVE_CLASSROOM_JOIN_PATH } from "@/lib/live-classroom-url";
+import { liveClassroomDeckStudyPath } from "@/lib/live-classroom-url";
 
 type LobbyInboxRow = Awaited<
   ReturnType<typeof listLiveClassroomLobbyInboxMessagesForUser>
@@ -20,6 +20,8 @@ export function buildLiveClassroomLobbyInviteCopy(input: {
   battleMode: LiveClassroomBattleMode;
   joinCode: string;
   deckName?: string | null;
+  deckId?: number | null;
+  teamId?: number | null;
 }): { title: string; description: string } {
   const greeting = input.recipientDisplayName?.trim()
     ? `Dear ${input.recipientDisplayName.trim()},`
@@ -30,6 +32,10 @@ export function buildLiveClassroomLobbyInviteCopy(input: {
   const deckLine = input.deckName?.trim()
     ? `\nLinked deck: ${input.deckName.trim()}`
     : "";
+  const studyPath =
+    input.deckId != null && Number.isFinite(input.deckId) && input.deckId > 0
+      ? liveClassroomDeckStudyPath(input.deckId, input.teamId)
+      : null;
 
   return {
     title: `Live Classroom™ invitation — ${input.sessionName}`,
@@ -43,10 +49,12 @@ export function buildLiveClassroomLobbyInviteCopy(input: {
       "You will be placed on a team for this session. Your host may assign your team in the lobby before the battle begins.\n\n" +
       `Lobby join code: ${input.joinCode}\n\n` +
       "How to enter the lobby code:\n" +
-      "1. Open the study page for the deck linked to this battle (or go to Live Classroom → Join with code).\n" +
+      "1. Open the study page for the deck linked to this battle.\n" +
       "2. Enter the lobby join code in the Join with code field.\n" +
       "3. Select Join lobby.\n\n" +
-      `Direct path: ${LIVE_CLASSROOM_JOIN_PATH}\n\n` +
+      (studyPath
+        ? `Study page path: ${studyPath}\n\n`
+        : "Join with code appears on the linked deck’s study page.\n\n") +
       "Join with the code only — there is no lobby link to share.\n\n" +
       "Regards,\n" +
       `${hostLine}\n` +

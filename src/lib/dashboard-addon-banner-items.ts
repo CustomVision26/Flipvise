@@ -36,6 +36,8 @@ export async function buildDashboardAddonBannerItems(input: {
   /** When true, AI Essay shows Coming soon instead of Unlock. */
   aiEssayComingSoonForUser?: boolean;
 }): Promise<DashboardAddonBannerItem[]> {
+  // Active + In banner → every signed-in user sees the chip. Entitlement only
+  // switches Unlock vs Open; it must not hide the add-on from the banner.
   const catalog = await listAddonCatalog();
   return catalog
     .filter((row) => row.active && row.publishedOnBanner !== false)
@@ -62,9 +64,5 @@ export async function buildDashboardAddonBannerItems(input: {
           !essayComingSoon && eligible && !unlocked && stripePriceConfigured,
         href: unlocked ? addonFeatureHref(row.key) : null,
       };
-    })
-    // Unlocked studio document types use the dedicated Studio button instead.
-    .filter(
-      (item) => !(item.unlocked && isAiDocumentStudioAddonKey(item.key)),
-    );
+    });
 }

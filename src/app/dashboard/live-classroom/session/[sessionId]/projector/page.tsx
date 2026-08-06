@@ -21,7 +21,8 @@ export default async function LiveClassroomProjectorPage({
   if (!ctx.hasAccess) {
     return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
-  if (!ctx.canHost) {
+  // Owner / team admin only (same gate as Start battle).
+  if (!ctx.canManage) {
     redirect(liveClassroomLobbyPath(sessionId));
   }
 

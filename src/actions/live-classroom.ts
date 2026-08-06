@@ -25,6 +25,7 @@ import {
   listLiveClassroomParticipants,
   listLiveClassroomTeams,
   markStrategyCardUsed,
+  returnLiveClassroomSessionToLobby,
   updateLiveBattleQuestion,
   updateLiveClassroomParticipant,
   updateLiveClassroomSession,
@@ -384,13 +385,27 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
   if (!session) throw new Error("Session not found");
   await requireLiveClassroomAccess({ teamId: session.teamId });
 
+  // Lobby only needs teams + participants; skip battle payloads to keep polls light.
+  const lobbyOnly = session.status === "lobby";
   const [teams, participants, questions, answers, strategyCards] =
     await Promise.all([
       listLiveClassroomTeams(sessionId),
       listLiveClassroomParticipants(sessionId),
-      listLiveBattleQuestions(sessionId),
-      listLiveBattleAnswersForSession(sessionId),
-      listLiveBattleStrategyCards(sessionId),
+      lobbyOnly
+        ? Promise.resolve([] as Awaited<
+            ReturnType<typeof listLiveBattleQuestions>
+          >)
+        : listLiveBattleQuestions(sessionId),
+      lobbyOnly
+        ? Promise.resolve([] as Awaited<
+            ReturnType<typeof listLiveBattleAnswersForSession>
+          >)
+        : listLiveBattleAnswersForSession(sessionId),
+      lobbyOnly
+        ? Promise.resolve([] as Awaited<
+            ReturnType<typeof listLiveBattleStrategyCards>
+          >)
+        : listLiveBattleStrategyCards(sessionId),
     ]);
 
   const currentQuestion = questions[session.currentQuestionIndex] ?? null;
@@ -495,6 +510,8 @@ export async function assignLiveClassroomTeamsAction(raw: {
   sessionId: number;
   mode: "random" | "manual";
   assignments?: Array<{ userId: string; liveTeamId: number }>;
+  /** Used when starting a battle while teams are already locked. */
+  allowWhenLocked?: boolean;
 }) {
   const schema = z.object({
     sessionId: z.number().int().positive(),
@@ -507,16 +524,20 @@ export async function assignLiveClassroomTeamsAction(raw: {
         }),
       )
       .optional(),
+    allowWhenLocked: z.boolean().optional(),
   });
   const parsed = schema.safeParse(raw);
   if (!parsed.success) throw new Error("Invalid assignment input");
 
   const session = await getLiveClassroomSessionById(parsed.data.sessionId);
   if (!session) throw new Error("Session not found");
-  if (session.teamsLocked) throw new Error("Teams are locked.");
+  if (session.teamsLocked && !parsed.data.allowWhenLocked) {
+    throw new Error("Teams are locked.");
+  }
   await requireLiveClassroomAccess({
     teamId: session.teamId,
     requireHost: true,
+    requireOrgManage: parsed.data.allowWhenLocked === true,
   });
 
   const teams = await listLiveClassroomTeams(session.id);
@@ -709,10 +730,16 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
 export async function startLiveClassroomBattleAction(sessionId: number) {
   const session = await getLiveClassroomSessionById(sessionId);
   if (!session) throw new Error("Session not found");
+  // Owner / team admin only — not teachers or students.
   const { licensedSeats } = await requireLiveClassroomAccess({
     teamId: session.teamId,
     requireHost: true,
+    requireOrgManage: true,
   });
+
+  if (!session.teamsLocked) {
+    throw new Error("Lock teams before starting the battle.");
+  }
 
   const participants = await listLiveClassroomParticipants(sessionId);
   if (!canStartWithParticipantCount(participants.length, licensedSeats)) {
@@ -722,7 +749,11 @@ export async function startLiveClassroomBattleAction(sessionId: number) {
   }
   const unassigned = participants.filter((p) => p.liveTeamId == null);
   if (unassigned.length > 0) {
-    await assignLiveClassroomTeamsAction({ sessionId, mode: "random" });
+    await assignLiveClassroomTeamsAction({
+      sessionId,
+      mode: "random",
+      allowWhenLocked: true,
+    });
   }
 
   await updateLiveClassroomSession(sessionId, {
@@ -842,13 +873,22 @@ export async function controlLiveClassroomBattleAction(raw: {
       });
       break;
     }
-    case "end":
-      await endLiveClassroomSessionAction(session.id);
-      return { ok: true as const, ended: true };
+    case "end": {
+      // Keep the session — return everyone to the lobby (do not complete/delete).
+      await returnLiveClassroomSessionToLobby(session.id, {
+        survivalHearts: session.config.survivalHearts,
+      });
+      revalidateLiveClassroom(session.teamId, session.id);
+      return {
+        ok: true as const,
+        ended: false,
+        returnedToLobby: true as const,
+      };
+    }
   }
 
   revalidateLiveClassroom(session.teamId, session.id);
-  return { ok: true as const, ended: false };
+  return { ok: true as const, ended: false, returnedToLobby: false as const };
 }
 
 export async function submitLiveClassroomAnswerAction(raw: {
@@ -1521,6 +1561,8 @@ export async function sendLiveClassroomLobbyCodeInboxAction(raw: {
     battleMode: session.battleMode,
     joinCode: session.joinCode,
     deckName,
+    deckId: session.deckId,
+    teamId: session.teamId,
   });
 
   await upsertLiveClassroomLobbyInboxMessage({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -161,8 +161,7 @@ export function LiveClassroomSessionSettingsDialog({
   );
   const [allowMusic, setAllowMusic] = useState(session.config.allowMusic);
 
-  useEffect(() => {
-    if (!open) return;
+  function hydrateSessionFormFromProps() {
     setName(session.name);
     setSessionType(session.sessionType);
     setBattleMode(session.battleMode);
@@ -176,10 +175,9 @@ export function LiveClassroomSessionSettingsDialog({
     setAllowAiExplanations(session.config.allowAiExplanations);
     setAllowStrategyCards(session.config.allowStrategyCards);
     setAllowMusic(session.config.allowMusic);
-  }, [open, session]);
+  }
 
-  useEffect(() => {
-    if (!open) return;
+  function hydrateLcAccessFromProps() {
     const assigned = new Set(assignedUserIds);
     const next: Record<string, boolean> = {};
     for (const member of workspaceMembers) {
@@ -187,7 +185,17 @@ export function LiveClassroomSessionSettingsDialog({
         member.userId === ownerUserId || assigned.has(member.userId);
     }
     setLcAccessByUserId(next);
-  }, [open, assignedUserIds, workspaceMembers, ownerUserId]);
+  }
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      // Lobby realtime polls rewrite `session` every few seconds. Hydrate only
+      // when opening so in-progress edits are not wiped before Save.
+      hydrateSessionFormFromProps();
+      hydrateLcAccessFromProps();
+    }
+    setOpen(next);
+  }
 
   if (!canHost) return null;
 
@@ -306,7 +314,7 @@ export function LiveClassroomSessionSettingsDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button
