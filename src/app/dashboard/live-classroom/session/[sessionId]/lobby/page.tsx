@@ -1,8 +1,17 @@
-import { notFound } from "next/navigation";
-import { listLiveClassroomParticipantGrants } from "@/db/queries/live-classroom";
+import { notFound, redirect } from "next/navigation";
+import {
+  getLiveClassroomParticipant,
+  listLiveClassroomParticipantGrants,
+  listLiveClassroomSavedGroups,
+} from "@/db/queries/live-classroom";
 import { listTeamMembers } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { loadLiveClassroomSessionPageContext } from "@/lib/load-live-classroom-page-context";
+import {
+  liveClassroomHostPath,
+  liveClassroomPlayPath,
+  liveClassroomReportPath,
+} from "@/lib/live-classroom-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomLobby } from "@/components/live-classroom-lobby";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
@@ -16,7 +25,10 @@ export default async function LiveClassroomLobbyPage({
 }) {
   const { sessionId: raw } = await params;
   const sessionId = Number(raw);
-  if (!Number.isFinite(sessionId) || sessionId <= 0) notFound();
+  if (!Number.isFinite(sessionId) || sessionId <= 0) {
+    console.error(`[live-classroom] lobby: invalid sessionId param`, raw);
+    notFound();
+  }
 
   const ctx = await loadLiveClassroomSessionPageContext(sessionId);
   if (!ctx.owns) {
@@ -26,9 +38,34 @@ export default async function LiveClassroomLobbyPage({
     return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
 
-  const [members, participantGrants] = await Promise.all([
+  // Battle already running / ended — never render the lobby countdown overlay.
+  const status = ctx.session.status;
+  if (status === "completed" || status === "cancelled") {
+    redirect(liveClassroomReportPath(sessionId));
+  }
+  if (status === "active" || status === "paused") {
+    const participant = await getLiveClassroomParticipant(
+      sessionId,
+      ctx.userId,
+    );
+    const hasTeam = participant?.liveTeamId != null;
+    const isSessionHost = ctx.session.hostUserId === ctx.userId;
+    if (hasTeam || !isSessionHost) {
+      redirect(liveClassroomPlayPath(sessionId));
+    }
+    redirect(
+      ctx.canHost
+        ? liveClassroomHostPath(sessionId)
+        : liveClassroomPlayPath(sessionId),
+    );
+  }
+
+  const [members, participantGrants, savedGroupRows] = await Promise.all([
     listTeamMembers(ctx.teamId),
     listLiveClassroomParticipantGrants(ctx.teamId),
+    ctx.canManage
+      ? listLiveClassroomSavedGroups(ctx.teamId)
+      : Promise.resolve([]),
   ]);
 
   const memberUserIds = [
@@ -67,6 +104,12 @@ export default async function LiveClassroomLobbyPage({
         licensedSeats={ctx.licensedSeats}
         workspaceMembers={workspaceMembers}
         assignedUserIds={participantGrants.map((g) => g.userId)}
+        savedGroups={savedGroupRows.map((g) => ({
+          id: g.id,
+          name: g.name,
+          groups: g.groups,
+          updatedAt: g.updatedAt.toISOString(),
+        }))}
       />
     </LiveClassroomShell>
   );

@@ -24,7 +24,11 @@ export default async function LiveClassroomPlayPage({
 
   return (
     <LiveClassroomShell teamId={ctx.teamId}>
-      <LiveClassroomStudentPlay sessionId={sessionId} userId={ctx.userId} />
+      <LiveClassroomStudentPlay
+        sessionId={sessionId}
+        userId={ctx.userId}
+        canManage={ctx.canManage}
+      />
     </LiveClassroomShell>
   );
 }

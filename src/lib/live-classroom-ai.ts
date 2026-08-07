@@ -131,6 +131,50 @@ Return:
   );
 }
 
+/**
+ * Short in-battle nudge for the AI Hint strategy card.
+ * Helps students think — must not name or letter the correct choice.
+ */
+export async function generateLiveClassroomAiHint(input: {
+  userId: string;
+  teamId: number;
+  prompt: string;
+  choices: string[];
+  correctIndex: number;
+}): Promise<string> {
+  const schema = z.object({
+    hint: z.string().min(1).max(280),
+  });
+
+  return runWithAiUsageContext(
+    {
+      userId: input.userId,
+      teamId: input.teamId,
+      feature: "live_classroom",
+      model: "gpt-4o",
+    },
+    async () => {
+      const { output } = await trackedGenerateText({
+        model: openai("gpt-4o"),
+        output: Output.object({ schema }),
+        prompt: `Give a brief live-classroom battle HINT for this multiple-choice question.
+
+Question: ${input.prompt}
+Choices: ${input.choices.map((c, i) => `${String.fromCharCode(65 + i)}. ${c}`).join(" | ")}
+Correct choice letter (for your eyes only — never reveal): ${String.fromCharCode(65 + input.correctIndex)}
+
+Rules:
+- 1–2 short sentences, classroom-friendly
+- Nudge thinking (theme, time period, process, or what to eliminate) without giving the answer away
+- Do NOT name the correct answer, its letter, or paraphrase it so obviously that only one choice remains
+- Do NOT say "the answer is" or "choose X"`,
+      });
+      if (!output?.hint?.trim()) throw new Error("AI hint failed.");
+      return output.hint.trim();
+    },
+  );
+}
+
 export async function generateLiveClassroomTeacherSummary(input: {
   userId: string;
   teamId: number;

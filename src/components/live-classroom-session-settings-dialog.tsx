@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Settings, Trash2 } from "lucide-react";
+import { CircleHelp, Loader2, Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   sendLiveClassroomLobbyCodeInboxAction,
@@ -44,22 +44,62 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
   LIVE_CLASSROOM_BATTLE_MODES,
-  LIVE_CLASSROOM_DIFFICULTIES,
+  LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC,
   LIVE_CLASSROOM_SESSION_TYPES,
+  LIVE_CLASSROOM_STRATEGY_CARD_KINDS,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
   battleModeLabel,
+  battleStartDelayLabel,
   sessionTypeLabel,
+  strategyCardLabel,
   type LiveClassroomBattleMode,
-  type LiveClassroomDifficulty,
   type LiveClassroomSessionConfig,
   type LiveClassroomSessionType,
+  type LiveClassroomStrategyCardKind,
   type LiveClassroomStrategyCardPolicy,
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
 
+function FieldHint({ label, caption }: { label: string; caption: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        type="button"
+        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+        aria-label={`${label} help`}
+      >
+        <CircleHelp className="size-3.5" aria-hidden />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-xs">{caption}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 const UNASSIGNED = "__unassigned__";
+const ALL_STRATEGY_CARD_KINDS = [...LIVE_CLASSROOM_STRATEGY_CARD_KINDS];
+
+function syncEnabledCardsToCount(
+  current: LiveClassroomStrategyCardKind[],
+  count: number,
+): LiveClassroomStrategyCardKind[] {
+  const max = ALL_STRATEGY_CARD_KINDS.length;
+  const n = Math.max(0, Math.min(Number.isFinite(count) ? count : 0, max));
+  if (n <= current.length) return current.slice(0, n);
+  const next = [...current];
+  for (const kind of ALL_STRATEGY_CARD_KINDS) {
+    if (next.length >= n) break;
+    if (!next.includes(kind)) next.push(kind);
+  }
+  return next;
+}
 
 export type LiveClassroomWorkspaceMemberOption = {
   key: string;
@@ -134,7 +174,10 @@ export function LiveClassroomSessionSettingsDialog({
   const [name, setName] = useState(session.name);
   const [sessionType, setSessionType] = useState(session.sessionType);
   const [battleMode, setBattleMode] = useState(session.battleMode);
-  const [difficulty, setDifficulty] = useState(session.config.difficulty);
+  const [battleStartDelaySec, setBattleStartDelaySec] = useState(
+    session.config.battleStartDelaySec ??
+      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
+  );
   const [questionCount, setQuestionCount] = useState(
     session.config.questionCount,
   );
@@ -160,29 +203,93 @@ export function LiveClassroomSessionSettingsDialog({
     session.config.allowStrategyCards,
   );
   const [allowMusic, setAllowMusic] = useState(session.config.allowMusic);
+  const [enabledCards, setEnabledCards] = useState<
+    LiveClassroomStrategyCardKind[]
+  >(
+    session.config.enabledStrategyCards?.length
+      ? session.config.enabledStrategyCards
+      : [...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards],
+  );
 
   function hydrateSessionFormFromProps() {
     setName(session.name);
     setSessionType(session.sessionType);
     setBattleMode(session.battleMode);
-    setDifficulty(session.config.difficulty);
+    setBattleStartDelaySec(
+      session.config.battleStartDelaySec ??
+        DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
+    );
     setQuestionCount(session.config.questionCount);
     setTimePerQuestionSec(session.config.timePerQuestionSec);
     setTeamAssignment(session.config.teamAssignment);
     setStrategyCardPolicy(session.config.strategyCardPolicy);
-    setStrategyCardLimitPerTeam(session.config.strategyCardLimitPerTeam);
     setSurvivalHearts(session.config.survivalHearts);
     setAllowAiExplanations(session.config.allowAiExplanations);
     setAllowStrategyCards(session.config.allowStrategyCards);
     setAllowMusic(session.config.allowMusic);
+    if (session.config.strategyCardPolicy === "unlimited") {
+      setEnabledCards(ALL_STRATEGY_CARD_KINDS);
+      setStrategyCardLimitPerTeam(ALL_STRATEGY_CARD_KINDS.length);
+    } else {
+      const cards = session.config.enabledStrategyCards?.length
+        ? session.config.enabledStrategyCards
+        : [...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards];
+      setEnabledCards(cards);
+      setStrategyCardLimitPerTeam(
+        session.config.strategyCardPolicy === "limited"
+          ? cards.length
+          : session.config.strategyCardLimitPerTeam,
+      );
+    }
   }
+
+  function applyStrategyCardPolicy(next: LiveClassroomStrategyCardPolicy) {
+    setStrategyCardPolicy(next);
+    if (next === "unlimited") {
+      setEnabledCards(ALL_STRATEGY_CARD_KINDS);
+      setStrategyCardLimitPerTeam(ALL_STRATEGY_CARD_KINDS.length);
+      return;
+    }
+    if (next === "limited") {
+      setEnabledCards((prev) => {
+        const kept =
+          prev.length > 0
+            ? prev
+            : ALL_STRATEGY_CARD_KINDS.slice(
+                0,
+                DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.strategyCardLimitPerTeam,
+              );
+        setStrategyCardLimitPerTeam(kept.length);
+        return kept;
+      });
+    }
+  }
+
+  function setCardsPerTeamCount(count: number) {
+    const next = syncEnabledCardsToCount(enabledCards, count);
+    setEnabledCards(next);
+    setStrategyCardLimitPerTeam(next.length);
+  }
+
+  function toggleStrategyCard(kind: LiveClassroomStrategyCardKind) {
+    if (strategyCardPolicy !== "limited") return;
+    setEnabledCards((prev) => {
+      const next = prev.includes(kind)
+        ? prev.filter((k) => k !== kind)
+        : [...prev, kind];
+      setStrategyCardLimitPerTeam(next.length);
+      return next;
+    });
+  }
+
+  const strategyDetailsLocked = strategyCardPolicy === "disabled";
+  const strategyCardsEditable = strategyCardPolicy === "limited";
 
   function hydrateLcAccessFromProps() {
     const assigned = new Set(assignedUserIds);
     const next: Record<string, boolean> = {};
     for (const member of workspaceMembers) {
-      next[member.userId] =
-        member.userId === ownerUserId || assigned.has(member.userId);
+      next[member.userId] = assigned.has(member.userId);
     }
     setLcAccessByUserId(next);
   }
@@ -200,7 +307,6 @@ export function LiveClassroomSessionSettingsDialog({
   if (!canHost) return null;
 
   async function toggleLcAccess(userId: string, enabled: boolean) {
-    if (userId === ownerUserId) return;
     const previous = lcAccessByUserId[userId] ?? false;
     setLcAccessByUserId((prev) => ({ ...prev, [userId]: enabled }));
     setMemberPending(userId);
@@ -257,12 +363,24 @@ export function LiveClassroomSessionSettingsDialog({
           name,
           sessionType,
           battleMode,
-          difficulty,
+          battleStartDelaySec,
           questionCount,
           timePerQuestionSec,
           teamAssignment,
-          strategyCardPolicy,
-          strategyCardLimitPerTeam,
+          strategyCardPolicy: allowStrategyCards
+            ? strategyCardPolicy
+            : "disabled",
+          strategyCardLimitPerTeam:
+            strategyCardPolicy === "unlimited"
+              ? ALL_STRATEGY_CARD_KINDS.length
+              : strategyCardLimitPerTeam,
+          enabledStrategyCards: !allowStrategyCards
+            ? []
+            : strategyCardPolicy === "unlimited"
+              ? ALL_STRATEGY_CARD_KINDS
+              : strategyCardPolicy === "disabled"
+                ? []
+                : enabledCards,
           survivalHearts:
             battleMode === "survival" ? survivalHearts : undefined,
           allowAiExplanations,
@@ -329,7 +447,7 @@ export function LiveClassroomSessionSettingsDialog({
         <Settings className="size-3.5" aria-hidden />
         Settings
       </DialogTrigger>
-      <DialogContent className="max-h-[min(90vh,44rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[min(90vh,48rem)] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Session settings</DialogTitle>
           <DialogDescription>
@@ -349,202 +467,297 @@ export function LiveClassroomSessionSettingsDialog({
           </TabsList>
 
           <TabsContent value="session" className="mt-4 space-y-4">
-            <form onSubmit={saveSettings} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="lc-sess-name">Session name</Label>
-                <Input
-                  id="lc-sess-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  maxLength={255}
-                />
-              </div>
+            <form onSubmit={saveSettings} className="space-y-5">
+              <section className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="lc-sess-name">Session name</Label>
+                  <Input
+                    id="lc-sess-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    maxLength={255}
+                  />
+                </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Session type</Label>
-                  <Select
-                    value={sessionType}
-                    onValueChange={(v) =>
-                      setSessionType(v as LiveClassroomSessionType)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LIVE_CLASSROOM_SESSION_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {sessionTypeLabel(t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Battle mode</Label>
-                  <Select
-                    value={battleMode}
-                    onValueChange={(v) =>
-                      setBattleMode(v as LiveClassroomBattleMode)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LIVE_CLASSROOM_BATTLE_MODES.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {battleModeLabel(m)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Difficulty</Label>
-                  <Select
-                    value={difficulty}
-                    onValueChange={(v) =>
-                      setDifficulty(v as LiveClassroomDifficulty)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LIVE_CLASSROOM_DIFFICULTIES.map((d) => (
-                        <SelectItem key={d} value={d}>
-                          {d.charAt(0).toUpperCase() + d.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Team assignment</Label>
-                  <Select
-                    value={teamAssignment}
-                    onValueChange={(v) =>
-                      setTeamAssignment(v as LiveClassroomTeamAssignmentMode)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m === "manual"
-                            ? "Manual"
-                            : m === "random"
-                              ? "Random"
-                              : "Saved groups"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lc-sess-q">Questions</Label>
-                  <Input
-                    id="lc-sess-q"
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lc-sess-time">Seconds per question</Label>
-                  <Input
-                    id="lc-sess-time"
-                    type="number"
-                    min={5}
-                    max={180}
-                    value={timePerQuestionSec}
-                    onChange={(e) =>
-                      setTimePerQuestionSec(Number(e.target.value))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Strategy card policy</Label>
-                  <Select
-                    value={strategyCardPolicy}
-                    onValueChange={(v) =>
-                      setStrategyCardPolicy(
-                        v as LiveClassroomStrategyCardPolicy,
-                      )
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LIVE_CLASSROOM_STRATEGY_CARD_POLICIES.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p.charAt(0).toUpperCase() + p.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lc-sess-cards">Cards per team</Label>
-                  <Input
-                    id="lc-sess-cards"
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={strategyCardLimitPerTeam}
-                    onChange={(e) =>
-                      setStrategyCardLimitPerTeam(Number(e.target.value))
-                    }
-                  />
-                </div>
-                {battleMode === "survival" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="lc-sess-hearts">Survival hearts</Label>
+                    <Label>Session type</Label>
+                    <Select
+                      value={sessionType}
+                      onValueChange={(v) =>
+                        setSessionType(v as LiveClassroomSessionType)
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LIVE_CLASSROOM_SESSION_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {sessionTypeLabel(t)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Battle mode</Label>
+                    <Select
+                      value={battleMode}
+                      onValueChange={(v) =>
+                        setBattleMode(v as LiveClassroomBattleMode)
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LIVE_CLASSROOM_BATTLE_MODES.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {battleModeLabel(m)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label>Start time</Label>
+                      <FieldHint
+                        label="Start time"
+                        caption="Countdown after Start battle before questions begin (60 seconds to 5 minutes)."
+                      />
+                    </div>
+                    <Select
+                      value={String(battleStartDelaySec)}
+                      onValueChange={(v) => {
+                        if (v != null) setBattleStartDelaySec(Number(v));
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {battleStartDelayLabel(battleStartDelaySec)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC.map(
+                          (sec) => (
+                            <SelectItem key={sec} value={String(sec)}>
+                              {battleStartDelayLabel(sec)}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Team assignment</Label>
+                    <Select
+                      value={teamAssignment}
+                      onValueChange={(v) =>
+                        setTeamAssignment(
+                          v as LiveClassroomTeamAssignmentMode,
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m === "manual"
+                              ? "Manual"
+                              : m === "random"
+                                ? "Random"
+                                : "Saved groups"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lc-sess-q">Questions</Label>
                     <Input
-                      id="lc-sess-hearts"
+                      id="lc-sess-q"
                       type="number"
                       min={1}
-                      max={5}
-                      value={survivalHearts}
+                      max={30}
+                      value={questionCount}
                       onChange={(e) =>
-                        setSurvivalHearts(Number(e.target.value))
+                        setQuestionCount(Number(e.target.value))
                       }
                     />
                   </div>
-                ) : null}
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lc-sess-time">Seconds per question</Label>
+                    <Input
+                      id="lc-sess-time"
+                      type="number"
+                      min={5}
+                      max={180}
+                      value={timePerQuestionSec}
+                      onChange={(e) =>
+                        setTimePerQuestionSec(Number(e.target.value))
+                      }
+                    />
+                  </div>
+                  {battleMode === "survival" ? (
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="lc-sess-hearts">Survival hearts</Label>
+                      <Input
+                        id="lc-sess-hearts"
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={survivalHearts}
+                        onChange={(e) =>
+                          setSurvivalHearts(Number(e.target.value))
+                        }
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </section>
 
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2">
-                  <span className="text-xs text-foreground">AI explanations</span>
+              <section className="grid gap-3 sm:grid-cols-3">
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+                  <span className="text-sm text-foreground">
+                    AI explanations
+                  </span>
                   <Switch
                     checked={allowAiExplanations}
                     onCheckedChange={setAllowAiExplanations}
                   />
                 </label>
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2">
-                  <span className="text-xs text-foreground">Strategy cards</span>
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+                  <span className="text-sm text-foreground">Strategy cards</span>
                   <Switch
                     checked={allowStrategyCards}
                     onCheckedChange={setAllowStrategyCards}
                   />
                 </label>
-                <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2">
-                  <span className="text-xs text-foreground">Battle music</span>
+                <label className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+                  <span className="text-sm text-foreground">Battle music</span>
                   <Switch
                     checked={allowMusic}
                     onCheckedChange={setAllowMusic}
                   />
                 </label>
-              </div>
+              </section>
+
+              {allowStrategyCards ? (
+                <section className="space-y-4 rounded-xl border border-border/70 bg-card/40 p-4 shadow-sm">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Label>Strategy card policy</Label>
+                        <FieldHint
+                          label="Strategy card policy"
+                          caption="Disabled greys out card limits and the available set. Unlimited enables every strategy card. Limited lets you choose how many cards each team gets."
+                        />
+                      </div>
+                      <Select
+                        value={strategyCardPolicy}
+                        onValueChange={(v) => {
+                          if (v != null) {
+                            applyStrategyCardPolicy(
+                              v as LiveClassroomStrategyCardPolicy,
+                            );
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LIVE_CLASSROOM_STRATEGY_CARD_POLICIES.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p.charAt(0).toUpperCase() + p.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div
+                      className={
+                        strategyDetailsLocked
+                          ? "space-y-2 opacity-50"
+                          : "space-y-2"
+                      }
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Label htmlFor="lc-sess-cards">Cards per team</Label>
+                        <FieldHint
+                          label="Cards per team"
+                          caption="Matches how many strategy card types are selected below. Editable when policy is Limited."
+                        />
+                      </div>
+                      <Input
+                        id="lc-sess-cards"
+                        type="number"
+                        min={0}
+                        max={ALL_STRATEGY_CARD_KINDS.length}
+                        value={
+                          strategyCardPolicy === "unlimited"
+                            ? ALL_STRATEGY_CARD_KINDS.length
+                            : strategyCardLimitPerTeam
+                        }
+                        disabled={!strategyCardsEditable}
+                        aria-disabled={strategyDetailsLocked}
+                        onChange={(e) =>
+                          setCardsPerTeamCount(Number(e.target.value))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div
+                    className={
+                      strategyDetailsLocked
+                        ? "space-y-2 opacity-50"
+                        : "space-y-2"
+                    }
+                    aria-disabled={strategyDetailsLocked}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Label>Strategy cards available</Label>
+                      <FieldHint
+                        label="Strategy cards available"
+                        caption="Unlimited shows every card. Limited lets you pick types; the count stays in sync with Cards per team. Disabled greys this out."
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {LIVE_CLASSROOM_STRATEGY_CARD_KINDS.map((kind) => {
+                        const on =
+                          strategyCardPolicy === "unlimited" ||
+                          enabledCards.includes(kind);
+                        return (
+                          <Button
+                            key={kind}
+                            type="button"
+                            size="sm"
+                            variant={on ? "default" : "outline"}
+                            className="rounded-full"
+                            aria-pressed={on}
+                            disabled={!strategyCardsEditable}
+                            onClick={() => toggleStrategyCard(kind)}
+                          >
+                            {strategyCardLabel(kind)}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    {strategyCardsEditable && enabledCards.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Select at least one card type, or set policy to
+                        Disabled / Unlimited.
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
+              ) : null}
 
               <DialogFooter className="px-0 pb-0">
                 <Button type="submit" disabled={pending} className="gap-2">
@@ -579,8 +792,7 @@ export function LiveClassroomSessionSettingsDialog({
                 const inLobby = Boolean(participant);
                 const busy = memberPending === member.userId;
                 const isOwner = member.userId === ownerUserId;
-                const hasLcAccess =
-                  isOwner || Boolean(lcAccessByUserId[member.userId]);
+                const hasLcAccess = Boolean(lcAccessByUserId[member.userId]);
                 const teamValue =
                   participant == null || participant.liveTeamId == null
                     ? UNASSIGNED
@@ -689,16 +901,14 @@ export function LiveClassroomSessionSettingsDialog({
                         <label className="flex items-center gap-2 text-sm text-foreground">
                           <Switch
                             checked={hasLcAccess}
-                            disabled={busy || isOwner}
+                            disabled={busy}
                             onCheckedChange={(checked) =>
                               void toggleLcAccess(member.userId, checked)
                             }
                             aria-label={`Grant Live Classroom access to ${member.displayName}`}
                           />
                           <span className="text-xs sm:text-sm">
-                            {isOwner
-                              ? "Owner always has LC access"
-                              : "Grant access to LC"}
+                            Grant access to LC
                           </span>
                         </label>
                         {hasLcAccess && !isOwner ? (

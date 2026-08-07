@@ -1,12 +1,13 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
+  useRef,
   useState,
   useTransition,
   type DragEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import {
   Copy,
   GripVertical,
@@ -20,12 +21,21 @@ import {
 import { toast } from "sonner";
 import {
   assignLiveClassroomTeamsAction,
+  clearLiveClassroomBattleCountdownAction,
+  getLiveClassroomRealtimeStateAction,
   heartbeatLiveClassroomAction,
   joinLiveClassroomSessionAction,
+  leaveLiveClassroomPresenceAction,
+  scheduleLiveClassroomBattleCountdownAction,
   startLiveClassroomBattleAction,
   updateLobbyTeamAction,
 } from "@/actions/live-classroom";
+import { LiveClassroomBattleCountdownDialog } from "@/components/live-classroom-battle-countdown-dialog";
 import { useLiveClassroomRealtime } from "@/components/live-classroom-realtime-poller";
+import {
+  LiveClassroomSavedGroupsControls,
+  type LiveClassroomSavedGroupOption,
+} from "@/components/live-classroom-saved-groups-controls";
 import {
   LiveClassroomSessionSettingsDialog,
   type LiveClassroomWorkspaceMemberOption,
@@ -43,12 +53,14 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
   battleModeLabel,
+  liveClassroomTeamTone,
   sessionTypeLabel,
 } from "@/lib/live-classroom-types";
 import {
   liveClassroomHostPath,
   liveClassroomPlayPath,
   liveClassroomProjectorPath,
+  liveClassroomReportPath,
 } from "@/lib/live-classroom-url";
 
 const LC_MEMBER_DRAG_MIME = "application/x-flipvise-lc-member";
@@ -63,6 +75,7 @@ type LiveClassroomLobbyProps = {
   licensedSeats: number;
   workspaceMembers?: LiveClassroomWorkspaceMemberOption[];
   assignedUserIds?: string[];
+  savedGroups?: LiveClassroomSavedGroupOption[];
 };
 
 export function LiveClassroomLobby({
@@ -73,13 +86,25 @@ export function LiveClassroomLobby({
   canManage,
   workspaceMembers = [],
   assignedUserIds = [],
+  savedGroups = [],
 }: LiveClassroomLobbyProps) {
-  const router = useRouter();
-  const { state, error, setState } = useLiveClassroomRealtime(sessionId);
   const [pending, startTransition] = useTransition();
   const [joined, setJoined] = useState(false);
   const [draggingUserId, setDraggingUserId] = useState<string | null>(null);
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
+  const [countdownAt, setCountdownAt] = useState<string | null>(null);
+  const [startingBattle, setStartingBattle] = useState(false);
+  const [schedulingBattle, setSchedulingBattle] = useState(false);
+  const leftLobbyForBattleRef = useRef(false);
+  const startingBattleRef = useRef(false);
+
+  // Pause polls only for the host while start runs — overlapping server actions
+  // starved navigation. Non-hosts keep polling so they see status=active.
+  const { state, error, setState } = useLiveClassroomRealtime(
+    sessionId,
+    5000,
+    !(startingBattle && canHost),
+  );
 
   useEffect(() => {
     void joinLiveClassroomSessionAction({ sessionId })
@@ -93,20 +118,178 @@ export function LiveClassroomLobby({
     if (!joined) return;
     const id = window.setInterval(() => {
       void heartbeatLiveClassroomAction(sessionId).catch(() => undefined);
-    }, 8000);
-    return () => window.clearInterval(id);
+    }, 12_000);
+    return () => {
+      window.clearInterval(id);
+      // Skip leave-presence when hard-navigating into an active battle — that
+      // brief offline window used to auto-complete independent sessions.
+      if (leftLobbyForBattleRef.current) return;
+      void leaveLiveClassroomPresenceAction(sessionId).catch(() => undefined);
+    };
   }, [joined, sessionId]);
+
+  const clearCountdownUi = useCallback(() => {
+    startingBattleRef.current = false;
+    setCountdownAt(null);
+    setStartingBattle(false);
+    setSchedulingBattle(false);
+  }, []);
+
+  const forceLeaveLobbyToBattle = useCallback(
+    (hasTeam: boolean, isSessionHost: boolean) => {
+      if (leftLobbyForBattleRef.current) return;
+      leftLobbyForBattleRef.current = true;
+      clearCountdownUi();
+      const dest =
+        hasTeam || !isSessionHost
+          ? liveClassroomPlayPath(sessionId)
+          : liveClassroomHostPath(sessionId);
+      // Hard navigation — soft replace left the lobby overlay stuck while the
+      // battle was already active under heavy poll/start load.
+      window.location.assign(dest);
+    },
+    [sessionId, clearCountdownUi],
+  );
 
   useEffect(() => {
     if (!state) return;
-    if (state.session.status === "active" || state.session.status === "paused") {
-      if (canHost && state.session.hostUserId === userId) {
-        router.push(liveClassroomHostPath(sessionId));
-      } else {
-        router.push(liveClassroomPlayPath(sessionId));
-      }
+    const status = state.session.status;
+    const serverStartsAt = state.session.battleStartsAt;
+
+    if (status === "completed" || status === "cancelled") {
+      leftLobbyForBattleRef.current = false;
+      clearCountdownUi();
+      window.location.assign(liveClassroomReportPath(sessionId));
+      return;
     }
-  }, [state, canHost, userId, sessionId, router]);
+
+    if (status === "active" || status === "paused") {
+      const me = state.participants.find((p) => p.userId === userId);
+      const hasTeam = me?.liveTeamId != null;
+      const isSessionHost = state.session.hostUserId === userId;
+      forceLeaveLobbyToBattle(hasTeam, isSessionHost);
+      return;
+    }
+
+    if (serverStartsAt) {
+      setCountdownAt(serverStartsAt);
+    } else if (!startingBattle && !schedulingBattle) {
+      setCountdownAt(null);
+    }
+  }, [
+    state,
+    userId,
+    sessionId,
+    startingBattle,
+    schedulingBattle,
+    forceLeaveLobbyToBattle,
+    clearCountdownUi,
+  ]);
+
+  const finishCountdownAndStart = useCallback(() => {
+    if (startingBattleRef.current || leftLobbyForBattleRef.current) return;
+    startingBattleRef.current = true;
+    setStartingBattle(true);
+    void (async () => {
+      try {
+        // Only host/admin starts — other clients keep the overlay until poll
+        // sees status=active (avoids start stampede + premature play load).
+        if (!canHost) {
+          return;
+        }
+        await startLiveClassroomBattleAction(sessionId);
+        const me = state?.participants.find((p) => p.userId === userId);
+        const hasTeam = me?.liveTeamId != null;
+        const isSessionHost = state?.session.hostUserId === userId;
+        forceLeaveLobbyToBattle(hasTeam, Boolean(isSessionHost));
+      } catch (e) {
+        leftLobbyForBattleRef.current = false;
+        clearCountdownUi();
+        void clearLiveClassroomBattleCountdownAction(sessionId).catch(
+          () => undefined,
+        );
+        toast.error(
+          e instanceof Error ? e.message : "Could not start the battle",
+        );
+      }
+    })();
+  }, [
+    canHost,
+    sessionId,
+    state,
+    userId,
+    forceLeaveLobbyToBattle,
+    clearCountdownUi,
+  ]);
+
+  // Non-host / stalled start: if still on lobby after activation window, recover.
+  useEffect(() => {
+    if (!startingBattle) return;
+    const id = window.setTimeout(() => {
+      if (leftLobbyForBattleRef.current) return;
+      void getLiveClassroomRealtimeStateAction(sessionId)
+        .then((next) => {
+          setState(next);
+          const status = next.session.status;
+          if (status === "active" || status === "paused") {
+            const me = next.participants.find((p) => p.userId === userId);
+            forceLeaveLobbyToBattle(
+              me?.liveTeamId != null,
+              next.session.hostUserId === userId,
+            );
+            return;
+          }
+          if (canHost && status === "lobby") {
+            return startLiveClassroomBattleAction(sessionId).then(() => {
+              const me = next.participants.find((p) => p.userId === userId);
+              forceLeaveLobbyToBattle(
+                me?.liveTeamId != null,
+                next.session.hostUserId === userId,
+              );
+            });
+          }
+          clearCountdownUi();
+          toast.error("Battle did not start. Try Start battle again.");
+        })
+        .catch((e) => {
+          clearCountdownUi();
+          toast.error(
+            e instanceof Error ? e.message : "Could not start the battle",
+          );
+        });
+    }, 12_000);
+    return () => window.clearTimeout(id);
+  }, [
+    startingBattle,
+    sessionId,
+    userId,
+    canHost,
+    setState,
+    forceLeaveLobbyToBattle,
+    clearCountdownUi,
+  ]);
+
+  async function scheduleBattleCountdown() {
+    if (schedulingBattle || startingBattle || countdownAt != null) return;
+    setSchedulingBattle(true);
+    try {
+      const result = await scheduleLiveClassroomBattleCountdownAction(sessionId);
+      if (result.alreadyActive) {
+        setSchedulingBattle(false);
+        leftLobbyForBattleRef.current = true;
+        window.location.assign(liveClassroomHostPath(sessionId));
+        return;
+      }
+      setCountdownAt(result.battleStartsAt);
+      toast.success("Countdown started");
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not start countdown",
+      );
+    } finally {
+      setSchedulingBattle(false);
+    }
+  }
 
   function run(label: string, fn: () => Promise<unknown>) {
     startTransition(async () => {
@@ -197,11 +380,32 @@ export function LiveClassroomLobby({
   }
 
   const { session, teams, participants } = state;
-  const lcAccessUserIds = new Set<string>([ownerUserId, ...assignedUserIds]);
+  const lcAccessUserIds = new Set<string>(assignedUserIds);
   const lcAccessTotal = lcAccessUserIds.size;
   const lcAccessInLobby = participants.filter((p) =>
     lcAccessUserIds.has(p.userId),
   ).length;
+
+  const selfParticipant = participants.find((p) => p.userId === userId);
+  const selfLiveTeamId = selfParticipant?.liveTeamId ?? null;
+  const selfLiveTeam = teams.find((t) => t.id === selfLiveTeamId) ?? null;
+  /** Owner / team admin see every team + Unassigned; members only see their assigned team. */
+  const visibleTeams = canManage
+    ? teams
+    : teams.filter((t) => t.id === selfLiveTeamId);
+  /** Teams with at least one member — shown as VS matchup for owners/admins. */
+  const matchupTeams = canManage
+    ? teams
+        .filter((t) => participants.some((p) => p.liveTeamId === t.id))
+        .map((t) => ({ name: t.name, colorKey: t.colorKey }))
+    : null;
+
+  const teamAssignment = session.config.teamAssignment ?? "manual";
+  /** Manual → hide Random / Save / load. Random → Save only. Saved groups → Save + load. */
+  const showRandomTeamsButton = teamAssignment === "random";
+  const showSaveGroupButton =
+    teamAssignment === "random" || teamAssignment === "saved_groups";
+  const showSavedGroupsDropdown = teamAssignment === "saved_groups";
 
   return (
     <div className="space-y-4">
@@ -287,26 +491,28 @@ export function LiveClassroomLobby({
           </p>
         {canHost ? (
           <div className="flex flex-wrap gap-2">
+            {showRandomTeamsButton ? (
+              <Button
+                type="button"
+                disabled={pending || session.teamsLocked}
+                className="gap-1.5"
+                variant="outline"
+                onClick={() =>
+                  run("Teams shuffled", () =>
+                    assignLiveClassroomTeamsAction({
+                      sessionId,
+                      mode: "random",
+                    }),
+                  )
+                }
+              >
+                <Shuffle className="size-3.5" aria-hidden />
+                Random teams
+              </Button>
+            ) : null}
             <Button
               type="button"
-              disabled={pending || session.teamsLocked}
-              className="gap-1.5"
-              variant="outline"
-              onClick={() =>
-                run("Teams shuffled", () =>
-                  assignLiveClassroomTeamsAction({
-                    sessionId,
-                    mode: "random",
-                  }),
-                )
-              }
-            >
-              <Shuffle className="size-3.5" aria-hidden />
-              Random teams
-            </Button>
-            <Button
-              type="button"
-              disabled={pending}
+              disabled={pending || schedulingBattle || startingBattle}
               variant="outline"
               className="gap-1.5"
               onClick={() =>
@@ -317,6 +523,13 @@ export function LiveClassroomLobby({
                       sessionId,
                       liveTeamId: teams[0]?.id ?? 0,
                       lockTeams: !session.teamsLocked,
+                    }).then((result) => {
+                      if (session.teamsLocked) {
+                        setCountdownAt(null);
+                        setStartingBattle(false);
+                        setSchedulingBattle(false);
+                      }
+                      return result;
                     }),
                 )
               }
@@ -330,27 +543,46 @@ export function LiveClassroomLobby({
             </Button>
             {canManage ? (
               <>
+                <LiveClassroomSavedGroupsControls
+                  sessionId={sessionId}
+                  teamsLocked={session.teamsLocked}
+                  teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+                  participants={participants.map((p) => ({
+                    userId: p.userId,
+                    displayName: p.displayName,
+                    liveTeamId: p.liveTeamId,
+                  }))}
+                  workspaceMembers={workspaceMembers}
+                  initialSavedGroups={savedGroups}
+                  showSaveButton={showSaveGroupButton}
+                  showLoadDropdown={showSavedGroupsDropdown}
+                  onApplied={() => {
+                    void getLiveClassroomRealtimeStateAction(sessionId)
+                      .then((next) => setState(next))
+                      .catch(() => undefined);
+                  }}
+                />
                 <Button
                   type="button"
                   disabled={
                     pending ||
+                    schedulingBattle ||
+                    startingBattle ||
                     participants.length === 0 ||
-                    !session.teamsLocked
+                    !session.teamsLocked ||
+                    countdownAt != null
                   }
                   className="gap-1.5"
                   title={
-                    session.teamsLocked
-                      ? "Start the battle"
-                      : "Lock teams before starting the battle"
+                    countdownAt != null
+                      ? "Countdown in progress"
+                      : session.teamsLocked
+                        ? "Start the battle countdown"
+                        : "Lock teams before starting the battle"
                   }
-                  onClick={() =>
-                    run("Battle started", async () => {
-                      await startLiveClassroomBattleAction(sessionId);
-                      router.push(liveClassroomHostPath(sessionId));
-                    })
-                  }
+                  onClick={() => void scheduleBattleCountdown()}
                 >
-                  {pending ? (
+                  {schedulingBattle || startingBattle ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
                     <Play className="size-3.5" aria-hidden />
@@ -392,84 +624,113 @@ export function LiveClassroomLobby({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {teams.map((team) => {
-          const members = participants.filter((p) => p.liveTeamId === team.id);
-          const targetKey = `team:${team.id}`;
-          const isDropTarget = dropTargetKey === targetKey;
-          return (
-            <Card
-              key={team.id}
-              className={cn(
-                "border-border/80 bg-card/60 shadow-sm transition-colors",
-                canDragAssign && "min-h-36",
-                isDropTarget &&
-                  "border-primary bg-primary/10 ring-2 ring-primary/40",
-              )}
-              onDragOver={(e) => onTeamDragOver(e, targetKey)}
-              onDragLeave={() => {
-                if (dropTargetKey === targetKey) setDropTargetKey(null);
-              }}
-              onDrop={(e) => onTeamDrop(e, team.id)}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{team.name}</CardTitle>
-                <CardDescription>
-                  {members.length} member{members.length === 1 ? "" : "s"}
-                  {canDragAssign
-                    ? " · Drop members here"
-                    : canManage && session.teamsLocked
-                      ? " · Teams locked"
-                      : ""}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {members.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    {canDragAssign
-                      ? "Drag a member here from Unassigned"
-                      : "No members yet"}
-                  </p>
-                ) : (
-                  members.map((m) => (
-                    <div
-                      key={m.id}
-                      draggable={canDragAssign}
-                      onDragStart={(e) => onMemberDragStart(e, m.userId)}
-                      onDragEnd={onMemberDragEnd}
-                      className={cn(
-                        "flex items-center justify-between gap-2 rounded-md px-1.5 py-1 text-sm",
-                        canDragAssign &&
-                          "cursor-grab active:cursor-grabbing hover:bg-muted/40",
-                        draggingUserId === m.userId && "opacity-50",
-                      )}
-                    >
-                      <span className="flex min-w-0 items-center gap-1.5 truncate text-foreground">
-                        {canDragAssign ? (
-                          <GripVertical
-                            className="size-3.5 shrink-0 text-muted-foreground"
-                            aria-hidden
-                          />
-                        ) : null}
-                        <span className="truncate">
-                          {m.displayName}
-                          {m.userId === userId ? " (you)" : ""}
-                        </span>
-                      </span>
-                      <Badge
-                        variant={m.connected ? "default" : "outline"}
-                        className="text-[10px]"
-                      >
-                        {m.connected ? "Online" : "Away"}
-                      </Badge>
-                    </div>
-                  ))
+      {!canManage && selfLiveTeamId == null ? (
+        <Card className="border-border/80 bg-card/60 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Waiting for a team</CardTitle>
+            <CardDescription>
+              The host will assign you to a team. You’ll only see your own team
+              once you’re placed.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : (
+        <div
+          className={cn(
+            "grid gap-4",
+            visibleTeams.length > 1 ? "md:grid-cols-2" : "md:grid-cols-1",
+          )}
+        >
+          {visibleTeams.map((team) => {
+            const members = participants.filter((p) => p.liveTeamId === team.id);
+            const targetKey = `team:${team.id}`;
+            const isDropTarget = dropTargetKey === targetKey;
+            const tone = liveClassroomTeamTone(team.colorKey);
+            return (
+              <Card
+                key={team.id}
+                className={cn(
+                  "shadow-sm transition-colors",
+                  tone.card,
+                  canDragAssign && "min-h-36",
+                  isDropTarget && "ring-2 ring-primary/50",
                 )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                onDragOver={(e) => onTeamDragOver(e, targetKey)}
+                onDragLeave={() => {
+                  if (dropTargetKey === targetKey) setDropTargetKey(null);
+                }}
+                onDrop={(e) => onTeamDrop(e, team.id)}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className={cn("text-base", tone.title)}>
+                    {team.name}
+                  </CardTitle>
+                  <CardDescription>
+                    {members.length} member{members.length === 1 ? "" : "s"}
+                    {canDragAssign
+                      ? " · Drop members here"
+                      : canManage && session.teamsLocked
+                        ? " · Teams locked"
+                        : ""}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-1.5">
+                  {members.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {canDragAssign
+                        ? "Drag a member here from Unassigned"
+                        : "No members yet"}
+                    </p>
+                  ) : (
+                    members.map((m) => (
+                      <div
+                        key={m.id}
+                        draggable={canDragAssign}
+                        onDragStart={(e) => onMemberDragStart(e, m.userId)}
+                        onDragEnd={onMemberDragEnd}
+                        className={cn(
+                          "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm",
+                          tone.row,
+                          canDragAssign &&
+                            "cursor-grab active:cursor-grabbing",
+                          draggingUserId === m.userId && "opacity-50",
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5 truncate">
+                          {canDragAssign ? (
+                            <GripVertical
+                              className="size-3.5 shrink-0 opacity-70"
+                              aria-hidden
+                            />
+                          ) : null}
+                          <span className="truncate">
+                            {m.displayName}
+                            {m.userId === userId ? " (you)" : ""}
+                          </span>
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0 text-[10px]",
+                            m.connected ? tone.badgeOnline : tone.badgeAway,
+                          )}
+                          title={
+                            m.connected
+                              ? "In the lobby and ready for the session"
+                              : "In the lobby but currently away"
+                          }
+                        >
+                          {m.connected ? "Ready" : "Not ready"}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {canManage ? (
         <Card
@@ -532,14 +793,45 @@ export function LiveClassroomLobby({
               <>
                 <Separator className="my-3" />
                 <p className="text-xs text-muted-foreground">
-                  Drag members onto a team, or use Random teams / start battle
-                  (auto-assigns remaining players).
+                  Drag members onto a team, or use Random teams. Lock teams
+                  before starting — unassigned members stay out of the battle.
+                </p>
+              </>
+            ) : null}
+            {canHost && session.teamsLocked ? (
+              <>
+                <Separator className="my-3" />
+                <p className="text-xs text-muted-foreground">
+                  Teams are locked. Unassigned members will not join any team
+                  when the battle starts. Unlock to move people.
                 </p>
               </>
             ) : null}
           </CardContent>
         </Card>
       ) : null}
+
+      <LiveClassroomBattleCountdownDialog
+        open={
+          session.status === "lobby" &&
+          (startingBattle || countdownAt != null)
+        }
+        battleStartsAt={countdownAt}
+        deckId={session.deckId}
+        deckName={session.deckName}
+        teamId={session.teamId}
+        liveTeamName={canManage ? null : (selfLiveTeam?.name ?? null)}
+        liveTeamColorKey={canManage ? null : (selfLiveTeam?.colorKey ?? null)}
+        matchupTeams={matchupTeams}
+        onComplete={finishCountdownAndStart}
+        onCancel={() => {
+          leftLobbyForBattleRef.current = false;
+          clearCountdownUi();
+          void clearLiveClassroomBattleCountdownAction(sessionId).catch(
+            () => undefined,
+          );
+        }}
+      />
     </div>
   );
 }

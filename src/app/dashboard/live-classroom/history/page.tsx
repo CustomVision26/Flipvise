@@ -1,18 +1,10 @@
-import Link from "next/link";
 import { listLiveClassroomSessionsForTeam } from "@/db/queries/live-classroom";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
-import {
-  battleModeLabel,
-  sessionTypeLabel,
-} from "@/lib/live-classroom-types";
-import {
-  LIVE_CLASSROOM_HISTORY_PATH,
-  liveClassroomReportPath,
-} from "@/lib/live-classroom-url";
+import { LIVE_CLASSROOM_HISTORY_PATH } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
-import { Badge } from "@/components/ui/badge";
+import { LiveClassroomRecentSessionsList } from "@/components/live-classroom-recent-sessions-list";
 import {
   Card,
   CardContent,
@@ -62,36 +54,20 @@ export default async function LiveClassroomHistoryPage({
               {sessions.length} session{sessions.length === 1 ? "" : "s"}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {sessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No completed battles yet.
-              </p>
-            ) : (
-              sessions.map((session) => (
-                <Link
-                  key={session.id}
-                  href={liveClassroomReportPath(session.id)}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2.5 transition-colors hover:bg-muted/40"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {session.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {sessionTypeLabel(session.sessionType)} ·{" "}
-                      {battleModeLabel(session.battleMode)}
-                      {session.endedAt
-                        ? ` · ${session.endedAt.toLocaleString()}`
-                        : ""}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="capitalize">
-                    {session.status}
-                  </Badge>
-                </Link>
-              ))
-            )}
+          <CardContent>
+            <LiveClassroomRecentSessionsList
+              canManage={ctx.canManage}
+              emptyMessage="No completed battles yet."
+              showEndedAt
+              sessions={sessions.map((session) => ({
+                id: session.id,
+                name: session.name,
+                status: session.status,
+                sessionType: session.sessionType,
+                battleMode: session.battleMode,
+                endedAt: session.endedAt?.toISOString() ?? null,
+              }))}
+            />
           </CardContent>
         </Card>
       </div>

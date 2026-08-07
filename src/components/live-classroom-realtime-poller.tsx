@@ -7,9 +7,14 @@ export type LiveClassroomRealtimeState = Awaited<
   ReturnType<typeof getLiveClassroomRealtimeStateAction>
 >;
 
-const DEFAULT_INTERVAL_MS = 2000;
+/** Lobby polls were 2s and each call was multi-second — that starved page navigations. */
+const DEFAULT_INTERVAL_MS = 5000;
 
-export function useLiveClassroomRealtime(sessionId: number, intervalMs = DEFAULT_INTERVAL_MS) {
+export function useLiveClassroomRealtime(
+  sessionId: number,
+  intervalMs = DEFAULT_INTERVAL_MS,
+  enabled = true,
+) {
   const [state, setState] = useState<LiveClassroomRealtimeState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -18,6 +23,12 @@ export function useLiveClassroomRealtime(sessionId: number, intervalMs = DEFAULT
 
   useEffect(() => {
     mounted.current = true;
+    if (!enabled) {
+      return () => {
+        mounted.current = false;
+      };
+    }
+
     let cancelled = false;
 
     async function tick() {
@@ -50,7 +61,7 @@ export function useLiveClassroomRealtime(sessionId: number, intervalMs = DEFAULT
       mounted.current = false;
       window.clearInterval(id);
     };
-  }, [sessionId, intervalMs]);
+  }, [sessionId, intervalMs, enabled]);
 
   return { state, error, isPending, setState };
 }

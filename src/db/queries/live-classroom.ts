@@ -28,15 +28,16 @@ import {
   type LiveOrganizationAnalyticsRow,
   type LiveTeacherAnalyticsRow,
 } from "@/db/schema";
-import type {
-  LiveClassroomBattleMode,
-  LiveClassroomReportStats,
-  LiveClassroomSessionConfig,
-  LiveClassroomSessionStatus,
-  LiveClassroomSessionType,
-  LiveClassroomStrategyCardKind,
-  LiveClassroomStrategyCardPolicy,
-  LiveClassroomTeamAssignmentMode,
+import {
+  LIVE_CLASSROOM_PRESENCE_STALE_MS,
+  type LiveClassroomBattleMode,
+  type LiveClassroomReportStats,
+  type LiveClassroomSessionConfig,
+  type LiveClassroomSessionStatus,
+  type LiveClassroomSessionType,
+  type LiveClassroomStrategyCardKind,
+  type LiveClassroomStrategyCardPolicy,
+  type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
 import {
   and,
@@ -46,6 +47,7 @@ import {
   eq,
   gte,
   inArray,
+  lt,
   or,
   sql,
 } from "drizzle-orm";
@@ -301,6 +303,42 @@ export async function createLiveClassroomSavedGroup(input: {
   return row;
 }
 
+export async function getLiveClassroomSavedGroup(
+  id: number,
+): Promise<LiveClassroomSavedGroupRow | null> {
+  const [row] = await db
+    .select()
+    .from(liveClassroomSavedGroups)
+    .where(eq(liveClassroomSavedGroups.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function updateLiveClassroomSavedGroup(
+  id: number,
+  patch: Partial<{
+    name: string;
+    groups: Array<{ teamName: string; userIds: string[] }>;
+  }>,
+): Promise<LiveClassroomSavedGroupRow | null> {
+  const [row] = await db
+    .update(liveClassroomSavedGroups)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(liveClassroomSavedGroups.id, id))
+    .returning();
+  return row ?? null;
+}
+
+export async function deleteLiveClassroomSavedGroup(
+  id: number,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(liveClassroomSavedGroups)
+    .where(eq(liveClassroomSavedGroups.id, id))
+    .returning({ id: liveClassroomSavedGroups.id });
+  return deleted.length > 0;
+}
+
 export function generateLiveClassroomJoinCode(): string {
   const bytes = randomBytes(6);
   let code = "";
@@ -554,6 +592,7 @@ export async function upsertLiveClassroomParticipant(input: {
       set: {
         connected,
         lastSeenAt: now,
+        removed: false,
         updatedAt: now,
         displayName:
           input.displayName !== undefined
@@ -621,6 +660,27 @@ export async function updateLiveClassroomParticipant(
     .where(eq(liveClassroomParticipants.id, id))
     .returning();
   return row ?? null;
+}
+
+/** Clear ghost "Ready" rows after heartbeats stop (user left lobby/play). */
+export async function markStaleLiveClassroomParticipantsDisconnected(
+  sessionId: number,
+  staleMs: number = LIVE_CLASSROOM_PRESENCE_STALE_MS,
+): Promise<number> {
+  const cutoff = new Date(Date.now() - staleMs);
+  const rows = await db
+    .update(liveClassroomParticipants)
+    .set({ connected: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(liveClassroomParticipants.sessionId, sessionId),
+        eq(liveClassroomParticipants.connected, true),
+        eq(liveClassroomParticipants.removed, false),
+        lt(liveClassroomParticipants.lastSeenAt, cutoff),
+      ),
+    )
+    .returning({ id: liveClassroomParticipants.id });
+  return rows.length;
 }
 
 export async function insertLiveBattleQuestions(
@@ -838,14 +898,42 @@ export async function returnLiveClassroomSessionToLobby(
     })
     .where(eq(liveClassroomTeams.sessionId, sessionId));
 
+  const existing = await getLiveClassroomSessionById(sessionId);
+  const {
+    battleStartsAt: _drop,
+    participantBattle: _pb,
+    questionTimerBonuses: _tb,
+    questionRevealTargets: _rt,
+    participantClocks: _pc,
+    ...restExtensions
+  } = existing?.extensions ?? {};
+  void _drop;
+  void _pb;
+  void _tb;
+  void _rt;
+  void _pc;
+
   return updateLiveClassroomSession(sessionId, {
     status: "lobby",
     currentQuestionIndex: 0,
     questionStartedAt: null,
-    teamsLocked: false,
+    // Keep teams locked and leave liveTeamId assignments intact so a restart
+    // restores the same roster (unassigned stay unassigned).
+    teamsLocked: existing?.teamsLocked ?? true,
     startedAt: null,
     endedAt: null,
+    extensions: restExtensions,
   });
+}
+
+export async function deleteLiveClassroomSession(
+  sessionId: number,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(liveClassroomSessions)
+    .where(eq(liveClassroomSessions.id, sessionId))
+    .returning({ id: liveClassroomSessions.id });
+  return deleted.length > 0;
 }
 
 export async function markStrategyCardUsed(

@@ -6,10 +6,6 @@ import {
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import {
-  battleModeLabel,
-  sessionTypeLabel,
-} from "@/lib/live-classroom-types";
-import {
   buildLiveClassroomHref,
   LIVE_CLASSROOM_HISTORY_PATH,
   LIVE_CLASSROOM_JOIN_PATH,
@@ -17,13 +13,11 @@ import {
   LIVE_CLASSROOM_ROOT_PATH,
   LIVE_CLASSROOM_SCHEDULED_PATH,
   LIVE_CLASSROOM_START_PATH,
-  liveClassroomLobbyPath,
-  liveClassroomReportPath,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
-import { Badge } from "@/components/ui/badge";
+import { LiveClassroomRecentSessionsList } from "@/components/live-classroom-recent-sessions-list";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -185,40 +179,17 @@ export default async function LiveClassroomDashboardPage({
               View history
             </Button>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {recentSessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No sessions yet. Start one to open a lobby.
-              </p>
-            ) : (
-              recentSessions.map((session) => {
-                const href =
-                  session.status === "completed" ||
-                  session.status === "cancelled"
-                    ? liveClassroomReportPath(session.id)
-                    : liveClassroomLobbyPath(session.id);
-                return (
-                  <Link
-                    key={session.id}
-                    href={href}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2.5 transition-colors hover:bg-muted/40"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {session.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {sessionTypeLabel(session.sessionType)} ·{" "}
-                        {battleModeLabel(session.battleMode)}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">
-                      {session.status}
-                    </Badge>
-                  </Link>
-                );
-              })
-            )}
+          <CardContent>
+            <LiveClassroomRecentSessionsList
+              canManage={ctx.canManage}
+              sessions={recentSessions.map((session) => ({
+                id: session.id,
+                name: session.name,
+                status: session.status,
+                sessionType: session.sessionType,
+                battleMode: session.battleMode,
+              }))}
+            />
           </CardContent>
         </Card>
       </div>

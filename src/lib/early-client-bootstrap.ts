@@ -32,7 +32,7 @@ function runEarlyClientBootstrap(): void {
     (isLocal || isNativeShell) &&
     "serviceWorker" in navigator
   ) {
-    const reloadKey = "flipvise-dev-sw-reset-v12";
+    const reloadKey = "flipvise-dev-sw-reset-v14";
     if (sessionStorage.getItem(reloadKey)) return;
 
     navigator.serviceWorker

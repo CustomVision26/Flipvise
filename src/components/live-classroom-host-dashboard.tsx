@@ -7,7 +7,6 @@ import {
   Loader2,
   Pause,
   Play,
-  SkipForward,
   Timer,
   Volume2,
   VolumeX,
@@ -16,8 +15,11 @@ import {
 import { toast } from "sonner";
 import {
   controlLiveClassroomBattleAction,
+  getLiveClassroomRealtimeStateAction,
   heartbeatLiveClassroomAction,
+  leaveLiveClassroomPresenceAction,
 } from "@/actions/live-classroom";
+import { LiveClassroomTeamTargetMenu } from "@/components/live-classroom-team-target-menu";
 import { useLiveClassroomRealtime } from "@/components/live-classroom-realtime-poller";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { remainingQuestionSeconds } from "@/lib/live-classroom-question-clock";
 import {
   liveClassroomLobbyPath,
   liveClassroomProjectorPath,
@@ -43,9 +46,10 @@ export function LiveClassroomHostDashboard({
   sessionId,
 }: LiveClassroomHostDashboardProps) {
   const router = useRouter();
-  const { state, error } = useLiveClassroomRealtime(sessionId);
+  const { state, error, setState } = useLiveClassroomRealtime(sessionId, 2000);
   const [pending, startTransition] = useTransition();
   const [tick, setTick] = useState(0);
+  const sessionStatus = state?.session.status ?? null;
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((t) => t + 1), 1000);
@@ -55,42 +59,47 @@ export function LiveClassroomHostDashboard({
   useEffect(() => {
     const id = window.setInterval(() => {
       void heartbeatLiveClassroomAction(sessionId).catch(() => undefined);
-    }, 8000);
-    return () => window.clearInterval(id);
+    }, 12_000);
+    return () => {
+      window.clearInterval(id);
+      void leaveLiveClassroomPresenceAction(sessionId).catch(() => undefined);
+    };
   }, [sessionId]);
 
   useEffect(() => {
-    if (!state) return;
-    if (state.session.status === "lobby" || state.session.status === "scheduled") {
-      router.push(liveClassroomLobbyPath(sessionId));
+    if (sessionStatus == null) return;
+    if (sessionStatus === "lobby" || sessionStatus === "scheduled") {
+      window.location.assign(liveClassroomLobbyPath(sessionId));
+      return;
     }
-    if (state.session.status === "completed" || state.session.status === "cancelled") {
-      router.push(liveClassroomReportPath(sessionId));
+    if (sessionStatus === "completed" || sessionStatus === "cancelled") {
+      window.location.assign(liveClassroomReportPath(sessionId));
     }
-  }, [state, sessionId, router]);
+  }, [sessionStatus, sessionId]);
 
   void tick;
   const remaining = (() => {
+    void tick;
     if (!state) return 0;
-    const limit = state.session.config.timePerQuestionSec;
-    if (!state.session.questionStartedAt || state.session.status === "paused") {
-      return limit;
-    }
-    const started = new Date(state.session.questionStartedAt).getTime();
-    const elapsed = Math.floor((Date.now() - started) / 1000);
-    return Math.max(0, limit - elapsed);
+    return remainingQuestionSeconds({
+      timePerQuestionSec: state.session.config.timePerQuestionSec,
+      bonusSec: state.session.timerBonusSec ?? 0,
+      startedAtIso: state.session.questionStartedAt,
+      paused: state.session.status === "paused",
+    });
   })();
 
   function control(
     action: Parameters<typeof controlLiveClassroomBattleAction>[0]["action"],
-    extraSeconds?: number,
+    opts?: { extraSeconds?: number; target?: "all" | number },
   ) {
     startTransition(async () => {
       try {
         const result = await controlLiveClassroomBattleAction({
           sessionId,
           action,
-          extraSeconds,
+          extraSeconds: opts?.extraSeconds,
+          target: opts?.target,
         });
         if (result.returnedToLobby) {
           toast.success("Returned to lobby");
@@ -100,6 +109,18 @@ export function LiveClassroomHostDashboard({
         if (result.ended) {
           toast.success("Session ended");
           router.push(liveClassroomReportPath(sessionId));
+          return;
+        }
+        if ("atEnd" in result && result.atEnd) {
+          toast.message("That was the last question.");
+        } else {
+          if (action === "add_time") {
+            toast.success("Time added");
+          } else if (action === "reveal") {
+            toast.success("Answer revealed");
+          }
+          const next = await getLiveClassroomRealtimeStateAction(sessionId);
+          setState(next);
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Control failed");
@@ -120,6 +141,7 @@ export function LiveClassroomHostDashboard({
   const q = state.currentQuestion;
   const total = q?.totalQuestions ?? 0;
   const index = state.session.currentQuestionIndex + 1;
+  const independent = Boolean(state.session.independentBattle);
 
   return (
     <div className="space-y-4">
@@ -130,15 +152,25 @@ export function LiveClassroomHostDashboard({
               {state.session.name}
             </CardTitle>
             <CardDescription>
-              Host controls · Question {Math.min(index, total)} / {total}
+              {independent
+                ? `Host controls · Players advance independently · ${state.session.activeBattlersRemaining} still battling`
+                : state.session.battleMode === "collaborative_team"
+                  ? `Host controls · Captains answer — advances when every team has answered · Question ${Math.min(index, total)} / ${total}`
+                  : `Host controls · Question ${Math.min(index, total)} / ${total}`}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{state.session.status}</Badge>
-            <Badge variant="outline" className="gap-1 font-mono">
-              <Timer className="size-3" aria-hidden />
-              {remaining}s
-            </Badge>
+            {independent ? (
+              <Badge variant="outline">
+                {state.session.activeBattlersRemaining} active
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1 font-mono">
+                <Timer className="size-3" aria-hidden />
+                {remaining}s
+              </Badge>
+            )}
             <Button
               nativeButton={false}
               size="sm"
@@ -178,26 +210,28 @@ export function LiveClassroomHostDashboard({
               Pause
             </Button>
           )}
-          <Button
-            type="button"
+          <LiveClassroomTeamTargetMenu
+            label="+15s"
+            icon={<Timer className="size-3.5" aria-hidden />}
             disabled={pending}
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => control("add_time", 15)}
-          >
-            <Timer className="size-3.5" aria-hidden />
-            +15s
-          </Button>
-          <Button
-            type="button"
+            pending={pending}
+            teams={state.teams
+              .filter((t) => !t.eliminated)
+              .map((t) => ({ id: t.id, name: t.name }))}
+            onSelect={(target) =>
+              control("add_time", { extraSeconds: 15, target })
+            }
+          />
+          <LiveClassroomTeamTargetMenu
+            label="Reveal"
+            icon={<Eye className="size-3.5" aria-hidden />}
             disabled={pending}
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => control("reveal")}
-          >
-            <Eye className="size-3.5" aria-hidden />
-            Reveal
-          </Button>
+            pending={pending}
+            teams={state.teams
+              .filter((t) => !t.eliminated)
+              .map((t) => ({ id: t.id, name: t.name }))}
+            onSelect={(target) => control("reveal", { target })}
+          />
           <Button
             type="button"
             disabled={pending}
@@ -205,8 +239,16 @@ export function LiveClassroomHostDashboard({
             className="gap-1.5"
             onClick={() => control("skip")}
           >
-            <SkipForward className="size-3.5" aria-hidden />
-            Skip / Next
+            Skip board
+          </Button>
+          <Button
+            type="button"
+            disabled={pending}
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => control("next_question")}
+          >
+            Next board
           </Button>
           <Button
             type="button"
@@ -244,7 +286,12 @@ export function LiveClassroomHostDashboard({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Connected", value: state.connectedCount },
-          { label: "Answered", value: state.answeredCount },
+          independent
+            ? {
+                label: "Still battling",
+                value: state.session.activeBattlersRemaining,
+              }
+            : { label: "Answered", value: state.answeredCount },
           { label: "Accuracy", value: `${state.averageAccuracy}%` },
           {
             label: "Avg response",
@@ -266,10 +313,43 @@ export function LiveClassroomHostDashboard({
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base">Current question</CardTitle>
+            <CardTitle className="text-base">
+              {independent ? "Player progress" : "Current question"}
+            </CardTitle>
+            {independent ? (
+              <CardDescription>
+                Battle ends when every assigned member finishes or leaves.
+              </CardDescription>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3">
-            {q ? (
+            {independent ? (
+              <ul className="space-y-1.5">
+                {state.participants
+                  .filter((p) => p.liveTeamId != null)
+                  .map((p) => (
+                    <li
+                      key={p.userId}
+                      className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"
+                    >
+                      <span className="truncate text-foreground">
+                        {p.displayName}
+                      </span>
+                      <Badge
+                        variant={
+                          p.battleStatus === "active" ? "secondary" : "outline"
+                        }
+                      >
+                        {p.battleStatus === "opted_out"
+                          ? "Left"
+                          : p.battleStatus === "finished"
+                            ? "Done"
+                            : `${p.answeredCount} answered`}
+                      </Badge>
+                    </li>
+                  ))}
+              </ul>
+            ) : q ? (
               <>
                 <p className="text-sm font-medium text-foreground">{q.prompt}</p>
                 <ul className="space-y-1.5">

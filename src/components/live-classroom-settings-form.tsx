@@ -338,7 +338,8 @@ export function LiveClassroomSettingsForm({
             Workspace membership does not grant Live Classroom™. Assign members
             here so they can join with the lobby code. Team admins who are
             assigned can host and manage; regular members need Can host to host
-            sessions. The subscription owner always has access.
+            sessions. Grant the owner access from a session’s Members settings
+            when they should play.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

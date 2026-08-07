@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
   accessHasAddon,
@@ -14,10 +16,13 @@ import {
 } from "@/db/queries/addons";
 import { getTeamById, listTeamMembers } from "@/db/queries/teams";
 import {
+  getLiveClassroomParticipant,
   getLiveClassroomParticipantGrant,
+  getLiveClassroomSessionById,
   getLiveClassroomTeacherGrant,
   getOrCreateLiveClassroomTeamSettings,
 } from "@/db/queries/live-classroom";
+import type { LiveClassroomSessionRow } from "@/db/queries/live-classroom";
 import {
   isLiveClassroomEligiblePlanSlug,
   liveClassroomParticipantLimitForPlan,
@@ -46,29 +51,42 @@ export async function redirectPathForMissingLiveClassroomAddon(): Promise<string
  * stripe/admin entitlement and the workspace plan is an eligible team tier.
  * Platform admins do not inherit product access — they monitor usage elsewhere.
  */
-export async function teamOwnsLiveClassroom(teamId: number): Promise<{
+type TeamOwnsLiveClassroomResult = {
   owns: boolean;
   team: NonNullable<Awaited<ReturnType<typeof getTeamById>>> | null;
   licensedSeats: number;
   subscriptionActive: boolean;
-}> {
-  const team = await getTeamById(teamId);
+};
+
+/** Short process cache — ownership rarely changes; avoids Clerk cascades on every nav. */
+const teamOwnsCache = new Map<
+  number,
+  { expiresAt: number; value: TeamOwnsLiveClassroomResult }
+>();
+const TEAM_OWNS_TTL_MS = 20_000;
+
+export async function teamOwnsLiveClassroom(
+  teamId: number,
+): Promise<TeamOwnsLiveClassroomResult> {
+  const cached = teamOwnsCache.get(teamId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const team = await getTeamByIdCached(teamId);
   if (!team) {
     return { owns: false, team: null, licensedSeats: 0, subscriptionActive: false };
   }
 
-  const subscriptionActive = await subscriberHasActiveWorkspacePlan(
-    team.ownerUserId,
-  );
   const eligible = isLiveClassroomEligiblePlanSlug(team.planSlug);
+  const [subscriptionActive, ownerEntitlement] = await Promise.all([
+    subscriberHasActiveWorkspacePlan(team.ownerUserId),
+    getUserAddonEntitlement(team.ownerUserId, LIVE_CLASSROOM_ADDON_KEY),
+  ]);
   const licensedSeats = eligible
     ? liveClassroomParticipantLimitForPlan(team.planSlug)
     : 0;
 
-  const ownerEntitlement = await getUserAddonEntitlement(
-    team.ownerUserId,
-    LIVE_CLASSROOM_ADDON_KEY,
-  );
   const ownerOwns =
     ownerEntitlement?.status === "active" &&
     (ownerEntitlement.source === "stripe" ||
@@ -82,7 +100,7 @@ export async function teamOwnsLiveClassroom(teamId: number): Promise<{
     eligible &&
     (ownerEntitlement?.source === "admin" || subscriptionActive);
 
-  return {
+  const value: TeamOwnsLiveClassroomResult = {
     owns: Boolean(owns),
     team,
     licensedSeats:
@@ -93,32 +111,71 @@ export async function teamOwnsLiveClassroom(teamId: number): Promise<{
           : 0,
     subscriptionActive,
   };
+  teamOwnsCache.set(teamId, { expiresAt: Date.now() + TEAM_OWNS_TTL_MS, value });
+  return value;
 }
+
+const getTeamByIdCached = cache(getTeamById);
 
 export async function resolveLiveClassroomOrgRole(input: {
   teamId: number;
   userId: string;
 }): Promise<LiveClassroomOrgRole | null> {
-  const team = await getTeamById(input.teamId);
+  const team = await getTeamByIdCached(input.teamId);
   if (!team) return null;
   if (team.ownerUserId === input.userId) return "subscription_owner";
 
-  const members = await listTeamMembers(input.teamId);
+  const [members, assigned, teacherGrant] = await Promise.all([
+    listTeamMembers(input.teamId),
+    getLiveClassroomParticipantGrant(input.teamId, input.userId),
+    getLiveClassroomTeacherGrant(input.teamId, input.userId),
+  ]);
   const membership = members.find((m) => m.userId === input.userId);
   if (!membership) return null;
 
   // Workspace membership alone is not enough — must be on the LC roster.
-  const assigned = await getLiveClassroomParticipantGrant(
-    input.teamId,
-    input.userId,
-  );
   if (!assigned) return null;
 
   if (membership.role === "team_admin") return "team_administrator";
-
-  const grant = await getLiveClassroomTeacherGrant(input.teamId, input.userId);
-  if (grant) return "teacher";
+  if (teacherGrant) return "teacher";
   return "student";
+}
+
+/**
+ * Fast gate for lobby heartbeat / realtime polls.
+ * Uses JWT auth + a few DB lookups — skips getAccessContext, Clerk Backend,
+ * and subscription ownership cascades that were saturating Neon/Clerk in dev.
+ */
+export async function requireLiveClassroomPollAccess(sessionId: number): Promise<{
+  userId: string;
+  session: LiveClassroomSessionRow;
+}> {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const session = await getLiveClassroomSessionById(sessionId);
+  if (!session) throw new Error("Session not found");
+  if (!["lobby", "scheduled", "active", "paused"].includes(session.status)) {
+    throw new Error("Session is not available.");
+  }
+
+  const [team, participant, grant] = await Promise.all([
+    getTeamByIdCached(session.teamId),
+    getLiveClassroomParticipant(sessionId, userId),
+    getLiveClassroomParticipantGrant(session.teamId, userId),
+  ]);
+  if (!team) throw new Error("Workspace not found");
+
+  const allowed =
+    team.ownerUserId === userId ||
+    (participant != null && !participant.removed) ||
+    grant != null;
+
+  if (!allowed) {
+    throw new Error("You are not assigned to this Live Classroom session.");
+  }
+
+  return { userId, session };
 }
 
 export function liveClassroomRoleCanHost(
@@ -166,16 +223,20 @@ export async function requireLiveClassroomAccess(input: {
     throw new Error("Unauthorized");
   }
 
-  const ownership = await teamOwnsLiveClassroom(input.teamId);
+  const [ownership, role, settings] = await Promise.all([
+    teamOwnsLiveClassroom(input.teamId),
+    resolveLiveClassroomOrgRole({
+      teamId: input.teamId,
+      userId: access.userId,
+    }),
+    getOrCreateLiveClassroomTeamSettings(input.teamId),
+  ]);
+
   if (!ownership.owns || !ownership.team) {
     if (mode === "page") redirect(await redirectPathForMissingLiveClassroomAddon());
     throw new Error("Live Classroom™ add-on required for this organization.");
   }
 
-  const role = await resolveLiveClassroomOrgRole({
-    teamId: input.teamId,
-    userId: access.userId,
-  });
   if (!role) {
     if (mode === "page") redirect(`/dashboard/live-classroom?team=${input.teamId}`);
     throw new Error(
@@ -193,7 +254,6 @@ export async function requireLiveClassroomAccess(input: {
     throw new Error("Organization admin permission required.");
   }
 
-  const settings = await getOrCreateLiveClassroomTeamSettings(input.teamId);
   if (!settings.enabled) {
     if (mode === "page") redirect(`/dashboard/live-classroom?team=${input.teamId}`);
     throw new Error("Live Classroom is disabled for this organization.");

@@ -493,7 +493,8 @@ async function resolveAccessContextCore(): Promise<AccessContext> {
     return guestAccessContext();
   }
 
-  await enforceExpiredPaymentGraceIfNeeded(userId).catch(() => {
+  // Do not block every page/action on grace enforcement — fire and forget.
+  void enforceExpiredPaymentGraceIfNeeded(userId).catch(() => {
     // Best-effort — access still resolves from Clerk metadata.
   });
 

@@ -1,6 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { loadLiveClassroomSessionPageContext } from "@/lib/load-live-classroom-page-context";
-import { liveClassroomLobbyPath } from "@/lib/live-classroom-url";
+import {
+  liveClassroomLobbyPath,
+  liveClassroomReportPath,
+} from "@/lib/live-classroom-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomProjector } from "@/components/live-classroom-projector";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
@@ -23,6 +26,14 @@ export default async function LiveClassroomProjectorPage({
   }
   // Owner / team admin only (same gate as Start battle).
   if (!ctx.canManage) {
+    redirect(liveClassroomLobbyPath(sessionId));
+  }
+
+  const status = ctx.session.status;
+  if (status === "completed" || status === "cancelled") {
+    redirect(liveClassroomReportPath(sessionId));
+  }
+  if (status === "lobby" || status === "scheduled") {
     redirect(liveClassroomLobbyPath(sessionId));
   }
 

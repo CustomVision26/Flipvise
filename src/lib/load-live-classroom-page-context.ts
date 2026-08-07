@@ -1,6 +1,6 @@
 import "server-only";
 
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/clerk-auth";
 import { getAccessContext } from "@/lib/access";
 import { getTeamsForTeamDashboard } from "@/db/queries/teams";
@@ -132,10 +132,24 @@ export async function loadLiveClassroomSessionPageContext(
   if (!userId) redirect("/");
 
   const session = await getLiveClassroomSessionById(sessionId);
-  if (!session) notFound();
+  if (!session) {
+    console.error(
+      `[live-classroom] session page context: session ${sessionId} not found`,
+    );
+    redirect(
+      `${LIVE_CLASSROOM_ROOT_PATH}?lc_error=session_not_found&session=${sessionId}`,
+    );
+  }
 
   const ownership = await teamOwnsLiveClassroom(session.teamId);
-  if (!ownership.team) notFound();
+  if (!ownership.team) {
+    console.error(
+      `[live-classroom] session page context: team ${session.teamId} missing for session ${sessionId}`,
+    );
+    redirect(
+      `${LIVE_CLASSROOM_ROOT_PATH}?lc_error=team_not_found&session=${sessionId}&team=${session.teamId}`,
+    );
+  }
 
   const access = await getAccessContext();
   const role = await resolveLiveClassroomOrgRole({
