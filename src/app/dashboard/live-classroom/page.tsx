@@ -76,7 +76,7 @@ export default async function LiveClassroomDashboardPage({
   ];
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -167,8 +167,10 @@ export default async function LiveClassroomDashboardPage({
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-base">Recent sessions</CardTitle>
-              <CardDescription>Lobby, live, and completed battles</CardDescription>
+              <CardTitle className="text-base">Sessions Pool</CardTitle>
+              <CardDescription>
+                Open lobbies, scheduled, live, and recent battles
+              </CardDescription>
             </div>
             <Button
               nativeButton={false}
@@ -189,6 +191,7 @@ export default async function LiveClassroomDashboardPage({
           <CardContent>
             <LiveClassroomRecentSessionsList
               canManage={ctx.canManage}
+              poolMode
               sessions={recentSessions.map((session) => {
                 const deck =
                   session.deckId != null
@@ -200,8 +203,11 @@ export default async function LiveClassroomDashboardPage({
                   status: session.status,
                   sessionType: session.sessionType,
                   battleMode: session.battleMode,
+                  scheduledFor: session.scheduledFor?.toISOString() ?? null,
+                  createdAt: session.createdAt.toISOString(),
                   deckName: deck?.name ?? null,
                   deckCardCount: deck?.cardCount ?? null,
+                  teamsLocked: session.teamsLocked,
                 };
               })}
             />

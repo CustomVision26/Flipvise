@@ -3,6 +3,7 @@ import { loadLiveClassroomSessionPageContext } from "@/lib/load-live-classroom-p
 import {
   liveClassroomLobbyPath,
   liveClassroomReportPath,
+  liveClassroomSessionGonePath,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomProjector } from "@/components/live-classroom-projector";
@@ -30,8 +31,16 @@ export default async function LiveClassroomProjectorPage({
   }
 
   const status = ctx.session.status;
-  if (status === "completed" || status === "cancelled") {
+  if (status === "completed") {
     redirect(liveClassroomReportPath(sessionId));
+  }
+  if (status === "cancelled") {
+    redirect(
+      liveClassroomSessionGonePath({
+        canManage: ctx.canManage,
+        teamId: ctx.teamId,
+      }),
+    );
   }
   if (status === "lobby" || status === "scheduled") {
     redirect(liveClassroomLobbyPath(sessionId));

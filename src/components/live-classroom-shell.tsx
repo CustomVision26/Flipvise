@@ -16,55 +16,70 @@ import { cn } from "@/lib/utils";
 
 export function LiveClassroomShell({
   teamId,
+  canManage = false,
   children,
 }: {
   teamId: number;
+  /** Owner / team admin — show Live Classroom nav. Members only see session content. */
+  canManage?: boolean;
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6 lg:flex-row lg:items-start lg:gap-8">
-      <aside className="hidden w-60 shrink-0 lg:block xl:w-64">
-        <div className="sticky top-20">
-          <div
-            className={cn(
-              teamAdminCardClass,
-              "rounded-xl border border-border/80 bg-card/80 p-3 backdrop-blur-sm",
-            )}
-          >
-            <p className="mb-3 px-2.5 text-sm font-semibold tracking-tight text-foreground">
-              Live Classroom™
-            </p>
-            <LiveClassroomNav teamId={teamId} />
+    <div
+      className={cn(
+        "mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 sm:px-6 sm:py-6",
+        canManage && "lg:flex-row lg:items-start lg:gap-8",
+      )}
+    >
+      {canManage ? (
+        <aside className="hidden w-60 shrink-0 lg:block xl:w-64">
+          <div className="sticky top-20">
+            <div
+              className={cn(
+                teamAdminCardClass,
+                "rounded-xl border border-border/80 bg-card/80 p-3 backdrop-blur-sm",
+              )}
+            >
+              <p className="mb-3 px-2.5 text-sm font-semibold tracking-tight text-foreground">
+                Live Classroom™
+              </p>
+              <LiveClassroomNav teamId={teamId} />
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <div className="flex items-center lg:hidden">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger
-              render={
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Menu className="size-4" aria-hidden />
-                  Live Classroom menu
-                </Button>
-              }
-            />
-            <SheetContent side="left" className="w-[min(100vw-2rem,18rem)] gap-0 p-0">
-              <SheetHeader className="border-b border-border px-4 py-3 text-left">
-                <SheetTitle className="text-base">Live Classroom™</SheetTitle>
-              </SheetHeader>
-              <div className="overflow-y-auto p-3">
-                <LiveClassroomNav
-                  teamId={teamId}
-                  onNavigate={() => setMobileOpen(false)}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+        {canManage ? (
+          <div className="flex items-center lg:hidden">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger
+                render={
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Menu className="size-4" aria-hidden />
+                    Live Classroom menu
+                  </Button>
+                }
+              />
+              <SheetContent
+                side="left"
+                className="w-[min(100vw-2rem,18rem)] gap-0 p-0"
+              >
+                <SheetHeader className="border-b border-border px-4 py-3 text-left">
+                  <SheetTitle className="text-base">Live Classroom™</SheetTitle>
+                </SheetHeader>
+                <div className="overflow-y-auto p-3">
+                  <LiveClassroomNav
+                    teamId={teamId}
+                    onNavigate={() => setMobileOpen(false)}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        ) : null}
 
         <main className="min-w-0 flex-1">{children}</main>
       </div>

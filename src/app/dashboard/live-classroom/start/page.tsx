@@ -32,7 +32,7 @@ export default async function LiveClassroomStartPage({
 
   if (!ctx.canHost) {
     return (
-      <LiveClassroomShell teamId={ctx.teamId}>
+      <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
         <div>
           <LiveClassroomBackLink teamId={ctx.teamId} />
           <Card className="border-border/80 bg-card/60 shadow-sm">
@@ -55,7 +55,7 @@ export default async function LiveClassroomStartPage({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div>
         <LiveClassroomBackLink teamId={ctx.teamId} />
         <LiveClassroomStartForm

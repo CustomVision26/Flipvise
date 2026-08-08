@@ -3,12 +3,18 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Loader2, Play, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { scheduleLiveClassroomBattleCountdownAction } from "@/actions/live-classroom";
 import {
   deleteLiveClassroomSessionAction,
+  openLiveClassroomSessionFromPoolAction,
   restartLiveClassroomSessionAction,
 } from "@/actions/live-classroom-session-admin";
+import {
+  LiveClassroomScheduledCountdown,
+  useLiveClassroomScheduleReady,
+} from "@/components/live-classroom-scheduled-countdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +35,7 @@ import {
   type LiveClassroomSessionType,
 } from "@/lib/live-classroom-types";
 import {
+  liveClassroomHostPath,
   liveClassroomLobbyPath,
   liveClassroomReportPath,
 } from "@/lib/live-classroom-url";
@@ -40,8 +47,11 @@ export type LiveClassroomSessionListItem = {
   sessionType: LiveClassroomSessionType;
   battleMode: LiveClassroomBattleMode;
   endedAt?: string | null;
+  scheduledFor?: string | null;
+  createdAt?: string | null;
   deckName?: string | null;
   deckCardCount?: number | null;
+  teamsLocked?: boolean;
 };
 
 type LiveClassroomRecentSessionsListProps = {
@@ -50,13 +60,209 @@ type LiveClassroomRecentSessionsListProps = {
   emptyMessage?: string;
   /** When true, show endedAt in the subtitle (history page). */
   showEndedAt?: boolean;
+  /** Sessions Pool: new-session label, countdown, switch-open behavior. */
+  poolMode?: boolean;
 };
+
+function isNewPoolSession(session: LiveClassroomSessionListItem): boolean {
+  return session.status === "lobby" || session.status === "scheduled";
+}
+
+function isLivePoolSession(session: LiveClassroomSessionListItem): boolean {
+  return session.status === "active" || session.status === "paused";
+}
+
+function PoolSessionRow({
+  session,
+  canManage,
+  poolMode,
+  showEndedAt,
+  busy,
+  anotherSessionLive,
+  onOpen,
+  onRestart,
+  onDelete,
+  onStartBattle,
+}: {
+  session: LiveClassroomSessionListItem;
+  canManage: boolean;
+  poolMode: boolean;
+  showEndedAt: boolean;
+  busy: boolean;
+  anotherSessionLive: boolean;
+  onOpen: () => void;
+  onRestart: () => void;
+  onDelete: () => void;
+  onStartBattle: () => void;
+}) {
+  const scheduleReady = useLiveClassroomScheduleReady(session.scheduledFor);
+  const ended =
+    session.status === "completed" || session.status === "cancelled";
+  const isLive = isLivePoolSession(session);
+  const showNew = poolMode && isNewPoolSession(session) && !isLive;
+  const showCountdown =
+    poolMode &&
+    !isLive &&
+    session.scheduledFor != null &&
+    (session.status === "scheduled" || session.status === "lobby");
+  const canStartBattle =
+    poolMode &&
+    canManage &&
+    !ended &&
+    !isLive &&
+    !anotherSessionLive &&
+    Boolean(session.teamsLocked) &&
+    scheduleReady &&
+    (session.status === "lobby" || session.status === "scheduled");
+
+  const href = ended
+    ? liveClassroomReportPath(session.id)
+    : isLive
+      ? liveClassroomHostPath(session.id)
+      : liveClassroomLobbyPath(session.id);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2.5 transition-colors hover:bg-muted/40">
+      <div className="min-w-0 flex-1 space-y-1">
+        {poolMode && !ended ? (
+          <button
+            type="button"
+            className="block w-full min-w-0 text-left"
+            disabled={busy}
+            onClick={onOpen}
+          >
+            <p className="truncate text-sm font-medium text-foreground">
+              {showNew ? "New session" : session.name}
+              {session.deckName ? (
+                <span className="font-normal text-muted-foreground">
+                  {" · "}
+                  {session.deckName}
+                  {session.deckCardCount != null
+                    ? ` · ${session.deckCardCount} card${
+                        session.deckCardCount === 1 ? "" : "s"
+                      }`
+                    : ""}
+                </span>
+              ) : null}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {showNew ? `${session.name} · ` : null}
+              {sessionTypeLabel(session.sessionType)} ·{" "}
+              {battleModeLabel(session.battleMode)}
+            </p>
+          </button>
+        ) : (
+          <Link href={href} className="block min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">
+              {session.name}
+              {session.deckName ? (
+                <span className="font-normal text-muted-foreground">
+                  {" · "}
+                  {session.deckName}
+                  {session.deckCardCount != null
+                    ? ` · ${session.deckCardCount} card${
+                        session.deckCardCount === 1 ? "" : "s"
+                      }`
+                    : ""}
+                </span>
+              ) : null}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {sessionTypeLabel(session.sessionType)} ·{" "}
+              {battleModeLabel(session.battleMode)}
+              {showEndedAt && session.endedAt
+                ? ` · ${new Date(session.endedAt).toLocaleString()}`
+                : ""}
+            </p>
+          </Link>
+        )}
+        {showCountdown && session.scheduledFor ? (
+          <LiveClassroomScheduledCountdown
+            scheduledFor={session.scheduledFor}
+            showDate
+          />
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {poolMode && !ended ? (
+          isLive ? (
+            <Button type="button" size="sm" disabled={busy} onClick={onOpen}>
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Host
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={onOpen}
+            >
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Lobby
+            </Button>
+          )
+        ) : null}
+        {canStartBattle ? (
+          <Button type="button" size="sm" disabled={busy} onClick={onStartBattle}>
+            {busy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Play className="size-3.5" aria-hidden />
+            )}
+            Start battle
+          </Button>
+        ) : null}
+        {canManage ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={busy}
+              onClick={onRestart}
+            >
+              {busy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RotateCcw className="size-3.5" aria-hidden />
+              )}
+              Restart
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-destructive hover:text-destructive"
+              disabled={busy}
+              onClick={onDelete}
+            >
+              <Trash2 className="size-3.5" aria-hidden />
+              Delete
+            </Button>
+          </>
+        ) : null}
+        {isLive ? (
+          <Badge>Live</Badge>
+        ) : showNew ? (
+          <Badge variant="outline">New session</Badge>
+        ) : (
+          <Badge variant="outline" className="capitalize">
+            {session.status}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function LiveClassroomRecentSessionsList({
   sessions,
   canManage,
   emptyMessage = "No sessions yet. Start one to open a lobby.",
   showEndedAt = false,
+  poolMode = false,
 }: LiveClassroomRecentSessionsListProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -101,87 +307,91 @@ export function LiveClassroomRecentSessionsList({
     });
   }
 
+  function openFromPool(session: LiveClassroomSessionListItem) {
+    if (session.status === "completed" || session.status === "cancelled") {
+      router.push(liveClassroomReportPath(session.id));
+      return;
+    }
+    setPendingId(session.id);
+    startTransition(async () => {
+      try {
+        const result = await openLiveClassroomSessionFromPoolAction(session.id);
+        if (result.closedOther) {
+          toast.message("Closed the other open session, then opened this one.");
+        }
+        router.push(
+          result.status === "active" || result.status === "paused"
+            ? liveClassroomHostPath(result.sessionId)
+            : liveClassroomLobbyPath(result.sessionId),
+        );
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Could not open session",
+        );
+      } finally {
+        setPendingId(null);
+      }
+    });
+  }
+
+  function startBattleFromPool(session: LiveClassroomSessionListItem) {
+    setPendingId(session.id);
+    startTransition(async () => {
+      try {
+        const opened = await openLiveClassroomSessionFromPoolAction(session.id);
+        if (opened.closedOther) {
+          toast.message("Closed the other open session, then opened this one.");
+        }
+        const result = await scheduleLiveClassroomBattleCountdownAction(
+          session.id,
+        );
+        if (result.alreadyActive) {
+          router.push(liveClassroomHostPath(session.id));
+          router.refresh();
+          return;
+        }
+        toast.success("Countdown started");
+        router.push(liveClassroomLobbyPath(session.id));
+        router.refresh();
+      } catch (e) {
+        toast.error(
+          e instanceof Error ? e.message : "Could not start battle",
+        );
+        router.push(liveClassroomLobbyPath(session.id));
+      } finally {
+        setPendingId(null);
+      }
+    });
+  }
+
   if (sessions.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
   }
 
   const deleteTarget = sessions.find((s) => s.id === deleteId);
+  const hasLiveSession = sessions.some(isLivePoolSession);
 
   return (
     <>
       <div className="space-y-2">
-        {sessions.map((session) => {
-          const href =
-            session.status === "completed" || session.status === "cancelled"
-              ? liveClassroomReportPath(session.id)
-              : liveClassroomLobbyPath(session.id);
-          const busy = pending && pendingId === session.id;
-          return (
-            <div
-              key={session.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2.5 transition-colors hover:bg-muted/40"
-            >
-              <Link href={href} className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {session.name}
-                  {session.deckName ? (
-                    <span className="font-normal text-muted-foreground">
-                      {" · "}
-                      {session.deckName}
-                      {session.deckCardCount != null
-                        ? ` · ${session.deckCardCount} card${
-                            session.deckCardCount === 1 ? "" : "s"
-                          }`
-                        : ""}
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {sessionTypeLabel(session.sessionType)} ·{" "}
-                  {battleModeLabel(session.battleMode)}
-                  {showEndedAt && session.endedAt
-                    ? ` · ${new Date(session.endedAt).toLocaleString()}`
-                    : ""}
-                </p>
-              </Link>
-              <div className="flex flex-wrap items-center gap-2">
-                {canManage ? (
-                  <>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      disabled={busy}
-                      onClick={() => restart(session.id)}
-                    >
-                      {busy ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <RotateCcw className="size-3.5" aria-hidden />
-                      )}
-                      Restart
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 text-destructive hover:text-destructive"
-                      disabled={busy}
-                      onClick={() => setDeleteId(session.id)}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden />
-                      Delete
-                    </Button>
-                  </>
-                ) : null}
-                <Badge variant="outline" className="capitalize">
-                  {session.status}
-                </Badge>
-              </div>
-            </div>
-          );
-        })}
+        {sessions.map((session) => (
+          <PoolSessionRow
+            key={session.id}
+            session={session}
+            canManage={canManage}
+            poolMode={poolMode}
+            showEndedAt={showEndedAt}
+            busy={pending && pendingId === session.id}
+            anotherSessionLive={
+              hasLiveSession && !isLivePoolSession(session)
+            }
+            onOpen={() => openFromPool(session)}
+            onRestart={() => restart(session.id)}
+            onDelete={() => setDeleteId(session.id)}
+            onStartBattle={() => startBattleFromPool(session)}
+          />
+        ))}
       </div>
 
       <AlertDialog

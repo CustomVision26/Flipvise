@@ -62,7 +62,7 @@ export default async function LiveClassroomReportDetailPage({
   const report = await getLiveBattleReportBySession(sessionId);
   if (!report) {
     return (
-      <LiveClassroomShell teamId={ctx.teamId}>
+      <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader>
             <CardTitle>Report not ready</CardTitle>
@@ -94,7 +94,7 @@ export default async function LiveClassroomReportDetailPage({
   const { stats } = report;
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>

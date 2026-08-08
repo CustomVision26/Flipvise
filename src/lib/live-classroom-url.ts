@@ -1,5 +1,7 @@
 /** Live Classroom™ routes under `/dashboard/live-classroom`. */
 
+import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
+
 export const LIVE_CLASSROOM_ROOT_PATH = "/dashboard/live-classroom";
 export const LIVE_CLASSROOM_START_PATH = "/dashboard/live-classroom/start";
 export const LIVE_CLASSROOM_JOIN_PATH = "/dashboard/live-classroom/join";
@@ -31,6 +33,20 @@ export function liveClassroomProjectorPath(sessionId: number): string {
 
 export function liveClassroomReportPath(sessionId: number): string {
   return `${LIVE_CLASSROOM_REPORTS_PATH}/${sessionId}`;
+}
+
+/**
+ * Where to send someone when a lobby/battle is closed or deleted.
+ * Owner / team admin → Sessions Pool; members → Team Dashboard.
+ */
+export function liveClassroomSessionGonePath(input: {
+  canManage: boolean;
+  teamId: number;
+}): string {
+  if (input.canManage) {
+    return buildLiveClassroomHref(LIVE_CLASSROOM_ROOT_PATH, input.teamId);
+  }
+  return `/dashboard?${buildTeamWorkspaceQueryString({ teamId: input.teamId })}`;
 }
 
 /** Study page where the Join with code Live Classroom Battle strip appears. */

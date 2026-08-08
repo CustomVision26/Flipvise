@@ -4,6 +4,7 @@ import {
 } from "@/db/queries/live-classroom";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import { LIVE_CLASSROOM_HISTORY_PATH } from "@/lib/live-classroom-url";
+import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
@@ -44,9 +45,10 @@ export default async function LiveClassroomHistoryPage({
   );
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-4">
         <div>
+          <LiveClassroomBackLink teamId={ctx.teamId} label="Back to Sessions Pool" />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Battle History
           </h1>

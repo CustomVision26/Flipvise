@@ -126,6 +126,9 @@ type LiveClassroomSessionSettingsDialogProps = {
   canHost: boolean;
   teamsLocked: boolean;
   ownerUserId: string;
+  /** When true, settings cannot be opened (e.g. another session is live). */
+  disabled?: boolean;
+  disabledReason?: string;
   session: {
     name: string;
     sessionType: LiveClassroomSessionType;
@@ -153,6 +156,8 @@ export function LiveClassroomSessionSettingsDialog({
   canHost,
   teamsLocked,
   ownerUserId,
+  disabled = false,
+  disabledReason,
   session,
   teams,
   participants,
@@ -183,6 +188,9 @@ export function LiveClassroomSessionSettingsDialog({
   );
   const [timePerQuestionSec, setTimePerQuestionSec] = useState(
     session.config.timePerQuestionSec,
+  );
+  const [teamCount, setTeamCount] = useState(() =>
+    Math.min(4, Math.max(2, teams.length || 4)),
   );
   const [teamAssignment, setTeamAssignment] = useState(
     session.config.teamAssignment,
@@ -221,6 +229,7 @@ export function LiveClassroomSessionSettingsDialog({
     );
     setQuestionCount(session.config.questionCount);
     setTimePerQuestionSec(session.config.timePerQuestionSec);
+    setTeamCount(Math.min(4, Math.max(2, teams.length || 4)));
     setTeamAssignment(session.config.teamAssignment);
     setStrategyCardPolicy(session.config.strategyCardPolicy);
     setSurvivalHearts(session.config.survivalHearts);
@@ -366,6 +375,7 @@ export function LiveClassroomSessionSettingsDialog({
           battleStartDelaySec,
           questionCount,
           timePerQuestionSec,
+          teamCount,
           teamAssignment,
           strategyCardPolicy: allowStrategyCards
             ? strategyCardPolicy
@@ -388,6 +398,7 @@ export function LiveClassroomSessionSettingsDialog({
           allowMusic,
         });
         toast.success("Session settings saved");
+        router.refresh();
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Could not save settings",
@@ -434,12 +445,15 @@ export function LiveClassroomSessionSettingsDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
+        disabled={disabled}
         render={
           <Button
             type="button"
             size="sm"
             variant="outline"
             className="gap-1.5"
+            disabled={disabled}
+            title={disabled ? disabledReason : undefined}
             aria-label="Session settings"
           />
         }
@@ -601,6 +615,29 @@ export function LiveClassroomSessionSettingsDialog({
                       onChange={(e) =>
                         setTimePerQuestionSec(Number(e.target.value))
                       }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="lc-sess-teams">Team count</Label>
+                      <FieldHint
+                        label="Team count"
+                        caption="Number of competing teams in the lobby (2–4). Unlock teams before changing this."
+                      />
+                    </div>
+                    <Input
+                      id="lc-sess-teams"
+                      type="number"
+                      min={2}
+                      max={4}
+                      value={teamCount}
+                      disabled={teamsLocked}
+                      title={
+                        teamsLocked
+                          ? "Unlock teams before changing team count"
+                          : undefined
+                      }
+                      onChange={(e) => setTeamCount(Number(e.target.value))}
                     />
                   </div>
                   {battleMode === "survival" ? (

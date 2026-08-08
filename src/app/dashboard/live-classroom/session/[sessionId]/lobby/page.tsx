@@ -3,6 +3,7 @@ import {
   getLiveClassroomParticipant,
   listLiveClassroomParticipantGrants,
   listLiveClassroomSavedGroups,
+  updateLiveClassroomSession,
 } from "@/db/queries/live-classroom";
 import { listTeamMembers } from "@/db/queries/teams";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
@@ -11,8 +12,10 @@ import {
   liveClassroomHostPath,
   liveClassroomPlayPath,
   liveClassroomReportPath,
+  liveClassroomSessionGonePath,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
+import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomLobby } from "@/components/live-classroom-lobby";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
@@ -38,9 +41,23 @@ export default async function LiveClassroomLobbyPage({
     return <LiveClassroomAssignmentRequired teamName={ctx.team.name} />;
   }
 
+  // Opening the lobby URL opens a scheduled session (so join/poll stay joinable).
+  if (ctx.session.status === "scheduled") {
+    await updateLiveClassroomSession(sessionId, { status: "lobby" });
+    ctx.session = { ...ctx.session, status: "lobby" };
+  }
+
   // Battle already running / ended — never render the lobby countdown overlay.
   const status = ctx.session.status;
-  if (status === "completed" || status === "cancelled") {
+  if (status === "cancelled") {
+    redirect(
+      liveClassroomSessionGonePath({
+        canManage: ctx.canManage,
+        teamId: ctx.teamId,
+      }),
+    );
+  }
+  if (status === "completed") {
     redirect(liveClassroomReportPath(sessionId));
   }
   if (status === "active" || status === "paused") {
@@ -94,23 +111,30 @@ export default async function LiveClassroomLobbyPage({
   ];
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
-      <LiveClassroomLobby
-        sessionId={sessionId}
-        userId={ctx.userId}
-        ownerUserId={ctx.team.ownerUserId}
-        canHost={ctx.canHost}
-        canManage={ctx.canManage}
-        licensedSeats={ctx.licensedSeats}
-        workspaceMembers={workspaceMembers}
-        assignedUserIds={participantGrants.map((g) => g.userId)}
-        savedGroups={savedGroupRows.map((g) => ({
-          id: g.id,
-          name: g.name,
-          groups: g.groups,
-          updatedAt: g.updatedAt.toISOString(),
-        }))}
-      />
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
+      <div>
+        <LiveClassroomBackLink
+          teamId={ctx.teamId}
+          label="Back to Sessions Pool"
+        />
+        <LiveClassroomLobby
+          sessionId={sessionId}
+          userId={ctx.userId}
+          ownerUserId={ctx.team.ownerUserId}
+          teamId={ctx.teamId}
+          canHost={ctx.canHost}
+          canManage={ctx.canManage}
+          licensedSeats={ctx.licensedSeats}
+          workspaceMembers={workspaceMembers}
+          assignedUserIds={participantGrants.map((g) => g.userId)}
+          savedGroups={savedGroupRows.map((g) => ({
+            id: g.id,
+            name: g.name,
+            groups: g.groups,
+            updatedAt: g.updatedAt.toISOString(),
+          }))}
+        />
+      </div>
     </LiveClassroomShell>
   );
 }

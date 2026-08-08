@@ -47,7 +47,8 @@ import {
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
 import {
-  liveClassroomHostPath,
+  buildLiveClassroomHref,
+  LIVE_CLASSROOM_ROOT_PATH,
   liveClassroomLobbyPath,
 } from "@/lib/live-classroom-url";
 
@@ -244,26 +245,16 @@ export function LiveClassroomStartForm({
           teamCount,
         });
 
-        if ("alreadyOpen" in result && result.alreadyOpen) {
-          toast.message(
-            result.status === "active" || result.status === "paused"
-              ? "You already have a live session open — opening host controls."
-              : "You already have an open lobby — opening it instead of creating another.",
-          );
-          router.push(
-            result.status === "active" || result.status === "paused"
-              ? liveClassroomHostPath(result.sessionId)
-              : liveClassroomLobbyPath(result.sessionId),
-          );
-          return;
-        }
-
         toast.success(
           scheduledFor
-            ? "Session scheduled"
+            ? "Session scheduled — see Sessions Pool"
             : `Lobby ready · code ${result.joinCode}`,
         );
-        router.push(liveClassroomLobbyPath(result.sessionId));
+        router.push(
+          scheduledFor
+            ? buildLiveClassroomHref(LIVE_CLASSROOM_ROOT_PATH, teamId)
+            : liveClassroomLobbyPath(result.sessionId),
+        );
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Could not create session",

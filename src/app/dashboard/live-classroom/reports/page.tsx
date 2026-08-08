@@ -39,7 +39,7 @@ export default async function LiveClassroomReportsPage({
   const reports = await listLiveBattleReportsForTeam(ctx.teamId, 50);
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-4">
         <div>
           <LiveClassroomBackLink

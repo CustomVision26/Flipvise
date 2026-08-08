@@ -6,6 +6,7 @@ import { getCardsByDeckUnscoped } from "@/db/queries/cards";
 import {
   bumpLiveOrganizationAnalytics,
   bumpLiveTeacherAnalytics,
+  cancelLiveClassroomLobbySession,
   countConcurrentLiveSessions,
   createLiveClassroomSession,
   createLiveClassroomTeamsForSession,
@@ -18,6 +19,7 @@ import {
   insertLiveBattleAnswer,
   insertLiveBattleQuestions,
   insertLiveBattleStrategyCards,
+  getOtherLiveBattleSessionForTeam,
   listActiveOrLobbySessionsForTeam,
   listLiveBattleAnswersForQuestion,
   listLiveBattleAnswersForSession,
@@ -32,6 +34,7 @@ import {
   getLiveClassroomDeckSummariesByIds,
   markStaleLiveClassroomParticipantsDisconnected,
   markStrategyCardUsed,
+  resizeLiveClassroomSessionTeams,
   returnLiveClassroomSessionToLobby,
   updateLiveBattleQuestion,
   updateLiveClassroomParticipant,
@@ -190,19 +193,23 @@ export async function createLiveClassroomSessionAction(
       ),
   );
   if (concurrent >= maxConcurrent) {
+    // Free the slot by closing open lobby / live sessions so a new one can start.
+    // Use lightweight status updates (not endLiveClassroomSessionAction) to avoid
+    // nested auth + AI report work that can fail mid-create.
     const open = await listActiveOrLobbySessionsForTeam(data.teamId);
-    const existing = open[0];
-    if (existing) {
-      return {
-        sessionId: existing.id,
-        joinCode: existing.joinCode,
-        alreadyOpen: true as const,
-        status: existing.status,
-      };
+    for (const existing of open) {
+      if (existing.status === "lobby") {
+        await cancelLiveClassroomLobbySession(existing.id);
+      } else if (
+        existing.status === "active" ||
+        existing.status === "paused"
+      ) {
+        await updateLiveClassroomSession(existing.id, {
+          status: "cancelled",
+          endedAt: new Date(),
+        });
+      }
     }
-    throw new Error(
-      `Maximum concurrent Live Classroom sessions (${maxConcurrent}) reached.`,
-    );
   }
 
   const config: LiveClassroomSessionConfig = {
@@ -359,7 +366,7 @@ export async function joinLiveClassroomSessionAction(raw: {
 
   const session = await getLiveClassroomSessionById(parsed.data.sessionId);
   if (!session) throw new Error("Session not found");
-  if (!["lobby", "active", "paused"].includes(session.status)) {
+  if (!["lobby", "scheduled", "active", "paused"].includes(session.status)) {
     throw new Error("This session is not joinable.");
   }
 
@@ -385,6 +392,11 @@ export async function joinLiveClassroomSessionAction(raw: {
     parsed.data.displayName?.trim() ||
     displays[access.userId]?.primaryLine ||
     "Participant";
+
+  // Opening the lobby for a scheduled session makes it live (joinable lobby).
+  if (session.status === "scheduled") {
+    await updateLiveClassroomSession(session.id, { status: "lobby" });
+  }
 
   await upsertLiveClassroomParticipant({
     sessionId: session.id,
@@ -412,7 +424,7 @@ export async function joinLiveClassroomByCodeAction(raw: { joinCode: string }) {
 
   const session = await getLiveClassroomSessionByJoinCode(parsed.data.joinCode);
   if (!session) throw new Error("No session found for that join code.");
-  if (!["lobby", "active", "paused"].includes(session.status)) {
+  if (!["lobby", "scheduled", "active", "paused"].includes(session.status)) {
     throw new Error("This session is not joinable.");
   }
 
@@ -471,9 +483,10 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
 
   await maybeMarkStaleParticipants(sessionId);
 
-  // Lobby only needs teams + participants; skip battle payloads to keep polls light.
-  const lobbyOnly = session.status === "lobby";
-  const [teams, participants, questions, answers, strategyCards, deckSummary] =
+  // Lobby / scheduled only need teams + participants; skip battle payloads.
+  const lobbyOnly =
+    session.status === "lobby" || session.status === "scheduled";
+  const [teams, participants, questions, answers, strategyCards, deckSummary, otherLiveSession] =
     await Promise.all([
       listLiveClassroomTeams(sessionId),
       listLiveClassroomParticipants(sessionId),
@@ -497,6 +510,7 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
             (map) => map[session.deckId!] ?? null,
           )
         : Promise.resolve(null),
+      getOtherLiveBattleSessionForTeam(session.teamId, sessionId),
     ]);
 
   const independent = isIndependentLiveClassroomBattleMode(session.battleMode);
@@ -666,6 +680,7 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
       deckId: session.deckId,
       deckName: deckSummary?.name ?? null,
       deckCardCount: deckSummary?.cardCount ?? null,
+      scheduledFor: session.scheduledFor?.toISOString() ?? null,
       timerBonusSec,
       remainingSec: remainingQuestionSeconds({
         timePerQuestionSec: session.config.timePerQuestionSec,
@@ -744,6 +759,8 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
         eliminated: t.eliminated,
         colorKey: t.colorKey,
       })),
+    /** Another session on this team that is currently mid-battle. */
+    otherLiveSession,
   };
 }
 
@@ -932,6 +949,26 @@ export async function updateLobbyTeamAction(raw: {
   });
 
   if (typeof parsed.data.lockTeams === "boolean") {
+    if (parsed.data.lockTeams) {
+      const [lobbyTeams, lobbyParticipants] = await Promise.all([
+        listLiveClassroomTeams(session.id),
+        listLiveClassroomParticipants(session.id),
+      ]);
+      const undersized = lobbyTeams.filter((team) => {
+        const count = lobbyParticipants.filter(
+          (p) => p.liveTeamId === team.id && !p.removed,
+        ).length;
+        return count < LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM;
+      });
+      if (undersized.length > 0) {
+        const names = undersized.map((t) => t.name).join(", ");
+        throw new Error(
+          undersized.length === 1
+            ? `Cannot lock teams — ${names} needs at least ${LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM} members. Add a member to ${names}.`
+            : `Cannot lock teams — add members so each team has at least ${LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM}. Needs members: ${names}.`,
+        );
+      }
+    }
     const { battleStartsAt: _drop, ...restExtensions } =
       session.extensions ?? {};
     void _drop;
@@ -1256,6 +1293,7 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   timePerQuestionSec?: number;
   difficulty?: (typeof LIVE_CLASSROOM_DIFFICULTIES)[number];
   battleStartDelaySec?: number;
+  teamCount?: number;
   allowAiExplanations?: boolean;
   allowStrategyCards?: boolean;
   allowMusic?: boolean;
@@ -1282,6 +1320,7 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
         ),
       )
       .optional(),
+    teamCount: z.number().int().min(2).max(4).optional(),
     allowAiExplanations: z.boolean().optional(),
     allowStrategyCards: z.boolean().optional(),
     allowMusic: z.boolean().optional(),
@@ -1312,8 +1351,26 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     name,
     sessionType,
     battleMode,
+    teamCount,
     ...configPatch
   } = parsed.data;
+
+  if (teamCount != null) {
+    if (session.teamsLocked) {
+      throw new Error("Unlock teams before changing team count.");
+    }
+    const currentTeams = await listLiveClassroomTeams(session.id);
+    if (currentTeams.length !== teamCount) {
+      await resizeLiveClassroomSessionTeams({
+        sessionId: session.id,
+        teamCount,
+        survivalHearts:
+          configPatch.survivalHearts ??
+          session.config.survivalHearts ??
+          DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.survivalHearts,
+      });
+    }
+  }
 
   const allowStrategyCards =
     (configPatch.allowStrategyCards ?? session.config.allowStrategyCards) &&
@@ -1375,6 +1432,20 @@ export async function scheduleLiveClassroomBattleCountdownAction(
   }
   if (!session.teamsLocked) {
     throw new Error("Lock teams before starting the battle.");
+  }
+  if (session.scheduledFor && session.scheduledFor.getTime() > Date.now()) {
+    throw new Error(
+      "This session is scheduled for a later time. Wait until the countdown finishes before starting.",
+    );
+  }
+  const otherLive = await getOtherLiveBattleSessionForTeam(
+    session.teamId,
+    session.id,
+  );
+  if (otherLive) {
+    throw new Error(
+      `“${otherLive.name}” is live. Finish or end that battle before starting this one.`,
+    );
   }
 
   const participants = await listLiveClassroomParticipants(sessionId);

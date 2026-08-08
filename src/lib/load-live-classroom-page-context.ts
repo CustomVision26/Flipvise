@@ -18,6 +18,7 @@ import {
 } from "@/lib/live-classroom-access";
 import type { LiveClassroomOrgRole } from "@/lib/live-classroom-types";
 import { buildLiveClassroomHref, LIVE_CLASSROOM_ROOT_PATH } from "@/lib/live-classroom-url";
+import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 import type { InferSelectModel } from "drizzle-orm";
 import type { teams } from "@/db/schema";
 
@@ -136,6 +137,19 @@ export async function loadLiveClassroomSessionPageContext(
     console.error(
       `[live-classroom] session page context: session ${sessionId} not found`,
     );
+    // Hard-deleted sessions: send non-managers to Team Dashboard when possible.
+    const dashTeams = await getTeamsForTeamDashboard(userId);
+    for (const team of dashTeams) {
+      const role = await resolveLiveClassroomOrgRole({
+        teamId: team.id,
+        userId,
+      });
+      if (role && !liveClassroomRoleCanManageOrg(role)) {
+        redirect(
+          `/dashboard?${buildTeamWorkspaceQueryString({ teamId: team.id })}`,
+        );
+      }
+    }
     redirect(
       `${LIVE_CLASSROOM_ROOT_PATH}?lc_error=session_not_found&session=${sessionId}`,
     );

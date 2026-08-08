@@ -36,20 +36,26 @@ import {
   liveClassroomLobbyPath,
   liveClassroomProjectorPath,
   liveClassroomReportPath,
+  liveClassroomSessionGonePath,
 } from "@/lib/live-classroom-url";
 
 type LiveClassroomHostDashboardProps = {
   sessionId: number;
+  teamId: number;
+  canManage?: boolean;
 };
 
 export function LiveClassroomHostDashboard({
   sessionId,
+  teamId,
+  canManage = true,
 }: LiveClassroomHostDashboardProps) {
   const router = useRouter();
   const { state, error, setState } = useLiveClassroomRealtime(sessionId, 2000);
   const [pending, startTransition] = useTransition();
   const [tick, setTick] = useState(0);
   const sessionStatus = state?.session.status ?? null;
+  const sessionGoneHref = liveClassroomSessionGonePath({ canManage, teamId });
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((t) => t + 1), 1000);
@@ -72,10 +78,25 @@ export function LiveClassroomHostDashboard({
       window.location.assign(liveClassroomLobbyPath(sessionId));
       return;
     }
-    if (sessionStatus === "completed" || sessionStatus === "cancelled") {
+    if (sessionStatus === "completed") {
       window.location.assign(liveClassroomReportPath(sessionId));
+      return;
     }
-  }, [sessionStatus, sessionId]);
+    if (sessionStatus === "cancelled") {
+      window.location.assign(sessionGoneHref);
+    }
+  }, [sessionStatus, sessionId, sessionGoneHref]);
+
+  useEffect(() => {
+    if (!error) return;
+    if (/completed/i.test(error)) {
+      window.location.assign(liveClassroomReportPath(sessionId));
+      return;
+    }
+    if (/cancelled|not available|not found/i.test(error)) {
+      window.location.assign(sessionGoneHref);
+    }
+  }, [error, sessionId, sessionGoneHref]);
 
   void tick;
   const remaining = (() => {
@@ -160,7 +181,9 @@ export function LiveClassroomHostDashboard({
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">{state.session.status}</Badge>
+            <Badge variant="secondary" className="capitalize">
+              {state.session.status}
+            </Badge>
             {independent ? (
               <Badge variant="outline">
                 {state.session.activeBattlersRemaining} active
@@ -266,6 +289,7 @@ export function LiveClassroomHostDashboard({
             )}
             {state.session.musicMuted ? "Unmute" : "Mute"}
           </Button>
+          <Badge className="self-center">Live</Badge>
           <Button
             type="button"
             disabled={pending}

@@ -225,6 +225,7 @@ export function LiveClassroomProjector({
               <ZoomIn className="size-4" aria-hidden />
             </Button>
           </div>
+          <Badge className="px-3 py-1.5 text-base">Live</Badge>
           <Badge variant="secondary" className="px-3 py-1.5 text-base capitalize">
             {state.session.status}
           </Badge>

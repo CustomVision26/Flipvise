@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   Copy,
+  DoorOpen,
   GripVertical,
   Loader2,
   Lock,
@@ -30,6 +31,7 @@ import {
   startLiveClassroomBattleAction,
   updateLobbyTeamAction,
 } from "@/actions/live-classroom";
+import { cancelLiveClassroomLobbySessionAction } from "@/actions/live-classroom-session-admin";
 import { LiveClassroomBattleCountdownDialog } from "@/components/live-classroom-battle-countdown-dialog";
 import { useLiveClassroomRealtime } from "@/components/live-classroom-realtime-poller";
 import {
@@ -37,9 +39,23 @@ import {
   type LiveClassroomSavedGroupOption,
 } from "@/components/live-classroom-saved-groups-controls";
 import {
+  LiveClassroomScheduledCountdown,
+  useLiveClassroomScheduleReady,
+} from "@/components/live-classroom-scheduled-countdown";
+import {
   LiveClassroomSessionSettingsDialog,
   type LiveClassroomWorkspaceMemberOption,
 } from "@/components/live-classroom-session-settings-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,11 +72,13 @@ import {
   liveClassroomTeamTone,
   sessionTypeLabel,
 } from "@/lib/live-classroom-types";
+import { LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM } from "@/lib/live-classroom-saved-groups";
 import {
   liveClassroomHostPath,
   liveClassroomPlayPath,
   liveClassroomProjectorPath,
   liveClassroomReportPath,
+  liveClassroomSessionGonePath,
 } from "@/lib/live-classroom-url";
 
 const LC_MEMBER_DRAG_MIME = "application/x-flipvise-lc-member";
@@ -69,6 +87,7 @@ type LiveClassroomLobbyProps = {
   sessionId: number;
   userId: string;
   ownerUserId: string;
+  teamId: number;
   canHost: boolean;
   /** Owner or team admin — can see unassigned roster and drag members onto teams. */
   canManage: boolean;
@@ -82,6 +101,7 @@ export function LiveClassroomLobby({
   sessionId,
   userId,
   ownerUserId,
+  teamId,
   canHost,
   canManage,
   workspaceMembers = [],
@@ -95,8 +115,15 @@ export function LiveClassroomLobby({
   const [countdownAt, setCountdownAt] = useState<string | null>(null);
   const [startingBattle, setStartingBattle] = useState(false);
   const [schedulingBattle, setSchedulingBattle] = useState(false);
+  const [closeLobbyOpen, setCloseLobbyOpen] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const leftLobbyForBattleRef = useRef(false);
   const startingBattleRef = useRef(false);
+
+  const sessionGoneHref = liveClassroomSessionGonePath({
+    canManage,
+    teamId,
+  });
 
   // Pause polls only for the host while start runs — overlapping server actions
   // starved navigation. Non-hosts keep polling so they see status=active.
@@ -108,11 +135,31 @@ export function LiveClassroomLobby({
 
   useEffect(() => {
     void joinLiveClassroomSessionAction({ sessionId })
-      .then(() => setJoined(true))
+      .then(() => {
+        setJoined(true);
+        setJoinError(null);
+      })
       .catch((e) => {
-        toast.error(e instanceof Error ? e.message : "Could not join lobby");
+        const message =
+          e instanceof Error ? e.message : "Could not join lobby";
+        setJoinError(message);
+        toast.error(message);
+        if (
+          /not joinable|not available|not found|cancelled|completed/i.test(
+            message,
+          )
+        ) {
+          window.location.assign(sessionGoneHref);
+        }
       });
-  }, [sessionId]);
+  }, [sessionId, sessionGoneHref]);
+
+  useEffect(() => {
+    if (!error) return;
+    if (/not available|not found/i.test(error)) {
+      window.location.assign(sessionGoneHref);
+    }
+  }, [error, sessionGoneHref]);
 
   useEffect(() => {
     if (!joined) return;
@@ -156,7 +203,14 @@ export function LiveClassroomLobby({
     const status = state.session.status;
     const serverStartsAt = state.session.battleStartsAt;
 
-    if (status === "completed" || status === "cancelled") {
+    if (status === "cancelled") {
+      leftLobbyForBattleRef.current = false;
+      clearCountdownUi();
+      window.location.assign(sessionGoneHref);
+      return;
+    }
+
+    if (status === "completed") {
       leftLobbyForBattleRef.current = false;
       clearCountdownUi();
       window.location.assign(liveClassroomReportPath(sessionId));
@@ -184,6 +238,7 @@ export function LiveClassroomLobby({
     schedulingBattle,
     forceLeaveLobbyToBattle,
     clearCountdownUi,
+    sessionGoneHref,
   ]);
 
   const finishCountdownAndStart = useCallback(() => {
@@ -304,6 +359,9 @@ export function LiveClassroomLobby({
 
   const canDragAssign =
     canManage && state != null && !state.session.teamsLocked && !pending;
+  const scheduleReady = useLiveClassroomScheduleReady(
+    state?.session.scheduledFor,
+  );
 
   function moveMemberToTeam(moveUserId: string, toLiveTeamId: number | null) {
     if (!canManage || !state || state.session.teamsLocked) return;
@@ -370,16 +428,41 @@ export function LiveClassroomLobby({
   }
 
   if (!state) {
+    const failMessage = joinError ?? error;
+    const unavailable =
+      failMessage != null &&
+      /not available|not found|not assigned|not joinable/i.test(failMessage);
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading lobby…
-        {error ? <span className="text-destructive">{error}</span> : null}
+      <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2">
+          {!unavailable ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : null}
+          {unavailable ? "This lobby is no longer available." : "Loading lobby…"}
+          {failMessage ? (
+            <span className="text-destructive">{failMessage}</span>
+          ) : null}
+        </div>
+        {unavailable ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={() => window.location.assign(sessionGoneHref)}
+          >
+            {canManage ? "Back to Sessions Pool" : "Back to Team Dashboard"}
+          </Button>
+        ) : null}
       </div>
     );
   }
 
-  const { session, teams, participants } = state;
+  const { session, teams, participants, otherLiveSession } = state;
+  const blockedByOtherLive = otherLiveSession != null;
+  const otherLiveBlockReason = otherLiveSession
+    ? `“${otherLiveSession.name}” is live. Finish that battle before starting this session.`
+    : undefined;
   const lcAccessUserIds = new Set<string>(assignedUserIds);
   const lcAccessTotal = lcAccessUserIds.size;
   const lcAccessInLobby = participants.filter((p) =>
@@ -428,14 +511,30 @@ export function LiveClassroomLobby({
                 </>
               ) : null}
             </CardDescription>
+            {session.scheduledFor ? (
+              <LiveClassroomScheduledCountdown
+                scheduledFor={session.scheduledFor}
+                showDate
+              />
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {blockedByOtherLive && otherLiveSession ? (
+              <Badge
+                title={otherLiveBlockReason}
+                className="gap-1"
+              >
+                Live: {otherLiveSession.name}
+              </Badge>
+            ) : null}
             {canHost ? (
               <LiveClassroomSessionSettingsDialog
                 sessionId={sessionId}
                 canHost={canHost}
                 teamsLocked={session.teamsLocked}
                 ownerUserId={ownerUserId}
+                disabled={blockedByOtherLive}
+                disabledReason={otherLiveBlockReason}
                 session={{
                   name: session.name,
                   sessionType: session.sessionType,
@@ -455,7 +554,13 @@ export function LiveClassroomLobby({
                 currentUserId={userId}
               />
             ) : null}
-            <Badge variant="outline" className="font-mono text-base tracking-widest">
+            <Badge
+              variant="outline"
+              className={cn(
+                "font-mono text-base tracking-widest",
+                blockedByOtherLive && "opacity-50",
+              )}
+            >
               {session.joinCode}
             </Badge>
             <Button
@@ -463,6 +568,8 @@ export function LiveClassroomLobby({
               size="sm"
               variant="outline"
               className="gap-1.5"
+              disabled={blockedByOtherLive}
+              title={otherLiveBlockReason}
               onClick={() => {
                 void navigator.clipboard.writeText(session.joinCode);
                 toast.success("Join code copied");
@@ -526,7 +633,24 @@ export function LiveClassroomLobby({
               disabled={pending || schedulingBattle || startingBattle}
               variant="outline"
               className="gap-1.5"
-              onClick={() =>
+              onClick={() => {
+                if (!session.teamsLocked) {
+                  const undersized = teams.filter((team) => {
+                    const count = participants.filter(
+                      (p) => p.liveTeamId === team.id,
+                    ).length;
+                    return count < LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM;
+                  });
+                  if (undersized.length > 0) {
+                    const names = undersized.map((t) => t.name).join(", ");
+                    toast.error(
+                      undersized.length === 1
+                        ? `Cannot lock teams — ${names} needs at least ${LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM} members. Add a member to ${names}.`
+                        : `Cannot lock teams — add members so each team has at least ${LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM}. Needs members: ${names}.`,
+                    );
+                    return;
+                  }
+                }
                 run(
                   session.teamsLocked ? "Teams unlocked" : "Teams locked",
                   () =>
@@ -542,8 +666,8 @@ export function LiveClassroomLobby({
                       }
                       return result;
                     }),
-                )
-              }
+                );
+              }}
             >
               {session.teamsLocked ? (
                 <Unlock className="size-3.5" aria-hidden />
@@ -573,34 +697,39 @@ export function LiveClassroomLobby({
                       .catch(() => undefined);
                   }}
                 />
-                <Button
-                  type="button"
-                  disabled={
-                    pending ||
-                    schedulingBattle ||
-                    startingBattle ||
-                    participants.length === 0 ||
-                    !session.teamsLocked ||
-                    countdownAt != null
-                  }
-                  className="gap-1.5"
-                  title={
-                    countdownAt != null
-                      ? "Countdown in progress"
-                      : session.teamsLocked
-                        ? "Start the battle countdown"
-                        : "Lock teams before starting the battle"
-                  }
-                  onClick={() => void scheduleBattleCountdown()}
-                >
-                  {schedulingBattle || startingBattle ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Play className="size-3.5" aria-hidden />
-                  )}
-                  Start battle
-                </Button>
-                {session.teamsLocked ? (
+                {scheduleReady ? (
+                  <Button
+                    type="button"
+                    disabled={
+                      pending ||
+                      schedulingBattle ||
+                      startingBattle ||
+                      participants.length === 0 ||
+                      !session.teamsLocked ||
+                      countdownAt != null ||
+                      blockedByOtherLive
+                    }
+                    className="gap-1.5"
+                    title={
+                      blockedByOtherLive
+                        ? otherLiveBlockReason
+                        : countdownAt != null
+                          ? "Countdown in progress"
+                          : session.teamsLocked
+                            ? "Start the battle countdown"
+                            : "Lock teams before starting the battle"
+                    }
+                    onClick={() => void scheduleBattleCountdown()}
+                  >
+                    {schedulingBattle || startingBattle ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Play className="size-3.5" aria-hidden />
+                    )}
+                    Start battle
+                  </Button>
+                ) : null}
+                {session.teamsLocked && !blockedByOtherLive ? (
                   <Button
                     nativeButton={false}
                     variant="secondary"
@@ -619,18 +748,40 @@ export function LiveClassroomLobby({
                     type="button"
                     variant="secondary"
                     disabled
-                    title="Lock teams before opening the projector"
+                    title={
+                      blockedByOtherLive
+                        ? otherLiveBlockReason
+                        : "Lock teams before opening the projector"
+                    }
                   >
                     Open projector
                   </Button>
                 )}
+                <Button
+                  type="button"
+                  disabled={pending || schedulingBattle || startingBattle}
+                  variant="outline"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setCloseLobbyOpen(true)}
+                >
+                  <DoorOpen className="size-3.5" aria-hidden />
+                  Close lobby
+                </Button>
               </>
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Waiting for the host to start the battle…
-          </p>
+          <div className="space-y-2">
+            {session.scheduledFor ? (
+              <LiveClassroomScheduledCountdown
+                scheduledFor={session.scheduledFor}
+                showDate
+              />
+            ) : null}
+            <p className="text-sm text-muted-foreground">
+              Waiting for the host to start the battle…
+            </p>
+          </div>
         )}
         </CardContent>
       </Card>
@@ -843,6 +994,46 @@ export function LiveClassroomLobby({
           );
         }}
       />
+
+      <AlertDialog open={closeLobbyOpen} onOpenChange={setCloseLobbyOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close lobby?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This ends the lobby without starting a battle. Students will no
+              longer be able to join with this code. You can start a new session
+              afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={pending}
+              onClick={(e) => {
+                e.preventDefault();
+                startTransition(() => {
+                  void cancelLiveClassroomLobbySessionAction(sessionId)
+                    .then(() => {
+                      toast.success("Lobby closed");
+                      leftLobbyForBattleRef.current = true;
+                      window.location.assign(sessionGoneHref);
+                    })
+                    .catch((err) => {
+                      toast.error(
+                        err instanceof Error
+                          ? err.message
+                          : "Could not close lobby",
+                      );
+                    });
+                });
+              }}
+            >
+              Close lobby
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/lib/clerk-auth";
 import { redirect } from "next/navigation";
 import {
   accessHasAddon,
@@ -155,6 +155,12 @@ export async function requireLiveClassroomPollAccess(sessionId: number): Promise
 
   const session = await getLiveClassroomSessionById(sessionId);
   if (!session) throw new Error("Session not found");
+  if (session.status === "completed") {
+    throw new Error("Session completed.");
+  }
+  if (session.status === "cancelled") {
+    throw new Error("Session cancelled.");
+  }
   if (!["lobby", "scheduled", "active", "paused"].includes(session.status)) {
     throw new Error("Session is not available.");
   }
@@ -168,6 +174,7 @@ export async function requireLiveClassroomPollAccess(sessionId: number): Promise
 
   const allowed =
     team.ownerUserId === userId ||
+    session.hostUserId === userId ||
     (participant != null && !participant.removed) ||
     grant != null;
 
@@ -217,10 +224,22 @@ export async function requireLiveClassroomAccess(input: {
   settings: Awaited<ReturnType<typeof getOrCreateLiveClassroomTeamSettings>>;
 }> {
   const mode = input.mode ?? "action";
+  // Prefer a direct auth() check so Server Actions get a clear failure when the
+  // Clerk session is missing from the action request (not a vague Unauthorized).
+  const { userId: authUserId } = await auth();
+  if (!authUserId) {
+    if (mode === "page") redirect("/");
+    throw new Error(
+      "Your session expired. Refresh the page and sign in again, then retry.",
+    );
+  }
+
   const access = await getAccessContext();
   if (!access.userId) {
     if (mode === "page") redirect("/");
-    throw new Error("Unauthorized");
+    throw new Error(
+      "Your session expired. Refresh the page and sign in again, then retry.",
+    );
   }
 
   const [ownership, role, settings] = await Promise.all([

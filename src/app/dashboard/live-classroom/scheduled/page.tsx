@@ -47,7 +47,7 @@ export default async function LiveClassroomScheduledPage({
   });
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-4">
         <LiveClassroomBackLink teamId={ctx.teamId} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

@@ -36,11 +36,13 @@ import {
 import {
   liveClassroomLobbyPath,
   liveClassroomReportPath,
+  liveClassroomSessionGonePath,
 } from "@/lib/live-classroom-url";
 
 type LiveClassroomStudentPlayProps = {
   sessionId: number;
   userId: string;
+  teamId: number;
   /** Owner / team admin — can target reveal from the timer control. */
   canManage?: boolean;
 };
@@ -48,6 +50,7 @@ type LiveClassroomStudentPlayProps = {
 export function LiveClassroomStudentPlay({
   sessionId,
   userId,
+  teamId,
   canManage = false,
 }: LiveClassroomStudentPlayProps) {
   const router = useRouter();
@@ -93,10 +96,29 @@ export function LiveClassroomStudentPlay({
       window.location.assign(liveClassroomLobbyPath(sessionId));
       return;
     }
-    if (sessionStatus === "completed" || sessionStatus === "cancelled") {
+    if (sessionStatus === "cancelled") {
+      window.location.assign(
+        liveClassroomSessionGonePath({ canManage, teamId }),
+      );
+      return;
+    }
+    if (sessionStatus === "completed") {
       window.location.assign(liveClassroomReportPath(sessionId));
     }
-  }, [sessionStatus, sessionId]);
+  }, [sessionStatus, sessionId, canManage, teamId]);
+
+  useEffect(() => {
+    if (!error) return;
+    if (/completed/i.test(error)) {
+      window.location.assign(liveClassroomReportPath(sessionId));
+      return;
+    }
+    if (/cancelled|not available|not found/i.test(error)) {
+      window.location.assign(
+        liveClassroomSessionGonePath({ canManage, teamId }),
+      );
+    }
+  }, [error, canManage, teamId, sessionId]);
 
   useEffect(() => {
     setSubmittedChoice(null);
@@ -420,6 +442,7 @@ export function LiveClassroomStudentPlay({
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Badge>Live</Badge>
             {independent ? (
               <Badge variant="secondary" className={teamTone.chip}>
                 {state.session.activeBattlersRemaining} battling

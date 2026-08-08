@@ -37,7 +37,7 @@ export default async function LiveClassroomSettingsPage({
 
   if (!ctx.canManage || !ctx.settings) {
     return (
-      <LiveClassroomShell teamId={ctx.teamId}>
+      <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader>
             <CardTitle>Admin access required</CardTitle>
@@ -69,7 +69,7 @@ export default async function LiveClassroomSettingsPage({
   );
 
   return (
-    <LiveClassroomShell teamId={ctx.teamId}>
+    <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">

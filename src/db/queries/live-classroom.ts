@@ -32,6 +32,7 @@ import {
 } from "@/db/schema";
 import {
   LIVE_CLASSROOM_PRESENCE_STALE_MS,
+  LIVE_CLASSROOM_DEFAULT_TEAM_NAMES,
   type LiveClassroomBattleMode,
   type LiveClassroomReportStats,
   type LiveClassroomSessionConfig,
@@ -50,6 +51,7 @@ import {
   gte,
   inArray,
   lt,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -497,6 +499,29 @@ export async function listActiveOrLobbySessionsForTeam(
     .orderBy(desc(liveClassroomSessions.updatedAt));
 }
 
+/** Another session on the team that is mid-battle (active/paused). */
+export async function getOtherLiveBattleSessionForTeam(
+  teamId: number,
+  excludeSessionId: number,
+): Promise<{ id: number; name: string } | null> {
+  const [row] = await db
+    .select({
+      id: liveClassroomSessions.id,
+      name: liveClassroomSessions.name,
+    })
+    .from(liveClassroomSessions)
+    .where(
+      and(
+        eq(liveClassroomSessions.teamId, teamId),
+        inArray(liveClassroomSessions.status, ["active", "paused"]),
+        ne(liveClassroomSessions.id, excludeSessionId),
+      ),
+    )
+    .orderBy(desc(liveClassroomSessions.updatedAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function countConcurrentLiveSessions(
   teamId: number,
 ): Promise<number> {
@@ -575,6 +600,50 @@ export async function listLiveClassroomTeams(
     .from(liveClassroomTeams)
     .where(eq(liveClassroomTeams.sessionId, sessionId))
     .orderBy(asc(liveClassroomTeams.sortOrder), asc(liveClassroomTeams.id));
+}
+
+/**
+ * Grow or shrink lobby teams to `teamCount` (2–4). Extra teams are deleted
+ * (participants on removed teams become unassigned via FK set null).
+ */
+export async function resizeLiveClassroomSessionTeams(input: {
+  sessionId: number;
+  teamCount: number;
+  survivalHearts: number;
+}): Promise<LiveClassroomTeamRow[]> {
+  const target = Math.min(4, Math.max(2, Math.floor(input.teamCount)));
+  const existing = await listLiveClassroomTeams(input.sessionId);
+  if (existing.length === target) return existing;
+
+  const colorKeys = ["blue", "red", "green", "yellow"] as const;
+  const hearts =
+    input.survivalHearts > 0 ? input.survivalHearts : 3;
+
+  if (existing.length > target) {
+    const removeIds = existing.slice(target).map((t) => t.id);
+    if (removeIds.length > 0) {
+      await db
+        .delete(liveClassroomTeams)
+        .where(inArray(liveClassroomTeams.id, removeIds));
+    }
+    return listLiveClassroomTeams(input.sessionId);
+  }
+
+  const start = existing.length;
+  await createLiveClassroomTeamsForSession(
+    input.sessionId,
+    Array.from({ length: target - existing.length }, (_, i) => {
+      const index = start + i;
+      return {
+        name:
+          LIVE_CLASSROOM_DEFAULT_TEAM_NAMES[index] ?? `Team ${index + 1}`,
+        colorKey: colorKeys[index] ?? "blue",
+        sortOrder: index,
+        hearts,
+      };
+    }),
+  );
+  return listLiveClassroomTeams(input.sessionId);
 }
 
 export async function updateLiveClassroomTeam(
@@ -956,6 +1025,39 @@ export async function returnLiveClassroomSessionToLobby(
     teamsLocked: existing?.teamsLocked ?? true,
     startedAt: null,
     endedAt: null,
+    extensions: restExtensions,
+  });
+}
+
+/** Close a lobby/scheduled session without starting a battle (frees concurrent slot). */
+export async function cancelLiveClassroomLobbySession(
+  sessionId: number,
+): Promise<LiveClassroomSessionRow | null> {
+  const existing = await getLiveClassroomSessionById(sessionId);
+  if (!existing) return null;
+  if (existing.status !== "lobby" && existing.status !== "scheduled") {
+    return null;
+  }
+
+  const {
+    battleStartsAt: _drop,
+    participantBattle: _pb,
+    questionTimerBonuses: _tb,
+    questionRevealTargets: _rt,
+    participantClocks: _pc,
+    ...restExtensions
+  } = existing.extensions ?? {};
+  void _drop;
+  void _pb;
+  void _tb;
+  void _rt;
+  void _pc;
+
+  return updateLiveClassroomSession(sessionId, {
+    status: "cancelled",
+    endedAt: new Date(),
+    questionStartedAt: null,
+    startedAt: null,
     extensions: restExtensions,
   });
 }
