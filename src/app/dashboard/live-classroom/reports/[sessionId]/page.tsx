@@ -2,13 +2,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getLiveBattleReportBySession,
+  getLiveClassroomParticipant,
   getLiveClassroomSessionById,
+  listLiveClassroomTeams,
 } from "@/db/queries/live-classroom";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import {
   buildLiveClassroomHref,
   LIVE_CLASSROOM_REPORTS_PATH,
 } from "@/lib/live-classroom-url";
+import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
@@ -24,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { LiveClassroomReportActions } from "@/components/live-classroom-report-actions";
+import { cn } from "@/lib/utils";
 
 export default async function LiveClassroomReportDetailPage({
   params,
@@ -70,7 +74,7 @@ export default async function LiveClassroomReportDetailPage({
               This session does not have a battle report yet.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-2">
             <Button
               nativeButton={false}
               variant="outline"
@@ -85,6 +89,21 @@ export default async function LiveClassroomReportDetailPage({
             >
               Back to reports
             </Button>
+            {!ctx.canManage ? (
+              <Button
+                nativeButton={false}
+                variant="ghost"
+                render={
+                  <Link
+                    href={`/dashboard?${buildTeamWorkspaceQueryString({
+                      teamId: ctx.teamId,
+                    })}`}
+                  />
+                }
+              >
+                Back to team dashboard
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       </LiveClassroomShell>
@@ -92,6 +111,57 @@ export default async function LiveClassroomReportDetailPage({
   }
 
   const { stats } = report;
+  const isManager = ctx.canManage;
+
+  let myTeamName: string | null = null;
+  if (!isManager) {
+    const participant = await getLiveClassroomParticipant(
+      sessionId,
+      ctx.userId,
+    );
+    if (participant?.liveTeamId != null) {
+      const teams = await listLiveClassroomTeams(sessionId);
+      myTeamName =
+        teams.find((t) => t.id === participant.liveTeamId)?.name ?? null;
+    }
+  }
+
+  const myIndividualStats = isManager
+    ? stats.individualStats
+    : stats.individualStats.filter((p) => p.userId === ctx.userId);
+  const myTeamStats = isManager
+    ? stats.teamStats
+    : stats.teamStats.filter((t) => t.teamName === myTeamName);
+  const mine = myIndividualStats[0] ?? null;
+
+  const visibleStats = isManager
+    ? [
+        { label: "Attendance", value: stats.attendance },
+        { label: "Accuracy", value: `${stats.accuracyPercent}%` },
+        {
+          label: "Avg response",
+          value: `${stats.averageResponseTimeSec}s`,
+        },
+        {
+          label: "Review",
+          value: `${stats.suggestedReviewMinutes} min`,
+        },
+      ]
+    : [
+        { label: "Attendance", value: mine ? "Present" : "Absent" },
+        {
+          label: "Accuracy",
+          value: mine ? `${mine.accuracyPercent}%` : "—",
+        },
+        {
+          label: "Avg response",
+          value: mine ? `${mine.avgResponseTimeSec}s` : "—",
+        },
+        {
+          label: "Review",
+          value: `${stats.suggestedReviewMinutes} min`,
+        },
+      ];
 
   return (
     <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
@@ -111,26 +181,34 @@ export default async function LiveClassroomReportDetailPage({
             </h1>
             <p className="text-sm text-muted-foreground">
               Battle report · {report.createdAt.toLocaleString()}
+              {!isManager ? " · Your results" : null}
             </p>
           </div>
-          {report.winnerTeamName ? (
-            <Badge className="text-sm">Winner: {report.winnerTeamName}</Badge>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {report.winnerTeamName ? (
+              <Badge className="text-sm">Winner: {report.winnerTeamName}</Badge>
+            ) : null}
+            {!isManager ? (
+              <Button
+                nativeButton={false}
+                variant="outline"
+                size="sm"
+                render={
+                  <Link
+                    href={`/dashboard?${buildTeamWorkspaceQueryString({
+                      teamId: ctx.teamId,
+                    })}`}
+                  />
+                }
+              >
+                Back to team dashboard
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Attendance", value: stats.attendance },
-            { label: "Accuracy", value: `${stats.accuracyPercent}%` },
-            {
-              label: "Avg response",
-              value: `${stats.averageResponseTimeSec}s`,
-            },
-            {
-              label: "Review",
-              value: `${stats.suggestedReviewMinutes} min`,
-            },
-          ].map((stat) => (
+          {visibleStats.map((stat) => (
             <Card
               key={stat.label}
               className="border-border/80 bg-card/60 shadow-sm"
@@ -145,11 +223,13 @@ export default async function LiveClassroomReportDetailPage({
           ))}
         </div>
 
-        <LiveClassroomReportActions
-          teamId={ctx.teamId}
-          sessionName={report.sessionName}
-          stats={stats}
-        />
+        {isManager ? (
+          <LiveClassroomReportActions
+            teamId={ctx.teamId}
+            sessionName={report.sessionName}
+            stats={stats}
+          />
+        ) : null}
 
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader>
@@ -177,13 +257,15 @@ export default async function LiveClassroomReportDetailPage({
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className={cn("grid gap-4", isManager && "lg:grid-cols-2")}>
           <Card className="border-border/80 bg-card/60 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-base">Team stats</CardTitle>
+              <CardTitle className="text-base">
+                {isManager ? "Team stats" : "Your team"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {stats.teamStats.map((t) => (
+              {myTeamStats.map((t) => (
                 <div
                   key={t.teamName}
                   className="flex justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"
@@ -194,36 +276,45 @@ export default async function LiveClassroomReportDetailPage({
                   </span>
                 </div>
               ))}
+              {myTeamStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No team data available.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 
-          <Card className="border-border/80 bg-card/60 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">Question analysis</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {stats.questionAnalysis.map((q) => (
-                <div
-                  key={q.questionId}
-                  className="rounded-md border border-border/50 px-3 py-2 text-sm"
-                >
-                  <p className="text-foreground">{q.prompt}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {q.correctCount} correct · {q.incorrectCount} incorrect ·{" "}
-                    {q.accuracyPercent}%
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {isManager ? (
+            <Card className="border-border/80 bg-card/60 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Question analysis</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {stats.questionAnalysis.map((q) => (
+                  <div
+                    key={q.questionId}
+                    className="rounded-md border border-border/50 px-3 py-2 text-sm"
+                  >
+                    <p className="text-foreground">{q.prompt}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {q.correctCount} correct · {q.incorrectCount} incorrect ·{" "}
+                      {q.accuracyPercent}%
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base">Individual results</CardTitle>
+            <CardTitle className="text-base">
+              {isManager ? "Individual results" : "Your results"}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {stats.individualStats.map((p) => (
+            {myIndividualStats.map((p) => (
               <div
                 key={p.userId}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"

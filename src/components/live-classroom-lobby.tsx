@@ -463,6 +463,12 @@ export function LiveClassroomLobby({
   const otherLiveBlockReason = otherLiveSession
     ? `“${otherLiveSession.name}” is live. Finish that battle before starting this session.`
     : undefined;
+  const assignedParticipants = participants.filter((p) => p.liveTeamId != null);
+  const notReadyParticipants = assignedParticipants.filter((p) => !p.connected);
+  const membersLockedAndReady =
+    session.teamsLocked &&
+    assignedParticipants.length > 0 &&
+    notReadyParticipants.length === 0;
   const lcAccessUserIds = new Set<string>(assignedUserIds);
   const lcAccessTotal = lcAccessUserIds.size;
   const lcAccessInLobby = participants.filter((p) =>
@@ -541,6 +547,7 @@ export function LiveClassroomLobby({
                   battleMode: session.battleMode,
                   config: session.config,
                 }}
+                deckId={session.deckId}
                 teams={teams.map((t) => ({ id: t.id, name: t.name }))}
                 participants={participants.map((p) => ({
                   id: p.id,
@@ -697,15 +704,13 @@ export function LiveClassroomLobby({
                       .catch(() => undefined);
                   }}
                 />
-                {scheduleReady ? (
+                {scheduleReady && membersLockedAndReady ? (
                   <Button
                     type="button"
                     disabled={
                       pending ||
                       schedulingBattle ||
                       startingBattle ||
-                      participants.length === 0 ||
-                      !session.teamsLocked ||
                       countdownAt != null ||
                       blockedByOtherLive
                     }
@@ -715,9 +720,7 @@ export function LiveClassroomLobby({
                         ? otherLiveBlockReason
                         : countdownAt != null
                           ? "Countdown in progress"
-                          : session.teamsLocked
-                            ? "Start the battle countdown"
-                            : "Lock teams before starting the battle"
+                          : "Start the battle countdown"
                     }
                     onClick={() => void scheduleBattleCountdown()}
                   >
@@ -728,6 +731,27 @@ export function LiveClassroomLobby({
                     )}
                     Start battle
                   </Button>
+                ) : scheduleReady && !blockedByOtherLive ? (
+                  <Badge
+                    variant="outline"
+                    className="gap-1.5 py-1.5 text-xs text-muted-foreground"
+                    title={
+                      !session.teamsLocked
+                        ? "Lock teams to enable Start battle."
+                        : assignedParticipants.length === 0
+                          ? "Assign at least one member to a team."
+                          : `Waiting for ${notReadyParticipants.length} member${notReadyParticipants.length === 1 ? "" : "s"} to reconnect: ${notReadyParticipants
+                              .map((p) => p.displayName)
+                              .join(", ")}`
+                    }
+                  >
+                    <Users className="size-3" aria-hidden />
+                    {!session.teamsLocked
+                      ? "Lock teams to start"
+                      : assignedParticipants.length === 0
+                        ? "No members assigned"
+                        : `${assignedParticipants.length - notReadyParticipants.length}/${assignedParticipants.length} ready`}
+                  </Badge>
                 ) : null}
                 {session.teamsLocked && !blockedByOtherLive ? (
                   <Button

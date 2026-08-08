@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleHelp, Loader2, Settings, Trash2 } from "lucide-react";
+import {
+  Check,
+  CircleHelp,
+  Loader2,
+  Settings,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   sendLiveClassroomLobbyCodeInboxAction,
@@ -10,9 +17,12 @@ import {
   updateLiveClassroomSessionSettingsAction,
   updateLobbyTeamAction,
 } from "@/actions/live-classroom";
+import { getCardsForDeckViewerPreviewAction } from "@/actions/cards";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -48,25 +58,34 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { LiveClassroomStrategyCardConfigDialog } from "@/components/live-classroom-strategy-card-config-dialog";
 import {
   DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
   LIVE_CLASSROOM_BATTLE_MODES,
   LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC,
+  LIVE_CLASSROOM_QUESTION_SOURCE_MODES,
   LIVE_CLASSROOM_SESSION_TYPES,
-  LIVE_CLASSROOM_STRATEGY_CARD_KINDS,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
   battleModeLabel,
   battleStartDelayLabel,
+  defaultStrategyCardSetting,
+  deriveStrategyCardPolicy,
   sessionTypeLabel,
+  strategyCardEnabledKinds,
   strategyCardLabel,
+  strategyCardsForBattleMode,
   type LiveClassroomBattleMode,
+  type LiveClassroomQuestionSourceMode,
   type LiveClassroomSessionConfig,
   type LiveClassroomSessionType,
   type LiveClassroomStrategyCardKind,
   type LiveClassroomStrategyCardPolicy,
+  type LiveClassroomStrategyCardSetting,
+  type LiveClassroomStrategyCardSettings,
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
+import { cn } from "@/lib/utils";
 
 function FieldHint({ label, caption }: { label: string; caption: string }) {
   return (
@@ -84,21 +103,51 @@ function FieldHint({ label, caption }: { label: string; caption: string }) {
 }
 
 const UNASSIGNED = "__unassigned__";
-const ALL_STRATEGY_CARD_KINDS = [...LIVE_CLASSROOM_STRATEGY_CARD_KINDS];
 
-function syncEnabledCardsToCount(
-  current: LiveClassroomStrategyCardKind[],
+type DeckCardPreview = {
+  id: number;
+  front: string | null;
+  back: string | null;
+  cardType: string;
+  choices: string[] | null;
+  correctChoiceIndex: number | null;
+};
+
+const CAPTION_QUESTION_SOURCE =
+  "Use every card in the deck as a question, or hand-pick specific deck cards for this battle. Changing this rebuilds the question set — safe before the battle starts.";
+
+function syncCardSettingsToCount(
+  settings: LiveClassroomStrategyCardSettings,
   count: number,
-): LiveClassroomStrategyCardKind[] {
-  const max = ALL_STRATEGY_CARD_KINDS.length;
+  available: LiveClassroomStrategyCardKind[],
+): LiveClassroomStrategyCardSettings {
+  const max = available.length;
   const n = Math.max(0, Math.min(Number.isFinite(count) ? count : 0, max));
-  if (n <= current.length) return current.slice(0, n);
-  const next = [...current];
-  for (const kind of ALL_STRATEGY_CARD_KINDS) {
-    if (next.length >= n) break;
-    if (!next.includes(kind)) next.push(kind);
+  const enabled = strategyCardEnabledKinds(settings, available);
+  let target: LiveClassroomStrategyCardKind[];
+  if (n <= enabled.length) {
+    target = enabled.slice(0, n);
+  } else {
+    target = [...enabled];
+    for (const kind of available) {
+      if (target.length >= n) break;
+      if (!target.includes(kind)) target.push(kind);
+    }
   }
-  return next;
+  const out: LiveClassroomStrategyCardSettings = { ...settings };
+  for (const kind of available) {
+    const inTarget = target.includes(kind);
+    const existing = out[kind] ?? defaultStrategyCardSetting(kind);
+    out[kind] = {
+      ...existing,
+      scope: inTarget
+        ? existing.scope === "disabled"
+          ? "all"
+          : existing.scope
+        : "disabled",
+    };
+  }
+  return out;
 }
 
 export type LiveClassroomWorkspaceMemberOption = {
@@ -135,6 +184,8 @@ type LiveClassroomSessionSettingsDialogProps = {
     battleMode: LiveClassroomBattleMode;
     config: LiveClassroomSessionConfig;
   };
+  /** Linked deck id, used to list questions for individual strategy-card scoping. */
+  deckId?: number | null;
   teams: SessionSettingsTeam[];
   participants: SessionSettingsParticipant[];
   workspaceMembers?: LiveClassroomWorkspaceMemberOption[];
@@ -159,6 +210,7 @@ export function LiveClassroomSessionSettingsDialog({
   disabled = false,
   disabledReason,
   session,
+  deckId = null,
   teams,
   participants,
   workspaceMembers = [],
@@ -186,6 +238,15 @@ export function LiveClassroomSessionSettingsDialog({
   const [questionCount, setQuestionCount] = useState(
     session.config.questionCount,
   );
+  const [questionSourceMode, setQuestionSourceMode] =
+    useState<LiveClassroomQuestionSourceMode>(
+      session.config.questionSourceMode ?? "all",
+    );
+  const [selectedCardIds, setSelectedCardIds] = useState<number[]>(
+    session.config.selectedDeckCardIds ?? [],
+  );
+  const [deckCards, setDeckCards] = useState<DeckCardPreview[]>([]);
+  const [loadingDeckCards, setLoadingDeckCards] = useState(false);
   const [timePerQuestionSec, setTimePerQuestionSec] = useState(
     session.config.timePerQuestionSec,
   );
@@ -194,9 +255,6 @@ export function LiveClassroomSessionSettingsDialog({
   );
   const [teamAssignment, setTeamAssignment] = useState(
     session.config.teamAssignment,
-  );
-  const [strategyCardPolicy, setStrategyCardPolicy] = useState(
-    session.config.strategyCardPolicy,
   );
   const [strategyCardLimitPerTeam, setStrategyCardLimitPerTeam] = useState(
     session.config.strategyCardLimitPerTeam,
@@ -211,13 +269,72 @@ export function LiveClassroomSessionSettingsDialog({
     session.config.allowStrategyCards,
   );
   const [allowMusic, setAllowMusic] = useState(session.config.allowMusic);
-  const [enabledCards, setEnabledCards] = useState<
-    LiveClassroomStrategyCardKind[]
-  >(
-    session.config.enabledStrategyCards?.length
-      ? session.config.enabledStrategyCards
-      : [...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards],
+  const [cardSettings, setCardSettings] = useState<LiveClassroomStrategyCardSettings>(
+    () => {
+      const available = strategyCardsForBattleMode(session.battleMode);
+      const out: LiveClassroomStrategyCardSettings = {};
+      for (const k of available) {
+        out[k] = session.config.strategyCardSettings?.[k] ?? {
+          ...defaultStrategyCardSetting(k),
+          scope: (session.config.enabledStrategyCards?.length
+            ? session.config.enabledStrategyCards.includes(k)
+            : true)
+            ? "all"
+            : "disabled",
+        };
+      }
+      return out;
+    },
   );
+  const [configuringKind, setConfiguringKind] =
+    useState<LiveClassroomStrategyCardKind | null>(null);
+
+  const availableStrategyCards = strategyCardsForBattleMode(battleMode);
+  const enabledCards = strategyCardEnabledKinds(
+    cardSettings,
+    availableStrategyCards,
+  );
+  const strategyCardPolicy = deriveStrategyCardPolicy(
+    enabledCards,
+    availableStrategyCards,
+  );
+  const strategyDetailsLocked = strategyCardPolicy === "disabled";
+  const strategyCardsEditable = strategyCardPolicy !== "disabled";
+
+  useEffect(() => {
+    if (!open || questionSourceMode !== "specific" || deckId == null) return;
+    let cancelled = false;
+    setLoadingDeckCards(true);
+    getCardsForDeckViewerPreviewAction({ deckId })
+      .then((rows) => {
+        if (cancelled) return;
+        setDeckCards(
+          rows.map((r) => ({
+            id: r.id,
+            front: r.front,
+            back: r.back,
+            cardType: r.cardType,
+            choices: r.choices ?? null,
+            correctChoiceIndex: r.correctChoiceIndex ?? null,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Could not load deck cards");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDeckCards(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, questionSourceMode, deckId]);
+
+  function toggleCardId(id: number, checked: boolean) {
+    setSelectedCardIds((prev) =>
+      checked ? [...prev, id] : prev.filter((existing) => existing !== id),
+    );
+  }
 
   function hydrateSessionFormFromProps() {
     setName(session.name);
@@ -228,71 +345,107 @@ export function LiveClassroomSessionSettingsDialog({
         DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
     );
     setQuestionCount(session.config.questionCount);
+    setQuestionSourceMode(session.config.questionSourceMode ?? "all");
+    setSelectedCardIds(session.config.selectedDeckCardIds ?? []);
     setTimePerQuestionSec(session.config.timePerQuestionSec);
     setTeamCount(Math.min(4, Math.max(2, teams.length || 4)));
     setTeamAssignment(session.config.teamAssignment);
-    setStrategyCardPolicy(session.config.strategyCardPolicy);
     setSurvivalHearts(session.config.survivalHearts);
     setAllowAiExplanations(session.config.allowAiExplanations);
     setAllowStrategyCards(session.config.allowStrategyCards);
     setAllowMusic(session.config.allowMusic);
-    if (session.config.strategyCardPolicy === "unlimited") {
-      setEnabledCards(ALL_STRATEGY_CARD_KINDS);
-      setStrategyCardLimitPerTeam(ALL_STRATEGY_CARD_KINDS.length);
-    } else {
-      const cards = session.config.enabledStrategyCards?.length
-        ? session.config.enabledStrategyCards
-        : [...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards];
-      setEnabledCards(cards);
-      setStrategyCardLimitPerTeam(
-        session.config.strategyCardPolicy === "limited"
-          ? cards.length
-          : session.config.strategyCardLimitPerTeam,
-      );
+    const available = strategyCardsForBattleMode(session.battleMode);
+    const out: LiveClassroomStrategyCardSettings = {};
+    for (const k of available) {
+      out[k] = session.config.strategyCardSettings?.[k] ?? {
+        ...defaultStrategyCardSetting(k),
+        scope:
+          session.config.strategyCardPolicy === "disabled"
+            ? "disabled"
+            : session.config.enabledStrategyCards?.length
+              ? session.config.enabledStrategyCards.includes(k)
+                ? "all"
+                : "disabled"
+              : "all",
+      };
     }
+    setCardSettings(out);
+    setStrategyCardLimitPerTeam(
+      session.config.strategyCardPolicy === "unlimited"
+        ? available.length
+        : session.config.strategyCardLimitPerTeam,
+    );
   }
 
-  function applyStrategyCardPolicy(next: LiveClassroomStrategyCardPolicy) {
-    setStrategyCardPolicy(next);
-    if (next === "unlimited") {
-      setEnabledCards(ALL_STRATEGY_CARD_KINDS);
-      setStrategyCardLimitPerTeam(ALL_STRATEGY_CARD_KINDS.length);
-      return;
-    }
-    if (next === "limited") {
-      setEnabledCards((prev) => {
-        const kept =
-          prev.length > 0
-            ? prev
-            : ALL_STRATEGY_CARD_KINDS.slice(
-                0,
-                DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.strategyCardLimitPerTeam,
-              );
-        setStrategyCardLimitPerTeam(kept.length);
-        return kept;
-      });
-    }
-  }
-
-  function setCardsPerTeamCount(count: number) {
-    const next = syncEnabledCardsToCount(enabledCards, count);
-    setEnabledCards(next);
-    setStrategyCardLimitPerTeam(next.length);
-  }
-
-  function toggleStrategyCard(kind: LiveClassroomStrategyCardKind) {
-    if (strategyCardPolicy !== "limited") return;
-    setEnabledCards((prev) => {
-      const next = prev.includes(kind)
-        ? prev.filter((k) => k !== kind)
-        : [...prev, kind];
-      setStrategyCardLimitPerTeam(next.length);
+  function setBattleModeAndCards(nextMode: LiveClassroomBattleMode) {
+    const available = strategyCardsForBattleMode(nextMode);
+    setBattleMode(nextMode);
+    setCardSettings((prev) => {
+      const next = { ...prev };
+      for (const k of available) {
+        if (!next[k]) next[k] = defaultStrategyCardSetting(k);
+      }
       return next;
     });
   }
 
-  const strategyDetailsLocked = strategyCardPolicy === "disabled";
-  const strategyCardsEditable = strategyCardPolicy === "limited";
+  function applyStrategyCardPolicy(next: LiveClassroomStrategyCardPolicy) {
+    setCardSettings((prev) => {
+      const out = { ...prev };
+      if (next === "unlimited") {
+        for (const k of availableStrategyCards) {
+          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
+        }
+        setStrategyCardLimitPerTeam(availableStrategyCards.length);
+        return out;
+      }
+      if (next === "disabled") {
+        for (const k of availableStrategyCards) {
+          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "disabled" };
+        }
+        setStrategyCardLimitPerTeam(0);
+        return out;
+      }
+      const currentlyEnabled = strategyCardEnabledKinds(out, availableStrategyCards);
+      let nextEnabledCount = currentlyEnabled.length;
+      if (
+        currentlyEnabled.length === 0 ||
+        currentlyEnabled.length === availableStrategyCards.length
+      ) {
+        for (const k of availableStrategyCards) {
+          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
+        }
+        const last = availableStrategyCards[availableStrategyCards.length - 1];
+        if (last) out[last] = { ...out[last]!, scope: "disabled" };
+        nextEnabledCount = Math.max(1, availableStrategyCards.length - 1);
+      }
+      setStrategyCardLimitPerTeam(nextEnabledCount);
+      return out;
+    });
+  }
+
+  function setCardsPerTeamCount(count: number) {
+    setCardSettings((prev) => {
+      const next = syncCardSettingsToCount(prev, count, availableStrategyCards);
+      setStrategyCardLimitPerTeam(
+        strategyCardEnabledKinds(next, availableStrategyCards).length,
+      );
+      return next;
+    });
+  }
+
+  function saveCardSetting(
+    kind: LiveClassroomStrategyCardKind,
+    setting: LiveClassroomStrategyCardSetting,
+  ) {
+    setCardSettings((prev) => {
+      const next = { ...prev, [kind]: setting };
+      setStrategyCardLimitPerTeam(
+        strategyCardEnabledKinds(next, availableStrategyCards).length,
+      );
+      return next;
+    });
+  }
 
   function hydrateLcAccessFromProps() {
     const assigned = new Set(assignedUserIds);
@@ -365,6 +518,10 @@ export function LiveClassroomSessionSettingsDialog({
 
   function saveSettings(e: React.FormEvent) {
     e.preventDefault();
+    if (questionSourceMode === "specific" && selectedCardIds.length === 0) {
+      toast.error("Select at least one card for this battle.");
+      return;
+    }
     startTransition(async () => {
       try {
         await updateLiveClassroomSessionSettingsAction({
@@ -374,23 +531,28 @@ export function LiveClassroomSessionSettingsDialog({
           battleMode,
           battleStartDelaySec,
           questionCount,
+          questionSourceMode,
+          selectedDeckCardIds:
+            questionSourceMode === "specific" ? selectedCardIds : undefined,
           timePerQuestionSec,
           teamCount,
           teamAssignment,
           strategyCardPolicy: allowStrategyCards
-            ? strategyCardPolicy
+            ? deriveStrategyCardPolicy(enabledCards, availableStrategyCards)
             : "disabled",
           strategyCardLimitPerTeam:
-            strategyCardPolicy === "unlimited"
-              ? ALL_STRATEGY_CARD_KINDS.length
-              : strategyCardLimitPerTeam,
+            !allowStrategyCards
+              ? 0
+              : deriveStrategyCardPolicy(enabledCards, availableStrategyCards) ===
+                  "unlimited"
+                ? availableStrategyCards.length
+                : enabledCards.filter((k) =>
+                    availableStrategyCards.includes(k),
+                  ).length,
           enabledStrategyCards: !allowStrategyCards
             ? []
-            : strategyCardPolicy === "unlimited"
-              ? ALL_STRATEGY_CARD_KINDS
-              : strategyCardPolicy === "disabled"
-                ? []
-                : enabledCards,
+            : enabledCards.filter((k) => availableStrategyCards.includes(k)),
+          strategyCardSettings: allowStrategyCards ? cardSettings : undefined,
           survivalHearts:
             battleMode === "survival" ? survivalHearts : undefined,
           allowAiExplanations,
@@ -520,7 +682,7 @@ export function LiveClassroomSessionSettingsDialog({
                     <Select
                       value={battleMode}
                       onValueChange={(v) =>
-                        setBattleMode(v as LiveClassroomBattleMode)
+                        setBattleModeAndCards(v as LiveClassroomBattleMode)
                       }
                     >
                       <SelectTrigger className="w-full">
@@ -684,6 +846,132 @@ export function LiveClassroomSessionSettingsDialog({
                 </label>
               </section>
 
+              {deckId != null ? (
+                <section className="space-y-2.5 rounded-lg border border-border/60 bg-muted/10 p-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Label>Cards to include in this battle</Label>
+                      <FieldHint
+                        label="Cards to include in this battle"
+                        caption={CAPTION_QUESTION_SOURCE}
+                      />
+                    </div>
+                    <Select
+                      value={questionSourceMode}
+                      onValueChange={(v) => {
+                        if (v != null)
+                          setQuestionSourceMode(
+                            v as LiveClassroomQuestionSourceMode,
+                          );
+                      }}
+                    >
+                      <SelectTrigger className="w-52">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LIVE_CLASSROOM_QUESTION_SOURCE_MODES.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m === "all"
+                              ? "All cards in the deck"
+                              : "Select specific cards"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {questionSourceMode === "specific" ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        {selectedCardIds.length > 0
+                          ? `${selectedCardIds.length} card${selectedCardIds.length === 1 ? "" : "s"} selected. Check the cards below to include as questions.`
+                          : "Check the cards below to include as questions."}
+                      </p>
+                      {loadingDeckCards ? (
+                        <div className="flex items-center gap-2 rounded-md border border-border/50 bg-card/40 px-3 py-4 text-sm text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                          Loading deck cards…
+                        </div>
+                      ) : deckCards.length === 0 ? (
+                        <p className="rounded-md border border-border/50 bg-card/40 px-3 py-4 text-xs text-muted-foreground">
+                          This deck has no cards yet.
+                        </p>
+                      ) : (
+                        <ScrollArea className="h-56 rounded-md border border-border/50 bg-card/40">
+                          <div className="space-y-2 p-2">
+                            {deckCards.map((card) => {
+                              const checked = selectedCardIds.includes(card.id);
+                              const isMc =
+                                card.cardType === "multiple_choice" &&
+                                Array.isArray(card.choices) &&
+                                card.choices.length > 0;
+                              return (
+                                <div
+                                  key={card.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => toggleCardId(card.id, !checked)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      toggleCardId(card.id, !checked);
+                                    }
+                                  }}
+                                  className="flex cursor-pointer items-start gap-2 rounded-md border border-border/40 bg-background/40 p-2 transition-colors hover:bg-background/70"
+                                >
+                                  <Checkbox checked={checked} className="mt-0.5" />
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <p className="text-sm font-medium text-foreground">
+                                      {card.front?.trim() || "Untitled question"}
+                                    </p>
+                                    {isMc ? (
+                                      <ul className="space-y-0.5">
+                                        {card.choices!.map((choice, i) => (
+                                          <li
+                                            key={i}
+                                            className={cn(
+                                              "flex items-center gap-1 text-xs",
+                                              i === card.correctChoiceIndex
+                                                ? "text-emerald-400"
+                                                : "text-muted-foreground",
+                                            )}
+                                          >
+                                            {i === card.correctChoiceIndex ? (
+                                              <Check
+                                                className="size-3 shrink-0"
+                                                aria-hidden
+                                              />
+                                            ) : (
+                                              <X
+                                                className="size-3 shrink-0"
+                                                aria-hidden
+                                              />
+                                            )}
+                                            <span className="truncate">{choice}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-xs text-muted-foreground">
+                                        Correct answer: {card.back?.trim() || "—"}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      All cards in this deck will be used as questions.
+                    </p>
+                  )}
+                </section>
+              ) : null}
+
               {allowStrategyCards ? (
                 <section className="space-y-4 rounded-xl border border-border/70 bg-card/40 p-4 shadow-sm">
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -692,7 +980,7 @@ export function LiveClassroomSessionSettingsDialog({
                         <Label>Strategy card policy</Label>
                         <FieldHint
                           label="Strategy card policy"
-                          caption="Disabled greys out card limits and the available set. Unlimited enables every strategy card. Limited lets you choose how many cards each team gets."
+                          caption="Unlimited = every card for this battle mode. Limited = some off. Disabled = none. Survival mode adds Shield and Recovery."
                         />
                       </div>
                       <Select
@@ -728,17 +1016,17 @@ export function LiveClassroomSessionSettingsDialog({
                         <Label htmlFor="lc-sess-cards">Cards per team</Label>
                         <FieldHint
                           label="Cards per team"
-                          caption="Matches how many strategy card types are selected below. Editable when policy is Limited."
+                          caption="Matches how many strategy card types are selected below for this battle mode."
                         />
                       </div>
                       <Input
                         id="lc-sess-cards"
                         type="number"
                         min={0}
-                        max={ALL_STRATEGY_CARD_KINDS.length}
+                        max={availableStrategyCards.length}
                         value={
                           strategyCardPolicy === "unlimited"
-                            ? ALL_STRATEGY_CARD_KINDS.length
+                            ? availableStrategyCards.length
                             : strategyCardLimitPerTeam
                         }
                         disabled={!strategyCardsEditable}
@@ -750,26 +1038,19 @@ export function LiveClassroomSessionSettingsDialog({
                     </div>
                   </div>
 
-                  <div
-                    className={
-                      strategyDetailsLocked
-                        ? "space-y-2 opacity-50"
-                        : "space-y-2"
-                    }
-                    aria-disabled={strategyDetailsLocked}
-                  >
+                  <div className="space-y-2">
                     <div className="flex items-center gap-1.5">
                       <Label>Strategy cards available</Label>
                       <FieldHint
                         label="Strategy cards available"
-                        caption="Unlimited shows every card. Limited lets you pick types; the count stays in sync with Cards per team. Disabled greys this out."
+                        caption="Click a card to choose which questions it applies to, its score/time value, and its per-team activation cap. Individual and Collaborative hide Shield and Recovery."
                       />
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {LIVE_CLASSROOM_STRATEGY_CARD_KINDS.map((kind) => {
-                        const on =
-                          strategyCardPolicy === "unlimited" ||
-                          enabledCards.includes(kind);
+                      {availableStrategyCards.map((kind) => {
+                        const setting =
+                          cardSettings[kind] ?? defaultStrategyCardSetting(kind);
+                        const on = setting.scope !== "disabled";
                         return (
                           <Button
                             key={kind}
@@ -778,18 +1059,20 @@ export function LiveClassroomSessionSettingsDialog({
                             variant={on ? "default" : "outline"}
                             className="rounded-full"
                             aria-pressed={on}
-                            disabled={!strategyCardsEditable}
-                            onClick={() => toggleStrategyCard(kind)}
+                            onClick={() => setConfiguringKind(kind)}
                           >
                             {strategyCardLabel(kind)}
+                            {on && setting.scope === "individual"
+                              ? ` · ${setting.cardIds.length}q`
+                              : ""}
                           </Button>
                         );
                       })}
                     </div>
-                    {strategyCardsEditable && enabledCards.length === 0 ? (
+                    {enabledCards.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        Select at least one card type, or set policy to
-                        Disabled / Unlimited.
+                        No cards enabled — click a card above to turn it back
+                        on.
                       </p>
                     ) : null}
                   </div>
@@ -999,6 +1282,27 @@ export function LiveClassroomSessionSettingsDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <LiveClassroomStrategyCardConfigDialog
+        open={configuringKind != null}
+        onOpenChange={(v) => {
+          if (!v) setConfiguringKind(null);
+        }}
+        kind={configuringKind}
+        deckId={deckId}
+        allowedCardIds={
+          questionSourceMode === "specific" ? selectedCardIds : null
+        }
+        setting={
+          configuringKind
+            ? cardSettings[configuringKind] ?? defaultStrategyCardSetting(configuringKind)
+            : defaultStrategyCardSetting("double_points")
+        }
+        onSave={(setting) => {
+          if (configuringKind) saveCardSetting(configuringKind, setting);
+        }}
+      />
+
     </Dialog>
   );
 }

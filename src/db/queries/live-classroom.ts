@@ -50,6 +50,8 @@ import {
   eq,
   gte,
   inArray,
+  isNotNull,
+  isNull,
   lt,
   ne,
   or,
@@ -484,6 +486,50 @@ export async function getLiveClassroomDeckSummariesByIds(
   return out;
 }
 
+/**
+ * Per-session lobby readiness for the Sessions Pool list: how many
+ * team-assigned (non-removed) participants there are, and how many of those
+ * are currently connected + presence-fresh ("ready"). Unassigned members are
+ * excluded since they won't join the battle.
+ */
+export async function getLiveClassroomLobbyReadinessBySessionIds(
+  sessionIds: number[],
+): Promise<Record<number, { assignedCount: number; readyCount: number }>> {
+  const unique = [...new Set(sessionIds.filter((id) => Number.isFinite(id)))];
+  const out: Record<number, { assignedCount: number; readyCount: number }> =
+    {};
+  if (unique.length === 0) return out;
+
+  const rows = await db
+    .select({
+      sessionId: liveClassroomParticipants.sessionId,
+      connected: liveClassroomParticipants.connected,
+      lastSeenAt: liveClassroomParticipants.lastSeenAt,
+    })
+    .from(liveClassroomParticipants)
+    .where(
+      and(
+        inArray(liveClassroomParticipants.sessionId, unique),
+        eq(liveClassroomParticipants.removed, false),
+        isNotNull(liveClassroomParticipants.liveTeamId),
+      ),
+    );
+
+  const nowMs = Date.now();
+  for (const row of rows) {
+    const entry = out[row.sessionId] ?? { assignedCount: 0, readyCount: 0 };
+    entry.assignedCount += 1;
+    if (
+      row.connected &&
+      nowMs - row.lastSeenAt.getTime() <= LIVE_CLASSROOM_PRESENCE_STALE_MS
+    ) {
+      entry.readyCount += 1;
+    }
+    out[row.sessionId] = entry;
+  }
+  return out;
+}
+
 export async function listActiveOrLobbySessionsForTeam(
   teamId: number,
 ): Promise<LiveClassroomSessionRow[]> {
@@ -830,6 +876,15 @@ export async function listLiveBattleQuestions(
     .orderBy(asc(liveBattleQuestions.sortOrder));
 }
 
+/** Lobby/scheduled only — clears prior questions before reissuing from a new card selection. */
+export async function deleteLiveBattleQuestionsForSession(
+  sessionId: number,
+): Promise<void> {
+  await db
+    .delete(liveBattleQuestions)
+    .where(eq(liveBattleQuestions.sessionId, sessionId));
+}
+
 export async function updateLiveBattleQuestion(
   id: number,
   patch: Partial<{
@@ -947,6 +1002,20 @@ export async function listLiveBattleStrategyCards(
     .from(liveBattleStrategyCards)
     .where(eq(liveBattleStrategyCards.sessionId, sessionId))
     .orderBy(asc(liveBattleStrategyCards.createdAt));
+}
+
+/** Remove not-yet-used strategy card instances so settings changes can reissue a fresh set. */
+export async function deleteUnusedLiveBattleStrategyCards(
+  sessionId: number,
+): Promise<void> {
+  await db
+    .delete(liveBattleStrategyCards)
+    .where(
+      and(
+        eq(liveBattleStrategyCards.sessionId, sessionId),
+        isNull(liveBattleStrategyCards.usedAt),
+      ),
+    );
 }
 
 /**
@@ -1074,7 +1143,11 @@ export async function deleteLiveClassroomSession(
 
 export async function markStrategyCardUsed(
   id: number,
-  input: { usedByUserId: string; questionId: number },
+  input: {
+    usedByUserId: string;
+    questionId: number;
+    eliminatedChoices?: number[];
+  },
 ): Promise<LiveBattleStrategyCardRow | null> {
   const [row] = await db
     .update(liveBattleStrategyCards)
@@ -1082,6 +1155,9 @@ export async function markStrategyCardUsed(
       usedByUserId: input.usedByUserId,
       questionId: input.questionId,
       usedAt: new Date(),
+      ...(input.eliminatedChoices
+        ? { eliminatedChoices: input.eliminatedChoices }
+        : {}),
     })
     .where(eq(liveBattleStrategyCards.id, id))
     .returning();

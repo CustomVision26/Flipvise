@@ -373,7 +373,7 @@ export function buildTeacherQuizReadingPassagePrompt(input: {
     lessonPlanContext: null,
     lessonPlanContextText: input.lessonPlanContext,
     subject: input.subject,
-    gradeLevel: input.gradeLevel,
+  gradeLevel: input.gradeLevel,
     topic: input.topic,
     difficultyLevel: input.difficultyLevel,
     questionsForThisPassage: input.questionCounts[0] ?? 1,

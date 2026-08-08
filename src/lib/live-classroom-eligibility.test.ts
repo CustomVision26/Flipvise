@@ -96,15 +96,15 @@ describe("Live Classroom scoring", () => {
     assert.equal(result.points, 10);
   });
 
-  it("doubles points when strategy card is active", () => {
+  it("adds the configured bonus when double points strategy card is active", () => {
     const result = scoreLiveClassroomAnswer({
       battleMode: "individual_team",
       correct: true,
       responseTimeMs: 0,
       timeLimitSec: 30,
-      doublePoints: true,
+      doublePointsBonus: 100,
     });
-    assert.equal(result.points, (100 + 50 + 10) * 2);
+    assert.equal(result.points, 100 + 50 + 10 + 100);
   });
 });
 

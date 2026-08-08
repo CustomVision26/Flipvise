@@ -10,6 +10,8 @@ import {
   countConcurrentLiveSessions,
   createLiveClassroomSession,
   createLiveClassroomTeamsForSession,
+  deleteLiveBattleQuestionsForSession,
+  deleteUnusedLiveBattleStrategyCards,
   getLiveBattleAnswer,
   getLiveBattleReportBySession,
   getLiveClassroomParticipant,
@@ -67,7 +69,6 @@ import {
   generateLiveClassroomAiExplanation,
   generateLiveClassroomAiHint,
   generateLiveClassroomTeacherSummary,
-  generateLiveClassroomWarmUpQuestions,
   questionsFromDeckCards,
 } from "@/lib/live-classroom-ai";
 import {
@@ -80,16 +81,24 @@ import {
   LIVE_CLASSROOM_DEFAULT_TEAM_NAMES,
   LIVE_CLASSROOM_BATTLE_MODES,
   LIVE_CLASSROOM_DIFFICULTIES,
+  LIVE_CLASSROOM_EXTRA_TIME_MAX_SEC,
+  LIVE_CLASSROOM_QUESTION_SOURCE_MODES,
   LIVE_CLASSROOM_SESSION_TYPES,
   LIVE_CLASSROOM_STRATEGY_CARD_KINDS,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
+  LIVE_CLASSROOM_STRATEGY_CARD_SCOPES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
   LIVE_CLASSROOM_CAPTAIN_MODES,
   LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC,
   isLiveClassroomPresenceFresh,
+  normalizeStrategyCardSettings,
+  resolveStrategyCardSetting,
+  strategyCardAppliesToDeckCard,
+  strategyCardEnabledKinds,
   type LiveClassroomReportStats,
   type LiveClassroomSessionConfig,
   type LiveClassroomStrategyCardKind,
+  type LiveClassroomStrategyCardSettingInput,
 } from "@/lib/live-classroom-types";
 import {
   LIVE_CLASSROOM_ROOT_PATH,
@@ -137,13 +146,34 @@ const savedGroupTeamsSchema = z
   )
   .min(1);
 
+const strategyCardSettingInputSchema = z.object({
+  scope: z.enum(LIVE_CLASSROOM_STRATEGY_CARD_SCOPES),
+  cardIds: z.array(z.number().int().positive()).max(1000).optional(),
+  value: z.number().int().min(0).max(100_000).optional(),
+  seconds: z.number().int().min(0).max(LIVE_CLASSROOM_EXTRA_TIME_MAX_SEC).optional(),
+  maxActivationsPerTeam: z.number().int().min(1).max(20).optional(),
+});
+
+/** Keys mirror LIVE_CLASSROOM_STRATEGY_CARD_KINDS — every entry is optional (partial map). */
+const strategyCardSettingsSchema = z.object({
+  double_points: strategyCardSettingInputSchema.optional(),
+  extra_time: strategyCardSettingInputSchema.optional(),
+  fifty_fifty: strategyCardSettingInputSchema.optional(),
+  shield: strategyCardSettingInputSchema.optional(),
+  ai_hint: strategyCardSettingInputSchema.optional(),
+  score_boost: strategyCardSettingInputSchema.optional(),
+  recovery: strategyCardSettingInputSchema.optional(),
+});
+
 const createSessionSchema = z.object({
   teamId: teamIdSchema,
   name: z.string().trim().min(1).max(255),
   sessionType: z.enum(LIVE_CLASSROOM_SESSION_TYPES),
   battleMode: z.enum(LIVE_CLASSROOM_BATTLE_MODES),
   deckId: z.number().int().positive().nullable().optional(),
-  questionCount: z.number().int().min(1).max(30),
+  questionCount: z.number().int().min(1).max(30).optional(),
+  questionSourceMode: z.enum(LIVE_CLASSROOM_QUESTION_SOURCE_MODES).optional(),
+  selectedDeckCardIds: z.array(z.number().int().positive()).optional(),
   timePerQuestionSec: z.number().int().min(5).max(180),
   difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES),
   allowAiExplanations: z.boolean(),
@@ -156,11 +186,37 @@ const createSessionSchema = z.object({
   enabledStrategyCards: z
     .array(z.enum(LIVE_CLASSROOM_STRATEGY_CARD_KINDS))
     .optional(),
+  strategyCardSettings: strategyCardSettingsSchema.optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
-  /** When true, generate AI warm-up questions from the selected workspace deck. */
-  warmUp: z.boolean().optional(),
   teamCount: z.number().int().min(2).max(4).optional(),
 });
+
+/** Issue one usable card instance per team per allowed activation, honoring per-kind scope/limits. */
+async function issueLiveClassroomStrategyCards(
+  sessionId: number,
+  config: LiveClassroomSessionConfig,
+): Promise<void> {
+  if (!config.allowStrategyCards || config.strategyCardPolicy === "disabled") return;
+  const teams = await listLiveClassroomTeams(sessionId);
+  const kinds = strategyCardEnabledKinds(
+    config.strategyCardSettings,
+    config.enabledStrategyCards,
+  );
+  const perTeamKinds =
+    config.strategyCardPolicy === "unlimited"
+      ? kinds
+      : kinds.slice(0, Math.min(config.strategyCardLimitPerTeam, kinds.length));
+  const cards: Array<{ liveTeamId: number; kind: LiveClassroomStrategyCardKind }> = [];
+  for (const team of teams) {
+    for (const kind of perTeamKinds) {
+      const setting = resolveStrategyCardSetting(config.strategyCardSettings, kind);
+      for (let i = 0; i < setting.maxActivationsPerTeam; i++) {
+        cards.push({ liveTeamId: team.id, kind });
+      }
+    }
+  }
+  if (cards.length) await insertLiveBattleStrategyCards(sessionId, cards);
+}
 
 function revalidateLiveClassroom(teamId: number, sessionId?: number) {
   revalidatePath(LIVE_CLASSROOM_ROOT_PATH);
@@ -212,9 +268,60 @@ export async function createLiveClassroomSessionAction(
     }
   }
 
+  if (!data.deckId) {
+    throw new Error("Select a deck linked to this workspace.");
+  }
+
+  const team = await getTeamById(data.teamId);
+  if (!team) throw new Error("Workspace not found.");
+  const workspaceDecks = await getDecksForTeam(data.teamId, team.ownerUserId);
+  const workspaceDeck = workspaceDecks.find((d) => d.id === data.deckId);
+  if (!workspaceDeck) {
+    throw new Error("Deck is not linked to this workspace.");
+  }
+
+  const cards = await getCardsByDeckUnscoped(data.deckId);
+  if (cards.length === 0) throw new Error("Deck has no cards.");
+
+  const questionSourceMode = data.questionSourceMode ?? "all";
+  const selectedDeckCardIds =
+    questionSourceMode === "specific" ? (data.selectedDeckCardIds ?? []) : [];
+  const sourceCards =
+    questionSourceMode === "specific"
+      ? cards.filter((c) => selectedDeckCardIds.includes(c.id))
+      : cards;
+  if (sourceCards.length === 0) {
+    throw new Error("Select at least one card for this battle.");
+  }
+
+  const questionRows = questionsFromDeckCards(
+    sourceCards.map((c) => {
+      const mcChoices = Array.isArray(c.choices) ? c.choices.filter(Boolean) : [];
+      const correct =
+        c.cardType === "multiple_choice" &&
+        typeof c.correctChoiceIndex === "number" &&
+        mcChoices[c.correctChoiceIndex]
+          ? mcChoices[c.correctChoiceIndex]!
+          : (c.back ?? "");
+      const distractors =
+        c.cardType === "multiple_choice"
+          ? mcChoices.filter((ch) => ch !== correct)
+          : mcChoices.filter((ch) => ch !== correct);
+      return {
+        id: c.id,
+        front: c.front ?? "Question",
+        back: correct || (c.back ?? "Answer"),
+        distractors,
+      };
+    }),
+    sourceCards.length,
+  );
+
   const config: LiveClassroomSessionConfig = {
     ...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
-    questionCount: data.questionCount,
+    questionCount: questionRows.length,
+    questionSourceMode,
+    selectedDeckCardIds,
     timePerQuestionSec: data.timePerQuestionSec,
     difficulty: data.difficulty,
     allowAiExplanations: data.allowAiExplanations,
@@ -229,6 +336,7 @@ export async function createLiveClassroomSessionAction(
     enabledStrategyCards:
       data.enabledStrategyCards ??
       DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards,
+    strategyCardSettings: normalizeStrategyCardSettings(data.strategyCardSettings),
   };
 
   const isScheduled = Boolean(data.scheduledFor);
@@ -256,66 +364,6 @@ export async function createLiveClassroomSessionAction(
     })),
   );
 
-  // Build questions from deck and/or AI warm-up
-  let questionRows: Array<{
-    prompt: string;
-    choices: string[];
-    correctIndex: number;
-    explanation: string;
-    distractorExplanations: string[];
-    topic: string;
-    cardId?: number | null;
-  }> = [];
-
-  if (!data.deckId) {
-    throw new Error("Select a deck linked to this workspace.");
-  }
-
-  const team = await getTeamById(data.teamId);
-  if (!team) throw new Error("Workspace not found.");
-  const workspaceDecks = await getDecksForTeam(data.teamId, team.ownerUserId);
-  const workspaceDeck = workspaceDecks.find((d) => d.id === data.deckId);
-  if (!workspaceDeck) {
-    throw new Error("Deck is not linked to this workspace.");
-  }
-
-  if (data.warmUp || data.sessionType === "warm_up") {
-    questionRows = await generateLiveClassroomWarmUpQuestions({
-      userId: access.userId,
-      teamId: data.teamId,
-      subject: workspaceDeck.name,
-      topic: workspaceDeck.description?.trim() || workspaceDeck.name,
-      grade: workspaceDeck.gradeLevel?.trim() || "General",
-      difficulty: data.difficulty,
-      questionCount: data.questionCount,
-    });
-  } else {
-    const cards = await getCardsByDeckUnscoped(data.deckId);
-    if (cards.length === 0) throw new Error("Deck has no cards.");
-    questionRows = questionsFromDeckCards(
-      cards.map((c) => {
-        const mcChoices = Array.isArray(c.choices) ? c.choices.filter(Boolean) : [];
-        const correct =
-          c.cardType === "multiple_choice" &&
-          typeof c.correctChoiceIndex === "number" &&
-          mcChoices[c.correctChoiceIndex]
-            ? mcChoices[c.correctChoiceIndex]!
-            : (c.back ?? "");
-        const distractors =
-          c.cardType === "multiple_choice"
-            ? mcChoices.filter((ch) => ch !== correct)
-            : mcChoices.filter((ch) => ch !== correct);
-        return {
-          id: c.id,
-          front: c.front ?? "Question",
-          back: correct || (c.back ?? "Answer"),
-          distractors,
-        };
-      }),
-      data.questionCount,
-    );
-  }
-
   await insertLiveBattleQuestions(
     session.id,
     questionRows.map((q, index) => ({
@@ -330,23 +378,7 @@ export async function createLiveClassroomSessionAction(
     })),
   );
 
-  if (config.allowStrategyCards && config.strategyCardPolicy !== "disabled") {
-    const teams = await listLiveClassroomTeams(session.id);
-    const kinds = config.enabledStrategyCards;
-    const perTeam =
-      config.strategyCardPolicy === "unlimited"
-        ? kinds.length
-        : Math.min(config.strategyCardLimitPerTeam, kinds.length);
-    const cards: Array<{ liveTeamId: number; kind: LiveClassroomStrategyCardKind }> =
-      [];
-    for (const team of teams) {
-      for (let i = 0; i < perTeam; i++) {
-        const kind = kinds[i % kinds.length];
-        if (kind) cards.push({ liveTeamId: team.id, kind });
-      }
-    }
-    if (cards.length) await insertLiveBattleStrategyCards(session.id, cards);
-  }
+  await issueLiveClassroomStrategyCards(session.id, config);
 
   void licensedSeats;
   revalidateLiveClassroom(data.teamId, session.id);
@@ -748,6 +780,8 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
       liveTeamId: c.liveTeamId,
       kind: c.kind,
       usedAt: c.usedAt?.toISOString() ?? null,
+      questionId: c.questionId,
+      eliminatedChoices: c.eliminatedChoices ?? null,
     })),
     leaderboard: [...teams]
       .sort((a, b) => b.score - a.score)
@@ -1301,7 +1335,15 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   strategyCardPolicy?: (typeof LIVE_CLASSROOM_STRATEGY_CARD_POLICIES)[number];
   strategyCardLimitPerTeam?: number;
   enabledStrategyCards?: (typeof LIVE_CLASSROOM_STRATEGY_CARD_KINDS)[number][];
+  strategyCardSettings?: Partial<
+    Record<
+      (typeof LIVE_CLASSROOM_STRATEGY_CARD_KINDS)[number],
+      LiveClassroomStrategyCardSettingInput
+    >
+  >;
   survivalHearts?: number;
+  questionSourceMode?: (typeof LIVE_CLASSROOM_QUESTION_SOURCE_MODES)[number];
+  selectedDeckCardIds?: number[];
 }) {
   const schema = z.object({
     sessionId: z.number().int().positive(),
@@ -1310,6 +1352,8 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     battleMode: z.enum(LIVE_CLASSROOM_BATTLE_MODES).optional(),
     questionCount: z.number().int().min(1).max(30).optional(),
     timePerQuestionSec: z.number().int().min(5).max(180).optional(),
+    questionSourceMode: z.enum(LIVE_CLASSROOM_QUESTION_SOURCE_MODES).optional(),
+    selectedDeckCardIds: z.array(z.number().int().positive()).optional(),
     difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES).optional(),
     battleStartDelaySec: z
       .number()
@@ -1330,6 +1374,7 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     enabledStrategyCards: z
       .array(z.enum(LIVE_CLASSROOM_STRATEGY_CARD_KINDS))
       .optional(),
+    strategyCardSettings: strategyCardSettingsSchema.optional(),
     survivalHearts: z.number().int().min(1).max(5).optional(),
   });
   const parsed = schema.safeParse(raw);
@@ -1380,6 +1425,12 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
       session.config.enabledStrategyCards ??
       DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards)
     : [];
+  const strategyCardSettings = configPatch.strategyCardSettings
+    ? {
+        ...(session.config.strategyCardSettings ?? {}),
+        ...normalizeStrategyCardSettings(configPatch.strategyCardSettings),
+      }
+    : session.config.strategyCardSettings ?? {};
 
   const nextConfig: LiveClassroomSessionConfig = {
     ...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
@@ -1387,6 +1438,7 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     ...configPatch,
     allowStrategyCards,
     enabledStrategyCards,
+    strategyCardSettings,
     allowMusic:
       (configPatch.allowMusic ?? session.config.allowMusic) &&
       settings.allowMusic,
@@ -1394,12 +1446,78 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
       configPatch.allowAiExplanations ?? session.config.allowAiExplanations,
   };
 
+  // Cards to include in this battle changed — rebuild the question set from
+  // the deck before saving, since the lobby has not started yet.
+  const questionSourceChanged =
+    configPatch.questionSourceMode != null ||
+    configPatch.selectedDeckCardIds != null;
+  if (questionSourceChanged && session.deckId != null) {
+    const deckCards = await getCardsByDeckUnscoped(session.deckId);
+    if (deckCards.length === 0) throw new Error("Deck has no cards.");
+
+    const sourceCards =
+      nextConfig.questionSourceMode === "specific"
+        ? deckCards.filter((c) =>
+            (nextConfig.selectedDeckCardIds ?? []).includes(c.id),
+          )
+        : deckCards;
+    if (sourceCards.length === 0) {
+      throw new Error("Select at least one card for this battle.");
+    }
+
+    const questionRows = questionsFromDeckCards(
+      sourceCards.map((c) => {
+        const mcChoices = Array.isArray(c.choices)
+          ? c.choices.filter(Boolean)
+          : [];
+        const correct =
+          c.cardType === "multiple_choice" &&
+          typeof c.correctChoiceIndex === "number" &&
+          mcChoices[c.correctChoiceIndex]
+            ? mcChoices[c.correctChoiceIndex]!
+            : (c.back ?? "");
+        const distractors =
+          c.cardType === "multiple_choice"
+            ? mcChoices.filter((ch) => ch !== correct)
+            : mcChoices.filter((ch) => ch !== correct);
+        return {
+          id: c.id,
+          front: c.front ?? "Question",
+          back: correct || (c.back ?? "Answer"),
+          distractors,
+        };
+      }),
+      sourceCards.length,
+    );
+
+    await deleteLiveBattleQuestionsForSession(session.id);
+    await insertLiveBattleQuestions(
+      session.id,
+      questionRows.map((q, index) => ({
+        sortOrder: index,
+        prompt: q.prompt,
+        choices: q.choices,
+        correctIndex: q.correctIndex,
+        explanation: q.explanation,
+        distractorExplanations: q.distractorExplanations,
+        topic: q.topic,
+        cardId: q.cardId ?? null,
+      })),
+    );
+    nextConfig.questionCount = questionRows.length;
+  }
+
   await updateLiveClassroomSession(session.id, {
     ...(name ? { name } : {}),
     ...(sessionType ? { sessionType } : {}),
     ...(battleMode ? { battleMode } : {}),
     config: nextConfig,
   });
+
+  // Battle hasn't started yet in "lobby"/"scheduled" — safe to fully reissue
+  // strategy cards so newly-selected scopes, values, and activation caps apply.
+  await deleteUnusedLiveBattleStrategyCards(session.id);
+  await issueLiveClassroomStrategyCards(session.id, nextConfig);
 
   revalidateLiveClassroom(session.teamId, session.id);
   return { ok: true as const };
@@ -1458,6 +1576,16 @@ export async function scheduleLiveClassroomBattleCountdownAction(
   if (!canStartWithParticipantCount(assigned.length, licensedSeats)) {
     throw new Error(
       `Need 1–${licensedSeats} team members (licensed seats) before starting.`,
+    );
+  }
+  const notReady = assigned.filter(
+    (p) => !(p.connected && isLiveClassroomPresenceFresh(p.lastSeenAt)),
+  );
+  if (notReady.length > 0) {
+    throw new Error(
+      notReady.length === 1
+        ? `${notReady[0]!.displayName || "A member"} is not ready yet. Wait for them to reconnect before starting.`
+        : `${notReady.length} members are not ready yet. Wait for everyone to reconnect before starting.`,
     );
   }
   // Locked teams are frozen: unassigned participants stay unassigned and are
@@ -1802,10 +1930,13 @@ export async function submitLiveClassroomAnswerAction(raw: {
       c.usedAt &&
       c.questionId === question.id,
   );
-  const doublePoints = activeForTeam.some((c) => c.kind === "double_points");
+  const doublePointsBonus = activeForTeam.some((c) => c.kind === "double_points")
+    ? resolveStrategyCardSetting(session.config.strategyCardSettings, "double_points")
+        .value
+    : 0;
   const shielded = activeForTeam.some((c) => c.kind === "shield");
   const scoreBoost = activeForTeam.some((c) => c.kind === "score_boost")
-    ? 50
+    ? resolveStrategyCardSetting(session.config.strategyCardSettings, "score_boost").value
     : 0;
 
   const started = session.questionStartedAt?.getTime() ?? Date.now();
@@ -1817,7 +1948,7 @@ export async function submitLiveClassroomAnswerAction(raw: {
     correct,
     responseTimeMs,
     timeLimitSec: session.config.timePerQuestionSec,
-    doublePoints,
+    doublePointsBonus,
     scoreBoostBonus: scoreBoost,
     shielded,
   });
@@ -2208,17 +2339,39 @@ export async function useLiveClassroomStrategyCardAction(raw: {
     throw new Error("This card belongs to another team.");
   }
 
+  const questions = await listLiveBattleQuestions(session.id);
+  const question = questions.find((q) => q.id === parsed.data.questionId);
+  if (!question) throw new Error("Question not found.");
+
+  const cardSetting = resolveStrategyCardSetting(
+    session.config.strategyCardSettings,
+    card.kind,
+  );
+  if (!strategyCardAppliesToDeckCard(cardSetting, question.cardId)) {
+    throw new Error("This strategy card doesn't apply to the current question.");
+  }
+
+  let eliminatedChoices: number[] | undefined;
+  if (card.kind === "fifty_fifty") {
+    const wrongIndexes = question.choices
+      .map((_, i) => i)
+      .filter((i) => i !== question.correctIndex);
+    for (let i = wrongIndexes.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [wrongIndexes[i], wrongIndexes[j]] = [wrongIndexes[j]!, wrongIndexes[i]!];
+    }
+    eliminatedChoices = wrongIndexes.slice(0, Math.min(2, wrongIndexes.length));
+  }
+
   await markStrategyCardUsed(card.id, {
     usedByUserId: access.userId,
     questionId: parsed.data.questionId,
+    eliminatedChoices,
   });
 
   let hint: string | null = null;
 
   if (card.kind === "ai_hint") {
-    const questions = await listLiveBattleQuestions(session.id);
-    const question = questions.find((q) => q.id === parsed.data.questionId);
-    if (!question) throw new Error("Question not found.");
     try {
       hint = await generateLiveClassroomAiHint({
         userId: access.userId,
@@ -2236,7 +2389,7 @@ export async function useLiveClassroomStrategyCardAction(raw: {
   if (card.kind === "extra_time") {
     const started = session.questionStartedAt ?? new Date();
     await updateLiveClassroomSession(session.id, {
-      questionStartedAt: new Date(started.getTime() - 15_000),
+      questionStartedAt: new Date(started.getTime() - cardSetting.seconds * 1000),
     });
   }
   if (card.kind === "recovery") {
@@ -2252,7 +2405,7 @@ export async function useLiveClassroomStrategyCardAction(raw: {
   }
 
   revalidateLiveClassroom(session.teamId, session.id);
-  return { ok: true as const, kind: card.kind, hint };
+  return { ok: true as const, kind: card.kind, hint, eliminatedChoices };
 }
 
 export async function endLiveClassroomSessionAction(
@@ -2600,41 +2753,6 @@ export async function setLiveClassroomTeacherGrantAction(raw: {
   }
   revalidateLiveClassroom(parsed.data.teamId);
   return { ok: true as const };
-}
-
-export async function generateWarmUpPreviewAction(raw: {
-  teamId: number;
-  subject: string;
-  topic: string;
-  grade: string;
-  difficulty: (typeof LIVE_CLASSROOM_DIFFICULTIES)[number];
-  questionCount: number;
-}) {
-  const schema = z.object({
-    teamId: teamIdSchema,
-    subject: z.string().min(1).max(255),
-    topic: z.string().min(1).max(255),
-    grade: z.string().min(1).max(64),
-    difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES),
-    questionCount: z.number().int().min(1).max(20),
-  });
-  const parsed = schema.safeParse(raw);
-  if (!parsed.success) throw new Error("Invalid warm-up input");
-
-  const { access } = await requireLiveClassroomAccess({
-    teamId: parsed.data.teamId,
-    requireHost: true,
-  });
-
-  return generateLiveClassroomWarmUpQuestions({
-    userId: access.userId,
-    teamId: parsed.data.teamId,
-    subject: parsed.data.subject,
-    topic: parsed.data.topic,
-    grade: parsed.data.grade,
-    difficulty: parsed.data.difficulty,
-    questionCount: parsed.data.questionCount,
-  });
 }
 
 export async function resolveLiveClassroomViewerRoleAction(teamId: number) {

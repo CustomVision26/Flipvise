@@ -61,6 +61,7 @@
     "db:ensure-live-classroom-participant-grants": "tsx scripts/ensure-live-classroom-participant-grants.ts",
     "db:ensure-live-classroom-lobby-inbox": "tsx scripts/ensure-live-classroom-lobby-inbox.ts",
     "db:ensure-addon-published-on-banner": "tsx scripts/ensure-addon-published-on-banner.ts",
+    "db:ensure-live-classroom-strategy-card-effect-columns": "tsx scripts/ensure-live-classroom-strategy-card-effect-columns.ts",
     "test:live-classroom": "tsx --test src/lib/live-classroom-eligibility.test.ts",
     "db:ensure-essay-sections-content": "tsx scripts/ensure-essay-sections-content.ts",
     "db:ensure-team-member-max-create-decks": "tsx scripts/ensure-team-member-max-create-decks.ts",

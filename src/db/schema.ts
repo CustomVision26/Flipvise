@@ -2175,6 +2175,8 @@ export const liveBattleStrategyCards = pgTable(
       onDelete: 'set null',
     }),
     usedAt: timestamp(),
+    /** 50/50 result — the two wrong-choice indexes hidden for the using team on that question. */
+    eliminatedChoices: integer().array(),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [index('live_battle_strategy_cards_session_idx').on(t.sessionId)],

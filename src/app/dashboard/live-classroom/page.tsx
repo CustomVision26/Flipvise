@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   getDashboardLiveClassroomStats,
   getLiveClassroomDeckSummariesByIds,
+  getLiveClassroomLobbyReadinessBySessionIds,
   listLiveClassroomSessionsForTeam,
 } from "@/db/queries/live-classroom";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
@@ -50,11 +51,18 @@ export default async function LiveClassroomDashboardPage({
     listLiveClassroomSessionsForTeam(ctx.teamId, { limit: 8 }),
   ]);
 
-  const deckSummaries = await getLiveClassroomDeckSummariesByIds(
-    recentSessions
-      .map((session) => session.deckId)
-      .filter((id): id is number => id != null),
-  );
+  const [deckSummaries, lobbyReadiness] = await Promise.all([
+    getLiveClassroomDeckSummariesByIds(
+      recentSessions
+        .map((session) => session.deckId)
+        .filter((id): id is number => id != null),
+    ),
+    getLiveClassroomLobbyReadinessBySessionIds(
+      recentSessions
+        .filter((s) => s.status === "lobby" || s.status === "scheduled")
+        .map((s) => s.id),
+    ),
+  ]);
 
   const teacherDisplays = stats.mostActiveTeacherUserId
     ? await getClerkUserFieldDisplaysByIds([stats.mostActiveTeacherUserId])
@@ -197,6 +205,7 @@ export default async function LiveClassroomDashboardPage({
                   session.deckId != null
                     ? deckSummaries[session.deckId]
                     : undefined;
+                const readiness = lobbyReadiness[session.id];
                 return {
                   id: session.id,
                   name: session.name,
@@ -208,6 +217,8 @@ export default async function LiveClassroomDashboardPage({
                   deckName: deck?.name ?? null,
                   deckCardCount: deck?.cardCount ?? null,
                   teamsLocked: session.teamsLocked,
+                  assignedMemberCount: readiness?.assignedCount ?? 0,
+                  readyMemberCount: readiness?.readyCount ?? 0,
                 };
               })}
             />

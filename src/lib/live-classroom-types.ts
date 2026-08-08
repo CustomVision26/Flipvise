@@ -64,6 +64,36 @@ export const LIVE_CLASSROOM_STRATEGY_CARD_POLICIES = [
 export type LiveClassroomStrategyCardPolicy =
   (typeof LIVE_CLASSROOM_STRATEGY_CARD_POLICIES)[number];
 
+/** Who a strategy card applies to once activated. */
+export const LIVE_CLASSROOM_STRATEGY_CARD_SCOPES = [
+  "all",
+  "individual",
+  "disabled",
+] as const;
+export type LiveClassroomStrategyCardScope =
+  (typeof LIVE_CLASSROOM_STRATEGY_CARD_SCOPES)[number];
+
+/** Extra time granted per activation must fall within 30 sec – 5 min. */
+export const LIVE_CLASSROOM_EXTRA_TIME_MIN_SEC = 30;
+export const LIVE_CLASSROOM_EXTRA_TIME_MAX_SEC = 300;
+
+/** Per-kind configuration: scope, linked deck cards, score/time value, and usage cap. */
+export type LiveClassroomStrategyCardSetting = {
+  scope: LiveClassroomStrategyCardScope;
+  /** Deck card ids this card applies to when `scope === "individual"`. */
+  cardIds: number[];
+  /** Score awarded on use — only meaningful for double_points / score_boost. */
+  value: number;
+  /** Extra seconds granted on use — only meaningful for extra_time (30–300). */
+  seconds: number;
+  /** How many times a single team may activate this card kind in one battle. */
+  maxActivationsPerTeam: number;
+};
+
+export type LiveClassroomStrategyCardSettings = Partial<
+  Record<LiveClassroomStrategyCardKind, LiveClassroomStrategyCardSetting>
+>;
+
 export const LIVE_CLASSROOM_DIFFICULTIES = [
   "easy",
   "medium",
@@ -71,6 +101,11 @@ export const LIVE_CLASSROOM_DIFFICULTIES = [
 ] as const;
 export type LiveClassroomDifficulty =
   (typeof LIVE_CLASSROOM_DIFFICULTIES)[number];
+
+/** Which deck cards become battle questions: every card, or a host-picked subset. */
+export const LIVE_CLASSROOM_QUESTION_SOURCE_MODES = ["all", "specific"] as const;
+export type LiveClassroomQuestionSourceMode =
+  (typeof LIVE_CLASSROOM_QUESTION_SOURCE_MODES)[number];
 
 export const LIVE_CLASSROOM_ORG_ROLES = [
   "subscription_owner",
@@ -133,6 +168,10 @@ export function battleStartDelayLabel(sec: number): string {
 
 export type LiveClassroomSessionConfig = {
   questionCount: number;
+  /** Whether questions were built from every deck card or a host-picked subset. */
+  questionSourceMode: LiveClassroomQuestionSourceMode;
+  /** Deck card ids used when `questionSourceMode === "specific"`. */
+  selectedDeckCardIds: number[];
   timePerQuestionSec: number;
   difficulty: LiveClassroomDifficulty;
   /**
@@ -149,6 +188,8 @@ export type LiveClassroomSessionConfig = {
   captainMode: LiveClassroomCaptainMode;
   survivalHearts: number;
   enabledStrategyCards: LiveClassroomStrategyCardKind[];
+  /** Per-kind scope, deck-card targeting, score/time value, and activation cap. */
+  strategyCardSettings?: LiveClassroomStrategyCardSettings;
   /** Reserved for voice / polls / screen share without schema churn. */
   futureExtensions?: Record<string, unknown>;
 };
@@ -188,6 +229,8 @@ export type LiveClassroomReportStats = {
 
 export const DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG: LiveClassroomSessionConfig = {
   questionCount: 5,
+  questionSourceMode: "all",
+  selectedDeckCardIds: [],
   timePerQuestionSec: 30,
   difficulty: "medium",
   battleStartDelaySec: 60,
@@ -208,6 +251,7 @@ export const DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG: LiveClassroomSessionConfig =
     "score_boost",
     "recovery",
   ],
+  strategyCardSettings: {},
 };
 
 export const LIVE_CLASSROOM_DEFAULT_TEAM_NAMES = [
@@ -264,6 +308,182 @@ export function strategyCardLabel(kind: LiveClassroomStrategyCardKind): string {
     default:
       return kind;
   }
+}
+
+/** Individual / Collaborative: no Shield or Recovery (survival-only). */
+const STRATEGY_CARDS_STANDARD: LiveClassroomStrategyCardKind[] = [
+  "double_points",
+  "extra_time",
+  "fifty_fifty",
+  "ai_hint",
+  "score_boost",
+];
+
+/** Survival includes Shield + Recovery. */
+const STRATEGY_CARDS_SURVIVAL: LiveClassroomStrategyCardKind[] = [
+  "double_points",
+  "extra_time",
+  "fifty_fifty",
+  "ai_hint",
+  "shield",
+  "recovery",
+  "score_boost",
+];
+
+/** Strategy card kinds allowed for a battle mode. */
+export function strategyCardsForBattleMode(
+  mode: LiveClassroomBattleMode,
+): LiveClassroomStrategyCardKind[] {
+  return mode === "survival"
+    ? [...STRATEGY_CARDS_SURVIVAL]
+    : [...STRATEGY_CARDS_STANDARD];
+}
+
+/**
+ * unlimited = every mode-allowed card enabled;
+ * limited = some but not all;
+ * disabled = none enabled.
+ */
+export function deriveStrategyCardPolicy(
+  enabled: readonly LiveClassroomStrategyCardKind[],
+  available: readonly LiveClassroomStrategyCardKind[],
+): LiveClassroomStrategyCardPolicy {
+  const enabledInMode = enabled.filter((k) => available.includes(k));
+  if (enabledInMode.length === 0) return "disabled";
+  if (available.every((k) => enabledInMode.includes(k))) return "unlimited";
+  return "limited";
+}
+
+/** Default per-kind setting used until the host configures the card. */
+export function defaultStrategyCardSetting(
+  kind: LiveClassroomStrategyCardKind,
+): LiveClassroomStrategyCardSetting {
+  switch (kind) {
+    case "double_points":
+      return { scope: "all", cardIds: [], value: 100, seconds: 0, maxActivationsPerTeam: 1 };
+    case "score_boost":
+      return { scope: "all", cardIds: [], value: 50, seconds: 0, maxActivationsPerTeam: 1 };
+    case "extra_time":
+      return { scope: "all", cardIds: [], value: 0, seconds: 30, maxActivationsPerTeam: 1 };
+    default:
+      return { scope: "all", cardIds: [], value: 0, seconds: 0, maxActivationsPerTeam: 1 };
+  }
+}
+
+/** Resolve a kind's setting, falling back to sensible defaults. */
+export function resolveStrategyCardSetting(
+  settings: LiveClassroomStrategyCardSettings | null | undefined,
+  kind: LiveClassroomStrategyCardKind,
+): LiveClassroomStrategyCardSetting {
+  const stored = settings?.[kind];
+  const fallback = defaultStrategyCardSetting(kind);
+  if (!stored) return fallback;
+  return {
+    scope: stored.scope ?? fallback.scope,
+    cardIds: Array.isArray(stored.cardIds) ? stored.cardIds : fallback.cardIds,
+    value: Number.isFinite(stored.value) ? stored.value : fallback.value,
+    seconds: Number.isFinite(stored.seconds) ? stored.seconds : fallback.seconds,
+    maxActivationsPerTeam: Number.isFinite(stored.maxActivationsPerTeam)
+      ? Math.max(1, stored.maxActivationsPerTeam)
+      : fallback.maxActivationsPerTeam,
+  };
+}
+
+/**
+ * Kinds a team may receive cards for — a kind is "enabled" whenever its
+ * resolved scope is not "disabled". Mirrors the policy chip shown in the UI.
+ */
+export function strategyCardEnabledKinds(
+  settings: LiveClassroomStrategyCardSettings | null | undefined,
+  available: readonly LiveClassroomStrategyCardKind[],
+): LiveClassroomStrategyCardKind[] {
+  return available.filter(
+    (k) => resolveStrategyCardSetting(settings, k).scope !== "disabled",
+  );
+}
+
+export function strategyCardScopeLabel(
+  scope: LiveClassroomStrategyCardScope,
+): string {
+  switch (scope) {
+    case "all":
+      return "All cards in battle";
+    case "individual":
+      return "Individual cards/questions";
+    case "disabled":
+      return "Disabled";
+    default:
+      return scope;
+  }
+}
+
+/** Whether a kind's activation grants a configurable score bonus. */
+export function strategyCardHasScoreValue(
+  kind: LiveClassroomStrategyCardKind,
+): boolean {
+  return kind === "double_points" || kind === "score_boost";
+}
+
+/** Whether a card instance (by originating deck card id) is eligible under a setting. */
+export function strategyCardAppliesToDeckCard(
+  setting: LiveClassroomStrategyCardSetting,
+  deckCardId: number | null | undefined,
+): boolean {
+  if (setting.scope === "disabled") return false;
+  if (setting.scope === "all") return true;
+  return deckCardId != null && setting.cardIds.includes(deckCardId);
+}
+
+export type LiveClassroomStrategyCardSettingInput = {
+  scope: LiveClassroomStrategyCardScope;
+  cardIds?: number[];
+  value?: number;
+  seconds?: number;
+  maxActivationsPerTeam?: number;
+};
+
+/** Clamp a single host-submitted setting into a safe, fully-populated shape. */
+export function normalizeStrategyCardSetting(
+  kind: LiveClassroomStrategyCardKind,
+  entry: LiveClassroomStrategyCardSettingInput,
+): LiveClassroomStrategyCardSetting {
+  const fallback = defaultStrategyCardSetting(kind);
+  return {
+    scope: entry.scope,
+    cardIds: Array.isArray(entry.cardIds) ? entry.cardIds : fallback.cardIds,
+    value: Math.max(0, Math.round(entry.value ?? fallback.value)),
+    seconds:
+      kind === "extra_time"
+        ? Math.min(
+            LIVE_CLASSROOM_EXTRA_TIME_MAX_SEC,
+            Math.max(
+              LIVE_CLASSROOM_EXTRA_TIME_MIN_SEC,
+              Math.round(entry.seconds ?? fallback.seconds),
+            ),
+          )
+        : Math.max(0, Math.round(entry.seconds ?? fallback.seconds)),
+    maxActivationsPerTeam: Math.max(
+      1,
+      Math.min(20, Math.round(entry.maxActivationsPerTeam ?? fallback.maxActivationsPerTeam)),
+    ),
+  };
+}
+
+/** Normalize a full (possibly partial) host-submitted settings map. */
+export function normalizeStrategyCardSettings(
+  input:
+    | Partial<Record<LiveClassroomStrategyCardKind, LiveClassroomStrategyCardSettingInput>>
+    | null
+    | undefined,
+): LiveClassroomStrategyCardSettings {
+  const out: LiveClassroomStrategyCardSettings = {};
+  if (!input) return out;
+  for (const kind of LIVE_CLASSROOM_STRATEGY_CARD_KINDS) {
+    const entry = input[kind];
+    if (!entry) continue;
+    out[kind] = normalizeStrategyCardSetting(kind, entry);
+  }
+  return out;
 }
 
 /** Tailwind tone classes for lobby / projector / play team UI by `colorKey`. */

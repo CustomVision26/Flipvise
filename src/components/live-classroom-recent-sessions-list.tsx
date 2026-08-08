@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Loader2, Play, RotateCcw, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { scheduleLiveClassroomBattleCountdownAction } from "@/actions/live-classroom";
 import {
@@ -52,6 +52,10 @@ export type LiveClassroomSessionListItem = {
   deckName?: string | null;
   deckCardCount?: number | null;
   teamsLocked?: boolean;
+  /** Members currently assigned to a team in the lobby (excludes Unassigned). */
+  assignedMemberCount?: number;
+  /** Of the assigned members, how many are connected + presence-fresh. */
+  readyMemberCount?: number;
 };
 
 type LiveClassroomRecentSessionsListProps = {
@@ -105,15 +109,20 @@ function PoolSessionRow({
     !isLive &&
     session.scheduledFor != null &&
     (session.status === "scheduled" || session.status === "lobby");
-  const canStartBattle =
+  const assignedCount = session.assignedMemberCount ?? 0;
+  const readyCount = session.readyMemberCount ?? 0;
+  const membersLockedAndReady =
+    Boolean(session.teamsLocked) && assignedCount > 0 && readyCount === assignedCount;
+  const isStartCandidate =
     poolMode &&
     canManage &&
     !ended &&
     !isLive &&
     !anotherSessionLive &&
-    Boolean(session.teamsLocked) &&
     scheduleReady &&
     (session.status === "lobby" || session.status === "scheduled");
+  const canStartBattle = isStartCandidate && membersLockedAndReady;
+  const showWaitingForReady = isStartCandidate && !membersLockedAndReady;
 
   const href = ended
     ? liveClassroomReportPath(session.id)
@@ -212,6 +221,25 @@ function PoolSessionRow({
             )}
             Start battle
           </Button>
+        ) : showWaitingForReady ? (
+          <Badge
+            variant="outline"
+            className="gap-1 text-xs text-muted-foreground"
+            title={
+              !session.teamsLocked
+                ? "Lock teams in the lobby to enable Start battle."
+                : assignedCount === 0
+                  ? "No members assigned to a team yet."
+                  : `Waiting for members to be ready (${readyCount}/${assignedCount}).`
+            }
+          >
+            <Users className="size-3" aria-hidden />
+            {!session.teamsLocked
+              ? "Teams not locked"
+              : assignedCount === 0
+                ? "No members yet"
+                : `${readyCount}/${assignedCount} ready`}
+          </Badge>
         ) : null}
         {canManage ? (
           <>

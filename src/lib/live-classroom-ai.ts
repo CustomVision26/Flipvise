@@ -7,20 +7,6 @@ import {
   runWithAiUsageContext,
   trackedGenerateText,
 } from "@/lib/ai-usage/track";
-import type { LiveClassroomDifficulty } from "@/lib/live-classroom-types";
-
-const warmUpQuestionSchema = z.object({
-  questions: z.array(
-    z.object({
-      prompt: z.string(),
-      choices: z.array(z.string()).min(2).max(6),
-      correctIndex: z.number().int().min(0),
-      explanation: z.string(),
-      distractorExplanations: z.array(z.string()),
-      topic: z.string(),
-    }),
-  ),
-});
 
 const sessionSummarySchema = z.object({
   summary: z.string(),
@@ -29,62 +15,6 @@ const sessionSummarySchema = z.object({
   weakestTopic: z.string().nullable(),
   suggestedReviewMinutes: z.number().int().min(1).max(60),
 });
-
-export type GeneratedWarmUpQuestion = z.infer<
-  typeof warmUpQuestionSchema
->["questions"][number];
-
-export async function generateLiveClassroomWarmUpQuestions(input: {
-  userId: string;
-  teamId: number;
-  subject: string;
-  topic: string;
-  grade: string;
-  difficulty: LiveClassroomDifficulty;
-  questionCount: number;
-}): Promise<GeneratedWarmUpQuestion[]> {
-  const count = Math.min(20, Math.max(1, input.questionCount));
-  return runWithAiUsageContext(
-    {
-      userId: input.userId,
-      teamId: input.teamId,
-      feature: "live_classroom",
-      model: "gpt-4o",
-    },
-    async () => {
-      const { output } = await trackedGenerateText({
-        model: openai("gpt-4o"),
-        output: Output.object({ schema: warmUpQuestionSchema }),
-        prompt: `Generate ${count} multiple-choice warm-up battle questions for a live classroom.
-
-Subject: ${input.subject}
-Topic: ${input.topic}
-Grade: ${input.grade}
-Difficulty: ${input.difficulty}
-
-Rules:
-- Exactly ${count} questions
-- Each question has 4 choices
-- correctIndex is 0-based
-- Provide a clear explanation of the correct answer
-- Provide brief distractorExplanations for each incorrect choice (same length as choices; empty string for the correct choice index)
-- Keep prompts classroom-appropriate and concise
-- Topic field should be a short concept label`,
-      });
-      if (!output?.questions?.length) {
-        throw new Error("AI warm-up generation returned no questions.");
-      }
-      return output.questions.slice(0, count).map((q) => ({
-        ...q,
-        choices: q.choices.slice(0, 6),
-        correctIndex: Math.min(
-          Math.max(0, q.correctIndex),
-          Math.max(0, q.choices.length - 1),
-        ),
-      }));
-    },
-  );
-}
 
 export async function generateLiveClassroomAiExplanation(input: {
   userId: string;

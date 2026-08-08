@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CircleHelp, Loader2 } from "lucide-react";
+import { Check, CircleHelp, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { createLiveClassroomSessionAction } from "@/actions/live-classroom";
+import { getCardsForDeckViewerPreviewAction } from "@/actions/cards";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -24,26 +27,42 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { LiveClassroomStrategyCardConfigDialog } from "@/components/live-classroom-strategy-card-config-dialog";
 import {
   LIVE_CLASSROOM_BATTLE_MODES,
   LIVE_CLASSROOM_DIFFICULTIES,
+  LIVE_CLASSROOM_QUESTION_SOURCE_MODES,
   LIVE_CLASSROOM_SESSION_TYPES,
-  LIVE_CLASSROOM_STRATEGY_CARD_KINDS,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
   battleModeLabel,
+  defaultStrategyCardSetting,
+  deriveStrategyCardPolicy,
   sessionTypeLabel,
+  strategyCardEnabledKinds,
   strategyCardLabel,
+  strategyCardsForBattleMode,
   type LiveClassroomBattleMode,
   type LiveClassroomDifficulty,
+  type LiveClassroomQuestionSourceMode,
   type LiveClassroomSessionType,
   type LiveClassroomStrategyCardKind,
   type LiveClassroomStrategyCardPolicy,
+  type LiveClassroomStrategyCardSetting,
+  type LiveClassroomStrategyCardSettings,
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
 import {
@@ -57,6 +76,15 @@ export type LiveClassroomDeckOption = {
   name: string;
 };
 
+type DeckCardPreview = {
+  id: number;
+  front: string | null;
+  back: string | null;
+  cardType: string;
+  choices: string[] | null;
+  correctChoiceIndex: number | null;
+};
+
 const CAPTION_SESSION_NAME =
   "Title shown in the lobby and host controls so students and teachers can recognize this battle.";
 const CAPTION_SESSION_TYPE =
@@ -64,11 +92,13 @@ const CAPTION_SESSION_TYPE =
 const CAPTION_BATTLE_MODE =
   "How teams compete: individual scoring within teams, captain-led play, or survival with hearts.";
 const CAPTION_DIFFICULTY =
-  "Sets how hard AI warm-up questions are (and the intended challenge level for this session).";
+  "Sets the intended challenge level for this session.";
 const CAPTION_TEAM_ASSIGNMENT =
   "How students are placed on teams — random, manual in the lobby, or from saved groups.";
-const CAPTION_QUESTIONS =
-  "How many questions this session will run (1–30). Warm-up generates this many; deck mode samples from the deck.";
+const CAPTION_QUESTION_SOURCE =
+  "Use every card in the deck as a question, or hand-pick specific deck cards to include in this battle.";
+const CAPTION_QUESTION_PICKER =
+  "Check the deck cards to include as questions in this battle. Strategy cards can then target these same questions.";
 const CAPTION_SECONDS =
   "Countdown timer for each question before the round advances.";
 const CAPTION_TEAM_COUNT =
@@ -77,10 +107,8 @@ const CAPTION_SURVIVAL_HEARTS =
   "Lives each team starts with in Survival mode. Wrong answers cost hearts.";
 const CAPTION_SCHEDULE =
   "Optional start time. Leave blank to open the lobby immediately; set a time to schedule the session.";
-const CAPTION_WARM_UP =
-  "When on, AI generates warm-up questions from the selected workspace deck instead of using deck cards directly.";
 const CAPTION_DECK =
-  "Pick a deck already linked to this workspace. Warm-up uses its name, description, and grade; other modes use its cards.";
+  "Pick a deck already linked to this workspace. Its cards are used to build this session's questions.";
 const CAPTION_AI_EXPLANATIONS =
   "After answers, show AI explanations for the correct choice and common wrong answers.";
 const CAPTION_STRATEGY_CARDS =
@@ -88,9 +116,9 @@ const CAPTION_STRATEGY_CARDS =
 const CAPTION_BATTLE_MUSIC =
   "Play background battle music during the live session when enabled for this workspace.";
 const CAPTION_STRATEGY_POLICY =
-  "Limited caps how many strategy cards each team gets; unlimited issues the full enabled set; disabled turns them off.";
+  "Unlimited = every card for this battle mode is on. Limited = some cards off. Disabled = none selected.";
 const CAPTION_STRATEGY_KINDS =
-  "Toggle which strategy card types are available this session. Highlighted cards are enabled.";
+  "Cards depend on battle mode. Survival adds Shield and Recovery. Click a card to choose which questions it applies to, its score/time value, and how many times a team can use it.";
 
 function HintBalloon({
   fieldLabel,
@@ -172,7 +200,12 @@ export function LiveClassroomStartForm({
   const [deckId, setDeckId] = useState<string>(
     decks[0] ? String(decks[0].id) : "",
   );
-  const [questionCount, setQuestionCount] = useState(5);
+  const [questionSourceMode, setQuestionSourceMode] =
+    useState<LiveClassroomQuestionSourceMode>("all");
+  const [selectedCardIds, setSelectedCardIds] = useState<number[]>([]);
+  const [deckCards, setDeckCards] = useState<DeckCardPreview[]>([]);
+  const [loadingDeckCards, setLoadingDeckCards] = useState(false);
+  const [cardPickerOpen, setCardPickerOpen] = useState(false);
   const [timePerQuestionSec, setTimePerQuestionSec] = useState(30);
   const [difficulty, setDifficulty] =
     useState<LiveClassroomDifficulty>("medium");
@@ -187,45 +220,146 @@ export function LiveClassroomStartForm({
     useState<LiveClassroomTeamAssignmentMode>(
       defaults?.defaultTeamAssignment ?? "random",
     );
-  const [strategyCardPolicy, setStrategyCardPolicy] =
-    useState<LiveClassroomStrategyCardPolicy>(
-      defaults?.strategyCardPolicy ?? "limited",
-    );
   const [survivalHearts, setSurvivalHearts] = useState(3);
   const [teamCount, setTeamCount] = useState(4);
   const [scheduledFor, setScheduledFor] = useState("");
-  const [useWarmUp, setUseWarmUp] = useState(sessionType === "warm_up");
-  const [enabledCards, setEnabledCards] = useState<
-    LiveClassroomStrategyCardKind[]
-  >([...LIVE_CLASSROOM_STRATEGY_CARD_KINDS]);
+  const [cardSettings, setCardSettings] = useState<LiveClassroomStrategyCardSettings>(
+    () => {
+      const out: LiveClassroomStrategyCardSettings = {};
+      for (const k of strategyCardsForBattleMode("individual_team")) {
+        out[k] = defaultStrategyCardSetting(k);
+      }
+      return out;
+    },
+  );
+  const [configuringKind, setConfiguringKind] =
+    useState<LiveClassroomStrategyCardKind | null>(null);
 
-  function toggleCard(kind: LiveClassroomStrategyCardKind) {
-    setEnabledCards((prev) =>
-      prev.includes(kind) ? prev.filter((k) => k !== kind) : [...prev, kind],
+  useEffect(() => {
+    setSelectedCardIds([]);
+  }, [deckId]);
+
+  useEffect(() => {
+    if (questionSourceMode === "specific" && deckId) setCardPickerOpen(true);
+  }, [questionSourceMode, deckId]);
+
+  useEffect(() => {
+    if (questionSourceMode !== "specific" || !deckId) return;
+    let cancelled = false;
+    setLoadingDeckCards(true);
+    getCardsForDeckViewerPreviewAction({ deckId: Number(deckId) })
+      .then((rows) => {
+        if (cancelled) return;
+        setDeckCards(
+          rows.map((r) => ({
+            id: r.id,
+            front: r.front,
+            back: r.back,
+            cardType: r.cardType,
+            choices: r.choices ?? null,
+            correctChoiceIndex: r.correctChoiceIndex ?? null,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Could not load deck cards");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDeckCards(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [questionSourceMode, deckId]);
+
+  function toggleCardId(id: number, checked: boolean) {
+    setSelectedCardIds((prev) =>
+      checked ? [...prev, id] : prev.filter((existing) => existing !== id),
     );
+  }
+
+  const availableStrategyCards = strategyCardsForBattleMode(battleMode);
+  const enabledCards = strategyCardEnabledKinds(
+    cardSettings,
+    availableStrategyCards,
+  );
+  const strategyCardPolicy = deriveStrategyCardPolicy(
+    enabledCards,
+    availableStrategyCards,
+  );
+
+  function setBattleModeAndCards(nextMode: LiveClassroomBattleMode) {
+    const available = strategyCardsForBattleMode(nextMode);
+    setBattleMode(nextMode);
+    setCardSettings((prev) => {
+      const next = { ...prev };
+      for (const k of available) {
+        if (!next[k]) next[k] = defaultStrategyCardSetting(k);
+      }
+      return next;
+    });
+  }
+
+  function applyStrategyCardPolicy(next: LiveClassroomStrategyCardPolicy) {
+    setCardSettings((prev) => {
+      const out = { ...prev };
+      if (next === "unlimited") {
+        for (const k of availableStrategyCards) {
+          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
+        }
+        return out;
+      }
+      if (next === "disabled") {
+        for (const k of availableStrategyCards) {
+          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "disabled" };
+        }
+        return out;
+      }
+      // limited — keep current selection if it's already partial; otherwise turn one off
+      const currentlyEnabled = strategyCardEnabledKinds(out, availableStrategyCards);
+      if (
+        currentlyEnabled.length === 0 ||
+        currentlyEnabled.length === availableStrategyCards.length
+      ) {
+        for (const k of availableStrategyCards) {
+          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
+        }
+        const last = availableStrategyCards[availableStrategyCards.length - 1];
+        if (last) out[last] = { ...out[last]!, scope: "disabled" };
+      }
+      return out;
+    });
+  }
+
+  function saveCardSetting(
+    kind: LiveClassroomStrategyCardKind,
+    setting: LiveClassroomStrategyCardSetting,
+  ) {
+    setCardSettings((prev) => ({ ...prev, [kind]: setting }));
   }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
       try {
-        const isWarmUp = sessionType === "warm_up" || useWarmUp;
         if (!deckId) {
-          toast.error(
-            isWarmUp
-              ? "Link a deck to this workspace for warm-up."
-              : "Select a deck for this session.",
-          );
+          toast.error("Select a deck for this session.");
+          return;
+        }
+        if (questionSourceMode === "specific" && selectedCardIds.length === 0) {
+          toast.error("Select at least one card for this battle.");
           return;
         }
 
         const result = await createLiveClassroomSessionAction({
           teamId,
           name,
-          sessionType: isWarmUp ? "warm_up" : sessionType,
+          sessionType,
           battleMode,
           deckId: Number(deckId),
-          questionCount,
+          questionSourceMode,
+          selectedDeckCardIds:
+            questionSourceMode === "specific" ? selectedCardIds : undefined,
           timePerQuestionSec,
           difficulty,
           allowAiExplanations,
@@ -235,13 +369,20 @@ export function LiveClassroomStartForm({
           survivalHearts:
             battleMode === "survival" ? survivalHearts : undefined,
           strategyCardPolicy: allowStrategyCards
-            ? strategyCardPolicy
+            ? deriveStrategyCardPolicy(
+                enabledCards,
+                strategyCardsForBattleMode(battleMode),
+              )
             : "disabled",
-          enabledStrategyCards: allowStrategyCards ? enabledCards : [],
+          enabledStrategyCards: allowStrategyCards
+            ? enabledCards.filter((k) =>
+                strategyCardsForBattleMode(battleMode).includes(k),
+              )
+            : [],
+          strategyCardSettings: allowStrategyCards ? cardSettings : undefined,
           scheduledFor: scheduledFor
             ? new Date(scheduledFor).toISOString()
             : null,
-          warmUp: isWarmUp ? true : undefined,
           teamCount,
         });
 
@@ -294,11 +435,9 @@ export function LiveClassroomStartForm({
               <FieldLabel label="Session type" caption={CAPTION_SESSION_TYPE} />
               <Select
                 value={sessionType}
-                onValueChange={(v) => {
-                  const next = v as LiveClassroomSessionType;
-                  setSessionType(next);
-                  setUseWarmUp(next === "warm_up");
-                }}
+                onValueChange={(v) =>
+                  setSessionType(v as LiveClassroomSessionType)
+                }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -318,7 +457,7 @@ export function LiveClassroomStartForm({
               <Select
                 value={battleMode}
                 onValueChange={(v) =>
-                  setBattleMode(v as LiveClassroomBattleMode)
+                  setBattleModeAndCards(v as LiveClassroomBattleMode)
                 }
               >
                 <SelectTrigger className="w-full">
@@ -381,22 +520,6 @@ export function LiveClassroomStartForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <FieldLabel
-                htmlFor="lc-qcount"
-                label="Questions"
-                caption={CAPTION_QUESTIONS}
-              />
-              <Input
-                id="lc-qcount"
-                type="number"
-                min={1}
-                max={30}
-                value={questionCount}
-                onChange={(e) => setQuestionCount(Number(e.target.value))}
-              />
             </div>
 
             <div className="space-y-2">
@@ -464,88 +587,97 @@ export function LiveClassroomStartForm({
             </div>
           </div>
 
-          <div className="space-y-3 rounded-lg border border-border/60 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <p className="text-sm font-medium text-foreground">
-                    AI Warm-Up generator
-                  </p>
-                  <HintBalloon
-                    fieldLabel="AI Warm-Up generator"
-                    caption={CAPTION_WARM_UP}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Generate warm-up questions from a deck linked to this
-                  workspace.
-                </p>
-              </div>
-              <Switch
-                checked={useWarmUp || sessionType === "warm_up"}
-                onCheckedChange={(v) => {
-                  setUseWarmUp(v);
-                  if (v) {
-                    setSessionType("warm_up");
-                  } else if (sessionType === "warm_up") {
-                    setSessionType(
-                      defaults?.defaultBattleType &&
-                        defaults.defaultBattleType !== "warm_up"
-                        ? defaults.defaultBattleType
-                        : "team_battle",
-                    );
-                  }
-                }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <FieldLabel
-                htmlFor="lc-workspace-deck"
-                label={
-                  useWarmUp || sessionType === "warm_up"
-                    ? "Link deck to this workspace"
-                    : "Deck"
-                }
-                caption={CAPTION_DECK}
-              />
-              <Select value={deckId} onValueChange={(v) => setDeckId(v ?? "")}>
-                <SelectTrigger id="lc-workspace-deck" className="w-full">
-                  <SelectValue placeholder="Select a deck">
-                    {(value) => {
-                      if (value == null || value === "") {
-                        return (
-                          <span className="text-muted-foreground">
-                            Select a deck
-                          </span>
-                        );
-                      }
-                      const deck = decks.find(
-                        (d) => String(d.id) === String(value),
-                      );
-                      return deck?.name ?? (
+          <div className="space-y-2 rounded-lg border border-border/60 p-4">
+            <FieldLabel
+              htmlFor="lc-workspace-deck"
+              label="Deck"
+              caption={CAPTION_DECK}
+            />
+            <Select value={deckId} onValueChange={(v) => setDeckId(v ?? "")}>
+              <SelectTrigger id="lc-workspace-deck" className="w-full">
+                <SelectValue placeholder="Select a deck">
+                  {(value) => {
+                    if (value == null || value === "") {
+                      return (
                         <span className="text-muted-foreground">
                           Select a deck
                         </span>
                       );
-                    }}
-                  </SelectValue>
+                    }
+                    const deck = decks.find(
+                      (d) => String(d.id) === String(value),
+                    );
+                    return deck?.name ?? (
+                      <span className="text-muted-foreground">
+                        Select a deck
+                      </span>
+                    );
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {decks.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {decks.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No decks linked to this workspace. Link a deck from Team Admin
+                Deck Manager first.
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <FieldLabel
+                label="Cards to include in this battle"
+                caption={CAPTION_QUESTION_SOURCE}
+              />
+              <Select
+                value={questionSourceMode}
+                onValueChange={(v) =>
+                  setQuestionSourceMode(v as LiveClassroomQuestionSourceMode)
+                }
+              >
+                <SelectTrigger id="lc-question-source" className="w-52">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {decks.map((d) => (
-                    <SelectItem key={d.id} value={String(d.id)}>
-                      {d.name}
+                  {LIVE_CLASSROOM_QUESTION_SOURCE_MODES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m === "all"
+                        ? "All cards in the deck"
+                        : "Select specific cards"}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {decks.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No decks linked to this workspace. Link a deck from Team Admin
-                  Deck Manager first.
-                </p>
-              ) : null}
             </div>
+
+            {questionSourceMode === "specific" ? (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+                <p className="text-xs text-muted-foreground">
+                  {selectedCardIds.length > 0
+                    ? `${selectedCardIds.length} card${selectedCardIds.length === 1 ? "" : "s"} selected.`
+                    : "No cards selected yet."}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCardPickerOpen(true)}
+                  disabled={!deckId}
+                >
+                  Choose cards
+                </Button>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                All cards in this deck will be used as questions.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
@@ -597,7 +729,9 @@ export function LiveClassroomStartForm({
                 <Select
                   value={strategyCardPolicy}
                   onValueChange={(v) =>
-                    setStrategyCardPolicy(v as LiveClassroomStrategyCardPolicy)
+                    applyStrategyCardPolicy(
+                      v as LiveClassroomStrategyCardPolicy,
+                    )
                   }
                 >
                   <SelectTrigger className="w-full sm:w-56">
@@ -618,17 +752,21 @@ export function LiveClassroomStartForm({
                   caption={CAPTION_STRATEGY_KINDS}
                 />
                 <div className="flex flex-wrap gap-2">
-                  {LIVE_CLASSROOM_STRATEGY_CARD_KINDS.map((kind) => {
-                    const on = enabledCards.includes(kind);
+                  {availableStrategyCards.map((kind) => {
+                    const setting = cardSettings[kind] ?? defaultStrategyCardSetting(kind);
+                    const on = setting.scope !== "disabled";
                     return (
                       <Button
                         key={kind}
                         type="button"
                         size="sm"
                         variant={on ? "default" : "outline"}
-                        onClick={() => toggleCard(kind)}
+                        onClick={() => setConfiguringKind(kind)}
                       >
                         {strategyCardLabel(kind)}
+                        {on && setting.scope === "individual"
+                          ? ` · ${setting.cardIds.length} question${setting.cardIds.length === 1 ? "" : "s"}`
+                          : ""}
                       </Button>
                     );
                   })}
@@ -643,6 +781,123 @@ export function LiveClassroomStartForm({
           </Button>
         </form>
       </CardContent>
+
+      <LiveClassroomStrategyCardConfigDialog
+        open={configuringKind != null}
+        onOpenChange={(v) => {
+          if (!v) setConfiguringKind(null);
+        }}
+        kind={configuringKind}
+        deckId={deckId ? Number(deckId) : null}
+        allowedCardIds={
+          questionSourceMode === "specific" ? selectedCardIds : null
+        }
+        setting={
+          configuringKind
+            ? cardSettings[configuringKind] ?? defaultStrategyCardSetting(configuringKind)
+            : defaultStrategyCardSetting("double_points")
+        }
+        onSave={(setting) => {
+          if (configuringKind) saveCardSetting(configuringKind, setting);
+        }}
+      />
+
+      <Dialog open={cardPickerOpen} onOpenChange={setCardPickerOpen}>
+        <DialogContent className="max-h-[min(90vh,44rem)] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose battle cards</DialogTitle>
+            <DialogDescription>{CAPTION_QUESTION_PICKER}</DialogDescription>
+          </DialogHeader>
+
+          {!deckId ? (
+            <p className="text-xs text-muted-foreground">
+              Select a deck first to choose specific cards.
+            </p>
+          ) : loadingDeckCards ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Loading deck cards…
+            </div>
+          ) : deckCards.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              This deck has no cards yet.
+            </p>
+          ) : (
+            <ScrollArea className="h-64 rounded-lg border border-border/60">
+              <div className="space-y-2 p-2">
+                {deckCards.map((card) => {
+                  const checked = selectedCardIds.includes(card.id);
+                  const isMc =
+                    card.cardType === "multiple_choice" &&
+                    Array.isArray(card.choices) &&
+                    card.choices.length > 0;
+                  return (
+                    <div
+                      key={card.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleCardId(card.id, !checked)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleCardId(card.id, !checked);
+                        }
+                      }}
+                      className="flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2 cursor-pointer"
+                    >
+                      <Checkbox checked={checked} className="mt-0.5" />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {card.front?.trim() || "Untitled question"}
+                        </p>
+                        {isMc ? (
+                          <ul className="space-y-0.5">
+                            {card.choices!.map((choice, i) => (
+                              <li
+                                key={i}
+                                className={cn(
+                                  "flex items-center gap-1 text-xs",
+                                  i === card.correctChoiceIndex
+                                    ? "text-emerald-400"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {i === card.correctChoiceIndex ? (
+                                  <Check className="size-3 shrink-0" aria-hidden />
+                                ) : (
+                                  <X className="size-3 shrink-0" aria-hidden />
+                                )}
+                                <span className="truncate">{choice}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Correct answer: {card.back?.trim() || "—"}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
+
+          {selectedCardIds.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {selectedCardIds.length} card
+              {selectedCardIds.length === 1 ? "" : "s"} selected.
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" onClick={() => setCardPickerOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

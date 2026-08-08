@@ -162,10 +162,21 @@ export function LiveClassroomStudentPlay({
     return state.strategyCards.filter((c) => c.liveTeamId === me.liveTeamId);
   }, [state, me]);
 
-  const unusedTeamCards = useMemo(
-    () => teamCards.filter((c) => !c.usedAt),
-    [teamCards],
-  );
+  const eliminatedChoiceIndexes = useMemo(() => {
+    if (currentQuestionId == null) return new Set<number>();
+    const out = new Set<number>();
+    for (const c of teamCards) {
+      if (
+        c.kind === "fifty_fifty" &&
+        c.usedAt &&
+        c.questionId === currentQuestionId &&
+        c.eliminatedChoices
+      ) {
+        for (const idx of c.eliminatedChoices) out.add(idx);
+      }
+    }
+    return out;
+  }, [teamCards, currentQuestionId]);
 
   const teammateScores = useMemo(() => {
     if (!state || !me?.liveTeamId) return [];
@@ -264,8 +275,7 @@ export function LiveClassroomStudentPlay({
   const showStrategySection =
     !waitingForOthers &&
     (showRevealPanel ||
-      (battle.session.config.allowStrategyCards &&
-        (collaborative ? teamCards.length > 0 : unusedTeamCards.length > 0)));
+      (battle.session.config.allowStrategyCards && teamCards.length > 0));
 
   function answer(choiceIndex: number) {
     if (!battle.currentQuestion || submittedChoice != null || !canAnswer) return;
@@ -448,6 +458,23 @@ export function LiveClassroomStudentPlay({
                 {state.session.activeBattlersRemaining} battling
               </Badge>
             ) : null}
+            {!canManage &&
+            waitingForOthers &&
+            state.session.battleMode === "individual_team" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={cn("font-medium", teamTone.chip)}
+                onClick={() =>
+                  router.push(
+                    `${liveClassroomReportPath(sessionId)}?team=${teamId}`,
+                  )
+                }
+              >
+                View report
+              </Button>
+            ) : null}
             {canManage && !waitingForOthers && q ? (
               <LiveClassroomTeamTargetMenu
                 label={paused ? "Paused" : `${remaining}s`}
@@ -526,6 +553,7 @@ export function LiveClassroomStudentPlay({
                   const selected = submittedChoice === i;
                   const isCorrectReveal =
                     q.revealed && q.correctIndex === i;
+                  const eliminated = eliminatedChoiceIndexes.has(i);
                   return (
                     <Button
                       key={`${q.id}-${i}`}
@@ -536,15 +564,18 @@ export function LiveClassroomStudentPlay({
                         submittedChoice != null ||
                         paused ||
                         !canAnswer ||
-                        remaining <= 0
+                        remaining <= 0 ||
+                        eliminated
                       }
                       className={cn(
                         "h-auto justify-start whitespace-normal px-4 py-3 text-left",
-                        isCorrectReveal
-                          ? "border-primary bg-primary/15 text-foreground"
-                          : selected
-                            ? teamTone.choiceSelected
-                            : teamTone.choiceIdle,
+                        eliminated
+                          ? "opacity-40 line-through"
+                          : isCorrectReveal
+                            ? "border-primary bg-primary/15 text-foreground"
+                            : selected
+                              ? teamTone.choiceSelected
+                              : teamTone.choiceIdle,
                       )}
                       onClick={() => answer(i)}
                     >
@@ -672,7 +703,7 @@ export function LiveClassroomStudentPlay({
             ) : null}
             {state.session.config.allowStrategyCards ? (
               <div className="flex flex-wrap gap-2">
-                {(collaborative ? teamCards : unusedTeamCards).map((card) => {
+                {teamCards.map((card) => {
                   const used = Boolean(card.usedAt);
                   const isAiHint = card.kind === "ai_hint";
                   return (

@@ -6,8 +6,8 @@ export type ScoreAnswerInput = {
   /** Elapsed ms from question start to answer. */
   responseTimeMs: number;
   timeLimitSec: number;
-  /** Active strategy multipliers already resolved for this answer. */
-  doublePoints?: boolean;
+  /** Active strategy bonuses already resolved for this answer (host-configured score values). */
+  doublePointsBonus?: number;
   scoreBoostBonus?: number;
   shielded?: boolean;
 };
@@ -45,7 +45,7 @@ export function scoreLiveClassroomAnswer(
 
   if (input.battleMode === "collaborative_team") {
     let points = COLLAB_CORRECT;
-    if (input.doublePoints) points *= 2;
+    points += input.doublePointsBonus ?? 0;
     points += input.scoreBoostBonus ?? 0;
     return {
       points,
@@ -59,7 +59,7 @@ export function scoreLiveClassroomAnswer(
   const ratio = Math.max(0, Math.min(1, 1 - input.responseTimeMs / limitMs));
   const speedBonus = Math.round(MAX_SPEED_BONUS * ratio);
   let points = BASE_CORRECT + speedBonus + participation;
-  if (input.doublePoints) points *= 2;
+  points += input.doublePointsBonus ?? 0;
   points += input.scoreBoostBonus ?? 0;
 
   return {
