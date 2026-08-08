@@ -40,6 +40,8 @@ export type LiveClassroomSessionListItem = {
   sessionType: LiveClassroomSessionType;
   battleMode: LiveClassroomBattleMode;
   endedAt?: string | null;
+  deckName?: string | null;
+  deckCardCount?: number | null;
 };
 
 type LiveClassroomRecentSessionsListProps = {
@@ -122,6 +124,17 @@ export function LiveClassroomRecentSessionsList({
               <Link href={href} className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground">
                   {session.name}
+                  {session.deckName ? (
+                    <span className="font-normal text-muted-foreground">
+                      {" · "}
+                      {session.deckName}
+                      {session.deckCardCount != null
+                        ? ` · ${session.deckCardCount} card${
+                            session.deckCardCount === 1 ? "" : "s"
+                          }`
+                        : ""}
+                    </span>
+                  ) : null}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {sessionTypeLabel(session.sessionType)} ·{" "}

@@ -18,6 +18,7 @@ import {
   insertLiveBattleAnswer,
   insertLiveBattleQuestions,
   insertLiveBattleStrategyCards,
+  listActiveOrLobbySessionsForTeam,
   listLiveBattleAnswersForQuestion,
   listLiveBattleAnswersForSession,
   listLiveBattleQuestions,
@@ -28,6 +29,7 @@ import {
   listLiveClassroomParticipants,
   listLiveClassroomSavedGroups,
   listLiveClassroomTeams,
+  getLiveClassroomDeckSummariesByIds,
   markStaleLiveClassroomParticipantsDisconnected,
   markStrategyCardUsed,
   returnLiveClassroomSessionToLobby,
@@ -43,6 +45,7 @@ import {
   grantLiveClassroomTeacher,
   revokeLiveClassroomParticipant,
   revokeLiveClassroomTeacher,
+  type LiveBattleQuestionRow,
 } from "@/db/queries/live-classroom";
 import { getDeckRowById } from "@/db/queries/decks";
 import { upsertLiveClassroomLobbyInboxMessage } from "@/db/queries/live-classroom-lobby-inbox";
@@ -187,6 +190,16 @@ export async function createLiveClassroomSessionAction(
       ),
   );
   if (concurrent >= maxConcurrent) {
+    const open = await listActiveOrLobbySessionsForTeam(data.teamId);
+    const existing = open[0];
+    if (existing) {
+      return {
+        sessionId: existing.id,
+        joinCode: existing.joinCode,
+        alreadyOpen: true as const,
+        status: existing.status,
+      };
+    }
     throw new Error(
       `Maximum concurrent Live Classroom sessions (${maxConcurrent}) reached.`,
     );
@@ -460,7 +473,7 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
 
   // Lobby only needs teams + participants; skip battle payloads to keep polls light.
   const lobbyOnly = session.status === "lobby";
-  const [teams, participants, questions, answers, strategyCards, linkedDeck] =
+  const [teams, participants, questions, answers, strategyCards, deckSummary] =
     await Promise.all([
       listLiveClassroomTeams(sessionId),
       listLiveClassroomParticipants(sessionId),
@@ -480,7 +493,9 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
           >)
         : listLiveBattleStrategyCards(sessionId),
       session.deckId != null
-        ? getDeckRowById(session.deckId)
+        ? getLiveClassroomDeckSummariesByIds([session.deckId]).then(
+            (map) => map[session.deckId!] ?? null,
+          )
         : Promise.resolve(null),
     ]);
 
@@ -495,8 +510,9 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
     answeredQuestionIdsByUser.set(a.userId, set);
   }
 
-  const hostQuestion = questions[session.currentQuestionIndex] ?? null;
-  let viewerQuestion = hostQuestion;
+  const hostQuestion: LiveBattleQuestionRow | null =
+    questions[session.currentQuestionIndex] ?? null;
+  let viewerQuestion: LiveBattleQuestionRow | null = hostQuestion;
   let personalQuestionIndexValue = session.currentQuestionIndex;
   let personalFinished = false;
   let personalBattleStatus: "active" | "finished" | "opted_out" = "active";
@@ -648,7 +664,8 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
       hostUserId: session.hostUserId,
       teamId: session.teamId,
       deckId: session.deckId,
-      deckName: linkedDeck?.name ?? null,
+      deckName: deckSummary?.name ?? null,
+      deckCardCount: deckSummary?.cardCount ?? null,
       timerBonusSec,
       remainingSec: remainingQuestionSeconds({
         timePerQuestionSec: session.config.timePerQuestionSec,

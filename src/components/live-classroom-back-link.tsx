@@ -6,22 +6,32 @@ import {
   LIVE_CLASSROOM_ROOT_PATH,
 } from "@/lib/live-classroom-url";
 
-/** Back control to the Live Classroom™ dashboard (main hub). */
-export function LiveClassroomBackLink({ teamId }: { teamId: number }) {
+type LiveClassroomBackLinkProps = {
+  teamId: number;
+  /** Defaults to the Live Classroom™ dashboard hub. */
+  href?: string;
+  label?: string;
+};
+
+/** Back control for Live Classroom™ sub-pages. */
+export function LiveClassroomBackLink({
+  teamId,
+  href,
+  label = "Back",
+}: LiveClassroomBackLinkProps) {
+  const destination =
+    href ?? buildLiveClassroomHref(LIVE_CLASSROOM_ROOT_PATH, teamId);
+
   return (
     <Button
       nativeButton={false}
       variant="ghost"
       size="sm"
       className="mb-3 -ml-2 gap-1.5 text-muted-foreground hover:text-foreground"
-      render={
-        <Link
-          href={buildLiveClassroomHref(LIVE_CLASSROOM_ROOT_PATH, teamId)}
-        />
-      }
+      render={<Link href={destination} />}
     >
       <ArrowLeft className="size-3.5" aria-hidden />
-      Back
+      {label}
     </Button>
   );
 }

@@ -233,25 +233,27 @@ export function LiveClassroomStudentPlay({
     );
   }
 
-  const q = waitingForOthers ? null : state.currentQuestion;
-  const paused = state.session.status === "paused";
+  const battle = state;
+  const q = waitingForOthers ? null : battle.currentQuestion;
+  const paused = battle.session.status === "paused";
   const showRevealPanel = Boolean(
     q?.revealed && (q.explanation || q.correctIndex != null),
   );
   const showStrategySection =
     !waitingForOthers &&
     (showRevealPanel ||
-      (state.session.config.allowStrategyCards &&
+      (battle.session.config.allowStrategyCards &&
         (collaborative ? teamCards.length > 0 : unusedTeamCards.length > 0)));
 
   function answer(choiceIndex: number) {
-    if (!state.currentQuestion || submittedChoice != null || !canAnswer) return;
+    if (!battle.currentQuestion || submittedChoice != null || !canAnswer) return;
     if (independent && personalFinished) return;
+    const questionId = battle.currentQuestion.id;
     startTransition(async () => {
       try {
         const result = await submitLiveClassroomAnswerAction({
           sessionId,
-          questionId: state.currentQuestion!.id,
+          questionId,
           choiceIndex,
         });
         setSubmittedChoice(choiceIndex);
@@ -301,8 +303,8 @@ export function LiveClassroomStudentPlay({
   }
 
   function navigateQuestion(action: "skip" | "next") {
-    if (!state.currentQuestion || !canNavigate) return;
-    const questionId = state.currentQuestion.id;
+    if (!battle.currentQuestion || !canNavigate) return;
+    const questionId = battle.currentQuestion.id;
     startTransition(async () => {
       try {
         const result = await advanceLiveClassroomPlayerQuestionAction({
@@ -342,14 +344,15 @@ export function LiveClassroomStudentPlay({
     strategyCardId: number,
     kind: Parameters<typeof strategyCardLabel>[0],
   ) {
-    if (!state.currentQuestion || (independent && personalFinished)) return;
+    if (!battle.currentQuestion || (independent && personalFinished)) return;
+    const questionId = battle.currentQuestion.id;
     startTransition(async () => {
       try {
         if (kind === "ai_hint") setHintLoading(true);
         const result = await useLiveClassroomStrategyCardAction({
           sessionId,
           strategyCardId,
-          questionId: state.currentQuestion!.id,
+          questionId,
         });
         if (kind === "ai_hint" && result.hint) {
           setAiHint(result.hint);

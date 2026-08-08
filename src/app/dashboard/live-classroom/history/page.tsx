@@ -1,4 +1,7 @@
-import { listLiveClassroomSessionsForTeam } from "@/db/queries/live-classroom";
+import {
+  getLiveClassroomDeckSummariesByIds,
+  listLiveClassroomSessionsForTeam,
+} from "@/db/queries/live-classroom";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import { LIVE_CLASSROOM_HISTORY_PATH } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
@@ -34,6 +37,11 @@ export default async function LiveClassroomHistoryPage({
     status: ["completed", "cancelled"],
     limit: 100,
   });
+  const deckSummaries = await getLiveClassroomDeckSummariesByIds(
+    sessions
+      .map((session) => session.deckId)
+      .filter((id): id is number => id != null),
+  );
 
   return (
     <LiveClassroomShell teamId={ctx.teamId}>
@@ -59,14 +67,22 @@ export default async function LiveClassroomHistoryPage({
               canManage={ctx.canManage}
               emptyMessage="No completed battles yet."
               showEndedAt
-              sessions={sessions.map((session) => ({
-                id: session.id,
-                name: session.name,
-                status: session.status,
-                sessionType: session.sessionType,
-                battleMode: session.battleMode,
-                endedAt: session.endedAt?.toISOString() ?? null,
-              }))}
+              sessions={sessions.map((session) => {
+                const deck =
+                  session.deckId != null
+                    ? deckSummaries[session.deckId]
+                    : undefined;
+                return {
+                  id: session.id,
+                  name: session.name,
+                  status: session.status,
+                  sessionType: session.sessionType,
+                  battleMode: session.battleMode,
+                  endedAt: session.endedAt?.toISOString() ?? null,
+                  deckName: deck?.name ?? null,
+                  deckCardCount: deck?.cardCount ?? null,
+                };
+              })}
             />
           </CardContent>
         </Card>

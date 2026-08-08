@@ -563,8 +563,9 @@ export function LiveClassroomSavedGroupsControls({
                   <Select
                     key={`${team.teamName}-${addMemberSelectKey}`}
                     onValueChange={(v) => {
-                      if (v) {
-                        addMemberToDraft(team.teamName, v);
+                      const value = typeof v === "string" ? v : "";
+                      if (value) {
+                        addMemberToDraft(team.teamName, value);
                         setAddMemberSelectKey((k) => k + 1);
                       }
                     }}

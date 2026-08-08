@@ -416,6 +416,17 @@ export function LiveClassroomLobby({
             <CardDescription>
               {sessionTypeLabel(session.sessionType)} ·{" "}
               {battleModeLabel(session.battleMode)}
+              {session.deckName ? (
+                <>
+                  {" · "}
+                  {session.deckName}
+                  {session.deckCardCount != null
+                    ? ` · ${session.deckCardCount} card${
+                        session.deckCardCount === 1 ? "" : "s"
+                      }`
+                    : ""}
+                </>
+              ) : null}
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">

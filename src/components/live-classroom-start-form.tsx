@@ -46,7 +46,10 @@ import {
   type LiveClassroomStrategyCardPolicy,
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
-import { liveClassroomLobbyPath } from "@/lib/live-classroom-url";
+import {
+  liveClassroomHostPath,
+  liveClassroomLobbyPath,
+} from "@/lib/live-classroom-url";
 
 export type LiveClassroomDeckOption = {
   id: number;
@@ -240,6 +243,20 @@ export function LiveClassroomStartForm({
           warmUp: isWarmUp ? true : undefined,
           teamCount,
         });
+
+        if ("alreadyOpen" in result && result.alreadyOpen) {
+          toast.message(
+            result.status === "active" || result.status === "paused"
+              ? "You already have a live session open — opening host controls."
+              : "You already have an open lobby — opening it instead of creating another.",
+          );
+          router.push(
+            result.status === "active" || result.status === "paused"
+              ? liveClassroomHostPath(result.sessionId)
+              : liveClassroomLobbyPath(result.sessionId),
+          );
+          return;
+        }
 
         toast.success(
           scheduledFor

@@ -10,6 +10,7 @@ import {
   LIVE_CLASSROOM_REPORTS_PATH,
 } from "@/lib/live-classroom-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
+import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +98,14 @@ export default async function LiveClassroomReportDetailPage({
       <div className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
+            <LiveClassroomBackLink
+              teamId={ctx.teamId}
+              href={buildLiveClassroomHref(
+                LIVE_CLASSROOM_REPORTS_PATH,
+                ctx.teamId,
+              )}
+              label="Back to reports"
+            />
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {report.sessionName}
             </h1>

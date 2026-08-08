@@ -1,6 +1,8 @@
 import { randomBytes } from "crypto";
 import { db } from "@/db";
 import {
+  cards,
+  decks,
   liveBattleAnswers,
   liveBattleQuestions,
   liveBattleReports,
@@ -446,6 +448,38 @@ export async function listLiveClassroomSessionsForTeam(
     return query.limit(options.limit);
   }
   return query;
+}
+
+/** Deck name + card count for Live Classroom session list rows. */
+export async function getLiveClassroomDeckSummariesByIds(
+  deckIds: number[],
+): Promise<Record<number, { name: string; cardCount: number }>> {
+  const unique = [
+    ...new Set(
+      deckIds.filter((id) => Number.isFinite(id) && id > 0),
+    ),
+  ];
+  if (unique.length === 0) return {};
+
+  const rows = await db
+    .select({
+      id: decks.id,
+      name: decks.name,
+      cardCount: sql<number>`cast(count(${cards.id}) as integer)`,
+    })
+    .from(decks)
+    .leftJoin(cards, eq(cards.deckId, decks.id))
+    .where(inArray(decks.id, unique))
+    .groupBy(decks.id, decks.name);
+
+  const out: Record<number, { name: string; cardCount: number }> = {};
+  for (const row of rows) {
+    out[row.id] = {
+      name: row.name,
+      cardCount: Number(row.cardCount) || 0,
+    };
+  }
+  return out;
 }
 
 export async function listActiveOrLobbySessionsForTeam(

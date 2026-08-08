@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   getDashboardLiveClassroomStats,
+  getLiveClassroomDeckSummariesByIds,
   listLiveClassroomSessionsForTeam,
 } from "@/db/queries/live-classroom";
 import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
@@ -48,6 +49,12 @@ export default async function LiveClassroomDashboardPage({
     getDashboardLiveClassroomStats(ctx.teamId),
     listLiveClassroomSessionsForTeam(ctx.teamId, { limit: 8 }),
   ]);
+
+  const deckSummaries = await getLiveClassroomDeckSummariesByIds(
+    recentSessions
+      .map((session) => session.deckId)
+      .filter((id): id is number => id != null),
+  );
 
   const teacherDisplays = stats.mostActiveTeacherUserId
     ? await getClerkUserFieldDisplaysByIds([stats.mostActiveTeacherUserId])
@@ -182,13 +189,21 @@ export default async function LiveClassroomDashboardPage({
           <CardContent>
             <LiveClassroomRecentSessionsList
               canManage={ctx.canManage}
-              sessions={recentSessions.map((session) => ({
-                id: session.id,
-                name: session.name,
-                status: session.status,
-                sessionType: session.sessionType,
-                battleMode: session.battleMode,
-              }))}
+              sessions={recentSessions.map((session) => {
+                const deck =
+                  session.deckId != null
+                    ? deckSummaries[session.deckId]
+                    : undefined;
+                return {
+                  id: session.id,
+                  name: session.name,
+                  status: session.status,
+                  sessionType: session.sessionType,
+                  battleMode: session.battleMode,
+                  deckName: deck?.name ?? null,
+                  deckCardCount: deck?.cardCount ?? null,
+                };
+              })}
             />
           </CardContent>
         </Card>

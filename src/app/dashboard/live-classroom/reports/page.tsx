@@ -8,6 +8,7 @@ import {
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
+import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -41,6 +42,10 @@ export default async function LiveClassroomReportsPage({
     <LiveClassroomShell teamId={ctx.teamId}>
       <div className="space-y-4">
         <div>
+          <LiveClassroomBackLink
+            teamId={ctx.teamId}
+            label="Back to Live Classroom"
+          />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Reports
           </h1>
