@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 function formatCountdown(remainingMs: number): string {
   const totalSec = Math.max(0, Math.floor(remainingMs / 1000));
@@ -39,10 +41,17 @@ export function useLiveClassroomScheduleReady(
 export function LiveClassroomScheduledCountdown({
   scheduledFor,
   showDate = false,
+  onEdit,
 }: {
   scheduledFor: string;
   /** When true, also show the absolute local date/time. */
   showDate?: boolean;
+  /**
+   * Reschedule handler — only rendered once the scheduled time has been
+   * reached (the "Starts now" state), since that's when a stuck/missed
+   * schedule needs a new date/time.
+   */
+  onEdit?: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -70,6 +79,19 @@ export function LiveClassroomScheduledCountdown({
         <Badge variant="secondary" className="tabular-nums">
           Starts now
         </Badge>
+        {onEdit ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6 text-muted-foreground hover:text-foreground"
+            title="Reschedule"
+            aria-label="Reschedule"
+            onClick={onEdit}
+          >
+            <Pencil className="size-3.5" aria-hidden />
+          </Button>
+        ) : null}
       </div>
     );
   }

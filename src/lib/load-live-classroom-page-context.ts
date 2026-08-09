@@ -3,7 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/clerk-auth";
 import { getAccessContext } from "@/lib/access";
-import { getTeamsForTeamDashboard } from "@/db/queries/teams";
+import { getEligibleWorkspaceTeamsForUser, getTeamById } from "@/db/queries/teams";
 import {
   getLiveClassroomSessionById,
   getOrCreateLiveClassroomTeamSettings,
@@ -59,7 +59,10 @@ export async function loadLiveClassroomPageContext(
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  const teamsForUser = await getTeamsForTeamDashboard(userId);
+  // Live Classroom is used by plain team members (students), not just
+  // owners/team admins — using the manage-only team list here would wrongly
+  // bounce roster members to onboarding and loop between pages.
+  const teamsForUser = await getEligibleWorkspaceTeamsForUser(userId);
   if (teamsForUser.length === 0) {
     redirect("/onboarding/team");
   }
@@ -74,6 +77,23 @@ export async function loadLiveClassroomPageContext(
     requestedTeamId != null
       ? teamsForUser.find((t) => t.id === requestedTeamId)
       : undefined;
+
+  // The general "eligible workspaces" list backs the team switcher and can
+  // omit a team where this user is only a Live Classroom roster member
+  // (e.g. a student without full team-member/subscription eligibility).
+  // Check LC-specific access directly before bouncing away — otherwise a
+  // deep link like a report `?team=` param that doesn't match the
+  // switcher list bounces to the user's own default team, which then
+  // redirects right back to the requested team, looping forever.
+  if (requestedTeamId != null && !team) {
+    const directRole = await resolveLiveClassroomOrgRole({
+      teamId: requestedTeamId,
+      userId,
+    });
+    if (directRole) {
+      team = (await getTeamById(requestedTeamId)) ?? undefined;
+    }
+  }
 
   if (requestedTeamId != null && !team) {
     redirect(buildLiveClassroomHref(canonicalPath, teamsForUser[0]!.id));
@@ -138,7 +158,7 @@ export async function loadLiveClassroomSessionPageContext(
       `[live-classroom] session page context: session ${sessionId} not found`,
     );
     // Hard-deleted sessions: send non-managers to Team Dashboard when possible.
-    const dashTeams = await getTeamsForTeamDashboard(userId);
+    const dashTeams = await getEligibleWorkspaceTeamsForUser(userId);
     for (const team of dashTeams) {
       const role = await resolveLiveClassroomOrgRole({
         teamId: team.id,

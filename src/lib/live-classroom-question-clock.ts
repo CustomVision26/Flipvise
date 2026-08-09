@@ -189,13 +189,15 @@ export function withParticipantClock(
   return { ...(extensions ?? {}), participantClocks: map };
 }
 
+/** Returns `null` when the battle has no per-question time limit (untimed). */
 export function remainingQuestionSeconds(input: {
-  timePerQuestionSec: number;
+  timePerQuestionSec: number | null;
   bonusSec: number;
   startedAtIso: string | null | undefined;
   paused?: boolean;
   nowMs?: number;
-}): number {
+}): number | null {
+  if (input.timePerQuestionSec == null) return null;
   const limit = Math.max(1, input.timePerQuestionSec + Math.max(0, input.bonusSec));
   if (input.paused || !input.startedAtIso) return limit;
   const started = Date.parse(input.startedAtIso);

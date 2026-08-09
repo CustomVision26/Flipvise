@@ -192,9 +192,10 @@ export function LiveClassroomStudentPlay({
       .sort((a, b) => b.score - a.score);
   }, [state, me, userId]);
 
+  // `null` means this battle has no per-question time limit.
   const remaining = (() => {
     void tick;
-    if (!state) return 0;
+    if (!state) return null;
     return remainingQuestionSeconds({
       timePerQuestionSec: state.session.config.timePerQuestionSec,
       bonusSec: state.session.timerBonusSec ?? 0,
@@ -214,6 +215,7 @@ export function LiveClassroomStudentPlay({
   useEffect(() => {
     if (!state || !canNavigate) return;
     if (state.session.status !== "active") return;
+    if (remaining == null) return; // untimed battle — no auto-advance
     const qid = state.currentQuestion?.id;
     if (qid == null) return;
     if (remaining > 0) return;
@@ -477,7 +479,13 @@ export function LiveClassroomStudentPlay({
             ) : null}
             {canManage && !waitingForOthers && q ? (
               <LiveClassroomTeamTargetMenu
-                label={paused ? "Paused" : `${remaining}s`}
+                label={
+                  paused
+                    ? "Paused"
+                    : remaining != null
+                      ? `${remaining}s`
+                      : "No timer"
+                }
                 disabled={pending || paused}
                 pending={pending}
                 variant="outline"
@@ -516,7 +524,13 @@ export function LiveClassroomStudentPlay({
                 variant="outline"
                 className={cn("font-mono tabular-nums", teamTone.chip)}
               >
-                {paused ? "Paused" : waitingForOthers ? "Done" : `${remaining}s`}
+                {paused
+                  ? "Paused"
+                  : waitingForOthers
+                    ? "Done"
+                    : remaining != null
+                      ? `${remaining}s`
+                      : "No timer"}
               </Badge>
             )}
           </div>
@@ -564,7 +578,7 @@ export function LiveClassroomStudentPlay({
                         submittedChoice != null ||
                         paused ||
                         !canAnswer ||
-                        remaining <= 0 ||
+                        (remaining != null && remaining <= 0) ||
                         eliminated
                       }
                       className={cn(
@@ -706,6 +720,9 @@ export function LiveClassroomStudentPlay({
                 {teamCards.map((card) => {
                   const used = Boolean(card.usedAt);
                   const isAiHint = card.kind === "ai_hint";
+                  const timerBlocked =
+                    card.kind === "extra_time" &&
+                    state.session.config.timePerQuestionSec == null;
                   return (
                     <Button
                       key={card.id}
@@ -717,11 +734,17 @@ export function LiveClassroomStudentPlay({
                         !q ||
                         paused ||
                         used ||
+                        timerBlocked ||
                         (isAiHint && hintLoading)
                       }
+                      title={
+                        timerBlocked
+                          ? "This battle has no time limit"
+                          : undefined
+                      }
                       className={cn(
-                        used && "opacity-50",
-                        !used && teamTone.choiceSelected,
+                        (used || timerBlocked) && "opacity-50",
+                        !used && !timerBlocked && teamTone.choiceSelected,
                       )}
                       onClick={() => useCard(card.id, card.kind)}
                     >

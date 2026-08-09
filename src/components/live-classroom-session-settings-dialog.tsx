@@ -67,6 +67,7 @@ import {
   LIVE_CLASSROOM_SESSION_TYPES,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
+  LIVE_CLASSROOM_TIME_PER_QUESTION_OPTIONS_SEC,
   battleModeLabel,
   battleStartDelayLabel,
   defaultStrategyCardSetting,
@@ -75,6 +76,8 @@ import {
   strategyCardEnabledKinds,
   strategyCardLabel,
   strategyCardsForBattleMode,
+  strategyCardsForTimerState,
+  timePerQuestionLabel,
   type LiveClassroomBattleMode,
   type LiveClassroomQuestionSourceMode,
   type LiveClassroomSessionConfig,
@@ -290,13 +293,19 @@ export function LiveClassroomSessionSettingsDialog({
     useState<LiveClassroomStrategyCardKind | null>(null);
 
   const availableStrategyCards = strategyCardsForBattleMode(battleMode);
-  const enabledCards = strategyCardEnabledKinds(
-    cardSettings,
+  // Extra Time can't run without a per-question clock — exclude it from the
+  // "available" set (and thus policy math) whenever the timer is off.
+  const timeAwareAvailableStrategyCards = strategyCardsForTimerState(
     availableStrategyCards,
+    timePerQuestionSec,
+  );
+  const enabledCards = strategyCardsForTimerState(
+    strategyCardEnabledKinds(cardSettings, availableStrategyCards),
+    timePerQuestionSec,
   );
   const strategyCardPolicy = deriveStrategyCardPolicy(
     enabledCards,
-    availableStrategyCards,
+    timeAwareAvailableStrategyCards,
   );
   const strategyDetailsLocked = strategyCardPolicy === "disabled";
   const strategyCardsEditable = strategyCardPolicy !== "disabled";
@@ -393,10 +402,10 @@ export function LiveClassroomSessionSettingsDialog({
     setCardSettings((prev) => {
       const out = { ...prev };
       if (next === "unlimited") {
-        for (const k of availableStrategyCards) {
+        for (const k of timeAwareAvailableStrategyCards) {
           out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
         }
-        setStrategyCardLimitPerTeam(availableStrategyCards.length);
+        setStrategyCardLimitPerTeam(timeAwareAvailableStrategyCards.length);
         return out;
       }
       if (next === "disabled") {
@@ -406,18 +415,24 @@ export function LiveClassroomSessionSettingsDialog({
         setStrategyCardLimitPerTeam(0);
         return out;
       }
-      const currentlyEnabled = strategyCardEnabledKinds(out, availableStrategyCards);
+      const currentlyEnabled = strategyCardEnabledKinds(
+        out,
+        timeAwareAvailableStrategyCards,
+      );
       let nextEnabledCount = currentlyEnabled.length;
       if (
         currentlyEnabled.length === 0 ||
-        currentlyEnabled.length === availableStrategyCards.length
+        currentlyEnabled.length === timeAwareAvailableStrategyCards.length
       ) {
-        for (const k of availableStrategyCards) {
+        for (const k of timeAwareAvailableStrategyCards) {
           out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
         }
-        const last = availableStrategyCards[availableStrategyCards.length - 1];
+        const last =
+          timeAwareAvailableStrategyCards[
+            timeAwareAvailableStrategyCards.length - 1
+          ];
         if (last) out[last] = { ...out[last]!, scope: "disabled" };
-        nextEnabledCount = Math.max(1, availableStrategyCards.length - 1);
+        nextEnabledCount = Math.max(1, timeAwareAvailableStrategyCards.length - 1);
       }
       setStrategyCardLimitPerTeam(nextEnabledCount);
       return out;
@@ -426,9 +441,13 @@ export function LiveClassroomSessionSettingsDialog({
 
   function setCardsPerTeamCount(count: number) {
     setCardSettings((prev) => {
-      const next = syncCardSettingsToCount(prev, count, availableStrategyCards);
+      const next = syncCardSettingsToCount(
+        prev,
+        count,
+        timeAwareAvailableStrategyCards,
+      );
       setStrategyCardLimitPerTeam(
-        strategyCardEnabledKinds(next, availableStrategyCards).length,
+        strategyCardEnabledKinds(next, timeAwareAvailableStrategyCards).length,
       );
       return next;
     });
@@ -537,21 +556,13 @@ export function LiveClassroomSessionSettingsDialog({
           timePerQuestionSec,
           teamCount,
           teamAssignment,
-          strategyCardPolicy: allowStrategyCards
-            ? deriveStrategyCardPolicy(enabledCards, availableStrategyCards)
-            : "disabled",
-          strategyCardLimitPerTeam:
-            !allowStrategyCards
-              ? 0
-              : deriveStrategyCardPolicy(enabledCards, availableStrategyCards) ===
-                  "unlimited"
-                ? availableStrategyCards.length
-                : enabledCards.filter((k) =>
-                    availableStrategyCards.includes(k),
-                  ).length,
-          enabledStrategyCards: !allowStrategyCards
-            ? []
-            : enabledCards.filter((k) => availableStrategyCards.includes(k)),
+          strategyCardPolicy: allowStrategyCards ? strategyCardPolicy : "disabled",
+          strategyCardLimitPerTeam: !allowStrategyCards
+            ? 0
+            : strategyCardPolicy === "unlimited"
+              ? timeAwareAvailableStrategyCards.length
+              : enabledCards.length,
+          enabledStrategyCards: !allowStrategyCards ? [] : enabledCards,
           strategyCardSettings: allowStrategyCards ? cardSettings : undefined,
           survivalHearts:
             battleMode === "survival" ? survivalHearts : undefined,
@@ -767,17 +778,40 @@ export function LiveClassroomSessionSettingsDialog({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lc-sess-time">Seconds per question</Label>
-                    <Input
-                      id="lc-sess-time"
-                      type="number"
-                      min={5}
-                      max={180}
-                      value={timePerQuestionSec}
-                      onChange={(e) =>
-                        setTimePerQuestionSec(Number(e.target.value))
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="lc-sess-time">Seconds per question</Label>
+                      <FieldHint
+                        label="Seconds per question"
+                        caption="Countdown timer for each question, or turn it off for an untimed battle."
+                      />
+                    </div>
+                    <Select
+                      value={
+                        timePerQuestionSec == null
+                          ? "off"
+                          : String(timePerQuestionSec)
                       }
-                    />
+                      onValueChange={(v) => {
+                        if (v == null) return;
+                        setTimePerQuestionSec(v === "off" ? null : Number(v));
+                      }}
+                    >
+                      <SelectTrigger id="lc-sess-time" className="w-full">
+                        <SelectValue>
+                          {timePerQuestionLabel(timePerQuestionSec)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">No time limit</SelectItem>
+                        {LIVE_CLASSROOM_TIME_PER_QUESTION_OPTIONS_SEC.map(
+                          (sec) => (
+                            <SelectItem key={sec} value={String(sec)}>
+                              {timePerQuestionLabel(sec)}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-1.5">
@@ -1023,10 +1057,10 @@ export function LiveClassroomSessionSettingsDialog({
                         id="lc-sess-cards"
                         type="number"
                         min={0}
-                        max={availableStrategyCards.length}
+                        max={timeAwareAvailableStrategyCards.length}
                         value={
                           strategyCardPolicy === "unlimited"
-                            ? availableStrategyCards.length
+                            ? timeAwareAvailableStrategyCards.length
                             : strategyCardLimitPerTeam
                         }
                         disabled={!strategyCardsEditable}
@@ -1050,16 +1084,30 @@ export function LiveClassroomSessionSettingsDialog({
                       {availableStrategyCards.map((kind) => {
                         const setting =
                           cardSettings[kind] ?? defaultStrategyCardSetting(kind);
-                        const on = setting.scope !== "disabled";
+                        const timerBlocked =
+                          kind === "extra_time" && timePerQuestionSec == null;
+                        const on = !timerBlocked && setting.scope !== "disabled";
                         return (
                           <Button
                             key={kind}
                             type="button"
                             size="sm"
                             variant={on ? "default" : "outline"}
-                            className="rounded-full"
+                            className={cn(
+                              "rounded-full",
+                              timerBlocked && "opacity-40",
+                            )}
                             aria-pressed={on}
-                            onClick={() => setConfiguringKind(kind)}
+                            disabled={timerBlocked}
+                            title={
+                              timerBlocked
+                                ? "Enable a question timer to use Extra Time"
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (timerBlocked) return;
+                              setConfiguringKind(kind);
+                            }}
                           >
                             {strategyCardLabel(kind)}
                             {on && setting.scope === "individual"

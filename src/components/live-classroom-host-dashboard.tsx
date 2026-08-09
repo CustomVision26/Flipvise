@@ -101,7 +101,7 @@ export function LiveClassroomHostDashboard({
   void tick;
   const remaining = (() => {
     void tick;
-    if (!state) return 0;
+    if (!state) return null;
     return remainingQuestionSeconds({
       timePerQuestionSec: state.session.config.timePerQuestionSec,
       bonusSec: state.session.timerBonusSec ?? 0,
@@ -191,7 +191,7 @@ export function LiveClassroomHostDashboard({
             ) : (
               <Badge variant="outline" className="gap-1 font-mono">
                 <Timer className="size-3" aria-hidden />
-                {remaining}s
+                {remaining != null ? `${remaining}s` : "No timer"}
               </Badge>
             )}
             <Button
@@ -236,7 +236,7 @@ export function LiveClassroomHostDashboard({
           <LiveClassroomTeamTargetMenu
             label="+15s"
             icon={<Timer className="size-3.5" aria-hidden />}
-            disabled={pending}
+            disabled={pending || state.session.config.timePerQuestionSec == null}
             pending={pending}
             teams={state.teams
               .filter((t) => !t.eliminated)

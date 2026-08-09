@@ -14,6 +14,7 @@ import {
   liveClassroomReportPath,
   liveClassroomSessionGonePath,
 } from "@/lib/live-classroom-url";
+import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomLobby } from "@/components/live-classroom-lobby";
@@ -115,7 +116,12 @@ export default async function LiveClassroomLobbyPage({
       <div>
         <LiveClassroomBackLink
           teamId={ctx.teamId}
-          label="Back to Sessions Pool"
+          label={ctx.canManage ? "Back to Sessions Pool" : "Back to Team Dashboard"}
+          href={
+            ctx.canManage
+              ? undefined
+              : `/dashboard?${buildTeamWorkspaceQueryString({ teamId: ctx.teamId })}`
+          }
         />
         <LiveClassroomLobby
           sessionId={sessionId}

@@ -166,13 +166,25 @@ export function battleStartDelayLabel(sec: number): string {
   return `${mins} min ${rem} sec`;
 }
 
+/** Per-question timer: disabled (no time limit) or 30 sec – 5 min. */
+export const LIVE_CLASSROOM_TIME_PER_QUESTION_OPTIONS_SEC = [
+  30, 45, 60, 90, 120, 150, 180, 210, 240, 270, 300,
+] as const;
+
+/** `null` means the battle has no per-question time limit. */
+export function timePerQuestionLabel(sec: number | null | undefined): string {
+  if (sec == null) return "No time limit";
+  return battleStartDelayLabel(sec);
+}
+
 export type LiveClassroomSessionConfig = {
   questionCount: number;
   /** Whether questions were built from every deck card or a host-picked subset. */
   questionSourceMode: LiveClassroomQuestionSourceMode;
   /** Deck card ids used when `questionSourceMode === "specific"`. */
   selectedDeckCardIds: number[];
-  timePerQuestionSec: number;
+  /** Seconds allowed per question, or `null` for no time limit (untimed battle). */
+  timePerQuestionSec: number | null;
   difficulty: LiveClassroomDifficulty;
   /**
    * Seconds to count down after Start battle before questions begin.
@@ -337,6 +349,18 @@ export function strategyCardsForBattleMode(
   return mode === "survival"
     ? [...STRATEGY_CARDS_SURVIVAL]
     : [...STRATEGY_CARDS_STANDARD];
+}
+
+/**
+ * Extra Time only makes sense when the battle has a per-question time limit.
+ * Filters a kind list down when `timePerQuestionSec` is `null` (untimed).
+ */
+export function strategyCardsForTimerState<
+  T extends readonly LiveClassroomStrategyCardKind[],
+>(kinds: T, timePerQuestionSec: number | null | undefined): LiveClassroomStrategyCardKind[] {
+  return timePerQuestionSec == null
+    ? kinds.filter((k) => k !== "extra_time")
+    : [...kinds];
 }
 
 /**

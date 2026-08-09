@@ -113,6 +113,19 @@ export default async function LiveClassroomReportDetailPage({
   const { stats } = report;
   const isManager = ctx.canManage;
 
+  const topTeamScore = stats.teamStats.reduce(
+    (max, t) => Math.max(max, t.score),
+    0,
+  );
+  const topTeams = stats.teamStats.filter((t) => t.score === topTeamScore);
+  const outcomeBadge = report.winnerTeamName
+    ? { label: `Winner: ${report.winnerTeamName}`, variant: "default" as const }
+    : topTeamScore <= 0
+      ? { label: "No winner — no points scored", variant: "outline" as const }
+      : topTeams.length > 1
+        ? { label: `Tied at ${topTeamScore} pts`, variant: "outline" as const }
+        : null;
+
   let myTeamName: string | null = null;
   if (!isManager) {
     const participant = await getLiveClassroomParticipant(
@@ -185,8 +198,10 @@ export default async function LiveClassroomReportDetailPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {report.winnerTeamName ? (
-              <Badge className="text-sm">Winner: {report.winnerTeamName}</Badge>
+            {outcomeBadge ? (
+              <Badge variant={outcomeBadge.variant} className="text-sm">
+                {outcomeBadge.label}
+              </Badge>
             ) : null}
             {!isManager ? (
               <Button

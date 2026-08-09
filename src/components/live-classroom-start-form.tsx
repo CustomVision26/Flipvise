@@ -42,21 +42,25 @@ import {
 import { cn } from "@/lib/utils";
 import { LiveClassroomStrategyCardConfigDialog } from "@/components/live-classroom-strategy-card-config-dialog";
 import {
+  DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
   LIVE_CLASSROOM_BATTLE_MODES,
-  LIVE_CLASSROOM_DIFFICULTIES,
+  LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC,
   LIVE_CLASSROOM_QUESTION_SOURCE_MODES,
   LIVE_CLASSROOM_SESSION_TYPES,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
+  LIVE_CLASSROOM_TIME_PER_QUESTION_OPTIONS_SEC,
   battleModeLabel,
+  battleStartDelayLabel,
   defaultStrategyCardSetting,
   deriveStrategyCardPolicy,
   sessionTypeLabel,
   strategyCardEnabledKinds,
   strategyCardLabel,
   strategyCardsForBattleMode,
+  strategyCardsForTimerState,
+  timePerQuestionLabel,
   type LiveClassroomBattleMode,
-  type LiveClassroomDifficulty,
   type LiveClassroomQuestionSourceMode,
   type LiveClassroomSessionType,
   type LiveClassroomStrategyCardKind,
@@ -91,8 +95,8 @@ const CAPTION_SESSION_TYPE =
   "Choose the battle format — team battle, warm-up, review, and other Live Classroom™ session styles.";
 const CAPTION_BATTLE_MODE =
   "How teams compete: individual scoring within teams, captain-led play, or survival with hearts.";
-const CAPTION_DIFFICULTY =
-  "Sets the intended challenge level for this session.";
+const CAPTION_START_TIME =
+  "Countdown after Start battle before questions begin (60 seconds to 5 minutes).";
 const CAPTION_TEAM_ASSIGNMENT =
   "How students are placed on teams — random, manual in the lobby, or from saved groups.";
 const CAPTION_QUESTION_SOURCE =
@@ -100,7 +104,7 @@ const CAPTION_QUESTION_SOURCE =
 const CAPTION_QUESTION_PICKER =
   "Check the deck cards to include as questions in this battle. Strategy cards can then target these same questions.";
 const CAPTION_SECONDS =
-  "Countdown timer for each question before the round advances.";
+  "Countdown timer for each question before the round advances, or turn it off for an untimed battle.";
 const CAPTION_TEAM_COUNT =
   "Number of competing teams created in the lobby (2–4).";
 const CAPTION_SURVIVAL_HEARTS =
@@ -206,9 +210,12 @@ export function LiveClassroomStartForm({
   const [deckCards, setDeckCards] = useState<DeckCardPreview[]>([]);
   const [loadingDeckCards, setLoadingDeckCards] = useState(false);
   const [cardPickerOpen, setCardPickerOpen] = useState(false);
-  const [timePerQuestionSec, setTimePerQuestionSec] = useState(30);
-  const [difficulty, setDifficulty] =
-    useState<LiveClassroomDifficulty>("medium");
+  const [timePerQuestionSec, setTimePerQuestionSec] = useState<number | null>(
+    30,
+  );
+  const [battleStartDelaySec, setBattleStartDelaySec] = useState(
+    DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
+  );
   const [allowAiExplanations, setAllowAiExplanations] = useState(
     defaults?.allowAiExplanations ?? true,
   );
@@ -279,13 +286,19 @@ export function LiveClassroomStartForm({
   }
 
   const availableStrategyCards = strategyCardsForBattleMode(battleMode);
-  const enabledCards = strategyCardEnabledKinds(
-    cardSettings,
+  // Extra Time can't run without a per-question clock — exclude it from the
+  // "available" set (and thus policy math) whenever the timer is off.
+  const timeAwareAvailableStrategyCards = strategyCardsForTimerState(
     availableStrategyCards,
+    timePerQuestionSec,
+  );
+  const enabledCards = strategyCardsForTimerState(
+    strategyCardEnabledKinds(cardSettings, availableStrategyCards),
+    timePerQuestionSec,
   );
   const strategyCardPolicy = deriveStrategyCardPolicy(
     enabledCards,
-    availableStrategyCards,
+    timeAwareAvailableStrategyCards,
   );
 
   function setBattleModeAndCards(nextMode: LiveClassroomBattleMode) {
@@ -304,7 +317,7 @@ export function LiveClassroomStartForm({
     setCardSettings((prev) => {
       const out = { ...prev };
       if (next === "unlimited") {
-        for (const k of availableStrategyCards) {
+        for (const k of timeAwareAvailableStrategyCards) {
           out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
         }
         return out;
@@ -316,15 +329,21 @@ export function LiveClassroomStartForm({
         return out;
       }
       // limited — keep current selection if it's already partial; otherwise turn one off
-      const currentlyEnabled = strategyCardEnabledKinds(out, availableStrategyCards);
+      const currentlyEnabled = strategyCardEnabledKinds(
+        out,
+        timeAwareAvailableStrategyCards,
+      );
       if (
         currentlyEnabled.length === 0 ||
-        currentlyEnabled.length === availableStrategyCards.length
+        currentlyEnabled.length === timeAwareAvailableStrategyCards.length
       ) {
-        for (const k of availableStrategyCards) {
+        for (const k of timeAwareAvailableStrategyCards) {
           out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
         }
-        const last = availableStrategyCards[availableStrategyCards.length - 1];
+        const last =
+          timeAwareAvailableStrategyCards[
+            timeAwareAvailableStrategyCards.length - 1
+          ];
         if (last) out[last] = { ...out[last]!, scope: "disabled" };
       }
       return out;
@@ -361,7 +380,7 @@ export function LiveClassroomStartForm({
           selectedDeckCardIds:
             questionSourceMode === "specific" ? selectedCardIds : undefined,
           timePerQuestionSec,
-          difficulty,
+          battleStartDelaySec,
           allowAiExplanations,
           allowStrategyCards,
           allowMusic,
@@ -369,16 +388,9 @@ export function LiveClassroomStartForm({
           survivalHearts:
             battleMode === "survival" ? survivalHearts : undefined,
           strategyCardPolicy: allowStrategyCards
-            ? deriveStrategyCardPolicy(
-                enabledCards,
-                strategyCardsForBattleMode(battleMode),
-              )
+            ? strategyCardPolicy
             : "disabled",
-          enabledStrategyCards: allowStrategyCards
-            ? enabledCards.filter((k) =>
-                strategyCardsForBattleMode(battleMode).includes(k),
-              )
-            : [],
+          enabledStrategyCards: allowStrategyCards ? enabledCards : [],
           strategyCardSettings: allowStrategyCards ? cardSettings : undefined,
           scheduledFor: scheduledFor
             ? new Date(scheduledFor).toISOString()
@@ -474,20 +486,22 @@ export function LiveClassroomStartForm({
             </div>
 
             <div className="space-y-2">
-              <FieldLabel label="Difficulty" caption={CAPTION_DIFFICULTY} />
+              <FieldLabel label="Start time" caption={CAPTION_START_TIME} />
               <Select
-                value={difficulty}
-                onValueChange={(v) =>
-                  setDifficulty(v as LiveClassroomDifficulty)
-                }
+                value={String(battleStartDelaySec)}
+                onValueChange={(v) => {
+                  if (v != null) setBattleStartDelaySec(Number(v));
+                }}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {battleStartDelayLabel(battleStartDelaySec)}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {LIVE_CLASSROOM_DIFFICULTIES.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d.charAt(0).toUpperCase() + d.slice(1)}
+                  {LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC.map((sec) => (
+                    <SelectItem key={sec} value={String(sec)}>
+                      {battleStartDelayLabel(sec)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -528,14 +542,27 @@ export function LiveClassroomStartForm({
                 label="Seconds per question"
                 caption={CAPTION_SECONDS}
               />
-              <Input
-                id="lc-time"
-                type="number"
-                min={5}
-                max={180}
-                value={timePerQuestionSec}
-                onChange={(e) => setTimePerQuestionSec(Number(e.target.value))}
-              />
+              <Select
+                value={timePerQuestionSec == null ? "off" : String(timePerQuestionSec)}
+                onValueChange={(v) => {
+                  if (v == null) return;
+                  setTimePerQuestionSec(v === "off" ? null : Number(v));
+                }}
+              >
+                <SelectTrigger id="lc-time" className="w-full">
+                  <SelectValue>
+                    {timePerQuestionLabel(timePerQuestionSec)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">No time limit</SelectItem>
+                  {LIVE_CLASSROOM_TIME_PER_QUESTION_OPTIONS_SEC.map((sec) => (
+                    <SelectItem key={sec} value={String(sec)}>
+                      {timePerQuestionLabel(sec)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -754,14 +781,26 @@ export function LiveClassroomStartForm({
                 <div className="flex flex-wrap gap-2">
                   {availableStrategyCards.map((kind) => {
                     const setting = cardSettings[kind] ?? defaultStrategyCardSetting(kind);
-                    const on = setting.scope !== "disabled";
+                    const timerBlocked =
+                      kind === "extra_time" && timePerQuestionSec == null;
+                    const on = !timerBlocked && setting.scope !== "disabled";
                     return (
                       <Button
                         key={kind}
                         type="button"
                         size="sm"
                         variant={on ? "default" : "outline"}
-                        onClick={() => setConfiguringKind(kind)}
+                        disabled={timerBlocked}
+                        title={
+                          timerBlocked
+                            ? "Enable a question timer to use Extra Time"
+                            : undefined
+                        }
+                        className={timerBlocked ? "opacity-40" : undefined}
+                        onClick={() => {
+                          if (timerBlocked) return;
+                          setConfiguringKind(kind);
+                        }}
                       >
                         {strategyCardLabel(kind)}
                         {on && setting.scope === "individual"

@@ -38,6 +38,7 @@ import {
   LiveClassroomSavedGroupsControls,
   type LiveClassroomSavedGroupOption,
 } from "@/components/live-classroom-saved-groups-controls";
+import { LiveClassroomRescheduleDialog } from "@/components/live-classroom-reschedule-dialog";
 import {
   LiveClassroomScheduledCountdown,
   useLiveClassroomScheduleReady,
@@ -116,6 +117,7 @@ export function LiveClassroomLobby({
   const [startingBattle, setStartingBattle] = useState(false);
   const [schedulingBattle, setSchedulingBattle] = useState(false);
   const [closeLobbyOpen, setCloseLobbyOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const leftLobbyForBattleRef = useRef(false);
   const startingBattleRef = useRef(false);
@@ -521,6 +523,7 @@ export function LiveClassroomLobby({
               <LiveClassroomScheduledCountdown
                 scheduledFor={session.scheduledFor}
                 showDate
+                onEdit={canHost ? () => setRescheduleOpen(true) : undefined}
               />
             ) : null}
           </div>
@@ -1010,13 +1013,23 @@ export function LiveClassroomLobby({
         liveTeamColorKey={canManage ? null : (selfLiveTeam?.colorKey ?? null)}
         matchupTeams={matchupTeams}
         onComplete={finishCountdownAndStart}
-        onCancel={() => {
-          leftLobbyForBattleRef.current = false;
-          clearCountdownUi();
-          void clearLiveClassroomBattleCountdownAction(sessionId).catch(
-            () => undefined,
-          );
-        }}
+        onCancel={
+          canManage
+            ? () => {
+                leftLobbyForBattleRef.current = false;
+                clearCountdownUi();
+                void clearLiveClassroomBattleCountdownAction(sessionId).catch(
+                  () => undefined,
+                );
+              }
+            : undefined
+        }
+      />
+
+      <LiveClassroomRescheduleDialog
+        open={rescheduleOpen}
+        onOpenChange={setRescheduleOpen}
+        sessionId={sessionId}
       />
 
       <AlertDialog open={closeLobbyOpen} onOpenChange={setCloseLobbyOpen}>

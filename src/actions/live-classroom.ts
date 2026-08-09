@@ -78,6 +78,7 @@ import {
 } from "@/lib/live-classroom-scoring";
 import {
   DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
+  deriveStrategyCardPolicy,
   LIVE_CLASSROOM_DEFAULT_TEAM_NAMES,
   LIVE_CLASSROOM_BATTLE_MODES,
   LIVE_CLASSROOM_DIFFICULTIES,
@@ -95,6 +96,8 @@ import {
   resolveStrategyCardSetting,
   strategyCardAppliesToDeckCard,
   strategyCardEnabledKinds,
+  strategyCardsForBattleMode,
+  strategyCardsForTimerState,
   type LiveClassroomReportStats,
   type LiveClassroomSessionConfig,
   type LiveClassroomStrategyCardKind,
@@ -174,8 +177,17 @@ const createSessionSchema = z.object({
   questionCount: z.number().int().min(1).max(30).optional(),
   questionSourceMode: z.enum(LIVE_CLASSROOM_QUESTION_SOURCE_MODES).optional(),
   selectedDeckCardIds: z.array(z.number().int().positive()).optional(),
-  timePerQuestionSec: z.number().int().min(5).max(180),
-  difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES),
+  timePerQuestionSec: z.number().int().min(30).max(300).nullable(),
+  difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES).optional(),
+  battleStartDelaySec: z
+    .number()
+    .int()
+    .refine((n) =>
+      (LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC as readonly number[]).includes(
+        n,
+      ),
+    )
+    .optional(),
   allowAiExplanations: z.boolean(),
   allowStrategyCards: z.boolean(),
   allowMusic: z.boolean(),
@@ -195,12 +207,24 @@ const createSessionSchema = z.object({
 async function issueLiveClassroomStrategyCards(
   sessionId: number,
   config: LiveClassroomSessionConfig,
+  battleMode: (typeof LIVE_CLASSROOM_BATTLE_MODES)[number],
 ): Promise<void> {
   if (!config.allowStrategyCards || config.strategyCardPolicy === "disabled") return;
   const teams = await listLiveClassroomTeams(sessionId);
+  // Defense in depth: never issue a kind the current battle mode doesn't
+  // support (e.g. Shield/Recovery outside Survival), even if stale config
+  // data says otherwise.
+  const modeAvailable = strategyCardsForBattleMode(battleMode);
+  // Extra Time is meaningless without a per-question clock — never issue it
+  // for an untimed battle, even if stale config data says otherwise.
+  const enabledInMode = config.enabledStrategyCards.filter(
+    (k) =>
+      modeAvailable.includes(k) &&
+      (k !== "extra_time" || config.timePerQuestionSec != null),
+  );
   const kinds = strategyCardEnabledKinds(
     config.strategyCardSettings,
-    config.enabledStrategyCards,
+    enabledInMode,
   );
   const perTeamKinds =
     config.strategyCardPolicy === "unlimited"
@@ -317,25 +341,53 @@ export async function createLiveClassroomSessionAction(
     sourceCards.length,
   );
 
+  const allowStrategyCards = data.allowStrategyCards && settings.allowStrategyCards;
+  const modeAvailableStrategyCards = strategyCardsForBattleMode(data.battleMode);
+  // Extra Time is meaningless without a per-question clock — drop it from the
+  // available set for an untimed battle so it can never be counted as enabled.
+  const timeAwareAvailableStrategyCards = strategyCardsForTimerState(
+    modeAvailableStrategyCards,
+    data.timePerQuestionSec,
+  );
+  // Never trust an unfiltered fallback — always constrain to cards this
+  // battle mode (and timer state) actually supports.
+  const enabledStrategyCards = allowStrategyCards
+    ? (
+        data.enabledStrategyCards ??
+        DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards
+      ).filter((k) => timeAwareAvailableStrategyCards.includes(k))
+    : [];
+  const strategyCardPolicy = allowStrategyCards
+    ? data.strategyCardPolicy ??
+      deriveStrategyCardPolicy(enabledStrategyCards, timeAwareAvailableStrategyCards)
+    : "disabled";
+  // Limit per team must reflect what was actually enabled for this session —
+  // never an unrelated org-wide default, which can silently under-issue cards.
+  const strategyCardLimitPerTeam = !allowStrategyCards
+    ? 0
+    : strategyCardPolicy === "unlimited"
+      ? timeAwareAvailableStrategyCards.length
+      : enabledStrategyCards.length;
+
   const config: LiveClassroomSessionConfig = {
     ...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
     questionCount: questionRows.length,
     questionSourceMode,
     selectedDeckCardIds,
     timePerQuestionSec: data.timePerQuestionSec,
-    difficulty: data.difficulty,
+    difficulty: data.difficulty ?? DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.difficulty,
+    battleStartDelaySec:
+      data.battleStartDelaySec ??
+      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
     allowAiExplanations: data.allowAiExplanations,
-    allowStrategyCards: data.allowStrategyCards && settings.allowStrategyCards,
+    allowStrategyCards,
     allowMusic: data.allowMusic && settings.allowMusic,
     teamAssignment: data.teamAssignment,
     captainMode: data.captainMode ?? "rotation",
     survivalHearts: data.survivalHearts ?? 3,
-    strategyCardPolicy:
-      data.strategyCardPolicy ?? settings.strategyCardPolicy,
-    strategyCardLimitPerTeam: settings.strategyCardLimitPerTeam,
-    enabledStrategyCards:
-      data.enabledStrategyCards ??
-      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards,
+    strategyCardPolicy,
+    strategyCardLimitPerTeam,
+    enabledStrategyCards,
     strategyCardSettings: normalizeStrategyCardSettings(data.strategyCardSettings),
   };
 
@@ -378,7 +430,7 @@ export async function createLiveClassroomSessionAction(
     })),
   );
 
-  await issueLiveClassroomStrategyCards(session.id, config);
+  await issueLiveClassroomStrategyCards(session.id, config, data.battleMode);
 
   void licensedSeats;
   revalidateLiveClassroom(data.teamId, session.id);
@@ -1324,7 +1376,8 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   sessionType?: (typeof LIVE_CLASSROOM_SESSION_TYPES)[number];
   battleMode?: (typeof LIVE_CLASSROOM_BATTLE_MODES)[number];
   questionCount?: number;
-  timePerQuestionSec?: number;
+  /** `null` disables the per-question time limit (untimed battle). */
+  timePerQuestionSec?: number | null;
   difficulty?: (typeof LIVE_CLASSROOM_DIFFICULTIES)[number];
   battleStartDelaySec?: number;
   teamCount?: number;
@@ -1344,6 +1397,8 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   survivalHearts?: number;
   questionSourceMode?: (typeof LIVE_CLASSROOM_QUESTION_SOURCE_MODES)[number];
   selectedDeckCardIds?: number[];
+  /** Reschedule (or clear, via null) the session's planned start time. */
+  scheduledFor?: string | null;
 }) {
   const schema = z.object({
     sessionId: z.number().int().positive(),
@@ -1351,10 +1406,11 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     sessionType: z.enum(LIVE_CLASSROOM_SESSION_TYPES).optional(),
     battleMode: z.enum(LIVE_CLASSROOM_BATTLE_MODES).optional(),
     questionCount: z.number().int().min(1).max(30).optional(),
-    timePerQuestionSec: z.number().int().min(5).max(180).optional(),
+    timePerQuestionSec: z.number().int().min(30).max(300).nullable().optional(),
     questionSourceMode: z.enum(LIVE_CLASSROOM_QUESTION_SOURCE_MODES).optional(),
     selectedDeckCardIds: z.array(z.number().int().positive()).optional(),
     difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES).optional(),
+    scheduledFor: z.string().datetime().nullable().optional(),
     battleStartDelaySec: z
       .number()
       .int()
@@ -1397,8 +1453,28 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     sessionType,
     battleMode,
     teamCount,
+    scheduledFor: scheduledForRaw,
     ...configPatch
   } = parsed.data;
+
+  let scheduledForPatch: { scheduledFor: Date | null; status?: "scheduled" } | null =
+    null;
+  if (scheduledForRaw !== undefined) {
+    if (scheduledForRaw === null) {
+      scheduledForPatch = { scheduledFor: null };
+    } else {
+      const next = new Date(scheduledForRaw);
+      if (Number.isNaN(next.getTime())) {
+        throw new Error("Invalid schedule date/time.");
+      }
+      scheduledForPatch = {
+        scheduledFor: next,
+        ...(session.status === "lobby" && next.getTime() > Date.now()
+          ? { status: "scheduled" as const }
+          : {}),
+      };
+    }
+  }
 
   if (teamCount != null) {
     if (session.teamsLocked) {
@@ -1417,13 +1493,21 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     }
   }
 
+  const nextTimePerQuestionSec =
+    "timePerQuestionSec" in configPatch
+      ? (configPatch.timePerQuestionSec ?? null)
+      : session.config.timePerQuestionSec;
+
   const allowStrategyCards =
     (configPatch.allowStrategyCards ?? session.config.allowStrategyCards) &&
     settings.allowStrategyCards;
   const enabledStrategyCards = allowStrategyCards
-    ? (configPatch.enabledStrategyCards ??
-      session.config.enabledStrategyCards ??
-      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards)
+    ? strategyCardsForTimerState(
+        configPatch.enabledStrategyCards ??
+          session.config.enabledStrategyCards ??
+          DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.enabledStrategyCards,
+        nextTimePerQuestionSec,
+      )
     : [];
   const strategyCardSettings = configPatch.strategyCardSettings
     ? {
@@ -1511,13 +1595,18 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     ...(name ? { name } : {}),
     ...(sessionType ? { sessionType } : {}),
     ...(battleMode ? { battleMode } : {}),
+    ...(scheduledForPatch ?? {}),
     config: nextConfig,
   });
 
   // Battle hasn't started yet in "lobby"/"scheduled" — safe to fully reissue
   // strategy cards so newly-selected scopes, values, and activation caps apply.
   await deleteUnusedLiveBattleStrategyCards(session.id);
-  await issueLiveClassroomStrategyCards(session.id, nextConfig);
+  await issueLiveClassroomStrategyCards(
+    session.id,
+    nextConfig,
+    battleMode ?? session.battleMode,
+  );
 
   revalidateLiveClassroom(session.teamId, session.id);
   return { ok: true as const };
@@ -1700,6 +1789,16 @@ export async function startLiveClassroomBattleAction(sessionId: number) {
     }
   }
 
+  // Final safety net: reconcile issued strategy cards against the session's
+  // current config right as the battle goes live, regardless of whatever
+  // settings-save history led here (cards can't have been used yet).
+  await deleteUnusedLiveBattleStrategyCards(sessionId);
+  await issueLiveClassroomStrategyCards(
+    sessionId,
+    session.config,
+    session.battleMode,
+  );
+
   await updateLiveClassroomSession(sessionId, {
     status: "active",
     startedAt,
@@ -1791,6 +1890,9 @@ export async function controlLiveClassroomBattleAction(raw: {
       const extra = parsed.data.extraSeconds ?? 15;
       if (!boardQuestion) {
         throw new Error("No active question to extend.");
+      }
+      if (session.config.timePerQuestionSec == null) {
+        throw new Error("This battle has no time limit — nothing to extend.");
       }
       // Per-team / all-teams bonus — students see it on their play timers.
       await updateLiveClassroomSession(session.id, {
@@ -2281,7 +2383,8 @@ export async function expireLiveClassroomQuestionTimeoutAction(raw: {
     startedAtIso,
     paused: false,
   });
-  if (remaining > 1) {
+  // No per-question time limit — never auto-skip on an untimed battle.
+  if (remaining == null || remaining > 1) {
     return {
       ok: true as const,
       ignored: true as const,
@@ -2387,6 +2490,9 @@ export async function useLiveClassroomStrategyCardAction(raw: {
   }
 
   if (card.kind === "extra_time") {
+    if (session.config.timePerQuestionSec == null) {
+      throw new Error("This battle has no time limit.");
+    }
     const started = session.questionStartedAt ?? new Date();
     await updateLiveClassroomSession(session.id, {
       questionStartedAt: new Date(started.getTime() - cardSetting.seconds * 1000),
@@ -2571,7 +2677,11 @@ export async function endLiveClassroomSessionAction(
     suggestedReviewMinutes: ai.suggestedReviewMinutes,
   };
 
-  const winner = [...teams].sort((a, b) => b.score - a.score)[0] ?? null;
+  // Only declare a winner when one team has a strictly higher, non-zero
+  // score — a 0-0 (or any tied) finish should not attribute a false win.
+  const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
+  const topTeams = teams.filter((t) => t.score === topScore);
+  const winner = topScore > 0 && topTeams.length === 1 ? topTeams[0] : null;
 
   await updateLiveClassroomSession(sessionId, {
     status: "completed",

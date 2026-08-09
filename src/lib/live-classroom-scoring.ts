@@ -5,7 +5,8 @@ export type ScoreAnswerInput = {
   correct: boolean;
   /** Elapsed ms from question start to answer. */
   responseTimeMs: number;
-  timeLimitSec: number;
+  /** `null` when the battle has no per-question time limit (no speed bonus). */
+  timeLimitSec: number | null;
   /** Active strategy bonuses already resolved for this answer (host-configured score values). */
   doublePointsBonus?: number;
   scoreBoostBonus?: number;
@@ -55,9 +56,12 @@ export function scoreLiveClassroomAnswer(
     };
   }
 
-  const limitMs = Math.max(1, input.timeLimitSec * 1000);
-  const ratio = Math.max(0, Math.min(1, 1 - input.responseTimeMs / limitMs));
-  const speedBonus = Math.round(MAX_SPEED_BONUS * ratio);
+  let speedBonus = 0;
+  if (input.timeLimitSec != null) {
+    const limitMs = Math.max(1, input.timeLimitSec * 1000);
+    const ratio = Math.max(0, Math.min(1, 1 - input.responseTimeMs / limitMs));
+    speedBonus = Math.round(MAX_SPEED_BONUS * ratio);
+  }
   let points = BASE_CORRECT + speedBonus + participation;
   points += input.doublePointsBonus ?? 0;
   points += input.scoreBoostBonus ?? 0;

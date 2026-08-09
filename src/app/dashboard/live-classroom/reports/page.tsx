@@ -6,6 +6,7 @@ import {
   LIVE_CLASSROOM_REPORTS_PATH,
   liveClassroomReportPath,
 } from "@/lib/live-classroom-url";
+import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
 import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
@@ -44,7 +45,12 @@ export default async function LiveClassroomReportsPage({
         <div>
           <LiveClassroomBackLink
             teamId={ctx.teamId}
-            label="Back to Live Classroom"
+            label={ctx.canManage ? "Back to Live Classroom" : "Back to team dashboard"}
+            href={
+              ctx.canManage
+                ? undefined
+                : `/dashboard?${buildTeamWorkspaceQueryString({ teamId: ctx.teamId })}`
+            }
           />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Reports

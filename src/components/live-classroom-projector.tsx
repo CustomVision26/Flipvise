@@ -80,7 +80,7 @@ export function LiveClassroomProjector({
 
   const remaining = useMemo(() => {
     void tick;
-    if (!state) return 0;
+    if (!state) return null;
     return remainingQuestionSeconds({
       timePerQuestionSec: state.session.config.timePerQuestionSec,
       bonusSec: state.session.timerBonusSec ?? 0,
@@ -231,9 +231,12 @@ export function LiveClassroomProjector({
           </Badge>
           <Badge
             variant="outline"
-            className="px-4 py-1.5 font-mono text-3xl tabular-nums"
+            className={cn(
+              "px-4 font-mono tabular-nums",
+              remaining != null ? "py-1.5 text-3xl" : "py-1.5 text-xl",
+            )}
           >
-            {remaining}s
+            {remaining != null ? `${remaining}s` : "No timer"}
           </Badge>
         </div>
       </div>
@@ -264,7 +267,9 @@ export function LiveClassroomProjector({
         <LiveClassroomTeamTargetMenu
           label="+15s"
           icon={<Timer className="size-4" aria-hidden />}
-          disabled={pending || !q}
+          disabled={
+            pending || !q || state.session.config.timePerQuestionSec == null
+          }
           pending={pending}
           teams={state.teams
             .filter((t) => !t.eliminated)
