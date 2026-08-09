@@ -10,8 +10,10 @@ import {
 } from "react";
 import {
   Copy,
+  Crown,
   DoorOpen,
   GripVertical,
+  Heart,
   Loader2,
   Lock,
   Play,
@@ -83,6 +85,8 @@ import {
 } from "@/lib/live-classroom-url";
 
 const LC_MEMBER_DRAG_MIME = "application/x-flipvise-lc-member";
+/** Collaborative Team mode — drag this onto a member row to make them captain. */
+const LC_CAPTAIN_DRAG_MIME = "application/x-flipvise-lc-captain";
 
 type LiveClassroomLobbyProps = {
   sessionId: number;
@@ -113,6 +117,12 @@ export function LiveClassroomLobby({
   const [joined, setJoined] = useState(false);
   const [draggingUserId, setDraggingUserId] = useState<string | null>(null);
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
+  const [draggingCaptainTeamId, setDraggingCaptainTeamId] = useState<
+    number | null
+  >(null);
+  const [captainDropTargetKey, setCaptainDropTargetKey] = useState<
+    string | null
+  >(null);
   const [countdownAt, setCountdownAt] = useState<string | null>(null);
   const [startingBattle, setStartingBattle] = useState(false);
   const [schedulingBattle, setSchedulingBattle] = useState(false);
@@ -429,6 +439,72 @@ export function LiveClassroomLobby({
     moveMemberToTeam(moveUserId, toLiveTeamId);
   }
 
+  function setTeamCaptain(liveTeamId: number, captainUserId: string) {
+    if (!canManage || !state) return;
+    const previous = state;
+    setState({
+      ...state,
+      teams: state.teams.map((t) =>
+        t.id === liveTeamId ? { ...t, captainUserId } : t,
+      ),
+    });
+    startTransition(async () => {
+      try {
+        await updateLobbyTeamAction({
+          sessionId,
+          liveTeamId,
+          captainUserId,
+        });
+        toast.success("Team captain set");
+      } catch (e) {
+        setState(previous);
+        toast.error(
+          e instanceof Error ? e.message : "Could not set team captain",
+        );
+      }
+    });
+  }
+
+  function onCaptainDragStart(e: DragEvent, liveTeamId: number) {
+    if (!canDragAssign) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData(LC_CAPTAIN_DRAG_MIME, String(liveTeamId));
+    e.dataTransfer.effectAllowed = "copy";
+    setDraggingCaptainTeamId(liveTeamId);
+  }
+
+  function onCaptainDragEnd() {
+    setDraggingCaptainTeamId(null);
+    setCaptainDropTargetKey(null);
+  }
+
+  function onMemberCaptainDragOver(
+    e: DragEvent,
+    liveTeamId: number,
+    memberUserId: string,
+  ) {
+    if (!canDragAssign || draggingCaptainTeamId !== liveTeamId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+    setCaptainDropTargetKey(`${liveTeamId}:${memberUserId}`);
+  }
+
+  function onMemberCaptainDrop(
+    e: DragEvent,
+    liveTeamId: number,
+    memberUserId: string,
+  ) {
+    if (draggingCaptainTeamId !== liveTeamId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCaptainDropTargetKey(null);
+    setDraggingCaptainTeamId(null);
+    setTeamCaptain(liveTeamId, memberUserId);
+  }
+
   if (!state) {
     const failMessage = joinError ?? error;
     const unavailable =
@@ -461,6 +537,11 @@ export function LiveClassroomLobby({
   }
 
   const { session, teams, participants, otherLiveSession } = state;
+  const isCollaborative = session.battleMode === "collaborative_team";
+  /** Survival is every player for themselves — no team identity to show, just one assigned roster. */
+  const isSurvival = session.battleMode === "survival";
+  /** Where a manager's drag-and-drop onto the single survival roster actually lands. */
+  const survivalRosterTeamId = teams[0]?.id ?? null;
   const blockedByOtherLive = otherLiveSession != null;
   const otherLiveBlockReason = otherLiveSession
     ? `“${otherLiveSession.name}” is live. Finish that battle before starting this session.`
@@ -699,6 +780,7 @@ export function LiveClassroomLobby({
                   }))}
                   workspaceMembers={workspaceMembers}
                   initialSavedGroups={savedGroups}
+                  battleMode={session.battleMode}
                   showSaveButton={showSaveGroupButton}
                   showLoadDropdown={showSavedGroupsDropdown}
                   onApplied={() => {
@@ -823,6 +905,102 @@ export function LiveClassroomLobby({
             </CardDescription>
           </CardHeader>
         </Card>
+      ) : isSurvival && canManage ? (
+        <Card
+          className={cn(
+            "shadow-sm transition-colors",
+            canDragAssign && "min-h-36",
+            dropTargetKey === "survival-roster" && "ring-2 ring-primary/50",
+          )}
+          onDragOver={(e) => onTeamDragOver(e, "survival-roster")}
+          onDragLeave={() => {
+            if (dropTargetKey === "survival-roster") setDropTargetKey(null);
+          }}
+          onDrop={(e) => onTeamDrop(e, survivalRosterTeamId)}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Challengers</CardTitle>
+            <CardDescription>
+              {assignedParticipants.length} player
+              {assignedParticipants.length === 1 ? "" : "s"} · every man for
+              himself — no teams in Survival
+              {canDragAssign
+                ? " · Drop members here"
+                : session.teamsLocked
+                  ? " · Teams locked"
+                  : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {assignedParticipants.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {canDragAssign
+                  ? "Drag a member here from Unassigned"
+                  : "No members yet"}
+              </p>
+            ) : (
+              assignedParticipants.map((m) => {
+                const playerHearts =
+                  teams.find((t) => t.id === m.liveTeamId)?.hearts ??
+                  session.config.survivalHearts;
+                return (
+                  <div
+                    key={m.id}
+                    draggable={canDragAssign}
+                    onDragStart={(e) => onMemberDragStart(e, m.userId)}
+                    onDragEnd={onMemberDragEnd}
+                    className={cn(
+                      "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm",
+                      "bg-muted/20",
+                      canDragAssign && "cursor-grab active:cursor-grabbing",
+                      draggingUserId === m.userId && "opacity-50",
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5 truncate">
+                      {canDragAssign ? (
+                        <GripVertical
+                          className="size-3.5 shrink-0 opacity-70"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <span className="truncate">
+                        {m.displayName}
+                        {m.userId === userId ? " (you)" : ""}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {session.teamsLocked ? (
+                        <span
+                          className="flex items-center gap-0.5"
+                          title={`${playerHearts} ${playerHearts === 1 ? "life" : "lives"} for this battle`}
+                        >
+                          {Array.from({ length: playerHearts }).map((_, i) => (
+                            <Heart
+                              key={i}
+                              className="size-3.5 fill-current text-rose-400"
+                              aria-hidden
+                            />
+                          ))}
+                        </span>
+                      ) : null}
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[10px]"
+                        title={
+                          m.connected
+                            ? "In the lobby and ready for the session"
+                            : "In the lobby but currently away"
+                        }
+                      >
+                        {m.connected ? "Ready" : "Not ready"}
+                      </Badge>
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
       ) : (
         <div
           className={cn(
@@ -832,6 +1010,11 @@ export function LiveClassroomLobby({
         >
           {visibleTeams.map((team) => {
             const members = participants.filter((p) => p.liveTeamId === team.id);
+            /** Survival, viewed by a regular player — only show yourself, no squadmates. */
+            const displayMembers =
+              isSurvival && !canManage
+                ? members.filter((m) => m.userId === userId)
+                : members;
             const targetKey = `team:${team.id}`;
             const isDropTarget = dropTargetKey === targetKey;
             const tone = liveClassroomTeamTone(team.colorKey);
@@ -851,38 +1034,78 @@ export function LiveClassroomLobby({
                 onDrop={(e) => onTeamDrop(e, team.id)}
               >
                 <CardHeader className="pb-2">
-                  <CardTitle className={cn("text-base", tone.title)}>
-                    {team.name}
-                  </CardTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className={cn("text-base", tone.title)}>
+                      {isSurvival && !canManage ? "Survivor" : team.name}
+                    </CardTitle>
+                    {isCollaborative && canDragAssign && members.length > 0 ? (
+                      <span
+                        draggable
+                        onDragStart={(e) => onCaptainDragStart(e, team.id)}
+                        onDragEnd={onCaptainDragEnd}
+                        title="Drag onto a member to make them team captain"
+                        className={cn(
+                          "flex shrink-0 cursor-grab items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[11px] font-medium text-muted-foreground active:cursor-grabbing",
+                          draggingCaptainTeamId === team.id && "opacity-50",
+                        )}
+                      >
+                        <Crown className="size-3.5" aria-hidden />
+                        Captain
+                      </span>
+                    ) : null}
+                  </div>
                   <CardDescription>
-                    {members.length} member{members.length === 1 ? "" : "s"}
+                    {isSurvival && !canManage
+                      ? `${team.hearts} ${team.hearts === 1 ? "life" : "lives"} remaining`
+                      : `${members.length} member${members.length === 1 ? "" : "s"}`}
                     {canDragAssign
                       ? " · Drop members here"
                       : canManage && session.teamsLocked
                         ? " · Teams locked"
                         : ""}
+                    {isCollaborative && !canDragAssign
+                      ? team.captainUserId
+                        ? ` · Captain: ${
+                            members.find((m) => m.userId === team.captainUserId)
+                              ?.displayName ?? "Assigned"
+                          }`
+                        : " · No captain set"
+                      : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-1.5">
-                  {members.length === 0 ? (
+                  {displayMembers.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
                       {canDragAssign
                         ? "Drag a member here from Unassigned"
                         : "No members yet"}
                     </p>
                   ) : (
-                    members.map((m) => (
+                    displayMembers.map((m) => {
+                      const isTeamCaptain =
+                        isCollaborative && team.captainUserId === m.userId;
+                      const isCaptainDropTarget =
+                        captainDropTargetKey === `${team.id}:${m.userId}`;
+                      return (
                       <div
                         key={m.id}
                         draggable={canDragAssign}
                         onDragStart={(e) => onMemberDragStart(e, m.userId)}
                         onDragEnd={onMemberDragEnd}
+                        onDragOver={(e) =>
+                          onMemberCaptainDragOver(e, team.id, m.userId)
+                        }
+                        onDragLeave={() => {
+                          if (isCaptainDropTarget) setCaptainDropTargetKey(null);
+                        }}
+                        onDrop={(e) => onMemberCaptainDrop(e, team.id, m.userId)}
                         className={cn(
                           "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm",
                           tone.row,
                           canDragAssign &&
                             "cursor-grab active:cursor-grabbing",
                           draggingUserId === m.userId && "opacity-50",
+                          isCaptainDropTarget && "ring-2 ring-amber-400/70",
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-1.5 truncate">
@@ -892,10 +1115,30 @@ export function LiveClassroomLobby({
                               aria-hidden
                             />
                           ) : null}
+                          {isTeamCaptain ? (
+                            <Crown
+                              className="size-3.5 shrink-0 text-amber-400"
+                              aria-hidden
+                            />
+                          ) : null}
                           <span className="truncate">
                             {m.displayName}
                             {m.userId === userId ? " (you)" : ""}
                           </span>
+                          {isSurvival ? (
+                            <span
+                              className="flex shrink-0 items-center gap-0.5"
+                              title={`${team.hearts} ${team.hearts === 1 ? "life" : "lives"} remaining this battle`}
+                            >
+                              {Array.from({ length: team.hearts }).map((_, i) => (
+                                <Heart
+                                  key={i}
+                                  className="size-3.5 fill-current text-rose-400"
+                                  aria-hidden
+                                />
+                              ))}
+                            </span>
+                          ) : null}
                         </span>
                         <Badge
                           variant="outline"
@@ -912,7 +1155,8 @@ export function LiveClassroomLobby({
                           {m.connected ? "Ready" : "Not ready"}
                         </Badge>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </CardContent>
               </Card>
@@ -1012,6 +1256,7 @@ export function LiveClassroomLobby({
         liveTeamName={canManage ? null : (selfLiveTeam?.name ?? null)}
         liveTeamColorKey={canManage ? null : (selfLiveTeam?.colorKey ?? null)}
         matchupTeams={matchupTeams}
+        isSurvival={isSurvival}
         onComplete={finishCountdownAndStart}
         onCancel={
           canManage

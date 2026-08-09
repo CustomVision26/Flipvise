@@ -106,7 +106,7 @@ const CAPTION_QUESTION_PICKER =
 const CAPTION_SECONDS =
   "Countdown timer for each question before the round advances, or turn it off for an untimed battle.";
 const CAPTION_TEAM_COUNT =
-  "Number of competing teams created in the lobby (2–4).";
+  "Number of competing teams created in the lobby (2–4). Not used in Survival — every player battles individually.";
 const CAPTION_SURVIVAL_HEARTS =
   "Lives each team starts with in Survival mode. Wrong answers cost hearts.";
 const CAPTION_SCHEDULE =
@@ -280,9 +280,11 @@ export function LiveClassroomStartForm({
   }, [questionSourceMode, deckId]);
 
   function toggleCardId(id: number, checked: boolean) {
-    setSelectedCardIds((prev) =>
-      checked ? [...prev, id] : prev.filter((existing) => existing !== id),
-    );
+    setSelectedCardIds((prev) => {
+      const already = prev.includes(id);
+      if (checked) return already ? prev : [...prev, id];
+      return already ? prev.filter((existing) => existing !== id) : prev;
+    });
   }
 
   const availableStrategyCards = strategyCardsForBattleMode(battleMode);
@@ -577,6 +579,12 @@ export function LiveClassroomStartForm({
                 min={2}
                 max={4}
                 value={teamCount}
+                disabled={battleMode === "survival"}
+                title={
+                  battleMode === "survival"
+                    ? "Survival is every player for themselves — team count doesn't apply."
+                    : undefined
+                }
                 onChange={(e) => setTeamCount(Number(e.target.value))}
               />
             </div>
@@ -836,6 +844,9 @@ export function LiveClassroomStartForm({
             ? cardSettings[configuringKind] ?? defaultStrategyCardSetting(configuringKind)
             : defaultStrategyCardSetting("double_points")
         }
+        otherCardSettings={Object.fromEntries(
+          enabledCards.map((k) => [k, cardSettings[k]!]),
+        )}
         onSave={(setting) => {
           if (configuringKind) saveCardSetting(configuringKind, setting);
         }}
@@ -884,7 +895,11 @@ export function LiveClassroomStartForm({
                       }}
                       className="flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2 cursor-pointer"
                     >
-                      <Checkbox checked={checked} className="mt-0.5" />
+                      <Checkbox
+                        checked={checked}
+                        tabIndex={-1}
+                        className="mt-0.5 pointer-events-none"
+                      />
                       <div className="min-w-0 flex-1 space-y-1">
                         <p className="text-sm font-medium text-foreground">
                           {card.front?.trim() || "Untitled question"}

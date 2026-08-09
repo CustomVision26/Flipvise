@@ -51,6 +51,17 @@ export function analyzeLiveClassroomSavedGroup(
   };
 }
 
+/**
+ * Survival saved groups only ever hold one bucket (every assigned player,
+ * no team split). Team-mode groups (individual/collaborative) always have
+ * 2+ named teams, so the group shape alone tells us which mode it came from.
+ */
+export function isSurvivalSavedGroup(
+  groups: LiveClassroomSavedGroupTeam[],
+): boolean {
+  return groups.length <= 1;
+}
+
 export function assertSavedGroupTeamsValid(
   groups: LiveClassroomSavedGroupTeam[],
 ): void {

@@ -223,6 +223,8 @@ export type LiveClassroomReportStats = {
   individualStats: Array<{
     userId: string;
     displayName: string;
+    /** `null` when the participant was never assigned to a team. */
+    teamName: string | null;
     correct: number;
     incorrect: number;
     accuracyPercent: number;
@@ -234,6 +236,15 @@ export type LiveClassroomReportStats = {
     correctCount: number;
     incorrectCount: number;
     accuracyPercent: number;
+    /** Strategy cards activated on this question, by team. */
+    strategyCardsUsed: Array<{
+      kind: LiveClassroomStrategyCardKind;
+      teamName: string;
+    }>;
+    /** Total extra seconds granted by the host/team admin on this question. */
+    extraTimeAddedSec: number;
+    /** Whether the host revealed the correct answer for this question. */
+    revealed: boolean;
   }>;
   aiTeacherSummary: string;
   suggestedReviewMinutes: number;
@@ -538,7 +549,7 @@ export function liveClassroomTeamTone(colorKey: string | null | undefined): {
           "border-transparent bg-rose-500/35 text-rose-50 hover:bg-rose-500/35",
         badgeAway: "border-rose-400/40 bg-transparent text-rose-200",
         accent: "text-rose-300",
-        surface: "border-rose-500/50 bg-rose-950/40",
+        surface: "border-rose-500/60 bg-rose-950/70",
         choiceSelected:
           "border-rose-400 bg-rose-500/35 text-rose-50 hover:bg-rose-500/40",
         choiceIdle:
@@ -554,7 +565,7 @@ export function liveClassroomTeamTone(colorKey: string | null | undefined): {
           "border-transparent bg-emerald-500/35 text-emerald-50 hover:bg-emerald-500/35",
         badgeAway: "border-emerald-400/40 bg-transparent text-emerald-200",
         accent: "text-emerald-300",
-        surface: "border-emerald-500/50 bg-emerald-950/40",
+        surface: "border-emerald-500/60 bg-emerald-950/70",
         choiceSelected:
           "border-emerald-400 bg-emerald-500/35 text-emerald-50 hover:bg-emerald-500/40",
         choiceIdle:
@@ -570,7 +581,7 @@ export function liveClassroomTeamTone(colorKey: string | null | undefined): {
           "border-transparent bg-amber-500/35 text-amber-50 hover:bg-amber-500/35",
         badgeAway: "border-amber-400/40 bg-transparent text-amber-200",
         accent: "text-amber-300",
-        surface: "border-amber-500/50 bg-amber-950/40",
+        surface: "border-amber-500/60 bg-amber-950/65",
         choiceSelected:
           "border-amber-400 bg-amber-500/35 text-amber-50 hover:bg-amber-500/40",
         choiceIdle:
@@ -587,7 +598,7 @@ export function liveClassroomTeamTone(colorKey: string | null | undefined): {
           "border-transparent bg-sky-500/35 text-sky-50 hover:bg-sky-500/35",
         badgeAway: "border-sky-400/40 bg-transparent text-sky-200",
         accent: "text-sky-300",
-        surface: "border-sky-500/50 bg-sky-950/40",
+        surface: "border-sky-500/60 bg-sky-950/70",
         choiceSelected:
           "border-sky-400 bg-sky-500/35 text-sky-50 hover:bg-sky-500/40",
         choiceIdle:

@@ -125,6 +125,7 @@ import {
   isQuestionRevealedForTeam,
   maxTimerBonusSeconds,
   readParticipantClockMap,
+  readTimerBonusMap,
   remainingQuestionSeconds,
   timerBonusSecondsForTeam,
   withParticipantClock,
@@ -804,11 +805,14 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
         score: pointsByUserId.get(p.userId) ?? 0,
         battleStatus: status as "active" | "finished" | "opted_out",
         answeredCount: answered,
+        /** Survival mode only — this player's own remaining lives. */
+        survivalLives: p.survivalLives,
       };
     }),
     currentQuestion: viewerQuestion
       ? {
           id: viewerQuestion.id,
+          cardId: viewerQuestion.cardId ?? null,
           prompt: viewerQuestion.prompt,
           choices: viewerQuestion.choices,
           sortOrder: viewerQuestion.sortOrder,
@@ -845,6 +849,20 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
         eliminated: t.eliminated,
         colorKey: t.colorKey,
       })),
+    /** Survival only — every player for themselves, ranked individually. */
+    survivalLeaderboard:
+      session.battleMode === "survival"
+        ? [...presence]
+            .filter((p) => !p.removed && p.liveTeamId != null)
+            .map((p) => ({
+              userId: p.userId,
+              displayName: p.displayName,
+              score: pointsByUserId.get(p.userId) ?? 0,
+              livesRemaining: p.survivalLives,
+              eliminated: p.survivalLives <= 0,
+            }))
+            .sort((a, b) => b.score - a.score)
+        : null,
     /** Another session on this team that is currently mid-battle. */
     otherLiveSession,
   };
@@ -1014,6 +1032,9 @@ export async function updateLobbyTeamAction(raw: {
   moveUserId?: string;
   /** Target team id, or null to move to Unassigned. */
   toLiveTeamId?: number | null;
+  /** Collaborative Team mode only — drag the captain badge onto a member to set them
+   * as that team's captain, or pass `null` to clear it. One captain per team. */
+  captainUserId?: string | null;
 }) {
   const schema = z.object({
     sessionId: z.number().int().positive(),
@@ -1023,6 +1044,7 @@ export async function updateLobbyTeamAction(raw: {
     removeUserId: z.string().optional(),
     moveUserId: z.string().optional(),
     toLiveTeamId: z.number().int().positive().nullable().optional(),
+    captainUserId: z.string().nullable().optional(),
   });
   const parsed = schema.safeParse(raw);
   if (!parsed.success) throw new Error("Invalid lobby update");
@@ -1098,6 +1120,36 @@ export async function updateLobbyTeamAction(raw: {
         liveTeamId: parsed.data.toLiveTeamId ?? null,
       });
     }
+  }
+
+  if (
+    parsed.data.liveTeamId &&
+    Object.prototype.hasOwnProperty.call(parsed.data, "captainUserId")
+  ) {
+    if (session.battleMode !== "collaborative_team") {
+      throw new Error("Captains are only used in Collaborative Team mode.");
+    }
+    const team = (await listLiveClassroomTeams(session.id)).find(
+      (t) => t.id === parsed.data.liveTeamId,
+    );
+    if (!team) throw new Error("Team not found.");
+    const nextCaptainUserId = parsed.data.captainUserId ?? null;
+    if (nextCaptainUserId) {
+      const candidate = await getLiveClassroomParticipant(
+        session.id,
+        nextCaptainUserId,
+      );
+      if (
+        !candidate ||
+        candidate.removed ||
+        candidate.liveTeamId !== team.id
+      ) {
+        throw new Error("The captain must be a member of this team.");
+      }
+    }
+    await updateLiveClassroomTeam(team.id, {
+      captainUserId: nextCaptainUserId,
+    });
   }
 
   revalidateLiveClassroom(session.teamId, session.id);
@@ -1789,6 +1841,20 @@ export async function startLiveClassroomBattleAction(sessionId: number) {
     }
   }
 
+  // Survival — every player for themselves. Reset each player's own lives
+  // to the configured starting count right as the battle goes live.
+  if (session.battleMode === "survival") {
+    await Promise.all(
+      participants
+        .filter((p) => !p.removed && p.liveTeamId != null)
+        .map((p) =>
+          updateLiveClassroomParticipant(p.id, {
+            survivalLives: session.config.survivalHearts,
+          }),
+        ),
+    );
+  }
+
   // Final safety net: reconcile issued strategy cards against the session's
   // current config right as the battle goes live, regardless of whatever
   // settings-save history led here (cards can't have been used yet).
@@ -2017,7 +2083,14 @@ export async function submitLiveClassroomAnswerAction(raw: {
 
   const teams = await listLiveClassroomTeams(session.id);
   const team = teams.find((t) => t.id === participant.liveTeamId);
-  if (team?.eliminated) throw new Error("Your team has been eliminated.");
+  // Survival is every player for themselves — gate on this player's own
+  // lives below, not the shared team bucket's hearts.
+  if (session.battleMode !== "survival" && team?.eliminated) {
+    throw new Error("Your team has been eliminated.");
+  }
+  if (session.battleMode === "survival" && participant.survivalLives <= 0) {
+    throw new Error("You are out of lives for this battle.");
+  }
 
   if (session.battleMode === "collaborative_team") {
     if (!team?.captainUserId || team.captainUserId !== access.userId) {
@@ -2026,20 +2099,36 @@ export async function submitLiveClassroomAnswerAction(raw: {
   }
 
   const strategyCards = await listLiveBattleStrategyCards(session.id);
-  const activeForTeam = strategyCards.filter(
-    (c) =>
-      c.liveTeamId === participant.liveTeamId &&
-      c.usedAt &&
-      c.questionId === question.id,
+  const teamCards = strategyCards.filter(
+    (c) => c.liveTeamId === participant.liveTeamId,
   );
-  const doublePointsBonus = activeForTeam.some((c) => c.kind === "double_points")
-    ? resolveStrategyCardSetting(session.config.strategyCardSettings, "double_points")
-        .value
-    : 0;
+  const activeForTeam = teamCards.filter(
+    (c) => c.usedAt && c.questionId === question.id,
+  );
   const shielded = activeForTeam.some((c) => c.kind === "shield");
-  const scoreBoost = activeForTeam.some((c) => c.kind === "score_boost")
-    ? resolveStrategyCardSetting(session.config.strategyCardSettings, "score_boost").value
-    : 0;
+
+  // Double Points / Score Boost are informational badges, not click-to-use
+  // buttons — they auto-apply the moment an unused card is eligible for the
+  // question being answered, consuming one instance per activation cap.
+  const strategyCardSettings = session.config.strategyCardSettings;
+  const questionCardId = question.cardId;
+  const questionId = question.id;
+  async function autoApplyBonusCard(
+    kind: "double_points" | "score_boost",
+  ): Promise<number> {
+    const setting = resolveStrategyCardSetting(strategyCardSettings, kind);
+    if (!strategyCardAppliesToDeckCard(setting, questionCardId)) return 0;
+    const unused = teamCards.find((c) => c.kind === kind && !c.usedAt);
+    if (!unused) return 0;
+    await markStrategyCardUsed(unused.id, {
+      usedByUserId: access.userId,
+      questionId,
+    });
+    return setting.value;
+  }
+
+  const doublePointsBonus = await autoApplyBonusCard("double_points");
+  const scoreBoost = await autoApplyBonusCard("score_boost");
 
   const started = session.questionStartedAt?.getTime() ?? Date.now();
   const responseTimeMs = Math.max(0, Date.now() - started);
@@ -2081,19 +2170,32 @@ export async function submitLiveClassroomAnswerAction(raw: {
     });
   }
 
-  if (session.battleMode === "survival" && team && scored.eliminated) {
-    const hearts = Math.max(0, team.hearts - 1);
-    await updateLiveClassroomTeam(team.id, {
-      hearts,
-      eliminated: hearts <= 0,
+  let survivalLivesRemaining: number | null = null;
+  let survivalOutOfLives = false;
+  if (session.battleMode === "survival" && scored.eliminated) {
+    survivalLivesRemaining = Math.max(0, participant.survivalLives - 1);
+    survivalOutOfLives = survivalLivesRemaining <= 0;
+    await updateLiveClassroomParticipant(participant.id, {
+      survivalLives: survivalLivesRemaining,
     });
+    // Kept in sync for any legacy UI still reading the shared team bucket.
+    if (team) {
+      const hearts = Math.max(0, team.hearts - 1);
+      await updateLiveClassroomTeam(team.id, {
+        hearts,
+        eliminated: hearts <= 0,
+      });
+    }
   }
 
   let personalFinished = false;
   let sessionCompleted = false;
   if (isIndependentLiveClassroomBattleMode(session.battleMode)) {
     const answeredNow = participant.answersSubmitted + 1;
-    if (questions.length > 0 && answeredNow >= questions.length) {
+    if (
+      survivalOutOfLives ||
+      (questions.length > 0 && answeredNow >= questions.length)
+    ) {
       personalFinished = true;
       await updateLiveClassroomSession(session.id, {
         extensions: withParticipantBattleStatus(
@@ -2123,6 +2225,8 @@ export async function submitLiveClassroomAnswerAction(raw: {
     speedBonus: scored.speedBonus,
     personalFinished,
     sessionCompleted,
+    survivalLivesRemaining,
+    survivalOutOfLives,
   };
 }
 
@@ -2158,6 +2262,67 @@ export async function optOutLiveClassroomBattleAction(sessionId: number) {
 
   const sessionCompleted =
     await maybeCompleteIndependentBattleIfEveryoneDone(session.id);
+
+  revalidateLiveClassroom(session.teamId, session.id);
+  return { ok: true as const, sessionCompleted };
+}
+
+/**
+ * Collaborative Team mode — the captain leaves early on behalf of the whole
+ * team. Ends the battle for every member of that team immediately; if it was
+ * the last active team, the whole session completes right away.
+ */
+export async function leaveLiveClassroomCollaborativeBattleAction(
+  sessionId: number,
+) {
+  const parsed = z.number().int().positive().safeParse(sessionId);
+  if (!parsed.success) throw new Error("Invalid session");
+
+  const session = await getLiveClassroomSessionById(parsed.data);
+  if (!session) throw new Error("Session not found");
+  if (session.status !== "active") {
+    throw new Error("Battle is not active.");
+  }
+  if (session.battleMode !== "collaborative_team") {
+    throw new Error(
+      "Leaving mid-battle is only available in Collaborative Team mode.",
+    );
+  }
+
+  const { access } = await requireLiveClassroomAccess({
+    teamId: session.teamId,
+  });
+  const participant = await getLiveClassroomParticipant(
+    session.id,
+    access.userId,
+  );
+  if (!participant || participant.removed || participant.liveTeamId == null) {
+    throw new Error("Join the session before leaving.");
+  }
+
+  const teams = await listLiveClassroomTeams(session.id);
+  const team = teams.find((t) => t.id === participant.liveTeamId);
+  if (!team) throw new Error("Team not found.");
+  if (!team.captainUserId || team.captainUserId !== access.userId) {
+    throw new Error(
+      "Only the team captain can leave the battle for the whole team.",
+    );
+  }
+
+  if (!team.eliminated) {
+    await updateLiveClassroomTeam(team.id, { eliminated: true });
+  }
+
+  // If every other team has already finished or left, end the whole session now.
+  const stillActive = teams.some(
+    (t) => t.id !== team.id && !t.eliminated && t.captainUserId,
+  );
+
+  let sessionCompleted = false;
+  if (!stillActive) {
+    await endLiveClassroomSessionAction(session.id, { systemComplete: true });
+    sessionCompleted = true;
+  }
 
   revalidateLiveClassroom(session.teamId, session.id);
   return { ok: true as const, sessionCompleted };
@@ -2433,6 +2598,11 @@ export async function useLiveClassroomStrategyCardAction(raw: {
   const cards = await listLiveBattleStrategyCards(session.id);
   const card = cards.find((c) => c.id === parsed.data.strategyCardId);
   if (!card || card.usedAt) throw new Error("Card unavailable.");
+  if (card.kind === "double_points" || card.kind === "score_boost") {
+    throw new Error(
+      "This card applies automatically when it matches the current question.",
+    );
+  }
 
   const participant = await getLiveClassroomParticipant(
     session.id,
@@ -2440,6 +2610,17 @@ export async function useLiveClassroomStrategyCardAction(raw: {
   );
   if (!participant || participant.liveTeamId !== card.liveTeamId) {
     throw new Error("This card belongs to another team.");
+  }
+
+  if (session.battleMode === "collaborative_team") {
+    const team = (await listLiveClassroomTeams(session.id)).find(
+      (t) => t.id === card.liveTeamId,
+    );
+    if (!team?.captainUserId || team.captainUserId !== access.userId) {
+      throw new Error(
+        "Only the team captain can activate strategy cards in Collaborative mode.",
+      );
+    }
   }
 
   const questions = await listLiveBattleQuestions(session.id);
@@ -2499,6 +2680,19 @@ export async function useLiveClassroomStrategyCardAction(raw: {
     });
   }
   if (card.kind === "recovery") {
+    const recoveringParticipant = await getLiveClassroomParticipant(
+      session.id,
+      access.userId,
+    );
+    if (
+      recoveringParticipant &&
+      recoveringParticipant.survivalLives < session.config.survivalHearts
+    ) {
+      await updateLiveClassroomParticipant(recoveringParticipant.id, {
+        survivalLives: recoveringParticipant.survivalLives + 1,
+      });
+    }
+    // Kept in sync for any legacy UI still reading the shared team bucket.
     const team = (await listLiveClassroomTeams(session.id)).find(
       (t) => t.id === card.liveTeamId,
     );
@@ -2649,6 +2843,7 @@ export async function endLiveClassroomSessionAction(
       return {
         userId: p.userId,
         displayName: p.displayName,
+        teamName: teams.find((t) => t.id === p.liveTeamId)?.name ?? null,
         correct: p.correctCount,
         incorrect: p.incorrectCount,
         accuracyPercent: denom > 0 ? Math.round((p.correctCount / denom) * 100) : 0,
@@ -2662,6 +2857,18 @@ export async function endLiveClassroomSessionAction(
     questionAnalysis: questions.map((q) => {
       const qAnswers = answers.filter((a) => a.questionId === q.id);
       const correctCount = qAnswers.filter((a) => a.correct).length;
+      const cardsUsedOnQuestion = strategyCards.filter(
+        (c) => c.usedAt && c.questionId === q.id,
+      );
+      const timerBonusEntry = readTimerBonusMap(session.extensions)[
+        String(q.id)
+      ];
+      const extraTimeAddedSec =
+        (timerBonusEntry?.all ?? 0) +
+        Object.values(timerBonusEntry?.byTeamId ?? {}).reduce(
+          (sum, sec) => sum + sec,
+          0,
+        );
       return {
         questionId: String(q.id),
         prompt: q.prompt,
@@ -2671,6 +2878,13 @@ export async function endLiveClassroomSessionAction(
           qAnswers.length > 0
             ? Math.round((correctCount / qAnswers.length) * 100)
             : 0,
+        strategyCardsUsed: cardsUsedOnQuestion.map((c) => ({
+          kind: c.kind,
+          teamName:
+            teams.find((t) => t.id === c.liveTeamId)?.name ?? "Team",
+        })),
+        extraTimeAddedSec,
+        revealed: q.revealed,
       };
     }),
     aiTeacherSummary: ai.summary,

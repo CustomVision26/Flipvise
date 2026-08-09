@@ -238,9 +238,6 @@ export function LiveClassroomSessionSettingsDialog({
     session.config.battleStartDelaySec ??
       DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
   );
-  const [questionCount, setQuestionCount] = useState(
-    session.config.questionCount,
-  );
   const [questionSourceMode, setQuestionSourceMode] =
     useState<LiveClassroomQuestionSourceMode>(
       session.config.questionSourceMode ?? "all",
@@ -311,7 +308,7 @@ export function LiveClassroomSessionSettingsDialog({
   const strategyCardsEditable = strategyCardPolicy !== "disabled";
 
   useEffect(() => {
-    if (!open || questionSourceMode !== "specific" || deckId == null) return;
+    if (!open || deckId == null) return;
     let cancelled = false;
     setLoadingDeckCards(true);
     getCardsForDeckViewerPreviewAction({ deckId })
@@ -337,12 +334,17 @@ export function LiveClassroomSessionSettingsDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, questionSourceMode, deckId]);
+  }, [open, deckId]);
+
+  const effectiveCardCount =
+    questionSourceMode === "specific" ? selectedCardIds.length : deckCards.length;
 
   function toggleCardId(id: number, checked: boolean) {
-    setSelectedCardIds((prev) =>
-      checked ? [...prev, id] : prev.filter((existing) => existing !== id),
-    );
+    setSelectedCardIds((prev) => {
+      const already = prev.includes(id);
+      if (checked) return already ? prev : [...prev, id];
+      return already ? prev.filter((existing) => existing !== id) : prev;
+    });
   }
 
   function hydrateSessionFormFromProps() {
@@ -353,7 +355,6 @@ export function LiveClassroomSessionSettingsDialog({
       session.config.battleStartDelaySec ??
         DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
     );
-    setQuestionCount(session.config.questionCount);
     setQuestionSourceMode(session.config.questionSourceMode ?? "all");
     setSelectedCardIds(session.config.selectedDeckCardIds ?? []);
     setTimePerQuestionSec(session.config.timePerQuestionSec);
@@ -549,7 +550,6 @@ export function LiveClassroomSessionSettingsDialog({
           sessionType,
           battleMode,
           battleStartDelaySec,
-          questionCount,
           questionSourceMode,
           selectedDeckCardIds:
             questionSourceMode === "specific" ? selectedCardIds : undefined,
@@ -765,17 +765,26 @@ export function LiveClassroomSessionSettingsDialog({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lc-sess-q">Questions</Label>
-                    <Input
-                      id="lc-sess-q"
-                      type="number"
-                      min={1}
-                      max={30}
-                      value={questionCount}
-                      onChange={(e) =>
-                        setQuestionCount(Number(e.target.value))
-                      }
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <Label>Card count</Label>
+                      <FieldHint
+                        label="Card count"
+                        caption="Automatically matches the cards included in this battle below — every deck card becomes one question."
+                      />
+                    </div>
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted/20 px-3 text-sm text-foreground">
+                      {loadingDeckCards ? (
+                        <Loader2
+                          className="size-3.5 animate-spin text-muted-foreground"
+                          aria-hidden
+                        />
+                      ) : (
+                        <span>
+                          {effectiveCardCount} card
+                          {effectiveCardCount === 1 ? "" : "s"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-1.5">
@@ -818,7 +827,7 @@ export function LiveClassroomSessionSettingsDialog({
                       <Label htmlFor="lc-sess-teams">Team count</Label>
                       <FieldHint
                         label="Team count"
-                        caption="Number of competing teams in the lobby (2–4). Unlock teams before changing this."
+                        caption="Number of competing teams in the lobby (2–4). Unlock teams before changing this. Not used in Survival — every player battles individually."
                       />
                     </div>
                     <Input
@@ -827,11 +836,13 @@ export function LiveClassroomSessionSettingsDialog({
                       min={2}
                       max={4}
                       value={teamCount}
-                      disabled={teamsLocked}
+                      disabled={teamsLocked || battleMode === "survival"}
                       title={
-                        teamsLocked
-                          ? "Unlock teams before changing team count"
-                          : undefined
+                        battleMode === "survival"
+                          ? "Survival is every player for themselves — team count doesn't apply."
+                          : teamsLocked
+                            ? "Unlock teams before changing team count"
+                            : undefined
                       }
                       onChange={(e) => setTeamCount(Number(e.target.value))}
                     />
@@ -953,7 +964,11 @@ export function LiveClassroomSessionSettingsDialog({
                                   }}
                                   className="flex cursor-pointer items-start gap-2 rounded-md border border-border/40 bg-background/40 p-2 transition-colors hover:bg-background/70"
                                 >
-                                  <Checkbox checked={checked} className="mt-0.5" />
+                                  <Checkbox
+                                    checked={checked}
+                                    tabIndex={-1}
+                                    className="mt-0.5 pointer-events-none"
+                                  />
                                   <div className="min-w-0 flex-1 space-y-1">
                                     <p className="text-sm font-medium text-foreground">
                                       {card.front?.trim() || "Untitled question"}
@@ -1000,7 +1015,9 @@ export function LiveClassroomSessionSettingsDialog({
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      All cards in this deck will be used as questions.
+                      {loadingDeckCards
+                        ? "Loading deck cards…"
+                        : `All ${deckCards.length} card${deckCards.length === 1 ? "" : "s"} in this deck will be used as questions.`}
                     </p>
                   )}
                 </section>
@@ -1346,6 +1363,9 @@ export function LiveClassroomSessionSettingsDialog({
             ? cardSettings[configuringKind] ?? defaultStrategyCardSetting(configuringKind)
             : defaultStrategyCardSetting("double_points")
         }
+        otherCardSettings={Object.fromEntries(
+          enabledCards.map((k) => [k, cardSettings[k]!]),
+        )}
         onSave={(setting) => {
           if (configuringKind) saveCardSetting(configuringKind, setting);
         }}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Loader2, SkipForward, Sparkles } from "lucide-react";
+import { ChevronRight, Crown, Heart, Loader2, SkipForward, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   advanceLiveClassroomPlayerQuestionAction,
@@ -11,6 +11,7 @@ import {
   getLiveClassroomRealtimeStateAction,
   heartbeatLiveClassroomAction,
   joinLiveClassroomSessionAction,
+  leaveLiveClassroomCollaborativeBattleAction,
   leaveLiveClassroomPresenceAction,
   optOutLiveClassroomBattleAction,
   submitLiveClassroomAnswerAction,
@@ -18,6 +19,16 @@ import {
 } from "@/actions/live-classroom";
 import { LiveClassroomTeamTargetMenu } from "@/components/live-classroom-team-target-menu";
 import { useLiveClassroomRealtime } from "@/components/live-classroom-realtime-poller";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +42,8 @@ import { remainingQuestionSeconds } from "@/lib/live-classroom-question-clock";
 import { cn } from "@/lib/utils";
 import {
   liveClassroomTeamTone,
+  resolveStrategyCardSetting,
+  strategyCardAppliesToDeckCard,
   strategyCardLabel,
 } from "@/lib/live-classroom-types";
 import {
@@ -66,6 +79,7 @@ export function LiveClassroomStudentPlay({
   const [localFinished, setLocalFinished] = useState(false);
   const [aiHint, setAiHint] = useState<string | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
+  const [leaveBattleOpen, setLeaveBattleOpen] = useState(false);
   const timeoutFiredForQuestionRef = useRef<number | null>(null);
 
   const sessionStatus = state?.session.status ?? null;
@@ -137,6 +151,9 @@ export function LiveClassroomStudentPlay({
   const myTeam = state?.teams.find((t) => t.id === me?.liveTeamId);
   const teamTone = liveClassroomTeamTone(myTeam?.colorKey);
   const collaborative = state?.session.battleMode === "collaborative_team";
+  /** Survival — every player for themselves, no team identity or shared team scores. */
+  const isSurvivalMode = state?.session.battleMode === "survival";
+  const myLivesRemaining = me?.survivalLives ?? null;
   const independent = Boolean(state?.session.independentBattle);
   const isCaptain =
     collaborative &&
@@ -149,8 +166,11 @@ export function LiveClassroomStudentPlay({
     state?.session.personalBattleStatus === "finished" ||
     state?.session.personalBattleStatus === "opted_out";
   const optedOut = state?.session.personalBattleStatus === "opted_out";
+  /** Collaborative Team — captain ended the battle early for the whole team. */
+  const collaborativeTeamEnded = collaborative && Boolean(myTeam?.eliminated);
   const waitingForOthers =
-    independent && personalFinished && state?.session.status === "active";
+    (independent && personalFinished && state?.session.status === "active") ||
+    (collaborativeTeamEnded && state?.session.status === "active");
   const canNavigate =
     Boolean(state) &&
     state!.session.status === "active" &&
@@ -274,10 +294,19 @@ export function LiveClassroomStudentPlay({
   const showRevealPanel = Boolean(
     q?.revealed && (q.explanation || q.correctIndex != null),
   );
+  // Double Points / Score Boost inform which question grants a bonus rather
+  // than being click-to-use actions — auto-applied at answer time. Shown
+  // right under the question prompt instead of the Strategy cards panel.
+  const bonusCards = teamCards.filter(
+    (c) => c.kind === "double_points" || c.kind === "score_boost",
+  );
+  const actionCards = teamCards.filter(
+    (c) => c.kind !== "double_points" && c.kind !== "score_boost",
+  );
   const showStrategySection =
     !waitingForOthers &&
     (showRevealPanel ||
-      (battle.session.config.allowStrategyCards && teamCards.length > 0));
+      (battle.session.config.allowStrategyCards && actionCards.length > 0));
 
   function answer(choiceIndex: number) {
     if (!battle.currentQuestion || submittedChoice != null || !canAnswer) return;
@@ -297,7 +326,9 @@ export function LiveClassroomStudentPlay({
           toast.success(
             result.sessionCompleted
               ? "Battle complete"
-              : "You’re done — waiting for other players",
+              : result.survivalOutOfLives
+                ? "Out of lives — your battle has ended"
+                : "You’re done — waiting for other players",
           );
         } else {
           toast.success(
@@ -325,6 +356,29 @@ export function LiveClassroomStudentPlay({
           result.sessionCompleted
             ? "Battle complete"
             : "You left the battle — waiting for other players",
+        );
+        await refreshBattleState().catch(() => undefined);
+        if (result.sessionCompleted) {
+          router.push(liveClassroomReportPath(sessionId));
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Could not leave battle");
+      }
+    });
+  }
+
+  function leaveCollaborativeBattle() {
+    setLeaveBattleOpen(false);
+    startTransition(async () => {
+      try {
+        const result = await leaveLiveClassroomCollaborativeBattleAction(
+          sessionId,
+        );
+        setLocalFinished(true);
+        toast.success(
+          result.sessionCompleted
+            ? "Battle complete"
+            : "Battle ended for your team — waiting for other teams",
         );
         await refreshBattleState().catch(() => undefined);
         if (result.sessionCompleted) {
@@ -412,10 +466,23 @@ export function LiveClassroomStudentPlay({
         >
           <div
             className={cn(
-              "pointer-events-auto max-w-lg rounded-xl border px-5 py-4 shadow-lg backdrop-blur-md",
+              "pointer-events-auto relative max-w-lg rounded-xl border px-5 py-4 pr-10 shadow-lg backdrop-blur-md",
               teamTone.surface,
             )}
           >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Close hint"
+              onClick={() => {
+                setAiHint(null);
+                setHintLoading(false);
+              }}
+              className="absolute right-2 top-2 size-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" aria-hidden />
+            </Button>
             <p className={cn("mb-2 text-xs font-semibold uppercase tracking-wide", teamTone.accent)}>
               AI Hint
             </p>
@@ -443,12 +510,28 @@ export function LiveClassroomStudentPlay({
                 : `Question ${Math.min(questionNumber, q?.totalQuestions ?? questionNumber)}${
                     q ? ` / ${q.totalQuestions}` : ""
                   }`}
-              {myTeam ? (
+              {isSurvivalMode ? (
+                <>
+                  {" · "}
+                  <span className={cn("font-medium", teamTone.accent)}>
+                    Score: {me?.score ?? 0}
+                  </span>
+                </>
+              ) : myTeam ? (
                 <>
                   {" · "}
                   <span className={cn("font-medium", teamTone.accent)}>
                     {myTeam.name}
                   </span>
+                  {isCaptain ? (
+                    <span
+                      className="ml-1 inline-flex items-center gap-0.5 align-middle text-amber-400"
+                      title="You are the team captain"
+                    >
+                      <Crown className="inline size-3.5" aria-hidden />
+                      <span className="text-xs font-medium">Captain</span>
+                    </span>
+                  ) : null}
                 </>
               ) : null}
             </CardDescription>
@@ -539,13 +622,18 @@ export function LiveClassroomStudentPlay({
           {waitingForOthers ? (
             <div className="space-y-3">
               <p className="text-base font-medium text-foreground">
-                {optedOut
-                  ? "You opted out of this battle."
-                  : "You’ve finished all questions."}
+                {collaborativeTeamEnded
+                  ? "Your team captain ended the battle."
+                  : optedOut
+                    ? "You opted out of this battle."
+                    : "You’ve finished all questions."}
               </p>
               <p className="text-sm text-muted-foreground">
-                The session ends when every team member finishes or leaves.
-                {typeof state.session.activeBattlersRemaining === "number"
+                {collaborativeTeamEnded
+                  ? "Your team's battle is over. Waiting for the other teams to finish."
+                  : "The session ends when every team member finishes or leaves."}
+                {!collaborativeTeamEnded &&
+                typeof state.session.activeBattlersRemaining === "number"
                   ? ` ${state.session.activeBattlersRemaining} player${
                       state.session.activeBattlersRemaining === 1 ? "" : "s"
                     } still battling.`
@@ -557,10 +645,45 @@ export function LiveClassroomStudentPlay({
               <p className="text-base font-medium text-foreground">{q.prompt}</p>
               {collaborative && !isCaptain ? (
                 <p className="text-xs text-muted-foreground">
-                  Collaborative mode — only your team captain can answer, skip,
-                  or go to the next question. You can still watch and use shared
-                  strategy cards.
+                  Collaborative mode — read along and follow the question at
+                  your own pace. Only your team captain can select and submit
+                  answers, activate strategy cards, and move to the next
+                  question.
                 </p>
+              ) : null}
+              {bonusCards.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {bonusCards.map((card) => {
+                    const used = Boolean(card.usedAt);
+                    const setting = resolveStrategyCardSetting(
+                      state.session.config.strategyCardSettings,
+                      card.kind,
+                    );
+                    const appliesNow = strategyCardAppliesToDeckCard(
+                      setting,
+                      q.cardId,
+                    );
+                    if (!used && !appliesNow) return null;
+                    const captainBlocked = collaborative && !isCaptain;
+                    return (
+                      <Badge
+                        key={card.id}
+                        variant={used ? "outline" : "default"}
+                        className={cn(
+                          "gap-1 px-2.5 py-1 text-xs font-semibold",
+                          used || captainBlocked
+                            ? "opacity-50"
+                            : cn(teamTone.choiceSelected, "border-transparent"),
+                        )}
+                      >
+                        {strategyCardLabel(card.kind)}
+                        {used
+                          ? " · Used"
+                          : ` · +${setting.value} pts this question`}
+                      </Badge>
+                    );
+                  })}
+                </div>
               ) : null}
               <div className="grid gap-2">
                 {q.choices.map((choice, i) => {
@@ -584,7 +707,7 @@ export function LiveClassroomStudentPlay({
                       className={cn(
                         "h-auto justify-start whitespace-normal px-4 py-3 text-left",
                         eliminated
-                          ? "opacity-40 line-through"
+                          ? "border-destructive/40 text-muted-foreground/70 line-through decoration-destructive decoration-[3px]"
                           : isCorrectReveal
                             ? "border-primary bg-primary/15 text-foreground"
                             : selected
@@ -656,6 +779,16 @@ export function LiveClassroomStudentPlay({
                     >
                       Leave battle
                     </Button>
+                  ) : collaborative && isCaptain ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      disabled={pending || paused}
+                      onClick={() => setLeaveBattleOpen(true)}
+                    >
+                      Leave battle
+                    </Button>
                   ) : null}
                 </div>
               ) : independent && canAnswer ? (
@@ -716,13 +849,14 @@ export function LiveClassroomStudentPlay({
               </div>
             ) : null}
             {state.session.config.allowStrategyCards ? (
-              <div className="flex flex-wrap gap-2">
-                {teamCards.map((card) => {
+              <div className="flex flex-wrap items-center gap-2">
+                {actionCards.map((card) => {
                   const used = Boolean(card.usedAt);
                   const isAiHint = card.kind === "ai_hint";
                   const timerBlocked =
                     card.kind === "extra_time" &&
                     state.session.config.timePerQuestionSec == null;
+                  const captainBlocked = collaborative && !isCaptain;
                   return (
                     <Button
                       key={card.id}
@@ -735,16 +869,19 @@ export function LiveClassroomStudentPlay({
                         paused ||
                         used ||
                         timerBlocked ||
+                        captainBlocked ||
                         (isAiHint && hintLoading)
                       }
                       title={
-                        timerBlocked
-                          ? "This battle has no time limit"
-                          : undefined
+                        captainBlocked
+                          ? "Only your team captain can activate strategy cards"
+                          : timerBlocked
+                            ? "This battle has no time limit"
+                            : undefined
                       }
                       className={cn(
-                        (used || timerBlocked) && "opacity-50",
-                        !used && !timerBlocked && teamTone.choiceSelected,
+                        (used || timerBlocked || captainBlocked) && "opacity-50",
+                        !used && !timerBlocked && !captainBlocked && teamTone.choiceSelected,
                       )}
                       onClick={() => useCard(card.id, card.kind)}
                     >
@@ -771,14 +908,43 @@ export function LiveClassroomStudentPlay({
       <Card className={cn("shadow-sm", teamTone.surface)}>
         <CardHeader className="pb-2">
           <CardTitle className={cn("text-base", teamTone.accent)}>
-            {myTeam ? `${myTeam.name} scores` : "Your team"}
+            {isSurvivalMode ? "Your lives" : myTeam ? `${myTeam.name} scores` : "Your team"}
           </CardTitle>
           <CardDescription>
-            Only your team’s scores are shown here.
+            {isSurvivalMode
+              ? "Survival is every player for themselves — a wrong answer costs a life. Run out before the questions end and your battle ends early."
+              : "Only your team’s scores are shown here."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {myTeam ? (
+          {isSurvivalMode ? (
+            myLivesRemaining != null ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  Lives remaining
+                </span>
+                <span className="flex items-center gap-1">
+                  {myLivesRemaining > 0 ? (
+                    Array.from({ length: myLivesRemaining }).map((_, i) => (
+                      <Heart
+                        key={i}
+                        className="size-4 fill-current text-rose-400"
+                        aria-hidden
+                      />
+                    ))
+                  ) : (
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Out of lives
+                    </span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                You are not assigned to this battle.
+              </p>
+            )
+          ) : myTeam ? (
             <>
               <div className="flex justify-between text-sm font-medium text-foreground">
                 <span>Team total</span>
@@ -795,15 +961,23 @@ export function LiveClassroomStudentPlay({
                       m.isSelf ? teamTone.row : "text-foreground",
                     )}
                   >
-                    <span className="truncate">
-                      {m.displayName}
-                      {m.isSelf ? " (you)" : ""}
-                      {independent && m.battleStatus === "finished"
-                        ? " · Done"
-                        : null}
-                      {independent && m.battleStatus === "opted_out"
-                        ? " · Left"
-                        : null}
+                    <span className="flex min-w-0 items-center gap-1 truncate">
+                      {collaborative && myTeam.captainUserId === m.userId ? (
+                        <Crown
+                          className="size-3.5 shrink-0 text-amber-400"
+                          aria-hidden
+                        />
+                      ) : null}
+                      <span className="truncate">
+                        {m.displayName}
+                        {m.isSelf ? " (you)" : ""}
+                        {independent && m.battleStatus === "finished"
+                          ? " · Done"
+                          : null}
+                        {independent && m.battleStatus === "opted_out"
+                          ? " · Left"
+                          : null}
+                      </span>
                     </span>
                     <span className="tabular-nums text-muted-foreground">
                       {m.score}
@@ -819,6 +993,25 @@ export function LiveClassroomStudentPlay({
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={leaveBattleOpen} onOpenChange={setLeaveBattleOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave battle for your whole team?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As team captain, leaving now ends the battle for every member of{" "}
+              {myTeam?.name ?? "your team"} — no one on your team will be able
+              to answer any more questions this battle.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay in battle</AlertDialogCancel>
+            <AlertDialogAction onClick={leaveCollaborativeBattle}>
+              Leave battle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

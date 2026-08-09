@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -59,20 +60,22 @@ export function LiveClassroomTeamTargetMenu({
         {label}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48">
-        <DropdownMenuLabel>Apply to</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onSelect("all")} disabled={pending}>
-          All teams
-        </DropdownMenuItem>
-        {activeTeams.map((team) => (
-          <DropdownMenuItem
-            key={team.id}
-            onClick={() => onSelect(team.id)}
-            disabled={pending}
-          >
-            {team.name}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Apply to</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onSelect("all")} disabled={pending}>
+            All teams
           </DropdownMenuItem>
-        ))}
+          {activeTeams.map((team) => (
+            <DropdownMenuItem
+              key={team.id}
+              onClick={() => onSelect(team.id)}
+              disabled={pending}
+            >
+              {team.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -2081,6 +2081,8 @@ export const liveClassroomParticipants = pgTable(
     totalResponseTimeMs: integer().notNull().default(0),
     answersSubmitted: integer().notNull().default(0),
     removed: boolean().notNull().default(false),
+    /** Survival mode only — this player's own remaining lives (every player for themselves). */
+    survivalLives: integer().notNull().default(3),
     joinedAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp().notNull().defaultNow(),
   },

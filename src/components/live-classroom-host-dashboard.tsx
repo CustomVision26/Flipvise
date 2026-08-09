@@ -406,25 +406,42 @@ export function LiveClassroomHostDashboard({
         <Card className="border-border/80 bg-card/60 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Leaderboard</CardTitle>
+            {state.session.battleMode === "survival" ? (
+              <CardDescription>
+                Every player for themselves — ranked individually.
+              </CardDescription>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-2">
-            {state.leaderboard.map((team, i) => (
-              <div
-                key={team.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"
-              >
-                <span className="truncate text-foreground">
-                  #{i + 1} {team.name}
-                  {team.eliminated ? " (out)" : ""}
-                </span>
-                <span className="tabular-nums text-muted-foreground">
-                  {team.score}
-                  {state.session.battleMode === "survival"
-                    ? ` · ♥ ${team.hearts}`
-                    : ""}
-                </span>
-              </div>
-            ))}
+            {state.session.battleMode === "survival"
+              ? (state.survivalLeaderboard ?? []).map((player, i) => (
+                  <div
+                    key={player.userId}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"
+                  >
+                    <span className="truncate text-foreground">
+                      #{i + 1} {player.displayName}
+                      {player.eliminated ? " (out)" : ""}
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {player.score} · ♥ {player.livesRemaining}
+                    </span>
+                  </div>
+                ))
+              : state.leaderboard.map((team, i) => (
+                  <div
+                    key={team.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"
+                  >
+                    <span className="truncate text-foreground">
+                      #{i + 1} {team.name}
+                      {team.eliminated ? " (out)" : ""}
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {team.score}
+                    </span>
+                  </div>
+                ))}
           </CardContent>
         </Card>
       </div>

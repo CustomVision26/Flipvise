@@ -801,6 +801,7 @@ export async function updateLiveClassroomParticipant(
     totalResponseTimeMs: number;
     answersSubmitted: number;
     removed: boolean;
+    survivalLives: number;
   }>,
 ): Promise<LiveClassroomParticipantRow | null> {
   const [row] = await db

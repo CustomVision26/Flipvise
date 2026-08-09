@@ -42,9 +42,12 @@ import {
 } from "@/components/ui/select";
 import {
   analyzeLiveClassroomSavedGroup,
+  isSurvivalSavedGroup,
   LIVE_CLASSROOM_MIN_MEMBERS_PER_TEAM,
   type LiveClassroomSavedGroupTeam,
 } from "@/lib/live-classroom-saved-groups";
+import type { LiveClassroomBattleMode } from "@/lib/live-classroom-types";
+import { cn } from "@/lib/utils";
 
 export type LiveClassroomSavedGroupOption = {
   id: number;
@@ -71,6 +74,8 @@ type LiveClassroomSavedGroupsControlsProps = {
   participants: LobbyParticipantSnapshot[];
   workspaceMembers: LiveClassroomWorkspaceMemberOption[];
   initialSavedGroups: LiveClassroomSavedGroupOption[];
+  /** Current session's battle mode — used to filter the load dropdown to matching saved groups. */
+  battleMode: LiveClassroomBattleMode;
   onApplied?: () => void;
   /** Team assignment = Random — show Save group. */
   showSaveButton?: boolean;
@@ -87,6 +92,7 @@ export function LiveClassroomSavedGroupsControls({
   participants,
   workspaceMembers,
   initialSavedGroups,
+  battleMode,
   onApplied,
   showSaveButton = true,
   showLoadDropdown = true,
@@ -105,6 +111,16 @@ export function LiveClassroomSavedGroupsControls({
     [],
   );
   const [addMemberSelectKey, setAddMemberSelectKey] = useState(0);
+
+  const isSurvivalSession = battleMode === "survival";
+  /** Survival saved groups (one roster, no team split) only apply to Survival sessions; team-mode groups only apply to Individual/Collaborative sessions. */
+  const modeFilteredSavedGroups = useMemo(
+    () =>
+      savedGroups.filter(
+        (g) => isSurvivalSavedGroup(g.groups) === isSurvivalSession,
+      ),
+    [savedGroups, isSurvivalSession],
+  );
 
   const workspaceIds = useMemo(
     () => new Set(workspaceMembers.map((m) => m.userId)),
@@ -356,31 +372,49 @@ export function LiveClassroomSavedGroupsControls({
       {showLoadDropdown ? (
         <Select
           value={selectedId}
-          disabled={pending || teamsLocked || savedGroups.length === 0}
+          disabled={
+            pending || teamsLocked || modeFilteredSavedGroups.length === 0
+          }
           onValueChange={handleSelectSavedGroup}
         >
           <SelectTrigger
-            className="w-[11.5rem]"
+            className="w-[14rem]"
             title={
               teamsLocked
                 ? "Unlock teams before loading a saved group"
-                : savedGroups.length === 0
-                  ? "No saved groups yet"
-                  : "Load a saved group onto the lobby teams"
+                : modeFilteredSavedGroups.length === 0
+                  ? isSurvivalSession
+                    ? "No saved Survival rosters yet"
+                    : "No saved team groups yet"
+                  : "Load a saved group onto the lobby"
             }
           >
             <SelectValue placeholder="Saved groups">
               {selectedId === NONE
                 ? "Saved groups"
-                : (savedGroups.find((g) => String(g.id) === selectedId)?.name ??
-                  "Saved groups")}
+                : (modeFilteredSavedGroups.find(
+                    (g) => String(g.id) === selectedId,
+                  )?.name ?? "Saved groups")}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>Saved groups</SelectItem>
-            {savedGroups.map((g) => (
+            {modeFilteredSavedGroups.map((g) => (
               <SelectItem key={g.id} value={String(g.id)}>
-                {g.name}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{g.name}</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "shrink-0 text-[9px]",
+                      isSurvivalSession
+                        ? "border-amber-400/40 text-amber-500"
+                        : "border-primary/40 text-primary",
+                    )}
+                  >
+                    {isSurvivalSession ? "Survival" : "Teams"}
+                  </Badge>
+                </span>
               </SelectItem>
             ))}
           </SelectContent>

@@ -37,6 +37,8 @@ type LiveClassroomBattleCountdownDialogProps = {
    * Shown as "Blue Team VS Red Team".
    */
   matchupTeams?: LiveClassroomCountdownMatchupTeam[] | null;
+  /** Survival — every player for themselves, no team matchup to show. */
+  isSurvival?: boolean;
   title?: string;
   description?: string;
 };
@@ -52,6 +54,7 @@ export function LiveClassroomBattleCountdownDialog({
   liveTeamName = null,
   liveTeamColorKey = null,
   matchupTeams = null,
+  isSurvival = false,
   title = "Battle starting soon",
   description = "Get ready — the battle begins when the timer hits zero.",
 }: LiveClassroomBattleCountdownDialogProps) {
@@ -106,7 +109,11 @@ export function LiveClassroomBattleCountdownDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-3 py-6">
-          {showMatchup ? (
+          {isSurvival ? (
+            <p className="text-center text-base font-semibold tracking-tight text-foreground">
+              Survival Challenge
+            </p>
+          ) : showMatchup ? (
             <div
               className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-center"
               aria-label="Teams entering battle"

@@ -19,16 +19,19 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import {
   LIVE_CLASSROOM_EXTRA_TIME_MAX_SEC,
   LIVE_CLASSROOM_EXTRA_TIME_MIN_SEC,
   LIVE_CLASSROOM_STRATEGY_CARD_SCOPES,
+  strategyCardAppliesToDeckCard,
   strategyCardHasScoreValue,
   strategyCardLabel,
   strategyCardScopeLabel,
   type LiveClassroomStrategyCardKind,
   type LiveClassroomStrategyCardScope,
   type LiveClassroomStrategyCardSetting,
+  type LiveClassroomStrategyCardSettings,
 } from "@/lib/live-classroom-types";
 
 type DeckCardPreview = {
@@ -52,6 +55,11 @@ type LiveClassroomStrategyCardConfigDialogProps = {
    */
   allowedCardIds?: number[] | null;
   setting: LiveClassroomStrategyCardSetting;
+  /**
+   * Every card kind's current setting (including this one), used to show
+   * which other strategy cards are already assigned to each question below.
+   */
+  otherCardSettings?: LiveClassroomStrategyCardSettings;
   onSave: (setting: LiveClassroomStrategyCardSetting) => void;
 };
 
@@ -62,6 +70,7 @@ export function LiveClassroomStrategyCardConfigDialog({
   deckId,
   allowedCardIds,
   setting,
+  otherCardSettings,
   onSave,
 }: LiveClassroomStrategyCardConfigDialogProps) {
   const [scope, setScope] = useState<LiveClassroomStrategyCardScope>(
@@ -128,10 +137,21 @@ export function LiveClassroomStrategyCardConfigDialog({
     : deckCards;
   const noBattleCardsChosen = allowedCardIds != null && allowedCardIds.length === 0;
 
+  function otherKindsAssignedTo(cardId: number): LiveClassroomStrategyCardKind[] {
+    if (!otherCardSettings) return [];
+    return (Object.entries(otherCardSettings) as Array<
+      [LiveClassroomStrategyCardKind, LiveClassroomStrategyCardSetting]
+    >)
+      .filter(([k, s]) => k !== kind && strategyCardAppliesToDeckCard(s, cardId))
+      .map(([k]) => k);
+  }
+
   function toggleCardId(id: number, checked: boolean) {
-    setCardIds((prev) =>
-      checked ? [...prev, id] : prev.filter((existing) => existing !== id),
-    );
+    setCardIds((prev) => {
+      const already = prev.includes(id);
+      if (checked) return already ? prev : [...prev, id];
+      return already ? prev.filter((existing) => existing !== id) : prev;
+    });
   }
 
   function handleSave() {
@@ -226,6 +246,7 @@ export function LiveClassroomStrategyCardConfigDialog({
                         card.cardType === "multiple_choice" &&
                         Array.isArray(card.choices) &&
                         card.choices.length > 0;
+                      const assignedKinds = otherKindsAssignedTo(card.id);
                       return (
                         <div
                           key={card.id}
@@ -240,7 +261,11 @@ export function LiveClassroomStrategyCardConfigDialog({
                           }}
                           className="flex items-start gap-2 rounded-md border border-border/50 bg-card/40 p-2 cursor-pointer"
                         >
-                          <Checkbox checked={checked} className="mt-0.5" />
+                          <Checkbox
+                            checked={checked}
+                            tabIndex={-1}
+                            className="mt-0.5 pointer-events-none"
+                          />
                           <div className="min-w-0 flex-1 space-y-1">
                             <p className="text-sm font-medium text-foreground">
                               {card.front?.trim() || "Untitled question"}
@@ -272,6 +297,19 @@ export function LiveClassroomStrategyCardConfigDialog({
                                 {card.back?.trim() || "—"}
                               </p>
                             )}
+                            {assignedKinds.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                                {assignedKinds.map((k) => (
+                                  <Badge
+                                    key={k}
+                                    variant="outline"
+                                    className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+                                  >
+                                    {strategyCardLabel(k)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       );
