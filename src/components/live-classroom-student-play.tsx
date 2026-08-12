@@ -2,7 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Crown, Heart, Loader2, SkipForward, Sparkles, X } from "lucide-react";
+import {
+  ChevronRight,
+  Crown,
+  Flag,
+  Heart,
+  HeartCrack,
+  Loader2,
+  LogOut,
+  PartyPopper,
+  SkipForward,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   advanceLiveClassroomPlayerQuestionAction,
@@ -80,6 +92,7 @@ export function LiveClassroomStudentPlay({
   const [aiHint, setAiHint] = useState<string | null>(null);
   const [hintLoading, setHintLoading] = useState(false);
   const [leaveBattleOpen, setLeaveBattleOpen] = useState(false);
+  const [optOutConfirmOpen, setOptOutConfirmOpen] = useState(false);
   const timeoutFiredForQuestionRef = useRef<number | null>(null);
 
   const sessionStatus = state?.session.status ?? null;
@@ -171,6 +184,17 @@ export function LiveClassroomStudentPlay({
   const waitingForOthers =
     (independent && personalFinished && state?.session.status === "active") ||
     (collaborativeTeamEnded && state?.session.status === "active");
+  /** Survival run ended because lives hit zero, rather than finishing every question. */
+  const outOfLivesFinished =
+    isSurvivalMode && !optedOut && !collaborativeTeamEnded && myLivesRemaining === 0;
+  const survivalHeartsTotal = state?.session.config.survivalHearts ?? 3;
+  const doneVisual = collaborativeTeamEnded
+    ? { Icon: Flag, ring: "border-muted-foreground/30 text-muted-foreground", glow: "bg-muted-foreground/20" }
+    : optedOut
+      ? { Icon: LogOut, ring: "border-muted-foreground/30 text-muted-foreground", glow: "bg-muted-foreground/20" }
+      : outOfLivesFinished
+        ? { Icon: HeartCrack, ring: "border-destructive/40 text-destructive", glow: "bg-destructive/25" }
+        : { Icon: PartyPopper, ring: cn("border-primary/40", teamTone.accent), glow: "bg-primary/25" };
   const canNavigate =
     Boolean(state) &&
     state!.session.status === "active" &&
@@ -348,6 +372,7 @@ export function LiveClassroomStudentPlay({
   }
 
   function optOut() {
+    setOptOutConfirmOpen(false);
     startTransition(async () => {
       try {
         const result = await optOutLiveClassroomBattleAction(sessionId);
@@ -513,8 +538,31 @@ export function LiveClassroomStudentPlay({
               {isSurvivalMode ? (
                 <>
                   {" · "}
-                  <span className={cn("font-medium", teamTone.accent)}>
-                    Score: {me?.score ?? 0}
+                  <span
+                    className="inline-flex items-center gap-1 align-middle"
+                    title={
+                      myLivesRemaining != null
+                        ? `${myLivesRemaining} life${myLivesRemaining === 1 ? "" : "s"} remaining`
+                        : undefined
+                    }
+                  >
+                    {myLivesRemaining != null ? (
+                      Array.from({ length: survivalHeartsTotal }).map((_, i) =>
+                        i < myLivesRemaining ? (
+                          <Heart
+                            key={i}
+                            className="size-3.5 fill-current text-rose-400"
+                            aria-hidden
+                          />
+                        ) : (
+                          <HeartCrack
+                            key={i}
+                            className="size-3.5 text-muted-foreground/30"
+                            aria-hidden
+                          />
+                        ),
+                      )
+                    ) : null}
                   </span>
                 </>
               ) : myTeam ? (
@@ -620,25 +668,62 @@ export function LiveClassroomStudentPlay({
         </CardHeader>
         <CardContent className="space-y-4">
           {waitingForOthers ? (
-            <div className="space-y-3">
-              <p className="text-base font-medium text-foreground">
-                {collaborativeTeamEnded
-                  ? "Your team captain ended the battle."
-                  : optedOut
-                    ? "You opted out of this battle."
-                    : "You’ve finished all questions."}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {collaborativeTeamEnded
-                  ? "Your team's battle is over. Waiting for the other teams to finish."
-                  : "The session ends when every team member finishes or leaves."}
-                {!collaborativeTeamEnded &&
-                typeof state.session.activeBattlersRemaining === "number"
-                  ? ` ${state.session.activeBattlersRemaining} player${
-                      state.session.activeBattlersRemaining === 1 ? "" : "s"
-                    } still battling.`
-                  : null}
-              </p>
+            <div className="flex flex-col items-center gap-5 py-6 text-center">
+              <div className="relative flex size-20 items-center justify-center animate-in zoom-in-50 fade-in-0 duration-500">
+                <span
+                  className={cn(
+                    "absolute inset-0 rounded-full opacity-70 blur-xl motion-reduce:animate-none",
+                    outOfLivesFinished ? "" : "animate-pulse-slow",
+                    doneVisual.glow,
+                  )}
+                  aria-hidden
+                />
+                <span
+                  className={cn(
+                    "relative flex size-16 items-center justify-center rounded-full border-2 bg-background/80 shadow-lg",
+                    doneVisual.ring,
+                  )}
+                >
+                  <doneVisual.Icon className="size-8" aria-hidden />
+                </span>
+              </div>
+
+              <div className="max-w-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                <p className="text-base font-semibold text-foreground">
+                  {collaborativeTeamEnded
+                    ? "Your team captain ended the battle."
+                    : optedOut
+                      ? "You opted out of this battle."
+                      : outOfLivesFinished
+                        ? "Out of lives — your run is over."
+                        : "You’ve finished all questions!"}
+                </p>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  {collaborativeTeamEnded
+                    ? "Your team's battle is over. Waiting for the other teams to finish."
+                    : "The session ends when every team member finishes or leaves."}
+                </p>
+              </div>
+
+              {!collaborativeTeamEnded &&
+              typeof state.session.activeBattlersRemaining === "number" &&
+              state.session.activeBattlersRemaining > 0 ? (
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium animate-in fade-in-0 duration-500",
+                    teamTone.chip,
+                  )}
+                >
+                  <span className="flex items-center gap-1" aria-hidden>
+                    <span className="size-1.5 rounded-full bg-current opacity-80 [animation-delay:-0.3s] motion-safe:animate-bounce" />
+                    <span className="size-1.5 rounded-full bg-current opacity-80 [animation-delay:-0.15s] motion-safe:animate-bounce" />
+                    <span className="size-1.5 rounded-full bg-current opacity-80 motion-safe:animate-bounce" />
+                  </span>
+                  {state.session.activeBattlersRemaining} player
+                  {state.session.activeBattlersRemaining === 1 ? "" : "s"} still
+                  battling
+                </div>
+              ) : null}
             </div>
           ) : q ? (
             <>
@@ -774,8 +859,9 @@ export function LiveClassroomStudentPlay({
                     <Button
                       type="button"
                       variant="outline"
+                      className="text-destructive hover:text-destructive"
                       disabled={pending || paused}
-                      onClick={optOut}
+                      onClick={() => setOptOutConfirmOpen(true)}
                     >
                       Leave battle
                     </Button>
@@ -795,8 +881,9 @@ export function LiveClassroomStudentPlay({
                 <Button
                   type="button"
                   variant="outline"
+                  className="text-destructive hover:text-destructive"
                   disabled={pending || paused}
-                  onClick={optOut}
+                  onClick={() => setOptOutConfirmOpen(true)}
                 >
                   Leave battle
                 </Button>
@@ -919,26 +1006,49 @@ export function LiveClassroomStudentPlay({
         <CardContent className="space-y-2">
           {isSurvivalMode ? (
             myLivesRemaining != null ? (
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-foreground">
-                  Lives remaining
-                </span>
-                <span className="flex items-center gap-1">
-                  {myLivesRemaining > 0 ? (
-                    Array.from({ length: myLivesRemaining }).map((_, i) => (
-                      <Heart
-                        key={i}
-                        className="size-4 fill-current text-rose-400"
-                        aria-hidden
-                      />
-                    ))
-                  ) : (
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Out of lives
-                    </span>
-                  )}
-                </span>
-              </div>
+              <>
+                <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {me?.displayName || "You"}
+                  </span>
+                  <span className={cn("shrink-0 text-sm font-semibold tabular-nums", teamTone.accent)}>
+                    {me?.score ?? 0} pts
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Lives remaining
+                  </span>
+                  <span
+                    className="flex items-center gap-1.5"
+                    role="img"
+                    aria-label={`${myLivesRemaining} of ${survivalHeartsTotal} lives remaining`}
+                  >
+                    {Array.from({ length: survivalHeartsTotal }).map((_, i) => {
+                      const alive = i < myLivesRemaining;
+                      const isLastAlive = alive && i === myLivesRemaining - 1;
+                      return alive ? (
+                        <Heart
+                          key={i}
+                          className={cn(
+                            "size-4 fill-current text-rose-400 transition-transform duration-300",
+                            isLastAlive && myLivesRemaining === 1
+                              ? "motion-safe:animate-pulse"
+                              : "",
+                          )}
+                          aria-hidden
+                        />
+                      ) : (
+                        <HeartCrack
+                          key={i}
+                          className="size-4 text-muted-foreground/30"
+                          aria-hidden
+                        />
+                      );
+                    })}
+                  </span>
+                </div>
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">
                 You are not assigned to this battle.
@@ -1007,6 +1117,28 @@ export function LiveClassroomStudentPlay({
           <AlertDialogFooter>
             <AlertDialogCancel>Stay in battle</AlertDialogCancel>
             <AlertDialogAction onClick={leaveCollaborativeBattle}>
+              Leave battle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={optOutConfirmOpen} onOpenChange={setOptOutConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave this battle?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isSurvivalMode
+                ? "You'll forfeit any remaining lives and unanswered questions — this ends your run early and can't be undone."
+                : "You won't be able to answer any more questions this battle — this can't be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay in battle</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={optOut}
+            >
               Leave battle
             </AlertDialogAction>
           </AlertDialogFooter>

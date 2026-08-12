@@ -338,6 +338,11 @@ export function LiveClassroomStrategyCardConfigDialog({
                   value={value}
                   onChange={(e) => setValue(Number(e.target.value))}
                 />
+                {kind === "double_points" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Defaults to twice the battle&apos;s Score per question.
+                  </p>
+                ) : null}
               </div>
             ) : null}
             {isExtraTime ? (

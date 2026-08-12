@@ -3,6 +3,7 @@
 import { buildTeamWorkspaceQueryString } from "@/lib/team-workspace-url";
 
 export const LIVE_CLASSROOM_ROOT_PATH = "/dashboard/live-classroom";
+export const LIVE_CLASSROOM_BRIDGE_PATH = "/dashboard/live-classroom/bridge";
 export const LIVE_CLASSROOM_START_PATH = "/dashboard/live-classroom/start";
 export const LIVE_CLASSROOM_JOIN_PATH = "/dashboard/live-classroom/join";
 export const LIVE_CLASSROOM_SCHEDULED_PATH =

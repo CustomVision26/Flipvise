@@ -11,14 +11,32 @@ export const LIVE_CLASSROOM_SESSION_STATUSES = [
 export type LiveClassroomSessionStatus =
   (typeof LIVE_CLASSROOM_SESSION_STATUSES)[number];
 
+/**
+ * `exit_ticket` / `review_battle` are legacy values kept only so historical
+ * sessions still load and display correctly — they are no longer offered as
+ * create/edit options (see `sessionTypeLabel` / DB enum for back-compat).
+ */
 export const LIVE_CLASSROOM_SESSION_TYPES = [
   "warm_up",
   "team_battle",
-  "exit_ticket",
-  "review_battle",
+  "head_to_head",
 ] as const;
 export type LiveClassroomSessionType =
+  | (typeof LIVE_CLASSROOM_SESSION_TYPES)[number]
+  | "exit_ticket"
+  | "review_battle";
+/** The subset of session types offered when creating/editing a session. */
+export type LiveClassroomCreatableSessionType =
   (typeof LIVE_CLASSROOM_SESSION_TYPES)[number];
+
+/** Maps any legacy session type to a valid creatable one (fallback: Warm-Up). */
+export function normalizeCreatableSessionType(
+  type: LiveClassroomSessionType,
+): LiveClassroomCreatableSessionType {
+  return (LIVE_CLASSROOM_SESSION_TYPES as readonly string[]).includes(type)
+    ? (type as LiveClassroomCreatableSessionType)
+    : "warm_up";
+}
 
 export const LIVE_CLASSROOM_BATTLE_MODES = [
   "individual_team",
@@ -27,6 +45,27 @@ export const LIVE_CLASSROOM_BATTLE_MODES = [
 ] as const;
 export type LiveClassroomBattleMode =
   (typeof LIVE_CLASSROOM_BATTLE_MODES)[number];
+
+/**
+ * Which battle modes a given session type may run. Warm-Up stays flexible
+ * (any mode); Team Battle is team-based only; Head To Head is Survival's
+ * every-player-for-themselves ranking only. Legacy types are unrestricted so
+ * pre-existing sessions keep working.
+ */
+export function battleModesForSessionType(
+  type: LiveClassroomSessionType,
+): readonly LiveClassroomBattleMode[] {
+  switch (type) {
+    case "warm_up":
+      return LIVE_CLASSROOM_BATTLE_MODES;
+    case "team_battle":
+      return ["individual_team", "collaborative_team"];
+    case "head_to_head":
+      return ["survival"];
+    default:
+      return LIVE_CLASSROOM_BATTLE_MODES;
+  }
+}
 
 export const LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES = [
   "manual",
@@ -177,6 +216,24 @@ export function timePerQuestionLabel(sec: number | null | undefined): string {
   return battleStartDelayLabel(sec);
 }
 
+/**
+ * Manual abandonment-window choices (1 min – 1 hr). `null` keeps the
+ * automatic default: 3 min for timed battles, 30 min for untimed battles.
+ */
+export const LIVE_CLASSROOM_ABANDONMENT_WINDOW_OPTIONS_SEC = [
+  60, 120, 180, 300, 600, 900, 1800, 3600,
+] as const;
+
+/** `null` means "Auto" (timer-aware default handled server-side). */
+export function abandonmentWindowLabel(sec: number | null | undefined): string {
+  if (sec == null) return "Auto (recommended)";
+  if (sec >= 3600 && sec % 3600 === 0) {
+    const hrs = sec / 3600;
+    return hrs === 1 ? "1 hr" : `${hrs} hr`;
+  }
+  return battleStartDelayLabel(sec);
+}
+
 export type LiveClassroomSessionConfig = {
   questionCount: number;
   /** Whether questions were built from every deck card or a host-picked subset. */
@@ -185,6 +242,11 @@ export type LiveClassroomSessionConfig = {
   selectedDeckCardIds: number[];
   /** Seconds allowed per question, or `null` for no time limit (untimed battle). */
   timePerQuestionSec: number | null;
+  /**
+   * Base points awarded for a correct answer on each battle question
+   * (before speed/participation bonuses and strategy-card bonuses).
+   */
+  pointsPerQuestion: number;
   difficulty: LiveClassroomDifficulty;
   /**
    * Seconds to count down after Start battle before questions begin.
@@ -202,6 +264,12 @@ export type LiveClassroomSessionConfig = {
   enabledStrategyCards: LiveClassroomStrategyCardKind[];
   /** Per-kind scope, deck-card targeting, score/time value, and activation cap. */
   strategyCardSettings?: LiveClassroomStrategyCardSettings;
+  /**
+   * Manual override for how long a silent player is given before an
+   * independent/survival battle is treated as abandoned and auto-completed.
+   * `null` = Auto (3 min timed / 30 min untimed). Owner/team admin only.
+   */
+  abandonmentWindowSec?: number | null;
   /** Reserved for voice / polls / screen share without schema churn. */
   futureExtensions?: Record<string, unknown>;
 };
@@ -229,6 +297,11 @@ export type LiveClassroomReportStats = {
     incorrect: number;
     accuracyPercent: number;
     avgResponseTimeSec: number;
+    /**
+     * Total points scored — used to rank the Survival (every-player-for-themselves)
+     * winner. Optional for backward compatibility with reports written before this field existed.
+     */
+    score?: number;
   }>;
   questionAnalysis: Array<{
     questionId: string;
@@ -255,6 +328,7 @@ export const DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG: LiveClassroomSessionConfig =
   questionSourceMode: "all",
   selectedDeckCardIds: [],
   timePerQuestionSec: 30,
+  pointsPerQuestion: 100,
   difficulty: "medium",
   battleStartDelaySec: 60,
   allowAiExplanations: true,
@@ -275,6 +349,7 @@ export const DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG: LiveClassroomSessionConfig =
     "recovery",
   ],
   strategyCardSettings: {},
+  abandonmentWindowSec: null,
 };
 
 export const LIVE_CLASSROOM_DEFAULT_TEAM_NAMES = [
@@ -290,6 +365,9 @@ export function sessionTypeLabel(type: LiveClassroomSessionType): string {
       return "Warm-Up Battle";
     case "team_battle":
       return "Team Battle";
+    case "head_to_head":
+      return "Head To Head Battle";
+    // Legacy — no longer offered as a create/edit option, kept for display.
     case "exit_ticket":
       return "Exit Ticket";
     case "review_battle":
@@ -299,10 +377,24 @@ export function sessionTypeLabel(type: LiveClassroomSessionType): string {
   }
 }
 
+/** Short one-liner shown under each Session type option — explains which battle modes it unlocks. */
+export function sessionTypeDescription(type: LiveClassroomSessionType): string {
+  switch (type) {
+    case "warm_up":
+      return "Any battle mode — Individual, Collaborative, or Survival.";
+    case "team_battle":
+      return "Team-based only — Individual Team or Collaborative Team.";
+    case "head_to_head":
+      return "Every player for themselves — Survival mode only.";
+    default:
+      return "";
+  }
+}
+
 export function battleModeLabel(mode: LiveClassroomBattleMode): string {
   switch (mode) {
     case "individual_team":
-      return "Individual Team Battle";
+      return "Individual Team";
     case "collaborative_team":
       return "Collaborative Team Battle";
     case "survival":
@@ -389,13 +481,43 @@ export function deriveStrategyCardPolicy(
   return "limited";
 }
 
+/** Default / clamp bounds for host-configured points per correct question. */
+export const LIVE_CLASSROOM_POINTS_PER_QUESTION_DEFAULT = 100;
+export const LIVE_CLASSROOM_POINTS_PER_QUESTION_MIN = 1;
+export const LIVE_CLASSROOM_POINTS_PER_QUESTION_MAX = 10_000;
+
+/** Double Points card default award = 2× the battle's points-per-question. */
+export function doublePointsDefaultAward(pointsPerQuestion: number): number {
+  const base = Number.isFinite(pointsPerQuestion)
+    ? Math.round(pointsPerQuestion)
+    : LIVE_CLASSROOM_POINTS_PER_QUESTION_DEFAULT;
+  return Math.max(0, base * 2);
+}
+
+export function clampPointsPerQuestion(value: number): number {
+  if (!Number.isFinite(value)) return LIVE_CLASSROOM_POINTS_PER_QUESTION_DEFAULT;
+  return Math.min(
+    LIVE_CLASSROOM_POINTS_PER_QUESTION_MAX,
+    Math.max(LIVE_CLASSROOM_POINTS_PER_QUESTION_MIN, Math.round(value)),
+  );
+}
+
 /** Default per-kind setting used until the host configures the card. */
 export function defaultStrategyCardSetting(
   kind: LiveClassroomStrategyCardKind,
+  options?: { pointsPerQuestion?: number },
 ): LiveClassroomStrategyCardSetting {
+  const points =
+    options?.pointsPerQuestion ?? LIVE_CLASSROOM_POINTS_PER_QUESTION_DEFAULT;
   switch (kind) {
     case "double_points":
-      return { scope: "all", cardIds: [], value: 100, seconds: 0, maxActivationsPerTeam: 1 };
+      return {
+        scope: "all",
+        cardIds: [],
+        value: doublePointsDefaultAward(points),
+        seconds: 0,
+        maxActivationsPerTeam: 1,
+      };
     case "score_boost":
       return { scope: "all", cardIds: [], value: 50, seconds: 0, maxActivationsPerTeam: 1 };
     case "extra_time":
@@ -409,9 +531,10 @@ export function defaultStrategyCardSetting(
 export function resolveStrategyCardSetting(
   settings: LiveClassroomStrategyCardSettings | null | undefined,
   kind: LiveClassroomStrategyCardKind,
+  options?: { pointsPerQuestion?: number },
 ): LiveClassroomStrategyCardSetting {
   const stored = settings?.[kind];
-  const fallback = defaultStrategyCardSetting(kind);
+  const fallback = defaultStrategyCardSetting(kind, options);
   if (!stored) return fallback;
   return {
     scope: stored.scope ?? fallback.scope,
@@ -481,8 +604,9 @@ export type LiveClassroomStrategyCardSettingInput = {
 export function normalizeStrategyCardSetting(
   kind: LiveClassroomStrategyCardKind,
   entry: LiveClassroomStrategyCardSettingInput,
+  options?: { pointsPerQuestion?: number },
 ): LiveClassroomStrategyCardSetting {
-  const fallback = defaultStrategyCardSetting(kind);
+  const fallback = defaultStrategyCardSetting(kind, options);
   return {
     scope: entry.scope,
     cardIds: Array.isArray(entry.cardIds) ? entry.cardIds : fallback.cardIds,
@@ -510,13 +634,14 @@ export function normalizeStrategyCardSettings(
     | Partial<Record<LiveClassroomStrategyCardKind, LiveClassroomStrategyCardSettingInput>>
     | null
     | undefined,
+  options?: { pointsPerQuestion?: number },
 ): LiveClassroomStrategyCardSettings {
   const out: LiveClassroomStrategyCardSettings = {};
   if (!input) return out;
   for (const kind of LIVE_CLASSROOM_STRATEGY_CARD_KINDS) {
     const entry = input[kind];
     if (!entry) continue;
-    out[kind] = normalizeStrategyCardSetting(kind, entry);
+    out[kind] = normalizeStrategyCardSetting(kind, entry, options);
   }
   return out;
 }

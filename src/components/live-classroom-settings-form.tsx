@@ -33,11 +33,21 @@ import {
   LIVE_CLASSROOM_SESSION_TYPES,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
+  normalizeCreatableSessionType,
   sessionTypeLabel,
+  type LiveClassroomCreatableSessionType,
   type LiveClassroomSessionType,
   type LiveClassroomStrategyCardPolicy,
   type LiveClassroomTeamAssignmentMode,
 } from "@/lib/live-classroom-types";
+
+function teamAssignmentLabel(mode: LiveClassroomTeamAssignmentMode): string {
+  return mode === "manual"
+    ? "Manual"
+    : mode === "random"
+      ? "Random"
+      : "Saved groups";
+}
 
 export type LiveClassroomRosterMember = {
   userId: string;
@@ -78,7 +88,9 @@ export function LiveClassroomSettingsForm({
 
   const [enabled, setEnabled] = useState(initial.enabled);
   const [defaultBattleType, setDefaultBattleType] =
-    useState<LiveClassroomSessionType>(initial.defaultBattleType);
+    useState<LiveClassroomCreatableSessionType>(
+      normalizeCreatableSessionType(initial.defaultBattleType),
+    );
   const [allowMusic, setAllowMusic] = useState(initial.allowMusic);
   const [allowStrategyCards, setAllowStrategyCards] = useState(
     initial.allowStrategyCards,
@@ -203,11 +215,11 @@ export function LiveClassroomSettingsForm({
                 <Select
                   value={defaultBattleType}
                   onValueChange={(v) =>
-                    setDefaultBattleType(v as LiveClassroomSessionType)
+                    setDefaultBattleType(v as LiveClassroomCreatableSessionType)
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>{sessionTypeLabel(defaultBattleType)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {LIVE_CLASSROOM_SESSION_TYPES.map((t) => (
@@ -230,16 +242,14 @@ export function LiveClassroomSettingsForm({
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>
+                      {teamAssignmentLabel(defaultTeamAssignment)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES.map((m) => (
                       <SelectItem key={m} value={m}>
-                        {m === "manual"
-                          ? "Manual"
-                          : m === "random"
-                            ? "Random"
-                            : "Saved groups"}
+                        {teamAssignmentLabel(m)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -255,7 +265,10 @@ export function LiveClassroomSettingsForm({
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue>
+                      {strategyCardPolicy.charAt(0).toUpperCase() +
+                        strategyCardPolicy.slice(1)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {LIVE_CLASSROOM_STRATEGY_CARD_POLICIES.map((p) => (
@@ -336,8 +349,9 @@ export function LiveClassroomSettingsForm({
           <CardTitle>Live Classroom™ team</CardTitle>
           <CardDescription>
             Workspace membership does not grant Live Classroom™. Assign members
-            here so they can join with the lobby code. Team admins who are
-            assigned can host and manage; regular members need Can host to host
+            here so they can join with the lobby code. Team admins need a host
+            token (Can host) to host battles — drag tokens on the Live Classroom
+            bridge, or toggle below. Regular members also need Can host to host
             sessions. Grant the owner access from a session’s Members settings
             when they should play.
           </CardDescription>
@@ -350,8 +364,7 @@ export function LiveClassroomSettingsForm({
           ) : (
             members.map((member) => {
               const pendingGrant = grantPending === member.userId;
-              const canHostToggle =
-                member.workspaceRole === "team_member" && member.isAssigned;
+              const canHostToggle = member.isAssigned;
               return (
                 <div key={member.userId}>
                   <div className="flex flex-col gap-3 rounded-md border border-border/40 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -381,24 +394,20 @@ export function LiveClassroomSettingsForm({
                           }
                         />
                       </label>
-                      {member.workspaceRole === "team_member" ? (
-                        <label className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            Can host
-                          </span>
-                          <Switch
-                            checked={member.hasTeacherGrant}
-                            disabled={pendingGrant || !canHostToggle}
-                            onCheckedChange={(v) =>
-                              void toggleTeacher(member, v)
-                            }
-                          />
-                        </label>
-                      ) : member.isAssigned ? (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Can host when assigned
-                        </Badge>
-                      ) : null}
+                      <label className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {member.workspaceRole === "team_admin"
+                            ? "Host token"
+                            : "Can host"}
+                        </span>
+                        <Switch
+                          checked={member.hasTeacherGrant}
+                          disabled={pendingGrant || !canHostToggle}
+                          onCheckedChange={(v) =>
+                            void toggleTeacher(member, v)
+                          }
+                        />
+                      </label>
                     </div>
                   </div>
                   <Separator className="my-2 bg-border/40 last:hidden" />

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPeriodSnapshot,
+  matchesAiUsageStatusFilter,
   planDefaultAllowance,
   resolveAllowancePriority,
 } from "./limits";
@@ -189,5 +190,21 @@ describe("buildPeriodSnapshot", () => {
       }).usageStatus,
       "flagged",
     );
+  });
+});
+
+describe("matchesAiUsageStatusFilter", () => {
+  it("treats near_limit as approaching or critical", () => {
+    assert.equal(matchesAiUsageStatusFilter("approaching", "near_limit"), true);
+    assert.equal(matchesAiUsageStatusFilter("critical", "near_limit"), true);
+    assert.equal(matchesAiUsageStatusFilter("normal", "near_limit"), false);
+    assert.equal(matchesAiUsageStatusFilter("limit_reached", "near_limit"), false);
+  });
+
+  it("matches exact statuses and allows empty filter", () => {
+    assert.equal(matchesAiUsageStatusFilter("limit_reached", "limit_reached"), true);
+    assert.equal(matchesAiUsageStatusFilter("normal", "limit_reached"), false);
+    assert.equal(matchesAiUsageStatusFilter("normal", null), true);
+    assert.equal(matchesAiUsageStatusFilter("normal", undefined), true);
   });
 });

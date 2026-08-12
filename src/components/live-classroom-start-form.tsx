@@ -43,17 +43,26 @@ import { cn } from "@/lib/utils";
 import { LiveClassroomStrategyCardConfigDialog } from "@/components/live-classroom-strategy-card-config-dialog";
 import {
   DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
+  LIVE_CLASSROOM_ABANDONMENT_WINDOW_OPTIONS_SEC,
   LIVE_CLASSROOM_BATTLE_MODES,
   LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC,
+  LIVE_CLASSROOM_POINTS_PER_QUESTION_MAX,
+  LIVE_CLASSROOM_POINTS_PER_QUESTION_MIN,
   LIVE_CLASSROOM_QUESTION_SOURCE_MODES,
   LIVE_CLASSROOM_SESSION_TYPES,
   LIVE_CLASSROOM_STRATEGY_CARD_POLICIES,
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
   LIVE_CLASSROOM_TIME_PER_QUESTION_OPTIONS_SEC,
+  abandonmentWindowLabel,
   battleModeLabel,
+  battleModesForSessionType,
   battleStartDelayLabel,
+  clampPointsPerQuestion,
   defaultStrategyCardSetting,
   deriveStrategyCardPolicy,
+  doublePointsDefaultAward,
+  normalizeCreatableSessionType,
+  sessionTypeDescription,
   sessionTypeLabel,
   strategyCardEnabledKinds,
   strategyCardLabel,
@@ -61,6 +70,7 @@ import {
   strategyCardsForTimerState,
   timePerQuestionLabel,
   type LiveClassroomBattleMode,
+  type LiveClassroomCreatableSessionType,
   type LiveClassroomQuestionSourceMode,
   type LiveClassroomSessionType,
   type LiveClassroomStrategyCardKind,
@@ -92,9 +102,9 @@ type DeckCardPreview = {
 const CAPTION_SESSION_NAME =
   "Title shown in the lobby and host controls so students and teachers can recognize this battle.";
 const CAPTION_SESSION_TYPE =
-  "Choose the battle format — team battle, warm-up, review, and other Live Classroom™ session styles.";
+  "Sets which battle modes are available below — Warm-Up allows any mode, Team Battle is team-only, Head To Head is Survival-only.";
 const CAPTION_BATTLE_MODE =
-  "How teams compete: individual scoring within teams, captain-led play, or survival with hearts.";
+  "How students compete: Individual Team scores per player, Collaborative Team plays through a captain, Survival is every player for themselves.";
 const CAPTION_START_TIME =
   "Countdown after Start battle before questions begin (60 seconds to 5 minutes).";
 const CAPTION_TEAM_ASSIGNMENT =
@@ -105,10 +115,14 @@ const CAPTION_QUESTION_PICKER =
   "Check the deck cards to include as questions in this battle. Strategy cards can then target these same questions.";
 const CAPTION_SECONDS =
   "Countdown timer for each question before the round advances, or turn it off for an untimed battle.";
+const CAPTION_POINTS_PER_QUESTION =
+  "Base points awarded when a student answers a question correctly (before speed, participation, or strategy-card bonuses). Double Points defaults to twice this value.";
 const CAPTION_TEAM_COUNT =
   "Number of competing teams created in the lobby (2–4). Not used in Survival — every player battles individually.";
 const CAPTION_SURVIVAL_HEARTS =
   "Lives each team starts with in Survival mode. Wrong answers cost hearts.";
+const CAPTION_ABANDONMENT_WINDOW =
+  "How long a silent player is given before their battle is treated as abandoned and auto-completed. Auto uses 3 min for timed battles or 30 min for untimed battles.";
 const CAPTION_SCHEDULE =
   "Optional start time. Leave blank to open the lobby immediately; set a time to schedule the session.";
 const CAPTION_DECK =
@@ -196,9 +210,10 @@ export function LiveClassroomStartForm({
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState("Live Classroom Battle");
-  const [sessionType, setSessionType] = useState<LiveClassroomSessionType>(
-    defaults?.defaultBattleType ?? "team_battle",
-  );
+  const [sessionType, setSessionType] =
+    useState<LiveClassroomCreatableSessionType>(
+      normalizeCreatableSessionType(defaults?.defaultBattleType ?? "team_battle"),
+    );
   const [battleMode, setBattleMode] =
     useState<LiveClassroomBattleMode>("individual_team");
   const [deckId, setDeckId] = useState<string>(
@@ -213,9 +228,15 @@ export function LiveClassroomStartForm({
   const [timePerQuestionSec, setTimePerQuestionSec] = useState<number | null>(
     30,
   );
+  const [pointsPerQuestion, setPointsPerQuestion] = useState(
+    DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+  );
   const [battleStartDelaySec, setBattleStartDelaySec] = useState(
     DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.battleStartDelaySec,
   );
+  const [abandonmentWindowSec, setAbandonmentWindowSec] = useState<
+    number | null
+  >(DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.abandonmentWindowSec ?? null);
   const [allowAiExplanations, setAllowAiExplanations] = useState(
     defaults?.allowAiExplanations ?? true,
   );
@@ -233,8 +254,9 @@ export function LiveClassroomStartForm({
   const [cardSettings, setCardSettings] = useState<LiveClassroomStrategyCardSettings>(
     () => {
       const out: LiveClassroomStrategyCardSettings = {};
+      const points = DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion;
       for (const k of strategyCardsForBattleMode("individual_team")) {
-        out[k] = defaultStrategyCardSetting(k);
+        out[k] = defaultStrategyCardSetting(k, { pointsPerQuestion: points });
       }
       return out;
     },
@@ -309,10 +331,48 @@ export function LiveClassroomStartForm({
     setCardSettings((prev) => {
       const next = { ...prev };
       for (const k of available) {
-        if (!next[k]) next[k] = defaultStrategyCardSetting(k);
+        if (!next[k]) {
+          next[k] = defaultStrategyCardSetting(k, { pointsPerQuestion });
+        }
       }
       return next;
     });
+  }
+
+  /** Keep Double Points auto-default at 2× points-per-question until customized. */
+  function updatePointsPerQuestion(nextRaw: number) {
+    const next = clampPointsPerQuestion(nextRaw);
+    setPointsPerQuestion((prev) => {
+      const autoPrev = doublePointsDefaultAward(prev);
+      setCardSettings((settings) => {
+        const dp = settings.double_points;
+        if (!dp || dp.value === autoPrev) {
+          return {
+            ...settings,
+            double_points: {
+              ...(dp ??
+                defaultStrategyCardSetting("double_points", {
+                  pointsPerQuestion: next,
+                })),
+              value: doublePointsDefaultAward(next),
+            },
+          };
+        }
+        return settings;
+      });
+      return next;
+    });
+  }
+
+  const allowedBattleModes = battleModesForSessionType(sessionType);
+
+  /** Session type gates which battle modes are offered — auto-pick a valid mode when the type changes. */
+  function setSessionTypeAndMode(nextType: LiveClassroomCreatableSessionType) {
+    setSessionType(nextType);
+    const allowed = battleModesForSessionType(nextType);
+    if (!allowed.includes(battleMode)) {
+      setBattleModeAndCards(allowed[0]);
+    }
   }
 
   function applyStrategyCardPolicy(next: LiveClassroomStrategyCardPolicy) {
@@ -320,13 +380,21 @@ export function LiveClassroomStartForm({
       const out = { ...prev };
       if (next === "unlimited") {
         for (const k of timeAwareAvailableStrategyCards) {
-          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
+          out[k] = {
+            ...(out[k] ??
+              defaultStrategyCardSetting(k, { pointsPerQuestion })),
+            scope: "all",
+          };
         }
         return out;
       }
       if (next === "disabled") {
         for (const k of availableStrategyCards) {
-          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "disabled" };
+          out[k] = {
+            ...(out[k] ??
+              defaultStrategyCardSetting(k, { pointsPerQuestion })),
+            scope: "disabled",
+          };
         }
         return out;
       }
@@ -340,7 +408,11 @@ export function LiveClassroomStartForm({
         currentlyEnabled.length === timeAwareAvailableStrategyCards.length
       ) {
         for (const k of timeAwareAvailableStrategyCards) {
-          out[k] = { ...(out[k] ?? defaultStrategyCardSetting(k)), scope: "all" };
+          out[k] = {
+            ...(out[k] ??
+              defaultStrategyCardSetting(k, { pointsPerQuestion })),
+            scope: "all",
+          };
         }
         const last =
           timeAwareAvailableStrategyCards[
@@ -382,6 +454,7 @@ export function LiveClassroomStartForm({
           selectedDeckCardIds:
             questionSourceMode === "specific" ? selectedCardIds : undefined,
           timePerQuestionSec,
+          pointsPerQuestion,
           battleStartDelaySec,
           allowAiExplanations,
           allowStrategyCards,
@@ -398,6 +471,7 @@ export function LiveClassroomStartForm({
             ? new Date(scheduledFor).toISOString()
             : null,
           teamCount,
+          abandonmentWindowSec,
         });
 
         toast.success(
@@ -450,16 +524,21 @@ export function LiveClassroomStartForm({
               <Select
                 value={sessionType}
                 onValueChange={(v) =>
-                  setSessionType(v as LiveClassroomSessionType)
+                  setSessionTypeAndMode(v as LiveClassroomCreatableSessionType)
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{sessionTypeLabel(sessionType)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {LIVE_CLASSROOM_SESSION_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {sessionTypeLabel(t)}
+                      <div className="flex flex-col py-0.5">
+                        <span>{sessionTypeLabel(t)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {sessionTypeDescription(t)}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -475,10 +554,10 @@ export function LiveClassroomStartForm({
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>{battleModeLabel(battleMode)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {LIVE_CLASSROOM_BATTLE_MODES.map((m) => (
+                  {allowedBattleModes.map((m) => (
                     <SelectItem key={m} value={m}>
                       {battleModeLabel(m)}
                     </SelectItem>
@@ -522,7 +601,13 @@ export function LiveClassroomStartForm({
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {teamAssignment === "manual"
+                      ? "Manual"
+                      : teamAssignment === "random"
+                        ? "Random"
+                        : "Saved groups"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES.map((m) => (
@@ -569,6 +654,23 @@ export function LiveClassroomStartForm({
 
             <div className="space-y-2">
               <FieldLabel
+                htmlFor="lc-points"
+                label="Score per question"
+                caption={CAPTION_POINTS_PER_QUESTION}
+              />
+              <Input
+                id="lc-points"
+                type="number"
+                min={LIVE_CLASSROOM_POINTS_PER_QUESTION_MIN}
+                max={LIVE_CLASSROOM_POINTS_PER_QUESTION_MAX}
+                step={1}
+                value={pointsPerQuestion}
+                onChange={(e) => updatePointsPerQuestion(Number(e.target.value))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <FieldLabel
                 htmlFor="lc-teams"
                 label="Team count"
                 caption={CAPTION_TEAM_COUNT}
@@ -606,6 +708,37 @@ export function LiveClassroomStartForm({
                 />
               </div>
             ) : null}
+
+            <div className="space-y-2">
+              <FieldLabel
+                htmlFor="lc-abandon"
+                label="Abandonment window"
+                caption={CAPTION_ABANDONMENT_WINDOW}
+              />
+              <Select
+                value={
+                  abandonmentWindowSec == null ? "auto" : String(abandonmentWindowSec)
+                }
+                onValueChange={(v) => {
+                  if (v == null) return;
+                  setAbandonmentWindowSec(v === "auto" ? null : Number(v));
+                }}
+              >
+                <SelectTrigger id="lc-abandon" className="w-full">
+                  <SelectValue>
+                    {abandonmentWindowLabel(abandonmentWindowSec)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (recommended)</SelectItem>
+                  {LIVE_CLASSROOM_ABANDONMENT_WINDOW_OPTIONS_SEC.map((sec) => (
+                    <SelectItem key={sec} value={String(sec)}>
+                      {abandonmentWindowLabel(sec)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2 sm:col-span-2">
               <FieldLabel
@@ -677,7 +810,11 @@ export function LiveClassroomStartForm({
                 }
               >
                 <SelectTrigger id="lc-question-source" className="w-52">
-                  <SelectValue />
+                  <SelectValue>
+                    {questionSourceMode === "all"
+                      ? "All cards in the deck"
+                      : "Select specific cards"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {LIVE_CLASSROOM_QUESTION_SOURCE_MODES.map((m) => (
@@ -770,7 +907,10 @@ export function LiveClassroomStartForm({
                   }
                 >
                   <SelectTrigger className="w-full sm:w-56">
-                    <SelectValue />
+                    <SelectValue>
+                      {strategyCardPolicy.charAt(0).toUpperCase() +
+                        strategyCardPolicy.slice(1)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {LIVE_CLASSROOM_STRATEGY_CARD_POLICIES.map((p) => (
@@ -788,7 +928,9 @@ export function LiveClassroomStartForm({
                 />
                 <div className="flex flex-wrap gap-2">
                   {availableStrategyCards.map((kind) => {
-                    const setting = cardSettings[kind] ?? defaultStrategyCardSetting(kind);
+                    const setting =
+                      cardSettings[kind] ??
+                      defaultStrategyCardSetting(kind, { pointsPerQuestion });
                     const timerBlocked =
                       kind === "extra_time" && timePerQuestionSec == null;
                     const on = !timerBlocked && setting.scope !== "disabled";
@@ -841,8 +983,9 @@ export function LiveClassroomStartForm({
         }
         setting={
           configuringKind
-            ? cardSettings[configuringKind] ?? defaultStrategyCardSetting(configuringKind)
-            : defaultStrategyCardSetting("double_points")
+            ? cardSettings[configuringKind] ??
+              defaultStrategyCardSetting(configuringKind, { pointsPerQuestion })
+            : defaultStrategyCardSetting("double_points", { pointsPerQuestion })
         }
         otherCardSettings={Object.fromEntries(
           enabledCards.map((k) => [k, cardSettings[k]!]),

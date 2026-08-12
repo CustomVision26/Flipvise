@@ -377,40 +377,69 @@ export function LiveClassroomProjector({
       </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {state.leaderboard.map((team, i) => (
-          <Card
-            key={team.id}
-            className={cn(
-              "border-border/80 bg-card/60 shadow-sm transition-transform duration-300",
-              i === 0 ? "ring-2 ring-primary/30" : "",
-            )}
-          >
-            <CardHeader className="pb-2">
-              <CardDescription className="text-sm">#{i + 1}</CardDescription>
-              <CardTitle className="truncate text-xl">{team.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between gap-2">
-              <span className="text-3xl font-semibold tabular-nums text-foreground">
-                {team.score}
-              </span>
-              {state.session.battleMode === "survival" ? (
-                <span className="flex items-center gap-0.5 text-primary">
-                  {Array.from({ length: team.hearts }).map((_, hi) => (
-                    <Heart
-                      key={hi}
-                      className="size-5 fill-current"
-                      aria-hidden
-                    />
-                  ))}
-                </span>
-              ) : null}
-            </CardContent>
-          </Card>
-        ))}
+        {/* Survival is every player for themselves — there's no team to show, so rank individuals. */}
+        {state.session.battleMode === "survival"
+          ? (state.survivalLeaderboard ?? []).map((player, i) => (
+              <Card
+                key={player.userId}
+                className={cn(
+                  "border-border/80 bg-card/60 shadow-sm transition-transform duration-300",
+                  i === 0 && !player.eliminated ? "ring-2 ring-primary/30" : "",
+                  player.eliminated ? "opacity-60" : "",
+                )}
+              >
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-sm">
+                    #{i + 1}
+                    {player.eliminated ? " · out" : ""}
+                  </CardDescription>
+                  <CardTitle className="truncate text-xl">
+                    {player.displayName}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between gap-2">
+                  <span className="text-3xl font-semibold tabular-nums text-foreground">
+                    {player.score}
+                  </span>
+                  <span className="flex items-center gap-0.5 text-primary">
+                    {Array.from({ length: player.livesRemaining }).map(
+                      (_, hi) => (
+                        <Heart
+                          key={hi}
+                          className="size-5 fill-current"
+                          aria-hidden
+                        />
+                      ),
+                    )}
+                  </span>
+                </CardContent>
+              </Card>
+            ))
+          : state.leaderboard.map((team, i) => (
+              <Card
+                key={team.id}
+                className={cn(
+                  "border-border/80 bg-card/60 shadow-sm transition-transform duration-300",
+                  i === 0 ? "ring-2 ring-primary/30" : "",
+                )}
+              >
+                <CardHeader className="pb-2">
+                  <CardDescription className="text-sm">#{i + 1}</CardDescription>
+                  <CardTitle className="truncate text-xl">{team.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between gap-2">
+                  <span className="text-3xl font-semibold tabular-nums text-foreground">
+                    {team.score}
+                  </span>
+                </CardContent>
+              </Card>
+            ))}
       </div>
 
       <p className="text-center text-sm text-muted-foreground">
-        Projector view — student names are hidden for privacy.
+        {state.session.battleMode === "survival"
+          ? "Projector view — every player for themselves."
+          : "Projector view — student names are hidden for privacy."}
       </p>
       </div>
     </div>

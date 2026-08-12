@@ -162,6 +162,7 @@ export default async function AdminAiUsageAnalyticsPage({
           feature,
           model,
           status,
+          usageStatus,
           searchUserIds,
           page,
           pageSize: 25,
@@ -169,9 +170,6 @@ export default async function AdminAiUsageAnalyticsPage({
   ]);
 
   let rows = userTable.rows;
-  if (usageStatus) {
-    rows = rows.filter((r) => r.snapshot.usageStatus === usageStatus);
-  }
 
   if (sort === "tokens") {
     rows = [...rows].sort((a, b) => b.totalTokens - a.totalTokens);

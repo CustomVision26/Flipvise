@@ -3,7 +3,10 @@ import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { currentUser } from "@/lib/clerk-auth";
-import { accessHasAddon, getAccessContext } from "@/lib/access";
+import { getAccessContext } from "@/lib/access";
+import { userCanEnterLiveClassroomBridge } from "@/lib/live-classroom-bridge";
+import { teamOwnsLiveClassroom } from "@/lib/live-classroom-access";
+import { getLiveClassroomTeacherGrant } from "@/db/queries/live-classroom";
 import { redirectIfAccountRecoveryIncomplete } from "@/lib/account-recovery-gate";
 import {
   formatSessionUserDisplayName,
@@ -52,7 +55,6 @@ import { AiDocumentStudioDashboardEntry } from "@/components/ai-document-studio-
 import { LiveClassroomDashboardEntry } from "@/components/live-classroom-dashboard-entry";
 import {
   hasAnyAiDocumentStudioAddon,
-  LIVE_CLASSROOM_ADDON_KEY,
 } from "@/lib/addon-keys";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
@@ -342,8 +344,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         : null;
     const workspaceHeadingGroupName = workspaceHeadingRow?.name ?? null;
     const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
+    const hostTokenGrant = await getLiveClassroomTeacherGrant(tw.teamId, userId);
+    const showLiveClassroom =
+      hostTokenGrant != null &&
+      (await teamOwnsLiveClassroom(tw.teamId)).owns;
+
     return (
       <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+        {showLiveClassroom ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <LiveClassroomDashboardEntry />
+          </div>
+        ) : null}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -702,7 +714,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showAiDocumentStudio = hasAnyAiDocumentStudioAddon(
     access.activeAddonKeys,
   );
-  const showLiveClassroom = accessHasAddon(access, LIVE_CLASSROOM_ADDON_KEY);
+  const showLiveClassroom = await userCanEnterLiveClassroomBridge(
+    userId,
+    access,
+  );
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

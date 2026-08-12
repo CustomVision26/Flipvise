@@ -70,7 +70,7 @@ export const TEAM_ADMIN_STUDY_PRIVILEGES_PATH =
 export const TEAM_ADMIN_ADDONS_PATH = "/dashboard/team-admin/add-ons";
 
 /** Live Classroom™ organization feature (absolute path under dashboard). */
-export const TEAM_ADMIN_LIVE_CLASSROOM_PATH = "/dashboard/live-classroom";
+export const TEAM_ADMIN_LIVE_CLASSROOM_PATH = "/dashboard/live-classroom/bridge";
 
 /** Study Modes — Team AI Recall™ / Active Recall analytics (`?team=`). */
 export const TEAM_ADMIN_ACTIVE_RECALL_PATH =
@@ -411,17 +411,14 @@ export function buildTeamAdminAddonsPath(
 
 export function isTeamAdminLiveClassroomPath(pathname: string): boolean {
   return (
-    pathname === TEAM_ADMIN_LIVE_CLASSROOM_PATH ||
-    pathname.startsWith(`${TEAM_ADMIN_LIVE_CLASSROOM_PATH}/`)
+    pathname === "/dashboard/live-classroom" ||
+    pathname.startsWith("/dashboard/live-classroom/")
   );
 }
 
-/** Live Classroom uses `?team=` only (no teamMemberId bookmark). */
+/** Live Classroom bridge — no `?team=` required (workspace picker). */
 export function buildTeamAdminLiveClassroomPath(
-  teamId?: number | null,
+  _teamId?: number | null,
 ): string {
-  if (teamId == null || !Number.isFinite(teamId) || teamId <= 0) {
-    return TEAM_ADMIN_LIVE_CLASSROOM_PATH;
-  }
-  return `${TEAM_ADMIN_LIVE_CLASSROOM_PATH}?team=${teamId}`;
+  return TEAM_ADMIN_LIVE_CLASSROOM_PATH;
 }

@@ -9,6 +9,7 @@ import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
 import { loadLiveClassroomPageContext } from "@/lib/load-live-classroom-page-context";
 import {
   buildLiveClassroomHref,
+  LIVE_CLASSROOM_BRIDGE_PATH,
   LIVE_CLASSROOM_HISTORY_PATH,
   LIVE_CLASSROOM_JOIN_PATH,
   LIVE_CLASSROOM_REPORTS_PATH,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/live-classroom-url";
 import { LiveClassroomShell } from "@/components/live-classroom-shell";
 import { LiveClassroomAssignmentRequired } from "@/components/live-classroom-assignment-required";
+import { LiveClassroomBackLink } from "@/components/live-classroom-back-link";
 import { LiveClassroomUnlock } from "@/components/live-classroom-unlock";
 import { LiveClassroomRecentSessionsList } from "@/components/live-classroom-recent-sessions-list";
 import { Button } from "@/components/ui/button";
@@ -86,6 +88,11 @@ export default async function LiveClassroomDashboardPage({
   return (
     <LiveClassroomShell teamId={ctx.teamId} canManage={ctx.canManage}>
       <div className="space-y-6">
+        <LiveClassroomBackLink
+          teamId={ctx.teamId}
+          href={LIVE_CLASSROOM_BRIDGE_PATH}
+          label="Back to workspaces"
+        />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">

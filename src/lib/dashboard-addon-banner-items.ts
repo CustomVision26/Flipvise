@@ -8,7 +8,7 @@ import {
   LIVE_CLASSROOM_ADDON_KEY,
 } from "@/lib/addon-keys";
 import { AI_DOC_STUDIO_BASE } from "@/lib/ai-document-studio-paths";
-import { LIVE_CLASSROOM_ROOT_PATH } from "@/lib/live-classroom-url";
+import { LIVE_CLASSROOM_BRIDGE_PATH } from "@/lib/live-classroom-url";
 import { resolveStripeAddonPriceIdFromEnvKey } from "@/lib/stripe-addon-price-env";
 
 export type DashboardAddonBannerItem = {
@@ -26,7 +26,7 @@ export type DashboardAddonBannerItem = {
 function addonFeatureHref(addonKey: string): string | null {
   // Unlocked document-type add-ons open via the AI Document Studio entry button.
   if (isAiDocumentStudioAddonKey(addonKey)) return AI_DOC_STUDIO_BASE;
-  if (addonKey === LIVE_CLASSROOM_ADDON_KEY) return LIVE_CLASSROOM_ROOT_PATH;
+  if (addonKey === LIVE_CLASSROOM_ADDON_KEY) return LIVE_CLASSROOM_BRIDGE_PATH;
   return null;
 }
 

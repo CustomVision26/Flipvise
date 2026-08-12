@@ -354,9 +354,18 @@ export function LiveClassroomRecentSessionsList({
         );
         router.refresh();
       } catch (e) {
+        // The list can be a stale snapshot — the battle may have finished
+        // (all questions answered / lives ran out) since this page loaded.
+        if (e instanceof Error && /already ended/i.test(e.message)) {
+          toast.message("That battle already finished — opening its report.");
+          router.push(liveClassroomReportPath(session.id));
+          router.refresh();
+          return;
+        }
         toast.error(
           e instanceof Error ? e.message : "Could not open session",
         );
+        router.refresh();
       } finally {
         setPendingId(null);
       }
@@ -383,6 +392,12 @@ export function LiveClassroomRecentSessionsList({
         router.push(liveClassroomLobbyPath(session.id));
         router.refresh();
       } catch (e) {
+        if (e instanceof Error && /already ended/i.test(e.message)) {
+          toast.message("That battle already finished — opening its report.");
+          router.push(liveClassroomReportPath(session.id));
+          router.refresh();
+          return;
+        }
         toast.error(
           e instanceof Error ? e.message : "Could not start battle",
         );

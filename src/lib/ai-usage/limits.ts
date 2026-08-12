@@ -57,6 +57,18 @@ export function computeUsageStatus(params: {
   return "normal";
 }
 
+/** Admin table / KPI filter. `near_limit` matches approaching + critical (≥80% and <100%). */
+export function matchesAiUsageStatusFilter(
+  status: AiUsagePeriodSnapshot["usageStatus"],
+  filter: string | null | undefined,
+): boolean {
+  if (!filter) return true;
+  if (filter === "near_limit") {
+    return status === "approaching" || status === "critical";
+  }
+  return status === filter;
+}
+
 export function buildPeriodSnapshot(params: {
   aiAccessEnabled: boolean;
   flagged: boolean;

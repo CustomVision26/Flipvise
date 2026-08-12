@@ -63,14 +63,26 @@ describe("Live Classroom scoring", () => {
     assert.equal(result.eliminated, false);
   });
 
-  it("scores collaborative captain submits at 500", () => {
+  it("scores collaborative captain submits with points per question", () => {
     const result = scoreLiveClassroomAnswer({
       battleMode: "collaborative_team",
       correct: true,
       responseTimeMs: 1000,
       timeLimitSec: 30,
+      pointsPerQuestion: 100,
     });
-    assert.equal(result.points, 500);
+    assert.equal(result.points, 100);
+  });
+
+  it("uses host-configured points per question for individual answers", () => {
+    const result = scoreLiveClassroomAnswer({
+      battleMode: "individual_team",
+      correct: true,
+      responseTimeMs: 0,
+      timeLimitSec: 30,
+      pointsPerQuestion: 50,
+    });
+    assert.equal(result.points, 50 + 50 + 10);
   });
 
   it("marks survival wrong answers as eliminated without shield", () => {

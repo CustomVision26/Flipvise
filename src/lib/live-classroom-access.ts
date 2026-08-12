@@ -136,7 +136,12 @@ export async function resolveLiveClassroomOrgRole(input: {
   // Workspace membership alone is not enough — must be on the LC roster.
   if (!assigned) return null;
 
-  if (membership.role === "team_admin") return "team_administrator";
+  // Team admins need an explicit host token (teacher grant) to host or manage
+  // Live Classroom for this workspace. Without a token they can only join as a
+  // participant when assigned to the roster.
+  if (membership.role === "team_admin") {
+    return teacherGrant ? "team_administrator" : "student";
+  }
   if (teacherGrant) return "teacher";
   return "student";
 }

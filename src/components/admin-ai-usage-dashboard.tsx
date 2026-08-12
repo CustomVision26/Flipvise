@@ -80,8 +80,9 @@ const FILTER_ALL = "__all__";
 
 const USAGE_STATUS_OPTIONS = [
   { value: "normal", label: "Normal" },
-  { value: "approaching", label: "Approaching limit" },
-  { value: "critical", label: "Critical" },
+  { value: "near_limit", label: "Near limit (80–99%)" },
+  { value: "approaching", label: "Approaching (80–89%)" },
+  { value: "critical", label: "Critical (90–99%)" },
   { value: "limit_reached", label: "Limit reached" },
   { value: "disabled", label: "AI disabled" },
   { value: "flagged", label: "Flagged" },
@@ -308,15 +309,41 @@ function KpiCard({
   value,
   previous,
   hint,
+  active,
+  onClick,
 }: {
   label: string;
   value: string;
   previous?: number;
   currentNumeric?: number;
   hint?: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const interactive = typeof onClick === "function";
   return (
-    <Card className={adminSupportKpiCardClass}>
+    <Card
+      className={cn(
+        adminSupportKpiCardClass,
+        interactive &&
+          "cursor-pointer transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active && "border-primary/70 bg-primary/5",
+      )}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-pressed={interactive ? Boolean(active) : undefined}
+      onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader className="space-y-1 p-4 pb-2">
         <CardDescription className="text-xs">{label}</CardDescription>
         <CardTitle className="text-2xl font-semibold tabular-nums tracking-tight">
@@ -905,12 +932,28 @@ export function AdminAiUsageDashboard(props: AdminAiUsageDashboardProps) {
             <KpiCard
               label="Users approaching limit"
               value={nearLimit.approaching.toLocaleString()}
-              hint="≥ 80% of period allowance"
+              hint="Current billing period · ≥ 80% of allowance · click to filter table"
+              active={filters.usageStatus === "near_limit"}
+              onClick={() =>
+                update({
+                  usageStatus:
+                    filters.usageStatus === "near_limit" ? null : "near_limit",
+                })
+              }
             />
             <KpiCard
               label="Users who reached limit"
               value={nearLimit.reached.toLocaleString()}
-              hint="≥ 100% of period allowance"
+              hint="Current billing period · ≥ 100% of allowance · click to filter table"
+              active={filters.usageStatus === "limit_reached"}
+              onClick={() =>
+                update({
+                  usageStatus:
+                    filters.usageStatus === "limit_reached"
+                      ? null
+                      : "limit_reached",
+                })
+              }
             />
           </div>
         </section>

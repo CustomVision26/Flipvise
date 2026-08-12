@@ -1860,9 +1860,12 @@ export const liveClassroomSessionStatusEnum = pgEnum(
   ['scheduled', 'lobby', 'active', 'paused', 'completed', 'cancelled'],
 );
 
+// `exit_ticket` / `review_battle` are legacy values kept for historical rows;
+// `head_to_head` is the new Survival-only session type (see
+// scripts/ensure-live-classroom-head-to-head-session-type.ts).
 export const liveClassroomSessionTypeEnum = pgEnum(
   'live_classroom_session_type',
-  ['warm_up', 'team_battle', 'exit_ticket', 'review_battle'],
+  ['warm_up', 'team_battle', 'exit_ticket', 'review_battle', 'head_to_head'],
 );
 
 export const liveClassroomBattleModeEnum = pgEnum(
@@ -1937,7 +1940,7 @@ export const liveClassroomTeamSettings = pgTable(
   (t) => [uniqueIndex('live_classroom_team_settings_team_uidx').on(t.teamId)],
 );
 
-/** Teacher permission grants beyond owner / team_admin. */
+/** Host tokens / teacher permission grants beyond the subscription owner. */
 export const liveClassroomTeacherGrants = pgTable(
   'live_classroom_teacher_grants',
   {

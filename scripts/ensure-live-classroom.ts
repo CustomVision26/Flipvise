@@ -107,7 +107,7 @@ async function main() {
       '["pro_plus_team_basic","pro_plus_team_gold","pro_plus_platinum_plan","pro_plus_enterprise","education_gold","education_enterprise"]'::json,
       'STRIPE_ADDON_LIVE_CLASSROOM_PRICE_ID',
       true,
-      false,
+      true,
       true
     )
     ON CONFLICT ("key") DO UPDATE SET
@@ -116,6 +116,7 @@ async function main() {
       "marketingBlurb" = EXCLUDED."marketingBlurb",
       "eligiblePlanIds" = EXCLUDED."eligiblePlanIds",
       "stripePriceEnvKey" = EXCLUDED."stripePriceEnvKey",
+      "publishedOnPricing" = true,
       "publishedOnBanner" = true,
       "updatedAt" = now()
   `;

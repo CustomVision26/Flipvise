@@ -53,7 +53,7 @@ export function ServiceWorkerRegister() {
 
     if (isDevOrLocalOrNativeHost()) {
       // Bump this key when Turbopack "module factory is not available" returns.
-      const reloadKey = "flipvise-dev-sw-reset-v20";
+      const reloadKey = "flipvise-dev-sw-reset-v23";
       if (sessionStorage.getItem(reloadKey)) return;
 
       void clearControllingServiceWorkersAndCaches()

@@ -5,6 +5,7 @@ import {
   aiUsagePeriodCounters,
   aiUsageTeamLimits,
   aiUsageUserLimits,
+  stripeSubscriptions,
   teams,
 } from "@/db/schema";
 import {
@@ -23,6 +24,7 @@ import {
 import type { AiUsageFeature, AiUsageStatus } from "@/lib/ai-usage/types";
 import {
   buildPeriodSnapshot,
+  matchesAiUsageStatusFilter,
   resolveAllowancePriority,
 } from "@/lib/ai-usage/limits";
 import { resolveUsagePeriod } from "@/lib/ai-usage/period";
@@ -597,7 +599,7 @@ export async function getAiUsageSummaryMetrics(params: {
       timedOut: sql<number>`coalesce(sum(case when ${aiUsageEvents.status} = 'timed_out' then 1 else 0 end), 0)::int`,
       totalTokens: sql<number>`coalesce(sum(${aiUsageEvents.totalTokens}), 0)::int`,
       estimatedCostMicros: sql<number>`coalesce(sum(${aiUsageEvents.estimatedCostMicros}), 0)::int`,
-      avgResponseTimeMs: sql<number>`coalesce(avg(${aiUsageEvents.responseTimeMs}), 0)::int`,
+      avgResponseTimeMs: sql<number>`coalesce(avg(case when ${aiUsageEvents.status} = 'success' then ${aiUsageEvents.responseTimeMs} end), 0)::int`,
       activeUsers: countDistinct(aiUsageEvents.userId),
     })
     .from(aiUsageEvents)
@@ -750,6 +752,8 @@ export type AiUsageUserTableFilters = {
   feature?: AiUsageFeature | null;
   model?: string | null;
   status?: AiUsageStatus | null;
+  /** Snapshot usageStatus filter; `near_limit` = approaching | critical. */
+  usageStatus?: string | null;
   searchUserIds?: string[] | null;
   page: number;
   pageSize: number;
@@ -795,24 +799,39 @@ export async function getAiUsageUserTable(filters: AiUsageUserTableFilters) {
     .groupBy(aiUsageEvents.userId)
     .orderBy(desc(sql`4`));
 
-  const total = aggregated.length;
-  const page = Math.max(1, filters.page);
-  const pageSize = Math.min(100, Math.max(1, filters.pageSize));
-  const slice = aggregated.slice((page - 1) * pageSize, page * pageSize);
-
-  const userIds = slice.map((r) => r.userId);
+  const allUserIds = aggregated.map((r) => r.userId);
   const limits =
-    userIds.length > 0
+    allUserIds.length > 0
       ? await db
           .select()
           .from(aiUsageUserLimits)
-          .where(inArray(aiUsageUserLimits.userId, userIds))
+          .where(inArray(aiUsageUserLimits.userId, allUserIds))
       : [];
   const limitMap = new Map(limits.map((l) => [l.userId, l]));
 
+  const subs =
+    allUserIds.length > 0
+      ? await db
+          .select({
+            userId: stripeSubscriptions.userId,
+            planSlug: stripeSubscriptions.planSlug,
+            status: stripeSubscriptions.status,
+          })
+          .from(stripeSubscriptions)
+          .where(inArray(stripeSubscriptions.userId, allUserIds))
+      : [];
+  const stripePlanMap = new Map<string, string | null>();
+  for (const s of subs) {
+    if (s.status === "active" || s.status === "trialing") {
+      stripePlanMap.set(s.userId, s.planSlug);
+    }
+  }
+
   const teamIds = [
     ...new Set(
-      slice.map((r) => r.teamId).filter((id): id is number => id != null),
+      aggregated
+        .map((r) => r.teamId)
+        .filter((id): id is number => id != null),
     ),
   ];
   const teamRows =
@@ -821,13 +840,19 @@ export async function getAiUsageUserTable(filters: AiUsageUserTableFilters) {
       : [];
   const teamMap = new Map(teamRows.map((t) => [t.id, t]));
 
-  const rows = slice.map((r) => {
+  const allRows = aggregated.map((r) => {
     const limit = limitMap.get(r.userId);
+    const planFromEvents =
+      r.subscriptionPlan && r.subscriptionPlan !== "unknown"
+        ? r.subscriptionPlan
+        : null;
+    const subscriptionPlan =
+      planFromEvents ?? stripePlanMap.get(r.userId) ?? null;
     const { allowance } = resolveAllowancePriority({
       isPlatformAdmin: false,
       userUnlimited: limit?.unlimited,
       userMonthlyAllowance: limit?.monthlyAllowance,
-      subscriptionPlan: r.subscriptionPlan,
+      subscriptionPlan,
     });
     const snapshot = buildPeriodSnapshot({
       aiAccessEnabled: limit?.aiAccessEnabled ?? true,
@@ -842,7 +867,7 @@ export async function getAiUsageUserTable(filters: AiUsageUserTableFilters) {
     const team = r.teamId != null ? teamMap.get(r.teamId) : null;
     return {
       userId: r.userId,
-      subscriptionPlan: r.subscriptionPlan,
+      subscriptionPlan,
       teamId: r.teamId,
       teamName: team?.name ?? null,
       generations: Number(r.generations),
@@ -861,6 +886,17 @@ export async function getAiUsageUserTable(filters: AiUsageUserTableFilters) {
       aiAccessEnabled: limit?.aiAccessEnabled ?? true,
     };
   });
+
+  const filtered = filters.usageStatus
+    ? allRows.filter((r) =>
+        matchesAiUsageStatusFilter(r.snapshot.usageStatus, filters.usageStatus),
+      )
+    : allRows;
+
+  const total = filtered.length;
+  const page = Math.max(1, filters.page);
+  const pageSize = Math.min(100, Math.max(1, filters.pageSize));
+  const rows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return { rows, total, page, pageSize };
 }
@@ -988,23 +1024,67 @@ export async function getAiUsageUserDetails(params: {
   };
 }
 
+/**
+ * Current billing-period near-limit counts (not the dashboard date-range).
+ * Resolves each user's Stripe plan + overrides — never the free fallback alone.
+ */
 export async function countUsersNearLimit() {
-  const counters = await db.select().from(aiUsagePeriodCounters);
-  const limits = await db.select().from(aiUsageUserLimits);
+  const now = new Date();
+  const counters = await db
+    .select()
+    .from(aiUsagePeriodCounters)
+    .where(gte(aiUsagePeriodCounters.periodEnd, now));
+
+  const latestByUser = new Map<string, (typeof counters)[number]>();
+  for (const c of counters) {
+    const prev = latestByUser.get(c.userId);
+    if (!prev || c.periodStart.getTime() > prev.periodStart.getTime()) {
+      latestByUser.set(c.userId, c);
+    }
+  }
+
+  const userIds = [...latestByUser.keys()];
+  if (userIds.length === 0) return { approaching: 0, reached: 0 };
+
+  const [limits, subs] = await Promise.all([
+    db
+      .select()
+      .from(aiUsageUserLimits)
+      .where(inArray(aiUsageUserLimits.userId, userIds)),
+    db
+      .select({
+        userId: stripeSubscriptions.userId,
+        planSlug: stripeSubscriptions.planSlug,
+        status: stripeSubscriptions.status,
+      })
+      .from(stripeSubscriptions)
+      .where(inArray(stripeSubscriptions.userId, userIds)),
+  ]);
+
   const limitMap = new Map(limits.map((l) => [l.userId, l]));
+  const planMap = new Map<string, string | null>();
+  for (const s of subs) {
+    if (s.status === "active" || s.status === "trialing") {
+      planMap.set(s.userId, s.planSlug);
+    }
+  }
 
   let approaching = 0;
   let reached = 0;
 
-  for (const c of counters) {
-    const limit = limitMap.get(c.userId);
+  for (const [userId, c] of latestByUser) {
+    const limit = limitMap.get(userId);
+    if (limit && limit.aiAccessEnabled === false) continue;
+    if (limit?.flagged) continue;
+
     const { allowance } = resolveAllowancePriority({
       isPlatformAdmin: false,
       userUnlimited: limit?.unlimited,
       userMonthlyAllowance: limit?.monthlyAllowance,
-      subscriptionPlan: null,
+      subscriptionPlan: planMap.get(userId) ?? null,
     });
     if (allowance.kind === "unlimited") continue;
+
     const used = Math.max(0, c.generationCount - c.resetAdjustment);
     const pct =
       allowance.generations <= 0 ? 100 : (used / allowance.generations) * 100;

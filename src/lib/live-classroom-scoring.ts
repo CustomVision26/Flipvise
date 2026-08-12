@@ -1,4 +1,5 @@
 import type { LiveClassroomBattleMode } from "@/lib/live-classroom-types";
+import { LIVE_CLASSROOM_POINTS_PER_QUESTION_DEFAULT } from "@/lib/live-classroom-types";
 
 export type ScoreAnswerInput = {
   battleMode: LiveClassroomBattleMode;
@@ -7,6 +8,11 @@ export type ScoreAnswerInput = {
   responseTimeMs: number;
   /** `null` when the battle has no per-question time limit (no speed bonus). */
   timeLimitSec: number | null;
+  /**
+   * Base points for a correct answer (host-configured on the session).
+   * @default 100
+   */
+  pointsPerQuestion?: number;
   /** Active strategy bonuses already resolved for this answer (host-configured score values). */
   doublePointsBonus?: number;
   scoreBoostBonus?: number;
@@ -20,21 +26,25 @@ export type ScoreAnswerResult = {
   eliminated: boolean;
 };
 
-const BASE_CORRECT = 100;
-const COLLAB_CORRECT = 500;
 const PARTICIPATION = 10;
 const MAX_SPEED_BONUS = 50;
 
 /**
  * Pure scoring — used by server actions and unit tests.
- * Individual: 100 + speed bonus + participation per correct answer.
- * Collaborative captain submit: 500 flat when correct.
+ * Correct answers use the host-configured points-per-question, plus speed /
+ * participation bonuses (individual & survival) and any active strategy bonuses.
  * Survival: scoring still awards points; hearts handled separately.
  */
 export function scoreLiveClassroomAnswer(
   input: ScoreAnswerInput,
 ): ScoreAnswerResult {
   const participation = PARTICIPATION;
+  const baseCorrect =
+    typeof input.pointsPerQuestion === "number" &&
+    Number.isFinite(input.pointsPerQuestion)
+      ? Math.max(0, Math.round(input.pointsPerQuestion))
+      : LIVE_CLASSROOM_POINTS_PER_QUESTION_DEFAULT;
+
   if (!input.correct) {
     return {
       points: input.shielded ? participation : 0,
@@ -45,7 +55,7 @@ export function scoreLiveClassroomAnswer(
   }
 
   if (input.battleMode === "collaborative_team") {
-    let points = COLLAB_CORRECT;
+    let points = baseCorrect;
     points += input.doublePointsBonus ?? 0;
     points += input.scoreBoostBonus ?? 0;
     return {
@@ -62,7 +72,7 @@ export function scoreLiveClassroomAnswer(
     const ratio = Math.max(0, Math.min(1, 1 - input.responseTimeMs / limitMs));
     speedBonus = Math.round(MAX_SPEED_BONUS * ratio);
   }
-  let points = BASE_CORRECT + speedBonus + participation;
+  let points = baseCorrect + speedBonus + participation;
   points += input.doublePointsBonus ?? 0;
   points += input.scoreBoostBonus ?? 0;
 

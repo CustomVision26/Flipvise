@@ -166,6 +166,50 @@ export async function listLiveClassroomTeacherGrants(
     .orderBy(desc(liveClassroomTeacherGrants.createdAt));
 }
 
+/** Host tokens (teacher grants) held by this user across all workspaces. */
+export async function listLiveClassroomTeacherGrantsForUser(
+  userId: string,
+): Promise<LiveClassroomTeacherGrantRow[]> {
+  return db
+    .select()
+    .from(liveClassroomTeacherGrants)
+    .where(eq(liveClassroomTeacherGrants.userId, userId))
+    .orderBy(desc(liveClassroomTeacherGrants.createdAt));
+}
+
+export async function listLiveClassroomSessionsForTeams(
+  teamIds: number[],
+  options?: {
+    status?: LiveClassroomSessionStatus | LiveClassroomSessionStatus[];
+    limit?: number;
+  },
+): Promise<LiveClassroomSessionRow[]> {
+  const unique = [...new Set(teamIds.filter((id) => Number.isFinite(id) && id > 0))];
+  if (unique.length === 0) return [];
+
+  const statuses = options?.status
+    ? Array.isArray(options.status)
+      ? options.status
+      : [options.status]
+    : null;
+
+  const conditions = [inArray(liveClassroomSessions.teamId, unique)];
+  if (statuses && statuses.length > 0) {
+    conditions.push(inArray(liveClassroomSessions.status, statuses));
+  }
+
+  const query = db
+    .select()
+    .from(liveClassroomSessions)
+    .where(and(...conditions))
+    .orderBy(desc(liveClassroomSessions.createdAt));
+
+  if (options?.limit != null) {
+    return query.limit(options.limit);
+  }
+  return query;
+}
+
 export async function grantLiveClassroomTeacher(
   teamId: number,
   userId: string,

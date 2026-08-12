@@ -91,9 +91,13 @@ import {
   LIVE_CLASSROOM_TEAM_ASSIGNMENT_MODES,
   LIVE_CLASSROOM_CAPTAIN_MODES,
   LIVE_CLASSROOM_BATTLE_START_DELAY_OPTIONS_SEC,
+  LIVE_CLASSROOM_ABANDONMENT_WINDOW_OPTIONS_SEC,
+  battleModeLabel,
+  battleModesForSessionType,
   isLiveClassroomPresenceFresh,
   normalizeStrategyCardSettings,
   resolveStrategyCardSetting,
+  sessionTypeLabel,
   strategyCardAppliesToDeckCard,
   strategyCardEnabledKinds,
   strategyCardsForBattleMode,
@@ -179,6 +183,7 @@ const createSessionSchema = z.object({
   questionSourceMode: z.enum(LIVE_CLASSROOM_QUESTION_SOURCE_MODES).optional(),
   selectedDeckCardIds: z.array(z.number().int().positive()).optional(),
   timePerQuestionSec: z.number().int().min(30).max(300).nullable(),
+  pointsPerQuestion: z.number().int().min(1).max(10_000).optional(),
   difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES).optional(),
   battleStartDelaySec: z
     .number()
@@ -202,7 +207,23 @@ const createSessionSchema = z.object({
   strategyCardSettings: strategyCardSettingsSchema.optional(),
   scheduledFor: z.string().datetime().nullable().optional(),
   teamCount: z.number().int().min(2).max(4).optional(),
-});
+  abandonmentWindowSec: z
+    .number()
+    .int()
+    .refine((n) =>
+      (LIVE_CLASSROOM_ABANDONMENT_WINDOW_OPTIONS_SEC as readonly number[]).includes(
+        n,
+      ),
+    )
+    .nullable()
+    .optional(),
+}).refine(
+  (data) => battleModesForSessionType(data.sessionType).includes(data.battleMode),
+  {
+    message: "That battle mode isn't available for the selected session type.",
+    path: ["battleMode"],
+  },
+);
 
 /** Issue one usable card instance per team per allowed activation, honoring per-kind scope/limits. */
 async function issueLiveClassroomStrategyCards(
@@ -234,7 +255,11 @@ async function issueLiveClassroomStrategyCards(
   const cards: Array<{ liveTeamId: number; kind: LiveClassroomStrategyCardKind }> = [];
   for (const team of teams) {
     for (const kind of perTeamKinds) {
-      const setting = resolveStrategyCardSetting(config.strategyCardSettings, kind);
+      const setting = resolveStrategyCardSetting(config.strategyCardSettings, kind, {
+        pointsPerQuestion:
+          config.pointsPerQuestion ??
+          DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+      });
       for (let i = 0; i < setting.maxActivationsPerTeam; i++) {
         cards.push({ liveTeamId: team.id, kind });
       }
@@ -246,6 +271,8 @@ async function issueLiveClassroomStrategyCards(
 function revalidateLiveClassroom(teamId: number, sessionId?: number) {
   revalidatePath(LIVE_CLASSROOM_ROOT_PATH);
   revalidatePath(`/dashboard/live-classroom`);
+  revalidatePath(`/dashboard/live-classroom/bridge`);
+  revalidatePath("/dashboard");
   if (sessionId != null) {
     revalidatePath(liveClassroomLobbyPath(sessionId));
     revalidatePath(liveClassroomHostPath(sessionId));
@@ -376,6 +403,9 @@ export async function createLiveClassroomSessionAction(
     questionSourceMode,
     selectedDeckCardIds,
     timePerQuestionSec: data.timePerQuestionSec,
+    pointsPerQuestion:
+      data.pointsPerQuestion ??
+      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
     difficulty: data.difficulty ?? DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.difficulty,
     battleStartDelaySec:
       data.battleStartDelaySec ??
@@ -389,7 +419,15 @@ export async function createLiveClassroomSessionAction(
     strategyCardPolicy,
     strategyCardLimitPerTeam,
     enabledStrategyCards,
-    strategyCardSettings: normalizeStrategyCardSettings(data.strategyCardSettings),
+    strategyCardSettings: normalizeStrategyCardSettings(
+      data.strategyCardSettings,
+      {
+        pointsPerQuestion:
+          data.pointsPerQuestion ??
+          DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+      },
+    ),
+    abandonmentWindowSec: data.abandonmentWindowSec ?? null,
   };
 
   const isScheduled = Boolean(data.scheduledFor);
@@ -871,6 +909,24 @@ export async function getLiveClassroomRealtimeStateAction(sessionId: number) {
 /** Ignore transient disconnects while clients leave lobby and open play/host. */
 const INDEPENDENT_BATTLE_LEAVE_GRACE_MS = 60_000;
 
+/**
+ * A lone individual/survival player must go silent this long before we treat
+ * them as having abandoned the run and auto-complete the session for them.
+ * Deliberately much longer than `LIVE_CLASSROOM_PRESENCE_STALE_MS` (~36s,
+ * used only for the "connected" UI badge) so a brief tab switch — e.g.
+ * checking the Sessions Pool dashboard — never force-ends an in-progress
+ * battle that still has unanswered questions or remaining survival lives.
+ */
+const INDEPENDENT_BATTLE_ABANDON_MS = 3 * 60_000;
+
+/**
+ * When the host disables the per-question timer ("no time limit"), the whole
+ * point is to let players take as long as they need — a short abandonment
+ * window would silently end the battle for everyone mid-thought. Untimed
+ * battles get a much longer runway before we treat silence as abandonment.
+ */
+const UNTIMED_INDEPENDENT_BATTLE_ABANDON_MS = 30 * 60_000;
+
 async function maybeCompleteIndependentBattleIfEveryoneDone(
   sessionId: number,
 ): Promise<boolean> {
@@ -888,6 +944,15 @@ async function maybeCompleteIndependentBattleIfEveryoneDone(
     return false;
   }
 
+  // Owner/team admin manual override always wins over the timer-aware default.
+  const manualAbandonSec = session.config.abandonmentWindowSec;
+  const abandonMs =
+    manualAbandonSec != null
+      ? manualAbandonSec * 1000
+      : session.config.timePerQuestionSec == null
+        ? UNTIMED_INDEPENDENT_BATTLE_ABANDON_MS
+        : INDEPENDENT_BATTLE_ABANDON_MS;
+
   const [participants, questions, answers] = await Promise.all([
     listLiveClassroomParticipants(sessionId),
     listLiveBattleQuestions(sessionId),
@@ -902,8 +967,9 @@ async function maybeCompleteIndependentBattleIfEveryoneDone(
   const allDone = allEligibleParticipantsCompletedIndependentBattle({
     participants: participants.map((p) => ({
       ...p,
-      connected:
-        p.connected && isLiveClassroomPresenceFresh(p.lastSeenAt, nowMs),
+      // Use a generous abandon window here (not the tight UI presence
+      // threshold) — this decides whether we permanently end the battle.
+      connected: isLiveClassroomPresenceFresh(p.lastSeenAt, nowMs, abandonMs),
     })),
     battleMap,
     answeredCountByUserId: answeredByUser,
@@ -1430,6 +1496,8 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   questionCount?: number;
   /** `null` disables the per-question time limit (untimed battle). */
   timePerQuestionSec?: number | null;
+  /** Base points awarded for each correct question answer. */
+  pointsPerQuestion?: number;
   difficulty?: (typeof LIVE_CLASSROOM_DIFFICULTIES)[number];
   battleStartDelaySec?: number;
   teamCount?: number;
@@ -1451,6 +1519,8 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   selectedDeckCardIds?: number[];
   /** Reschedule (or clear, via null) the session's planned start time. */
   scheduledFor?: string | null;
+  /** Manual abandonment-window override (seconds), or `null` for Auto. */
+  abandonmentWindowSec?: number | null;
 }) {
   const schema = z.object({
     sessionId: z.number().int().positive(),
@@ -1459,6 +1529,7 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     battleMode: z.enum(LIVE_CLASSROOM_BATTLE_MODES).optional(),
     questionCount: z.number().int().min(1).max(30).optional(),
     timePerQuestionSec: z.number().int().min(30).max(300).nullable().optional(),
+    pointsPerQuestion: z.number().int().min(1).max(10_000).optional(),
     questionSourceMode: z.enum(LIVE_CLASSROOM_QUESTION_SOURCE_MODES).optional(),
     selectedDeckCardIds: z.array(z.number().int().positive()).optional(),
     difficulty: z.enum(LIVE_CLASSROOM_DIFFICULTIES).optional(),
@@ -1484,6 +1555,16 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
       .optional(),
     strategyCardSettings: strategyCardSettingsSchema.optional(),
     survivalHearts: z.number().int().min(1).max(5).optional(),
+    abandonmentWindowSec: z
+      .number()
+      .int()
+      .refine((n) =>
+        (
+          LIVE_CLASSROOM_ABANDONMENT_WINDOW_OPTIONS_SEC as readonly number[]
+        ).includes(n),
+      )
+      .nullable()
+      .optional(),
   });
   const parsed = schema.safeParse(raw);
   if (!parsed.success) throw new Error("Invalid session settings");
@@ -1492,6 +1573,14 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   if (!session) throw new Error("Session not found");
   if (!["lobby", "scheduled"].includes(session.status)) {
     throw new Error("Session settings can only be changed before the battle starts.");
+  }
+
+  const effectiveSessionType = parsed.data.sessionType ?? session.sessionType;
+  const effectiveBattleMode = parsed.data.battleMode ?? session.battleMode;
+  if (!battleModesForSessionType(effectiveSessionType).includes(effectiveBattleMode)) {
+    throw new Error(
+      `${battleModeLabel(effectiveBattleMode)} isn't available for ${sessionTypeLabel(effectiveSessionType)} sessions.`,
+    );
   }
 
   const { settings } = await requireLiveClassroomAccess({
@@ -1564,7 +1653,12 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
   const strategyCardSettings = configPatch.strategyCardSettings
     ? {
         ...(session.config.strategyCardSettings ?? {}),
-        ...normalizeStrategyCardSettings(configPatch.strategyCardSettings),
+        ...normalizeStrategyCardSettings(configPatch.strategyCardSettings, {
+          pointsPerQuestion:
+            configPatch.pointsPerQuestion ??
+            session.config.pointsPerQuestion ??
+            DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+        }),
       }
     : session.config.strategyCardSettings ?? {};
 
@@ -1572,6 +1666,10 @@ export async function updateLiveClassroomSessionSettingsAction(raw: {
     ...DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG,
     ...session.config,
     ...configPatch,
+    pointsPerQuestion:
+      configPatch.pointsPerQuestion ??
+      session.config.pointsPerQuestion ??
+      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
     allowStrategyCards,
     enabledStrategyCards,
     strategyCardSettings,
@@ -2116,7 +2214,11 @@ export async function submitLiveClassroomAnswerAction(raw: {
   async function autoApplyBonusCard(
     kind: "double_points" | "score_boost",
   ): Promise<number> {
-    const setting = resolveStrategyCardSetting(strategyCardSettings, kind);
+    const setting = resolveStrategyCardSetting(strategyCardSettings, kind, {
+      pointsPerQuestion:
+        session.config.pointsPerQuestion ??
+        DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+    });
     if (!strategyCardAppliesToDeckCard(setting, questionCardId)) return 0;
     const unused = teamCards.find((c) => c.kind === kind && !c.usedAt);
     if (!unused) return 0;
@@ -2139,6 +2241,9 @@ export async function submitLiveClassroomAnswerAction(raw: {
     correct,
     responseTimeMs,
     timeLimitSec: session.config.timePerQuestionSec,
+    pointsPerQuestion:
+      session.config.pointsPerQuestion ??
+      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
     doublePointsBonus,
     scoreBoostBonus: scoreBoost,
     shielded,
@@ -2630,6 +2735,11 @@ export async function useLiveClassroomStrategyCardAction(raw: {
   const cardSetting = resolveStrategyCardSetting(
     session.config.strategyCardSettings,
     card.kind,
+    {
+      pointsPerQuestion:
+        session.config.pointsPerQuestion ??
+        DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+    },
   );
   if (!strategyCardAppliesToDeckCard(cardSetting, question.cardId)) {
     throw new Error("This strategy card doesn't apply to the current question.");
@@ -2745,6 +2855,18 @@ export async function endLiveClassroomSessionAction(
   const correctAnswers = answers.filter((a) => a.correct).length;
   const accuracyPercent =
     totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
+  // Only count members actually locked into the battle — excludes anyone who
+  // joined the lobby but was never assigned to a team and so never played.
+  const battlingParticipants = participants.filter(
+    (p) => p.liveTeamId != null,
+  );
+  const pointsByUserId = new Map<string, number>();
+  for (const a of answers) {
+    pointsByUserId.set(
+      a.userId,
+      (pointsByUserId.get(a.userId) ?? 0) + a.pointsAwarded,
+    );
+  }
   const avgResponseMs =
     totalAnswers > 0
       ? Math.round(
@@ -2796,12 +2918,12 @@ export async function endLiveClassroomSessionAction(
     teamId: session.teamId,
     sessionName: session.name,
     accuracyPercent,
-    attendance: participants.length,
+    attendance: battlingParticipants.length,
     strongestTopic,
     weakestTopic,
     mostMissedQuestion,
   }).catch(() => ({
-    summary: `Class accuracy was ${accuracyPercent}% with ${participants.length} participants.`,
+    summary: `Class accuracy was ${accuracyPercent}% with ${battlingParticipants.length} participants.`,
     recommendations: [
       "Review the most missed question together.",
       "Assign a short remediation deck before the next lesson.",
@@ -2812,7 +2934,7 @@ export async function endLiveClassroomSessionAction(
   }));
 
   const stats: LiveClassroomReportStats = {
-    attendance: participants.length,
+    attendance: battlingParticipants.length,
     accuracyPercent,
     averageResponseTimeSec: Math.round((avgResponseMs / 1000) * 10) / 10,
     strongestTopic: ai.strongestTopic ?? strongestTopic,
@@ -2847,6 +2969,7 @@ export async function endLiveClassroomSessionAction(
         correct: p.correctCount,
         incorrect: p.incorrectCount,
         accuracyPercent: denom > 0 ? Math.round((p.correctCount / denom) * 100) : 0,
+        score: pointsByUserId.get(p.userId) ?? 0,
         avgResponseTimeSec:
           p.answersSubmitted > 0
             ? Math.round((p.totalResponseTimeMs / p.answersSubmitted / 1000) * 10) /
@@ -2891,11 +3014,28 @@ export async function endLiveClassroomSessionAction(
     suggestedReviewMinutes: ai.suggestedReviewMinutes,
   };
 
-  // Only declare a winner when one team has a strictly higher, non-zero
-  // score — a 0-0 (or any tied) finish should not attribute a false win.
-  const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
-  const topTeams = teams.filter((t) => t.score === topScore);
-  const winner = topScore > 0 && topTeams.length === 1 ? topTeams[0] : null;
+  // Only declare a winner when one team/player has a strictly higher,
+  // non-zero score — a 0-0 (or any tied) finish should not attribute a
+  // false win. Survival has no meaningful team score (every player for
+  // themselves) — rank individuals instead.
+  let winnerName: string | null = null;
+  if (session.battleMode === "survival") {
+    const topScore = battlingParticipants.reduce(
+      (max, p) => Math.max(max, pointsByUserId.get(p.userId) ?? 0),
+      0,
+    );
+    const topPlayers = battlingParticipants.filter(
+      (p) => (pointsByUserId.get(p.userId) ?? 0) === topScore,
+    );
+    winnerName =
+      topScore > 0 && topPlayers.length === 1
+        ? topPlayers[0]!.displayName
+        : null;
+  } else {
+    const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
+    const topTeams = teams.filter((t) => t.score === topScore);
+    winnerName = topScore > 0 && topTeams.length === 1 ? topTeams[0]!.name : null;
+  }
 
   await updateLiveClassroomSession(sessionId, {
     status: "completed",
@@ -2908,7 +3048,7 @@ export async function endLiveClassroomSessionAction(
     hostUserId: session.hostUserId,
     sessionName: session.name,
     stats,
-    winnerTeamName: winner?.name ?? null,
+    winnerTeamName: winnerName,
   });
 
   const usedCards = strategyCards.filter((c) => c.usedAt).length;
@@ -2916,7 +3056,7 @@ export async function endLiveClassroomSessionAction(
     teamId: session.teamId,
     teacherUserId: session.hostUserId,
     sessionsHostedDelta: 1,
-    totalAttendanceDelta: participants.length,
+    totalAttendanceDelta: battlingParticipants.length,
     averageAccuracyPercent: accuracyPercent,
     battleWinsDelta: 1,
     strategyCardsUsedDelta: usedCards,
@@ -2925,16 +3065,16 @@ export async function endLiveClassroomSessionAction(
   await bumpLiveOrganizationAnalytics({
     teamId: session.teamId,
     totalSessionsDelta: 1,
-    totalAttendanceDelta: participants.length,
+    totalAttendanceDelta: battlingParticipants.length,
     averageAccuracyPercent: accuracyPercent,
     averageResponseTimeSec: Math.round(avgResponseMs / 1000),
-    averageAttendance: participants.length,
+    averageAttendance: battlingParticipants.length,
     mostActiveTeacherUserId: session.hostUserId,
     strategyCardsUsedDelta: usedCards,
   });
 
   revalidateLiveClassroom(session.teamId, sessionId);
-  return { reportId: report.id, winnerTeamName: winner?.name ?? null, stats };
+  return { reportId: report.id, winnerTeamName: winnerName, stats };
 }
 
 export async function updateLiveClassroomSettingsAction(raw: {

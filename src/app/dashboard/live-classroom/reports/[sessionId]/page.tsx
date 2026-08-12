@@ -32,6 +32,16 @@ import { Separator } from "@/components/ui/separator";
 import { LiveClassroomReportActions } from "@/components/live-classroom-report-actions";
 import { cn } from "@/lib/utils";
 
+/** "1st", "2nd", "3rd", "4th", ... */
+function ordinal(n: number): string {
+  const j = n % 10;
+  const k = n % 100;
+  if (j === 1 && k !== 11) return `${n}st`;
+  if (j === 2 && k !== 12) return `${n}nd`;
+  if (j === 3 && k !== 13) return `${n}rd`;
+  return `${n}th`;
+}
+
 export default async function LiveClassroomReportDetailPage({
   params,
   searchParams,
@@ -123,13 +133,27 @@ export default async function LiveClassroomReportDetailPage({
     0,
   );
   const topTeams = stats.teamStats.filter((t) => t.score === topTeamScore);
+  // Survival is every player for themselves — rank individuals, not team buckets.
+  const topIndividualScore = stats.individualStats.reduce(
+    (max, p) => Math.max(max, p.score ?? 0),
+    0,
+  );
+  const topIndividuals = stats.individualStats.filter(
+    (p) => (p.score ?? 0) === topIndividualScore,
+  );
   const outcomeBadge = report.winnerTeamName
     ? { label: `Winner: ${report.winnerTeamName}`, variant: "default" as const }
-    : topTeamScore <= 0
-      ? { label: "No winner — no points scored", variant: "outline" as const }
-      : topTeams.length > 1
-        ? { label: `Tied at ${topTeamScore} pts`, variant: "outline" as const }
-        : null;
+    : isSurvivalMode
+      ? topIndividualScore <= 0
+        ? { label: "No winner — no points scored", variant: "outline" as const }
+        : topIndividuals.length > 1
+          ? { label: `Tied at ${topIndividualScore} pts`, variant: "outline" as const }
+          : null
+      : topTeamScore <= 0
+        ? { label: "No winner — no points scored", variant: "outline" as const }
+        : topTeams.length > 1
+          ? { label: `Tied at ${topTeamScore} pts`, variant: "outline" as const }
+          : null;
 
   const reportTeams = await listLiveClassroomTeams(sessionId);
   const captainUserIds = new Set(
@@ -164,6 +188,25 @@ export default async function LiveClassroomReportDetailPage({
 
   const mine =
     stats.individualStats.find((p) => p.userId === ctx.userId) ?? null;
+  // Survival has no team winner — a player's own report shows their personal
+  // ranking among everyone who actually battled (locked into the session).
+  const survivalRankPool = stats.individualStats.filter(
+    (p) => p.teamName != null,
+  );
+  // Don't claim a "1st place" when nobody in the battle actually scored —
+  // that's not a real result, it's just an empty/abandoned battle.
+  const myPlacement =
+    isSurvivalMode && mine && mine.teamName != null && topIndividualScore > 0
+      ? survivalRankPool.filter((p) => (p.score ?? 0) > (mine.score ?? 0))
+          .length + 1
+      : null;
+  const displayBadge =
+    !isManager && isSurvivalMode && myPlacement != null
+      ? {
+          label: `Survivor · ${ordinal(myPlacement)} place`,
+          variant: myPlacement === 1 ? ("default" as const) : ("outline" as const),
+        }
+      : outcomeBadge;
   const myIndividualStats = isManager
     ? stats.individualStats
     : isSurvivalMode
@@ -224,9 +267,9 @@ export default async function LiveClassroomReportDetailPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {outcomeBadge ? (
-              <Badge variant={outcomeBadge.variant} className="text-sm">
-                {outcomeBadge.label}
+            {displayBadge ? (
+              <Badge variant={displayBadge.variant} className="text-sm">
+                {displayBadge.label}
               </Badge>
             ) : null}
             {!isManager ? (
@@ -300,8 +343,11 @@ export default async function LiveClassroomReportDetailPage({
           </CardContent>
         </Card>
 
-        <div className={cn("grid gap-4", isManager && "lg:grid-cols-2")}>
-          {isManager || !isSurvivalMode ? (
+        <div
+          className={cn("grid gap-4", isManager && !isSurvivalMode && "lg:grid-cols-2")}
+        >
+          {/* Survival is every player for themselves — there's no meaningful team score to show. */}
+          {!isSurvivalMode ? (
             <Card className="border-border/80 bg-card/60 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">
@@ -403,7 +449,8 @@ export default async function LiveClassroomReportDetailPage({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/50 px-3 py-2 text-sm"
               >
                 <span className="flex min-w-0 items-center gap-1 text-foreground">
-                  {captainUserIds.has(p.userId) ? (
+                  {/* Survival has no captains or teams — every player battles for themselves. */}
+                  {!isSurvivalMode && captainUserIds.has(p.userId) ? (
                     <Crown
                       className="size-3.5 shrink-0 text-amber-400"
                       aria-hidden
@@ -411,7 +458,7 @@ export default async function LiveClassroomReportDetailPage({
                   ) : null}
                   {p.displayName}
                   {!isManager && p.userId === ctx.userId ? " (you)" : ""}
-                  {p.teamName && !(isSurvivalMode && !isManager) ? (
+                  {p.teamName && !isSurvivalMode ? (
                     <span className="text-xs font-normal text-muted-foreground">
                       · {p.teamName}
                     </span>
@@ -420,6 +467,7 @@ export default async function LiveClassroomReportDetailPage({
                 <span className="tabular-nums text-muted-foreground">
                   {p.correct}/{p.correct + p.incorrect} · {p.accuracyPercent}% ·{" "}
                   {p.avgResponseTimeSec}s
+                  {isSurvivalMode ? ` · ${p.score ?? 0} pts` : ""}
                 </span>
               </div>
             ))}
