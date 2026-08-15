@@ -2209,15 +2209,16 @@ export async function submitLiveClassroomAnswerAction(raw: {
   // buttons — they auto-apply the moment an unused card is eligible for the
   // question being answered, consuming one instance per activation cap.
   const strategyCardSettings = session.config.strategyCardSettings;
+  const pointsPerQuestion =
+    session.config.pointsPerQuestion ??
+    DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion;
   const questionCardId = question.cardId;
   const questionId = question.id;
   async function autoApplyBonusCard(
     kind: "double_points" | "score_boost",
   ): Promise<number> {
     const setting = resolveStrategyCardSetting(strategyCardSettings, kind, {
-      pointsPerQuestion:
-        session.config.pointsPerQuestion ??
-        DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+      pointsPerQuestion,
     });
     if (!strategyCardAppliesToDeckCard(setting, questionCardId)) return 0;
     const unused = teamCards.find((c) => c.kind === kind && !c.usedAt);
@@ -2241,9 +2242,7 @@ export async function submitLiveClassroomAnswerAction(raw: {
     correct,
     responseTimeMs,
     timeLimitSec: session.config.timePerQuestionSec,
-    pointsPerQuestion:
-      session.config.pointsPerQuestion ??
-      DEFAULT_LIVE_CLASSROOM_SESSION_CONFIG.pointsPerQuestion,
+    pointsPerQuestion,
     doublePointsBonus,
     scoreBoostBonus: scoreBoost,
     shielded,

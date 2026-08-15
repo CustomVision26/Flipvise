@@ -125,10 +125,10 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         id: "notifications",
         title: "Notifications & app updates",
         paragraphs: [
-          "The native iOS/Android app can alert you about new inbox messages and when a newer version is available.",
+          "The native iOS/Android app can alert you about new inbox messages and when a newer version is available. On iPhone (including TestFlight), those alerts can appear on the lock screen and in Notification Center — the same banners iOS uses for Messages and Mail.",
         ],
         bullets: [
-          "When you allow notifications, Flipvise can show OS alerts for inbox items (team invites, billing notices, support replies, and similar) while the app is in the background.",
+          "When you allow notifications, Flipvise can show OS alerts for inbox items (team invites, billing notices, support replies, and similar) while the app is in the background or the phone is locked.",
           "While the app is open, new inbox items also appear as in-app popups — tap them to open your inbox.",
           "Saved quiz results sent to your inbox (your own scores, or a team member’s result if you own the workspace) trigger the same alerts.",
           "If the live website is updated on the server, the app may prompt you to refresh so you get the latest features without reinstalling.",

@@ -269,6 +269,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "The offline view matches the light/dark mode and interface color from your online dashboard (saved on the device), shows a faded Flipvise logo watermark, and pages through long deck and card lists.",
           "Personal decks and cards show Edit and Delete offline; team decks stay read-only and are managed on the online dashboard.",
           "Optional app lock: in offline Settings (gear icon), turn on “Require unlock to open” to protect the app with your device's Face ID, fingerprint, or PIN/passcode on launch and after backgrounding.",
+          "On the iPhone app (TestFlight or App Store), inbox alerts can appear on the lock screen and in Notification Center after you allow notifications.",
         ],
         requirements: [
           "Signed-in account; download your decks at least once while online.",
@@ -303,6 +304,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Accept team invites, review billing receipts, open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",
+          "In the iPhone app (TestFlight or App Store) and Android app, new inbox items can also show as lock-screen / notification-tray alerts when notifications are allowed.",
         ],
         requirements: ["Signed-in account with a primary email on file."],
         doNots: [

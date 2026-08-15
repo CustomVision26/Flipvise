@@ -92,7 +92,7 @@ const config: CapacitorConfig = {
       androidIsEncryption: false,
     },
     PushNotifications: {
-      presentationOptions: ["badge", "sound", "alert"],
+      presentationOptions: ["badge", "sound", "alert", "banner", "list"],
     },
     StatusBar: {
       // Keep web content below the status bar on all pages (deck back links, headers, etc.).

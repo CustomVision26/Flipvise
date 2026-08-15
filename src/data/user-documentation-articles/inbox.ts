@@ -51,6 +51,7 @@ export const INBOX_ARTICLES: DocArticle[] = [
           "Accept team invites before they expire — request a resend from your admin if needed.",
           "Keep affiliate and plan-assignment emails until you complete acceptance.",
           "Contact Us replies appear as “Support replied: …” with a link to the thread.",
+          "On the iPhone or Android app, the same inbox items can also appear as lock-screen or notification-tray alerts when you allow notifications.",
         ],
       },
     ],

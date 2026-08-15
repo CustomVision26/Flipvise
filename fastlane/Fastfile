@@ -79,6 +79,10 @@ platform :ios do
       git_url: ENV.fetch("MATCH_GIT_URL"),
       git_branch: ENV.fetch("MATCH_GIT_BRANCH", "match-certificates"),
       readonly: false,
+      # After enabling Push Notifications on the App ID (com.flipvise.ios),
+      # regenerate the App Store profile so it includes aps-environment=production.
+      # Set MATCH_FORCE=true on the next TestFlight run, then leave it off.
+      force: ENV["MATCH_FORCE"] == "true",
     )
     profile_name = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING][APP_IDENTIFIER]
 
