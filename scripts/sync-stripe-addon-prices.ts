@@ -6,6 +6,10 @@
  * Usage:
  *   npx tsx scripts/sync-stripe-addon-prices.ts
  *   npx tsx scripts/sync-stripe-addon-prices.ts --write-env
+ *   npx tsx scripts/sync-stripe-addon-prices.ts --live --env-file .env.old
+ *
+ * `--live` is required when STRIPE_SECRET_KEY is sk_live_*.
+ * `--write-env` only updates local .env.local (test). Live IDs are printed for Render.
  *
  * Default monthly/yearly amounts (USD cents) can be overridden:
  *   AI_ESSAY_MONTHLY_CENTS=999 AI_ESSAY_YEARLY_CENTS=9900
@@ -19,13 +23,20 @@ import Stripe from "stripe";
 import { listAddonCatalog } from "@/db/queries/addons";
 import {
   resolveStripeAddonPriceIdFromEnvKey,
+  stripeAddonPriceEnvKeyForAddonKey,
   stripeAddonYearlyPriceEnvKeyFromMonthly,
 } from "@/lib/stripe-addon-price-env";
 
-config({ path: resolve(process.cwd(), ".env") });
-config({ path: resolve(process.cwd(), ".env.local"), override: true });
-
 const writeEnv = process.argv.includes("--write-env");
+const liveFlag = process.argv.includes("--live");
+const envFileIdx = process.argv.indexOf("--env-file");
+const envFile = envFileIdx >= 0 ? process.argv[envFileIdx + 1] : null;
+if (envFile) {
+  config({ path: resolve(process.cwd(), envFile), override: true });
+} else {
+  config({ path: resolve(process.cwd(), ".env") });
+  config({ path: resolve(process.cwd(), ".env.local"), override: true });
+}
 
 type AddonSyncSpec = {
   key: string;
@@ -47,9 +58,52 @@ const DEFAULT_AMOUNTS: Record<
   live_classroom: { monthlyCents: 1999, yearlyCents: 19900 },
 };
 
+const FALLBACK_ADDONS: Array<{
+  key: string;
+  name: string;
+  description: string;
+  stripePriceEnvKey: string;
+}> = [
+  {
+    key: "ai_essay",
+    name: "AI Essay",
+    description:
+      "Generate essay activities, write drafts, submit work, and receive AI feedback.",
+    stripePriceEnvKey: stripeAddonPriceEnvKeyForAddonKey("ai_essay"),
+  },
+  {
+    key: "study_mode_focus",
+    name: "Focus Study Mode",
+    description: "An optional study mode add-on for eligible paid plans.",
+    stripePriceEnvKey: stripeAddonPriceEnvKeyForAddonKey("study_mode_focus"),
+  },
+  {
+    key: "live_classroom",
+    name: "Flipvise Live Classroom™",
+    description:
+      "Run real-time interactive learning sessions with warm-up battles, team competitions, exit tickets, strategy cards, and AI session reports.",
+    stripePriceEnvKey: stripeAddonPriceEnvKeyForAddonKey("live_classroom"),
+  },
+];
+
 function requireSecretKey(): string {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+  if (key.startsWith("sk_live_") && !liveFlag) {
+    throw new Error(
+      "Refusing to mutate live Stripe without --live. Re-run with --live --env-file .env.old",
+    );
+  }
+  if (key.startsWith("sk_test_") && liveFlag) {
+    throw new Error(
+      "STRIPE_SECRET_KEY is a test key. For live, pass --live --env-file .env.old",
+    );
+  }
+  if (writeEnv && key.startsWith("sk_live_")) {
+    throw new Error(
+      "Refusing to write live price IDs into .env.local. Copy the printed vars into Render instead.",
+    );
+  }
   return key;
 }
 
@@ -233,14 +287,27 @@ async function main() {
   const stripe = new Stripe(secret, { apiVersion: "2026-04-22.dahlia" });
   const mode = secret.startsWith("sk_live_") ? "live" : "test";
 
-  const catalog = await listAddonCatalog();
-  const sellable = catalog.filter(
-    (row) => row.active && row.stripePriceEnvKey.trim() !== "",
-  );
+  let sellable: Array<{
+    key: string;
+    name: string;
+    description: string;
+    marketingBlurb?: string | null;
+    stripePriceEnvKey: string;
+  }> = [];
+  try {
+    const catalog = await listAddonCatalog();
+    sellable = catalog.filter(
+      (row) => row.active && row.stripePriceEnvKey.trim() !== "",
+    );
+  } catch (error) {
+    console.warn(
+      "Could not load addon_catalog from the database; using built-in add-on list.",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   if (sellable.length === 0) {
-    console.log("No active catalog add-ons with stripePriceEnvKey.");
-    return;
+    sellable = FALLBACK_ADDONS;
   }
 
   console.log(`\n=== Sync Stripe add-on prices (${mode}) ===\n`);
@@ -327,7 +394,11 @@ async function main() {
     console.log("Updated .env.local with Stripe price IDs.");
     console.log("Restart `npm run dev` so Next.js picks up the new env.\n");
   } else {
-    console.log("Env keys to set (re-run with --write-env to apply):\n");
+    console.log(
+      mode === "live"
+        ? "--- Paste into Render (live) Environment ---\n"
+        : "Env keys to set (re-run with --write-env to apply):\n",
+    );
     for (const [k, v] of Object.entries(envUpdates)) {
       console.log(`${k}=${v}`);
     }

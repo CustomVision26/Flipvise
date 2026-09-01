@@ -83,6 +83,7 @@
     "stripe:cancel-duplicate-subs": "tsx scripts/cancel-duplicate-stripe-subs.ts",
     "stripe:reconcile-duplicate-subs": "tsx scripts/reconcile-duplicate-subs.ts",
     "stripe:verify-env": "tsx scripts/verify-stripe-price-env.ts",
+    "stripe:sync-plan-prices": "tsx scripts/sync-stripe-plan-prices.ts",
     "stripe:sync-addon-prices": "tsx scripts/sync-stripe-addon-prices.ts --write-env",
     "docs:validate": "tsx scripts/documentation-sync.ts validate",
     "docs:validate:ci": "tsx scripts/documentation-sync.ts validate-ci",
