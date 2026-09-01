@@ -53,7 +53,8 @@ export function GuestSignUpHost() {
 
     const closeClerk = () => {
       try {
-        clerk.close?.();
+        clerk.closeSignUp();
+        clerk.closeSignIn();
       } catch {
         // Modal may already be closing.
       }
