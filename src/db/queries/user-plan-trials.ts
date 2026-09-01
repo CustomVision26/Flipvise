@@ -11,8 +11,13 @@ export async function getUserPlanTrial(userId: string) {
 }
 
 export async function hasUserConsumedPlanTrial(userId: string): Promise<boolean> {
-  const row = await getUserPlanTrial(userId);
-  return row != null;
+  try {
+    const row = await getUserPlanTrial(userId);
+    return row != null;
+  } catch (error) {
+    console.error("[hasUserConsumedPlanTrial]", error);
+    return false;
+  }
 }
 
 export async function recordUserPlanTrial(input: {

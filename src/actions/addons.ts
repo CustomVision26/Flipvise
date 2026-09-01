@@ -70,7 +70,7 @@ async function resolveCheckoutCustomerParams(userId: string) {
       if (!("deleted" in customer && customer.deleted)) {
         return {
           customer: sub.stripeCustomerId,
-          customer_update: { name: "auto" as const },
+          customer_update: { name: "auto" as const, address: "auto" as const },
         };
       }
     } catch {

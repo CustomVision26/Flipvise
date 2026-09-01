@@ -5,6 +5,9 @@ export function navigateAfterCheckoutSessionCreated(
   result: CheckoutSessionActionResult,
   navigate: (href: string) => void,
 ): void {
+  if (result.error) {
+    return;
+  }
   if (result.upgradedInPlace && result.url) {
     window.location.href = result.url;
     return;

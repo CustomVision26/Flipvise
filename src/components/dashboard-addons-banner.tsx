@@ -304,12 +304,28 @@ export function DashboardAddonsBanner({
               </p>
             ) : unlockTarget && !unlockTarget.eligible ? (
               <p className="text-sm text-muted-foreground">
-                Your current plan is not eligible for this add-on. Ask a Team
-                Admin or platform admin for access, or visit{" "}
-                <Link href="/pricing/add-ons" className="underline">
-                  Add-on Catalog
-                </Link>
-                .
+                {unlockTarget.key === LIVE_CLASSROOM_ADDON_KEY ? (
+                  <>
+                    Live Classroom is an organization add-on for Team Basic,
+                    Team Gold, Platinum, Enterprise, Education Gold, and
+                    Education Enterprise. Individual Pro and Pro Plus cannot
+                    purchase it. Ask a Team Admin or platform admin for access,
+                    or upgrade on{" "}
+                    <Link href="/pricing" className="underline">
+                      Pricing
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Your current plan is not eligible for this add-on. Ask a
+                    Team Admin or platform admin for access, or visit{" "}
+                    <Link href="/pricing/add-ons" className="underline">
+                      Add-on Catalog
+                    </Link>
+                    .
+                  </>
+                )}
               </p>
             ) : null}
             {error ? <p className="text-sm text-destructive">{error}</p> : null}

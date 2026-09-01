@@ -37,7 +37,10 @@ import {
 } from "@/lib/stripe-addon-sync";
 import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { fetchUpgradableStripeSubscription } from "@/lib/apply-plan-upgrade";
-import { checkoutPlanChangeRequiredError } from "@/lib/checkout-promo-errors";
+import {
+  checkoutPlanChangeRequiredError,
+  isCheckoutPlanChangeRequiredError,
+} from "@/lib/checkout-promo-errors";
 import { personalDashboardHrefAfterCheckoutSuccess } from "@/lib/personal-dashboard-url";
 import { stripeCheckoutElementsSessionParams } from "@/lib/stripe-checkout-branding";
 import {
@@ -217,11 +220,11 @@ type CheckoutCustomerSessionParams =
   | {
       customer: string;
       /**
-       * Required when `tax_id_collection` + `billing_address_collection` use an existing customer.
-       * Do not set `address: "auto"` — that overwrites Bill-to with the card billing address.
-       * Mailing address for invoices is synced from Account details separately.
+       * Stripe Tax requires `address: "auto"` when Checkout reuses an existing customer.
+       * Clerk mailing address is still applied as a prefill, then restored on invoices
+       * via `checkout.session.completed` (`syncStripeCustomerBillToFromClerkUser`).
        */
-      customer_update: { name: "auto" };
+      customer_update: { name: "auto"; address: "auto" };
     }
   | { customer_email: string };
 
@@ -260,6 +263,7 @@ async function resolveCheckoutCustomerParams(
         customer: sub.stripeCustomerId,
         customer_update: {
           name: "auto",
+          address: "auto",
         },
       };
     }
@@ -272,6 +276,14 @@ async function resolveCheckoutCustomerParams(
   }
 
   return {};
+}
+
+function isNextControlFlowError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("digest" in error)) {
+    return false;
+  }
+  const digest = (error as { digest: unknown }).digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_");
 }
 
 function checkoutActionErrorMessage(error: unknown): string {
@@ -297,6 +309,9 @@ function checkoutActionErrorMessage(error: unknown): string {
       if (/automatic tax/i.test(message)) {
         return "Stripe Tax is not configured for this account. Contact support or disable automatic tax in Stripe.";
       }
+      if (/customer_update/i.test(message) && /address/i.test(message)) {
+        return "Checkout could not start because Stripe Tax needs a billing address. Please try again, or contact support.";
+      }
       return message;
     }
     return error.message;
@@ -310,7 +325,14 @@ export async function createStripeCheckoutSessionAction(
   try {
     return await createStripeCheckoutSessionActionInner(data);
   } catch (error) {
-    throw new Error(checkoutActionErrorMessage(error));
+    if (isNextControlFlowError(error)) throw error;
+    console.error("[createStripeCheckoutSessionAction]", error);
+    const raw =
+      error instanceof Error ? error.message : "Unable to start checkout.";
+    return {
+      error: checkoutActionErrorMessage(error),
+      ...(isCheckoutPlanChangeRequiredError(raw) ? { needsPlanChange: true } : {}),
+    };
   }
 }
 
@@ -322,6 +344,10 @@ export type CheckoutSessionActionResult = {
   planLabel?: string;
   receiptUrl?: string | null;
   receiptIsProration?: boolean;
+  /** User-facing failure — returned instead of thrown so production can show it. */
+  error?: string;
+  /** Existing subscription must use the in-place plan-change flow. */
+  needsPlanChange?: boolean;
 };
 
 async function createStripeCheckoutSessionActionInner(

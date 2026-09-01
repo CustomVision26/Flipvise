@@ -166,6 +166,13 @@ export function PricingCheckoutStep({
             : {}),
           ...(startTrial ? { startTrial: true } : {}),
         });
+        if (result.error) {
+          if (result.needsPlanChange) {
+            router.refresh();
+          }
+          handleCheckoutError(new Error(result.error));
+          return;
+        }
         navigateAfterCheckoutSessionCreated(result, router.push);
       } catch (e) {
         handleCheckoutError(e);
