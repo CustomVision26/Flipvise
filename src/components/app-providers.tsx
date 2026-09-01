@@ -5,7 +5,9 @@ import * as React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
+import { GuestSignUpHost } from "@/components/guest-sign-up-host";
 import { ThemeProvider } from "@/components/theme-provider";
+import { flipviseSignUpUrl } from "@/lib/flipvise-sign-up";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveLogoImageUrl } from "@/lib/branding";
 import { LoginWelcomeToast } from "@/components/login-welcome-toast";
@@ -43,12 +45,17 @@ function ThemeStorageNormalize({ children }: { children: React.ReactNode }) {
 
 function ClerkWithTheme({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider appearance={clerkAppearance} telemetry={false}>
+    <ClerkProvider
+      appearance={clerkAppearance}
+      telemetry={false}
+      signUpUrl={flipviseSignUpUrl()}
+    >
       <ClerkChunkLoadRecovery />
       <ClerkAuthHandoffMarker />
       <LoginWelcomeToast />
       <ClerkPostSignInHardNavigation />
       <ClerkSessionRouterSync />
+      <GuestSignUpHost />
       {children}
     </ClerkProvider>
   );

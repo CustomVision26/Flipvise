@@ -8,7 +8,7 @@ import {
 import {
   getAddonCatalogSettings,
   getUserAddonEntitlement,
-  isPlanEligibleForAddon,
+  isAccessEligibleForAddon,
   listPublishedActiveAddonsForPricing,
 } from "@/db/queries/addons";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
@@ -120,12 +120,13 @@ export default async function PricingAddOnsPage() {
       !(
         row.key === AI_ESSAY_ADDON_KEY && entitledRow.source === "team"
       );
-    const eligible = isPlanEligibleForAddon(
+    const eligible = isAccessEligibleForAddon(
       row.eligiblePlanIds,
-      access.effectivePlanSlug,
+      access,
     );
     const priceLabels = await resolveAddonStripePriceLabels(row.stripePriceEnvKey);
-    const stripePriceConfigured = priceLabels.monthlyConfigured;
+    const stripePriceConfigured =
+      priceLabels.monthlyConfigured || priceLabels.yearlyConfigured;
     const yearlyPriceConfigured = priceLabels.yearlyConfigured;
     const renewalState =
       entitled && entitledRow?.source === "stripe"

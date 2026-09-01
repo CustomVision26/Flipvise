@@ -1,11 +1,16 @@
 import type { InferSelectModel } from "drizzle-orm";
 import type { contactUsMessages, platformContactSettings } from "@/db/schema";
 import type { ContactSocialLink } from "@/db/queries/contact-us";
+import {
+  parsePlatformCompanyAddress,
+  type PlatformCompanyAddress,
+} from "@/lib/platform-company-address";
 
 export type SerializedContactSettings = {
   email: string;
   phone: string | null;
   socialLinks: ContactSocialLink[];
+  companyAddress: PlatformCompanyAddress;
   updatedAt: string | null;
 };
 
@@ -37,6 +42,7 @@ export function serializeContactSettings(
     email: row.email,
     phone: row.phone ?? null,
     socialLinks: (row.socialLinks ?? []) as ContactSocialLink[],
+    companyAddress: parsePlatformCompanyAddress(row.companyAddress),
     updatedAt: row.updatedAt?.toISOString() ?? null,
   };
 }

@@ -2,6 +2,9 @@ import type { InferSelectModel } from "drizzle-orm";
 import type { contactUsMessages, platformContactSettings } from "@/db/schema";
 import { SUPPORT_EMAIL } from "@/lib/support-contact";
 import type { ContactSocialLink } from "@/db/queries/contact-us";
+import {
+  DEFAULT_PLATFORM_COMPANY_ADDRESS,
+} from "@/lib/platform-company-address";
 
 export type PlatformContactSettingsRow = InferSelectModel<typeof platformContactSettings>;
 export type ContactUsMessageRow = InferSelectModel<typeof contactUsMessages>;
@@ -11,6 +14,7 @@ const CONTACT_US_TABLE_PATTERN =
 
 function isMissingContactUsTableError(error: unknown): boolean {
   if (isMissingContactUsReplyImageUrlColumnError(error)) return false;
+  if (isMissingPlatformCompanyAddressColumnError(error)) return false;
 
   let current: unknown = error;
   for (let depth = 0; depth < 6 && current && typeof current === "object"; depth++) {
@@ -29,7 +33,8 @@ function isMissingContactUsTableError(error: unknown): boolean {
   return (
     (/42P01/i.test(flat) || /does not exist/i.test(flat) || /Failed query/i.test(flat)) &&
     CONTACT_US_TABLE_PATTERN.test(flat) &&
-    !/imageUrl/i.test(flat)
+    !/imageUrl/i.test(flat) &&
+    !/companyAddress/i.test(flat)
   );
 }
 
@@ -70,9 +75,41 @@ export function defaultPlatformContactSettingsRow(): PlatformContactSettingsRow 
     email: SUPPORT_EMAIL,
     phone: null,
     socialLinks: [] as ContactSocialLink[],
+    companyAddress: { ...DEFAULT_PLATFORM_COMPANY_ADDRESS },
     updatedAt: new Date(),
     updatedByUserId: null,
   };
+}
+
+export function isMissingPlatformCompanyAddressColumnError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      /platform_contact_settings/i.test(message) &&
+      /companyAddress/i.test(message) &&
+      /(does not exist|Failed query|42703)/i.test(message)
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return (
+    /platform_contact_settings/i.test(flat) &&
+    /companyAddress/i.test(flat) &&
+    (/Failed query/i.test(flat) || /does not exist/i.test(flat) || /42703/i.test(flat))
+  );
+}
+
+let warnedMissingCompanyAddressColumn = false;
+export function warnMissingPlatformCompanyAddressColumnOnce() {
+  if (warnedMissingCompanyAddressColumn) return;
+  warnedMissingCompanyAddressColumn = true;
+  console.warn(
+    "[db] `platform_contact_settings` is missing `companyAddress` — run: npm run db:ensure-company-address",
+  );
 }
 
 export function isContactUsSchemaUnavailableError(error: unknown): boolean {

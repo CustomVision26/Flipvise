@@ -3,7 +3,7 @@
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { SignUpDialog } from "@/components/sign-up-dialog";
+import { openFlipviseSignUp } from "@/lib/flipvise-sign-up";
 import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +43,9 @@ export function HomeInviteEmailAuthButtons({ email }: { email: string }) {
           Sign In
         </Button>
       </SignInButton>
-      <SignUpDialog size="lg" initialEmail={email} />
+      <Button size="lg" onClick={() => openFlipviseSignUp({ email })}>
+        Sign Up
+      </Button>
       </div>
     </div>
   );

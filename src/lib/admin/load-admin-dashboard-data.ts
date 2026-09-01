@@ -43,6 +43,7 @@ import {
   type SerializedContactMessage,
   type SerializedContactSettings,
 } from "@/lib/contact-us-admin-dto";
+import { DEFAULT_PLATFORM_COMPANY_ADDRESS } from "@/lib/platform-company-address";
 import type { AdminDashboardSection } from "@/lib/admin-dashboard-section";
 import { getAdminClerkUserList } from "@/lib/admin/admin-clerk-cache";
 import {
@@ -195,6 +196,7 @@ const EMPTY_CONTACT_SETTINGS: SerializedContactSettings = {
   email: "customvision26@gmail.com",
   phone: null,
   socialLinks: [],
+  companyAddress: { ...DEFAULT_PLATFORM_COMPANY_ADDRESS },
   updatedAt: null,
 };
 

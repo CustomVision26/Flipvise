@@ -26,6 +26,7 @@ import type {
 } from '@/lib/teacher-worksheet-schema';
 import type { LessonPlanReferenceMaterial } from '@/lib/lesson-plan-reference-material';
 import type { PlanReconciliationSnapshot } from '@/lib/plan-reconciliation-types';
+import type { PlatformCompanyAddress } from '@/lib/platform-company-address';
 import type {
   EssayFeedbackResult,
   EssayGenerateInput,
@@ -582,6 +583,8 @@ export const platformContactSettings = pgTable('platform_contact_settings', {
   socialLinks: json().$type<
     { platform: string; label: string; url: string }[]
   >().notNull().default([]),
+  /** Seller address on Stripe invoices/receipts and the public Contact Us page. */
+  companyAddress: json().$type<PlatformCompanyAddress>().notNull(),
   updatedAt: timestamp().notNull().defaultNow(),
   updatedByUserId: varchar({ length: 255 }),
 });

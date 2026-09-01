@@ -63,12 +63,13 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Buying an add-on",
         bullets: [
           "Catalog is visible only when a platform admin enables it and publishes add-ons.",
-          "Cards show Stripe monthly/yearly amounts; guests sign in via modal to purchase.",
+          "Cards show Stripe monthly/yearly amounts; guests sign in via modal to purchase. Unlock Feature in the header banner uses the same checkout.",
           "Choose monthly or yearly when a yearly Stripe price is configured.",
           "Checkout opens an add-on subscription (separate from your base plan subscription).",
           "Plan-change checkout can offer locked published add-ons in a dialog before payment.",
           "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay after purchase or grant.",
           "Live Classroom™ is an organization add-on for Team/Enterprise plans — purchased by the subscription owner; participant limits inherit licensed seats.",
+          "Platform admins with complimentary Pro Plus (no Stripe billingPlan) are eligible for add-ons that list Pro Plus. Team-only add-ons such as Live Classroom still require a team or education team plan.",
         ],
       },
       {
@@ -102,7 +103,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "after-purchase",
         title: "After purchase",
         bullets: [
-          "Receipts and invoices in Stripe Customer Portal.",
+          "Receipts and invoices in Stripe Customer Portal — they show Flipvise Studio LLC @flipvise. New invoices also include the company street address in the footer (apartment/suite omitted).",
           "May sync to Flipvise inbox.",
           "Currency follows Stripe Price configuration (typically USD).",
         ],

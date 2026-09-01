@@ -30,6 +30,7 @@ import {
   notifyUserOfContactUsAdminReply,
 } from "@/lib/contact-us-notify";
 import { serializeContactMessage } from "@/lib/contact-us-admin-dto";
+import { platformCompanyAddressSchema } from "@/lib/platform-company-address";
 import {
   contactUsThreadHref,
   serializeContactUsThread,
@@ -98,6 +99,7 @@ const updateContactSettingsSchema = z.object({
   email: z.string().trim().email().max(255),
   phone: z.string().trim().max(64).nullable(),
   socialLinks: z.array(socialLinkSchema).max(12),
+  companyAddress: platformCompanyAddressSchema,
 });
 
 const messageIdSchema = z.object({
@@ -376,6 +378,7 @@ export async function updatePlatformContactSettingsAction(
     email: parsed.data.email,
     phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
     socialLinks: parsed.data.socialLinks as ContactSocialLink[],
+    companyAddress: parsed.data.companyAddress,
     updatedByUserId: userId,
   });
 
@@ -469,5 +472,6 @@ export async function getPublicContactSettingsAction() {
     email: settings.email,
     phone: settings.phone ?? null,
     socialLinks: (settings.socialLinks ?? []) as ContactSocialLink[],
+    companyAddress: settings.companyAddress,
   };
 }

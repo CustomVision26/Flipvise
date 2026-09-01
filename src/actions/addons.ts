@@ -7,7 +7,7 @@ import {
   assignTeamAddonEntitlement,
   getAddonCatalogByKey,
   getUserAddonEntitlement,
-  isPlanEligibleForAddon,
+  isAccessEligibleForAddon,
   listAddonCatalog,
   revokeTeamAddonEntitlement,
   revokeUserAddonEntitlement,
@@ -127,7 +127,12 @@ export async function createAddonCheckoutSessionAction(
   const planSlug =
     access.effectivePlanSlug ??
     (await resolveEffectivePlanSlugForUser(access.userId));
-  if (!isPlanEligibleForAddon(catalog.eligiblePlanIds, planSlug)) {
+  if (
+    !isAccessEligibleForAddon(catalog.eligiblePlanIds, {
+      ...access,
+      effectivePlanSlug: planSlug,
+    })
+  ) {
     throw new Error("Your current plan is not eligible for this add-on.");
   }
 

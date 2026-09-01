@@ -9,6 +9,7 @@ import { neon } from "@neondatabase/serverless";
 
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
+config({ path: resolve(process.cwd(), ".env.db.prod"), override: true });
 
 const databaseUrl =
   process.env.DATABASE_URL ??

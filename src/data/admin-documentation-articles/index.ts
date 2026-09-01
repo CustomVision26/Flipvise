@@ -251,6 +251,7 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Open hosted invoice link when Stripe provides a hosted_invoice_url.",
           "Download PDF when invoice_pdf is available on the Stripe object.",
+          "The seller block on those documents uses Stripe Dashboard business details. Flipvise also stamps Flipvise Studio LLC @flipvise and the street address on new invoices (footer and Company/Address fields; apartment omitted).",
           "Proration receipts from plan changes appear here after invoice.payment_succeeded webhook processing.",
         ],
       },
@@ -526,7 +527,10 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "settings",
         title: "Platform contact settings",
         bullets: [
-          "Edit support email, phone number, and social links displayed on the public /contact page.",
+          "Edit support email, phone number, company address, and social links displayed on the public /contact page.",
+          "Saving contact details stores the company address for /contact and stamps Flipvise Studio LLC @flipvise plus the street address on new Stripe invoices (footer and Company/Address fields; apartment omitted).",
+          "The invoice header seller block is Stripe Dashboard → Settings → Public details and Business details (test and live). Stripe does not allow apps to change the platform account seller header.",
+          "The Stripe webhook must include invoice.created so new invoices receive the footer stamp.",
           "Changes apply immediately to the Contact Us page footer and contact cards.",
           "Keep email addresses monitored — guest replies do not require a Clerk account.",
         ],
@@ -561,7 +565,8 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Permission model",
         bullets: [
           "Gate features with accessHasAddon / canAccessAddon — never plan slug alone.",
-          "Stripe prices come from STRIPE_ADDON_<KEY>_PRICE_ID (optional yearly companion).",
+          "Stripe prices come from STRIPE_ADDON_<KEY>_PRICE_ID (optional yearly companion). Unlock Feature stays disabled until the Stripe column shows Configured.",
+          "Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus even when Clerk has no billingPlan.",
           "Team Admins assign the same catalog keys from Team Admin → Add-ons.",
         ],
       },

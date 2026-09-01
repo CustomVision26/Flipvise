@@ -292,6 +292,22 @@ export async function POST(req: NextRequest) {
         }
         break;
       }
+      case "invoice.created": {
+        const createdInvoice = event.data.object as Stripe.Invoice;
+        try {
+          const { stampCompanyAddressOnStripeInvoice } = await import(
+            "@/lib/stripe-invoice-addresses"
+          );
+          await stampCompanyAddressOnStripeInvoice(createdInvoice.id);
+        } catch (error) {
+          console.error(
+            "[stripe webhook] stamp company address",
+            createdInvoice.id,
+            error,
+          );
+        }
+        break;
+      }
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         const userId = await resolveClerkUserIdFromInvoice(invoice);

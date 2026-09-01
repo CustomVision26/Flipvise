@@ -4,6 +4,7 @@ import {
   ExternalLink,
   HelpCircle,
   Mail,
+  MapPin,
   MessageSquare,
   Phone,
 } from "lucide-react";
@@ -19,6 +20,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { ContactSocialLink } from "@/db/queries/contact-us";
+import {
+  formatPlatformCompanyAddressLines,
+  type PlatformCompanyAddress,
+} from "@/lib/platform-company-address";
 import { cn } from "@/lib/utils";
 
 function SupportOptionIcon({
@@ -53,6 +58,7 @@ type ContactSupportViewProps = {
   email: string;
   phone: string | null;
   socialLinks: ContactSocialLink[];
+  companyAddress: PlatformCompanyAddress | null;
   defaultName?: string;
   defaultEmail?: string;
 };
@@ -61,6 +67,7 @@ export function ContactSupportView({
   email,
   phone,
   socialLinks,
+  companyAddress,
   defaultName,
   defaultEmail,
 }: ContactSupportViewProps) {
@@ -146,6 +153,22 @@ export function ContactSupportView({
                   <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm font-medium hover:underline">
                     {phone}
                   </a>
+                </div>
+              </div>
+            ) : null}
+
+            {companyAddress ? (
+              <div className="flex items-start gap-3 rounded-xl border border-border/50 bg-muted/15 p-4">
+                <MapPin className="mt-0.5 size-4 shrink-0 text-foreground/80" aria-hidden />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Company address</p>
+                  <address className="text-sm font-medium not-italic leading-relaxed">
+                    {formatPlatformCompanyAddressLines(companyAddress).map((line) => (
+                      <span key={line} className="block">
+                        {line}
+                      </span>
+                    ))}
+                  </address>
                 </div>
               </div>
             ) : null}

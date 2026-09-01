@@ -28,7 +28,7 @@ export const CONTACT_US_ARTICLES: DocArticle[] = [
         id: "cards",
         title: "Page sections",
         bullets: [
-          "Contact details — support inbox, optional phone, social links.",
+          "Contact details — support inbox, optional phone, company address, social links.",
           "In-app Help Center card — links to categorized tickets for signed-in users.",
           "Documentation card — links to this user guide.",
         ],

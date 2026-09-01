@@ -109,6 +109,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Filter by invoice status, date range, and search (invoice #, name, email).",
           "Promo column shows general vs affiliate codes and discount detail.",
           "Open hosted invoice or PDF links when Stripe provides them.",
+          "Seller name and mailing address on those Stripe documents come from Stripe Dashboard business details; new invoices also include Flipvise Studio LLC @flipvise and the street address in the footer (apartment omitted).",
           "Export CSV.",
         ],
         requirements: ["Platform admin access."],
@@ -224,7 +225,8 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Reply to guest and signed-in Contact Us messages.",
           "Archive or mark threads read; stats show open and weekly volume.",
-          "Edit support email, phone, and social links shown on /contact.",
+          "Edit support email, phone, company address, and social links shown on /contact.",
+          "Company address is stamped on new Stripe invoices as Flipvise Studio LLC @flipvise plus the street address (apartment omitted). Set the same details in Stripe Dashboard Public details and Business details so the invoice header (seller block) matches.",
         ],
         requirements: ["Platform admin access."],
         doNots: [
@@ -272,7 +274,8 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         requirements: [
           "Platform admin access.",
-          "STRIPE_ADDON_<KEY>_PRICE_ID (and optional yearly companion) for self-serve purchase.",
+          "STRIPE_ADDON_<KEY>_PRICE_ID (and optional yearly companion) for self-serve purchase — Unlock Feature stays disabled until the catalog Stripe column shows Configured.",
+          "Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus even without a Stripe billingPlan.",
         ],
         doNots: [
           "Do not hardcode Stripe price_* IDs — use catalog stripePriceEnvKey env vars.",

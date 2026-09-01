@@ -179,7 +179,11 @@ export function DashboardAddonsBanner({
       setUnlockTarget(item);
       return;
     }
-    setPeriod("monthly");
+    setPeriod(
+      item.monthlyPriceConfigured || !item.yearlyPriceConfigured
+        ? "monthly"
+        : "yearly",
+    );
     setError(null);
     setUnlockTarget(item);
   }
@@ -266,8 +270,24 @@ export function DashboardAddonsBanner({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
+                <SelectItem
+                  value="monthly"
+                  disabled={
+                    unlockTarget != null &&
+                    !unlockTarget.monthlyPriceConfigured
+                  }
+                >
+                  Monthly
+                </SelectItem>
+                <SelectItem
+                  value="yearly"
+                  disabled={
+                    unlockTarget != null &&
+                    !unlockTarget.yearlyPriceConfigured
+                  }
+                >
+                  Yearly
+                </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -275,11 +295,17 @@ export function DashboardAddonsBanner({
               <p className="text-sm text-muted-foreground">
                 Sign in from the homepage, then return to unlock this add-on.
               </p>
-            ) : unlockTarget && !unlockTarget.canPurchase ? (
+            ) : unlockTarget && !unlockTarget.stripePriceConfigured ? (
               <p className="text-sm text-muted-foreground">
-                Your plan may not be eligible, or Stripe pricing is not
-                configured. Ask a Team Admin or platform admin for access, or
-                visit{" "}
+                Stripe pricing is not configured for this add-on. A platform
+                admin must set the add-on price environment variables so the
+                catalog Stripe column shows Configured, then restart the
+                server.
+              </p>
+            ) : unlockTarget && !unlockTarget.eligible ? (
+              <p className="text-sm text-muted-foreground">
+                Your current plan is not eligible for this add-on. Ask a Team
+                Admin or platform admin for access, or visit{" "}
                 <Link href="/pricing/add-ons" className="underline">
                   Add-on Catalog
                 </Link>
@@ -298,7 +324,10 @@ export function DashboardAddonsBanner({
               disabled={
                 pending ||
                 !signedIn ||
-                !unlockTarget?.canPurchase
+                !unlockTarget?.canPurchase ||
+                (period === "yearly"
+                  ? !unlockTarget.yearlyPriceConfigured
+                  : !unlockTarget.monthlyPriceConfigured)
               }
             >
               Unlock Feature

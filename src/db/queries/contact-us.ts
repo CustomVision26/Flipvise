@@ -3,10 +3,17 @@ import { db } from "@/db";
 import { contactUsMessages, contactUsReplies, platformContactSettings } from "@/db/schema";
 import { SUPPORT_EMAIL } from "@/lib/support-contact";
 import {
+  DEFAULT_PLATFORM_COMPANY_ADDRESS,
+  parsePlatformCompanyAddress,
+  type PlatformCompanyAddress,
+} from "@/lib/platform-company-address";
+import {
   defaultPlatformContactSettingsRow,
   isContactUsSchemaUnavailableError,
   isMissingContactUsReplyImageUrlColumnError,
+  isMissingPlatformCompanyAddressColumnError,
   warnMissingContactUsReplyImageUrlColumnOnce,
+  warnMissingPlatformCompanyAddressColumnOnce,
   withContactUsReadFallback,
 } from "@/lib/contact-us-db-fallback";
 import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
@@ -37,33 +44,68 @@ const EMPTY_CONTACT_US_STATS: ContactUsStats = {
   thisWeekCount: 0,
 };
 
+function withParsedCompanyAddress(
+  row: typeof platformContactSettings.$inferSelect,
+) {
+  return {
+    ...row,
+    companyAddress: parsePlatformCompanyAddress(row.companyAddress),
+  };
+}
+
 export async function getPlatformContactSettings() {
   return withContactUsReadFallback(async () => {
-    const rows = await db
-      .select()
-      .from(platformContactSettings)
-      .where(eq(platformContactSettings.id, SETTINGS_ID))
-      .limit(1);
+    try {
+      const rows = await db
+        .select()
+        .from(platformContactSettings)
+        .where(eq(platformContactSettings.id, SETTINGS_ID))
+        .limit(1);
 
-    if (rows[0]) return rows[0];
+      if (rows[0]) return withParsedCompanyAddress(rows[0]);
 
-    await db
-      .insert(platformContactSettings)
-      .values({
-        id: SETTINGS_ID,
-        email: SUPPORT_EMAIL,
-        phone: null,
-        socialLinks: [],
-      })
-      .onConflictDoNothing();
+      await db
+        .insert(platformContactSettings)
+        .values({
+          id: SETTINGS_ID,
+          email: SUPPORT_EMAIL,
+          phone: null,
+          socialLinks: [],
+          companyAddress: DEFAULT_PLATFORM_COMPANY_ADDRESS,
+        })
+        .onConflictDoNothing();
 
-    const seeded = await db
-      .select()
-      .from(platformContactSettings)
-      .where(eq(platformContactSettings.id, SETTINGS_ID))
-      .limit(1);
+      const seeded = await db
+        .select()
+        .from(platformContactSettings)
+        .where(eq(platformContactSettings.id, SETTINGS_ID))
+        .limit(1);
 
-    return seeded[0] ?? defaultPlatformContactSettingsRow();
+      return seeded[0]
+        ? withParsedCompanyAddress(seeded[0])
+        : defaultPlatformContactSettingsRow();
+    } catch (error) {
+      if (!isMissingPlatformCompanyAddressColumnError(error)) throw error;
+      warnMissingPlatformCompanyAddressColumnOnce();
+      const rows = await db
+        .select({
+          id: platformContactSettings.id,
+          email: platformContactSettings.email,
+          phone: platformContactSettings.phone,
+          socialLinks: platformContactSettings.socialLinks,
+          updatedAt: platformContactSettings.updatedAt,
+          updatedByUserId: platformContactSettings.updatedByUserId,
+        })
+        .from(platformContactSettings)
+        .where(eq(platformContactSettings.id, SETTINGS_ID))
+        .limit(1);
+      const row = rows[0];
+      if (!row) return defaultPlatformContactSettingsRow();
+      return {
+        ...row,
+        companyAddress: { ...DEFAULT_PLATFORM_COMPANY_ADDRESS },
+      };
+    }
   }, defaultPlatformContactSettingsRow());
 }
 
@@ -71,9 +113,11 @@ export async function upsertPlatformContactSettings(input: {
   email: string;
   phone: string | null;
   socialLinks: ContactSocialLink[];
+  companyAddress: PlatformCompanyAddress;
   updatedByUserId: string;
 }) {
   const now = new Date();
+  const companyAddress = parsePlatformCompanyAddress(input.companyAddress);
   await db
     .insert(platformContactSettings)
     .values({
@@ -81,6 +125,7 @@ export async function upsertPlatformContactSettings(input: {
       email: input.email,
       phone: input.phone,
       socialLinks: input.socialLinks,
+      companyAddress,
       updatedByUserId: input.updatedByUserId,
       updatedAt: now,
     })
@@ -90,6 +135,7 @@ export async function upsertPlatformContactSettings(input: {
         email: input.email,
         phone: input.phone,
         socialLinks: input.socialLinks,
+        companyAddress,
         updatedByUserId: input.updatedByUserId,
         updatedAt: now,
       },

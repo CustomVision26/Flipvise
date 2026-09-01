@@ -7,22 +7,32 @@ import {
   parseMailingAddressFromPublicMetadata,
   type MailingAddressFields,
 } from "@/lib/account-recovery-profile";
+import {
+  DEFAULT_PLATFORM_COMPANY_ADDRESS,
+  formatInvoiceSellerName,
+  formatPlatformCompanyAddressForInvoice,
+  parsePlatformCompanyAddress,
+} from "@/lib/platform-company-address";
 import { stripe } from "@/lib/stripe";
 import type { CheckoutSavedMailingAddress } from "@/lib/checkout-saved-mailing-address";
 import {
   getActiveStripeSubscription,
   getManageableStripeSubscription,
 } from "@/db/queries/stripe-subscriptions";
+import { getPlatformContactSettings } from "@/db/queries/contact-us";
 
 export type { CheckoutSavedMailingAddress };
 
 /**
  * Expected seller name on Stripe invoice PDFs.
- * Platform account business details cannot be updated via API (`accounts.update`
- * is Connect-only). Set in Stripe Dashboard → Settings → Business details:
- * business name "Flipvise Studio LLC", support/business address, and phone.
+ * Platform account legal/public details cannot be updated via API
+ * (`accounts.update` is Connect-only). Set Business name "Flipvise Studio LLC",
+ * username @flipvise, and the Fort Myers street address (no apartment) in
+ * Stripe Dashboard → Settings → Business details and Public details (test and
+ * live). Invoice PDFs also get this stamped in the footer from Contact Us.
  */
-export const STRIPE_INVOICE_SELLER_BUSINESS_NAME = "Flipvise Studio LLC";
+export const STRIPE_INVOICE_SELLER_BUSINESS_NAME =
+  DEFAULT_PLATFORM_COMPANY_ADDRESS.name;
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -120,22 +130,35 @@ export async function syncStripeCustomerBillToFromClerkUser(
   customerId: string,
   clerkUserId: string,
 ): Promise<void> {
-  const profile = await loadClerkInvoiceProfile(clerkUserId);
-  if (!profile?.address) return;
+  const [profile, customer] = await Promise.all([
+    loadClerkInvoiceProfile(clerkUserId),
+    stripe.customers.retrieve(customerId),
+  ]);
+  if (customer.deleted) return;
+
+  const invoiceSettings: Stripe.CustomerUpdateParams.InvoiceSettings = {
+    custom_fields: await companyAddressInvoiceCustomFields(),
+  };
+  const defaultPm = customer.invoice_settings?.default_payment_method;
+  if (typeof defaultPm === "string" && defaultPm) {
+    invoiceSettings.default_payment_method = defaultPm;
+  }
 
   const update: Stripe.CustomerUpdateParams = {
-    address: profile.address,
+    invoice_settings: invoiceSettings,
   };
-  if (profile.name) update.name = profile.name;
-  if (profile.email) update.email = profile.email;
-  if (profile.phone) update.phone = profile.phone;
-  // Keep shipping aligned so Invoice PDF fallbacks stay consistent.
-  if (profile.name) {
-    update.shipping = {
-      name: profile.name,
-      address: profile.address,
-      ...(profile.phone ? { phone: profile.phone } : {}),
-    };
+  if (profile?.address) {
+    update.address = profile.address;
+    if (profile.name) update.name = profile.name;
+    if (profile.email) update.email = profile.email;
+    if (profile.phone) update.phone = profile.phone;
+    if (profile.name) {
+      update.shipping = {
+        name: profile.name,
+        address: profile.address,
+        ...(profile.phone ? { phone: profile.phone } : {}),
+      };
+    }
   }
 
   await stripe.customers.update(customerId, update);
@@ -157,6 +180,71 @@ export async function syncStripeCustomerBillToForClerkUser(
   } catch (error) {
     console.error(
       "[stripe-invoice-addresses] syncStripeCustomerBillToForClerkUser:",
+      error,
+    );
+  }
+}
+
+const COMPANY_CUSTOM_FIELD_NAME = "Company";
+const ADDRESS_CUSTOM_FIELD_NAME = "Address";
+const LEGACY_COMPANY_ADDRESS_FIELD_NAME = "Company address";
+
+async function companyAddressInvoiceCustomFields(): Promise<
+  Stripe.CustomerUpdateParams.InvoiceSettings.CustomField[]
+> {
+  const settings = await getPlatformContactSettings();
+  const address = parsePlatformCompanyAddress(settings.companyAddress);
+  const streetLine = [
+    address.streetAddress.trim(),
+    [address.city, address.stateProvince].filter(Boolean).join(", "),
+    address.postalCode.trim(),
+    address.country.trim(),
+  ]
+    .filter(Boolean)
+    .join(", ")
+    .slice(0, 140);
+  return [
+    {
+      name: COMPANY_CUSTOM_FIELD_NAME,
+      value: formatInvoiceSellerName(address.name).slice(0, 140),
+    },
+    { name: ADDRESS_CUSTOM_FIELD_NAME, value: streetLine },
+  ];
+}
+
+/**
+ * Stamp Contact Us company (Flipvise Studio LLC @flipvise) and street address
+ * onto a Stripe invoice (footer + custom fields). Apartment/suite is omitted.
+ */
+export async function stampCompanyAddressOnStripeInvoice(
+  invoiceId: string,
+): Promise<void> {
+  try {
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    if (invoice.status !== "draft") return;
+
+    const settings = await getPlatformContactSettings();
+    const address = parsePlatformCompanyAddress(settings.companyAddress);
+    const footer = formatPlatformCompanyAddressForInvoice(address);
+    const ourFieldNames = new Set([
+      COMPANY_CUSTOM_FIELD_NAME,
+      ADDRESS_CUSTOM_FIELD_NAME,
+      LEGACY_COMPANY_ADDRESS_FIELD_NAME,
+    ]);
+    const existing = (invoice.custom_fields ?? []).filter(
+      (field) => !ourFieldNames.has(field.name),
+    );
+
+    await stripe.invoices.update(invoiceId, {
+      footer,
+      custom_fields: [
+        ...existing.slice(0, 2),
+        ...(await companyAddressInvoiceCustomFields()),
+      ],
+    });
+  } catch (error) {
+    console.error(
+      "[stripe-invoice-addresses] stampCompanyAddressOnStripeInvoice:",
       error,
     );
   }

@@ -8,14 +8,47 @@ import {
   type UserAddonEntitlementRow,
 } from "@/db/schema";
 import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
-import { isPlanEligibleForAddon } from "@/lib/addon-plan-eligibility";
+import {
+  isAccessEligibleForAddon,
+  isPlanEligibleForAddon,
+} from "@/lib/addon-plan-eligibility";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-export { isPlanEligibleForAddon };
+export { isPlanEligibleForAddon, isAccessEligibleForAddon };
 
 const SETTINGS_ID = 1;
 
 export type { AddonCatalogRow, AddonCatalogSettingsRow, UserAddonEntitlementRow };
+
+/** PostgreSQL undefined_table / missing column — add-on migrations not applied yet. */
+function isMissingAddonCatalogError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    const code = typeof obj.code === "string" ? obj.code : "";
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      (code === "42P01" || code === "42703") &&
+      /addon_catalog/i.test(message)
+    ) {
+      return true;
+    }
+    if (
+      /addon_catalog/i.test(message) &&
+      /(does not exist|undefined table|relation .* does not exist|Failed query)/i.test(
+        message,
+      )
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return (
+    (/42P01/i.test(flat) || /42703/i.test(flat) || /does not exist/i.test(flat)) &&
+    /addon_catalog/i.test(flat)
+  );
+}
 
 export async function getAddonCatalogSettings(): Promise<AddonCatalogSettingsRow> {
   const [row] = await db
@@ -68,7 +101,20 @@ export async function setAddonCatalogPricingVisible(input: {
 }
 
 export async function listAddonCatalog(): Promise<AddonCatalogRow[]> {
-  return db.select().from(addonCatalog).orderBy(desc(addonCatalog.createdAt));
+  try {
+    return await db
+      .select()
+      .from(addonCatalog)
+      .orderBy(desc(addonCatalog.createdAt));
+  } catch (error) {
+    if (isMissingAddonCatalogError(error)) {
+      console.error(
+        "[db] Table addon_catalog is missing. Header add-on banner is disabled until you run: npm run db:ensure-addon-catalog-entitlements && npm run db:ensure-addon-published-on-banner (against the production DATABASE_URL).",
+      );
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function getAddonCatalogByKey(key: string): Promise<AddonCatalogRow | null> {

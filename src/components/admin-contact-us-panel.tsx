@@ -49,7 +49,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import {
   adminFilterInputClass,
   adminSectionTitleClass,
@@ -73,6 +72,12 @@ import {
   isGuestContactUsMessage,
 } from "@/lib/contact-us-admin-status";
 import type { ContactSocialLink } from "@/db/queries/contact-us";
+import { WORLD_COUNTRY_NAMES } from "@/data/world-countries";
+import { getStateProvinceNamesForCountry } from "@/data/world-country-subdivisions";
+import {
+  DEFAULT_PLATFORM_COMPANY_ADDRESS,
+  type PlatformCompanyAddress,
+} from "@/lib/platform-company-address";
 import { cn } from "@/lib/utils";
 
 const AdminContactUsThreadPanel = dynamic(
@@ -135,10 +140,35 @@ export function AdminContactUsPanel({
 
   const [email, setEmail] = useState(settings.email);
   const [phone, setPhone] = useState(settings.phone ?? "");
+  const [companyAddress, setCompanyAddress] = useState<PlatformCompanyAddress>(
+    settings.companyAddress ?? DEFAULT_PLATFORM_COMPANY_ADDRESS,
+  );
   const [socialLinks, setSocialLinks] = useState<ContactSocialLink[]>(
     settings.socialLinks.length > 0 ? settings.socialLinks : [],
   );
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [stateOptions, setStateOptions] = useState<string[]>([]);
+  const [statesLoading, setStatesLoading] = useState(false);
+
+  const selectedCountry = companyAddress.country.trim();
+  const useStateSelect = stateOptions.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedCountry) {
+      setStateOptions([]);
+      return;
+    }
+    setStatesLoading(true);
+    void getStateProvinceNamesForCountry(selectedCountry).then((names) => {
+      if (cancelled) return;
+      setStateOptions(names);
+      setStatesLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCountry]);
 
   useEffect(() => {
     const messageId = Number(searchParams.get("message"));
@@ -203,6 +233,7 @@ export function AdminContactUsPanel({
       await updatePlatformContactSettingsAction({
         email: email.trim(),
         phone: phone.trim() || null,
+        companyAddress,
         socialLinks: socialLinks.filter((l) => l.label.trim() && l.url.trim()),
       });
       setSettingsSaved(true);
@@ -284,7 +315,8 @@ export function AdminContactUsPanel({
         <CardHeader className="gap-1 border-b border-border/40 pb-4">
           <CardTitle className="text-base">Public contact details</CardTitle>
           <CardDescription>
-            Email, phone, and social links shown on the user Contact Us page.
+            Email, phone, company address, and social links shown on the user Contact Us
+            page. New Stripe invoices include this company address in the footer.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-5">
@@ -309,6 +341,179 @@ export function AdminContactUsPanel({
                 placeholder="+1 (555) 000-0000"
                 className={adminFilterInputClass}
               />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Company address</Label>
+              <p className="text-xs text-muted-foreground">
+                Shown on the Contact Us page. New Stripe invoices also include this address
+                in the footer. The invoice header (seller block) is set in Stripe Dashboard
+                → Settings → Public details (
+                <a
+                  href="https://dashboard.stripe.com/test/settings/public_details"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  test
+                </a>
+                {" / "}
+                <a
+                  href="https://dashboard.stripe.com/settings/public_details"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  live
+                </a>
+                ) and Business details — Stripe does not allow apps to change that header.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-company-name">Company name</Label>
+              <Input
+                id="contact-company-name"
+                value={companyAddress.name}
+                onChange={(e) =>
+                  setCompanyAddress((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Flipvise Studio LLC"
+                className={adminFilterInputClass}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="contact-company-street">Street address</Label>
+                <Input
+                  id="contact-company-street"
+                  value={companyAddress.streetAddress}
+                  onChange={(e) =>
+                    setCompanyAddress((prev) => ({
+                      ...prev,
+                      streetAddress: e.target.value,
+                    }))
+                  }
+                  placeholder="6450 Aragon Way"
+                  className={adminFilterInputClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-company-line2">Apartment, suite, etc.</Label>
+                <Input
+                  id="contact-company-line2"
+                  value={companyAddress.line2}
+                  onChange={(e) =>
+                    setCompanyAddress((prev) => ({ ...prev, line2: e.target.value }))
+                  }
+                  placeholder="apt 205"
+                  className={adminFilterInputClass}
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="contact-company-city">City</Label>
+                <Input
+                  id="contact-company-city"
+                  value={companyAddress.city}
+                  onChange={(e) =>
+                    setCompanyAddress((prev) => ({ ...prev, city: e.target.value }))
+                  }
+                  placeholder="Fort Myers"
+                  className={adminFilterInputClass}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-company-state">State / province</Label>
+                {useStateSelect ? (
+                  <Select
+                    value={
+                      companyAddress.stateProvince.trim() &&
+                      stateOptions.includes(companyAddress.stateProvince)
+                        ? companyAddress.stateProvince
+                        : null
+                    }
+                    onValueChange={(v) =>
+                      setCompanyAddress((prev) => ({
+                        ...prev,
+                        stateProvince: v ?? "",
+                      }))
+                    }
+                    disabled={statesLoading}
+                  >
+                    <SelectTrigger
+                      id="contact-company-state"
+                      className={adminFilterInputClass}
+                    >
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stateOptions.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    id="contact-company-state"
+                    value={companyAddress.stateProvince}
+                    onChange={(e) =>
+                      setCompanyAddress((prev) => ({
+                        ...prev,
+                        stateProvince: e.target.value,
+                      }))
+                    }
+                    placeholder="Florida"
+                    className={adminFilterInputClass}
+                  />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-company-postal">Postal code</Label>
+                <Input
+                  id="contact-company-postal"
+                  value={companyAddress.postalCode}
+                  onChange={(e) =>
+                    setCompanyAddress((prev) => ({
+                      ...prev,
+                      postalCode: e.target.value,
+                    }))
+                  }
+                  placeholder="33966"
+                  className={adminFilterInputClass}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-company-country">Country</Label>
+              <Select
+                value={companyAddress.country.trim() || null}
+                onValueChange={(v) =>
+                  setCompanyAddress((prev) => ({
+                    ...prev,
+                    country: v ?? "",
+                    stateProvince: "",
+                  }))
+                }
+              >
+                <SelectTrigger
+                  id="contact-company-country"
+                  className={adminFilterInputClass}
+                >
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORLD_COUNTRY_NAMES.map((country) => (
+                    <SelectItem key={country} value={country}>
+                      {country}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

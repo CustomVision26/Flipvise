@@ -21,6 +21,10 @@ import {
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { markClerkAuthHandoff } from "@/lib/clerk-auth-handoff";
+import {
+  FLIPVISE_OPEN_SIGN_UP_EVENT,
+  type OpenFlipviseSignUpDetail,
+} from "@/lib/flipvise-sign-up";
 import { authContinueUrl, DEFAULT_AUTH_REDIRECT } from "@/lib/safe-redirect-path";
 
 const VERIFICATION_CODE_LENGTH = 6;
@@ -99,11 +103,14 @@ export function SignUpDialog({
   initialEmail = "",
   triggerLabel = "Sign Up",
   redirectPath = DEFAULT_AUTH_REDIRECT,
+  showTrigger = true,
 }: {
   size?: "default" | "sm" | "lg" | "xs";
   initialEmail?: string;
   triggerLabel?: string;
   redirectPath?: string;
+  /** When false, only the global host / `openFlipviseSignUp()` opens the dialog. */
+  showTrigger?: boolean;
 }) {
   // Clerk's useSignUp no longer exposes `isLoaded` (SignUpSignalValue).
   const { isLoaded } = useAuth();
@@ -122,6 +129,21 @@ export function SignUpDialog({
   useEffect(() => {
     if (initialEmail) setEmail(initialEmail);
   }, [initialEmail]);
+
+  useEffect(() => {
+    function onOpen(event: Event) {
+      const email = (event as CustomEvent<OpenFlipviseSignUpDetail>).detail
+        ?.email;
+      if (typeof email === "string" && email.trim()) {
+        setEmail(email.trim());
+      }
+      setOpen(true);
+    }
+    window.addEventListener(FLIPVISE_OPEN_SIGN_UP_EVENT, onOpen);
+    return () => {
+      window.removeEventListener(FLIPVISE_OPEN_SIGN_UP_EVENT, onOpen);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -218,11 +240,11 @@ export function SignUpDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={<Button size={size} disabled={!isLoaded} />}
-      >
-        {triggerLabel}
-      </DialogTrigger>
+      {showTrigger ? (
+        <DialogTrigger render={<Button size={size} disabled={!isLoaded} />}>
+          {triggerLabel}
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="max-h-[min(90vh,820px)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Create your account</DialogTitle>

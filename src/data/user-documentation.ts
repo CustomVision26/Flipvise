@@ -15,8 +15,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Landing page for guests. Sign in or create an account to reach your dashboard.",
         howItWorks: [
-          "Use Sign In to open the Clerk authentication modal.",
-          "Use Sign Up to open the Flipvise account form (name, email, phone, account type, password, and password confirmation).",
+          "Use Sign In to open the Clerk authentication modal. Sign up from that modal uses the Flipvise account form (not Clerk’s hosted Sign Up).",
+          "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation).",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After sign-in you are redirected to your personal dashboard automatically (or to account details if phone, mailing address, or type are still missing).",
         ],
@@ -98,7 +98,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         requirements: [
           "Active AI Essay add-on entitlement (Stripe or admin). Team member assignment is coming soon.",
-          "Eligible paid plan for self-serve purchase.",
+          "Eligible paid plan for self-serve purchase (Pro, Pro Plus, team, or education). Platform admins with complimentary Pro Plus can also purchase.",
         ],
         doNots: [
           "Do not expect the model essay to appear automatically — owners must reveal it.",
@@ -513,7 +513,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Send a message card: fill in Name, Email, Subject, and Message (minimum 10 characters), then click Start conversation.",
           "After submit you are redirected to your live chat thread at /contact/thread/[messageId] — administrators are notified immediately.",
           "Name and Email pre-fill when you are signed in (from your Clerk profile).",
-          "Contact details card lists the support inbox (mailto link), optional phone number, and social media links configured by the platform team.",
+          "Contact details card lists the support inbox (mailto link), optional phone number, company address, and social media links configured by the platform team.",
           "In-app Help Center card explains categorized tickets for signed-in users and links to the Help Center section in this guide.",
           "Check the documentation first card links back to this user guide for self-service answers.",
         ],
@@ -649,7 +649,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
           "Each card shows the live Stripe price (monthly, and yearly when configured) with a period toggle.",
-          "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe.",
+          "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe. Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus.",
           "After you slide to subscribe, a success toast appears and you return to your personal dashboard; Inbox receives a formal add-on confirmation.",
           "During a plan change, if the catalog is published, locked add-ons may also be offered in a checkout dialog before payment.",
           "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",
@@ -678,7 +678,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Pay with a credit or debit card Stripe accepts in your region. Flipvise does not store your full card number; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
-          "After purchase, receipts and invoices appear in the Stripe Customer Portal (Manage subscription) and may sync to your Flipvise inbox.",
+          "After purchase, receipts and invoices appear in the Stripe Customer Portal (Manage subscription) and may sync to your Flipvise inbox. Invoices include Flipvise Studio LLC @flipvise and the company street address.",
           "Currency is determined by the Stripe Price for your selected plan (typically USD for this app’s catalog).",
         ],
         requirements: [

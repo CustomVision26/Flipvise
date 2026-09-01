@@ -2,7 +2,7 @@
 
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { SignUpDialog } from "@/components/sign-up-dialog";
+import { openFlipviseSignUp } from "@/lib/flipvise-sign-up";
 import { useKeepClerkAuthButtonsMounted } from "@/lib/use-clerk-modal-teardown";
 
 export function SignInBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
@@ -34,5 +34,9 @@ export function SignUpBtn({ size }: { size?: "default" | "sm" | "lg" | "xs" }) {
     );
   }
   if (!keepMounted) return null;
-  return <SignUpDialog size={size} />;
+  return (
+    <Button size={size} onClick={() => openFlipviseSignUp()}>
+      Sign Up
+    </Button>
+  );
 }

@@ -10,6 +10,7 @@ import { neon } from "@neondatabase/serverless";
 
 config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), ".env.local"), override: true });
+config({ path: resolve(process.cwd(), ".env.db.prod"), override: true });
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -60,6 +61,7 @@ async function main() {
       "stripePriceEnvKey" varchar(128) DEFAULT '' NOT NULL,
       "active" boolean DEFAULT true NOT NULL,
       "publishedOnPricing" boolean DEFAULT false NOT NULL,
+      "publishedOnBanner" boolean DEFAULT true NOT NULL,
       "createdAt" timestamp DEFAULT now() NOT NULL,
       "updatedAt" timestamp DEFAULT now() NOT NULL
     )
@@ -95,6 +97,11 @@ async function main() {
   await sql`
     ALTER TABLE "user_addon_entitlements"
     ADD COLUMN IF NOT EXISTS "teamId" integer
+  `;
+
+  await sql`
+    ALTER TABLE "addon_catalog"
+    ADD COLUMN IF NOT EXISTS "publishedOnBanner" boolean DEFAULT true NOT NULL
   `;
 
   await sql`

@@ -1,5 +1,35 @@
 import { canonicalTeamPlanId } from "@/lib/team-plans";
 
+/** Access fields used to decide whether a user may purchase an add-on. */
+export type AddonEligibilityAccess = {
+  effectivePlanSlug?: string | null;
+  isAdmin?: boolean;
+  adminGranted?: boolean;
+  hasClerkPersonalProPlus?: boolean;
+  hasClerkPersonalPro?: boolean;
+  activeTeamPlan?: string | null;
+  activeEducationTeamPlan?: string | null;
+};
+
+/**
+ * Plan slug used for add-on purchase / Stripe-entitlement eligibility.
+ *
+ * Platform admins and complimentary unlocks have Pro Plus features without a
+ * Stripe `billingPlan`, so treat them as `pro_plus` when metadata has no paid slug.
+ */
+export function resolvePlanSlugForAddonEligibility(
+  access: AddonEligibilityAccess,
+): string | null {
+  const slug = access.effectivePlanSlug?.trim();
+  if (slug && slug !== "free") return slug;
+  if (access.activeTeamPlan) return access.activeTeamPlan;
+  if (access.activeEducationTeamPlan) return access.activeEducationTeamPlan;
+  if (access.isAdmin || access.adminGranted) return "pro_plus";
+  if (access.hasClerkPersonalProPlus) return "pro_plus";
+  if (access.hasClerkPersonalPro) return "pro";
+  return null;
+}
+
 /** True when the user's effective plan slug is listed on the add-on catalog row. */
 export function isPlanEligibleForAddon(
   eligiblePlanIds: string[],
@@ -15,4 +45,14 @@ export function isPlanEligibleForAddon(
     if (canonical && canonicalTeamPlanId(id) === canonical) return true;
   }
   return false;
+}
+
+export function isAccessEligibleForAddon(
+  eligiblePlanIds: string[],
+  access: AddonEligibilityAccess,
+): boolean {
+  return isPlanEligibleForAddon(
+    eligiblePlanIds,
+    resolvePlanSlugForAddonEligibility(access),
+  );
 }

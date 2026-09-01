@@ -116,6 +116,7 @@ export default async function RootLayout({
     canAccessTeacherTools,
     activeEducationTeamPlan,
     isAdmin,
+    adminGranted,
     activeAddonKeys,
     effectivePlanSlug,
   } = access;
@@ -222,14 +223,26 @@ export default async function RootLayout({
           activeAddonKeys,
         })
       : false;
-  const addonBannerItems =
-    !isMinimalHeaderRoute && (userId || isNativeSignInRoute)
-      ? await buildDashboardAddonBannerItems({
-          activeAddonKeys: userId ? activeAddonKeys : [],
-          effectivePlanSlug: userId ? effectivePlanSlug : null,
-          aiEssayComingSoonForUser,
-        })
-      : [];
+  let addonBannerItems: Awaited<
+    ReturnType<typeof buildDashboardAddonBannerItems>
+  > = [];
+  if (!isMinimalHeaderRoute && (userId || isNativeSignInRoute)) {
+    try {
+      addonBannerItems = await buildDashboardAddonBannerItems({
+        activeAddonKeys: userId ? activeAddonKeys : [],
+        effectivePlanSlug: userId ? effectivePlanSlug : null,
+        isAdmin: userId ? isAdmin : false,
+        adminGranted: userId ? adminGranted : false,
+        hasClerkPersonalProPlus: userId ? hasClerkPersonalProPlus : false,
+        hasClerkPersonalPro: userId ? hasClerkPersonalPro : false,
+        activeTeamPlan: userId ? activeTeamPlan : null,
+        activeEducationTeamPlan: userId ? activeEducationTeamPlan : null,
+        aiEssayComingSoonForUser,
+      });
+    } catch {
+      // Missing addon_catalog (or similar) must not block sign-in /auth/continue.
+    }
+  }
   const showHeaderAddons = addonBannerItems.length > 0;
   const showHeaderChrome =
     Boolean(userId) ||

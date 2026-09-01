@@ -44,6 +44,7 @@ import {
 } from "@/lib/education-plans";
 import { listAffiliatesForPlanHistory } from "@/db/queries/affiliates";
 import { listAccessibleAddonKeysForUser } from "@/db/queries/addons";
+import { resolvePlanSlugForAddonEligibility } from "@/lib/addon-plan-eligibility";
 import { enforceExpiredPaymentGraceIfNeeded } from "@/lib/billing-grace-enforcement";
 import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { resolveActiveAffiliateGrant } from "@/lib/billing-tab-plan-display";
@@ -477,7 +478,7 @@ export const getAccessContext = cache(async function getAccessContext(): Promise
   try {
     const activeAddonKeys = await listAccessibleAddonKeysForUser(
       ctx.userId,
-      ctx.effectivePlanSlug,
+      resolvePlanSlugForAddonEligibility(ctx),
     );
     if (activeAddonKeys.length === 0) return ctx;
     return { ...ctx, activeAddonKeys };

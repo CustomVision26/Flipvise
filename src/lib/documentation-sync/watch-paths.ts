@@ -7,6 +7,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/app-top-nav.tsx",
     "src/components/auth-buttons.tsx",
     "src/components/sign-up-dialog.tsx",
+    "src/components/guest-sign-up-host.tsx",
+    "src/lib/flipvise-sign-up.ts",
     "src/components/account-recovery-fields.tsx",
     "src/actions/account-recovery-profile.ts",
     "src/app/onboarding/account-recovery/page.tsx",
@@ -142,7 +144,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "help-center-account": ["src/components/help-center.tsx"],
   "help-center-my-tickets": ["src/components/help-center-my-tickets.tsx"],
   "help-center-priority-support": ["src/components/help-center.tsx"],
-  "contact-us-page": ["src/components/contact-support-view.tsx"],
+  "contact-us-page": ["src/components/contact-support-view.tsx", "src/lib/platform-company-address.ts"],
   "contact-us-live-chat": ["src/components/contact-support-view.tsx", "src/components/contact-us-thread-view.tsx"],
   "contact-us-guest-vs-signed-in": ["src/components/contact-support-view.tsx"],
   "contact-us-vs-help-center": ["src/components/contact-support-view.tsx", "src/components/help-center.tsx"],
@@ -153,6 +155,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/pricing-checkout-payment.tsx",
     "src/app/pricing/checkout/pay/page.tsx",
     "src/lib/stripe-invoice-addresses.ts",
+    "src/lib/platform-company-address.ts",
     "src/app/api/webhooks/stripe/route.ts",
   ],
   checkout: [
@@ -300,7 +303,11 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/db/queries/admin.ts",
   ],
   subscription: ["src/lib/admin/admin-billing-snapshot.ts", "src/db/queries/stripe-subscriptions.ts"],
-  invoices: ["src/db/queries/billing.ts"],
+  invoices: [
+    "src/db/queries/billing.ts",
+    "src/lib/stripe-invoice-addresses.ts",
+    "src/lib/platform-company-address.ts",
+  ],
   "paid-subscribers": ["src/lib/admin-user-plan-label.ts", "src/db/queries/billing.ts"],
   "team-workspaces": [
     "src/db/queries/admin.ts",
@@ -316,6 +323,9 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/components/admin-contact-us-panel.tsx",
     "src/components/admin-contact-us-thread-panel.tsx",
     "src/db/queries/contact-us.ts",
+    "src/actions/contact-us.ts",
+    "src/lib/platform-company-address.ts",
+    "src/lib/stripe-invoice-addresses.ts",
   ],
   "pricing-plans": ["src/components/admin-plans-editor.tsx", "src/data/plans-config.json"],
   "admin-add-ons": [

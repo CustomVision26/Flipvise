@@ -30,6 +30,7 @@ export default async function ContactPage() {
         email={settings.email}
         phone={settings.phone ?? null}
         socialLinks={settings.socialLinks ?? []}
+        companyAddress={settings.companyAddress ?? null}
         defaultName={defaultName}
         defaultEmail={defaultEmail}
       />

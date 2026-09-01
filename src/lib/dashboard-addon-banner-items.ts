@@ -1,7 +1,8 @@
+import { listAddonCatalog } from "@/db/queries/addons";
 import {
-  isPlanEligibleForAddon,
-  listAddonCatalog,
-} from "@/db/queries/addons";
+  isAccessEligibleForAddon,
+  type AddonEligibilityAccess,
+} from "@/lib/addon-plan-eligibility";
 import {
   AI_ESSAY_ADDON_KEY,
   isAiDocumentStudioAddonKey,
@@ -17,6 +18,10 @@ export type DashboardAddonBannerItem = {
   blurb: string;
   unlocked: boolean;
   canPurchase: boolean;
+  eligible: boolean;
+  monthlyPriceConfigured: boolean;
+  yearlyPriceConfigured: boolean;
+  stripePriceConfigured: boolean;
   /** Workspace members cannot unlock AI Essay yet. */
   comingSoon?: boolean;
   /** Destination when unlocked; omit to open unlock flow. */
@@ -32,10 +37,9 @@ function addonFeatureHref(addonKey: string): string | null {
 
 export async function buildDashboardAddonBannerItems(input: {
   activeAddonKeys: string[];
-  effectivePlanSlug: string | null;
   /** When true, AI Essay shows Coming soon instead of Unlock. */
   aiEssayComingSoonForUser?: boolean;
-}): Promise<DashboardAddonBannerItem[]> {
+} & AddonEligibilityAccess): Promise<DashboardAddonBannerItem[]> {
   // Active + In banner → every signed-in user sees the chip. Entitlement only
   // switches Unlock vs Open; it must not hide the add-on from the banner.
   const catalog = await listAddonCatalog();
@@ -47,19 +51,25 @@ export async function buildDashboardAddonBannerItems(input: {
         row.key === AI_ESSAY_ADDON_KEY &&
         Boolean(input.aiEssayComingSoonForUser) &&
         !unlocked;
-      const eligible = isPlanEligibleForAddon(
-        row.eligiblePlanIds,
-        input.effectivePlanSlug,
-      );
-      const stripePriceConfigured = Boolean(
+      const eligible = isAccessEligibleForAddon(row.eligiblePlanIds, input);
+      const monthlyPriceConfigured = Boolean(
         resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "monthly"),
       );
+      const yearlyPriceConfigured = Boolean(
+        resolveStripeAddonPriceIdFromEnvKey(row.stripePriceEnvKey, "yearly"),
+      );
+      const stripePriceConfigured =
+        monthlyPriceConfigured || yearlyPriceConfigured;
       return {
         key: row.key,
         name: row.name,
         blurb: row.marketingBlurb || row.description,
         unlocked,
         comingSoon: essayComingSoon,
+        eligible,
+        monthlyPriceConfigured,
+        yearlyPriceConfigured,
+        stripePriceConfigured,
         canPurchase:
           !essayComingSoon && eligible && !unlocked && stripePriceConfigured,
         href: unlocked ? addonFeatureHref(row.key) : null,
