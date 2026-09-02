@@ -17,6 +17,7 @@ import {
   mergePlansConfigWithStripePricing,
 } from "@/lib/stripe-pricing-display";
 import { stripe } from "@/lib/stripe";
+import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { getSavedMailingAddressForCheckout } from "@/lib/stripe-invoice-addresses";
 import { publishedTrialDaysForPlan } from "@/lib/plan-trial";
@@ -96,11 +97,20 @@ export default async function PricingCheckoutPayPage({
     session.customer_email?.trim() ||
     null;
   if (!customerEmail) {
-    const { primaryEmail } = await getClerkUserFieldDisplayById(userId);
-    customerEmail = primaryEmail?.trim().toLowerCase() ?? null;
+    try {
+      const { primaryEmail } = await getClerkUserFieldDisplayById(userId);
+      customerEmail = primaryEmail?.trim().toLowerCase() ?? null;
+    } catch (error) {
+      console.error("[pricing/checkout/pay] customer email:", error);
+    }
   }
 
-  const savedMailingAddress = await getSavedMailingAddressForCheckout(userId);
+  let savedMailingAddress = null;
+  try {
+    savedMailingAddress = await getSavedMailingAddressForCheckout(userId);
+  } catch (error) {
+    console.error("[pricing/checkout/pay] mailing address:", error);
+  }
 
   const plans = await loadPlansForPricingUi();
   const planRow = isStripePaidPlanId(planId)
@@ -140,6 +150,7 @@ export default async function PricingCheckoutPayPage({
       savedMailingAddress={
         savedMailingAddress ? toClientJson(savedMailingAddress) : null
       }
+      publishableKey={resolveStripePublishableKey()}
     />
   );
 }

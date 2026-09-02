@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
 
 const stripeSecretKeyRaw = process.env.STRIPE_SECRET_KEY;
 if (!stripeSecretKeyRaw) {
@@ -20,7 +21,7 @@ function validateStripeEnv(): void {
     );
   }
 
-  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim();
+  const publishableKey = resolveStripePublishableKey();
   if (publishableKey) {
     const publishableMode = stripeKeyMode(publishableKey);
     if (publishableMode === "unknown") {

@@ -1,3 +1,5 @@
+import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
+
 /** Matches formal Stripe-hosted Checkout styling (light page, navy accent). */
 export const STRIPE_CHECKOUT_PAGE_BG = "#f6f7f9";
 export const STRIPE_CHECKOUT_NAVY = "#1a2332";
@@ -25,7 +27,10 @@ export const STRIPE_CHECKOUT_ELEMENTS_APPEARANCE = {
   },
 };
 
-export function isStripeTestModeClient(): boolean {
-  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() ?? "";
+export function isStripeTestModeClient(publishableKey?: string | null): boolean {
+  const key =
+    publishableKey?.trim() ||
+    resolveStripePublishableKey() ||
+    "";
   return key.startsWith("pk_test_");
 }

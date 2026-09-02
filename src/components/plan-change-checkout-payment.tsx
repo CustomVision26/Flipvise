@@ -7,6 +7,7 @@ import { ArrowLeft, CreditCard } from "lucide-react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -323,14 +324,19 @@ export function PlanChangeCheckoutPayment({
   returnUrl,
   summary,
   backHref,
+  publishableKey = null,
 }: {
   clientSecret: string;
   returnUrl: string;
   summary: PlanChangeCheckoutSummary;
   backHref: string;
+  publishableKey?: string | null;
 }) {
-  const stripePromise = useMemo(() => getStripePromise(), []);
-  const isTestMode = isStripeTestModeClient();
+  const stripePromise = useMemo(
+    () => getStripePromise(publishableKey),
+    [publishableKey],
+  );
+  const isTestMode = isStripeTestModeClient(publishableKey);
   const options = useMemo(
     () => ({
       clientSecret,
@@ -388,9 +394,21 @@ export function PlanChangeCheckoutPayment({
           </div>
 
           <div className="space-y-8 px-5 py-6 sm:px-7 sm:py-8">
-            <Elements stripe={stripePromise} options={options}>
-              <PlanChangePaymentForm summary={summary} returnUrl={returnUrl} />
-            </Elements>
+            {publishableKey ? (
+              <Elements stripe={stripePromise} options={options}>
+                <PlanChangePaymentForm summary={summary} returnUrl={returnUrl} />
+              </Elements>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTitle>Payment form could not load</AlertTitle>
+                <AlertDescription>
+                  Stripe’s publishable key is missing. On Render set{" "}
+                  <span className="font-mono">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</span>{" "}
+                  to the live <span className="font-mono">pk_live_</span> key that
+                  matches <span className="font-mono">STRIPE_SECRET_KEY</span>.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         </div>
 

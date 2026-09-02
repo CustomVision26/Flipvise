@@ -1,14 +1,21 @@
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
+import { sanitizeStripePublishableKey } from "@/lib/stripe-publishable-key";
 
-let stripePromise: Promise<Stripe | null> | null = null;
+const stripePromiseByKey = new Map<string, Promise<Stripe | null>>();
 
-export function getStripePromise(): Promise<Stripe | null> {
-  if (!stripePromise) {
-    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim();
-    if (!key) {
-      throw new Error("Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
-    }
-    stripePromise = loadStripe(key);
+export function getStripePromise(
+  publishableKey?: string | null,
+): Promise<Stripe | null> {
+  const key =
+    sanitizeStripePublishableKey(publishableKey) ??
+    sanitizeStripePublishableKey(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  if (!key) {
+    return Promise.resolve(null);
   }
-  return stripePromise;
+  let promise = stripePromiseByKey.get(key);
+  if (!promise) {
+    promise = loadStripe(key);
+    stripePromiseByKey.set(key, promise);
+  }
+  return promise;
 }

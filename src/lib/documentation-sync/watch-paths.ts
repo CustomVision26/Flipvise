@@ -166,11 +166,14 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   checkout: [
     "src/app/pricing/checkout/page.tsx",
     "src/app/pricing/checkout/pay/page.tsx",
+    "src/app/pricing/checkout/pay/error.tsx",
     "src/components/pricing-checkout-payment.tsx",
     "src/components/pricing-checkout-step.tsx",
     "src/components/plan-change-addons-dialog.tsx",
     "src/actions/stripe.ts",
     "src/lib/stripe-catalog-price.ts",
+    "src/lib/stripe-publishable-key.ts",
+    "src/lib/stripe-load-client.ts",
   ],
   "manage-subscription": [
     "src/components/user-billing-page.tsx",

@@ -657,7 +657,8 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Environment requirements",
         bullets: [
           "Matching Stripe price IDs must be set in Render/production environment variables.",
-          "Test keys (sk_test_*) and live keys (sk_live_*) must match across STRIPE_SECRET_KEY and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.",
+          "Test keys (sk_test_*) and live keys (sk_live_*) must match across STRIPE_SECRET_KEY and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY (pk_live_ on Render). If only STRIPE_PUBLIC_KEY is set, checkout still reads it on the server.",
+          "Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY used to crash /pricing/checkout/pay with the generic error page after a live session was created.",
         ],
       },
     ],

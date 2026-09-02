@@ -15,6 +15,7 @@ import {
 } from "@/lib/plan-change-proration-preview";
 import { resolvePlanChangeSelectedAddonLine } from "@/lib/plan-change-locked-addons";
 import { toClientJson } from "@/lib/to-client-json";
+import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
 
 export const dynamic = "force-dynamic";
 
@@ -98,6 +99,7 @@ export default async function PlanChangeCheckoutPayPage({
       returnUrl={setupPayload.returnUrl}
       summary={toClientJson(summary)}
       backHref={backHref}
+      publishableKey={resolveStripePublishableKey()}
     />
   );
 }

@@ -8,6 +8,7 @@ import { getAddonCatalogByKey } from "@/db/queries/addons";
 import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { checkoutSessionAmountsMajor } from "@/lib/stripe-checkout-session-amounts";
 import { stripe } from "@/lib/stripe";
+import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
 import { getSavedMailingAddressForCheckout } from "@/lib/stripe-invoice-addresses";
 import { toClientJson } from "@/lib/to-client-json";
@@ -68,11 +69,20 @@ export default async function AddonCheckoutPayPage({
     session.customer_email?.trim() ||
     null;
   if (!customerEmail) {
-    const { primaryEmail } = await getClerkUserFieldDisplayById(userId);
-    customerEmail = primaryEmail?.trim().toLowerCase() ?? null;
+    try {
+      const { primaryEmail } = await getClerkUserFieldDisplayById(userId);
+      customerEmail = primaryEmail?.trim().toLowerCase() ?? null;
+    } catch (error) {
+      console.error("[pricing/add-ons/pay] customer email:", error);
+    }
   }
 
-  const savedMailingAddress = await getSavedMailingAddressForCheckout(userId);
+  let savedMailingAddress = null;
+  try {
+    savedMailingAddress = await getSavedMailingAddressForCheckout(userId);
+  } catch (error) {
+    console.error("[pricing/add-ons/pay] mailing address:", error);
+  }
   const stripeAmounts = checkoutSessionAmountsMajor(session);
   const period =
     session.metadata?.period === "yearly" ? "yearly" : "monthly";
@@ -116,6 +126,7 @@ export default async function AddonCheckoutPayPage({
       savedMailingAddress={
         savedMailingAddress ? toClientJson(savedMailingAddress) : null
       }
+      publishableKey={resolveStripePublishableKey()}
     />
   );
 }

@@ -11,6 +11,7 @@ import {
   useCheckoutElements,
 } from "@stripe/react-stripe-js/checkout";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1125,16 +1126,22 @@ export function PricingCheckoutPayment({
   summary,
   backHref,
   savedMailingAddress = null,
+  publishableKey = null,
   className,
 }: {
   clientSecret: string;
   summary: PricingCheckoutSummary;
   backHref: string;
   savedMailingAddress?: CheckoutSavedMailingAddress | null;
+  /** Server-resolved pk_test_ / pk_live_ (covers STRIPE_PUBLIC_KEY alias). */
+  publishableKey?: string | null;
   className?: string;
 }) {
-  const stripePromise = useMemo(() => getStripePromise(), []);
-  const isTestMode = isStripeTestModeClient();
+  const stripePromise = useMemo(
+    () => getStripePromise(publishableKey),
+    [publishableKey],
+  );
+  const isTestMode = isStripeTestModeClient(publishableKey);
   const options = useMemo(
     () => ({
       clientSecret,
@@ -1194,12 +1201,26 @@ export function PricingCheckoutPayment({
           </div>
 
           <div className="space-y-8 px-5 py-6 sm:px-7 sm:py-8">
-            <CheckoutElementsProvider stripe={stripePromise} options={options}>
-              <CheckoutPayBody
-                summary={summary}
-                savedMailingAddress={savedMailingAddress}
-              />
-            </CheckoutElementsProvider>
+            {publishableKey ? (
+              <CheckoutElementsProvider stripe={stripePromise} options={options}>
+                <CheckoutPayBody
+                  summary={summary}
+                  savedMailingAddress={savedMailingAddress}
+                />
+              </CheckoutElementsProvider>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTitle>Payment form could not load</AlertTitle>
+                <AlertDescription>
+                  Stripe’s publishable key is missing. On Render set{" "}
+                  <span className="font-mono">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</span>{" "}
+                  to the <span className="font-mono">pk_live_</span> key that matches{" "}
+                  <span className="font-mono">STRIPE_SECRET_KEY</span>, then retry
+                  checkout. Do not use the test <span className="font-mono">pk_test_</span>{" "}
+                  key with a live session.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
         </div>
 

@@ -34,7 +34,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "checkout-path",
         title: "Purchase path",
         bullets: [
-          "Choose plan → /pricing/checkout review → Stripe Embedded Checkout payment.",
+          "Choose plan → /pricing/checkout review → Stripe Embedded Checkout on /pricing/checkout/pay.",
           "Eligible plans may show Start free trial (monthly only) or Subscribe now.",
           "Promos apply to new paid subscriptions only — not trials or plan changes.",
         ],

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-02T02:29:41.272Z",
+  "updatedAt": "2026-09-02T02:56:44.605Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "d84d35021597f04e786b27462ccd35ff04cfac2b7b5854ba518a802e76681c8e",
@@ -100,18 +100,18 @@
     },
     "pricing": {
       "watchFingerprint": "a5b3def5a230456df21af199a03b3b22307feb32e1990ad15e9f8669807f877d",
-      "docFingerprint": "4706e6f3cba93a3e01d152656d35635ab797479c96362b2bd9746e8fd9c4f025"
+      "docFingerprint": "69e94a66d3ce3b9548102fcbebb034ff068f53b7576118c00cc1287f12ada0c1"
     },
     "pricing-add-ons": {
       "watchFingerprint": "96c1c6e30772095598c618fa3dcace7ee35e4aa24c613eb00d4e83f7bc972144",
       "docFingerprint": "c94045d15840d1d6f07852565946998a934c1be9b8b6051cddabdd5b92d13feb"
     },
     "stripe-billing-payment": {
-      "watchFingerprint": "1c90ef0496cf2e9092457b77ef912e77d319ac84441930315ff12b48893cb642",
+      "watchFingerprint": "0e2cfed9ee2b9fc904aefe5697bb7217cb2cace6836199f49f96e8d2f59f0949",
       "docFingerprint": "ffec403a87247179fe582deceea852602ea5cdb0ab70ea6fedb6914d2324d89c"
     },
     "checkout": {
-      "watchFingerprint": "26d54b8d54de131f1a6eadc6436347f57fb66f9af2f5ecc5843f99f0b7f1d542",
+      "watchFingerprint": "faf0ed29fd2f977f69295da3e9bb67c40efbb792d6df3ca41996e694521f5668",
       "docFingerprint": "197959aab8cd9259afd2a162c78edf574e6ffb7c43968380cffe5ec4adf2579f"
     },
     "manage-subscription": {
@@ -119,7 +119,7 @@
       "docFingerprint": "49f9f6ff74b41af7ddb9a3e933eadb21099bde2ee15e456f1f15f9d736df7e68"
     },
     "prorations-plan-changes": {
-      "watchFingerprint": "3fb06d2e567d7f455d259a8040c6dd399037516215086196812712491f42dbdf",
+      "watchFingerprint": "40bc13fbb7bb01ed82d329179094f419b9ad1b00c46ff94198f8abf07ed94c3e",
       "docFingerprint": "e30a179a1665e357af740f43ecf3b5a0a6b6212bcad264ae75199dbf9c64edd3"
     },
     "promo-general": {
@@ -272,7 +272,7 @@
     },
     "pricing-plans": {
       "watchFingerprint": "958de07d03a389c9259dfb896f95421654c7528e32a2b63b66183b208c47ce9e",
-      "docFingerprint": "e433b9ee70d2096d983c7d4be7742ad725119356db9e1c79bdb78bb99cf576b0"
+      "docFingerprint": "d5f50f1affa14c6b1433dd22da4c39806f4c5c105e21610df09217b8503e1057"
     },
     "addon-plans": {
       "watchFingerprint": "593621d973b134edc0faee79cae1abcef3cf60ad103448f4f0e3cb6acabd23d7",

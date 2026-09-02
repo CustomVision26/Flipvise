@@ -627,7 +627,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Active public codes appear as quick-fill chips under the promo field when a tier’s general sale is running.",
           "Signed-in users see a Current plan badge; active subscribers also get Manage subscription.",
           "When the platform admin publishes the Add-on Catalog, /pricing/add-ons lists optional features (such as AI Essay) that stack on your current plan — monthly or yearly where configured.",
-          "Choose a plan → review on /pricing/checkout → pay on Stripe Embedded Checkout.",
+          "Choose a plan → review on /pricing/checkout → pay on /pricing/checkout/pay.",
         ],
         requirements: [
           "Guests can browse; sign-in is required to purchase.",
