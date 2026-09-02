@@ -88,6 +88,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/native-notification-bootstrap.tsx",
     "src/components/native-app-bootstrap.tsx",
     "src/components/service-worker-register.tsx",
+    "src/lib/early-client-bootstrap.ts",
+    "src/lib/dev-sw-reset-key.ts",
     "src/lib/native-notifications/push-registration.ts",
     "src/lib/native-notifications/push-handlers.ts",
     "src/lib/native-notifications/inbox-poller.ts",

@@ -15,6 +15,73 @@ function absoluteLogoUrlForCheckout(): string | null {
 }
 
 /**
+ * Checkout keeps cards (including Apple Pay / Google Pay), Link, and ACH.
+ * Everything else Stripe might surface from the Dashboard is excluded.
+ */
+const STRIPE_CHECKOUT_ALLOWED_DYNAMIC_TYPES = new Set<string>([
+  "card",
+  "us_bank_account",
+]);
+
+const STRIPE_CHECKOUT_EXCLUDABLE_PAYMENT_METHOD_TYPES: Stripe.Checkout.SessionCreateParams.ExcludedPaymentMethodType[] =
+  [
+    "acss_debit",
+    "affirm",
+    "afterpay_clearpay",
+    "alipay",
+    "alma",
+    "amazon_pay",
+    "au_becs_debit",
+    "bacs_debit",
+    "bancontact",
+    "billie",
+    "blik",
+    "boleto",
+    "cashapp",
+    "crypto",
+    "customer_balance",
+    "eps",
+    "fpx",
+    "giropay",
+    "grabpay",
+    "ideal",
+    "kakao_pay",
+    "klarna",
+    "konbini",
+    "kr_card",
+    "mb_way",
+    "mobilepay",
+    "multibanco",
+    "naver_pay",
+    "nz_bank_account",
+    "oxxo",
+    "p24",
+    "pay_by_bank",
+    "payco",
+    "paynow",
+    "paypal",
+    "payto",
+    "pix",
+    "promptpay",
+    "revolut_pay",
+    "samsung_pay",
+    "satispay",
+    "sepa_debit",
+    "sofort",
+    "sunbit",
+    "swish",
+    "twint",
+    "upi",
+    "wechat_pay",
+    "zip",
+  ];
+
+export const STRIPE_CHECKOUT_EXCLUDED_PAYMENT_METHOD_TYPES =
+  STRIPE_CHECKOUT_EXCLUDABLE_PAYMENT_METHOD_TYPES.filter(
+    (type) => !STRIPE_CHECKOUT_ALLOWED_DYNAMIC_TYPES.has(type),
+  );
+
+/**
  * Formal hosted Checkout presentation: light layout, rectangular fields,
  * professional typography. Do not pass payment_method_types — Stripe dynamic
  * methods (cards, wallets, Link, ACH) come from the Dashboard.
@@ -56,10 +123,11 @@ export function stripeCheckoutBrandingParams(): Pick<
  */
 export function stripeCheckoutElementsSessionParams(): Pick<
   Stripe.Checkout.SessionCreateParams,
-  "ui_mode"
+  "ui_mode" | "excluded_payment_method_types"
 > {
   return {
     ui_mode: "elements" as Stripe.Checkout.SessionCreateParams["ui_mode"],
+    excluded_payment_method_types: STRIPE_CHECKOUT_EXCLUDED_PAYMENT_METHOD_TYPES,
   };
 }
 

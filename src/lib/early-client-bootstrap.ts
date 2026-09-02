@@ -1,3 +1,5 @@
+import { FLIPVISE_DEV_SW_RESET_KEY } from "@/lib/dev-sw-reset-key";
+
 /**
  * Runs once when the client bundle first evaluates (before React mount).
  * Replaces inline layout <script> tags that React 19 no longer allows in components.
@@ -32,7 +34,7 @@ function runEarlyClientBootstrap(): void {
     (isLocal || isNativeShell) &&
     "serviceWorker" in navigator
   ) {
-    const reloadKey = "flipvise-dev-sw-reset-v22";
+    const reloadKey = FLIPVISE_DEV_SW_RESET_KEY;
     if (sessionStorage.getItem(reloadKey)) return;
 
     navigator.serviceWorker

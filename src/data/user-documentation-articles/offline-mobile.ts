@@ -21,6 +21,7 @@ export const OFFLINE_MOBILE_ARTICLES: DocArticle[] = [
         bullets: [
           "Native app: install the Flipvise app on Android (Google Play) or iOS (App Store).",
           "Or install the website: open Flipvise in your mobile browser and choose “Add to Home Screen” to use it as an app (PWA).",
+          "The PWA service worker does not cache Next.js runtime files. On localhost it unregisters itself so a stale worker cannot break development.",
           "The app shares the same account, decks, and plan as the website — there is nothing extra to set up.",
         ],
       },

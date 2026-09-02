@@ -25,6 +25,7 @@ import { syncRecentStripeInvoicesForUser } from "@/lib/stripe-invoice-persist";
 import { personalDashboardHrefAfterPlanChangeSuccess } from "@/lib/personal-dashboard-url";
 import { recordPlanChangeCheckoutInboxConfirmation } from "@/lib/record-subscription-checkout-inbox";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
+import { STRIPE_CHECKOUT_EXCLUDED_PAYMENT_METHOD_TYPES } from "@/lib/stripe-checkout-branding";
 import { isStripeSetupIntentId } from "@/lib/stripe-checkout-session-id";
 import { asPaidPlanId } from "@/lib/stripe-billing-sync";
 import {
@@ -171,6 +172,7 @@ export async function createPlanChangeSetupIntentAction(
   const setupIntent = await stripe.setupIntents.create({
     customer: live.customerId,
     automatic_payment_methods: { enabled: true },
+    excluded_payment_method_types: STRIPE_CHECKOUT_EXCLUDED_PAYMENT_METHOD_TYPES,
     usage: "off_session",
     metadata: {
       clerkUserId: userId,

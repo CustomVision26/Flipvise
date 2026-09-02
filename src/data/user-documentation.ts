@@ -254,6 +254,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Use Flipvise on iPhone and Android, and study your downloaded decks with no internet connection.",
         howItWorks: [
           "Install the app: on Android/iOS via the Flipvise app, or add the website to your home screen (PWA).",
+          "The installed website’s service worker skips Next.js runtime files. Local development unregisters it so cached chunks cannot break the dashboard.",
           "Sign in while online, open your dashboard, and tap “Make available offline” to download your decks and cards onto the device.",
           "When you have no connection, the app opens an offline Study view: pick a deck and flip through its cards.",
           "Edits and quiz results made offline are saved on the device and upload automatically the next time you sync.",

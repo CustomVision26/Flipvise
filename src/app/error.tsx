@@ -21,6 +21,20 @@ export default function ErrorPage({
 }) {
   useEffect(() => {
     console.error(error);
+
+    const isStaleChunk =
+      /module factory is not available/i.test(error.message) ||
+      /stale browser cache/i.test(error.message);
+    if (!isStaleChunk) return;
+
+    const reloadKey = "flipvise-module-factory-reload-v1";
+    try {
+      if (sessionStorage.getItem(reloadKey) === "1") return;
+      sessionStorage.setItem(reloadKey, "1");
+    } catch {
+      return;
+    }
+    window.location.reload();
   }, [error]);
 
   return (
@@ -45,7 +59,20 @@ export default function ErrorPage({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger
-              render={<Button onClick={reset} className="gap-2" />}
+              render={
+                <Button
+                  onClick={() => {
+                    if (
+                      /module factory is not available/i.test(error.message)
+                    ) {
+                      window.location.reload();
+                      return;
+                    }
+                    reset();
+                  }}
+                  className="gap-2"
+                />
+              }
             >
               <RefreshCw className="h-4 w-4" />
               Try Again

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { FLIPVISE_DEV_SW_RESET_KEY } from "@/lib/dev-sw-reset-key";
 
 function isDevOrLocalOrNativeHost(): boolean {
   const host = window.location.hostname;
@@ -53,7 +54,7 @@ export function ServiceWorkerRegister() {
 
     if (isDevOrLocalOrNativeHost()) {
       // Bump this key when Turbopack "module factory is not available" returns.
-      const reloadKey = "flipvise-dev-sw-reset-v23";
+      const reloadKey = FLIPVISE_DEV_SW_RESET_KEY;
       if (sessionStorage.getItem(reloadKey)) return;
 
       void clearControllingServiceWorkersAndCaches()
