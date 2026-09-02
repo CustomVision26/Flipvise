@@ -9,6 +9,7 @@ import {
   readStripePriceIdFromEnv,
   stripePriceEnvPairForPlan,
 } from "@/lib/stripe-plan-price-env";
+import { usdPriceJmdCurrencyOptions } from "@/lib/stripe-jmd-currency";
 
 const CATALOG_STRIPE_PRICE_TOLERANCE = 0.02;
 
@@ -125,7 +126,7 @@ async function findCatalogPriceOnProduct(input: {
 
 async function createCatalogPrice(input: {
   productId: string;
-  plan: StripePaidPlanId;
+  nickname: string;
   period: "monthly" | "yearly";
   expectedMajor: number;
   currency: string;
@@ -135,14 +136,61 @@ async function createCatalogPrice(input: {
       ? { interval: "year", interval_count: 1 }
       : { interval: "month", interval_count: 1 };
 
+  const unitAmount = majorToSmallestUnit(input.expectedMajor, input.currency);
   const created = await stripe.prices.create({
     product: input.productId,
     currency: input.currency,
-    unit_amount: majorToSmallestUnit(input.expectedMajor, input.currency),
+    unit_amount: unitAmount,
     recurring,
-    nickname: `Flipvise ${input.plan} ${input.period} ($${input.expectedMajor})`,
+    nickname: input.nickname,
+    ...(input.currency.toLowerCase() === "usd"
+      ? { currency_options: usdPriceJmdCurrencyOptions(unitAmount) }
+      : {}),
   });
   return created.id;
+}
+
+/**
+ * Find or create a recurring Price on the same product as `configuredPriceId`
+ * whose per-cycle amount matches the catalog.
+ */
+export async function ensureCatalogAlignedPriceId(input: {
+  configuredPriceId: string;
+  period: "monthly" | "yearly";
+  monthlyPrice: number | null;
+  yearlyMonthlyPrice: number | null;
+  nickname: string;
+}): Promise<string> {
+  const expectedMajor = expectedCatalogBillingCycleMajor(input);
+  if (expectedMajor == null || expectedMajor <= 0) {
+    return input.configuredPriceId;
+  }
+
+  const configured = await stripe.prices.retrieve(input.configuredPriceId);
+  if (priceMatchesCatalogMajor(configured, expectedMajor)) {
+    return input.configuredPriceId;
+  }
+
+  const productId = productIdFromPrice(configured);
+  if (!productId) {
+    return input.configuredPriceId;
+  }
+
+  const existingId = await findCatalogPriceOnProduct({
+    productId,
+    period: input.period,
+    expectedMajor,
+    currency: configured.currency,
+  });
+  if (existingId) return existingId;
+
+  return createCatalogPrice({
+    productId,
+    nickname: input.nickname,
+    period: input.period,
+    expectedMajor,
+    currency: configured.currency,
+  });
 }
 
 /**
@@ -164,46 +212,11 @@ export async function resolveCatalogAlignedStripePriceId(input: {
     );
   }
 
-  const expectedMajor = expectedCatalogBillingCycleMajor(input);
-  if (expectedMajor == null || expectedMajor <= 0) {
-    return configuredId;
-  }
-
-  const configured = await stripe.prices.retrieve(configuredId);
-  if (priceMatchesCatalogMajor(configured, expectedMajor)) {
-    return configuredId;
-  }
-
-  const productId = productIdFromPrice(configured);
-  if (!productId) {
-    return configuredId;
-  }
-
-  const currency = configured.currency;
-  const existingId = await findCatalogPriceOnProduct({
-    productId,
+  return ensureCatalogAlignedPriceId({
+    configuredPriceId: configuredId,
     period: input.period,
-    expectedMajor,
-    currency,
+    monthlyPrice: input.monthlyPrice,
+    yearlyMonthlyPrice: input.yearlyMonthlyPrice,
+    nickname: `Flipvise ${input.plan} ${input.period} ($${expectedCatalogBillingCycleMajor(input) ?? "?"})`,
   });
-  if (existingId) {
-    const actualMajor = majorPerBillingCycleFromSubscriptionPrice(configured);
-    console.warn(
-      `[stripe-catalog-price] ${envPair.primary}=${configuredId} ($${actualMajor ?? "?"}) does not match catalog $${expectedMajor}. Using existing price ${existingId}. Update env when convenient.`,
-    );
-    return existingId;
-  }
-
-  const createdId = await createCatalogPrice({
-    productId,
-    plan: input.plan,
-    period: input.period,
-    expectedMajor,
-    currency,
-  });
-  const actualMajor = majorPerBillingCycleFromSubscriptionPrice(configured);
-  console.warn(
-    `[stripe-catalog-price] ${envPair.primary}=${configuredId} ($${actualMajor ?? "?"}) does not match catalog $${expectedMajor}. Created ${createdId}. Set ${envPair.primary}=${createdId} in env.`,
-  );
-  return createdId;
 }

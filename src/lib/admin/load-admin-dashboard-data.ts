@@ -73,6 +73,8 @@ import {
   type SupportStats,
 } from "@/lib/support-admin-dto";
 import type { PlanConfig } from "@/components/pricing-content";
+import type { AdminAddonPlanEditorItem } from "@/lib/admin/load-addon-plan-editor-items";
+import { loadAdminAddonPlanEditorItems } from "@/lib/admin/load-addon-plan-editor-items";
 
 const OVERVIEW_INVOICE_LIMIT = 500;
 const INVOICES_TAB_LIMIT = 2000;
@@ -187,6 +189,7 @@ export type AdminTabsData = {
   contactMessages: SerializedContactMessage[];
   contactUsStats: ContactUsMessageStats;
   plansConfig: PlanConfig[];
+  addonPlans: AdminAddonPlanEditorItem[];
   affiliates: SerializedAffiliate[];
   billingMonitorRows: AdminBillingMonitorRow[];
   deletionProrationRows: SerializedDeletionProrationRow[];
@@ -230,6 +233,7 @@ export async function loadAdminTabsData(
     contactMessages: [],
     contactUsStats: EMPTY_CONTACT_US_STATS,
     plansConfig: [],
+    addonPlans: [],
     affiliates: [],
     billingMonitorRows: [],
     deletionProrationRows: [],
@@ -267,18 +271,24 @@ export async function loadAdminTabsData(
     }
 
     case "plans": {
-      const [plansConfig, rawPlanAssignmentLogs, rawAffiliates] =
+      const [plansConfig, rawPlanAssignmentLogs, rawAffiliates, addonPlans] =
         await runDbTasksWithConcurrencyLimit(
           [
             () => readPlansConfig(),
             () => getAdminPlanAssignmentLogs(500),
             () => listAffiliates(),
+            () =>
+              loadAdminAddonPlanEditorItems().catch((error) => {
+                console.error("[loadAdminTabsData] addon plans:", error);
+                return [];
+              }),
           ] as const,
-          3,
+          4,
         );
       return {
         ...empty,
         plansConfig,
+        addonPlans,
         affiliates: serializeAffiliatesForAdmin(rawAffiliates),
         planAssignmentLogs: rawPlanAssignmentLogs.map((log) => ({
           id: log.id,

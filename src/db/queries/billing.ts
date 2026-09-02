@@ -444,3 +444,28 @@ export async function listBillingInvoicesForUser(userId: string, userEmail?: str
     return [];
   }
 }
+
+export async function getBillingInvoiceByRef(ref: string) {
+  const trimmed = ref.trim();
+  if (!trimmed) return null;
+
+  try {
+    const byExternal = await db
+      .select()
+      .from(billingInvoices)
+      .where(eq(billingInvoices.externalId, trimmed))
+      .limit(1);
+    if (byExternal[0]) return byExternal[0];
+
+    const byNumber = await db
+      .select()
+      .from(billingInvoices)
+      .where(eq(billingInvoices.invoiceNumber, trimmed))
+      .limit(1);
+    return byNumber[0] ?? null;
+  } catch (error) {
+    if (isMissingBillingInvoicesTableError(error)) return null;
+    throw error;
+  }
+}
+

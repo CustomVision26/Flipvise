@@ -26,6 +26,7 @@ import {
   stripeAddonPriceEnvKeyForAddonKey,
   stripeAddonYearlyPriceEnvKeyFromMonthly,
 } from "@/lib/stripe-addon-price-env";
+import { usdPriceJmdCurrencyOptions } from "@/lib/stripe-jmd-currency";
 
 const writeEnv = process.argv.includes("--write-env");
 const liveFlag = process.argv.includes("--live");
@@ -138,13 +139,20 @@ async function ensureProduct(
   const existing = await findProductByAddonKey(stripe, spec.key);
   if (existing) {
     if (!existing.active) {
-      return stripe.products.update(existing.id, { active: true });
+      return stripe.products.update(existing.id, {
+        active: true,
+        tax_code: "txcd_10103000",
+      });
+    }
+    if (!existing.tax_code) {
+      return stripe.products.update(existing.id, { tax_code: "txcd_10103000" });
     }
     return existing;
   }
   return stripe.products.create({
     name: spec.name,
     description: spec.description,
+    tax_code: "txcd_10103000",
     metadata: {
       flipvise_addon_key: spec.key,
       type: "addon",
@@ -242,6 +250,7 @@ async function findOrCreateRecurringPrice(
     currency: "usd",
     unit_amount: unitAmount,
     recurring: { interval },
+    currency_options: usdPriceJmdCurrencyOptions(unitAmount),
     metadata: {
       type: "addon",
       period: interval === "month" ? "monthly" : "yearly",

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { flipviseBillingReceiptHref } from "@/lib/flipvise-billing-receipt";
 import {
   BookCheck,
   Users,
@@ -729,7 +730,6 @@ function InboxItemRow({
         {item.type === "subscription_confirmed" && item.payload.receiptUrl && (
           <a
             href={item.payload.receiptUrl}
-            target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
           >
@@ -740,27 +740,13 @@ function InboxItemRow({
 
         {item.type === "billing" && (
           <div className="flex gap-2">
-            {item.payload.hostedInvoiceUrl && (
-              <a
-                href={item.payload.hostedInvoiceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
-              >
-                <ExternalLink className="size-3" aria-hidden />
-                Open invoice
-              </a>
-            )}
-            {item.payload.invoicePdfUrl && (
-              <a
-                href={item.payload.invoicePdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
-              >
-                PDF
-              </a>
-            )}
+            <a
+              href={flipviseBillingReceiptHref(item.payload.externalId)}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-accent"
+            >
+              <ExternalLink className="size-3" aria-hidden />
+              Receipt
+            </a>
           </div>
         )}
 

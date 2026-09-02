@@ -107,7 +107,8 @@ export const ADMIN_DASHBOARD_NAV: AdminNavSection[] = [
           pathname === "/admin/plans" ||
           pathname === "/admin/plan-history" ||
           pathname === "/admin/affiliate-messaging" ||
-          pathname === "/admin/plan-trials",
+          pathname === "/admin/plan-trials" ||
+          pathname === "/admin/addon-plans",
       },
       {
         title: "Marketing Affiliates",

@@ -13,6 +13,7 @@ import {
   revokeUserAddonEntitlement,
   setAddonCatalogPricingVisible,
   updateAddonCatalogFlags,
+  updateAddonCatalogPricing,
   upsertAddonCatalogEntry,
 } from "@/db/queries/addons";
 import {
@@ -46,7 +47,9 @@ import {
   resumeStripeAddonRenewal,
   scheduleStripeAddonCancelAtPeriodEnd,
 } from "@/lib/stripe-addon-sync";
+import { ensureCatalogAlignedPriceId } from "@/lib/stripe-catalog-price";
 import { stripeCheckoutElementsSessionParams } from "@/lib/stripe-checkout-branding";
+import { syncStripeAddonProductFromCatalog } from "@/lib/stripe-addon-product-sync";
 import { createClerkClient } from "@clerk/backend";
 
 const clerkClient = createClerkClient({
@@ -145,10 +148,19 @@ export async function createAddonCheckoutSessionAction(
   }
 
   const period: AddonBillingPeriod = parsed.data.period;
-  const priceId = resolveStripeAddonPriceIdFromEnvKey(
+  let priceId = resolveStripeAddonPriceIdFromEnvKey(
     catalog.stripePriceEnvKey,
     period,
   );
+  if (priceId && (catalog.monthlyPrice != null || catalog.yearlyMonthlyPrice != null)) {
+    priceId = await ensureCatalogAlignedPriceId({
+      configuredPriceId: priceId,
+      period,
+      monthlyPrice: catalog.monthlyPrice,
+      yearlyMonthlyPrice: catalog.yearlyMonthlyPrice,
+      nickname: `Flipvise ${catalog.key} ${period}`,
+    });
+  }
   if (!priceId) {
     const hint =
       period === "yearly"
@@ -525,3 +537,66 @@ export async function resumeOwnAddonRenewalsAction(
   revalidatePath("/dashboard", "layout");
   return { resumedAddonKeys, periodEndIso };
 }
+
+const updateAddonPlanSchema = z.object({
+  key: addonKeySchema,
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000),
+  marketingBlurb: z.string().max(2000),
+  monthlyPrice: z.number().positive().nullable(),
+  yearlyMonthlyPrice: z.number().positive().nullable(),
+});
+
+export async function updateAddonPlanAction(
+  data: z.infer<typeof updateAddonPlanSchema>,
+) {
+  const parsed = updateAddonPlanSchema.safeParse(data);
+  if (!parsed.success) throw new Error("Invalid add-on plan data");
+  await assertAdminDashboardAccess();
+
+  const existing = await getAddonCatalogByKey(parsed.data.key);
+  if (!existing) throw new Error("Add-on not found");
+
+  const row = await updateAddonCatalogPricing({
+    key: parsed.data.key,
+    name: parsed.data.name.trim(),
+    description: parsed.data.description.trim(),
+    marketingBlurb: parsed.data.marketingBlurb.trim(),
+    monthlyPrice: parsed.data.monthlyPrice,
+    yearlyMonthlyPrice: parsed.data.yearlyMonthlyPrice,
+  });
+  if (!row) throw new Error("Failed to save add-on");
+
+  try {
+    await syncStripeAddonProductFromCatalog({
+      addonKey: row.key,
+      name: row.name,
+      description: row.marketingBlurb.trim() || row.description,
+      stripePriceEnvKey: row.stripePriceEnvKey,
+      monthlyPrice: row.monthlyPrice,
+      yearlyMonthlyPrice: row.yearlyMonthlyPrice,
+    });
+  } catch (error) {
+    console.error("[updateAddonPlanAction] Stripe product sync:", error);
+    throw new Error(
+      error instanceof Error
+        ? `Saved in Flipvise, but Stripe update failed: ${error.message}`
+        : "Saved in Flipvise, but Stripe update failed.",
+    );
+  }
+
+  revalidatePath("/admin/plans");
+  revalidatePath("/admin/addon-plans");
+  revalidatePath("/admin/add-ons");
+  revalidatePath("/pricing");
+  revalidatePath("/pricing/add-ons");
+  return {
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    marketingBlurb: row.marketingBlurb,
+    monthlyPrice: row.monthlyPrice,
+    yearlyMonthlyPrice: row.yearlyMonthlyPrice,
+  };
+}
+

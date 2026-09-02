@@ -25,6 +25,7 @@ import type { PlanHistoryRow, PlanHistoryTypeLabel } from "@/lib/plan-history-ty
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { formatUserInvoicePromoDisplay, parsePromoFromDiscountLabel } from "@/lib/admin-invoice-promo-display";
 import { receiptPlanTitle, planSlugFromStripeLineDescription } from "@/lib/stripe-receipt-plan-title";
+import { receiptUrlForBillingInvoice } from "@/lib/flipvise-billing-receipt";
 
 export type { PlanHistoryRow, PlanHistoryTypeLabel };
 
@@ -43,10 +44,16 @@ function invoiceStatusLabel(status: string): string {
 }
 
 function receiptUrlFromStoredInvoice(input: {
+  externalId?: string | null;
+  stripeInvoiceId?: string | null;
   hostedInvoiceUrl: string | null;
   invoicePdfUrl: string | null;
 }): string | null {
-  return input.hostedInvoiceUrl ?? input.invoicePdfUrl ?? null;
+  return receiptUrlForBillingInvoice({
+    externalId: (input.externalId ?? input.stripeInvoiceId ?? "").trim(),
+    hostedInvoiceUrl: input.hostedInvoiceUrl,
+    invoicePdfUrl: input.invoicePdfUrl,
+  });
 }
 
 function groupProrationLinesByInvoice(

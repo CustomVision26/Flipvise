@@ -55,6 +55,7 @@ import {
   Timer,
   Activity,
   UserRoundX,
+  Puzzle,
 } from "lucide-react";
 import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
 import type { SerializedDeletionProrationRow } from "@/lib/admin/deletion-proration-admin-dto";
@@ -65,6 +66,7 @@ import {
   type SupportStats,
 } from "@/components/admin-support-panel";
 import { AdminPlansEditor } from "@/components/admin-plans-editor";
+import { AdminAddonPlansEditor } from "@/components/admin-addon-plans-editor";
 import { AdminPlanTrialSettings } from "@/components/admin-plan-trial-settings";
 import {
   AdminBillingMonitor,
@@ -83,9 +85,11 @@ import type {
   SerializedUser,
 } from "@/lib/admin-dashboard-types";
 import { formatAdminInvoicePromoCell } from "@/lib/admin-invoice-promo-display";
+import { flipviseBillingReceiptHref } from "@/lib/flipvise-billing-receipt";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import { TEAM_PLAN_LABELS } from "@/lib/team-plans";
 import type { PlanConfig } from "@/components/pricing-content";
+import type { AdminAddonPlanEditorItem } from "@/lib/admin/load-addon-plan-editor-items";
 import type {
   ContactUsStats,
   SerializedContactMessage,
@@ -156,6 +160,7 @@ export interface AdminTabsProps {
   contactMessages: SerializedContactMessage[];
   contactUsStats: ContactUsStats;
   plansConfig: PlanConfig[];
+  addonPlans?: AdminAddonPlanEditorItem[];
   affiliates: SerializedAffiliate[];
   /** Server default (env) — used as the initial value for “accept link” days in the invite form. */
   affiliateInviteDefaultExpiresInDays: number;
@@ -266,6 +271,7 @@ export function AdminTabs({
   contactMessages,
   contactUsStats,
   plansConfig,
+  addonPlans = [],
   affiliates,
   affiliateInviteDefaultExpiresInDays,
   billingMonitorRows,
@@ -352,7 +358,8 @@ export function AdminTabs({
             : pathname === "/admin/plans" ||
                 pathname === "/admin/plan-history" ||
                 pathname === "/admin/affiliate-messaging" ||
-                pathname === "/admin/plan-trials"
+                pathname === "/admin/plan-trials" ||
+                pathname === "/admin/addon-plans"
               ? "plans"
               : pathname === "/admin/marketing-affiliates"
                 ? "marketing-affiliates"
@@ -367,7 +374,9 @@ export function AdminTabs({
         ? "affiliate-messaging"
         : pathname === "/admin/plan-trials"
           ? "trial-settings"
-          : "pricing-plans";
+          : pathname === "/admin/addon-plans"
+            ? "addon-plans"
+            : "pricing-plans";
 
   const subscriptionSubTab =
     pathname === "/admin/subscription-monitor"
@@ -1620,29 +1629,12 @@ export function AdminTabs({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {invoice.hostedInvoiceUrl ? (
-                            <a
-                              href={invoice.hostedInvoiceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={buttonVariants({ size: "sm", variant: "outline" })}
-                            >
-                              Open
-                            </a>
-                          ) : null}
-                          {invoice.invoicePdfUrl ? (
-                            <a
-                              href={invoice.invoicePdfUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={buttonVariants({ size: "sm", variant: "secondary" })}
-                            >
-                              PDF
-                            </a>
-                          ) : null}
-                          {!invoice.hostedInvoiceUrl && !invoice.invoicePdfUrl ? (
-                            <span className="text-xs text-muted-foreground">No links</span>
-                          ) : null}
+                          <a
+                            href={flipviseBillingReceiptHref(invoice.id)}
+                            className={buttonVariants({ size: "sm" })}
+                          >
+                            Receipt
+                          </a>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1915,7 +1907,9 @@ export function AdminTabs({
                       ? "/admin/affiliate-messaging"
                       : v === "trial-settings"
                         ? "/admin/plan-trials"
-                        : "/admin/plans",
+                        : v === "addon-plans"
+                          ? "/admin/addon-plans"
+                          : "/admin/plans",
                 )
               }
               className="w-full gap-4"
@@ -1946,6 +1940,10 @@ export function AdminTabs({
                 <TabsTrigger value="trial-settings" className="gap-1.5">
                   <Timer className="h-4 w-4 shrink-0" />
                   Trial settings
+                </TabsTrigger>
+                <TabsTrigger value="addon-plans" className="gap-1.5">
+                  <Puzzle className="h-4 w-4 shrink-0" />
+                  Addon plans
                 </TabsTrigger>
               </TabsList>
 
@@ -1985,6 +1983,21 @@ export function AdminTabs({
                 <div className={adminPlansSubTabPanelClass}>
                   <p className={adminSupportSectionLabelClass}>Plan trials</p>
                   <AdminPlanTrialSettings initialPlans={plansConfig} />
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="addon-plans"
+                className="mt-0 border-0 bg-transparent p-0 shadow-none ring-0"
+              >
+                <div className={adminPlansSubTabPanelClass}>
+                  <p className={adminSupportSectionLabelClass}>Addon plans</p>
+                  <p className="text-sm text-muted-foreground">
+                    Edit add-on names, prices, and descriptions. Save writes to the catalog and
+                    the matching Stripe product. Yearly is the per-month rate billed annually
+                    (Stripe charges that amount × 12 once per year).
+                  </p>
+                  <AdminAddonPlansEditor initialAddons={addonPlans} />
                 </div>
               </TabsContent>
 

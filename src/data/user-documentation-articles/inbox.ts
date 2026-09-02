@@ -35,7 +35,7 @@ export const INBOX_ARTICLES: DocArticle[] = [
               "Formal invite with workspace name, role, plan owner, and inviting team admin — accept or decline",
             ],
             ["Affiliate invite / arrangement change", "Accept invite or confirm plan change"],
-            ["Billing / Stripe receipt", "Review charge or open portal"],
+            ["Billing / Flipvise receipt", "Open receipt with company mailing address"],
             ["Quiz result", "Open full attempt breakdown"],
             ["Affiliate broadcast", "Read promo announcements from admin"],
             ["Contact Us reply", "Open live chat thread"],

@@ -33,47 +33,31 @@ export function formatInvoiceSellerName(name: string): string {
 }
 
 /**
- * Invoice/receipt seller lines: company + @flipvise, street, city/state/postal,
- * country. Apartment/suite (line2) is omitted.
+ * Invoice/receipt seller lines: company name, street, apartment, city/state/postal,
+ * country, optional phone. Matches the Contact Us company address.
  */
 export function formatPlatformCompanyAddressInvoiceLines(
   address: PlatformCompanyAddress | null | undefined,
+  phone?: string | null,
 ): string[] {
-  const resolved = parsePlatformCompanyAddress(address);
-  const cityState = [resolved.city, resolved.stateProvince]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
-  const cityLine = [cityState, resolved.postalCode.trim()]
-    .filter(Boolean)
-    .join(" ");
-  return [
-    formatInvoiceSellerName(resolved.name),
-    resolved.streetAddress.trim(),
-    cityLine,
-    resolved.country.trim(),
-  ].filter(Boolean);
+  const lines = formatPlatformCompanyAddressLines(address);
+  const trimmedPhone = phone?.trim();
+  if (trimmedPhone) lines.push(trimmedPhone);
+  return lines;
 }
 
 export function formatPlatformCompanyAddressForInvoice(
   address: PlatformCompanyAddress | null | undefined,
+  phone?: string | null,
 ): string {
-  return formatPlatformCompanyAddressInvoiceLines(address).join("\n");
+  return formatPlatformCompanyAddressInvoiceLines(address, phone).join("\n");
 }
 
 export function formatPlatformCompanyAddressInvoiceCompact(
   address: PlatformCompanyAddress | null | undefined,
+  phone?: string | null,
 ): string {
-  const resolved = parsePlatformCompanyAddress(address);
-  return [
-    formatInvoiceSellerName(resolved.name),
-    resolved.streetAddress.trim(),
-    [resolved.city, resolved.stateProvince].filter(Boolean).join(", "),
-    resolved.postalCode.trim(),
-    resolved.country.trim(),
-  ]
-    .map((part) => part.trim())
-    .filter(Boolean)
+  return formatPlatformCompanyAddressInvoiceLines(address, phone)
     .join(", ")
     .slice(0, 140);
 }

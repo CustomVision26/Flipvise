@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
   json,
+  doublePrecision,
 } from 'drizzle-orm/pg-core';
 import type { CardQuizVariants, FillInBlankSegment } from '@/lib/card-quiz-variants';
 import type { QuizQuestionType } from '@/lib/quiz-questions';
@@ -1477,6 +1478,13 @@ export const addonCatalog = pgTable(
      * Empty string means admin-grant-only (no self-serve Checkout).
      */
     stripePriceEnvKey: varchar({ length: 128 }).notNull().default(''),
+    /** Catalog monthly amount in USD. Checkout finds/creates a matching Stripe Price. */
+    monthlyPrice: doublePrecision(),
+    /**
+     * Per-month rate when billed annually. Stripe yearly Price is this × 12
+     * (same convention as plans-config.json yearlyMonthlyPrice).
+     */
+    yearlyMonthlyPrice: doublePrecision(),
     /** When false, new purchases and admin assigns are blocked; existing entitlements remain. */
     active: boolean().notNull().default(true),
     /** When true (and settings.pricingCatalogVisible), listed on `/pricing/add-ons`. */

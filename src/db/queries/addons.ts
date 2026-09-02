@@ -109,7 +109,7 @@ export async function listAddonCatalog(): Promise<AddonCatalogRow[]> {
   } catch (error) {
     if (isMissingAddonCatalogError(error)) {
       console.error(
-        "[db] Table addon_catalog is missing. Header add-on banner is disabled until you run: npm run db:ensure-addon-catalog-entitlements && npm run db:ensure-addon-published-on-banner (against the production DATABASE_URL).",
+        "[db] addon_catalog is missing or outdated. Header add-on banner is disabled until you run: npm run db:ensure-addon-catalog-entitlements && npm run db:ensure-addon-published-on-banner && npm run db:ensure-addon-catalog-prices (against the same DATABASE_URL as next dev).",
       );
       return [];
     }
@@ -151,6 +151,29 @@ export async function updateAddonCatalogFlags(input: {
   const [row] = await db
     .update(addonCatalog)
     .set(patch)
+    .where(eq(addonCatalog.key, input.key))
+    .returning();
+  return row ?? null;
+}
+
+export async function updateAddonCatalogPricing(input: {
+  key: string;
+  name: string;
+  description: string;
+  marketingBlurb: string;
+  monthlyPrice: number | null;
+  yearlyMonthlyPrice: number | null;
+}): Promise<AddonCatalogRow | null> {
+  const [row] = await db
+    .update(addonCatalog)
+    .set({
+      name: input.name,
+      description: input.description,
+      marketingBlurb: input.marketingBlurb,
+      monthlyPrice: input.monthlyPrice,
+      yearlyMonthlyPrice: input.yearlyMonthlyPrice,
+      updatedAt: new Date(),
+    })
     .where(eq(addonCatalog.key, input.key))
     .returning();
   return row ?? null;

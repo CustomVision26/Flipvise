@@ -134,6 +134,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/record-welcome-inbox.ts",
     "src/lib/team-invite-message-copy.ts",
     "src/components/login-welcome-toast.tsx",
+    "src/lib/flipvise-billing-receipt.ts",
+    "src/app/dashboard/billing/receipts/[invoiceId]/page.tsx",
   ],
   "help-center-overview": ["src/components/help-center.tsx"],
   "help-center-support": ["src/components/help-center.tsx", "src/components/contact-support-view.tsx"],
@@ -156,6 +158,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/pricing/checkout/pay/page.tsx",
     "src/lib/stripe-invoice-addresses.ts",
     "src/lib/platform-company-address.ts",
+    "src/lib/flipvise-invoice-receipt.ts",
     "src/app/api/webhooks/stripe/route.ts",
   ],
   checkout: [
@@ -166,7 +169,12 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/plan-change-addons-dialog.tsx",
     "src/actions/stripe.ts",
   ],
-  "manage-subscription": ["src/components/user-billing-page.tsx", "src/components/manage-billing-button.tsx"],
+  "manage-subscription": [
+    "src/components/user-billing-page.tsx",
+    "src/components/manage-billing-button.tsx",
+    "src/lib/flipvise-billing-receipt.ts",
+    "src/app/dashboard/billing/receipts/[invoiceId]/page.tsx",
+  ],
   "prorations-plan-changes": [
     "src/actions/stripe.ts",
     "src/app/pricing/checkout/plan-change/pay/page.tsx",
@@ -186,6 +194,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/header-user-section.tsx",
     "src/components/user-account-details-page.tsx",
     "src/components/account-recovery-fields.tsx",
+    "src/data/world-country-subdivisions.ts",
     "src/actions/account-details-edit.ts",
     "src/actions/account-recovery-profile.ts",
   ],
@@ -307,6 +316,8 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/db/queries/billing.ts",
     "src/lib/stripe-invoice-addresses.ts",
     "src/lib/platform-company-address.ts",
+    "src/lib/flipvise-billing-receipt.ts",
+    "src/components/flipvise-invoice-receipt-view.tsx",
   ],
   "paid-subscribers": ["src/lib/admin-user-plan-label.ts", "src/db/queries/billing.ts"],
   "team-workspaces": [
@@ -351,6 +362,12 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/components/admin-affiliates-panel.tsx",
     "src/components/admin-affiliate-quota-panel.tsx",
     "src/db/queries/affiliates.ts",
+  ],
+  "addon-plans": [
+    "src/components/admin-addon-plans-editor.tsx",
+    "src/actions/addons.ts",
+    "src/lib/stripe-addon-product-sync.ts",
+    "src/lib/admin/load-addon-plan-editor-items.ts",
   ],
   "plan-trials": [
     "src/components/admin-plan-trial-settings.tsx",

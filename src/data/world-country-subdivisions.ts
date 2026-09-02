@@ -1,10 +1,48 @@
 import { countryCodeFromName } from "@/data/world-countries";
 
 /**
- * Subdivision helpers (states/provinces).
+ * Subdivision helpers (states/provinces/parishes).
  * Loads `country-state-city` only inside these functions so RSC/SSR pages that
  * never call them do not pull the package into the server module graph.
  */
+
+const TRAILING_PARISH = /\s+Parish$/i;
+
+/** Drop a trailing "Parish" so Jamaica options read "Clarendon", not "Clarendon Parish". */
+export function stripTrailingParishLabel(name: string): string {
+  return name.replace(TRAILING_PARISH, "").trim();
+}
+
+function subdivisionDisplayName(countryCode: string, name: string): string {
+  if (countryCode === "JM") return stripTrailingParishLabel(name);
+  return name;
+}
+
+function subdivisionNamesEqual(a: string, b: string): boolean {
+  const left = a.trim();
+  const right = b.trim();
+  if (!left || !right) return false;
+  if (left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0) {
+    return true;
+  }
+  return (
+    stripTrailingParishLabel(left).localeCompare(
+      stripTrailingParishLabel(right),
+      undefined,
+      { sensitivity: "accent" },
+    ) === 0
+  );
+}
+
+/** Map a stored value (with or without "Parish") to a listed dropdown option. */
+export function matchListedStateProvince(
+  options: readonly string[],
+  stored: string,
+): string | null {
+  const trimmed = stored.trim();
+  if (!trimmed) return null;
+  return options.find((option) => subdivisionNamesEqual(option, trimmed)) ?? null;
+}
 
 async function getStatesOfCountry(countryCode: string) {
   const { State } = await import("country-state-city");
@@ -20,7 +58,11 @@ export async function getStateProvinceNamesForCountry(
   const states = await getStatesOfCountry(code);
   if (!states.length) return [];
   return Array.from(
-    new Set(states.map((state) => state.name).filter(Boolean)),
+    new Set(
+      states
+        .map((state) => subdivisionDisplayName(code, state.name))
+        .filter(Boolean),
+    ),
   ).sort((a, b) => a.localeCompare(b, "en"));
 }
 
@@ -41,7 +83,7 @@ export async function isValidStateProvinceForCountry(
     if (!trimmed) return true;
     return trimmed.length >= 2 && trimmed.length <= 120;
   }
-  return states.includes(trimmed);
+  return matchListedStateProvince(states, trimmed) != null;
 }
 
 export async function mailingAddressSubdivisionError(
@@ -51,9 +93,9 @@ export async function mailingAddressSubdivisionError(
   if (!countryName.trim()) return "Select your country.";
   if (!(await isValidStateProvinceForCountry(countryName, stateProvince))) {
     if (await countryHasStateProvinceList(countryName)) {
-      return "Select a state / province for the chosen country.";
+      return "Select a state / province / parish for the chosen country.";
     }
-    return "Enter a valid state / province (or leave blank).";
+    return "Enter a valid state / province / parish (or leave blank).";
   }
   return null;
 }
@@ -78,9 +120,7 @@ export async function stateProvinceToStripeCode(
   const upper = trimmed.toUpperCase();
   const match =
     states.find((state) => state.isoCode.toUpperCase() === upper) ??
-    states.find(
-      (state) => state.name.localeCompare(trimmed, undefined, { sensitivity: "accent" }) === 0,
-    );
+    states.find((state) => subdivisionNamesEqual(state.name, trimmed));
 
   if (!match?.isoCode) return null;
 

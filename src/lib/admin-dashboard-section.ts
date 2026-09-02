@@ -24,6 +24,7 @@ export function adminDashboardSectionFromPath(pathname: string): AdminDashboardS
     pathname === "/admin/plan-history" ||
     pathname === "/admin/affiliate-messaging" ||
     pathname === "/admin/plan-trials" ||
+    pathname === "/admin/addon-plans" ||
     pathname === "/admin/add-ons"
   ) {
     return "plans";

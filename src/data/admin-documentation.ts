@@ -108,8 +108,8 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Filter by invoice status, date range, and search (invoice #, name, email).",
           "Promo column shows general vs affiliate codes and discount detail.",
-          "Open hosted invoice or PDF links when Stripe provides them.",
-          "Seller name and mailing address on those Stripe documents come from Stripe Dashboard business details; new invoices also include Flipvise Studio LLC @flipvise and the street address in the footer (apartment omitted).",
+          "Open Flipvise receipt (seller address from Contact Us company address).",
+          "Seller name and mailing address on Stripe-hosted PDFs come from Stripe Dashboard business details; Flipvise receipts use the Contact Us company address including apartment and phone.",
           "Export CSV.",
         ],
         requirements: ["Platform admin access."],
@@ -225,8 +225,8 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Reply to guest and signed-in Contact Us messages.",
           "Archive or mark threads read; stats show open and weekly volume.",
-          "Edit support email, phone, company address, and social links shown on /contact.",
-          "Company address is stamped on new Stripe invoices as Flipvise Studio LLC @flipvise plus the street address (apartment omitted). Set the same details in Stripe Dashboard Public details and Business details so the invoice header (seller block) matches.",
+          "Edit support email, phone, company address (state / province / parish), and social links shown on /contact.",
+          "Company address is the seller block on Flipvise receipts. New Stripe invoices also get this address in the footer. Stripe-hosted PDF headers still use Stripe Dashboard Public details and Business details.",
         ],
         requirements: ["Platform admin access."],
         doNots: [
@@ -256,6 +256,30 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not hardcode price_* IDs in the editor — use env var keys as documented.",
           "Do not enable overlapping promo windows without verifying Stripe coupon validity.",
           "Do not advertise AI Recall™ on Free or standard Pro feature lists — eligibility is enforced in code.",
+        ],
+      },
+      {
+        id: "addon-plans",
+        title: "Addon Plans",
+        route: "/admin/addon-plans",
+        purpose:
+          "Edit add-on product names, monthly and yearly prices, and catalog copy, then sync those changes to Stripe.",
+        howItWorks: [
+          "Addon plans is a sub-tab of Plans, next to Trial settings.",
+          "Each add-on card matches the pricing-plan editor: display name, monthly price, yearly price ($/mo billed annually), and description.",
+          "Save writes addon_catalog and updates the matching Stripe product (name, description, tax code).",
+          "Stripe cannot change a Price amount — Save creates a new Price when the amount changes. Checkout picks the catalog-aligned Price on the same product.",
+          "Yearly Stripe charge is yearly monthly rate × 12.",
+          "Grant, publish, and Unlock Feature controls stay on /admin/add-ons.",
+        ],
+        requirements: [
+          "Platform admin access.",
+          "STRIPE_ADDON_<KEY>_PRICE_ID and yearly companion so Stripe can locate the product.",
+          "addon_catalog monthlyPrice / yearlyMonthlyPrice columns (npm run db:ensure-addon-catalog-prices).",
+        ],
+        doNots: [
+          "Do not put live price_* IDs in local .env.local (test mode).",
+          "Do not skip the Stripe tax code — products without txcd_10103000 show Managed Payments Needs info.",
         ],
       },
       {

@@ -93,7 +93,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Checkout process",
         bullets: [
           "Subscription mode — not a separate in-app card form on pricing.",
-          "Billing address required — international/overseas addresses supported.",
+          "Billing address required — international/overseas addresses supported (state / province / parish).",
           "Stripe Automatic Tax may apply based on address.",
           "Tax ID collection enabled for business customers where supported.",
           "Flipvise does not store full card numbers — Stripe handles PCI compliance.",
@@ -103,7 +103,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "after-purchase",
         title: "After purchase",
         bullets: [
-          "Receipts and invoices in Stripe Customer Portal — they show Flipvise Studio LLC @flipvise. New invoices also include the company street address in the footer (apartment/suite omitted).",
+          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (including apartment and phone). Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "May sync to Flipvise inbox.",
           "Currency follows Stripe Price configuration (typically USD).",
         ],
@@ -135,7 +135,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "Account email — your signed-in Flipvise address; receipts and billing notices go here.",
           "Payment method — card number, expiry, and CVC for whoever is paying.",
-          "Billing address — name and address on the card or bank account you are paying with. When you have a complete Flipvise mailing address in Account Details, Same as my Flipvise mailing address is selected by default so country/address fields stay hidden and you enter Card Name only. Uncheck it to enter a different billing address. Used to verify the payment method and calculate tax where applicable.",
+          "Billing address — name and address on the card or bank account you are paying with. When you have a complete Flipvise mailing address in Account Details, Same as my Flipvise mailing address is selected by default so country/address fields stay hidden and you enter Card Name only. Uncheck it to enter a different billing address (state / province / parish). Used to verify the payment method and calculate tax where applicable.",
         ],
       },
     ],
@@ -159,7 +159,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Portal actions",
         bullets: [
           "Update card and billing address.",
-          "Download invoices.",
+          "Download Stripe invoices from the portal, or open Flipvise receipts from Billing plan history and Inbox (seller address from Contact Us).",
           "Cancel at period end.",
           "Plan upgrades/downgrades can also start from /pricing with in-app proration checkout.",
         ],

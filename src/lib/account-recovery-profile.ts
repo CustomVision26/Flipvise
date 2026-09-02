@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isWorldCountryName } from "@/data/world-countries";
+import { stripTrailingParishLabel } from "@/data/world-country-subdivisions";
 
 /** Account type / status collected at sign-up for recovery and support. */
 export const ACCOUNT_TYPE_VALUES = [
@@ -83,7 +84,7 @@ export const mailingAddressFieldsSchema = z.object({
     .min(3, "Enter your street address.")
     .max(200, "Street address is too long."),
   city: z.string().trim().min(2, "Enter your city.").max(120, "City is too long."),
-  stateProvince: z.string().trim().max(120, "State / province is too long."),
+  stateProvince: z.string().trim().max(120, "State / province / parish is too long."),
   /** Optional — leave blank when the locality does not use postal codes. */
   postalCode: z.string().trim().max(32, "Postal code is too long."),
   country: z
@@ -199,7 +200,7 @@ export function formatMailingAddress(
   address: MailingAddressFields | null | undefined,
 ): string {
   if (!address) return "";
-  const cityState = [address.city, address.stateProvince]
+  const cityState = [address.city, stripTrailingParishLabel(address.stateProvince)]
     .map((part) => part.trim())
     .filter(Boolean)
     .join(", ");

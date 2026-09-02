@@ -73,7 +73,10 @@ import {
 } from "@/lib/contact-us-admin-status";
 import type { ContactSocialLink } from "@/db/queries/contact-us";
 import { WORLD_COUNTRY_NAMES } from "@/data/world-countries";
-import { getStateProvinceNamesForCountry } from "@/data/world-country-subdivisions";
+import {
+  getStateProvinceNamesForCountry,
+  matchListedStateProvince,
+} from "@/data/world-country-subdivisions";
 import {
   DEFAULT_PLATFORM_COMPANY_ADDRESS,
   type PlatformCompanyAddress,
@@ -316,7 +319,7 @@ export function AdminContactUsPanel({
           <CardTitle className="text-base">Public contact details</CardTitle>
           <CardDescription>
             Email, phone, company address, and social links shown on the user Contact Us
-            page. New Stripe invoices include this company address in the footer.
+            page. Flipvise receipts use this company address as the seller block.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-5">
@@ -348,9 +351,9 @@ export function AdminContactUsPanel({
             <div className="space-y-1">
               <Label>Company address</Label>
               <p className="text-xs text-muted-foreground">
-                Shown on the Contact Us page. New Stripe invoices also include this address
-                in the footer. The invoice header (seller block) is set in Stripe Dashboard
-                → Settings → Public details (
+                Shown on the Contact Us page and as the seller address on Flipvise
+                receipts (Inbox, Billing, and admin Invoices). Stripe-hosted PDFs still
+                use Stripe Dashboard → Settings → Public details (
                 <a
                   href="https://dashboard.stripe.com/test/settings/public_details"
                   target="_blank"
@@ -368,7 +371,7 @@ export function AdminContactUsPanel({
                 >
                   live
                 </a>
-                ) and Business details — Stripe does not allow apps to change that header.
+                ) for their header — Stripe does not allow apps to change that header.
               </p>
             </div>
             <div className="space-y-2">
@@ -426,14 +429,16 @@ export function AdminContactUsPanel({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact-company-state">State / province</Label>
+                <Label htmlFor="contact-company-state">
+                  State / province / parish
+                </Label>
                 {useStateSelect ? (
                   <Select
                     value={
-                      companyAddress.stateProvince.trim() &&
-                      stateOptions.includes(companyAddress.stateProvince)
-                        ? companyAddress.stateProvince
-                        : null
+                      matchListedStateProvince(
+                        stateOptions,
+                        companyAddress.stateProvince,
+                      )
                     }
                     onValueChange={(v) =>
                       setCompanyAddress((prev) => ({
@@ -447,7 +452,7 @@ export function AdminContactUsPanel({
                       id="contact-company-state"
                       className={adminFilterInputClass}
                     >
-                      <SelectValue placeholder="Select state" />
+                      <SelectValue placeholder="Select state / province / parish" />
                     </SelectTrigger>
                     <SelectContent>
                       {stateOptions.map((state) => (

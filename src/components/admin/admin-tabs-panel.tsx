@@ -31,6 +31,7 @@ export async function AdminTabsPanel({
       contactMessages={data.contactMessages}
       contactUsStats={data.contactUsStats}
       plansConfig={data.plansConfig}
+      addonPlans={data.addonPlans}
       affiliates={data.affiliates}
       affiliateInviteDefaultExpiresInDays={getAffiliateInviteExpiryDays()}
       billingMonitorRows={data.billingMonitorRows}

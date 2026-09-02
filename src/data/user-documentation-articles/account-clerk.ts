@@ -21,7 +21,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         bullets: [
           "Update display name and profile image.",
           "Add, verify, or set primary email address.",
-          "Connected accounts for social sign-in providers.",
+          "Account details (custom tab) also stores mailing address with a State / province / parish field; the current-details summary omits Parish from parish names.",
         ],
       },
       {
@@ -52,10 +52,10 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         id: "fields",
         title: "Displayed and editable fields",
         bullets: [
-          "Current details summary shows phone number, mailing address, type/status, and Security Q&A as **************.",
+          "Current details summary shows phone number, mailing address (Jamaica parish names without the word Parish), type/status, and Security Q&A as **************.",
           "Click the masked Security Q&A to re-verify your login; after success, all questions and answers are displayed.",
           "Click Edit details — you must re-verify your login (Clerk step-up) before the form unlocks; Cancel discards unsaved changes.",
-          "Mailing address: street address, country from the full country list, state/province filtered by country, city, and optional postal code.",
+          "Mailing address: street address, country from the full country list, state / province / parish filtered by country (Jamaica options omit the word Parish), city, and optional postal code.",
           "Type / status: Student, Teacher, Parent, Education Institution, Corporation.",
           "Name of institution or corporation appears when those types are selected.",
           "Three security questions: pick three different prompts and enter answers only you would know.",

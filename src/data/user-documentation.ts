@@ -18,7 +18,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Use Sign In to open the Clerk authentication modal. Sign up from that modal uses the Flipvise account form (not Clerk’s hosted Sign Up).",
           "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation).",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
-          "After sign-in you are redirected to your personal dashboard automatically (or to account details if phone, mailing address, or type are still missing).",
+          "After sign-in you are redirected to your personal dashboard automatically (or to account details if phone, mailing address, or type are still missing). Account details mailing address uses a State / province / parish field; Jamaica parish names do not repeat the word Parish in the list.",
         ],
         requirements: ["None — guests can browse pricing and documentation."],
         doNots: [
@@ -301,7 +301,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
           "Team workspace invites use a formal message with the workspace name, role (Team Admin or Member), plan owner, and inviting team admin when available — accept or decline from the inbox.",
           "After a successful plan subscribe, plan change, or add-on purchase, Inbox receives a formal written confirmation (separate from the on-screen toast).",
-          "Accept team invites, review billing receipts, open quiz results, and continue Contact Us live chats from here.",
+          "Accept team invites, review Flipvise billing receipts, open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",
           "In the iPhone app (TestFlight or App Store) and Android app, new inbox items can also show as lock-screen / notification-tray alerts when notifications are allowed.",
@@ -674,11 +674,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "How Flipvise collects payment, including overseas billing addresses and cards.",
         howItWorks: [
           "All paid plans bill through Stripe Checkout (subscription mode) — not a separate in-app card form on the pricing page.",
-          "Billing address is required at checkout. Enter your real country, city, postal code, and street address — overseas/international addresses are supported. When your Account Details mailing address is complete, Same as my Flipvise mailing address is selected by default; uncheck it to enter a different billing address.",
+          "Billing address is required at checkout. Enter your real country, city, postal code, street address, and state / province / parish — overseas/international addresses are supported. When your Account Details mailing address is complete, Same as my Flipvise mailing address is selected by default; uncheck it to enter a different billing address.",
           "Pay with a credit or debit card Stripe accepts in your region. Flipvise does not store your full card number; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
-          "After purchase, receipts and invoices appear in the Stripe Customer Portal (Manage subscription) and may sync to your Flipvise inbox. Invoices include Flipvise Studio LLC @flipvise and the company street address.",
+          "After purchase, Flipvise receipts (Inbox, Billing plan history) show Flipvise Studio LLC and the company mailing address from Contact Us, including apartment and phone. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "Currency is determined by the Stripe Price for your selected plan (typically USD for this app’s catalog).",
         ],
         requirements: [
@@ -705,7 +705,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Plan change with a published Add-on Catalog: after you slide to confirm, a dialog lists locked add-ons only (features you do not already have). Skip, or select one, review the plan + add-on breakdown, acknowledge, then continue.",
           "Slide to confirm → plan-change payment. If you selected an add-on, Stripe redirects through a continue bridge that finalizes the plan change then opens add-on checkout in the same session (two separate receipts).",
           "Promotion code field appears only when a promo window is active on Pricing — never on plan-change checkout when Pricing has no promo UI.",
-          "Stripe Embedded Checkout collects card + billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Slide to subscribe enables when card details, Card Name, and billing address are complete.",
+          "Stripe Embedded Checkout collects card + billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Manual billing address uses a State / province / parish field. Slide to subscribe enables when card details, Card Name, and billing address are complete.",
           "Success redirects to /dashboard?checkout=success with a confirmation toast; Inbox also receives a formal subscription or plan-change confirmation.",
         ],
         requirements: ["Signed-in account.", "Valid paid plan slug in the URL."],
@@ -723,7 +723,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "From /pricing: Manage subscription (when you have an active Stripe subscription).",
           "From Account menu → Billing tab: Manage billing and Cancel subscription.",
-          "Opens Stripe Customer Portal in a new page — update card, download invoices, cancel at period end.",
+          "Billing tab plan history receipt links open the Flipvise receipt (company mailing address from Contact Us).",
+          "Opens Stripe Customer Portal in a new page — update card, download Stripe invoices, cancel at period end.",
           "Plan upgrades/downgrades can also start from /pricing (Change to …) which uses in-app proration checkout.",
           "Billing tab shows plan history (past plan slugs and dates) synced from your account.",
           "If a renewal payment fails, paid features remain for 12 hours while Stripe retries — update your card before grace ends.",
@@ -864,7 +865,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Profile: update display name and profile image.",
           "Email addresses: add, verify, or set primary email.",
           "Security: change password, enable 2FA, review active sessions.",
-          "Account details (custom tab): view phone, mailing address, type/status, and masked Security Q&A; Edit requires login verification.",
+          "Account details (custom tab): view phone, mailing address (state / province / parish; current details omit Parish from parish names), type/status, and masked Security Q&A; Edit requires login verification.",
         ],
         requirements: ["Signed-in account."],
         doNots: [
@@ -880,7 +881,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "View and edit phone number, mailing address, type/status, and 3 security questions required for account verification.",
         howItWorks: [
           "Open Manage account — Account details is the first tab (before Profile / Security).",
-          "The page shows your current phone, mailing address, type/status, and Security Q&A as ************** in a read-only summary.",
+          "Mailing address includes street, country, state / province / parish (current details and Jamaica parish names omit repeating Parish), city, and optional postal code.",
           "Click the masked Security Q&A — Clerk prompts you to verify your login; after success, all security questions and answers are shown.",
           "Click Edit details — Clerk prompts you to verify your login before the editable form unlocks; Save or Cancel when finished.",
           "Education Institution and Corporation show a name sub-field.",

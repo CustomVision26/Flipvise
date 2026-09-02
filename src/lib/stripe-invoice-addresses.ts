@@ -11,6 +11,7 @@ import {
   DEFAULT_PLATFORM_COMPANY_ADDRESS,
   formatInvoiceSellerName,
   formatPlatformCompanyAddressForInvoice,
+  formatPlatformCompanyAddressInvoiceCompact,
   parsePlatformCompanyAddress,
 } from "@/lib/platform-company-address";
 import { stripe } from "@/lib/stripe";
@@ -194,15 +195,10 @@ async function companyAddressInvoiceCustomFields(): Promise<
 > {
   const settings = await getPlatformContactSettings();
   const address = parsePlatformCompanyAddress(settings.companyAddress);
-  const streetLine = [
-    address.streetAddress.trim(),
-    [address.city, address.stateProvince].filter(Boolean).join(", "),
-    address.postalCode.trim(),
-    address.country.trim(),
-  ]
-    .filter(Boolean)
-    .join(", ")
-    .slice(0, 140);
+  const streetLine = formatPlatformCompanyAddressInvoiceCompact(
+    address,
+    settings.phone,
+  );
   return [
     {
       name: COMPANY_CUSTOM_FIELD_NAME,
@@ -213,8 +209,7 @@ async function companyAddressInvoiceCustomFields(): Promise<
 }
 
 /**
- * Stamp Contact Us company (Flipvise Studio LLC @flipvise) and street address
- * onto a Stripe invoice (footer + custom fields). Apartment/suite is omitted.
+ * Stamp Contact Us company address onto a Stripe invoice (footer + custom fields).
  */
 export async function stampCompanyAddressOnStripeInvoice(
   invoiceId: string,
@@ -225,7 +220,10 @@ export async function stampCompanyAddressOnStripeInvoice(
 
     const settings = await getPlatformContactSettings();
     const address = parsePlatformCompanyAddress(settings.companyAddress);
-    const footer = formatPlatformCompanyAddressForInvoice(address);
+    const footer = formatPlatformCompanyAddressForInvoice(
+      address,
+      settings.phone,
+    );
     const ourFieldNames = new Set([
       COMPANY_CUSTOM_FIELD_NAME,
       ADDRESS_CUSTOM_FIELD_NAME,

@@ -11,7 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WORLD_COUNTRY_NAMES } from "@/data/world-countries";
-import { getStateProvinceNamesForCountry } from "@/data/world-country-subdivisions";
+import {
+  getStateProvinceNamesForCountry,
+  matchListedStateProvince,
+} from "@/data/world-country-subdivisions";
 import {
   ACCOUNT_RECOVERY_FIELD_STEPS,
   type AccountRecoveryFieldStepId,
@@ -285,7 +288,7 @@ export function AccountRecoveryFields({
                   htmlFor={`${idPrefix}-state-province`}
                   className="text-sm font-medium"
                 >
-                  State / province
+                  State / province / parish
                   {!useStateSelect && selectedCountry ? (
                     <span className="font-normal text-muted-foreground">
                       {" "}
@@ -306,10 +309,10 @@ export function AccountRecoveryFields({
                 ) : useStateSelect ? (
                   <Select
                     value={
-                      value.mailingAddress.stateProvince.trim() &&
-                      stateOptions.includes(value.mailingAddress.stateProvince)
-                        ? value.mailingAddress.stateProvince
-                        : null
+                      matchListedStateProvince(
+                        stateOptions,
+                        value.mailingAddress.stateProvince,
+                      )
                     }
                     disabled={disabled || !selectedCountry}
                     itemToStringLabel={stateProvinceLabel}
@@ -328,7 +331,7 @@ export function AccountRecoveryFields({
                       className="h-10 w-full"
                       aria-required
                     >
-                      <SelectValue placeholder="Select state / province" />
+                      <SelectValue placeholder="Select state / province / parish" />
                     </SelectTrigger>
                     <SelectContent nestedInModal={nestedInModal}>
                       {stateOptions.map((state) => (
@@ -345,7 +348,7 @@ export function AccountRecoveryFields({
                     autoComplete="address-level1"
                     placeholder={
                       selectedCountry
-                        ? "State or province (optional)"
+                        ? "State, province, or parish (optional)"
                         : "Select a country first"
                     }
                     value={value.mailingAddress.stateProvince}

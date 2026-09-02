@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { billingActivePlanSlug } from "@/lib/plan-metadata-billing-resolution";
 import { ManageBillingButton } from "@/components/manage-billing-button";
+import { flipviseBillingReceiptHref } from "@/lib/flipvise-billing-receipt";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -160,40 +161,19 @@ export async function BillingInboxSection({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {row.hostedInvoiceUrl ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <a
-                          href={row.hostedInvoiceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
-                        >
-                          Open
-                        </a>
-                      }
-                    />
-                    <TooltipContent>View invoice in your browser</TooltipContent>
-                  </Tooltip>
-                ) : null}
-                {row.invoicePdfUrl ? (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <a
-                          href={row.invoicePdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={cn(buttonVariants({ size: "sm" }))}
-                        >
-                          PDF
-                        </a>
-                      }
-                    />
-                    <TooltipContent>Download invoice as PDF</TooltipContent>
-                  </Tooltip>
-                ) : null}
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <a
+                        href={flipviseBillingReceiptHref(row.externalId)}
+                        className={cn(buttonVariants({ size: "sm" }))}
+                      >
+                        Receipt
+                      </a>
+                    }
+                  />
+                  <TooltipContent>View Flipvise receipt</TooltipContent>
+                </Tooltip>
               </div>
             </div>
             );

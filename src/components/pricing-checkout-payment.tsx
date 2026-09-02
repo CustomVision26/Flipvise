@@ -1026,7 +1026,7 @@ function CheckoutPaymentFields({
                   htmlFor="checkout-billing-state"
                   className="text-sm font-medium text-[#30313d]"
                 >
-                  State / province
+                  State / province / parish
                 </Label>
                 <Input
                   id="checkout-billing-state"
@@ -1041,7 +1041,7 @@ function CheckoutPaymentFields({
                     void handleManualAddressBlur();
                   }}
                   autoComplete="address-level1"
-                  placeholder="State or province"
+                  placeholder="State, province, or parish"
                   disabled={isApplyingBillingAddress || isSubmitting}
                   className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
                 />

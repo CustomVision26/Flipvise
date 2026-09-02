@@ -17,6 +17,7 @@ import Stripe from "stripe";
 import type { PlanConfig } from "@/lib/plan-config-types";
 import { isStripePaidPlanId, type StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { stripePriceEnvPairForPlan } from "@/lib/stripe-plan-price-env";
+import { usdPriceJmdCurrencyOptions } from "@/lib/stripe-jmd-currency";
 
 const liveFlag = process.argv.includes("--live");
 const envFileIdx = process.argv.indexOf("--env-file");
@@ -123,6 +124,7 @@ async function ensureProduct(
       flipvise_plan: spec.plan,
       type: "plan",
     },
+    tax_code: "txcd_10103000",
     marketing_features: marketingFeatures,
   };
 
@@ -173,6 +175,7 @@ async function findOrCreatePrice(
     unit_amount: unitAmount,
     recurring: { interval, interval_count: 1 },
     nickname: `Flipvise ${spec.plan} ${interval === "month" ? "monthly" : "yearly"} ($${(unitAmount / 100).toFixed(0)})`,
+    currency_options: usdPriceJmdCurrencyOptions(unitAmount),
     metadata: {
       type: "plan",
       plan: spec.plan,

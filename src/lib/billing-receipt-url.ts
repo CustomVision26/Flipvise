@@ -4,6 +4,7 @@ import {
   addonBillingPlanSlug,
   isAddonBillingPlanSlug,
 } from "@/lib/addon-plan-slug";
+import { receiptUrlForBillingInvoice } from "@/lib/flipvise-billing-receipt";
 
 export type BillingReceiptInfo = {
   receiptUrl: string | null;
@@ -17,10 +18,11 @@ export type BillingReceiptPair = {
 };
 
 function receiptUrlFromStoredInvoice(input: {
+  externalId: string;
   hostedInvoiceUrl: string | null;
   invoicePdfUrl: string | null;
 }): string | null {
-  return input.hostedInvoiceUrl ?? input.invoicePdfUrl ?? null;
+  return receiptUrlForBillingInvoice(input);
 }
 
 function emptyReceipt(): BillingReceiptInfo {

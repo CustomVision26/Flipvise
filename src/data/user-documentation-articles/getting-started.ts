@@ -30,7 +30,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           "Sign In opens Clerk in modal mode — you stay on the homepage overlay. Sign up in that modal opens the same Flipvise account dialog (not Clerk’s Apple/Google Sign Up).",
           "Sign Up opens the Flipvise account dialog: first/last name, email, password, and password confirmation. After email verification, Complete your account details collects phone, mailing address, type/status, and security questions before the personal dashboard unlocks.",
           "Phone, mailing address, and account type are saved with a Server Action after verification so Flipvise can help recover your account later.",
-          "If you signed in with social auth and still need phone, mailing address, or type details, you are guided through a three-step Account details flow (/onboarding/account-recovery) once before the dashboard — not again after you save. That screen shows a logo-only header (no workspace switcher, plan label, or account icons).",
+          "If you signed in with social auth and still need phone, mailing address, or type details, you are guided through a three-step Account details flow (/onboarding/account-recovery) once before the dashboard — not again after you save. That screen shows a logo-only header (no workspace switcher, plan label, or account icons). The mailing address step labels the region field State / province / parish; Jamaica options omit Parish from each name.",
           "Use the same email address that appears on team or affiliate invites.",
           "If you arrived from an invite link, the flow may return you to that invite after authentication.",
         ],
