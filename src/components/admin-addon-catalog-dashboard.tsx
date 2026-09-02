@@ -835,7 +835,7 @@ export function AdminAddonCatalogDashboard({
                       id="assign-addon-key"
                       value={assignAddonKey}
                       onChange={(e) => setAssignAddonKey(e.target.value)}
-                      placeholder="study_mode_focus"
+                      placeholder="ai_essay"
                       autoComplete="off"
                       className="h-9 font-mono text-sm"
                     />

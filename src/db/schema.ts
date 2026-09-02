@@ -1474,7 +1474,7 @@ export const addonCatalog = pgTable(
     /** Plan slugs eligible to purchase or receive this add-on. */
     eligiblePlanIds: json().$type<string[]>().notNull().default([]),
     /**
-     * Env var name holding the Stripe monthly Price id, e.g. `STRIPE_ADDON_STUDY_MODE_XYZ_PRICE_ID`.
+     * Env var name holding the Stripe monthly Price id, e.g. `STRIPE_ADDON_AI_ESSAY_PRICE_ID`.
      * Empty string means admin-grant-only (no self-serve Checkout).
      */
     stripePriceEnvKey: varchar({ length: 128 }).notNull().default(''),

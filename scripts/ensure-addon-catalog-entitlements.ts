@@ -131,26 +131,13 @@ async function main() {
   `;
 
   await sql`
-    INSERT INTO "addon_catalog" (
-      "key",
-      "name",
-      "description",
-      "marketingBlurb",
-      "eligiblePlanIds",
-      "stripePriceEnvKey",
-      "active",
-      "publishedOnPricing"
-    ) VALUES (
-      'study_mode_focus',
-      'Focus Study Mode',
-      'An optional study mode add-on for eligible paid plans.',
-      'Unlock Focus Study Mode as a monthly add-on on top of your current plan.',
-      '["pro","pro_plus","pro_plus_team_basic","pro_plus_team_gold","pro_plus_platinum_plan","pro_plus_enterprise","education_plus","education_gold","education_enterprise"]'::json,
-      'STRIPE_ADDON_STUDY_MODE_FOCUS_PRICE_ID',
-      true,
-      false
-    )
-    ON CONFLICT ("key") DO NOTHING
+    DELETE FROM "user_addon_entitlements"
+    WHERE "addonKey" = 'study_mode_focus'
+  `;
+
+  await sql`
+    DELETE FROM "addon_catalog"
+    WHERE "key" = 'study_mode_focus'
   `;
 
   await sql`

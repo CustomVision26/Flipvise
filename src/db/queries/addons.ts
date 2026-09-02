@@ -228,6 +228,24 @@ export async function upsertAddonCatalogEntry(input: {
   return row;
 }
 
+/** Remove a retired add-on from the catalog and all entitlements for that key. */
+export async function deleteAddonCatalogAndEntitlements(
+  addonKey: string,
+): Promise<{ entitlementsDeleted: number; catalogDeleted: number }> {
+  const entitlements = await db
+    .delete(userAddonEntitlements)
+    .where(eq(userAddonEntitlements.addonKey, addonKey))
+    .returning({ id: userAddonEntitlements.id });
+  const catalog = await db
+    .delete(addonCatalog)
+    .where(eq(addonCatalog.key, addonKey))
+    .returning({ id: addonCatalog.id });
+  return {
+    entitlementsDeleted: entitlements.length,
+    catalogDeleted: catalog.length,
+  };
+}
+
 export async function listActiveAddonKeysForUser(userId: string): Promise<string[]> {
   const rows = await db
     .select({ addonKey: userAddonEntitlements.addonKey })

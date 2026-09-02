@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-02T03:41:12.133Z",
+  "updatedAt": "2026-09-02T04:13:07.746Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "d84d35021597f04e786b27462ccd35ff04cfac2b7b5854ba518a802e76681c8e",
@@ -11,11 +11,11 @@
       "docFingerprint": "ef6f6cc80973d79bc56ccaf304de0f4c76eadfee927032be489aef26b9031319"
     },
     "personal-dashboard": {
-      "watchFingerprint": "96fe46855120033c82cf09091d9f57cf7dd9f79208e9a743ef99df24f85bbac8",
-      "docFingerprint": "9c36c24cab56ebb89570235fa6ba3369de393d0c93503fc1e6353bf574a3a9b0"
+      "watchFingerprint": "e498738604c097dd7ad04b2aba953dd5a2a9bf8798bc1edd3ab44291bc405b12",
+      "docFingerprint": "2010ef0ba37e959fcce05ded1d4ba58cfe47503c4b30710fbc9f4b27bb86412e"
     },
     "ai-essay": {
-      "watchFingerprint": "eb6bd61007d71c88eb13029912225e100e0817b3579ae77fde142607f12e0ea4",
+      "watchFingerprint": "77ece62c697d06d1aafa8512a078a28659ac8a0993d889327bcad69c9d60e8c0",
       "docFingerprint": "530030a6660212c36ab784fdee38fa88bf528b9dffe13f773c192d557d0749d7"
     },
     "team-workspace-dashboard": {
@@ -167,7 +167,7 @@
       "docFingerprint": "d0ebe9278721a2b66b5d044b0b6764abdb49de8e4b711bd9a10f0b33d57f975f"
     },
     "live-classroom": {
-      "watchFingerprint": "c2d7d39ac6c06176f50126a073849f53b364f4f4314122fa471abbbada520a97",
+      "watchFingerprint": "1b4f3efb5e1c6f015a5202ed619acaae33daaf82e9797b8e0ba595c672ee0fb4",
       "docFingerprint": "bce43ccf2fa9f83086a21174150426744d69f528526208ef08dbebbfbab13051"
     },
     "members": {
@@ -279,8 +279,8 @@
       "docFingerprint": "7407fa7bb8c6a3d55ebce2ec4f0d08ab529d0bb44df8d02f9027ce0e0d20df7d"
     },
     "admin-add-ons": {
-      "watchFingerprint": "c04c282b763d5069efe22bfc7a02c567cc612edc292596bde1a67f90633be2c2",
-      "docFingerprint": "ee4d35d56abf4f13fd384344b39386f1358dbbfb07d6f98e9d1476b6a08197ed"
+      "watchFingerprint": "35a088c30c391404d6ee698e6bb35fc8bb62feae8165bf9eeed6800c008a4eb3",
+      "docFingerprint": "5c558773402328cef54b7d25dc62fe087acbfaffb77fa827478a565d2ec524b5"
     },
     "plan-history": {
       "watchFingerprint": "2853840c9e2bb609f4f52292a00cbdfd1787b1efee3a9586fd516de5ced82cc0",

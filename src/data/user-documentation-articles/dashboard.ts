@@ -32,7 +32,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "ai-essay-card",
         title: "Add-ons running banner",
         bullets: [
-          "Chips scroll in a soft accent ticker in the top bar; each add-on keeps a distinct tint (e.g. teal for AI Essay, amber for Focus Study Mode).",
+          "Chips scroll in a soft accent ticker in the top bar; each add-on keeps a distinct tint (e.g. teal for AI Essay, rose for Live Classroom).",
           "Locked chips open Unlock Feature (monthly/yearly Stripe add-on checkout).",
           "Unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay; hover pauses the marquee.",
           "Access also comes from Team Admin assignment or a platform admin grant.",

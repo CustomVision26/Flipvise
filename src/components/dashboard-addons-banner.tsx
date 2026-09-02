@@ -53,7 +53,6 @@ const ADDON_ICON_STYLES = [
 
 const ADDON_KEY_COLOR_INDEX: Record<string, number> = {
   [AI_ESSAY_ADDON_KEY]: 0,
-  study_mode_focus: 1,
   [LIVE_CLASSROOM_ADDON_KEY]: 2,
 };
 

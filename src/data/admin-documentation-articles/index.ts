@@ -568,6 +568,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus even when Clerk has no billingPlan. An active team or education-team plan is also checked, so complimentary Pro Plus does not hide Team Gold eligibility for Live Classroom.",
           "The public catalog shows Addon Plans prices and copy. Ineligible signed-in users get View eligible plans (opens /pricing) instead of a disabled Not eligible button.",
           "Team Admins assign the same catalog keys from Team Admin → Add-ons.",
+          "Focus Study Mode (study_mode_focus) is retired — do not re-add it to the catalog or Stripe.",
         ],
       },
     ],

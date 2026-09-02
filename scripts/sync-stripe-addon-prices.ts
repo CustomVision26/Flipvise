@@ -54,7 +54,6 @@ const DEFAULT_AMOUNTS: Record<
   { monthlyCents: number; yearlyCents: number | null }
 > = {
   ai_essay: { monthlyCents: 999, yearlyCents: 9900 },
-  study_mode_focus: { monthlyCents: 499, yearlyCents: 4900 },
   /** Organization add-on — Team / Enterprise / Education Gold+Enterprise only. */
   live_classroom: { monthlyCents: 1299, yearlyCents: 144000 },
 };
@@ -71,12 +70,6 @@ const FALLBACK_ADDONS: Array<{
     description:
       "Generate essay activities, write drafts, submit work, and receive AI feedback.",
     stripePriceEnvKey: stripeAddonPriceEnvKeyForAddonKey("ai_essay"),
-  },
-  {
-    key: "study_mode_focus",
-    name: "Focus Study Mode",
-    description: "An optional study mode add-on for eligible paid plans.",
-    stripePriceEnvKey: stripeAddonPriceEnvKeyForAddonKey("study_mode_focus"),
   },
   {
     key: "live_classroom",

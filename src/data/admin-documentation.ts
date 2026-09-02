@@ -307,6 +307,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not hardcode Stripe price_* IDs — use catalog stripePriceEnvKey env vars.",
           "Do not gate add-on features on plan slug alone — use accessHasAddon / canAccessAddon.",
+          "Do not re-seed Focus Study Mode (study_mode_focus) — that add-on was removed from the catalog and Stripe.",
         ],
       },
       {
