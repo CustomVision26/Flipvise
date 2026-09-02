@@ -248,6 +248,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Edit plan display, Stripe price env references, discount coupons, and promo schedules.",
           "Changes affect /pricing cards and checkout validation.",
+          "Checkout recovers if Render still has a deleted STRIPE_*_PRICE_ID by finding the tagged/named Stripe product and a matching catalog Price. Update Render env to the current ids after a price change.",
           "Affiliate discount blocks are configured per tier for combined codes.",
           "AI Recall™ (Active Recall study mode) is an entitlement of Pro Plus, Education Plus, team-tier, and education team plans — not Free or standard Pro. Keep feature lists on /pricing aligned with that gate.",
         ],

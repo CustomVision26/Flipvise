@@ -373,6 +373,7 @@ async function swapStripeSubscriptionPlan(input: {
         period: input.period,
         monthlyPrice: planRow.monthlyPrice,
         yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
+        productName: planRow.name,
       })
     : priceIdForPlanAndPeriod(input.planSlug, input.period);
   if (!newPriceId) {

@@ -62,6 +62,7 @@ export async function syncStripeAddonProductFromCatalog(input: {
       monthlyPrice: input.monthlyPrice,
       yearlyMonthlyPrice: input.yearlyMonthlyPrice,
       nickname: `Flipvise ${input.addonKey} monthly ($${input.monthlyPrice})`,
+      productMetadata: { key: "flipvise_addon_key", value: input.addonKey },
     });
   }
 
@@ -73,6 +74,7 @@ export async function syncStripeAddonProductFromCatalog(input: {
       monthlyPrice: input.monthlyPrice,
       yearlyMonthlyPrice: input.yearlyMonthlyPrice,
       nickname: `Flipvise ${input.addonKey} yearly ($${Math.round(input.yearlyMonthlyPrice * 12)})`,
+      productMetadata: { key: "flipvise_addon_key", value: input.addonKey },
     });
   }
 

@@ -51,6 +51,7 @@ async function resolveTargetPriceId(
         period,
         monthlyPrice: planRow.monthlyPrice,
         yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
+        productName: planRow.name,
       });
     }
     return resolveStripePriceIdForPlan(planSlug, period);

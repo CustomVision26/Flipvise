@@ -159,6 +159,7 @@ export async function createAddonCheckoutSessionAction(
       monthlyPrice: catalog.monthlyPrice,
       yearlyMonthlyPrice: catalog.yearlyMonthlyPrice,
       nickname: `Flipvise ${catalog.key} ${period}`,
+      productMetadata: { key: "flipvise_addon_key", value: catalog.key },
     });
   }
   if (!priceId) {

@@ -88,6 +88,39 @@ function productIdFromPrice(price: Stripe.Price): string | null {
   return null;
 }
 
+async function retrievePriceOrNull(priceId: string): Promise<Stripe.Price | null> {
+  try {
+    return await stripe.prices.retrieve(priceId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+    if (/no such price/i.test(message) || code === "resource_missing") return null;
+    throw error;
+  }
+}
+
+async function findActiveProductIdByMetadata(
+  key: string,
+  value: string,
+): Promise<string | null> {
+  for await (const product of stripe.products.list({ active: true, limit: 100 })) {
+    if (product.metadata?.[key] === value) return product.id;
+  }
+  return null;
+}
+
+async function findActiveProductIdByName(name: string): Promise<string | null> {
+  const needle = name.trim().toLowerCase();
+  if (!needle) return null;
+  for await (const product of stripe.products.list({ active: true, limit: 100 })) {
+    if (product.name.trim().toLowerCase() === needle) return product.id;
+  }
+  return null;
+}
+
 async function listActivePricesForProduct(
   productId: string,
 ): Promise<Stripe.Price[]> {
@@ -153,6 +186,9 @@ async function createCatalogPrice(input: {
 /**
  * Find or create a recurring Price on the same product as `configuredPriceId`
  * whose per-cycle amount matches the catalog.
+ *
+ * If the env Price id was deleted (common after /admin/plans Save creates a new
+ * Price), look up the product by metadata and use/create a matching Price.
  */
 export async function ensureCatalogAlignedPriceId(input: {
   configuredPriceId: string;
@@ -160,27 +196,41 @@ export async function ensureCatalogAlignedPriceId(input: {
   monthlyPrice: number | null;
   yearlyMonthlyPrice: number | null;
   nickname: string;
+  productMetadata?: { key: string; value: string };
+  productName?: string;
 }): Promise<string> {
   const expectedMajor = expectedCatalogBillingCycleMajor(input);
   if (expectedMajor == null || expectedMajor <= 0) {
     return input.configuredPriceId;
   }
 
-  const configured = await stripe.prices.retrieve(input.configuredPriceId);
-  if (priceMatchesCatalogMajor(configured, expectedMajor)) {
+  const configured = await retrievePriceOrNull(input.configuredPriceId);
+  if (configured && priceMatchesCatalogMajor(configured, expectedMajor)) {
     return input.configuredPriceId;
   }
 
-  const productId = productIdFromPrice(configured);
+  let productId = configured ? productIdFromPrice(configured) : null;
+  if (!productId && input.productMetadata) {
+    productId = await findActiveProductIdByMetadata(
+      input.productMetadata.key,
+      input.productMetadata.value,
+    );
+  }
+  if (!productId && input.productName) {
+    productId = await findActiveProductIdByName(input.productName);
+  }
   if (!productId) {
-    return input.configuredPriceId;
+    throw new Error(
+      `Stripe price ${input.configuredPriceId} was not found on this Stripe account. Update the matching STRIPE_*_PRICE_ID env var (Render live vs local test) to a Price that exists in the same mode as STRIPE_SECRET_KEY.`,
+    );
   }
 
+  const currency = configured?.currency ?? "usd";
   const existingId = await findCatalogPriceOnProduct({
     productId,
     period: input.period,
     expectedMajor,
-    currency: configured.currency,
+    currency,
   });
   if (existingId) return existingId;
 
@@ -189,7 +239,7 @@ export async function ensureCatalogAlignedPriceId(input: {
     nickname: input.nickname,
     period: input.period,
     expectedMajor,
-    currency: configured.currency,
+    currency,
   });
 }
 
@@ -203,6 +253,7 @@ export async function resolveCatalogAlignedStripePriceId(input: {
   period: "monthly" | "yearly";
   monthlyPrice: number | null;
   yearlyMonthlyPrice: number | null;
+  productName?: string;
 }): Promise<string> {
   const envPair = stripePriceEnvPairForPlan(input.plan, input.period);
   const configuredId = readStripePriceIdFromEnv(envPair);
@@ -218,5 +269,7 @@ export async function resolveCatalogAlignedStripePriceId(input: {
     monthlyPrice: input.monthlyPrice,
     yearlyMonthlyPrice: input.yearlyMonthlyPrice,
     nickname: `Flipvise ${input.plan} ${input.period} ($${expectedCatalogBillingCycleMajor(input) ?? "?"})`,
+    productMetadata: { key: "flipvise_plan", value: input.plan },
+    productName: input.productName,
   });
 }

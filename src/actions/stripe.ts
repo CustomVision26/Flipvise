@@ -406,6 +406,7 @@ async function createStripeCheckoutSessionActionInner(
         period,
         monthlyPrice: planRow.monthlyPrice,
         yearlyMonthlyPrice: planRow.yearlyMonthlyPrice,
+        productName: planRow.name,
       })
     : priceIdForPlan(plan, period);
 

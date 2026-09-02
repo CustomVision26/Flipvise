@@ -170,6 +170,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/pricing-checkout-step.tsx",
     "src/components/plan-change-addons-dialog.tsx",
     "src/actions/stripe.ts",
+    "src/lib/stripe-catalog-price.ts",
   ],
   "manage-subscription": [
     "src/components/user-billing-page.tsx",
@@ -340,7 +341,11 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/lib/platform-company-address.ts",
     "src/lib/stripe-invoice-addresses.ts",
   ],
-  "pricing-plans": ["src/components/admin-plans-editor.tsx", "src/data/plans-config.json"],
+  "pricing-plans": [
+    "src/components/admin-plans-editor.tsx",
+    "src/data/plans-config.json",
+    "src/lib/stripe-catalog-price.ts",
+  ],
   "admin-add-ons": [
     "src/app/admin/add-ons/page.tsx",
     "src/components/admin-addon-catalog-dashboard.tsx",

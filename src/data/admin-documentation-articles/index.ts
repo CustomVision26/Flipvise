@@ -613,6 +613,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Stripe price references use env var keys (STRIPE_PRO_PRICE_ID, STRIPE_PRO_PLUS_YEARLY_PRICE_ID, team-tier keys, etc.) — never hardcode price_* IDs in the editor.",
           "Affiliate discount blocks configure per-tier combined promo codes.",
           "Save writes plans-config.json — changes affect checkout validation and pricing page rendering.",
+          "Stripe cannot edit a Price amount in place. After a price change, checkout looks up the Pro Plus (etc.) product and uses a matching Price even if Render still has a deleted STRIPE_*_PRICE_ID. Still update Render env to the current Price ids from .env.old / the sync script so webhooks and the Dashboard stay aligned.",
         ],
       },
       {
