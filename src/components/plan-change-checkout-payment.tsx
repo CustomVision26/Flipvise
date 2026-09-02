@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, CreditCard } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +19,13 @@ import type {
   PlanChangeProrationPreview,
 } from "@/lib/plan-change-proration-preview";
 import { getStripePromise } from "@/lib/stripe-load-client";
+import { formatStripeCheckoutPaymentError } from "@/lib/stripe-checkout-payment-error";
 import {
   STRIPE_CHECKOUT_ELEMENTS_APPEARANCE,
   STRIPE_CHECKOUT_NAVY,
   STRIPE_CHECKOUT_PAGE_BG,
+  STRIPE_CHECKOUT_PAYMENT_ELEMENT_WALLETS,
+  STRIPE_CHECKOUT_PAYMENT_METHODS_HELP,
   STRIPE_CHECKOUT_TEXT,
   isStripeTestModeClient,
 } from "@/lib/stripe-checkout-appearance";
@@ -202,6 +205,7 @@ function PlanChangePaymentForm({
   const elements = useElements();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentComplete, setPaymentComplete] = useState(false);
 
   const addonCents = summary.selectedAddon?.amountCents ?? 0;
   const planDueCents = Math.max(0, summary.preview.amountDueCents);
@@ -235,7 +239,11 @@ function PlanChangePaymentForm({
 
     if (result.error) {
       toast.dismiss(pendingToast);
-      setErrorMessage(result.error.message ?? "Unable to confirm payment method.");
+      setErrorMessage(
+        formatStripeCheckoutPaymentError(
+          result.error.message ?? "Unable to confirm payment method.",
+        ),
+      );
       setIsSubmitting(false);
       return;
     }
@@ -279,14 +287,17 @@ function PlanChangePaymentForm({
           <div className="space-y-1">
             <p className="text-sm font-medium text-[#30313d]">Payment method</p>
             <p className="text-xs leading-relaxed text-[#6b7280]">
-              Card details for the person or business paying for this subscription.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2 text-sm text-[#30313d]">
-            <CreditCard className="size-4 text-[#6b7280]" aria-hidden />
-            <span>Card</span>
-          </div>
-          <PaymentElement />
+            {STRIPE_CHECKOUT_PAYMENT_METHODS_HELP}
+          </p>
+        </div>
+        <PaymentElement
+          onChange={(event) => {
+            setPaymentComplete(event.complete);
+          }}
+          options={{
+            wallets: STRIPE_CHECKOUT_PAYMENT_ELEMENT_WALLETS,
+          }}
+        />
         </div>
 
         {errorMessage ? (
@@ -304,11 +315,16 @@ function PlanChangePaymentForm({
           </p>
           <SlideToSubmitButton
             label={slideLabel}
-            disabled={!stripe || !elements || isSubmitting}
+            disabled={!stripe || !elements || !paymentComplete || isSubmitting}
             pending={isSubmitting}
             onSubmit={handleConfirm}
             variant="checkout"
           />
+          {!paymentComplete && !isSubmitting ? (
+            <p className="text-center text-xs leading-relaxed text-[#6b7280]" role="status">
+              Complete your payment details to enable Confirm.
+            </p>
+          ) : null}
           <p className="text-center text-xs leading-relaxed text-[#6b7280]">
             By confirming, you authorize Flipvise to adjust your subscription and
             charge or credit your payment method according to the summary above.

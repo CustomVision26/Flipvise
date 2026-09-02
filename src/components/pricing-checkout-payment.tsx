@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, Tag } from "lucide-react";
+import { ArrowLeft, Tag } from "lucide-react";
 import { toast } from "sonner";
 import {
   CheckoutElementsProvider,
@@ -47,11 +47,14 @@ import {
   STRIPE_CHECKOUT_ELEMENTS_APPEARANCE,
   STRIPE_CHECKOUT_NAVY,
   STRIPE_CHECKOUT_PAGE_BG,
+  STRIPE_CHECKOUT_PAYMENT_ELEMENT_WALLETS,
+  STRIPE_CHECKOUT_PAYMENT_METHODS_HELP,
   STRIPE_CHECKOUT_TEXT,
   isStripeTestModeClient,
 } from "@/lib/stripe-checkout-appearance";
 import { formatPlanMoney } from "@/lib/pricing-period-display";
 import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
+import { formatStripeCheckoutPaymentError } from "@/lib/stripe-checkout-payment-error";
 import { cn } from "@/lib/utils";
 
 const MAILING_INVALID_FOR_STRIPE_MESSAGE =
@@ -471,7 +474,11 @@ function CheckoutPaymentFields({
       const result = await state.checkout.updateBillingAddress(contact);
       if (result.type === "error") {
         setBillingSyncedToStripe(false);
-        setErrorMessage(result.error.message || fallbackMessage);
+        setErrorMessage(
+          formatStripeCheckoutPaymentError(
+            result.error.message || fallbackMessage,
+          ),
+        );
         return false;
       }
       if (!isStripeBillingContactComplete(result.session.billingAddress)) {
@@ -641,7 +648,9 @@ function CheckoutPaymentFields({
   if (checkoutState.type === "error") {
     return (
       <p className="text-sm text-destructive">
-        {checkoutState.error.message || "Unable to load payment form."}
+        {formatStripeCheckoutPaymentError(
+          checkoutState.error.message || "Unable to load payment form.",
+        )}
       </p>
     );
   }
@@ -668,10 +677,10 @@ function CheckoutPaymentFields({
   const slideDisabledHint = (() => {
     if (isSubmitting) return null;
     if (!paymentComplete) {
-      return "Enter complete card details to enable Subscribe.";
+      return "Complete your payment details to enable Subscribe.";
     }
     if (!cardName.trim()) {
-      return "Enter the name on the card to enable Subscribe.";
+      return "Enter the name on the payment method to enable Subscribe.";
     }
     if (savedMailingAddress && !mailingValidForStripe && !manualAddressComplete) {
       return "Your Flipvise mailing address is not valid for Stripe billing. Enter a billing address manually.";
@@ -694,7 +703,7 @@ function CheckoutPaymentFields({
     try {
       const trimmedName = cardName.trim();
       if (!trimmedName) {
-        setErrorMessage("Enter the name on the card.");
+        setErrorMessage("Enter the name on the payment method.");
         setIsSubmitting(false);
         return;
       }
@@ -710,8 +719,10 @@ function CheckoutPaymentFields({
       const result = await checkout.confirm();
 
       if (result.type === "error") {
-        const message = result.error.message || "Payment could not be completed.";
-        if (/complete billing address/i.test(message)) {
+        const message = formatStripeCheckoutPaymentError(
+          result.error.message || "Payment could not be completed.",
+        );
+        if (/complete billing address/i.test(result.error.message ?? "")) {
           setUseMailingAsBilling(false);
           setMailingValidForStripe(false);
           setErrorMessage(
@@ -747,9 +758,11 @@ function CheckoutPaymentFields({
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Payment could not be completed. Please try again.",
+        formatStripeCheckoutPaymentError(
+          error instanceof Error
+            ? error.message
+            : "Payment could not be completed. Please try again.",
+        ),
       );
       setIsSubmitting(false);
     }
@@ -839,18 +852,15 @@ function CheckoutPaymentFields({
         <div className="space-y-1">
           <p className="text-sm font-medium text-[#30313d]">Payment method</p>
           <p className="text-xs leading-relaxed text-[#6b7280]">
-            Card details for the person or business paying for this subscription.
+            {STRIPE_CHECKOUT_PAYMENT_METHODS_HELP}
           </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-md border border-[#e8ebf0] bg-[#fafbfc] px-3 py-2 text-sm text-[#30313d]">
-          <CreditCard className="size-4 text-[#6b7280]" aria-hidden />
-          <span>Card</span>
         </div>
         <PaymentElement
           onChange={(event) => {
             setPaymentComplete(event.complete);
           }}
           options={{
+            wallets: STRIPE_CHECKOUT_PAYMENT_ELEMENT_WALLETS,
             fields: {
               billingDetails: {
                 // Name/address come from updateBillingAddress().
@@ -917,7 +927,7 @@ function CheckoutPaymentFields({
 
         <div className="space-y-2">
           <Label htmlFor="checkout-card-name" className="text-sm font-medium text-[#30313d]">
-            Card Name
+            Name on payment method
           </Label>
           <Input
             id="checkout-card-name"
@@ -926,8 +936,8 @@ function CheckoutPaymentFields({
             onBlur={() => {
               void handleCardNameBlur();
             }}
-            autoComplete="cc-name"
-            placeholder="Name on card"
+            autoComplete="name"
+            placeholder="Name on card or bank account"
             disabled={isApplyingBillingAddress || isSubmitting}
             className="h-11 border-[#d0d7e2] bg-white font-normal text-[#30313d] shadow-none"
           />

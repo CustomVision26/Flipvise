@@ -97,7 +97,9 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Billing address required — international/overseas addresses supported (state / province / parish).",
           "Stripe Automatic Tax may apply based on address.",
           "Tax ID collection enabled for business customers where supported.",
-          "Flipvise does not store full card numbers — Stripe handles PCI compliance.",
+          "Flipvise does not store full card or bank numbers — Stripe handles PCI compliance.",
+          "Checkout does not lock to cards. Stripe can offer cards, Apple Pay, Google Pay, Link, and US bank account (ACH) from Dashboard payment-method settings.",
+          "A Stripe test card on the public checkout is rewritten to a formal alert: test card numbers are not accepted; use a genuine bank-issued card.",
         ],
       },
       {
@@ -135,8 +137,9 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Account vs payment details",
         bullets: [
           "Account email — your signed-in Flipvise address; receipts and billing notices go here.",
-          "Payment method — card number, expiry, and CVC for whoever is paying.",
-          "Billing address — name and address on the card or bank account you are paying with. When you have a complete Flipvise mailing address in Account Details, Same as my Flipvise mailing address is selected by default so country/address fields stay hidden and you enter Card Name only. Uncheck it to enter a different billing address (state / province / parish). Used to verify the payment method and calculate tax where applicable.",
+          "Payment method — card, Apple Pay, Google Pay, Link, or US bank account (ACH), depending on what Stripe shows for your location and device.",
+          "Billing address — name and address on the card or bank account you are paying with. When you have a complete Flipvise mailing address in Account Details, Same as my Flipvise mailing address is selected by default so country/address fields stay hidden and you enter Name on payment method only. Uncheck it to enter a different billing address (state / province / parish). Used to verify the payment method and calculate tax where applicable.",
+          "If a Stripe test card number is entered on the public checkout, a formal red alert explains that test card numbers are not accepted and a genuine bank-issued card is required. Stripe’s technical wording is not shown.",
         ],
       },
     ],

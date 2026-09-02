@@ -170,7 +170,7 @@ export async function createPlanChangeSetupIntentAction(
 
   const setupIntent = await stripe.setupIntents.create({
     customer: live.customerId,
-    payment_method_types: ["card"],
+    automatic_payment_methods: { enabled: true },
     usage: "off_session",
     metadata: {
       clerkUserId: userId,

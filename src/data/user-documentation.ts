@@ -672,11 +672,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         id: "stripe-billing-payment",
         title: "Stripe Billing & Payment",
         purpose:
-          "How Flipvise collects payment, including overseas billing addresses and cards.",
+          "How Flipvise collects payment, including overseas billing addresses and Stripe payment methods.",
         howItWorks: [
           "All paid plans bill through Stripe Checkout (subscription mode) — not a separate in-app card form on the pricing page.",
           "Billing address is required at checkout. Enter your real country, city, postal code, street address, and state / province / parish — overseas/international addresses are supported. When your Account Details mailing address is complete, Same as my Flipvise mailing address is selected by default; uncheck it to enter a different billing address.",
-          "Pay with a credit or debit card Stripe accepts in your region. Flipvise does not store your full card number; Stripe handles PCI-compliant payment data.",
+          "Pay with a credit or debit card, Apple Pay, Google Pay, Link, or a US bank account (ACH) when Stripe offers those methods for your location and device. Flipvise does not store full card or bank numbers; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
           "After purchase, Flipvise receipts (Inbox, Billing plan history) show Flipvise Studio LLC and the company mailing address from Contact Us, including apartment and phone. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
@@ -706,7 +706,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Plan change with a published Add-on Catalog: after you slide to confirm, a dialog lists locked add-ons only (features you do not already have). Skip, or select one, review the plan + add-on breakdown, acknowledge, then continue.",
           "Slide to confirm → plan-change payment. If you selected an add-on, Stripe redirects through a continue bridge that finalizes the plan change then opens add-on checkout in the same session (two separate receipts).",
           "Promotion code field appears only when a promo window is active on Pricing — never on plan-change checkout when Pricing has no promo UI.",
-          "Stripe Embedded Checkout collects card + billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Manual billing address uses a State / province / parish field. Slide to subscribe enables when card details, Card Name, and billing address are complete.",
+          "Stripe Embedded Checkout collects payment method and billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Customers can pay with card, Apple Pay, Google Pay, Link, or US bank account (ACH) when Stripe shows those options. Manual billing address uses a State / province / parish field. Slide to subscribe enables when payment details, name on the payment method, and billing address are complete.",
+          "A Stripe test card on the public checkout shows a formal alert: test card numbers are not accepted; use a genuine bank-issued card. Stripe’s technical wording is not shown.",
           "Success redirects to /dashboard?checkout=success with a confirmation toast; Inbox also receives a formal subscription or plan-change confirmation.",
         ],
         requirements: ["Signed-in account.", "Valid paid plan slug in the URL."],
@@ -714,6 +715,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not abandon checkout and retry with a different Clerk account — metadata is tied to your user.",
           "Do not apply a promo on plan-change checkout — remove the code and rely on proration.",
           "Do not expect already-owned add-ons in the plan-change dialog — only locked catalog add-ons appear.",
+          "Do not use Stripe test card numbers (for example 4242…) on the public checkout — only a genuine bank-issued card is accepted.",
         ],
       },
       {

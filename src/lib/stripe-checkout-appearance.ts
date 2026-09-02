@@ -27,6 +27,17 @@ export const STRIPE_CHECKOUT_ELEMENTS_APPEARANCE = {
   },
 };
 
+/** Shown under Payment method — Stripe ranks eligible options per customer. */
+export const STRIPE_CHECKOUT_PAYMENT_METHODS_HELP =
+  "Pay with a card, Apple Pay, Google Pay, Link, or a US bank account (ACH). Stripe shows the methods available for your location and device.";
+
+/** Let Payment Element offer wallets instead of a card-only form. */
+export const STRIPE_CHECKOUT_PAYMENT_ELEMENT_WALLETS = {
+  applePay: "auto",
+  googlePay: "auto",
+  link: "auto",
+} as const;
+
 export function isStripeTestModeClient(publishableKey?: string | null): boolean {
   const key =
     publishableKey?.trim() ||

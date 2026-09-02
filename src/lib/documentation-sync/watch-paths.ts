@@ -157,6 +157,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/stripe.ts",
     "src/components/stripe-checkout-button.tsx",
     "src/components/pricing-checkout-payment.tsx",
+    "src/lib/stripe-checkout-payment-error.ts",
+    "src/lib/stripe-checkout-branding.ts",
     "src/app/pricing/checkout/pay/page.tsx",
     "src/lib/stripe-invoice-addresses.ts",
     "src/lib/platform-company-address.ts",
@@ -173,6 +175,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/stripe.ts",
     "src/lib/stripe-catalog-price.ts",
     "src/lib/stripe-publishable-key.ts",
+    "src/lib/stripe-checkout-payment-error.ts",
+    "src/lib/stripe-checkout-branding.ts",
     "src/lib/stripe-load-client.ts",
   ],
   "manage-subscription": [
@@ -183,7 +187,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   ],
   "prorations-plan-changes": [
     "src/actions/stripe.ts",
+    "src/actions/plan-change-checkout.ts",
     "src/app/pricing/checkout/plan-change/pay/page.tsx",
+    "src/components/plan-change-checkout-payment.tsx",
     "src/components/plan-change-addons-dialog.tsx",
     "src/components/stripe-checkout-toast.tsx",
   ],
@@ -348,6 +354,7 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/components/admin-plans-editor.tsx",
     "src/data/plans-config.json",
     "src/lib/stripe-catalog-price.ts",
+    "src/lib/stripe-checkout-branding.ts",
   ],
   "admin-add-ons": [
     "src/app/admin/add-ons/page.tsx",

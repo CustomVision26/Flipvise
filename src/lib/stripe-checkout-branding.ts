@@ -15,25 +15,17 @@ function absoluteLogoUrlForCheckout(): string | null {
 }
 
 /**
- * Formal hosted Checkout presentation: classic card form (no Link wallet),
- * light layout, rectangular fields, professional typography.
+ * Formal hosted Checkout presentation: light layout, rectangular fields,
+ * professional typography. Do not pass payment_method_types — Stripe dynamic
+ * methods (cards, wallets, Link, ACH) come from the Dashboard.
  */
 export function stripeCheckoutBrandingParams(): Pick<
   Stripe.Checkout.SessionCreateParams,
-  | "branding_settings"
-  | "custom_text"
-  | "wallet_options"
-  | "payment_method_types"
+  "branding_settings" | "custom_text"
 > {
   const logoUrl = absoluteLogoUrlForCheckout();
 
   return {
-    payment_method_types: ["card"],
-    wallet_options: {
-      link: {
-        display: "never",
-      },
-    },
     branding_settings: {
       display_name: "Flipvise",
       background_color: CHECKOUT_BACKGROUND_COLOR,
@@ -57,19 +49,17 @@ export function stripeCheckoutBrandingParams(): Pick<
   };
 }
 
-/** On-site Checkout (`ui_mode: elements`) — card only, no Link; branding via Elements appearance. */
+/**
+ * On-site Checkout (`ui_mode: elements`). Omit payment_method_types so Stripe
+ * can offer cards, Apple Pay, Google Pay, Link, and ACH when those methods are
+ * enabled in the Dashboard.
+ */
 export function stripeCheckoutElementsSessionParams(): Pick<
   Stripe.Checkout.SessionCreateParams,
-  "ui_mode" | "payment_method_types" | "wallet_options"
+  "ui_mode"
 > {
   return {
     ui_mode: "elements" as Stripe.Checkout.SessionCreateParams["ui_mode"],
-    payment_method_types: ["card"],
-    wallet_options: {
-      link: {
-        display: "never",
-      },
-    },
   };
 }
 

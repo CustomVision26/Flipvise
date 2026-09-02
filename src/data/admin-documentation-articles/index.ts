@@ -614,6 +614,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Affiliate discount blocks configure per-tier combined promo codes.",
           "Save writes plans-config.json — changes affect checkout validation and pricing page rendering.",
           "Stripe cannot edit a Price amount in place. After a price change, checkout looks up the Pro Plus (etc.) product and uses a matching Price even if Render still has a deleted STRIPE_*_PRICE_ID. Still update Render env to the current Price ids from .env.old / the sync script so webhooks and the Dashboard stay aligned.",
+          "Checkout sessions omit payment_method_types. Enable Cards, Apple Pay, Google Pay, Link, and ACH Direct Debit in the live Stripe Dashboard (Settings → Payment methods). Register the public app domain under Payment method domains so wallets appear.",
         ],
       },
       {
@@ -794,7 +795,7 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Checkout behavior",
         bullets: [
           "One trial per account — user_plan_trials table tracks consumption.",
-          "Trial checkout sets trial_period_days on Stripe subscription — $0 today, card on file for renewal.",
+          "Trial checkout sets trial_period_days on Stripe subscription — $0 today, payment method on file for renewal.",
           "Trials use noPromoCheckoutDiscount — no general coupon, affiliate code, or allow_promotion_codes.",
           "Yearly billing period does not offer trials — monthly only.",
           "Trial ending and expired inbox notices remind users before and after trial ends.",
