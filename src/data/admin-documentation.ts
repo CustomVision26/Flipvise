@@ -267,7 +267,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Addon plans is a sub-tab of Plans, next to Trial settings.",
           "Each add-on card matches the pricing-plan editor: display name, monthly price, yearly price ($/mo billed annually), and description.",
-          "Save writes addon_catalog and updates the matching Stripe product (name, description, tax code).",
+          "Save writes addon_catalog and updates the matching Stripe product (name, description, tax code). /pricing/add-ons reads those catalog amounts so cards match Addon Plans even when Stripe price retrieve fails.",
           "Stripe cannot change a Price amount — Save creates a new Price when the amount changes. Checkout picks the catalog-aligned Price on the same product.",
           "Yearly Stripe charge is yearly monthly rate × 12.",
           "Grant, publish, and Unlock Feature controls stay on /admin/add-ons.",

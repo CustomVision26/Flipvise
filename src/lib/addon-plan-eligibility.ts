@@ -11,6 +11,36 @@ export type AddonEligibilityAccess = {
   activeEducationTeamPlan?: string | null;
 };
 
+function pushEligibilitySlug(slugs: string[], value: string | null | undefined) {
+  const slug = value?.trim();
+  if (!slug || slug === "free") return;
+  if (!slugs.includes(slug)) slugs.push(slug);
+}
+
+/**
+ * Every paid plan this access context can use for add-on eligibility.
+ * Personal, team, education-team, and complimentary Pro Plus are all considered —
+ * a complimentary admin Pro Plus must not hide an active Team Gold workspace.
+ */
+export function listAddonEligibilityPlanSlugs(
+  access: AddonEligibilityAccess,
+): string[] {
+  const slugs: string[] = [];
+  pushEligibilitySlug(slugs, access.effectivePlanSlug);
+  pushEligibilitySlug(slugs, access.activeTeamPlan);
+  pushEligibilitySlug(slugs, access.activeEducationTeamPlan);
+  if (access.isAdmin || access.adminGranted) {
+    pushEligibilitySlug(slugs, "pro_plus");
+  }
+  if (access.hasClerkPersonalProPlus) {
+    pushEligibilitySlug(slugs, "pro_plus");
+  }
+  if (access.hasClerkPersonalPro) {
+    pushEligibilitySlug(slugs, "pro");
+  }
+  return slugs;
+}
+
 /**
  * Plan slug used for add-on purchase / Stripe-entitlement eligibility.
  *
@@ -51,8 +81,7 @@ export function isAccessEligibleForAddon(
   eligiblePlanIds: string[],
   access: AddonEligibilityAccess,
 ): boolean {
-  return isPlanEligibleForAddon(
-    eligiblePlanIds,
-    resolvePlanSlugForAddonEligibility(access),
+  return listAddonEligibilityPlanSlugs(access).some((slug) =>
+    isPlanEligibleForAddon(eligiblePlanIds, slug),
   );
 }

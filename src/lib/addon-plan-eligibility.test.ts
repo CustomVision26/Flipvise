@@ -79,4 +79,15 @@ describe("isAccessEligibleForAddon", () => {
       false,
     );
   });
+
+  it("lets a complimentary admin with an active team plan buy team-only add-ons", () => {
+    assert.equal(
+      isAccessEligibleForAddon(["pro_plus_team_gold"], {
+        effectivePlanSlug: "pro_plus",
+        isAdmin: true,
+        activeTeamPlan: "pro_plus_team_gold",
+      }),
+      true,
+    );
+  });
 });

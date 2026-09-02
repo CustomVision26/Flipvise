@@ -63,13 +63,14 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Buying an add-on",
         bullets: [
           "Catalog is visible only when a platform admin enables it and publishes add-ons.",
-          "Cards show Stripe monthly/yearly amounts; guests sign in via modal to purchase. Unlock Feature in the header banner uses the same checkout.",
-          "Choose monthly or yearly when a yearly Stripe price is configured.",
+          "Cards show Addon Plans monthly/yearly amounts (same values as /admin/addon-plans); Stripe is used only when the catalog omits a price. Guests sign in via modal to purchase. Unlock Feature in the header banner uses the same checkout.",
+          "Choose monthly or yearly when a yearly price is configured.",
+          "If you are signed in on a plan that cannot buy that add-on, View eligible plans takes you to /pricing.",
           "Checkout opens an add-on subscription (separate from your base plan subscription).",
           "Plan-change checkout can offer locked published add-ons in a dialog before payment.",
           "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay after purchase or grant.",
           "Live Classroom™ is an organization add-on for Team/Enterprise plans — purchased by the subscription owner; participant limits inherit licensed seats.",
-          "Platform admins with complimentary Pro Plus (no Stripe billingPlan) are eligible for add-ons that list Pro Plus. Team-only add-ons such as Live Classroom still require a team or education team plan.",
+          "Platform admins with complimentary Pro Plus (no Stripe billingPlan) are eligible for add-ons that list Pro Plus. Team-only add-ons such as Live Classroom still require a team or education team plan — but an active Team Gold (or other listed team) plan counts even when complimentary Pro Plus is also present.",
         ],
       },
       {

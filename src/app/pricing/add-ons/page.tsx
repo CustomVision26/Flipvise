@@ -13,9 +13,10 @@ import {
 } from "@/db/queries/addons";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
 import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
+import { resolvePlanSlugForAddonEligibility } from "@/lib/addon-plan-eligibility";
 import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { isStripeAddonSubscription } from "@/lib/stripe-addon-metadata";
-import { resolveAddonStripePriceLabels } from "@/lib/stripe-addon-price-display";
+import { resolveAddonStripePriceLabels, mergeAddonPriceLabelsWithCatalog } from "@/lib/stripe-addon-price-display";
 import { stripe } from "@/lib/stripe";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
@@ -124,10 +125,14 @@ export default async function PricingAddOnsPage() {
       row.eligiblePlanIds,
       access,
     );
-    const priceLabels = await resolveAddonStripePriceLabels(row.stripePriceEnvKey);
+    const stripeLabels = await resolveAddonStripePriceLabels(row.stripePriceEnvKey);
+    const priceLabels = mergeAddonPriceLabelsWithCatalog(stripeLabels, {
+      monthlyPrice: row.monthlyPrice,
+      yearlyMonthlyPrice: row.yearlyMonthlyPrice,
+    });
     const stripePriceConfigured =
-      priceLabels.monthlyConfigured || priceLabels.yearlyConfigured;
-    const yearlyPriceConfigured = priceLabels.yearlyConfigured;
+      stripeLabels.monthlyConfigured || stripeLabels.yearlyConfigured;
+    const yearlyPriceConfigured = stripeLabels.yearlyConfigured;
     const renewalState =
       entitled && entitledRow?.source === "stripe"
         ? await resolveStripeAddonRenewalState(entitledRow.stripeSubscriptionId)
@@ -193,7 +198,9 @@ export default async function PricingAddOnsPage() {
       <PricingAddonsCatalog
         addons={toClientJson(cards)}
         signedIn={access.userId != null}
-        effectivePlanSlug={access.effectivePlanSlug}
+        effectivePlanSlug={
+          resolvePlanSlugForAddonEligibility(access) ?? access.effectivePlanSlug
+        }
       />
     </div>
   );

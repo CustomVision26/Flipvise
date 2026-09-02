@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import {
@@ -128,9 +129,7 @@ export function PricingAddonsCatalog({
         {addons.map((addon) => {
           const pending = pendingKey === addon.key;
           const period = periodFor(addon.key);
-          const showYearlyToggle = Boolean(
-            addon.yearlyPriceConfigured && addon.yearlyPriceLabel,
-          );
+          const showYearlyToggle = Boolean(addon.yearlyPriceLabel);
           const priceLabel =
             period === "yearly" && addon.yearlyPriceLabel
               ? addon.yearlyPriceLabel
@@ -140,6 +139,7 @@ export function PricingAddonsCatalog({
           let disabled = false;
           let tip = "Start billing for this add-on";
           let useSignInCta = false;
+          let usePricingLink = false;
 
           if (!signedIn) {
             ctaLabel = "Sign in to purchase";
@@ -164,16 +164,24 @@ export function PricingAddonsCatalog({
             tip =
               "AI Essay for workspace members is coming soon. Only the plan owner can unlock it on their personal dashboard right now.";
           } else if (!addon.eligible) {
-            ctaLabel = "Not eligible";
-            disabled = true;
-            tip = `Requires an eligible plan (yours: ${effectivePlanSlug ?? "free"})`;
+            ctaLabel = "View eligible plans";
+            disabled = false;
+            usePricingLink = true;
+            tip = `Requires an eligible plan (yours: ${effectivePlanSlug ?? "free"}). Open Pricing to upgrade.`;
           } else if (!addon.canPurchase || !addon.stripePriceConfigured) {
             ctaLabel = "Unavailable";
             disabled = true;
             tip = "This add-on is not available for self-serve purchase yet";
           }
 
-          const purchaseButton = (
+          const purchaseButton = usePricingLink ? (
+            <Button
+              nativeButton={false}
+              render={<Link href="/pricing" />}
+            >
+              {ctaLabel}
+            </Button>
+          ) : (
             <Button
               type="button"
               disabled={disabled || pending || (useSignInCta && !authLoaded)}

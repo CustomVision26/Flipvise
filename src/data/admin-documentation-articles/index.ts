@@ -565,7 +565,8 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Gate features with accessHasAddon / canAccessAddon — never plan slug alone.",
           "Stripe prices come from STRIPE_ADDON_<KEY>_PRICE_ID (optional yearly companion). Unlock Feature stays disabled until the Stripe column shows Configured.",
-          "Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus even when Clerk has no billingPlan.",
+          "Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus even when Clerk has no billingPlan. An active team or education-team plan is also checked, so complimentary Pro Plus does not hide Team Gold eligibility for Live Classroom.",
+          "The public catalog shows Addon Plans prices and copy. Ineligible signed-in users get View eligible plans (opens /pricing) instead of a disabled Not eligible button.",
           "Team Admins assign the same catalog keys from Team Admin → Add-ons.",
         ],
       },
@@ -580,7 +581,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "editor",
         title: "Editor fields",
         bullets: [
-          "Display name — shown on /pricing/add-ons and the Stripe product.",
+          "Display name — shown on /pricing/add-ons and the Stripe product. Catalog cards use this name, Description (blurb), and the monthly/yearly prices you save.",
           "Monthly price ($) — billed each month.",
           "Yearly price ($/mo billed annually) — Stripe yearly Price is this amount × 12.",
           "Description — catalog card blurb. Product details — longer copy stored on the Stripe product.",

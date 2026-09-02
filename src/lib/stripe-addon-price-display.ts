@@ -1,6 +1,5 @@
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
-import { formatCurrencyFromCents } from "@/lib/format-currency";
 import { roundMajor } from "@/lib/money-math";
 import {
   majorPerBillingCycleFromSubscriptionPrice,
@@ -9,20 +8,14 @@ import {
   resolveStripeAddonPriceIdFromEnvKey,
   type AddonBillingPeriod,
 } from "@/lib/stripe-addon-price-env";
+import {
+  formatAddonPriceMajor,
+  mergeAddonPriceLabelsWithCatalog,
+  type AddonStripePriceLabels,
+} from "@/lib/addon-catalog-price-labels";
 
-export type AddonStripePriceLabels = {
-  /** e.g. "$8.99/mo" — charged each month */
-  monthlyLabel: string | null;
-  /**
-   * Actual amount charged for a year of the add-on, e.g. "$95.88/yr".
-   * Prefer this for the yearly hero price (not a monthly-equivalent).
-   */
-  yearlyLabel: string | null;
-  /** Effective monthly rate when paying yearly, e.g. "$7.99/mo" */
-  yearlyMonthlyEquivalentLabel: string | null;
-  monthlyConfigured: boolean;
-  yearlyConfigured: boolean;
-};
+export type { AddonStripePriceLabels };
+export { mergeAddonPriceLabelsWithCatalog };
 
 function monthsPerBillingCycle(rec: Stripe.Price.Recurring): number {
   const n = rec.interval_count ?? 1;
@@ -38,11 +31,6 @@ function monthsPerBillingCycle(rec: Stripe.Price.Recurring): number {
     default:
       return 1;
   }
-}
-
-function formatMajor(amount: number, currency: string): string {
-  const cents = Math.round(amount * 100);
-  return formatCurrencyFromCents(cents, currency);
 }
 
 /**
@@ -99,7 +87,7 @@ export async function resolveAddonStripePriceLabels(
     const monthlyCharge =
       majorPerBillingCycleFromSubscriptionPrice(monthlyPrice);
     if (monthlyCharge != null) {
-      monthlyLabel = `${formatMajor(monthlyCharge, monthlyPrice.currency)}/mo`;
+      monthlyLabel = `${formatAddonPriceMajor(monthlyCharge, monthlyPrice.currency)}/mo`;
     }
   }
 
@@ -108,8 +96,8 @@ export async function resolveAddonStripePriceLabels(
   if (yearlyPrice?.active) {
     const annual = annualChargeMajor(yearlyPrice);
     if (annual != null) {
-      yearlyLabel = `${formatMajor(annual, yearlyPrice.currency)}/yr`;
-      yearlyMonthlyEquivalentLabel = `${formatMajor(
+      yearlyLabel = `${formatAddonPriceMajor(annual, yearlyPrice.currency)}/yr`;
+      yearlyMonthlyEquivalentLabel = `${formatAddonPriceMajor(
         roundMajor(annual / 12),
         yearlyPrice.currency,
       )}/mo`;

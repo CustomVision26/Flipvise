@@ -13,7 +13,7 @@
  *
  * Default monthly/yearly amounts (USD cents) can be overridden:
  *   AI_ESSAY_MONTHLY_CENTS=999 AI_ESSAY_YEARLY_CENTS=9900
- *   LIVE_CLASSROOM_MONTHLY_CENTS=1999 LIVE_CLASSROOM_YEARLY_CENTS=19900 ...
+ *   LIVE_CLASSROOM_MONTHLY_CENTS=1299 LIVE_CLASSROOM_YEARLY_CENTS=144000 ...
  */
 
 import { config } from "dotenv";
@@ -56,7 +56,7 @@ const DEFAULT_AMOUNTS: Record<
   ai_essay: { monthlyCents: 999, yearlyCents: 9900 },
   study_mode_focus: { monthlyCents: 499, yearlyCents: 4900 },
   /** Organization add-on — Team / Enterprise / Education Gold+Enterprise only. */
-  live_classroom: { monthlyCents: 1999, yearlyCents: 19900 },
+  live_classroom: { monthlyCents: 1299, yearlyCents: 144000 },
 };
 
 const FALLBACK_ADDONS: Array<{

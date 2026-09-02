@@ -59,6 +59,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/plan-change-addons-dialog.tsx",
     "src/actions/addons.ts",
     "src/lib/stripe-addon-price-display.ts",
+    "src/lib/addon-catalog-price-labels.ts",
+    "src/lib/addon-plan-eligibility.ts",
   ],
   "team-admin-add-ons": [
     "src/app/dashboard/(team-admin)/team-admin/add-ons/page.tsx",

@@ -648,8 +648,9 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Purchase optional premium add-ons (for example AI Essay) that attach to your existing subscription.",
         howItWorks: [
           "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
-          "Each card shows the live Stripe price (monthly, and yearly when configured) with a period toggle.",
-          "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe. Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus.",
+          "Each card shows Addon Plans prices (monthly, and yearly when configured) with a period toggle. Stripe fills the amount only when the catalog omits a price.",
+          "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe. Eligibility includes your personal plan, team or education-team plan, and complimentary admin Pro Plus — Team Gold still unlocks Live Classroom if you also have complimentary Pro Plus.",
+          "If your plan is not eligible, View eligible plans opens /pricing so you can upgrade.",
           "After you slide to subscribe, a success toast appears and you return to your personal dashboard; Inbox receives a formal add-on confirmation.",
           "During a plan change, if the catalog is published, locked add-ons may also be offered in a checkout dialog before payment.",
           "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",

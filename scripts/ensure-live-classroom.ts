@@ -104,7 +104,7 @@ async function main() {
       'live_classroom',
       'Flipvise Live Classroom™',
       'Run real-time interactive learning sessions with warm-up battles, team competitions, exit tickets, strategy cards, and AI session reports. Participant limits inherit your organization licensed seats.',
-      'Turn Flipvise into a live teaching platform — Zoom + Kahoot + Flipvise AI for Team and Enterprise organizations.',
+      'Turn Flipvise into a live teaching platform for Team and Enterprise organizations.',
       '["pro_plus_team_basic","pro_plus_team_gold","pro_plus_platinum_plan","pro_plus_enterprise","education_gold","education_enterprise"]'::json,
       'STRIPE_ADDON_LIVE_CLASSROOM_PRICE_ID',
       true,

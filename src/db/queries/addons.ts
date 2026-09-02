@@ -11,6 +11,7 @@ import { AI_ESSAY_ADDON_KEY } from "@/lib/addon-keys";
 import {
   isAccessEligibleForAddon,
   isPlanEligibleForAddon,
+  type AddonEligibilityAccess,
 } from "@/lib/addon-plan-eligibility";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
@@ -256,13 +257,14 @@ export async function listActiveUserAddonEntitlements(
 }
 
 /**
- * Add-on keys the user may use given their effective plan.
- * Stripe/team entitlements require plan eligibility (Free → none).
- * Platform-admin grants remain available regardless of plan.
+ * Add-on keys the user may use given their plans (personal, team, and
+ * complimentary admin Pro Plus). Stripe/team entitlements require plan
+ * eligibility (Free → none). Platform-admin grants remain available regardless
+ * of plan.
  */
 export async function listAccessibleAddonKeysForUser(
   userId: string,
-  effectivePlanSlug: string | null | undefined,
+  access: AddonEligibilityAccess,
 ): Promise<string[]> {
   const entitlements = await listActiveUserAddonEntitlements(userId);
   if (entitlements.length === 0) return [];
@@ -279,7 +281,7 @@ export async function listAccessibleAddonKeysForUser(
     }
     const catalog = await getAddonCatalogByKey(row.addonKey);
     if (!catalog) continue;
-    if (isPlanEligibleForAddon(catalog.eligiblePlanIds, effectivePlanSlug)) {
+    if (isAccessEligibleForAddon(catalog.eligiblePlanIds, access)) {
       keys.push(row.addonKey);
     }
   }
