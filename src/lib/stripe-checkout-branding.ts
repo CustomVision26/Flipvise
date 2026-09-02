@@ -1,6 +1,11 @@
 import type Stripe from "stripe";
 import { resolveLogoImageUrl } from "@/lib/branding";
 
+type CheckoutSessionCreateParams = Stripe.Checkout.SessionCreateParams;
+type CheckoutExcludedPaymentMethodType = NonNullable<
+  CheckoutSessionCreateParams["excluded_payment_method_types"]
+>[number];
+
 /** Light neutral page — traditional invoice / billing feel. */
 const CHECKOUT_BACKGROUND_COLOR = "#f6f7f9";
 /** Navy CTA — restrained, formal contrast on light background. */
@@ -23,7 +28,7 @@ const STRIPE_CHECKOUT_ALLOWED_DYNAMIC_TYPES = new Set<string>([
   "us_bank_account",
 ]);
 
-const STRIPE_CHECKOUT_EXCLUDABLE_PAYMENT_METHOD_TYPES: Stripe.Checkout.SessionCreateParams.ExcludedPaymentMethodType[] =
+const STRIPE_CHECKOUT_EXCLUDABLE_PAYMENT_METHOD_TYPES: CheckoutExcludedPaymentMethodType[] =
   [
     "acss_debit",
     "affirm",
@@ -87,7 +92,7 @@ export const STRIPE_CHECKOUT_EXCLUDED_PAYMENT_METHOD_TYPES =
  * methods (cards, wallets, Link, ACH) come from the Dashboard.
  */
 export function stripeCheckoutBrandingParams(): Pick<
-  Stripe.Checkout.SessionCreateParams,
+  CheckoutSessionCreateParams,
   "branding_settings" | "custom_text"
 > {
   const logoUrl = absoluteLogoUrlForCheckout();
@@ -122,11 +127,11 @@ export function stripeCheckoutBrandingParams(): Pick<
  * enabled in the Dashboard.
  */
 export function stripeCheckoutElementsSessionParams(): Pick<
-  Stripe.Checkout.SessionCreateParams,
+  CheckoutSessionCreateParams,
   "ui_mode" | "excluded_payment_method_types"
 > {
   return {
-    ui_mode: "elements" as Stripe.Checkout.SessionCreateParams["ui_mode"],
+    ui_mode: "elements" as CheckoutSessionCreateParams["ui_mode"],
     excluded_payment_method_types: STRIPE_CHECKOUT_EXCLUDED_PAYMENT_METHOD_TYPES,
   };
 }

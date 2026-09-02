@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-02T23:25:11.787Z",
+  "updatedAt": "2026-09-02T23:39:34.950Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "d84d35021597f04e786b27462ccd35ff04cfac2b7b5854ba518a802e76681c8e",
@@ -107,11 +107,11 @@
       "docFingerprint": "c94045d15840d1d6f07852565946998a934c1be9b8b6051cddabdd5b92d13feb"
     },
     "stripe-billing-payment": {
-      "watchFingerprint": "2dea8316036c16cc8b6b483dd25ec7c107e1f657df3582c286099b6144b3c18a",
+      "watchFingerprint": "d9de5f9a5828bb8935ac1957b541920f79a68765cddc513b08ca61a265927f29",
       "docFingerprint": "677073dfe1b02d6c6243befa8b2a3c27c5b938386ad40d7181daa65baf913f20"
     },
     "checkout": {
-      "watchFingerprint": "893495f6085dcf9c52bc00687f68ded000238731e9d720fcb71c17620efd7950",
+      "watchFingerprint": "8fd759d80aaa31f8a61c9205a437100f432f5b42d2dc73335fa4d8de061dd0ae",
       "docFingerprint": "4faaadff6d7f297101119ec0ce18bf3fad0481398d86a3b2cfbe4a9cacb97391"
     },
     "manage-subscription": {
@@ -271,7 +271,7 @@
       "docFingerprint": "a4fb82943b98c78a343442bf2c56f8a3d0f41f55d93980e693bd0fdbfe80eaea"
     },
     "pricing-plans": {
-      "watchFingerprint": "892199d8447f5d198bbbcabfee66392efce184ec0b2169620215c834595f83b5",
+      "watchFingerprint": "4c93619ea4ccd0f321f4a829aa802c5d57890349eee90f0513738dd3f210b31e",
       "docFingerprint": "d04862aca256e8f8c5eade72009366c359e4148390960e12752079934bc0f972"
     },
     "addon-plans": {
