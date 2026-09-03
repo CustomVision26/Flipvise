@@ -59,9 +59,8 @@ export function buildAdminBillingMonitorRows(input: {
     if (sub.status === "trialing") {
       const trialEnd = sub.trialEnd ?? sub.currentPeriodEnd;
       const trialStart = sub.createdAt;
-      const chargeAt = trialEnd;
       const detail = trialEnd
-        ? `Trial started ${trialStart.toLocaleDateString(undefined, { dateStyle: "long" })} · ends ${trialEnd.toLocaleDateString(undefined, { dateStyle: "long" })} · first charge ${chargeAt.toLocaleDateString(undefined, { dateStyle: "long" })}`
+        ? `Trial started ${trialStart.toLocaleDateString(undefined, { dateStyle: "long" })} · ends ${trialEnd.toLocaleDateString(undefined, { dateStyle: "long" })} · first charge ${trialEnd.toLocaleDateString(undefined, { dateStyle: "long" })}`
         : "On trial";
       pushRow({
         userId: sub.userId,

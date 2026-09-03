@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-03T01:09:58.263Z",
+  "updatedAt": "2026-09-03T01:30:51.443Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "d84d35021597f04e786b27462ccd35ff04cfac2b7b5854ba518a802e76681c8e",
@@ -235,7 +235,7 @@
       "docFingerprint": "91aa768f4effcfe6258ca9fda087d6c91768f27a79150b63425e0adc9708f9c6"
     },
     "subscription-monitor": {
-      "watchFingerprint": "2448c7818b5da94bf4e108cb6c1de83cd3804c17c7cc520eaae22ca640215f77",
+      "watchFingerprint": "4f044801487c624bf0bec03e1d785dde17f94597ffb74df0a2cc2c95ef21edce",
       "docFingerprint": "a557f1e7d7b6a2f6af864777ab3edcb6b846b7450400b149b97423a96f33f686"
     },
     "subscription-deletion-proration": {
