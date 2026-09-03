@@ -301,7 +301,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "New accounts receive a formal Welcome to Flipvise message with getting-started tips.",
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
           "Team workspace invites use a formal message with the workspace name, role (Team Admin or Member), plan owner, and inviting team admin when available — accept or decline from the inbox.",
-          "After a successful plan subscribe, plan change, or add-on purchase, Inbox receives a formal written confirmation (separate from the on-screen toast). Free-trial confirmations say you are on a trial and list the start date, end date, and first renewal charge date.",
+          "After a successful plan subscribe, plan change, or add-on purchase, Inbox receives a formal written confirmation (separate from the on-screen toast). Free-trial confirmations say you are on a trial and list the start date, end date, and first renewal charge date. Confirmations close with a single signature: Regards, Flipvise Team by Flipvise Studio LLC.",
           "Accept team invites, review Flipvise billing receipts, open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",

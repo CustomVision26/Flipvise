@@ -38,5 +38,7 @@ describe("subscription checkout inbox trial copy", () => {
     assert.match(body, /free trial that started September 2, 2026/);
     assert.match(body, /ends September 9, 2026/);
     assert.match(body, /renewal charge will be billed on September 9, 2026/);
+    assert.match(body, /Regards,\nFlipvise Team by Flipvise Studio LLC$/);
+    assert.equal(body.split("Flipvise Team by Flipvise Studio LLC").length - 1, 1);
   });
 });

@@ -138,6 +138,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/record-welcome-inbox.ts",
     "src/lib/record-subscription-checkout-inbox.ts",
     "src/lib/subscription-checkout-inbox-copy.ts",
+    "src/lib/flipvise-inbox-signature.ts",
     "src/lib/team-invite-message-copy.ts",
     "src/components/login-welcome-toast.tsx",
     "src/lib/flipvise-billing-receipt.ts",

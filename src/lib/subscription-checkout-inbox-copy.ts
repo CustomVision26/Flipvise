@@ -1,4 +1,5 @@
 import { isStripeSetupIntentId } from "@/lib/stripe-checkout-session-id";
+import { withFlipviseInboxSignature } from "@/lib/flipvise-inbox-signature";
 
 export type SubscriptionCheckoutConfirmationKind =
   | "plan"
@@ -107,30 +108,30 @@ export function subscriptionCheckoutConfirmationDescription(input: {
     : "";
 
   if (kind === "addon") {
-    return (
+    return withFlipviseInboxSignature(
       `Thank you for unlocking the ${input.planLabel} add-on on your Flipvise account.` +
-      amountClause +
-      ` This add-on is active now and renews separately from your base plan; you may cancel the add-on anytime in Billing without ending your plan.` +
-      ` A copy of this confirmation is kept in your inbox for your records.`
+        amountClause +
+        ` This add-on is active now and renews separately from your base plan; you may cancel the add-on anytime in Billing without ending your plan.` +
+        ` A copy of this confirmation is kept in your inbox for your records.`,
     );
   }
 
   if (kind === "plan_change") {
-    return (
+    return withFlipviseInboxSignature(
       `Thank you for confirming your plan change to ${input.planLabel}.` +
-      amountClause +
-      promoClause +
-      ` Your subscription has been updated with proration for the remainder of the current billing period.` +
-      ` You can review receipts and manage renewal in Billing. This confirmation is saved in your inbox.`
+        amountClause +
+        promoClause +
+        ` Your subscription has been updated with proration for the remainder of the current billing period.` +
+        ` You can review receipts and manage renewal in Billing. This confirmation is saved in your inbox.`,
     );
   }
 
-  return (
+  return withFlipviseInboxSignature(
     `Thank you for subscribing to the ${input.planLabel} plan on Flipvise.` +
-    amountClause +
-    promoClause +
-    trialInboxClause(input.trial, billing) +
-    ` Your subscription is active, and paid features for this plan are available on your personal dashboard.` +
-    ` You can manage billing, receipts, and cancellation from your profile → Billing. This confirmation is saved in your inbox.`
+      amountClause +
+      promoClause +
+      trialInboxClause(input.trial, billing) +
+      ` Your subscription is active, and paid features for this plan are available on your personal dashboard.` +
+      ` You can manage billing, receipts, and cancellation from your profile → Billing. This confirmation is saved in your inbox.`,
   );
 }

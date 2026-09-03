@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-03T01:30:51.443Z",
+  "updatedAt": "2026-09-03T02:44:26.238Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "d84d35021597f04e786b27462ccd35ff04cfac2b7b5854ba518a802e76681c8e",
@@ -43,8 +43,8 @@
       "docFingerprint": "1d5d33115b1583c83a08969bf3fd867497aada277bd09a54d7fcc0edd78bbd56"
     },
     "inbox": {
-      "watchFingerprint": "421c496c568693af7e645643fe4b7af1b8f9780e9d9e6d4746ac4345f8eb7c16",
-      "docFingerprint": "621891650fc7131165885b38a434a75127b29bf9c9f825583754701f74a37d01"
+      "watchFingerprint": "17acb90226ef0a80e55a6047674795fe39b82bf92442bc55bd0ebed9f514fbde",
+      "docFingerprint": "259fec5ce4f7944bc20ff226fc55c6f270abaf783a2f16fb088fd103436acab7"
     },
     "help-center-overview": {
       "watchFingerprint": "b738b1b91624db937518dfac35e0ffd721e7ed8f86ec190766677c58c170a545",

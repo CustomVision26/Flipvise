@@ -661,7 +661,8 @@ function InboxItemRow({
                 className={cn(
                   "text-sm leading-relaxed text-foreground",
                   (item.type === "welcome" ||
-                    item.type === "live_classroom_lobby") &&
+                    item.type === "live_classroom_lobby" ||
+                    item.type === "subscription_confirmed") &&
                     "whitespace-pre-line",
                 )}
               >
