@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { AdminBillingMonitorRow } from "@/lib/admin/billing-monitor-snapshot";
+import { groupAdminBillingMonitorRowsByUser } from "@/lib/admin/billing-monitor-snapshot";
 import type { SerializedDeletionProrationRow } from "@/lib/admin/deletion-proration-admin-dto";
 import { countDeletionProrationOwedFromSerialized } from "@/lib/admin/deletion-proration-admin-dto";
 import { formatCentsMoney } from "@/lib/money-math";
@@ -319,6 +320,11 @@ export function AdminBillingMonitor({ rows }: { rows: AdminBillingMonitorRow[] }
     });
   }, [rows, search, categoryFilter]);
 
+  const grouped = useMemo(
+    () => groupAdminBillingMonitorRowsByUser(filtered),
+    [filtered],
+  );
+
   const counts = useMemo(() => {
     const map = new Map<AdminBillingMonitorRow["category"], number>();
     for (const row of rows) {
@@ -393,45 +399,63 @@ export function AdminBillingMonitor({ rows }: { rows: AdminBillingMonitorRow[] }
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border/80">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead>Detail</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No matching billing alerts.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((row) => (
-                <TableRow key={`${row.userId}-${row.category}`}>
-                  <TableCell className="font-medium">{row.userName}</TableCell>
-                  <TableCell className="text-muted-foreground">{row.email ?? "—"}</TableCell>
-                  <TableCell>{row.planLabel}</TableCell>
-                  <TableCell>
-                    <Badge variant={categoryBadgeVariant(row.category)}>
-                      {CATEGORY_LABELS[row.category]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {new Date(row.eventAt).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-sm">{row.detail}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="space-y-3">
+        {grouped.length === 0 ? (
+          <div className="rounded-lg border border-border/80 py-8 text-center text-muted-foreground">
+            No matching billing alerts.
+          </div>
+        ) : (
+          grouped.map((group) => (
+            <div
+              key={group.userId}
+              className="overflow-hidden rounded-lg border border-border/80"
+            >
+              <div className="flex flex-col gap-1 border-b border-border/60 bg-card/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium text-foreground">{group.userName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {group.email ?? "—"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{group.planLabel}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {group.incidents.length}{" "}
+                    {group.incidents.length === 1 ? "incident" : "incidents"}
+                  </span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Detail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.incidents.map((row) => (
+                      <TableRow key={`${row.userId}-${row.category}`}>
+                        <TableCell>
+                          <Badge variant={categoryBadgeVariant(row.category)}>
+                            {CATEGORY_LABELS[row.category]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {new Date(row.eventAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="min-w-[16rem] whitespace-normal text-sm">
+                          {row.detail}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -40,6 +40,7 @@ import { liveClassroomLobbyInboxRowsToInboxItems } from "@/lib/live-classroom-lo
 import { listLiveClassroomLobbyInboxMessagesForUser } from "@/db/queries/live-classroom-lobby-inbox";
 import { listBillingNoticeInboxMessagesForUser } from "@/db/queries/billing-notice-inbox";
 import { listWelcomeInboxMessagesForUser } from "@/db/queries/welcome-inbox";
+import { getActiveStripeSubscription } from "@/db/queries/stripe-subscriptions";
 import { formatUserInvoicePromoDisplay } from "@/lib/admin-invoice-promo-display";
 import { adminPlanAssignmentLogToInboxItem } from "@/lib/admin-plan-inbox-item";
 import { adminPlanInviteRowToInboxItem } from "@/lib/admin-plan-invite-inbox";
@@ -103,6 +104,7 @@ export default async function DashboardInboxPage() {
     billingNoticeRows,
     welcomeInboxRows,
     liveClassroomLobbyInboxRows,
+    stripeSubscription,
   ] = await Promise.all([
     getQuizResultInboxForUser(userId),
     getAiRecallResultInboxForUser(userId).catch(() => []),
@@ -122,6 +124,7 @@ export default async function DashboardInboxPage() {
     listBillingNoticeInboxMessagesForUser(userId),
     listWelcomeInboxMessagesForUser(userId),
     listLiveClassroomLobbyInboxMessagesForUser(userId).catch(() => []),
+    getActiveStripeSubscription(userId).catch(() => null),
   ]);
 
   // ── Resolve team context for quiz results ─────────────────────────────────
@@ -295,10 +298,30 @@ export default async function DashboardInboxPage() {
   }
 
   // 3. Subscription checkout confirmations
+  const checkoutTrial =
+    stripeSubscription?.status === "trialing" && stripeSubscription.trialEnd
+      ? {
+          startedAt: stripeSubscription.createdAt,
+          endsAt: stripeSubscription.trialEnd,
+          chargeAt: stripeSubscription.trialEnd,
+        }
+      : null;
+
   for (const row of subscriptionCheckoutRows) {
     const key = `subscription_confirmed:${row.id}`;
     const isRead = readSet.has(key);
     const period = row.period === "yearly" ? "yearly" : "monthly";
+    const trial =
+      checkoutTrial &&
+      row.createdAt.getTime() <= checkoutTrial.endsAt.getTime()
+        ? {
+            ...checkoutTrial,
+            startedAt:
+              row.createdAt.getTime() <= checkoutTrial.endsAt.getTime()
+                ? row.createdAt
+                : checkoutTrial.startedAt,
+          }
+        : null;
 
     items.push({
       type: "subscription_confirmed",
@@ -308,6 +331,7 @@ export default async function DashboardInboxPage() {
         planSlug: row.planSlug,
         checkoutSessionId: row.checkoutSessionId,
         promoDisplay: row.promoDisplay ?? null,
+        trial,
       }),
       description: subscriptionCheckoutConfirmationDescription({
         planLabel: row.planLabel,
@@ -317,6 +341,7 @@ export default async function DashboardInboxPage() {
         amountCents: row.amountCents ?? null,
         currency: row.currency ?? null,
         promoDisplay: row.promoDisplay ?? null,
+        trial,
       }),
       dateIso: row.createdAt.toISOString(),
       isRead,

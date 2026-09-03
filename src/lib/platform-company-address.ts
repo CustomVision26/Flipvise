@@ -15,12 +15,21 @@ export type PlatformCompanyAddress = {
 export const DEFAULT_PLATFORM_COMPANY_ADDRESS: PlatformCompanyAddress = {
   name: "Flipvise Studio LLC",
   streetAddress: "6450 Aragon Way",
-  line2: "apt 205",
+  line2: "",
   city: "Fort Myers",
   stateProvince: "Florida",
   postalCode: "33966",
   country: "United States",
 };
+
+/** Former default unit that must not appear on invoices or Contact Us. */
+const LEGACY_COMPANY_APARTMENT = /^apt\.?\s*205$/i;
+
+export function companyAddressHasLegacyApartment(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const line2 = (value as { line2?: unknown }).line2;
+  return typeof line2 === "string" && LEGACY_COMPANY_APARTMENT.test(line2.trim());
+}
 
 /** Stripe invoice/receipt handle shown next to the company name (image 3). */
 export const STRIPE_INVOICE_SELLER_HANDLE = "@flipvise";
@@ -33,7 +42,7 @@ export function formatInvoiceSellerName(name: string): string {
 }
 
 /**
- * Invoice/receipt seller lines: company name, street, apartment, city/state/postal,
+ * Invoice/receipt seller lines: company name, street, optional suite, city/state/postal,
  * country, optional phone. Matches the Contact Us company address.
  */
 export function formatPlatformCompanyAddressInvoiceLines(
@@ -80,8 +89,13 @@ export function parsePlatformCompanyAddress(
   value: unknown,
 ): PlatformCompanyAddress {
   const parsed = platformCompanyAddressSchema.safeParse(value);
-  if (parsed.success) return parsed.data;
-  return { ...DEFAULT_PLATFORM_COMPANY_ADDRESS };
+  const address = parsed.success
+    ? parsed.data
+    : { ...DEFAULT_PLATFORM_COMPANY_ADDRESS };
+  if (LEGACY_COMPANY_APARTMENT.test(address.line2.trim())) {
+    return { ...address, line2: "" };
+  }
+  return address;
 }
 
 export function formatPlatformCompanyAddressLines(

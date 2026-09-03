@@ -4,6 +4,7 @@ import { contactUsMessages, contactUsReplies, platformContactSettings } from "@/
 import { SUPPORT_EMAIL } from "@/lib/support-contact";
 import {
   DEFAULT_PLATFORM_COMPANY_ADDRESS,
+  companyAddressHasLegacyApartment,
   parsePlatformCompanyAddress,
   type PlatformCompanyAddress,
 } from "@/lib/platform-company-address";
@@ -53,6 +54,22 @@ function withParsedCompanyAddress(
   };
 }
 
+async function persistClearedLegacyCompanyApartment(
+  row: typeof platformContactSettings.$inferSelect,
+) {
+  const parsed = withParsedCompanyAddress(row);
+  if (!companyAddressHasLegacyApartment(row.companyAddress)) return parsed;
+  try {
+    await db
+      .update(platformContactSettings)
+      .set({ companyAddress: parsed.companyAddress, updatedAt: new Date() })
+      .where(eq(platformContactSettings.id, SETTINGS_ID));
+  } catch (error) {
+    console.error("[persistClearedLegacyCompanyApartment]", error);
+  }
+  return parsed;
+}
+
 export async function getPlatformContactSettings() {
   return withContactUsReadFallback(async () => {
     try {
@@ -62,7 +79,7 @@ export async function getPlatformContactSettings() {
         .where(eq(platformContactSettings.id, SETTINGS_ID))
         .limit(1);
 
-      if (rows[0]) return withParsedCompanyAddress(rows[0]);
+      if (rows[0]) return persistClearedLegacyCompanyApartment(rows[0]);
 
       await db
         .insert(platformContactSettings)
@@ -82,7 +99,7 @@ export async function getPlatformContactSettings() {
         .limit(1);
 
       return seeded[0]
-        ? withParsedCompanyAddress(seeded[0])
+        ? persistClearedLegacyCompanyApartment(seeded[0])
         : defaultPlatformContactSettingsRow();
     } catch (error) {
       if (!isMissingPlatformCompanyAddressColumnError(error)) throw error;

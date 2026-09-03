@@ -79,9 +79,10 @@ import {
 } from "@/data/world-country-subdivisions";
 import {
   DEFAULT_PLATFORM_COMPANY_ADDRESS,
+  parsePlatformCompanyAddress,
   type PlatformCompanyAddress,
 } from "@/lib/platform-company-address";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const AdminContactUsThreadPanel = dynamic(
   () =>
@@ -233,14 +234,29 @@ export function AdminContactUsPanel({
   function handleSaveSettings() {
     startTransition(async () => {
       setSettingsSaved(false);
-      await updatePlatformContactSettingsAction({
-        email: email.trim(),
-        phone: phone.trim() || null,
-        companyAddress,
-        socialLinks: socialLinks.filter((l) => l.label.trim() && l.url.trim()),
-      });
-      setSettingsSaved(true);
-      router.refresh();
+      try {
+        const result = await updatePlatformContactSettingsAction({
+          email: email.trim(),
+          phone: phone.trim() || null,
+          companyAddress: parsePlatformCompanyAddress(companyAddress),
+          socialLinks: socialLinks.filter(
+            (link) => link.label.trim() && link.url.trim() && link.platform.trim(),
+          ),
+        });
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        setSettingsSaved(true);
+        toast.success("Contact details saved.");
+        router.refresh();
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not save contact details. Try again.",
+        );
+      }
     });
   }
 
@@ -410,7 +426,7 @@ export function AdminContactUsPanel({
                   onChange={(e) =>
                     setCompanyAddress((prev) => ({ ...prev, line2: e.target.value }))
                   }
-                  placeholder="apt 205"
+                  placeholder="Suite (optional)"
                   className={adminFilterInputClass}
                 />
               </div>

@@ -164,6 +164,7 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Billing monitor alerts",
         bullets: [
           "Summary cards: active trial, trial ending soon, subscription expiring, payment failed (grace), grace expired.",
+          "Each user is a card with a nested incident table (category, event, full detail). Trial rows show start date, end date, and first charge date. Paid subscriptions nearing period end stay in Subscription expiring; trials do not also appear there.",
           "Grace window is 12 hours after the first past_due webhook before paid access reverts to Free.",
           "Search, category filter, and CSV export for operational follow-up.",
         ],
@@ -249,7 +250,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "links",
         title: "Hosted invoice and PDF",
         bullets: [
-          "Open Flipvise receipt when Stripe invoice id is persisted. The seller block uses Contact Us company address (street, apartment, city, phone).",
+          "Open Flipvise receipt when Stripe invoice id is persisted. The seller block uses Contact Us company address (street, city, phone — no apartment).",
           "Stripe-hosted PDFs still use Stripe Dashboard business details for their header. Flipvise also stamps the Contact Us address on new Stripe invoices (footer and Company/Address fields).",
           "Proration receipts from plan changes appear here after invoice.payment_succeeded webhook processing.",
         ],
@@ -527,7 +528,7 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Platform contact settings",
         bullets: [
           "Edit support email, phone, company address (state / province / parish), and social links displayed on the public /contact page.",
-          "Saving contact details stores the company address for /contact and as the seller block on Flipvise receipts. New Stripe invoices also get this address in the footer and Company/Address fields.",
+          "Saving contact details stores the company address for /contact and as the seller block on Flipvise receipts. New Stripe invoices also get this address in the footer and Company/Address fields. Incomplete social links are skipped; invalid fields show an on-page error instead of crashing the screen.",
           "Stripe-hosted invoice PDF headers still come from Stripe Dashboard → Settings → Public details and Business details (test and live). Stripe does not allow apps to change the platform account seller header.",
           "The Stripe webhook must include invoice.created so new invoices receive the footer stamp.",
           "Changes apply immediately to the Contact Us page footer and contact cards.",

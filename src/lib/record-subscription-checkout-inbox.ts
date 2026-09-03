@@ -15,53 +15,20 @@ import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import { resolveCheckoutSessionChargeReceiptUrl } from "@/lib/stripe-invoice-receipt-url";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import { STRIPE_ADDON_META_TYPE } from "@/lib/stripe-addon-metadata";
+import { normalizeCheckoutPeriod } from "@/lib/subscription-checkout-inbox-copy";
+
+export {
+  resolveSubscriptionCheckoutConfirmationKind,
+  subscriptionCheckoutConfirmationDescription,
+  subscriptionCheckoutConfirmationTitle,
+} from "@/lib/subscription-checkout-inbox-copy";
+export type {
+  SubscriptionCheckoutConfirmationKind,
+  SubscriptionCheckoutTrialDates,
+} from "@/lib/subscription-checkout-inbox-copy";
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function normalizePeriod(value: unknown): "monthly" | "yearly" {
-  return value === "yearly" ? "yearly" : "monthly";
-}
-
-function periodLabel(period: "monthly" | "yearly"): string {
-  return period === "yearly" ? "annual" : "monthly";
-}
-
-function formatMoney(
-  amountCents: number | null,
-  currency: string | null,
-): string | null {
-  if (amountCents == null) return null;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: (currency ?? "USD").toUpperCase(),
-      maximumFractionDigits: 2,
-    }).format(amountCents / 100);
-  } catch {
-    return `${(amountCents / 100).toFixed(2)} ${currency ?? "USD"}`;
-  }
-}
-
-export type SubscriptionCheckoutConfirmationKind =
-  | "plan"
-  | "addon"
-  | "plan_change";
-
-export function resolveSubscriptionCheckoutConfirmationKind(input: {
-  planSlug: string;
-  checkoutSessionId: string;
-  promoDisplay?: string | null;
-}): SubscriptionCheckoutConfirmationKind {
-  if (input.planSlug.startsWith("addon:")) return "addon";
-  if (
-    isStripeSetupIntentId(input.checkoutSessionId) ||
-    input.promoDisplay === "Prorated plan change"
-  ) {
-    return "plan_change";
-  }
-  return "plan";
 }
 
 async function resolveReceiptUrl(
@@ -89,7 +56,7 @@ export async function recordSubscriptionCheckoutInboxForSession(
   if (session.mode !== "subscription") return;
 
   const isAddon = session.metadata?.type === STRIPE_ADDON_META_TYPE;
-  const period = normalizePeriod(session.metadata?.period);
+  const period = normalizeCheckoutPeriod(session.metadata?.period);
   const amountCents =
     typeof session.amount_total === "number" ? session.amount_total : null;
   const currency = stringOrNull(session.currency)?.toUpperCase() ?? null;
@@ -168,65 +135,4 @@ export async function recordPlanChangeCheckoutInboxConfirmation(input: {
     category: "subscription_checkout",
     body: `${input.planLabel} plan updated`,
   });
-}
-
-export function subscriptionCheckoutConfirmationTitle(input: {
-  planLabel: string;
-  planSlug: string;
-  checkoutSessionId: string;
-  promoDisplay?: string | null;
-}): string {
-  const kind = resolveSubscriptionCheckoutConfirmationKind(input);
-  if (kind === "addon") return `Add-on confirmed — ${input.planLabel}`;
-  if (kind === "plan_change") return `Plan updated — ${input.planLabel}`;
-  return `Subscription confirmed — ${input.planLabel}`;
-}
-
-/** Formal inbox body for plan / add-on / plan-change confirmations. */
-export function subscriptionCheckoutConfirmationDescription(input: {
-  planLabel: string;
-  planSlug: string;
-  checkoutSessionId: string;
-  period: string;
-  amountCents: number | null;
-  currency: string | null;
-  promoDisplay: string | null;
-}): string {
-  const kind = resolveSubscriptionCheckoutConfirmationKind(input);
-  const period = normalizePeriod(input.period);
-  const billing = periodLabel(period);
-  const amount = formatMoney(input.amountCents, input.currency);
-  const amountClause = amount
-    ? ` Today's charge was ${amount} (${billing} billing).`
-    : ` Billing is ${billing}.`;
-  const promoClause = input.promoDisplay
-    ? ` Promotion applied: ${input.promoDisplay}.`
-    : "";
-
-  if (kind === "addon") {
-    return (
-      `Thank you for unlocking the ${input.planLabel} add-on on your Flipvise account.` +
-      amountClause +
-      ` This add-on is active now and renews separately from your base plan; you may cancel the add-on anytime in Billing without ending your plan.` +
-      ` A copy of this confirmation is kept in your inbox for your records.`
-    );
-  }
-
-  if (kind === "plan_change") {
-    return (
-      `Thank you for confirming your plan change to ${input.planLabel}.` +
-      amountClause +
-      promoClause +
-      ` Your subscription has been updated with proration for the remainder of the current billing period.` +
-      ` You can review receipts and manage renewal in Billing. This confirmation is saved in your inbox.`
-    );
-  }
-
-  return (
-    `Thank you for subscribing to the ${input.planLabel} plan on Flipvise.` +
-    amountClause +
-    promoClause +
-    ` Your subscription is active, and paid features for this plan are available on your personal dashboard.` +
-    ` You can manage billing, receipts, and cancellation from your profile → Billing. This confirmation is saved in your inbox.`
-  );
 }

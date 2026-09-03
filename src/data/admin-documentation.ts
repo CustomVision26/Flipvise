@@ -74,7 +74,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/subscription-monitor",
         purpose: "Track billing alerts: trials, expirations, payment grace, and past-due users.",
         howItWorks: [
-          "Billing monitor tab: trial ending, subscription expiring, payment grace, and past-due users.",
+          "Billing monitor tab groups alerts by user, with a nested incident table for category, event time, and full detail (trial start, trial end, and first charge when on a trial).",
           "Search, category filter, and CSV export for operational follow-up.",
         ],
         requirements: ["Platform admin access."],
@@ -108,8 +108,8 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Filter by invoice status, date range, and search (invoice #, name, email).",
           "Promo column shows general vs affiliate codes and discount detail.",
-          "Open Flipvise receipt (seller address from Contact Us company address).",
-          "Seller name and mailing address on Stripe-hosted PDFs come from Stripe Dashboard business details; Flipvise receipts use the Contact Us company address including apartment and phone.",
+          "Open Flipvise receipt (seller address from Contact Us company address — street, city, and phone; no apartment).",
+          "Seller name and mailing address on Stripe-hosted PDFs come from Stripe Dashboard business details; Flipvise receipts use the Contact Us company street address and phone (no apartment).",
           "Export CSV.",
         ],
         requirements: ["Platform admin access."],

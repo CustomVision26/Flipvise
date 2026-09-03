@@ -36,6 +36,10 @@ export const INBOX_ARTICLES: DocArticle[] = [
             ],
             ["Affiliate invite / arrangement change", "Accept invite or confirm plan change"],
             ["Billing / Flipvise receipt", "Open receipt with company mailing address"],
+            [
+              "Subscription confirmation",
+              "Read plan or trial details (trial start, end, and first charge date when applicable)",
+            ],
             ["Quiz result", "Open full attempt breakdown"],
             ["Affiliate broadcast", "Read promo announcements from admin"],
             ["Contact Us reply", "Open live chat thread"],

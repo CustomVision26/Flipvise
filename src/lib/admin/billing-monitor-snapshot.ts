@@ -58,6 +58,11 @@ export function buildAdminBillingMonitorRows(input: {
 
     if (sub.status === "trialing") {
       const trialEnd = sub.trialEnd ?? sub.currentPeriodEnd;
+      const trialStart = sub.createdAt;
+      const chargeAt = trialEnd;
+      const detail = trialEnd
+        ? `Trial started ${trialStart.toLocaleDateString(undefined, { dateStyle: "long" })} · ends ${trialEnd.toLocaleDateString(undefined, { dateStyle: "long" })} · first charge ${chargeAt.toLocaleDateString(undefined, { dateStyle: "long" })}`
+        : "On trial";
       pushRow({
         userId: sub.userId,
         userName,
@@ -66,9 +71,7 @@ export function buildAdminBillingMonitorRows(input: {
         category: "active_trial",
         status: "trialing",
         eventAt: (trialEnd ?? sub.updatedAt).toISOString(),
-        detail: trialEnd
-          ? `Trial ends ${trialEnd.toLocaleDateString(undefined, { dateStyle: "long" })}`
-          : "On trial",
+        detail,
       });
 
       if (trialEnd && trialEnd.getTime() - nowMs <= TRIAL_ENDING_SOON_MS && trialEnd.getTime() > nowMs) {
@@ -86,7 +89,7 @@ export function buildAdminBillingMonitorRows(input: {
     }
 
     if (
-      (sub.status === "active" || sub.status === "trialing") &&
+      sub.status === "active" &&
       sub.currentPeriodEnd &&
       sub.currentPeriodEnd.getTime() - nowMs <= SUBSCRIPTION_EXPIRING_SOON_MS &&
       sub.currentPeriodEnd.getTime() > nowMs
@@ -145,6 +148,12 @@ export function buildAdminBillingMonitorRows(input: {
       : endingSoon
         ? "trial_ending_soon"
         : "active_trial";
+    const startLabel = trial.startedAt.toLocaleDateString(undefined, {
+      dateStyle: "long",
+    });
+    const endLabel = trial.trialEndsAt.toLocaleDateString(undefined, {
+      dateStyle: "long",
+    });
     pushRow({
       userId: trial.userId,
       userName: user?.fullName ?? trial.userId,
@@ -154,10 +163,39 @@ export function buildAdminBillingMonitorRows(input: {
       status: "trial_record",
       eventAt: trial.trialEndsAt.toISOString(),
       detail: ended
-        ? `Trial record — ended ${trial.trialEndsAt.toLocaleDateString(undefined, { dateStyle: "long" })}`
-        : `Trial record — ends ${trial.trialEndsAt.toLocaleDateString(undefined, { dateStyle: "long" })}`,
+        ? `Trial started ${startLabel} · ended ${endLabel}`
+        : `Trial started ${startLabel} · ends ${endLabel} · first charge ${endLabel}`,
     });
   }
 
   return out.sort((a, b) => a.eventAt.localeCompare(b.eventAt));
+}
+
+export type AdminBillingMonitorUserGroup = {
+  userId: string;
+  userName: string;
+  email: string | null;
+  planLabel: string;
+  incidents: AdminBillingMonitorRow[];
+};
+
+export function groupAdminBillingMonitorRowsByUser(
+  rows: AdminBillingMonitorRow[],
+): AdminBillingMonitorUserGroup[] {
+  const groups = new Map<string, AdminBillingMonitorUserGroup>();
+  for (const row of rows) {
+    const existing = groups.get(row.userId);
+    if (existing) {
+      existing.incidents.push(row);
+      continue;
+    }
+    groups.set(row.userId, {
+      userId: row.userId,
+      userName: row.userName,
+      email: row.email,
+      planLabel: row.planLabel,
+      incidents: [row],
+    });
+  }
+  return [...groups.values()];
 }

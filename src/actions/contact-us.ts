@@ -30,7 +30,7 @@ import {
   notifyUserOfContactUsAdminReply,
 } from "@/lib/contact-us-notify";
 import { serializeContactMessage } from "@/lib/contact-us-admin-dto";
-import { platformCompanyAddressSchema } from "@/lib/platform-company-address";
+import { platformCompanyAddressSchema, parsePlatformCompanyAddress } from "@/lib/platform-company-address";
 import {
   contactUsThreadHref,
   serializeContactUsThread,
@@ -85,8 +85,18 @@ async function assertContactUsThreadAccess(messageId: number, token?: string) {
 const socialLinkSchema = z.object({
   platform: z.string().trim().min(1).max(64),
   label: z.string().trim().min(1).max(120),
-  url: z.string().trim().url().max(500),
-});
+  url: z.string().trim().max(500),
+}).transform((link) => {
+  const trimmed = link.url.trim();
+  const url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return { ...link, url };
+}).pipe(
+  z.object({
+    platform: z.string().min(1),
+    label: z.string().min(1),
+    url: z.string().url(),
+  }),
+);
 
 const submitContactMessageSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -369,18 +379,40 @@ export async function pingContactUsGuestChatActiveAction(
 export async function updatePlatformContactSettingsAction(
   data: z.infer<typeof updateContactSettingsSchema>,
 ) {
-  const parsed = updateContactSettingsSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid contact settings");
+  const parsed = updateContactSettingsSchema.safeParse({
+    ...data,
+    companyAddress: parsePlatformCompanyAddress(data.companyAddress),
+    socialLinks: data.socialLinks.filter(
+      (link) => link.platform.trim() && link.label.trim() && link.url.trim(),
+    ),
+  });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      ok: false as const,
+      error: issue?.message
+        ? `Could not save contact details: ${issue.message}`
+        : "Could not save contact details. Check the email, address, and social links.",
+    };
+  }
 
   const { userId } = await requireAdmin();
 
-  await upsertPlatformContactSettings({
-    email: parsed.data.email,
-    phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
-    socialLinks: parsed.data.socialLinks as ContactSocialLink[],
-    companyAddress: parsed.data.companyAddress,
-    updatedByUserId: userId,
-  });
+  try {
+    await upsertPlatformContactSettings({
+      email: parsed.data.email,
+      phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
+      socialLinks: parsed.data.socialLinks as ContactSocialLink[],
+      companyAddress: parsed.data.companyAddress,
+      updatedByUserId: userId,
+    });
+  } catch (error) {
+    console.error("[updatePlatformContactSettingsAction]", error);
+    return {
+      ok: false as const,
+      error: "Could not save contact details. Try again.",
+    };
+  }
 
   revalidatePath("/contact");
   revalidatePath("/admin/support-center/contact-us");

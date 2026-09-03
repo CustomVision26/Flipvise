@@ -1,10 +1,12 @@
 import type Stripe from "stripe";
 import { getBillingInvoiceByRef } from "@/db/queries/billing";
 import { getPlatformContactSettings } from "@/db/queries/contact-us";
+import { getUserPlanTrial } from "@/db/queries/user-plan-trials";
 import {
   formatPlatformCompanyAddressInvoiceLines,
   parsePlatformCompanyAddress,
 } from "@/lib/platform-company-address";
+import { formatStripeInvoiceLineDescription } from "@/lib/stripe-invoice-trial-line";
 import { stripe } from "@/lib/stripe";
 
 export type FlipviseInvoiceReceiptLine = {
@@ -92,6 +94,48 @@ async function loadStripeInvoiceLines(
   return listed.data;
 }
 
+function unixSecondsOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+async function loadInvoiceTrialWindow(input: {
+  invoice: Stripe.Invoice;
+  userId: string;
+}): Promise<{ start: number | null; end: number | null }> {
+  const subRef = input.invoice.parent?.subscription_details?.subscription;
+  const subId =
+    typeof subRef === "string"
+      ? subRef
+      : subRef && typeof subRef === "object" && "id" in subRef
+        ? String(subRef.id)
+        : null;
+
+  if (subId) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subId);
+      const start = unixSecondsOrNull(subscription.trial_start);
+      const end = unixSecondsOrNull(subscription.trial_end);
+      if (start != null || end != null) return { start, end };
+    } catch (error) {
+      console.error("[loadFlipviseInvoiceReceipt] subscription", subId, error);
+    }
+  }
+
+  try {
+    const trial = await getUserPlanTrial(input.userId);
+    if (trial?.trialEndsAt) {
+      return {
+        start: null,
+        end: Math.floor(trial.trialEndsAt.getTime() / 1000),
+      };
+    }
+  } catch (error) {
+    console.error("[loadFlipviseInvoiceReceipt] userPlanTrial", error);
+  }
+
+  return { start: null, end: null };
+}
+
 export async function loadFlipviseInvoiceReceipt(input: {
   ref: string;
   userId: string;
@@ -163,6 +207,10 @@ export async function loadFlipviseInvoiceReceipt(input: {
     const invCurrency = (invoice.currency ?? currency).toLowerCase();
     const customerAddress =
       invoice.customer_address ?? invoice.customer_shipping?.address ?? null;
+    const trialWindow = await loadInvoiceTrialWindow({
+      invoice,
+      userId: input.userId,
+    });
 
     return {
       externalId: row.externalId,
@@ -177,11 +225,25 @@ export async function loadFlipviseInvoiceReceipt(input: {
       amountPaidLabel: formatMoney(cents, invCurrency),
       amountPaidCents: cents,
       currency: invCurrency,
-      lines: lineItems.map((line) => ({
-        description: stringOrNull(line.description) ?? "Item",
-        quantity: typeof line.quantity === "number" ? line.quantity : null,
-        amountLabel: formatMoney(line.amount ?? 0, invCurrency),
-      })),
+      lines: lineItems.map((line) => {
+        const isTrialCopy = /free trial/i.test(line.description ?? "");
+        const hasTrialEnd = trialWindow.end != null;
+        return {
+          description: formatStripeInvoiceLineDescription({
+            description: stringOrNull(line.description),
+            amountCents: line.amount ?? 0,
+            trialStartSeconds:
+              trialWindow.start ??
+              (hasTrialEnd ? unixSecondsOrNull(invoice.created) : null) ??
+              (isTrialCopy ? unixSecondsOrNull(line.period?.start) : null),
+            trialEndSeconds:
+              trialWindow.end ??
+              (isTrialCopy ? unixSecondsOrNull(line.period?.end) : null),
+          }),
+          quantity: typeof line.quantity === "number" ? line.quantity : null,
+          amountLabel: formatMoney(line.amount ?? 0, invCurrency),
+        };
+      }),
       stripeHostedUrl:
         stringOrNull(invoice.hosted_invoice_url) ?? row.hostedInvoiceUrl,
       paid,

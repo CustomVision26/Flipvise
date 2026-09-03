@@ -45,7 +45,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "Some plans offer a published free trial (e.g. Pro Plus — 7 days when enabled).",
           "One trial per account — after you use it, only Subscribe now is available.",
-          "Trial checkout shows $0 today; you add a payment method on Stripe but are not charged until the trial ends.",
+          "Trial checkout shows $0 today; you add a payment method on Stripe but are not charged until the trial ends. The Flipvise receipt lists the trial length (for example 7 days) and the end date.",
           "You must acknowledge billing terms before sliding to start the trial.",
           "When the trial ends, Stripe charges the monthly rate unless you cancel before then.",
           "Trial ending and expired notices appear in your dashboard inbox (not email).",
@@ -106,7 +106,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "after-purchase",
         title: "After purchase",
         bullets: [
-          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (including apartment and phone). Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
+          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (street, city, and phone — no apartment). Free-trial line items include the trial length and the date the trial ends. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "May sync to Flipvise inbox.",
           "Currency follows Stripe Price configuration (typically USD).",
         ],
