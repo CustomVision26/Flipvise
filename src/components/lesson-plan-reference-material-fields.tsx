@@ -3,6 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Camera, FileText, FileType, Link2, Loader2, Plus, Presentation, X } from "lucide-react";
 import { extractLessonPlanReferenceAction } from "@/actions/teacher-lesson-plan";
+import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -130,6 +131,13 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
       }
 
       const extracted = await extractLessonPlanReferenceAction(formData);
+      if (!extracted.ok) {
+        lastExtractErrorRef.current = extracted.error;
+        onError(extracted.error);
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return null;
+      }
       const material = normalizeLessonPlanReferenceMaterial({
         text: extracted.text,
         summary: extracted.summary,
@@ -138,10 +146,10 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
       resetSourcePickerState(setSourceMode, setUrl, setSelectedFile, fileInputRef);
       return material;
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not read that reference material. Try another source.";
+      const message = userFacingServerActionError(
+        error,
+        "Could not read that website. Try Add URL again, or paste the page text with Plain text.",
+      );
       lastExtractErrorRef.current = message;
       onError(message);
       setSelectedFile(null);

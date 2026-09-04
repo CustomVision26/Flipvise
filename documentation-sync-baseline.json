@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-03T02:44:26.238Z",
+  "updatedAt": "2026-09-04T03:27:30.350Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "d84d35021597f04e786b27462ccd35ff04cfac2b7b5854ba518a802e76681c8e",
@@ -207,8 +207,8 @@
       "docFingerprint": "5abfc9ed8a86a087b76478cefe5c10c158ef30e9f6816009b0405a33061e68ef"
     },
     "teacher-ai-content-tools": {
-      "watchFingerprint": "c730cf322ec68075d435c91cb388ab6dc5703b65498bcf9891ce4df27a40aa11",
-      "docFingerprint": "921b0a1686affca1590a52c293b54978ba962a18772e5c743560e19cd33107ea"
+      "watchFingerprint": "91882ae29351042c713f6cdf1a8c9257d6ba39b2e3051494778c1781d8698212",
+      "docFingerprint": "7ac509176bee22b8079fa88958f426200c4e15b45aeafc464ac78b952e56b4d4"
     },
     "teacher-classroom": {
       "watchFingerprint": "3c49f67e8911bdf103ddf7fc858e2a920c07ae9b6db49ee4eeb255361d90d006",

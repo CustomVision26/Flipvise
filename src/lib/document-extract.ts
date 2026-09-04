@@ -203,7 +203,24 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
         throw err;
       }
     }
-    throw err;
+    if (
+      err instanceof Error &&
+      /fetch failed|Failed to fetch|ECONNRESET|ENOTFOUND|ECONNREFUSED|certificate|network/i.test(
+        err.message,
+      )
+    ) {
+      try {
+        return await fetchUrlViaReaderProxy(parsed, controller.signal);
+      } catch {
+        throw new Error(
+          "Could not reach that website. Check the link, or paste the page text with Plain text.",
+        );
+      }
+    }
+    if (err instanceof Error) throw err;
+    throw new Error(
+      "Could not read that website. Try another page or upload a file.",
+    );
   } finally {
     clearTimeout(timeout);
   }

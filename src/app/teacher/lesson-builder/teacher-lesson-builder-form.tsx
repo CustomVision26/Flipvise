@@ -98,6 +98,7 @@ import {
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import { resolveDeckSubjectAndTopic } from "@/lib/deck-subject-topic";
 import { afterOverlayDismiss, dismissOpenOverlays } from "@/lib/dismiss-open-overlays";
+import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import {
   normalizeLessonPlanReferenceMaterial,
   type LessonPlanReferenceMaterial,
@@ -643,7 +644,7 @@ export function TeacherLessonBuilderForm({
         }
 
         const planPeriodDays = form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS;
-        let plan = await generateLessonPlanAction({
+        const generated = await generateLessonPlanAction({
           ...form,
           planPeriodDays,
           difficultyLevel:
@@ -657,6 +658,11 @@ export function TeacherLessonBuilderForm({
           referenceMaterials:
             resolvedReferences.length > 0 ? resolvedReferences : undefined,
         });
+        if (!generated.ok) {
+          setErrorMessage(generated.error);
+          return;
+        }
+        let plan = generated.result;
         setSavedPlanId(null);
         setSavedVocabularyDetailPdfUrl(null);
 
@@ -665,7 +671,7 @@ export function TeacherLessonBuilderForm({
           setShowResult(true);
           setIsGeneratingDayDetails(true);
           try {
-            const details = await generateAllDaysVocabularyDetailAction({
+            const detailsResult = await generateAllDaysVocabularyDetailAction({
               subject: form.subject,
               gradeLevel: form.gradeLevel,
               topic: form.topic,
@@ -681,6 +687,10 @@ export function TeacherLessonBuilderForm({
                 lessonTimeline: day.lessonTimeline,
               })),
             });
+            if (!detailsResult.ok) {
+              throw new Error(detailsResult.error);
+            }
+            const details = detailsResult.details;
             plan = {
               ...plan,
               weeklySchedule: attachVocabularyDetailsToSchedule(
@@ -708,15 +718,12 @@ export function TeacherLessonBuilderForm({
         }
         markDeckEditSyncResolved(form);
       } catch (error) {
-        const raw =
-          error instanceof Error
-            ? error.message
-            : "Lesson generation failed. Please try again.";
-        const message =
-          raw.includes("Server Components render") || raw.includes("digest property")
-            ? "Lesson generation failed. Refresh the page and try again. If it keeps happening, restart the dev server."
-            : raw;
-        setErrorMessage(message);
+        setErrorMessage(
+          userFacingServerActionError(
+            error,
+            "Lesson generation failed. Refresh the page and try again.",
+          ),
+        );
       } finally {
         setIsGenerating(false);
       }
@@ -746,7 +753,7 @@ export function TeacherLessonBuilderForm({
 
       setIsGeneratingDayDetails(true);
       try {
-        const details = await generateAllDaysVocabularyDetailAction({
+        const detailsResult = await generateAllDaysVocabularyDetailAction({
           subject: form.subject,
           gradeLevel: form.gradeLevel,
           topic: form.topic,
@@ -762,13 +769,16 @@ export function TeacherLessonBuilderForm({
             lessonTimeline: day.lessonTimeline,
           })),
         });
+        if (!detailsResult.ok) {
+          throw new Error(detailsResult.error);
+        }
 
         return {
           ...plan,
           weeklySchedule: mergeVocabularyDetailsByDayLabel(
             schedule,
             targetDays,
-            details,
+            detailsResult.details,
           ),
         };
       } catch (error) {
@@ -990,6 +1000,10 @@ export function TeacherLessonBuilderForm({
               ...payload,
             })
           : await saveLessonPlanAction(payload);
+      if (!saved.ok) {
+        toast.error(saved.error);
+        return;
+      }
 
       if (isEditing && editDraft) {
         setResult(planToSave);
@@ -1078,9 +1092,9 @@ export function TeacherLessonBuilderForm({
       },
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not save lesson plan.";
-      toast.error(message);
+      toast.error(
+        userFacingServerActionError(error, "Could not save lesson plan."),
+      );
     } finally {
       setIsSaving(false);
     }

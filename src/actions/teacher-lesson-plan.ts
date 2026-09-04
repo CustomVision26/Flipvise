@@ -15,6 +15,10 @@ import {
   isAiUsageLimitError,
 } from "@/lib/ai-usage/errors";
 import {
+  isNextControlFlowError,
+  userFacingServerActionError,
+} from "@/lib/server-action-client-error";
+import {
   coerceLessonPlanDayVocabularyDetail,
   coerceLessonPlanResultAi,
   lessonPlanDayVocabularyDetailAiSchema,
@@ -162,6 +166,19 @@ function lessonPlanValidationError(error: z.ZodError): string {
   }
 
   return issue.message || "Invalid input";
+}
+
+function failLessonPlanAction(
+  error: unknown,
+  fallback: string,
+  logLabel: string,
+): { ok: false; error: string } {
+  if (isNextControlFlowError(error)) throw error;
+  console.error(`[${logLabel}]`, error);
+  return {
+    ok: false,
+    error: userFacingServerActionError(error, fallback),
+  };
 }
 
 function truncateReferenceSummary(summary: string, max = 200): string {
@@ -333,7 +350,8 @@ function normalizeLessonPlanActionInput(
 
 export async function generateLessonPlanAction(
   data: LessonPlanActionInput,
-): Promise<LessonPlanResult> {
+): Promise<{ ok: true; result: LessonPlanResult } | { ok: false; error: string }> {
+  try {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -355,7 +373,7 @@ export async function generateLessonPlanAction(
     isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
   };
 
-  return runWithAiUsageContext(usageCtx, async () => {
+  const result = await runWithAiUsageContext(usageCtx, async () => {
   let curriculumContext: CurriculumResearchContext | null = null;
   let applyJamaicaNscGuidelines = false;
 
@@ -447,6 +465,14 @@ ${input.referenceMaterials?.length || input.referenceMaterialText?.trim() ? "- T
     };
   }
   });
+    return { ok: true as const, result };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Lesson generation failed. Please try again.",
+      "generateLessonPlanAction",
+    );
+  }
 }
 
 const generateDayVocabularyDetailSchema = z.object({
@@ -573,28 +599,40 @@ ${fiveERequirement}
 
 export async function generateDayVocabularyDetailAction(
   data: z.infer<typeof generateDayVocabularyDetailSchema>,
-) {
-  const ctx = await getAccessContext();
-  const { userId } = await requireTeacherToolsAccess(
-    ctx,
-    "Lesson Builder requires an education plan.",
-  );
+): Promise<
+  | { ok: true; detail: LessonPlanDayVocabularyDetail }
+  | { ok: false; error: string }
+> {
+  try {
+    const ctx = await getAccessContext();
+    const { userId } = await requireTeacherToolsAccess(
+      ctx,
+      "Lesson Builder requires an education plan.",
+    );
 
-  const parsed = generateDayVocabularyDetailSchema.safeParse(data);
-  if (!parsed.success) {
-    throw new Error(lessonPlanValidationError(parsed.error));
+    const parsed = generateDayVocabularyDetailSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new Error(lessonPlanValidationError(parsed.error));
+    }
+
+    const detail = await runWithAiUsageContext(
+      {
+        userId,
+        feature: "lesson_plan",
+        teamId: null,
+        subscriptionPlan: ctx.effectivePlanSlug,
+        isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+      },
+      () => generateDayVocabularyDetailCore(parsed.data),
+    );
+    return { ok: true, detail };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Could not generate vocabulary detail for that day. Please try again.",
+      "generateDayVocabularyDetailAction",
+    );
   }
-
-  return runWithAiUsageContext(
-    {
-      userId,
-      feature: "lesson_plan",
-      teamId: null,
-      subscriptionPlan: ctx.effectivePlanSlug,
-      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
-    },
-    () => generateDayVocabularyDetailCore(parsed.data),
-  );
 }
 
 const generateAllDaysVocabularyDetailSchema = z.object({
@@ -620,45 +658,57 @@ const generateAllDaysVocabularyDetailSchema = z.object({
 
 export async function generateAllDaysVocabularyDetailAction(
   data: z.infer<typeof generateAllDaysVocabularyDetailSchema>,
-) {
-  const ctx = await getAccessContext();
-  const { userId } = await requireTeacherToolsAccess(
-    ctx,
-    "Lesson Builder requires an education plan.",
-  );
+): Promise<
+  | { ok: true; details: LessonPlanDayVocabularyDetail[] }
+  | { ok: false; error: string }
+> {
+  try {
+    const ctx = await getAccessContext();
+    const { userId } = await requireTeacherToolsAccess(
+      ctx,
+      "Lesson Builder requires an education plan.",
+    );
 
-  const parsed = generateAllDaysVocabularyDetailSchema.safeParse(data);
-  if (!parsed.success) {
-    throw new Error(lessonPlanValidationError(parsed.error));
+    const parsed = generateAllDaysVocabularyDetailSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new Error(lessonPlanValidationError(parsed.error));
+    }
+
+    const details = await runWithAiUsageContext(
+      {
+        userId,
+        feature: "lesson_plan",
+        teamId: null,
+        subscriptionPlan: ctx.effectivePlanSlug,
+        isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+      },
+      async () => {
+        const { days, ...lessonContext } = parsed.data;
+        const jamaicaNscGuidelinesApplied =
+          await resolveApplyJamaicaNscForDetail(lessonContext);
+
+        return Promise.all(
+          days.map((day) =>
+            generateDayVocabularyDetailCore({
+              ...lessonContext,
+              jamaicaNscGuidelinesApplied,
+              dayLabel: day.dayLabel,
+              dailyFocus: day.dailyFocus,
+              vocabulary: day.vocabulary,
+              lessonTimeline: day.lessonTimeline,
+            }),
+          ),
+        );
+      },
+    );
+    return { ok: true, details };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Could not generate vocabulary detail for every day. Please try again.",
+      "generateAllDaysVocabularyDetailAction",
+    );
   }
-
-  return runWithAiUsageContext(
-    {
-      userId,
-      feature: "lesson_plan",
-      teamId: null,
-      subscriptionPlan: ctx.effectivePlanSlug,
-      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
-    },
-    async () => {
-      const { days, ...lessonContext } = parsed.data;
-      const jamaicaNscGuidelinesApplied =
-        await resolveApplyJamaicaNscForDetail(lessonContext);
-
-      return Promise.all(
-        days.map((day) =>
-          generateDayVocabularyDetailCore({
-            ...lessonContext,
-            jamaicaNscGuidelinesApplied,
-            dayLabel: day.dayLabel,
-            dailyFocus: day.dailyFocus,
-            vocabulary: day.vocabulary,
-            lessonTimeline: day.lessonTimeline,
-          }),
-        ),
-      );
-    },
-  );
 }
 
 const saveLessonPlanSchema = z.object({
@@ -802,7 +852,9 @@ async function tryUploadLessonPlanVocabularyDetailPdf(
 
 function revalidateLessonPlanPaths() {
   revalidatePath("/teacher/resources");
-  revalidatePath("/teacher/lesson-builder");
+  // Do not revalidate /teacher/lesson-builder here — refreshing that RSC
+  // tree after a mutation can fail the Server Action in production and hide
+  // the real error behind the generic "Server Components render" toast.
   revalidatePath("/teacher/quizzes");
   revalidatePath("/teacher/classes");
   revalidatePath("/dashboard");
@@ -1052,63 +1104,75 @@ export async function getJamaicaNscLessonGuidelinesAction(): Promise<JamaicaNscL
 
 export async function extractLessonPlanReferenceAction(
   formData: FormData,
-): Promise<{ text: string; summary: string }> {
-  const ctx = await getAccessContext();
-  const { userId } = await requireTeacherToolsAccess(
-    ctx,
-    "Lesson Builder requires an education plan.",
-  );
-
-  const url = formData.get("url")?.toString().trim() ?? "";
-  const fileEntry = formData.get("file");
-  const hasFile = fileEntry instanceof File && fileEntry.size > 0;
-
-  if (url && hasFile) {
-    throw new Error("Add either a website URL or a file — not both at once.");
-  }
-  if (!url && !hasFile) {
-    throw new Error("Provide a website URL or upload a file.");
-  }
-
-  const advancedImport = canUseAdvancedSourceImport({
-    hasAiReading: ctx.hasAiReading,
-    teamTierProWorkspace: ctx.activeEducationTeamPlan !== null,
-  });
-
-  if (url) {
-    assertFormatAllowedForPlan("url", advancedImport);
-    const extracted = await extractTextFromUrl(url);
-    const summary = truncateReferenceSummary(
-      isYouTubeUrl(url)
-        ? youTubeReferenceSummary(url, extracted.sourceTitle)
-        : extracted.sourceTitle
-          ? `${extracted.sourceTitle} (website)`
-          : referenceSourceSummaryLabel("url", { url }),
+): Promise<
+  { ok: true; text: string; summary: string } | { ok: false; error: string }
+> {
+  try {
+    const ctx = await getAccessContext();
+    const { userId } = await requireTeacherToolsAccess(
+      ctx,
+      "Lesson Builder requires an education plan.",
     );
-    return {
-      text: truncateSourceImportText(extracted.text),
-      summary,
-    };
-  }
 
-  const file = fileEntry as File;
-  const extracted = await runWithAiUsageContext(
-    {
-      userId,
-      feature: "ocr",
-      teamId: null,
-      subscriptionPlan: ctx.effectivePlanSlug,
-      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
-    },
-    () => extractTextFromFile(file),
-  );
-  assertFormatAllowedForPlan(extracted.format, advancedImport);
-  return {
-    text: truncateSourceImportText(extracted.text),
-    summary: truncateReferenceSummary(
-      referenceSourceSummaryLabel(extracted.format, { fileName: file.name }),
-    ),
-  };
+    const url = formData.get("url")?.toString().trim() ?? "";
+    const fileEntry = formData.get("file");
+    const hasFile = fileEntry instanceof File && fileEntry.size > 0;
+
+    if (url && hasFile) {
+      throw new Error("Add either a website URL or a file — not both at once.");
+    }
+    if (!url && !hasFile) {
+      throw new Error("Provide a website URL or upload a file.");
+    }
+
+    const advancedImport = canUseAdvancedSourceImport({
+      hasAiReading: ctx.hasAiReading,
+      teamTierProWorkspace: ctx.activeEducationTeamPlan !== null,
+    });
+
+    if (url) {
+      assertFormatAllowedForPlan("url", advancedImport);
+      const extracted = await extractTextFromUrl(url);
+      const summary = truncateReferenceSummary(
+        isYouTubeUrl(url)
+          ? youTubeReferenceSummary(url, extracted.sourceTitle)
+          : extracted.sourceTitle
+            ? `${extracted.sourceTitle} (website)`
+            : referenceSourceSummaryLabel("url", { url }),
+      );
+      return {
+        ok: true,
+        text: truncateSourceImportText(extracted.text),
+        summary,
+      };
+    }
+
+    const file = fileEntry as File;
+    const extracted = await runWithAiUsageContext(
+      {
+        userId,
+        feature: "ocr",
+        teamId: null,
+        subscriptionPlan: ctx.effectivePlanSlug,
+        isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+      },
+      () => extractTextFromFile(file),
+    );
+    assertFormatAllowedForPlan(extracted.format, advancedImport);
+    return {
+      ok: true,
+      text: truncateSourceImportText(extracted.text),
+      summary: truncateReferenceSummary(
+        referenceSourceSummaryLabel(extracted.format, { fileName: file.name }),
+      ),
+    };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Could not read that reference material. Try another source.",
+      "extractLessonPlanReferenceAction",
+    );
+  }
 }
 
 export async function saveLessonPlanAction(data: {
@@ -1117,7 +1181,8 @@ export async function saveLessonPlanAction(data: {
   deckId?: number;
   newDeckName?: string;
   teamId?: number;
-}): Promise<LessonPlanSaveResult> {
+}): Promise<({ ok: true } & LessonPlanSaveResult) | { ok: false; error: string }> {
+  try {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -1199,13 +1264,10 @@ export async function saveLessonPlanAction(data: {
     sourceDeckName: deckTarget.sourceDeckName,
   });
 
-  revalidatePath("/teacher/resources");
-  revalidatePath("/teacher/lesson-builder");
-  revalidatePath("/teacher/quizzes");
-  revalidatePath("/teacher/classes");
-  revalidatePath("/dashboard");
+  revalidateLessonPlanPaths();
 
   return {
+    ok: true,
     id: saved.id,
     lessonTitle: saved.lessonTitle,
     pdfUrl: saved.pdfUrl,
@@ -1214,6 +1276,13 @@ export async function saveLessonPlanAction(data: {
     sourceDeckName: deckTarget.sourceDeckName,
     savedAsPersonalCopy: false,
   };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Could not save lesson plan.",
+      "saveLessonPlanAction",
+    );
+  }
 }
 
 const updateLessonPlanSchema = saveLessonPlanSchema.extend({
@@ -1226,7 +1295,8 @@ export async function updateLessonPlanAction(data: {
   result: LessonPlanResult;
   deckId?: number;
   teamId?: number;
-}): Promise<LessonPlanSaveResult> {
+}): Promise<({ ok: true } & LessonPlanSaveResult) | { ok: false; error: string }> {
+  try {
   const ctx = await getAccessContext();
   const { userId } = await requireTeacherToolsAccess(
     ctx,
@@ -1295,7 +1365,7 @@ export async function updateLessonPlanAction(data: {
       unitContext,
     });
     revalidateLessonPlanPaths();
-    return saved;
+    return { ok: true, ...saved };
   }
 
   const team =
@@ -1319,7 +1389,7 @@ export async function updateLessonPlanAction(data: {
       allowOwnerPersonalCopy: true,
     });
     revalidateLessonPlanPaths();
-    return saved;
+    return { ok: true, ...saved };
   }
 
   // Personal copies (and any unlinked plan) keep deckId null so they never steal
@@ -1406,6 +1476,7 @@ export async function updateLessonPlanAction(data: {
   revalidateLessonPlanPaths();
 
   return {
+    ok: true,
     id: updated.id,
     lessonTitle: updated.lessonTitle,
     pdfUrl: updated.pdfUrl,
@@ -1414,6 +1485,13 @@ export async function updateLessonPlanAction(data: {
     sourceDeckName: deckTarget.sourceDeckName,
     savedAsPersonalCopy: false,
   };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Could not update lesson plan.",
+      "updateLessonPlanAction",
+    );
+  }
 }
 
 const updateLessonPlanIntakeSchema = z.object({

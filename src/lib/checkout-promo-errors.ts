@@ -1,4 +1,8 @@
+import { isProductionOmittedServerError } from "@/lib/server-action-client-error";
+
 /** Internal prefix — stripped before showing the message in UI. */
+export { isProductionOmittedServerError };
+
 export const CHECKOUT_PLAN_NO_DISCOUNT_PROMO_PREFIX =
   "__CHECKOUT_PLAN_NO_DISCOUNT__" as const;
 
@@ -76,13 +80,6 @@ export function checkoutPlanChangeNoPromoUserMessage(message: string): string {
   return message.slice(CHECKOUT_PLAN_CHANGE_NO_PROMO_PREFIX.length);
 }
 
-export function isProductionOmittedServerError(message: string): boolean {
-  return (
-    message.includes("Server Components render") ||
-    message.includes("digest property is included")
-  );
-}
-
 export const CHECKOUT_GENERIC_RETRY_MESSAGE =
   "Checkout could not start. Please refresh the page and try again. If this continues, contact support.";
 
@@ -113,4 +110,4 @@ export function shouldClearPromoOnCheckoutError(message: string): boolean {
     isCheckoutPlanChangeNoPromoError(message)
   );
 }
-
+

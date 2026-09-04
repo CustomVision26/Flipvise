@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { generateAllDaysVocabularyDetailAction, generateDayVocabularyDetailAction } from "@/actions/teacher-lesson-plan";
+import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -540,7 +541,7 @@ export function LessonPlanWeeklySchedulePanel({
 
     setIsGeneratingAll(true);
     try {
-      const details = await generateAllDaysVocabularyDetailAction({
+      const detailsResult = await generateAllDaysVocabularyDetailAction({
         ...lessonContext,
         jamaicaNscGuidelinesApplied: useFiveEModel,
         days: targetDays.map((day) => ({
@@ -550,6 +551,11 @@ export function LessonPlanWeeklySchedulePanel({
           lessonTimeline: day.lessonTimeline,
         })),
       });
+      if (!detailsResult.ok) {
+        toast.error(detailsResult.error);
+        return;
+      }
+      const details = detailsResult.details;
 
       const detailByLabel = new Map(
         targetDays.map((day, index) => [day.dayLabel, details[index]!]),
@@ -580,9 +586,10 @@ export function LessonPlanWeeklySchedulePanel({
       });
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not generate detailed vocabulary for all days.",
+        userFacingServerActionError(
+          error,
+          "Could not generate detailed vocabulary for all days.",
+        ),
       );
     } finally {
       setIsGeneratingAll(false);
@@ -600,7 +607,7 @@ export function LessonPlanWeeklySchedulePanel({
 
     setGeneratingDayIndex(dayIndex);
     try {
-      const detail = await generateDayVocabularyDetailAction({
+      const generated = await generateDayVocabularyDetailAction({
         ...lessonContext,
         jamaicaNscGuidelinesApplied: useFiveEModel,
         dayLabel: day.dayLabel,
@@ -608,6 +615,11 @@ export function LessonPlanWeeklySchedulePanel({
         vocabulary: day.vocabulary,
         lessonTimeline: day.lessonTimeline,
       });
+      if (!generated.ok) {
+        toast.error(generated.error);
+        return;
+      }
+      const detail = generated.detail;
 
       const nextSchedule = schedule.map((entry, index) => {
         if (index !== dayIndex) return entry;
@@ -631,9 +643,10 @@ export function LessonPlanWeeklySchedulePanel({
       }
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not generate detailed vocabulary.",
+        userFacingServerActionError(
+          error,
+          "Could not generate detailed vocabulary.",
+        ),
       );
     } finally {
       setGeneratingDayIndex(null);
