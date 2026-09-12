@@ -93,6 +93,7 @@ function planLabel(slug: string): string {
   const allOptions = [
     ...ADMIN_PLAN_DROPDOWN_OPTIONS.base,
     ...ADMIN_PLAN_DROPDOWN_OPTIONS.team,
+    ...ADMIN_PLAN_DROPDOWN_OPTIONS.education,
   ];
   return allOptions.find((o) => o.id === slug)?.label ?? slug;
 }
@@ -100,6 +101,7 @@ function planLabel(slug: string): string {
 const PLAN_OPTIONS = [
   ...ADMIN_PLAN_DROPDOWN_OPTIONS.base.filter((o) => o.id !== "free"),
   ...ADMIN_PLAN_DROPDOWN_OPTIONS.team,
+  ...ADMIN_PLAN_DROPDOWN_OPTIONS.education,
 ] as const;
 
 // ── Email lookup hook ─────────────────────────────────────────────────────────

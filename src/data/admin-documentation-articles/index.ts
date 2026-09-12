@@ -87,6 +87,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Admin plan assignment uses an invite-before-commit flow for most changes. The target user receives an inbox invite and must accept before Clerk metadata and Stripe billing update. Complimentary grants skip Stripe; paid upgrades on active subscriptions trigger Stripe proration on accept.",
         ],
         bullets: [
+          "Menu groups: Clear & personal (Free, Pro, Pro Plus), Team tiers (Team Basic, Team Gold, Platinum, Enterprise), and Education tiers (Education Plus, Education Gold, Education Enterprise).",
           "Pending invites appear in the user's dashboard inbox — plan is not applied until accepted.",
           "Direct override (support tool) exists for immediate metadata writes without user consent — use only for testing or emergency support, not for initiating real billing.",
           "Plan Assignment History tab logs every admin-initiated grant, change, or revocation.",
@@ -250,7 +251,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "links",
         title: "Hosted invoice and PDF",
         bullets: [
-          "Open Flipvise receipt when Stripe invoice id is persisted. The receipt lists plan start, plan end, and auto-renewal On or Off. The seller block uses Contact Us company address (street, city, phone — no apartment).",
+          "Open Flipvise receipt when Stripe invoice id is persisted. The receipt lists plan start, plan end, and auto-renewal On or Off, and closes with Regards, Flipvise Team by Flipvise Studio LLC. The seller block uses Contact Us company address (street, city, phone — no apartment).",
           "Stripe-hosted PDFs still use Stripe Dashboard business details for their header. Flipvise also stamps the Contact Us address on new Stripe invoices (footer and Company/Address fields).",
           "Proration receipts from plan changes appear here after invoice.payment_succeeded webhook processing.",
         ],
@@ -742,7 +743,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "invite",
         title: "Invite affiliate",
         bullets: [
-          "Invite by email with plan grant slug, arrangement end date, and accept-link expiry (days).",
+          "Invite by email with plan grant slug (Pro, Pro Plus, team tiers, and Education Plus / Gold / Enterprise), arrangement end date, and accept-link expiry (days).",
           "Pending invite — no Clerk plan change until the affiliate accepts via inbox or accept URL.",
           "Loops transactional email sends only when the email has no matching Clerk account at invite time (LOOPS_API_KEY + LOOPS_AFFILIATE_INVITATION_TRANSACTIONAL_ID required).",
           "Sample Loops template copy: src/data/admin-documentation-articles/affiliate-invitation-loops-sample.md",

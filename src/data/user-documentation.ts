@@ -616,7 +616,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Active public codes appear as quick-fill chips under the promo field when a tier’s general sale is running.",
           "Signed-in users see a Current plan badge; active subscribers also get Manage subscription.",
           "When the Add-on Catalog is published, it lists optional features (such as AI Essay) that stack on your current plan — monthly or yearly where configured.",
-          "Choose a plan → review on /pricing/checkout → pay on /pricing/checkout/pay.",
+          "Choose a plan → review on /pricing/checkout → pay on /pricing/checkout/pay. Open subscribe guide from Purchase path in the in-depth article (or Checkout) to walk through that flow.",
         ],
         requirements: [
           "Guests can browse; sign-in is required to purchase.",
@@ -673,7 +673,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Pay with a credit or debit card, Apple Pay, Google Pay, Link, or a US bank account (ACH) when Stripe offers those methods for your location and device. Flipvise does not store full card or bank numbers; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
-          "After purchase, Flipvise receipts (Inbox, Billing plan history) show Flipvise Studio LLC and the company mailing address from Contact Us (street, city, and phone — no apartment). Receipts list the plan start date, plan end date, and whether auto-renewal is On or Off. Free-trial receipts also show how many days the trial lasts and the end date. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
+          "After purchase, Flipvise receipts (Inbox, Billing plan history) show Flipvise Studio LLC and the company mailing address from Contact Us (street, city, and phone — no apartment). Receipts list the plan start date, plan end date, and whether auto-renewal is On or Off, and close with Regards, Flipvise Team by Flipvise Studio LLC. Free-trial receipts also show how many days the trial lasts and the end date. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "Currency is determined by the Stripe Price for your selected plan (typically USD for this app’s catalog).",
         ],
         requirements: [
@@ -694,6 +694,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Confirm plan, billing period, promo, and amount due before Stripe payment.",
         howItWorks: [
+          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse.",
           "Review selected plan name, monthly vs yearly period, and list price.",
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",

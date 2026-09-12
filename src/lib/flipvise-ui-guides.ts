@@ -1,4 +1,9 @@
-export type DocsUiGuideId = "signup" | "signin" | "personal-dashboard" | "pricing";
+export type DocsUiGuideId =
+  | "signup"
+  | "signin"
+  | "personal-dashboard"
+  | "pricing"
+  | "subscribe";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -7,6 +12,7 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "signin",
   "personal-dashboard",
   "pricing",
+  "subscribe",
 ];
 
 export type DocsUiGuideStep = {
@@ -225,6 +231,87 @@ export const PRICING_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+export const SUBSCRIBE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 01.png"),
+    title: "Choose a plan",
+    caption:
+      "On /pricing, pick a paid card such as Education Plus. Choose Change to… or Subscribe now to open checkout review.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 02.png"),
+    title: "Review checkout",
+    caption:
+      "Confirm the plan name, Monthly or Yearly, and the price. Slide to continue to open Stripe Embedded Checkout.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 03.png"),
+    title: "Order summary",
+    caption:
+      "Secure Checkout shows the plan, billing period, and total due today. Account email is your signed-in Flipvise address for receipts.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 04.png"),
+    title: "Enter payment details",
+    caption:
+      "Add a genuine card (test numbers are not accepted), expiration, and security code. Keep Same as my Flipvise mailing address checked when that address is correct.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 05.png"),
+    title: "Name on payment method",
+    caption:
+      "Enter the name on the card. Slide to subscribe stays disabled until payment details, name, and billing address are complete.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 06.png"),
+    title: "Slide to subscribe",
+    caption:
+      "When the control is enabled, slide to subscribe to pay. You authorize Flipvise to charge you until you cancel.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 07.png"),
+    title: "Subscription active",
+    caption:
+      "You return to Personal Dashboard. The header shows your new plan. A toast confirms the subscription and that a notice was sent to Inbox.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 08.png"),
+    title: "Inbox confirmation",
+    caption:
+      "Open Inbox for Subscription confirmed and the paid invoice. Use Receipt on either item to open the Flipvise receipt.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 09.png"),
+    title: "Billing tab",
+    caption:
+      "Account menu → Billing shows the current plan as Active, Manage subscription, and Plan history with start and end dates.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 10.png"),
+    title: "Open the receipt link",
+    caption:
+      "In Plan history, scroll to Receipt and open the invoice number (for example WV99HW27-0001) to view the Flipvise receipt.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 11.png"),
+    title: "Download PDF",
+    caption:
+      "The on-screen receipt lists seller, bill-to, amount paid, and line items. Current receipts also show plan start, plan end, auto-renewal, and a Flipvise Team signature. Choose Download PDF to save a copy.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 12.png"),
+    title: "Save or open the file",
+    caption:
+      "Use the browser download bar to save Flipvise-receipt-….pdf to your computer, or open it in a new tab.",
+  },
+  {
+    src: uiSrc("06 Flipvise - Do A Subscribing - 13.png"),
+    title: "PDF receipt",
+    caption:
+      "The PDF matches the on-screen receipt: invoice number, date paid, line items, and amount paid. Current PDFs also list plan start, plan end, and auto-renewal, and close with Regards, Flipvise Team by Flipvise Studio LLC.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -248,5 +335,10 @@ export const DOCS_UI_GUIDES: Record<
     title: "Plans & Pricing",
     summary: "Open pricing, compare tiers, and start checkout or a free trial.",
     steps: PRICING_GUIDE_STEPS,
+  },
+  subscribe: {
+    title: "Subscribe to a plan",
+    summary: "Choose a plan, complete Stripe checkout, and open your receipt.",
+    steps: SUBSCRIBE_GUIDE_STEPS,
   },
 };

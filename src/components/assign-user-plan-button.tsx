@@ -198,6 +198,22 @@ export function AssignUserPlanButton({
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Education tiers</DropdownMenuLabel>
+              {ADMIN_PLAN_DROPDOWN_OPTIONS.education.map((row) => (
+                <DropdownMenuItem
+                  key={row.id}
+                  onClick={() => {
+                    setError(null);
+                    setPending(row.id);
+                  }}
+                  disabled={isPending}
+                >
+                  {row.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
         {error && (

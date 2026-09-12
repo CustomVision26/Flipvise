@@ -1,3 +1,4 @@
+import { FLIPVISE_INBOX_SIGNATURE } from "@/lib/flipvise-inbox-signature";
 import type { FlipviseInvoiceReceipt } from "@/lib/flipvise-invoice-receipt";
 
 export async function generateFlipviseInvoiceReceiptPdf(
@@ -156,6 +157,32 @@ export async function generateFlipviseInvoiceReceiptPdf(
   doc.setFontSize(11);
   doc.text(receipt.paid ? "Amount paid" : "Amount due", margin, y);
   doc.text(receipt.amountPaidLabel, pageW - margin, y, { align: "right" });
+
+  const signatureLines = FLIPVISE_INBOX_SIGNATURE.split("\n");
+  const pageH = doc.internal.pageSize.getHeight();
+  const signatureBlock = 14 * signatureLines.length;
+  const footerY = pageH - margin - signatureBlock + 14;
+  y += 36;
+  if (y + signatureBlock > pageH - margin) {
+    doc.addPage();
+    y = margin;
+  } else if (y < footerY) {
+    y = footerY;
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(90);
+  doc.text(signatureLines[0] ?? "Regards,", margin, y);
+  y += 14;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(20);
+  doc.text(
+    signatureLines.slice(1).join(" ") || "Flipvise Team by Flipvise Studio LLC",
+    margin,
+    y,
+  );
 
   const array = doc.output("arraybuffer");
   return Buffer.from(array);

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
+import { FLIPVISE_INBOX_SIGNATURE } from "@/lib/flipvise-inbox-signature";
 import type { FlipviseInvoiceReceipt } from "@/lib/flipvise-invoice-receipt";
 import { FlipviseInvoiceReceiptPdfButton } from "@/components/flipvise-invoice-receipt-pdf-button";
 
@@ -161,6 +162,21 @@ export function FlipviseInvoiceReceiptView({
             {receipt.amountPaidLabel}
           </p>
         </div>
+
+        <footer className="space-y-0.5 pt-2">
+          {FLIPVISE_INBOX_SIGNATURE.split("\n").map((line, index) => (
+            <p
+              key={line}
+              className={
+                index === 0
+                  ? "text-sm text-muted-foreground"
+                  : "text-sm font-medium text-foreground"
+              }
+            >
+              {line}
+            </p>
+          ))}
+        </footer>
 
         <FlipviseInvoiceReceiptPdfButton invoiceRef={receipt.externalId} />
       </CardContent>

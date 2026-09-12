@@ -35,6 +35,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "checkout-path",
         title: "Purchase path",
         bullets: [
+          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse.",
           "Choose plan → /pricing/checkout review → Stripe Embedded Checkout on /pricing/checkout/pay.",
           "Eligible plans may show Start free trial (monthly only) or Subscribe now.",
           "Promos apply to new paid subscriptions only — not trials or plan changes.",
@@ -136,7 +137,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "after-purchase",
         title: "After purchase",
         bullets: [
-          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (street, city, and phone — no apartment). Each receipt lists the plan start date, plan end date, and whether auto-renewal is On or Off. Free-trial line items include the trial length and the date the trial ends. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
+          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (street, city, and phone — no apartment). Each receipt lists the plan start date, plan end date, and whether auto-renewal is On or Off, and closes with Regards, Flipvise Team by Flipvise Studio LLC. Free-trial line items include the trial length and the date the trial ends. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "May sync to Flipvise inbox.",
           "Currency follows Stripe Price configuration (typically USD).",
         ],
@@ -152,6 +153,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "new-vs-change",
         title: "New subscription vs plan change",
         bullets: [
+          "Open subscribe guide to follow choosing a plan, Stripe checkout, and opening your receipt.",
           "New subscribers: promo field applies; discount shows on payment step.",
           "Free trial checkout: no promo field — trial terms and acknowledgment checkbox instead.",
           "Existing subscribers: proration preview instead of promo — promos blocked on plan changes.",

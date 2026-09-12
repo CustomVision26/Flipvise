@@ -159,6 +159,11 @@ function DocPagePanel({
             Open pricing guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "checkout" ? (
+          <DocsUiGuideStartButton guideId="subscribe">
+            Open subscribe guide
+          </DocsUiGuideStartButton>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -249,6 +254,12 @@ function articleSectionGuide(pageId: string, sectionId: string) {
   }
   if (pageId === "pricing" && sectionId === "ui") {
     return { id: "pricing" as const, label: "Open pricing guide" };
+  }
+  if (pageId === "pricing" && sectionId === "checkout-path") {
+    return { id: "subscribe" as const, label: "Open subscribe guide" };
+  }
+  if (pageId === "checkout" && sectionId === "new-vs-change") {
+    return { id: "subscribe" as const, label: "Open subscribe guide" };
   }
   return null;
 }
