@@ -14,6 +14,11 @@ import {
 import { logAdminPlanAssignment } from "@/db/queries/admin";
 import { markInboxItemRead } from "@/db/queries/inbox-reads";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import {
+  formatClerkPublicActorName,
+  getClerkPublicActorNameById,
+  looksLikeClerkUserId,
+} from "@/lib/clerk-user-display";
 
 const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
@@ -50,10 +55,7 @@ export async function acceptAdminPlanInviteAction(data: z.infer<typeof acceptDec
   const assignment = invite.assignment as AdminPlanAssignment;
 
   const target = await clerkClient.users.getUser(userId);
-  const targetName =
-    [target.firstName, target.lastName].filter(Boolean).join(" ") ||
-    target.username ||
-    userId;
+  const targetName = formatClerkPublicActorName(target);
   const targetEmail =
     target.emailAddresses.find((e) => e.id === target.primaryEmailAddressId)?.emailAddress ??
     null;
@@ -64,6 +66,11 @@ export async function acceptAdminPlanInviteAction(data: z.infer<typeof acceptDec
     recordAdminAssignment: true,
   });
 
+  const assignedByName =
+    looksLikeClerkUserId(invite.assignedByName) || !invite.assignedByName.trim()
+      ? await getClerkPublicActorNameById(invite.assignedByUserId)
+      : invite.assignedByName.trim();
+
   await logAdminPlanAssignment({
     targetUserId: userId,
     targetUserName: targetName,
@@ -72,7 +79,7 @@ export async function acceptAdminPlanInviteAction(data: z.infer<typeof acceptDec
     planName: planSlugToDisplayName(assignment),
     previousPlanName: planSlugToDisplayName(previousSlug),
     assignedByUserId: invite.assignedByUserId,
-    assignedByName: invite.assignedByName,
+    assignedByName,
     planApplicationPath: planResult.path,
   });
 

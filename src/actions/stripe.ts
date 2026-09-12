@@ -42,6 +42,7 @@ import {
   isCheckoutPlanChangeRequiredError,
 } from "@/lib/checkout-promo-errors";
 import { personalDashboardHrefAfterCheckoutSuccess } from "@/lib/personal-dashboard-url";
+import { writeCheckoutSessionCookie } from "@/lib/checkout-session-cookie";
 import { stripeCheckoutElementsSessionParams } from "@/lib/stripe-checkout-branding";
 import {
   isGeneralDiscountEffectivelyActive,
@@ -466,7 +467,7 @@ async function createStripeCheckoutSessionActionInner(
     });
   }
 
-  const returnUrl = `${appUrl}${successReturnPath}${successReturnPath.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`;
+  const returnUrl = `${appUrl}${successReturnPath}`;
 
   const subscriptionMetadata: Record<string, string> = {
     clerkUserId: userId,
@@ -532,6 +533,8 @@ async function createStripeCheckoutSessionActionInner(
   if (!session.client_secret) {
     throw new Error("Failed to create checkout session");
   }
+
+  await writeCheckoutSessionCookie(session.id);
 
   return {
     sessionId: session.id,

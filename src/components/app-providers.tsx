@@ -12,6 +12,7 @@ import { flipviseSignUpUrl } from "@/lib/flipvise-sign-up";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveLogoImageUrl } from "@/lib/branding";
 import { LoginWelcomeToast } from "@/components/login-welcome-toast";
+import { SensitiveUrlQueryStripper } from "@/components/sensitive-url-query-stripper";
 import { ClerkAuthHandoffMarker } from "@/components/clerk-auth-handoff-marker";
 import { ClerkChunkLoadRecovery } from "@/components/clerk-chunk-load-recovery";
 import { ClerkPostSignInHardNavigation } from "@/components/clerk-post-sign-in-hard-navigation";
@@ -54,6 +55,9 @@ function ClerkWithTheme({ children }: { children: React.ReactNode }) {
       <ClerkChunkLoadRecovery />
       <ClerkAuthHandoffMarker />
       <LoginWelcomeToast />
+      <React.Suspense fallback={null}>
+        <SensitiveUrlQueryStripper />
+      </React.Suspense>
       <ClerkPostSignInHardNavigation />
       <ClerkSessionRouterSync />
       <GuestSignUpHost />

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createAddonCheckoutSessionAction } from "@/actions/addons";
 import { finalizePlanChangePaymentAction } from "@/actions/plan-change-checkout";
+import { addonCheckoutPayHref } from "@/lib/checkout-session-url";
 import { clearPlanChangePendingAddon } from "@/lib/plan-change-pending-addon";
 import type { PricingBillingPeriod } from "@/lib/pricing-billing-period";
 
@@ -85,9 +86,7 @@ export function PlanChangeContinueHandoff({
         return;
       }
 
-      window.location.assign(
-        `/pricing/add-ons/pay?session_id=${encodeURIComponent(sessionId)}&from_plan_change=1`,
-      );
+      window.location.assign(addonCheckoutPayHref(true));
     })();
   }, [
     addonKey,

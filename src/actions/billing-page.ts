@@ -24,6 +24,10 @@ import { syncBillingInvoicesForUser, syncCheckoutSessionInvoicesForUser } from "
 import { recordSubscriptionCheckoutInboxForSession } from "@/lib/record-subscription-checkout-inbox";
 import { resolveLatestBillingReceiptForUser } from "@/lib/billing-receipt-url";
 import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
+import {
+  clearCheckoutSessionCookie,
+  readCheckoutSessionCookie,
+} from "@/lib/checkout-session-cookie";
 import { getAccessContext } from "@/lib/access";
 import type { StripePaidPlanId } from "@/lib/billing-plan-ids";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
@@ -302,7 +306,10 @@ export async function syncBillingAfterCheckoutAction(
   }
 
   const email = await resolveUserEmail(userId);
-  const checkoutSessionId = parsed.data.checkoutSessionId?.trim() ?? "";
+  let checkoutSessionId = parsed.data.checkoutSessionId?.trim() ?? "";
+  if (!isStripeCheckoutSessionId(checkoutSessionId)) {
+    checkoutSessionId = (await readCheckoutSessionCookie()) ?? "";
+  }
 
   let result: { synced: boolean; planSlug: StripePaidPlanId | null } = {
     synced: false,
@@ -401,8 +408,16 @@ export async function syncBillingAfterCheckoutAction(
     }
   }
 
+  const synced = preferAddon
+    ? addonSynced || result.synced || Boolean(planLabel)
+    : result.synced;
+
+  if (synced) {
+    await clearCheckoutSessionCookie();
+  }
+
   return {
-    synced: preferAddon ? addonSynced || result.synced || Boolean(planLabel) : result.synced,
+    synced,
     planSlug: result.planSlug,
     planLabel,
     receiptUrl: receipt.receiptUrl,

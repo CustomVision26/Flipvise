@@ -93,7 +93,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "url-params",
         title: "URL parameters",
         bullets: [
-          "userid and plan query params scope the dashboard for workspace navigation — do not change another user’s userid.",
+          "The address bar does not include Clerk user ids, plan slugs, or Stripe session ids — identity comes from your signed-in session.",
           "After successful Stripe checkout you may land with ?checkout=success and a confirmation toast.",
         ],
       },
@@ -150,7 +150,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "Owners open Team Admin Dash from the switcher (owned workspaces are not Team Dashboard rows).",
           "Plan owners create, rename, and delete owned workspaces from Manage Workspaces, listed under Team Workspace View in this sidebar.",
           "Team context is stored in a cookie when invited members switch.",
-          "Co-admins should use canonical URLs with ?team= and teamMemberId= — not cookie-only bookmarks.",
+          "Co-admins should bookmark /dashboard?team=<workspaceId> — not cookie-only context.",
         ],
       },
       {

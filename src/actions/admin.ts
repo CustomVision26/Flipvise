@@ -21,6 +21,7 @@ import {
 } from "@/lib/clerk-platform-admin-role";
 import { isPlatformSuperadminAllowListed } from "@/lib/platform-superadmin";
 import { isAdminPlanAssignment } from "@/lib/admin-assignable-plans";
+import { formatClerkPublicActorName } from "@/lib/clerk-user-display";
 import { countTeamsForOwner, insertTeam } from "@/db/queries/teams";
 import { insertTeamWorkspaceEvent } from "@/db/queries/team-workspace-events";
 import { isTeamPlanId, limitsForPlan } from "@/lib/team-plans";
@@ -121,14 +122,8 @@ export async function createAdminPlanAssignmentInviteAction(data: ApplyPlanAssig
 
   const targetMeta = target.publicMetadata as Record<string, unknown>;
   const previousSlug = previousPlanSlugFromMeta(targetMeta);
-  const targetName =
-    [target.firstName, target.lastName].filter(Boolean).join(" ") ||
-    target.username ||
-    targetUserId;
-  const callerName =
-    [caller.firstName, caller.lastName].filter(Boolean).join(" ") ||
-    caller.username ||
-    userId;
+  const targetName = formatClerkPublicActorName(target);
+  const callerName = formatClerkPublicActorName(caller);
 
   await supersedePendingAdminPlanInvitesForUser(targetUserId);
   await insertAdminPlanAssignmentInvite({
@@ -143,7 +138,7 @@ export async function createAdminPlanAssignmentInviteAction(data: ApplyPlanAssig
   notifyNativeInboxPush({
     recipientUserId: targetUserId,
     category: "admin_plan_invite",
-    body: "An administrator assigned you a new plan — review in your inbox.",
+    body: `${callerName} assigned you a new plan — review in your inbox.`,
   });
 
   revalidatePath("/admin");

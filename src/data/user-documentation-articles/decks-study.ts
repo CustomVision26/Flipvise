@@ -165,7 +165,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Quiz schedule — quizzes cannot start before the configured date/time.",
           "Exam Mode — session locking, admin grant to resume/restart, one controlled attempt per deck. Applies to the plan owner whenever Exam Mode is on, plus Team Admins and/or Members selected in Exam Mode settings. When active for you, the Timed quiz lobby shows a green Exam Mode on light.",
           "Owners and team admins get a Cancel button on the unanswered-submit dialog — it returns to the Resume quiz lobby without submitting (members only see Keep answering / Submit anyway).",
-          "Workspace deck study links canonicalize to /decks/[deckId]/study?team=&userid=&plan=&teamMemberId=.",
+          "Workspace deck study links canonicalize to /decks/[deckId]/study?team=.",
         ],
       },
       {

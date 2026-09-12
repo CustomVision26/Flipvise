@@ -736,15 +736,15 @@ function CheckoutPaymentFields({
       }
 
       // Prefer personal dashboard so toast + inbox sync run via StripeCheckoutToast.
-      const sessionId = result.session.id;
       const destination = new URL(
         successHref?.trim() || "/dashboard?checkout=success",
         window.location.origin,
       );
       destination.searchParams.set("checkout", "success");
-      if (sessionId) {
-        destination.searchParams.set("session_id", sessionId);
-      }
+      destination.searchParams.delete("session_id");
+      destination.searchParams.delete("userid");
+      destination.searchParams.delete("userId");
+      destination.searchParams.delete("plan");
 
       toast.success(isTrial ? "Trial started" : "Payment received", {
         description: isTrial

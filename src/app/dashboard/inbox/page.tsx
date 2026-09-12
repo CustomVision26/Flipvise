@@ -8,7 +8,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getQuizResultInboxForUser } from "@/db/queries/quiz-results";
 import { getAiRecallResultInboxForUser } from "@/db/queries/ai-recall";
 import { getTeamsByIds, listTeamMembersByTeamIds } from "@/db/queries/teams";
-import { getClerkUserFieldDisplaysByIds } from "@/lib/clerk-user-display";
+import { getClerkUserFieldDisplaysByIds, getClerkPublicActorNamesByIds, looksLikeClerkUserId } from "@/lib/clerk-user-display";
 import { listTeamInvitationsForInviteeEmail } from "@/db/queries/teams";
 import { isTeamInviteExpired } from "@/lib/team-invite-expiry";
 import { resolveTeamInviteInboxOutcome } from "@/lib/team-invite-inbox-outcome";
@@ -163,6 +163,19 @@ export default async function DashboardInboxPage() {
   const userDisplayById = allUserIds.length > 0
     ? await getClerkUserFieldDisplaysByIds(allUserIds)
     : {};
+
+  const planActorIds = [
+    ...adminPlanInviteRows.map((r) => r.assignedByUserId),
+    ...adminPlanLogRows.map((r) => r.assignedByUserId),
+  ];
+  const planActorNames =
+    planActorIds.length > 0 ? await getClerkPublicActorNamesByIds(planActorIds) : {};
+
+  function assignedByDisplay(stored: string, assignedByUserId: string): string {
+    const name = stored.trim();
+    if (name && !looksLikeClerkUserId(name)) return name;
+    return planActorNames[assignedByUserId] || "An administrator";
+  }
 
   // ── Normalize all items ───────────────────────────────────────────────────
   const items: UnifiedInboxItem[] = [];
@@ -576,7 +589,15 @@ export default async function DashboardInboxPage() {
 
   for (const row of adminPlanInviteRows) {
     if (row.status === "accepted") continue;
-    items.push(adminPlanInviteRowToInboxItem(row, readSet));
+    items.push(
+      adminPlanInviteRowToInboxItem(
+        {
+          ...row,
+          assignedByName: assignedByDisplay(row.assignedByName, row.assignedByUserId),
+        },
+        readSet,
+      ),
+    );
   }
 
   for (const row of adminPlanLogRows) {
@@ -588,7 +609,7 @@ export default async function DashboardInboxPage() {
           action: row.action,
           planName: row.planName,
           previousPlanName: row.previousPlanName,
-          assignedByName: row.assignedByName,
+          assignedByName: assignedByDisplay(row.assignedByName, row.assignedByUserId),
           createdAt: row.createdAt,
           planApplicationPath: row.planApplicationPath,
         },

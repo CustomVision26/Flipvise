@@ -43,13 +43,11 @@ export function EssayUnlockDialog({
     // Close first so checkout is not covered if this dialog outlives navigation.
     onOpenChange(false);
     try {
-      const result = await createAddonCheckoutSessionAction({
+      await createAddonCheckoutSessionAction({
         addonKey: AI_ESSAY_ADDON_KEY,
         period,
       });
-      router.push(
-        `/pricing/add-ons/pay?session_id=${encodeURIComponent(result.sessionId)}`,
-      );
+      router.push("/pricing/add-ons/pay");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start checkout.");
       onOpenChange(true);

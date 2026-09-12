@@ -4,6 +4,10 @@ const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
+export function looksLikeClerkUserId(value: string): boolean {
+  return /^user_[A-Za-z0-9]+$/.test(value.trim());
+}
+
 export type SessionUserNameFields = {
   fullName: string | null;
   firstName: string | null;
@@ -24,6 +28,50 @@ export function formatSessionUserDisplayName(user: SessionUserNameFields): strin
     if (local) return local;
   }
   return "You";
+}
+
+/** Public-facing actor label: full name, else username, else email — never a Clerk user id. */
+export function formatClerkPublicActorName(user: {
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
+  primaryEmailAddress?: { emailAddress: string } | null;
+  primaryEmailAddressId?: string | null;
+  emailAddresses?: Array<{
+    emailAddress: string;
+    id?: string | null;
+    verification?: { status: string } | null;
+  }>;
+}): string {
+  const full = user.fullName?.trim();
+  if (full && !looksLikeClerkUserId(full)) return full;
+  const combined = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  if (combined && !looksLikeClerkUserId(combined)) return combined;
+  const username = user.username?.trim();
+  if (username && !looksLikeClerkUserId(username)) return username;
+  const email = pickBestEmailFromClerkUser(user);
+  if (email) return email;
+  return "An administrator";
+}
+
+export async function getClerkPublicActorNameById(userId: string): Promise<string> {
+  try {
+    const u = await clerkClient.users.getUser(userId);
+    return formatClerkPublicActorName(u);
+  } catch {
+    return "An administrator";
+  }
+}
+
+export async function getClerkPublicActorNamesByIds(
+  userIds: string[],
+): Promise<Record<string, string>> {
+  const unique = [...new Set(userIds.filter(Boolean))];
+  const pairs = await Promise.all(
+    unique.map(async (id) => [id, await getClerkPublicActorNameById(id)] as const),
+  );
+  return Object.fromEntries(pairs);
 }
 
 export async function getClerkUserDisplayNameById(userId: string): Promise<string> {

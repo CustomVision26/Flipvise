@@ -10,6 +10,7 @@ import {
   isWorkspaceSubscriberPlanQueryParam,
 } from "@/lib/team-plans";
 import { TEAM_WORKSPACE_QUERY } from "@/lib/team-workspace-url";
+import { stripSensitiveUrlSearchParams, searchRecordToUrlSearchParams } from "@/lib/sensitive-url-query";
 
 export type ResolvedTeamWorkspaceUrl = {
   teamId: number;
@@ -150,8 +151,8 @@ export function searchParamsLooksLikeTeamWorkspace(
 }
 
 /**
- * Workspace URLs may include `userid`, `plan`, and `teamMemberId` alongside `team`
- * (bookmark shape). Deck/dashboard handlers normalize to the full query when needed.
+ * Legacy workspace bookmarks may include `userid`, `plan`, and `teamMemberId`
+ * alongside `team`. Deck/dashboard handlers strip those down to `team=`.
  */
 export function teamWorkspaceSearchParamsHaveLegacyIdentityFields(
   sp: Record<string, string | string[] | undefined>,
@@ -165,31 +166,19 @@ export function teamWorkspaceSearchParamsHaveLegacyIdentityFields(
 }
 
 /**
- * If the URL carries `userid` / `plan` without a `team` workspace query, return a path
- * with those removed. Preserves other params such as `team_invite=accepted`.
- * When `viewerUserId` is set and matches `userid` / `userId`, no redirect is applied (intentional in-app links).
- * Returns `null` when no redirect is needed.
+ * If the URL carries Clerk ids, Stripe session ids, or dashboard `plan=`,
+ * return a cleaned path. Always strips those keys even when `userid` matches
+ * the signed-in user. Workspace URLs keep `team=` only.
  */
 export function canonicalDashboardPathRemovingSensitiveQuery(
   sp: Record<string, string | string[] | undefined>,
-  viewerUserId?: string,
+  _viewerUserId?: string,
 ): string | null {
-  if (searchParamsLooksLikeTeamWorkspace(sp)) return null;
-  const uid = firstString(sp, ["userid", "userId"]);
-  const hasUid = uid != null;
-  const hasPlan = firstString(sp, ["plan", "Plan"]) != null;
-  if (!hasUid && !hasPlan) return null;
-  if (
-    viewerUserId != null &&
-    uid != null &&
-    uid === viewerUserId
-  ) {
-    return null;
-  }
-  const next = new URLSearchParams();
-  const teamInvite = firstString(sp, ["team_invite"]);
-  if (teamInvite) next.set("team_invite", teamInvite);
-  return next.toString() ? `/dashboard?${next.toString()}` : "/dashboard";
+  const raw = searchRecordToUrlSearchParams(sp);
+  const cleaned = stripSensitiveUrlSearchParams(raw, "/dashboard");
+  if (cleaned.toString() === raw.toString()) return null;
+  const qs = cleaned.toString();
+  return qs ? `/dashboard?${qs}` : "/dashboard";
 }
 
 /** Parses a request query string (e.g. `proxy` `x-search` header: `?team=1&…`). */
@@ -232,21 +221,13 @@ export function shouldRedirectUnauthorizedDashboardUseridParam(
   return uid !== sessionUserId;
 }
 
-/** Canonical workspace query for deck/study/dashboard links. */
+/** Canonical workspace query for deck/study/dashboard links (`team=` only). */
 export async function buildResolvedTeamWorkspaceQueryString(
-  viewerUserId: string,
+  _viewerUserId: string,
   tw: ResolvedTeamWorkspaceUrl,
 ): Promise<string> {
-  let teamMemberUrlParam = 0;
-  if (tw.ownerUserId !== viewerUserId) {
-    const member = await getMemberRecord(tw.teamId, viewerUserId);
-    teamMemberUrlParam = member?.id ?? 0;
-  }
   const p = new URLSearchParams();
   p.set(TEAM_WORKSPACE_QUERY.team, String(tw.teamId));
-  p.set(TEAM_WORKSPACE_QUERY.userid, tw.ownerUserId);
-  p.set(TEAM_WORKSPACE_QUERY.plan, tw.workspacePlanQuery);
-  p.set(TEAM_WORKSPACE_QUERY.teamMemberId, String(teamMemberUrlParam));
   return p.toString();
 }
 
@@ -267,9 +248,9 @@ function teamWorkspaceIdentityQueryFromSearchParams(
 }
 
 /**
- * When workspace identity query fields are missing, stale, or partial (e.g. only `team=`),
- * returns the canonical `team` + `userid` + `plan` + `teamMemberId` query string.
- * When the URL is already canonical, returns `null` (no redirect).
+ * When workspace identity query fields are stale (e.g. leftover `userid` / `plan`),
+ * returns the canonical `team=` query string. When the URL is already canonical,
+ * returns `null` (no redirect).
  */
 export async function resolveTeamWorkspaceCanonicalRedirectQueryString(
   viewerUserId: string,

@@ -20,7 +20,7 @@ interface PageProps {
  * `/dashboard/team-admin/members?team=`.
  *
  * **Workspace main dashboard** (for co-admins; hidden for the subscriber owner) uses:
- * `/dashboard?team=<workspaceId>&userid=<ownerClerkId>&plan=<team.planSlug>&teamMemberId=<viewerRowId>`
+ * `/dashboard?team=<workspaceId>`
  *
  * Dashboard switchers (Personal / Team / Team Admin) live in
  * `TeamAdminTopDashboardBar` on the team-admin layout.

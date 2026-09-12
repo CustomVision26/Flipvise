@@ -33,6 +33,7 @@ import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { resolveEffectivePlan } from "@/lib/plan-metadata-billing-resolution";
 import { stripe, resolveAppUrl } from "@/lib/stripe";
 import { personalDashboardHrefAfterAddonCheckoutSuccess } from "@/lib/personal-dashboard-url";
+import { writeCheckoutSessionCookie } from "@/lib/checkout-session-cookie";
 import { STRIPE_ADDON_META_TYPE } from "@/lib/stripe-addon-metadata";
 import {
   resolveStripeAddonPriceIdFromEnvKey,
@@ -213,6 +214,8 @@ export async function createAddonCheckoutSessionAction(
   if (!session.client_secret) {
     throw new Error("Failed to create add-on checkout session");
   }
+
+  await writeCheckoutSessionCookie(session.id);
 
   return {
     mode: "checkout",

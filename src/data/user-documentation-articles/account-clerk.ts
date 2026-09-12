@@ -39,6 +39,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         bullets: [
           "Do not remove primary email if team or affiliate invites are tied to it.",
           "Account deletion from Clerk Security is intercepted by Flipvise — read the confirmation dialog first.",
+          "Dashboard links from Manage account do not put your Clerk user id in the address bar.",
         ],
       },
     ],
@@ -65,7 +66,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         id: "save",
         title: "Saving",
         paragraphs: [
-          "Save changes runs a Server Action that updates your Flipvise profile, then returns you to the read-only summary. Phone, mailing address, and type/status are stored for support; security answers are stored privately. Incomplete profiles are redirected to Account details before the personal dashboard unlocks.",
+          "Save changes runs a Server Action that updates your Flipvise profile, then returns you to the read-only summary. Phone, mailing address, and type/status are stored for support; security answers are stored privately. Incomplete profiles are redirected to Account details before the personal dashboard (/dashboard, no Clerk user id in the URL) unlocks.",
         ],
       },
     ],
@@ -83,6 +84,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
           "Free users: 3 interface color presets.",
           "Pro: 8 interface background accent colors.",
           "Pro Plus, team tier, or admin grant: full 12-color palette.",
+          "Account menu links back to Personal Dash at /dashboard without a Clerk user id in the address bar.",
         ],
       },
       {
@@ -108,6 +110,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
           "Cancel subscription: with active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both. Access continues until period end.",
           "Add-on-only cancel keeps the base plan renewing and writes an Inbox notice. If plan renewal was canceled, use Keep renewing plan to resume.",
           "Plan history lists plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is ending). Receipts show plan start, plan end, and auto-renewal On or Off.",
+          "Checkout success returns to /dashboard?checkout=success without Stripe session ids in the address bar.",
         ],
       },
       {

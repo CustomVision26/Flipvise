@@ -80,10 +80,8 @@ export function PricingAddonsCatalog({
     setPendingKey(addonKey);
     try {
       const period = periodFor(addonKey);
-      const result = await createAddonCheckoutSessionAction({ addonKey, period });
-      router.push(
-        `/pricing/add-ons/pay?session_id=${encodeURIComponent(result.sessionId)}`,
-      );
+      await createAddonCheckoutSessionAction({ addonKey, period });
+      router.push("/pricing/add-ons/pay");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start add-on checkout.");
     } finally {

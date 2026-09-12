@@ -41,6 +41,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "UI Guides in the header lists every Flipvise UI guide. Guests see it in the top nav; signed-in users see it beside Inbox.",
           "Guest homepage nav shows Plans and Contact Us; on Documentation or Contact Us you also see Home and Documentation.",
           "Signed-in users also see plan label, workspace switcher, inbox, UI Guides, and account menu. The plan label still opens Plans & Pricing.",
+          "Personal Dash is /dashboard; invited workspaces use /dashboard?team=<id> — Clerk user ids are not placed in the address bar.",
         ],
         requirements: ["Signed in for inbox and account controls."],
         doNots: [
@@ -87,7 +88,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not create decks beyond your plan limit — the Add Deck action is blocked at the cap.",
           "Team-tier subscribers author decks here, not on a duplicate team deck dashboard.",
-          "Do not change another user’s userid query parameter in the URL.",
+          "Do not share or bookmark URLs that contain account or payment identifiers.",
         ],
       },
       {
@@ -193,7 +194,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "When a team admin (or you via Format Quiz Question) has published a question distribution, the lobby mix matches those exact counts.",
           "Each question shows a format badge (e.g. True / false, Fill in the blank) while you answer.",
           "When formats have been published, each card keeps its assigned format until published again; otherwise formats are chosen at random per card.",
-          "Team study URLs use /decks/[deckId]/study?team=&userid=&plan=&teamMemberId= (auto-filled when you open a workspace deck).",
+          "Team study URLs use /decks/[deckId]/study?team= (workspace id is filled when you open a workspace deck).",
           "Workspace owners and team admins see Cancel on the unanswered-submit dialog to return to the Resume quiz lobby without submitting.",
           "Team quizzes may enforce timers, schedules, and Exam Mode rules set by admins; when Exam Mode is on for members, the Timed quiz lobby shows a green Exam Mode on light. Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question.",
           "AI Reading (text-to-speech) is available on Pro Plus when enabled.",
@@ -639,7 +640,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "The catalog is available when published. Each card shows monthly and yearly prices when both are offered.",
           "Guests can browse prices and sign in to purchase. Signed-in users on an eligible plan can subscribe.",
           "If your plan cannot buy that add-on, View eligible plans takes you to Pricing so you can upgrade.",
-          "After you subscribe, you return to your personal dashboard with a confirmation; Inbox also receives a confirmation.",
+          "Checkout opens an add-on subscription that stacks on your base plan. The pay page is /pricing/add-ons/pay — Stripe session ids are stored in an httpOnly cookie, not the address bar.",
           "During a plan change, locked add-ons you do not already have may be offered before payment.",
           "Access can also come from a Team Admin assignment or a complimentary grant from Flipvise.",
           "AI Essay unlocks generation, drafts, submissions, and AI feedback. Open it from the add-ons banner on your dashboard after purchase or grant.",
@@ -685,6 +686,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not use a VPN-only fake address — mismatches can cause tax errors or payment failures.",
           "Do not assume tax is always zero; overseas customers may see VAT/GST/sales tax when Stripe Tax applies.",
           "Do not share Checkout session links — they are tied to your account session.",
+          "Do not paste Stripe session ids or Clerk user ids into the address bar.",
         ],
       },
       {
@@ -702,6 +704,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Slide to confirm → plan-change payment. If you selected an add-on, Stripe redirects through a continue bridge that finalizes the plan change then opens add-on checkout in the same session (two separate receipts).",
           "Promotion code field appears only when a promo window is active on Pricing — never on plan-change checkout when Pricing has no promo UI.",
           "Stripe Embedded Checkout collects payment method and billing address (Same as my Flipvise mailing address defaults on when available) and shows final total with tax. Customers can pay with card, Apple Pay, Google Pay, Link, or US bank account (ACH) when Stripe shows those options. Manual billing address uses a State / province / parish field. Slide to subscribe enables when payment details, name on the payment method, and billing address are complete.",
+          "The payment page keeps the Stripe session in an httpOnly cookie — session ids and Clerk user ids are not shown in the address bar.",
           "A Stripe test card on the public checkout shows a formal alert: test card numbers are not accepted; use a genuine bank-issued card. Stripe’s technical wording is not shown.",
           "Success redirects to /dashboard?checkout=success with a confirmation toast; Inbox also receives a formal subscription or plan-change confirmation.",
         ],
@@ -711,6 +714,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Do not apply a promo on plan-change checkout — remove the code and rely on proration.",
           "Do not expect already-owned add-ons in the plan-change dialog — only locked catalog add-ons appear.",
           "Do not use Stripe test card numbers (for example 4242…) on the public checkout — only a genuine bank-issued card is accepted.",
+          "Do not paste Stripe session ids or Clerk user ids into the address bar.",
         ],
       },
       {
@@ -742,7 +746,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "If you already subscribe, choosing another paid tier on /pricing routes to plan-change checkout — not a second full-price subscription.",
           "Stripe calculates proration: credit for unused time on the old plan and charge for the new plan for the remainder of the billing period.",
           "Checkout shows line items (credits as negative amounts, charges as positive) and Amount due today.",
-          "When the Add-on Catalog is published, you may optionally pick one locked add-on before plan-change payment; the dialog shows plan proration plus the add-on list price, then opens add-on checkout after the plan swap succeeds.",
+          "When the Add-on Catalog is published, you may optionally pick one locked add-on before plan-change payment; the dialog shows plan proration plus the add-on list price, then opens add-on checkout after the plan swap succeeds (pay URL has no Stripe session id).",
           "Badge on plan-change payment: “Prorated adjustment — no additional promo discount”.",
           "Previous promotion discounts do not carry over to plan changes — only the prorated difference is billed.",
           "Switching monthly ↔ yearly on the same tier also reprices with proration.",
@@ -859,7 +863,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Manage name, email, password, connected accounts, and sessions.",
         howItWorks: [
-          "Click your avatar in the header to open Manage account.",
+          "Click your avatar in the header to open Manage account. Dashboard links from the account menu do not put your Clerk user id in the address bar.",
           "Profile: update display name and profile image.",
           "Email addresses: add, verify, or set primary email.",
           "Security: change password, enable 2FA, review active sessions.",
@@ -884,7 +888,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Click Edit details — Clerk prompts you to verify your login before the editable form unlocks; Save or Cancel when finished.",
           "Education Institution and Corporation show a name sub-field.",
           "Save writes phone, mailing address, and type to public profile metadata and security answers to private metadata via a Server Action.",
-          "New accounts (and incomplete profiles) complete Account details in three slides — contact, account type, then security questions — before the personal dashboard unlocks.",
+          "New accounts (and incomplete profiles) complete Account details in three slides — contact, account type, then security questions — before the personal dashboard unlocks. That dashboard is /dashboard with no Clerk user id in the URL.",
         ],
         requirements: ["Signed-in account."],
         doNots: [
@@ -900,7 +904,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Choose light or dark base theme.",
           "Pro users pick interface background accent colors (8 on Pro, 12 on Pro Plus and above).",
           "Free users choose from 3 interface color presets.",
-          "Microphone settings configure speech-to-text input for deck creation.",
+          "Microphone settings configure speech-to-text input for deck creation. Returning to Personal Dash uses /dashboard without a Clerk user id in the address bar.",
         ],
         requirements: [
           "Signed-in account.",
@@ -923,7 +927,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Cancel subscription: if you have active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both — access continues until period end.",
           "Add-on-only cancel leaves your base plan renewing; an Inbox billing notice confirms that. Plan cancel shows Keep renewing plan if you need to reverse it.",
           "Plan history lists paid plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is scheduled to end). Opening a Flipvise receipt shows plan start, plan end, and whether auto-renewal is On or Off.",
-          "See Pricing & Billing docs for prorations, promos, and first-time checkout.",
+          "See Pricing & Billing docs for prorations, promos, and first-time checkout. Checkout success returns to /dashboard?checkout=success without Stripe session ids in the address bar.",
         ],
         requirements: [
           "Signed-in account.",
@@ -965,7 +969,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Central hub for members, deck assignment, invites, quiz settings, and workspace history.",
         howItWorks: [
-          "Access via workspace switcher → WS Admin Dash (invited workspaces) or Team Admin Dash (personal), or direct URL with ?team= and teamMemberId=.",
+          "Access via workspace switcher → WS Admin Dash (invited workspaces) or Team Admin Dash (personal), or /dashboard/team-admin?team= and teamMemberId=. The member Team Dashboard is /dashboard?team=<id> only.",
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
           "Add-ons → Member add-ons covers upcoming member feature assignment; AI Essay is plan-owner personal only for now (member access coming soon).",
@@ -991,7 +995,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "AI Essay is not assignable to workspace members yet — only the plan owner can use it on their personal dashboard.",
           "Workspace members who open AI Essay see a Coming soon message until member add-ons ship.",
           "Live Classroom™ is listed under Add-ons and is an organization add-on purchased by the subscription owner — then assign members to the Live Classroom team in Settings; participant limits inherit licensed seats.",
-          "Future member add-ons reuse the same Team Admin surface without a new admin system.",
+          "Future member add-ons reuse the same Team Admin surface without a new admin system. Catalog purchase still uses /pricing/add-ons/pay without a Stripe session id in the URL.",
         ],
         requirements: ["Team owner or team_admin."],
         doNots: [

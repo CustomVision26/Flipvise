@@ -570,6 +570,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Platform admins with complimentary Pro Plus can purchase add-ons that list Pro Plus even when Clerk has no billingPlan. An active team or education-team plan is also checked, so complimentary Pro Plus does not hide Team Gold eligibility for Live Classroom.",
           "The public catalog shows Addon Plans prices and copy. Ineligible signed-in users get View eligible plans (opens /pricing) instead of a disabled Not eligible button.",
           "Team Admins assign the same catalog keys from Team Admin → Add-ons.",
+          "Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
           "Focus Study Mode (study_mode_focus) is retired — do not re-add it to the catalog or Stripe.",
         ],
       },
@@ -588,7 +589,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Monthly price ($) — billed each month.",
           "Yearly price ($/mo billed annually) — Stripe yearly Price is this amount × 12.",
           "Description — catalog card blurb. Product details — longer copy stored on the Stripe product.",
-          "Save writes addon_catalog and updates Stripe. Grants and publish toggles remain on /admin/add-ons.",
+          "Save writes addon_catalog and updates Stripe. Grants and publish toggles remain on /admin/add-ons. Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
         ],
       },
       {

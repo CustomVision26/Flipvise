@@ -18,7 +18,8 @@ import {
 } from "@/lib/stripe-pricing-display";
 import { stripe } from "@/lib/stripe";
 import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
-import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
+import { requirePayPageCheckoutSessionId } from "@/lib/checkout-session-pay-page";
+import { planCheckoutPayHref } from "@/lib/checkout-session-url";
 import { getSavedMailingAddressForCheckout } from "@/lib/stripe-invoice-addresses";
 import { publishedTrialDaysForPlan } from "@/lib/plan-trial";
 import { toClientJson } from "@/lib/to-client-json";
@@ -43,16 +44,17 @@ export default async function PricingCheckoutPayPage({
   searchParams,
 }: PricingCheckoutPayPageProps) {
   const { session_id: sessionIdParam } = await searchParams;
-  const sessionId = sessionIdParam?.trim() ?? "";
 
   const { userId } = await auth();
   if (!userId) {
     redirect("/");
   }
 
-  if (!isStripeCheckoutSessionId(sessionId)) {
-    redirect("/pricing/checkout");
-  }
+  const sessionId = await requirePayPageCheckoutSessionId({
+    urlSessionId: sessionIdParam,
+    nextPath: planCheckoutPayHref(),
+    fallbackPath: "/pricing/checkout",
+  });
 
   let session;
   try {
@@ -67,8 +69,7 @@ export default async function PricingCheckoutPayPage({
   }
 
   if (session.status === "complete") {
-    const params = new URLSearchParams({ checkout: "success", session_id: sessionId });
-    redirect(`/dashboard?${params.toString()}`);
+    redirect("/dashboard?checkout=success");
   }
 
   if (!session.client_secret) {

@@ -533,7 +533,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       (m) => m.teamId === teamCtxId,
     );
 
-    /** Co-admins must use the canonical `?team=&userid=&plan=&teamMemberId=` URL — cookie-only context wrongly showed the member Study/Preview UI. */
+    /** Co-admins must use the canonical `?team=` URL — cookie-only context wrongly showed the member Study/Preview UI. */
     if (cookieMembership?.role === "team_admin") {
       const cookieTeam = await tryTeamQuery(() => getTeamById(teamCtxId), null);
       if (cookieTeam && isWorkspaceSubscriptionPlanSlug(cookieTeam.planSlug)) {

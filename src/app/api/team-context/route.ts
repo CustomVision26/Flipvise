@@ -4,6 +4,7 @@ import {
   clearTeamContextCookie,
   syncTeamContextCookieForUser,
 } from "@/lib/team-context-cookie-server";
+import { stripSensitiveQueryFromPath } from "@/lib/sensitive-url-query";
 
 function safeSameOriginRedirectPath(
   redirect: string | null,
@@ -16,7 +17,7 @@ function safeSameOriginRedirectPath(
   try {
     const url = new URL(trimmed, origin);
     if (url.origin !== origin) return fallback;
-    return `${url.pathname}${url.search}`;
+    return stripSensitiveQueryFromPath(`${url.pathname}${url.search}`);
   } catch {
     return fallback;
   }

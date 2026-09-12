@@ -94,7 +94,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           "Personal Dash — your own decks and account context.",
           "Team workspaces — study or manage decks in a subscriber’s workspace.",
           "WS Admin Dash — opens Team Admin for co-admins on invited workspaces (tooltip: This Workspace Admin Dashboard).",
-          "Switching workspaces updates URL query params and a team context cookie.",
+          "Switching workspaces updates a team context cookie. Personal Dash is /dashboard; invited workspaces use /dashboard?team=<id> without Clerk user ids in the URL.",
         ],
       },
       {

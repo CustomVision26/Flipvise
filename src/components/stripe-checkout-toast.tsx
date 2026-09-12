@@ -11,6 +11,8 @@ import {
   readPlanChangePendingAddon,
 } from "@/lib/plan-change-pending-addon";
 import { showSubscriptionSuccessToast } from "@/lib/subscription-success-toast";
+import { addonCheckoutPayHref } from "@/lib/checkout-session-url";
+import { stripSensitiveUrlSearchParams } from "@/lib/sensitive-url-query";
 
 function resolveCheckoutRedirectKind(
   searchParams: URLSearchParams,
@@ -128,12 +130,14 @@ export function StripeCheckoutToast() {
 
     const next = new URL(window.location.href);
     next.searchParams.delete("checkout");
-    next.searchParams.delete("session_id");
     next.searchParams.delete("setup_intent");
-    next.searchParams.delete("setup_intent_client_secret");
     next.searchParams.delete("redirect_status");
     next.searchParams.delete("addon_checkout");
-    const qs = next.searchParams.toString();
+    const cleaned = stripSensitiveUrlSearchParams(
+      next.searchParams,
+      next.pathname,
+    );
+    const qs = cleaned.toString();
     router.replace(`${next.pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
 
     if (checkout === "canceled") {
@@ -196,13 +200,11 @@ export function StripeCheckoutToast() {
           clearPlanChangePendingAddon();
           if (pendingAddon) {
             try {
-              const addonSession = await createAddonCheckoutSessionAction({
+              await createAddonCheckoutSessionAction({
                 addonKey: pendingAddon.addonKey,
                 period: pendingAddon.period,
               });
-              window.location.assign(
-                `/pricing/add-ons/pay?session_id=${encodeURIComponent(addonSession.sessionId)}&from_plan_change=1`,
-              );
+              window.location.assign(addonCheckoutPayHref(true));
               return;
             } catch (addonErr) {
               console.error(

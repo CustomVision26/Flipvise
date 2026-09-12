@@ -8,9 +8,9 @@ import { buildTeacherPath } from "@/lib/teacher-url";
 import { cn } from "@/lib/utils";
 
 type TeamAdminDashboardNavActionsProps = {
-  /** Personal dashboard URL (includes `userid=` and usually `plan=`). */
+  /** Personal dashboard URL (`/dashboard`). */
   mainDashboardHref: string;
-  /** Workspace-scoped main dashboard: `team`, `userid` (owner), `plan`, `teamMemberId`. */
+  /** Workspace-scoped main dashboard: `?team=` (workspace id). */
   workspaceDashboardHref: string;
   workspaceTeamId: number;
   workspaceTeamMemberUrlParam?: number;

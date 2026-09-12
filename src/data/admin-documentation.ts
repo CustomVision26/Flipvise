@@ -273,7 +273,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Save writes addon_catalog and updates the matching Stripe product (name, description, tax code). /pricing/add-ons reads those catalog amounts so cards match Addon Plans even when Stripe price retrieve fails.",
           "Stripe cannot change a Price amount — Save creates a new Price when the amount changes. Checkout picks the catalog-aligned Price on the same product.",
           "Yearly Stripe charge is yearly monthly rate × 12.",
-          "Grant, publish, and Unlock Feature controls stay on /admin/add-ons.",
+          "Grant, publish, and Unlock Feature controls stay on /admin/add-ons. Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
         ],
         requirements: [
           "Platform admin access.",
@@ -297,7 +297,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Per-add-on Active, Published (header banner), and On pricing switches control purchase, banner chips, and catalog listing.",
           "Complimentary assignment searches registered users by name or email, shows a selection summary, then assign or revoke.",
           "AI Essay usage section shows entitlement, activity, and token metric cards plus an event breakdown list.",
-          "Team Admins assign the same catalog keys from Team Admin → Add-ons without a separate admin product.",
+          "Team Admins assign the same catalog keys from Team Admin → Add-ons without a separate admin product. Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
         ],
         requirements: [
           "Platform admin access.",

@@ -33,7 +33,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Getting there",
         bullets: [
           "Workspace switcher → WS Admin Dash (invited) or Team Admin Dash (personal).",
-          "Direct URL: /dashboard/team-admin?team=<id>&teamMemberId=<id>.",
+          "Direct URL: /dashboard/team-admin?team=<id>&teamMemberId=<id>. The member Team Dashboard is /dashboard?team=<id> only.",
           "Default landing redirects to Deck Manager → Assign decks to members.",
           "teamMemberId=0 means you are the subscriber owner.",
         ],
@@ -71,6 +71,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Workspace members who open AI Essay see Coming soon until member access ships.",
           "Live Classroom™ is under Add-ons and is an organization add-on purchased by the subscription owner. After purchase, assign members to the Live Classroom team in Live Classroom™ → Settings.",
           "Future member add-ons will reuse this Team Admin surface.",
+          "Catalog purchase uses /pricing/add-ons/pay without a Stripe session id in the URL.",
         ],
       },
     ],

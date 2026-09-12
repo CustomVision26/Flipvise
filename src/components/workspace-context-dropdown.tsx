@@ -42,7 +42,7 @@ interface WorkspaceContextDropdownProps {
   totalEligibleTeamCount?: number;
   /** Selected team workspace, or null for personal (no cookie). */
   activeTeamId: number | null;
-  /** Personal dashboard URL (may include `?userid=` / `plan=` for bookmarks; must match session). */
+  /** Personal dashboard URL. */
   personalWorkspaceHref?: string;
   /** Plan label next to "Personal" (e.g. Team Gold, Pro, Free). */
   personalPlanLabel?: string;

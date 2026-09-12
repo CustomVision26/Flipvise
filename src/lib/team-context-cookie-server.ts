@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { getMemberRecord, getTeamById, teamWorkspaceAllowsViewerAccess } from "@/db/queries/teams";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
+import { stripSensitiveQueryFromPath } from "@/lib/sensitive-url-query";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -48,7 +49,9 @@ export function dashboardPathFromSearchParams(
     }
   }
   const query = params.toString();
-  return query ? `/dashboard?${query}` : "/dashboard";
+  return stripSensitiveQueryFromPath(
+    query ? `/dashboard?${query}` : "/dashboard",
+  );
 }
 
 export function teamContextCookieApiPath(input: {

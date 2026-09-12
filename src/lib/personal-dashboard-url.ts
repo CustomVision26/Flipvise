@@ -1,15 +1,9 @@
 import type { EducationTeamPlanId } from "@/lib/education-plans";
-import {
-  personalDashboardPlanQueryValue,
-  type TeamPlanId,
-} from "@/lib/team-plans";
+import { type TeamPlanId } from "@/lib/team-plans";
 
 /**
- * Personal dashboard URL with no query string — used where a clean path is preferable
- * (pricing/admin fallbacks, legacy links). After sign-in, prefer
- * {@link personalDashboardHrefWithUserPlanQuery}.
- *
- * Workspace switcher “Personal Dash” links use {@link personalDashboardHrefWithUserPlanQuery}.
+ * Personal dashboard URL. Billing identity lives in the Clerk session — never
+ * `userid`, `plan`, or Stripe session ids in the address bar.
  */
 export function personalDashboardHref(): string {
   return "/dashboard";
@@ -24,73 +18,33 @@ export type PersonalDashboardHrefWithPlanInput = {
   hasClerkPersonalProPlus: boolean;
 };
 
-/** `?userid=` + optional `plan=` — must match signed-in user; see `canonicalDashboardPathRemovingSensitiveQuery`. */
+/** Personal dashboard — query params are not used for identity. */
 export function personalDashboardHrefWithUserPlanQuery(
-  input: PersonalDashboardHrefWithPlanInput,
+  _input: PersonalDashboardHrefWithPlanInput,
 ): string {
-  const personalStripeSlug = input.hasClerkPersonalProPlus
-    ? ("pro_plus" as const)
-    : input.hasClerkPersonalPro
-      ? ("pro" as const)
-      : null;
-
-  const planQuery = personalDashboardPlanQueryValue(
-    input.activeTeamPlan,
-    input.isPro,
-    personalStripeSlug,
-    input.activeEducationTeamPlan ?? null,
-  );
-  const params = new URLSearchParams({ userid: input.userId });
-  if (planQuery !== "") params.set("plan", planQuery);
-  return `/dashboard?${params.toString()}`;
+  return personalDashboardHref();
 }
 
-/**
- * Stripe Checkout `success_url` — same `userid` / `plan` shape as the workspace switcher,
- * plus `checkout=success` for post-payment sync toast.
- */
-export function personalDashboardHrefAfterCheckoutSuccess(input: {
+/** Stripe Checkout success return — toast flag only. Session id is an httpOnly cookie. */
+export function personalDashboardHrefAfterCheckoutSuccess(_input: {
   userId: string;
   purchasedPlanSlug: string;
 }): string {
-  const slug = input.purchasedPlanSlug.trim();
-  const params = new URLSearchParams({
-    userid: input.userId,
-    checkout: "success",
-  });
-  if (slug) params.set("plan", slug);
-  return `/dashboard?${params.toString()}`;
+  return "/dashboard?checkout=success";
 }
 
-/** SetupIntent return after prorated plan swap — must not include `checkout=success`. */
-export function personalDashboardHrefAfterPlanChangeSuccess(input: {
+/** SetupIntent return after prorated plan swap. */
+export function personalDashboardHrefAfterPlanChangeSuccess(_input: {
   userId: string;
   purchasedPlanSlug: string;
 }): string {
-  const slug = input.purchasedPlanSlug.trim();
-  const params = new URLSearchParams({
-    userid: input.userId,
-    checkout: "plan_change",
-  });
-  if (slug) params.set("plan", slug);
-  return `/dashboard?${params.toString()}`;
+  return "/dashboard?checkout=plan_change";
 }
 
-/**
- * Stripe Checkout `return_url` after add-on subscribe — personal dashboard with
- * `checkout=success` toast/sync. Keeps `session_id={CHECKOUT_SESSION_ID}` literal
- * for Stripe to substitute.
- */
-export function personalDashboardHrefAfterAddonCheckoutSuccess(input: {
+/** Add-on Checkout return_url. Session id is stored in an httpOnly cookie at create time. */
+export function personalDashboardHrefAfterAddonCheckoutSuccess(_input: {
   userId: string;
-  /** Current base plan slug (not the add-on key). */
   currentPlanSlug?: string | null;
 }): string {
-  const params = new URLSearchParams({
-    userid: input.userId,
-    checkout: "success",
-  });
-  const slug = input.currentPlanSlug?.trim();
-  if (slug) params.set("plan", slug);
-  return `/dashboard?${params.toString()}&session_id={CHECKOUT_SESSION_ID}`;
+  return "/dashboard?checkout=success";
 }

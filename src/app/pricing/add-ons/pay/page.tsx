@@ -9,28 +9,37 @@ import { getClerkUserFieldDisplayById } from "@/lib/clerk-user-display";
 import { checkoutSessionAmountsMajor } from "@/lib/stripe-checkout-session-amounts";
 import { stripe } from "@/lib/stripe";
 import { resolveStripePublishableKey } from "@/lib/stripe-publishable-key";
-import { isStripeCheckoutSessionId } from "@/lib/stripe-checkout-session-id";
+import { requirePayPageCheckoutSessionId } from "@/lib/checkout-session-pay-page";
+import {
+  addonCheckoutPayHref,
+  planCheckoutPayHref,
+} from "@/lib/checkout-session-url";
 import { getSavedMailingAddressForCheckout } from "@/lib/stripe-invoice-addresses";
 import { toClientJson } from "@/lib/to-client-json";
 
 export const dynamic = "force-dynamic";
 
 interface AddonCheckoutPayPageProps {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; from_plan_change?: string }>;
 }
 
 export default async function AddonCheckoutPayPage({
   searchParams,
 }: AddonCheckoutPayPageProps) {
-  const { session_id: sessionIdParam } = await searchParams;
-  const sessionId = sessionIdParam?.trim() ?? "";
+  const {
+    session_id: sessionIdParam,
+    from_plan_change: fromPlanChangeParam,
+  } = await searchParams;
+  const fromPlanChange = fromPlanChangeParam === "1";
 
   const { userId } = await auth();
   if (!userId) redirect("/");
 
-  if (!isStripeCheckoutSessionId(sessionId)) {
-    redirect("/pricing/add-ons");
-  }
+  const sessionId = await requirePayPageCheckoutSessionId({
+    urlSessionId: sessionIdParam,
+    nextPath: addonCheckoutPayHref(fromPlanChange),
+    fallbackPath: "/pricing/add-ons",
+  });
 
   let session;
   try {
@@ -45,16 +54,11 @@ export default async function AddonCheckoutPayPage({
     redirect("/pricing/add-ons");
   }
   if (session.metadata?.type !== "addon") {
-    redirect("/pricing/checkout/pay?session_id=" + encodeURIComponent(sessionId));
+    redirect(planCheckoutPayHref());
   }
 
   if (session.status === "complete") {
-    const params = new URLSearchParams({
-      userid: userId,
-      checkout: "success",
-      session_id: sessionId,
-    });
-    redirect(`/dashboard?${params.toString()}`);
+    redirect("/dashboard?checkout=success");
   }
 
   if (!session.client_secret) {
@@ -100,10 +104,6 @@ export default async function AddonCheckoutPayPage({
     }
   }
 
-  const successParams = new URLSearchParams({
-    userid: userId,
-    checkout: "success",
-  });
   const summary: PricingCheckoutSummary = {
     planLabel: catalog?.name ?? "Add-on",
     period,
@@ -115,7 +115,7 @@ export default async function AddonCheckoutPayPage({
     monthlyRateAfterTrial: stripeAmounts?.subtotalMajor ?? null,
     stripeAmounts,
     billingNote,
-    successHref: `/dashboard?${successParams.toString()}`,
+    successHref: "/dashboard?checkout=success",
   };
 
   return (

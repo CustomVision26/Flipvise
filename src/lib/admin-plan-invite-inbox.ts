@@ -15,7 +15,7 @@ type InviteRow = {
 };
 
 function planLabelFromSnapshotSlug(slug: string | null | undefined): string {
-  if (slug == null || slug === "") return "—";
+  if (slug == null || slug === "") return "Free";
   if (!isAdminPlanAssignment(slug)) return slug;
   return labelForAdminPlanAssignment(slug);
 }

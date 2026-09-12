@@ -1,6 +1,6 @@
 /**
- * Team workspace dashboard links use `team`, `userid` (subscriber owner), `plan`, and `teamMemberId`
- * (`0` = owner; else the viewer’s `team_members.id`). Access is still enforced server-side.
+ * Team workspace dashboard links use `team` (workspace id). Owner identity and
+ * member row ids are resolved from the signed-in session — not from the URL.
  */
 export const TEAM_WORKSPACE_QUERY = {
   team: "team",
@@ -38,16 +38,11 @@ export function buildTeamWorkspaceQueryString(input: { teamId: number }): string
 
 export function buildTeamWorkspaceDashboardPath(input: {
   teamId: number;
-  ownerUserId: string;
-  planSlug: string;
-  teamMemberUrlParam: number;
+  ownerUserId?: string;
+  planSlug?: string;
+  teamMemberUrlParam?: number;
 }): string {
-  const p = new URLSearchParams();
-  p.set(TEAM_WORKSPACE_QUERY.team, String(input.teamId));
-  p.set(TEAM_WORKSPACE_QUERY.userid, input.ownerUserId);
-  p.set(TEAM_WORKSPACE_QUERY.plan, input.planSlug);
-  p.set(TEAM_WORKSPACE_QUERY.teamMemberId, String(input.teamMemberUrlParam));
-  return `/dashboard?${p.toString()}`;
+  return `/dashboard?${buildTeamWorkspaceQueryString({ teamId: input.teamId })}`;
 }
 
 /** Append `?` or `&` and workspace query to a path that may already have a query. */

@@ -79,7 +79,7 @@ interface HeaderUserSectionProps {
   /** Full count of eligible team workspaces (may exceed `workspaceTeams` for free personal). */
   workspaceTeamsTotalEligible?: number;
   activeWorkspaceTeamId?: number | null;
-  /** Personal dashboard target when selecting “Personal Dash” (may include `?userid=` / `plan=`). */
+  /** Personal dashboard target when selecting “Personal Dash”. */
   personalWorkspaceHref?: string;
   /** Shown next to "Personal Dash" in the workspace dropdown (access role or grant type). */
   personalPlanLabelForWorkspace?: string;

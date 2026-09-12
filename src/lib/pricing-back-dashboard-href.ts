@@ -8,7 +8,7 @@ import { tryTeamQuery } from "@/lib/team-query-fallback";
 
 /**
  * “Back to Dashboard” on `/pricing`: matches header workspace switcher — team cookie + nav row →
- * `/dashboard?team=&userid=&plan=&teamMemberId=`; otherwise personal `?userid=&plan=`.
+ * `/dashboard?team=`; otherwise personal `/dashboard`.
  */
 export async function resolvePricingBackToDashboardHref(input: {
   userId: string;

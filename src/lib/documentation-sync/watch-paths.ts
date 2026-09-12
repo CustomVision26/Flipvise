@@ -146,6 +146,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/flipvise-billing-receipt.ts",
     "src/lib/flipvise-invoice-receipt.ts",
     "src/components/flipvise-invoice-receipt-view.tsx",
+    "src/lib/clerk-user-display.ts",
+    "src/lib/admin-plan-invite-inbox.ts",
     "src/app/dashboard/billing/receipts/[invoiceId]/page.tsx",
   ],
   "help-center-overview": ["src/components/help-center.tsx"],

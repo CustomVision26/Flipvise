@@ -145,13 +145,11 @@ export function DashboardAddonsBanner({
     setPending(true);
     setUnlockTarget(null);
     try {
-      const result = await createAddonCheckoutSessionAction({
+      await createAddonCheckoutSessionAction({
         addonKey: target.key,
         period: selectedPeriod,
       });
-      router.push(
-        `/pricing/add-ons/pay?session_id=${encodeURIComponent(result.sessionId)}`,
-      );
+      router.push("/pricing/add-ons/pay");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start checkout.");
       setUnlockTarget(target);
