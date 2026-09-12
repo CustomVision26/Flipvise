@@ -250,7 +250,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "links",
         title: "Hosted invoice and PDF",
         bullets: [
-          "Open Flipvise receipt when Stripe invoice id is persisted. The seller block uses Contact Us company address (street, city, phone — no apartment).",
+          "Open Flipvise receipt when Stripe invoice id is persisted. The receipt lists plan start, plan end, and auto-renewal On or Off. The seller block uses Contact Us company address (street, city, phone — no apartment).",
           "Stripe-hosted PDFs still use Stripe Dashboard business details for their header. Flipvise also stamps the Contact Us address on new Stripe invoices (footer and Company/Address fields).",
           "Proration receipts from plan changes appear here after invoice.payment_succeeded webhook processing.",
         ],

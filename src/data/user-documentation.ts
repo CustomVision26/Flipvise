@@ -102,6 +102,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
           "Assigned members see only decks assigned to them.",
           "Team context is stored in a cookie when invited members switch workspaces.",
+          "Plan owners create, rename, and delete workspaces from Manage Workspaces, listed under this topic in the sidebar.",
         ],
         requirements: [
           "Active invite membership on the workspace (team_member or team_admin).",
@@ -117,6 +118,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         id: "manage-workspaces",
         title: "Manage Workspaces",
         route: "/dashboard/workspaces",
+        parentPageId: "team-workspace-dashboard",
         purpose:
           "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
@@ -287,7 +289,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "After sign-in on web, PWA, or the mobile app, a brief welcome toast appears at the top of the screen.",
           "Team workspace invites use a formal message with the workspace name, role (Team Admin or Member), plan owner, and inviting team admin when available — accept or decline from the inbox.",
           "After a successful plan subscribe, plan change, or add-on purchase, Inbox receives a formal written confirmation (separate from the on-screen toast). Free-trial confirmations say you are on a trial and list the start date, end date, and first renewal charge date. Confirmations close with a single signature: Regards, Flipvise Team by Flipvise Studio LLC.",
-          "Accept team invites, review Flipvise billing receipts, open quiz results, and continue Contact Us live chats from here.",
+          "Accept team invites, review Flipvise billing receipts (plan start, plan end, and auto-renewal), open quiz results, and continue Contact Us live chats from here.",
           "Contact Us notifications appear as “Support replied: …” when an administrator responds to your public message — tap Open conversation to return to the thread.",
           "The header inbox icon shows a badge count for pending items.",
           "In the iPhone app (TestFlight or App Store) and Android app, new inbox items can also show as lock-screen / notification-tray alerts when notifications are allowed.",
@@ -671,7 +673,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Pay with a credit or debit card, Apple Pay, Google Pay, Link, or a US bank account (ACH) when Stripe offers those methods for your location and device. Flipvise does not store full card or bank numbers; Stripe handles PCI-compliant payment data.",
           "Stripe Automatic Tax may calculate tax from your billing address. The checkout summary shows subtotal, any discount, tax (if applicable), and total before you confirm.",
           "Tax ID collection is enabled for business customers where Stripe supports it.",
-          "After purchase, Flipvise receipts (Inbox, Billing plan history) show Flipvise Studio LLC and the company mailing address from Contact Us (street, city, and phone — no apartment). Free-trial receipts also show how many days the trial lasts and the end date. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
+          "After purchase, Flipvise receipts (Inbox, Billing plan history) show Flipvise Studio LLC and the company mailing address from Contact Us (street, city, and phone — no apartment). Receipts list the plan start date, plan end date, and whether auto-renewal is On or Off. Free-trial receipts also show how many days the trial lasts and the end date. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "Currency is determined by the Stripe Price for your selected plan (typically USD for this app’s catalog).",
         ],
         requirements: [
@@ -718,7 +720,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "From /pricing: Manage subscription (when you have an active Stripe subscription).",
           "From Account menu → Billing tab: Manage billing and Cancel subscription.",
-          "Billing tab plan history receipt links open the Flipvise receipt (company street address from Contact Us). Trial receipts list the trial length and end date.",
+          "Billing tab plan history receipt links open the Flipvise receipt (company street address from Contact Us). Receipts list the plan start, plan end, and auto-renewal On or Off. Trial receipts also list the trial length and end date.",
           "Opens Stripe Customer Portal in a new page — update card, download Stripe invoices, cancel at period end.",
           "Plan upgrades/downgrades can also start from /pricing (Change to …) which uses in-app proration checkout.",
           "Billing tab shows plan history (past plan slugs and dates) synced from your account.",
@@ -919,7 +921,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Manage billing opens Stripe Customer Portal — update overseas billing address, card, download invoices.",
           "Cancel subscription: if you have active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both — access continues until period end.",
           "Add-on-only cancel leaves your base plan renewing; an Inbox billing notice confirms that. Plan cancel shows Keep renewing plan if you need to reverse it.",
-          "Plan history lists paid plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is scheduled to end).",
+          "Plan history lists paid plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is scheduled to end). Opening a Flipvise receipt shows plan start, plan end, and whether auto-renewal is On or Off.",
           "See Pricing & Billing docs for prorations, promos, and first-time checkout.",
         ],
         requirements: [

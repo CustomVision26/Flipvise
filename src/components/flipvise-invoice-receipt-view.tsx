@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
@@ -46,6 +47,28 @@ export function FlipviseInvoiceReceiptView({
                 <dd className="inline text-foreground">{receipt.datePaidLabel}</dd>
               </div>
             ) : null}
+            {receipt.planPeriodStartLabel ? (
+              <div>
+                <dt className="inline">Plan starts: </dt>
+                <dd className="inline text-foreground">{receipt.planPeriodStartLabel}</dd>
+              </div>
+            ) : null}
+            {receipt.planPeriodEndLabel ? (
+              <div>
+                <dt className="inline">Plan ends: </dt>
+                <dd className="inline text-foreground">{receipt.planPeriodEndLabel}</dd>
+              </div>
+            ) : null}
+            {receipt.autoRenewalOn != null ? (
+              <div className="flex items-center gap-2 pt-1">
+                <dt className="inline">Auto-renewal: </dt>
+                <dd className="inline">
+                  <Badge variant={receipt.autoRenewalOn ? "secondary" : "outline"}>
+                    {receipt.autoRenewalOn ? "On" : "Off"}
+                  </Badge>
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </div>
         <Image
@@ -90,6 +113,17 @@ export function FlipviseInvoiceReceiptView({
             ? `${receipt.amountPaidLabel} paid${receipt.datePaidLabel ? ` on ${receipt.datePaidLabel}` : ""}`
             : `${receipt.amountPaidLabel} due`}
         </p>
+        {receipt.autoRenewalOn != null ? (
+          <p className="text-sm text-muted-foreground">
+            {receipt.autoRenewalOn && receipt.planPeriodEndLabel
+              ? `Auto-renewal is on. This plan renews on ${receipt.planPeriodEndLabel} unless you cancel.`
+              : !receipt.autoRenewalOn && receipt.planPeriodEndLabel
+                ? `Auto-renewal is off. Access ends on ${receipt.planPeriodEndLabel}.`
+                : receipt.autoRenewalOn
+                  ? "Auto-renewal is on."
+                  : "Auto-renewal is off."}
+          </p>
+        ) : null}
 
         {receipt.lines.length > 0 ? (
           <Table>

@@ -28,6 +28,22 @@ export async function generateFlipviseInvoiceReceiptPdf(
   }
   if (receipt.datePaidLabel) {
     doc.text(`Date paid: ${receipt.datePaidLabel}`, margin, y);
+    y += 14;
+  }
+  if (receipt.planPeriodStartLabel) {
+    doc.text(`Plan starts: ${receipt.planPeriodStartLabel}`, margin, y);
+    y += 14;
+  }
+  if (receipt.planPeriodEndLabel) {
+    doc.text(`Plan ends: ${receipt.planPeriodEndLabel}`, margin, y);
+    y += 14;
+  }
+  if (receipt.autoRenewalOn != null) {
+    doc.text(
+      `Auto-renewal: ${receipt.autoRenewalOn ? "On" : "Off"}`,
+      margin,
+      y,
+    );
     y += 22;
   } else {
     y += 8;
@@ -84,7 +100,25 @@ export async function generateFlipviseInvoiceReceiptPdf(
     ? `${receipt.amountPaidLabel} paid${receipt.datePaidLabel ? ` on ${receipt.datePaidLabel}` : ""}`
     : `${receipt.amountPaidLabel} due`;
   doc.text(paidLine, margin, y);
-  y += 20;
+  y += 18;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(70);
+  if (receipt.autoRenewalOn === true && receipt.planPeriodEndLabel) {
+    const note = doc.splitTextToSize(
+      `Auto-renewal is on. This plan renews on ${receipt.planPeriodEndLabel} unless you cancel.`,
+      pageW - margin * 2,
+    );
+    doc.text(note, margin, y);
+    y += 13 * note.length + 6;
+  } else if (receipt.autoRenewalOn === false && receipt.planPeriodEndLabel) {
+    const note = doc.splitTextToSize(
+      `Auto-renewal is off. Access ends on ${receipt.planPeriodEndLabel}.`,
+      pageW - margin * 2,
+    );
+    doc.text(note, margin, y);
+    y += 13 * note.length + 6;
+  }
 
   doc.setDrawColor(200);
   doc.line(margin, y, pageW - margin, y);

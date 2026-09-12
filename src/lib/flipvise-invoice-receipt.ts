@@ -21,6 +21,9 @@ export type FlipviseInvoiceReceipt = {
   invoiceNumber: string | null;
   receiptNumber: string | null;
   datePaidLabel: string | null;
+  planPeriodStartLabel: string | null;
+  planPeriodEndLabel: string | null;
+  autoRenewalOn: boolean | null;
   sellerLines: string[];
   billToName: string | null;
   billToLines: string[];
@@ -52,11 +55,24 @@ function formatMoney(cents: number, currency: string): string {
 
 function formatPaidDate(seconds: number | null | undefined): string | null {
   if (typeof seconds !== "number" || !Number.isFinite(seconds)) return null;
-  return new Date(seconds * 1000).toLocaleDateString("en-US", {
+  return formatDateFromMs(seconds * 1000);
+}
+
+function formatDateFromMs(ms: number | null | undefined): string | null {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  return new Date(ms).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+}
+
+function formatDateValue(value: Date | number | null | undefined): string | null {
+  if (value instanceof Date) return formatDateFromMs(value.getTime());
+  if (typeof value === "number") {
+    return value > 1_000_000_000_000 ? formatDateFromMs(value) : formatPaidDate(value);
+  }
+  return null;
 }
 
 function stripeAddressLines(
@@ -98,10 +114,83 @@ function unixSecondsOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-async function loadInvoiceTrialWindow(input: {
+function invoiceLinePeriodBounds(lines: Stripe.InvoiceLineItem[]): {
+  start: number | null;
+  end: number | null;
+} {
+  let start: number | null = null;
+  let end: number | null = null;
+  for (const line of lines) {
+    const lineStart = unixSecondsOrNull(line.period?.start);
+    const lineEnd = unixSecondsOrNull(line.period?.end);
+    if (lineStart != null) start = start == null ? lineStart : Math.min(start, lineStart);
+    if (lineEnd != null) end = end == null ? lineEnd : Math.max(end, lineEnd);
+  }
+  return { start, end };
+}
+
+function subscriptionCurrentPeriod(subscription: Stripe.Subscription): {
+  start: number | null;
+  end: number | null;
+} {
+  const item = subscription.items.data[0] as
+    | (Stripe.SubscriptionItem & {
+        current_period_start?: number;
+        current_period_end?: number;
+      })
+    | undefined;
+  const sub = subscription as Stripe.Subscription & {
+    current_period_start?: number;
+    current_period_end?: number;
+  };
+  return {
+    start:
+      unixSecondsOrNull(item?.current_period_start) ??
+      unixSecondsOrNull(sub.current_period_start),
+    end:
+      unixSecondsOrNull(item?.current_period_end) ??
+      unixSecondsOrNull(sub.current_period_end),
+  };
+}
+
+function autoRenewalFromSubscription(subscription: Stripe.Subscription): boolean {
+  if (subscription.cancel_at_period_end === true) return false;
+  if (
+    subscription.status === "canceled" ||
+    subscription.status === "unpaid" ||
+    subscription.status === "incomplete_expired"
+  ) {
+    return false;
+  }
+  return (
+    subscription.status === "active" ||
+    subscription.status === "trialing" ||
+    subscription.status === "past_due"
+  );
+}
+
+type InvoiceSubscriptionContext = {
+  trialStart: number | null;
+  trialEnd: number | null;
+  periodStart: number | null;
+  periodEnd: number | null;
+  autoRenewalOn: boolean | null;
+};
+
+async function loadInvoiceSubscriptionContext(input: {
   invoice: Stripe.Invoice;
+  lineItems: Stripe.InvoiceLineItem[];
   userId: string;
-}): Promise<{ start: number | null; end: number | null }> {
+  storedPeriodStart: Date | null;
+  storedPeriodEnd: Date | null;
+}): Promise<InvoiceSubscriptionContext> {
+  const linePeriod = invoiceLinePeriodBounds(input.lineItems);
+  let trialStart: number | null = null;
+  let trialEnd: number | null = null;
+  let periodStart = linePeriod.start;
+  let periodEnd = linePeriod.end;
+  let autoRenewalOn: boolean | null = null;
+
   const subRef = input.invoice.parent?.subscription_details?.subscription;
   const subId =
     typeof subRef === "string"
@@ -112,28 +201,39 @@ async function loadInvoiceTrialWindow(input: {
 
   if (subId) {
     try {
-      const subscription = await stripe.subscriptions.retrieve(subId);
-      const start = unixSecondsOrNull(subscription.trial_start);
-      const end = unixSecondsOrNull(subscription.trial_end);
-      if (start != null || end != null) return { start, end };
+      const subscription = await stripe.subscriptions.retrieve(subId, {
+        expand: ["items.data"],
+      });
+      trialStart = unixSecondsOrNull(subscription.trial_start);
+      trialEnd = unixSecondsOrNull(subscription.trial_end);
+      autoRenewalOn = autoRenewalFromSubscription(subscription);
+      const current = subscriptionCurrentPeriod(subscription);
+      periodStart = periodStart ?? current.start;
+      periodEnd = periodEnd ?? current.end;
     } catch (error) {
       console.error("[loadFlipviseInvoiceReceipt] subscription", subId, error);
     }
   }
 
-  try {
-    const trial = await getUserPlanTrial(input.userId);
-    if (trial?.trialEndsAt) {
-      return {
-        start: null,
-        end: Math.floor(trial.trialEndsAt.getTime() / 1000),
-      };
+  if (trialStart == null && trialEnd == null) {
+    try {
+      const trial = await getUserPlanTrial(input.userId);
+      if (trial?.trialEndsAt) {
+        trialEnd = Math.floor(trial.trialEndsAt.getTime() / 1000);
+      }
+    } catch (error) {
+      console.error("[loadFlipviseInvoiceReceipt] userPlanTrial", error);
     }
-  } catch (error) {
-    console.error("[loadFlipviseInvoiceReceipt] userPlanTrial", error);
   }
 
-  return { start: null, end: null };
+  if (periodStart == null && input.storedPeriodStart) {
+    periodStart = Math.floor(input.storedPeriodStart.getTime() / 1000);
+  }
+  if (periodEnd == null && input.storedPeriodEnd) {
+    periodEnd = Math.floor(input.storedPeriodEnd.getTime() / 1000);
+  }
+
+  return { trialStart, trialEnd, periodStart, periodEnd, autoRenewalOn };
 }
 
 export async function loadFlipviseInvoiceReceipt(input: {
@@ -174,6 +274,9 @@ export async function loadFlipviseInvoiceReceipt(input: {
     invoiceNumber: row.invoiceNumber,
     receiptNumber: null,
     datePaidLabel: fallbackPaid,
+    planPeriodStartLabel: formatDateValue(row.periodStart),
+    planPeriodEndLabel: formatDateValue(row.periodEnd),
+    autoRenewalOn: null,
     sellerLines,
     billToName: null,
     billToLines: [],
@@ -207,10 +310,17 @@ export async function loadFlipviseInvoiceReceipt(input: {
     const invCurrency = (invoice.currency ?? currency).toLowerCase();
     const customerAddress =
       invoice.customer_address ?? invoice.customer_shipping?.address ?? null;
-    const trialWindow = await loadInvoiceTrialWindow({
+    const subscriptionContext = await loadInvoiceSubscriptionContext({
       invoice,
+      lineItems,
       userId: input.userId,
+      storedPeriodStart: row.periodStart,
+      storedPeriodEnd: row.periodEnd,
     });
+    const trialWindow = {
+      start: subscriptionContext.trialStart,
+      end: subscriptionContext.trialEnd,
+    };
 
     return {
       externalId: row.externalId,
@@ -218,6 +328,9 @@ export async function loadFlipviseInvoiceReceipt(input: {
       invoiceNumber: stringOrNull(invoice.number) ?? row.invoiceNumber,
       receiptNumber: stringOrNull(invoice.receipt_number),
       datePaidLabel,
+      planPeriodStartLabel: formatPaidDate(subscriptionContext.periodStart),
+      planPeriodEndLabel: formatPaidDate(subscriptionContext.periodEnd),
+      autoRenewalOn: subscriptionContext.autoRenewalOn,
       sellerLines,
       billToName: stringOrNull(invoice.customer_name),
       billToLines: stripeAddressLines(customerAddress),

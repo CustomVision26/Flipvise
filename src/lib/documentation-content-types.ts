@@ -5,6 +5,8 @@ export type DocPage = {
   route?: string;
   /** Clerk UserButton custom profile tab slug (e.g. appearance, billing). */
   clerkTab?: string;
+  /** When set, this page is nested under another page in the docs sidebar. */
+  parentPageId?: string;
   purpose: string;
   howItWorks: string[];
   requirements: string[];

@@ -108,7 +108,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Filter by invoice status, date range, and search (invoice #, name, email).",
           "Promo column shows general vs affiliate codes and discount detail.",
-          "Open Flipvise receipt (seller address from Contact Us company address — street, city, and phone; no apartment).",
+          "Open Flipvise receipt (plan start, plan end, auto-renewal On or Off; seller address from Contact Us company address — street, city, and phone; no apartment).",
           "Seller name and mailing address on Stripe-hosted PDFs come from Stripe Dashboard business details; Flipvise receipts use the Contact Us company street address and phone (no apartment).",
           "Export CSV.",
         ],

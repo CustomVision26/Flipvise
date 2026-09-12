@@ -35,6 +35,7 @@ export function serializeDocumentationForAgent(context: DocumentationAgentContex
         title: page.title,
         route: page.route,
         clerkTab: page.clerkTab,
+        parentPageId: page.parentPageId,
         purpose: page.purpose,
         howItWorks: page.howItWorks,
         requirements: page.requirements,

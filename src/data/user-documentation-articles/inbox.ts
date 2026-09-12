@@ -35,7 +35,10 @@ export const INBOX_ARTICLES: DocArticle[] = [
               "Formal invite with workspace name, role, plan owner, and inviting team admin — accept or decline",
             ],
             ["Affiliate invite / arrangement change", "Accept invite or confirm plan change"],
-            ["Billing / Flipvise receipt", "Open receipt with company mailing address"],
+            [
+              "Billing / Flipvise receipt",
+              "Open receipt with company mailing address, plan start, plan end, and auto-renewal On or Off",
+            ],
             [
               "Subscription confirmation",
               "Read plan or trial details (trial start, end, and first charge date when applicable), signed once by Flipvise Team by Flipvise Studio LLC",

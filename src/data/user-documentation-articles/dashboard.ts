@@ -148,6 +148,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         bullets: [
           "Use the header workspace switcher — Personal Dash for owners; invited workspaces open Team Dashboard.",
           "Owners open Team Admin Dash from the switcher (owned workspaces are not Team Dashboard rows).",
+          "Plan owners create, rename, and delete owned workspaces from Manage Workspaces, listed under Team Workspace View in this sidebar.",
           "Team context is stored in a cookie when invited members switch.",
           "Co-admins should use canonical URLs with ?team= and teamMemberId= — not cookie-only bookmarks.",
         ],

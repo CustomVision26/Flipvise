@@ -136,7 +136,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "after-purchase",
         title: "After purchase",
         bullets: [
-          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (street, city, and phone — no apartment). Free-trial line items include the trial length and the date the trial ends. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
+          "Flipvise receipts in Inbox and Billing show Flipvise Studio LLC and the company mailing address (street, city, and phone — no apartment). Each receipt lists the plan start date, plan end date, and whether auto-renewal is On or Off. Free-trial line items include the trial length and the date the trial ends. Stripe Customer Portal PDFs still use Stripe Dashboard public details for their header.",
           "May sync to Flipvise inbox.",
           "Currency follows Stripe Price configuration (typically USD).",
         ],
@@ -193,7 +193,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Portal actions",
         bullets: [
           "Update card and billing address.",
-          "Download Stripe invoices from the portal, or open Flipvise receipts from Billing plan history and Inbox (seller address from Contact Us).",
+          "Download Stripe invoices from the portal, or open Flipvise receipts from Billing plan history and Inbox (seller address from Contact Us; plan start, plan end, and auto-renewal On or Off).",
           "Cancel at period end.",
           "Plan upgrades/downgrades can also start from /pricing with in-app proration checkout.",
         ],

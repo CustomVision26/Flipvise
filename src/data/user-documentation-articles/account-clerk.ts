@@ -107,7 +107,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
           "Manage billing → Stripe Customer Portal (card, address, invoices).",
           "Cancel subscription: with active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both. Access continues until period end.",
           "Add-on-only cancel keeps the base plan renewing and writes an Inbox notice. If plan renewal was canceled, use Keep renewing plan to resume.",
-          "Plan history lists plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is ending).",
+          "Plan history lists plan invoices, plan-change (proration) receipts, and add-on receipts as separate rows (Canceling when renewal is ending). Receipts show plan start, plan end, and auto-renewal On or Off.",
         ],
       },
       {

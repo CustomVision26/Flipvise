@@ -18,6 +18,7 @@ export const docPagePayloadSchema = z.object({
   title: z.string().min(1),
   route: z.string().optional(),
   clerkTab: z.string().optional(),
+  parentPageId: z.string().min(1).optional(),
   purpose: z.string().min(1),
   howItWorks: z.array(z.string().min(1)).min(1),
   requirements: z.array(z.string().min(1)).min(1),

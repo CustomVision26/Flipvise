@@ -499,6 +499,87 @@ function isDocPageActive(pageId: string, activeId: string | null): boolean {
   return parseDocArticleHash(activeId) === pageId;
 }
 
+function groupDocPagesByParent(pages: DocPage[]) {
+  const childrenByParent = new Map<string, DocPage[]>();
+  const roots: DocPage[] = [];
+  for (const page of pages) {
+    if (page.parentPageId) {
+      const nested = childrenByParent.get(page.parentPageId) ?? [];
+      nested.push(page);
+      childrenByParent.set(page.parentPageId, nested);
+    } else {
+      roots.push(page);
+    }
+  }
+  return { roots, childrenByParent };
+}
+
+function TocPageItem({
+  page,
+  childrenPages,
+  hasArticle,
+  activeId,
+  onSelect,
+}: {
+  page: DocPage;
+  childrenPages: DocPage[];
+  hasArticle: (pageId: string) => boolean;
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const pageActive = isDocPageActive(page.id, activeId);
+  const articleActive = activeId != null && parseDocArticleHash(activeId) === page.id;
+  const nestedActive = childrenPages.some((child) => isDocPageActive(child.id, activeId));
+
+  return (
+    <li className="space-y-0.5">
+      <button
+        type="button"
+        onClick={() => onSelect(page.id)}
+        className={cn(
+          "block w-full rounded-md px-2 py-1 text-left text-xs leading-snug transition-colors hover:bg-muted/30 hover:text-foreground",
+          pageActive && !articleActive
+            ? "bg-primary/10 font-medium text-foreground"
+            : pageActive || nestedActive
+              ? "font-medium text-foreground"
+              : "text-muted-foreground",
+        )}
+      >
+        {page.title}
+      </button>
+      {hasArticle(page.id) ? (
+        <button
+          type="button"
+          onClick={() => onSelect(docArticleHash(page.id))}
+          className={cn(
+            "flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[10px] leading-snug transition-colors hover:bg-primary/10 hover:text-foreground",
+            articleActive
+              ? "bg-primary/15 font-medium text-primary"
+              : "text-muted-foreground/90",
+          )}
+        >
+          <BookOpen className="size-2.5 shrink-0" aria-hidden />
+          In-depth guide
+        </button>
+      ) : null}
+      {childrenPages.length > 0 ? (
+        <ul className="mt-1 space-y-0.5 border-l border-border/50 pl-2.5">
+          {childrenPages.map((child) => (
+            <TocPageItem
+              key={child.id}
+              page={child}
+              childrenPages={[]}
+              hasArticle={hasArticle}
+              activeId={activeId}
+              onSelect={onSelect}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
 function DocumentationToc({
   sections,
   hasArticle,
@@ -508,7 +589,6 @@ function DocumentationToc({
   sections: DocSection[];
   hasArticle: (pageId: string) => boolean;
 }) {
-  const openArticle = (pageId: string) => onSelect(docArticleHash(pageId));
 
   return (
     <nav aria-label="Documentation sections" className="space-y-5">
@@ -531,6 +611,7 @@ function DocumentationToc({
           const sectionActive =
             activeId === section.id ||
             section.pages.some((page) => isDocPageActive(page.id, activeId));
+          const { roots, childrenByParent } = groupDocPagesByParent(section.pages);
 
           return (
             <div key={section.id} className="space-y-1.5">
@@ -546,44 +627,16 @@ function DocumentationToc({
                 {section.title}
               </button>
               <ul className="space-y-0.5 border-l border-border/60 pl-3">
-                {section.pages.map((page) => {
-                  const pageActive = isDocPageActive(page.id, activeId);
-                  const articleActive =
-                    activeId != null && parseDocArticleHash(activeId) === page.id;
-                  return (
-                    <li key={page.id} className="space-y-0.5">
-                      <button
-                        type="button"
-                        onClick={() => onSelect(page.id)}
-                        className={cn(
-                          "block w-full rounded-md px-2 py-1 text-left text-xs leading-snug transition-colors hover:bg-muted/30 hover:text-foreground",
-                          pageActive && !articleActive
-                            ? "bg-primary/10 font-medium text-foreground"
-                            : pageActive
-                              ? "font-medium text-foreground"
-                              : "text-muted-foreground",
-                        )}
-                      >
-                        {page.title}
-                      </button>
-                      {hasArticle(page.id) ? (
-                        <button
-                          type="button"
-                          onClick={() => openArticle(page.id)}
-                          className={cn(
-                            "flex w-full items-center gap-1 rounded-md px-2 py-0.5 text-left text-[10px] leading-snug transition-colors hover:bg-primary/10 hover:text-foreground",
-                            articleActive
-                              ? "bg-primary/15 font-medium text-primary"
-                              : "text-muted-foreground/90",
-                          )}
-                        >
-                          <BookOpen className="size-2.5 shrink-0" aria-hidden />
-                          In-depth guide
-                        </button>
-                      ) : null}
-                    </li>
-                  );
-                })}
+                {roots.map((page) => (
+                  <TocPageItem
+                    key={page.id}
+                    page={page}
+                    childrenPages={childrenByParent.get(page.id) ?? []}
+                    hasArticle={hasArticle}
+                    activeId={activeId}
+                    onSelect={onSelect}
+                  />
+                ))}
               </ul>
             </div>
           );
@@ -644,6 +697,11 @@ function DocContentPanel({
 
   if (target.type === "section") {
     const { section } = target;
+    const { roots, childrenByParent } = groupDocPagesByParent(section.pages);
+    const orderedPages = roots.flatMap((page) => [
+      page,
+      ...(childrenByParent.get(page.id) ?? []),
+    ]);
     return (
       <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
         <CardHeader className="gap-1 border-b border-border/50 pb-4">
@@ -652,11 +710,11 @@ function DocContentPanel({
         </CardHeader>
         <CardContent className="pt-5">
           <Accordion className="gap-1">
-            {section.pages.map((page) => (
+            {orderedPages.map((page) => (
               <AccordionItem
                 key={page.id}
                 value={page.id}
-                className="border-border/50 px-1"
+                className={cn("border-border/50 px-1", page.parentPageId && "ml-4")}
               >
                 <AccordionTrigger className="rounded-md px-2 py-3 text-foreground hover:bg-muted/30 hover:no-underline">
                   <span className="flex min-w-0 flex-col items-start gap-1 text-left">
@@ -682,11 +740,23 @@ function DocContentPanel({
 
   const { section, page } = target;
   const showSectionBack = section.pages.length > 1;
+  const parentPage = page.parentPageId
+    ? section.pages.find((candidate) => candidate.id === page.parentPageId)
+    : undefined;
 
   return (
     <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
       <CardHeader className="gap-2 border-b border-border/50 pb-4">
-        {showSectionBack ? (
+        {parentPage ? (
+          <button
+            type="button"
+            onClick={() => onSelect(parentPage.id)}
+            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="size-3.5" aria-hidden />
+            {parentPage.title}
+          </button>
+        ) : showSectionBack ? (
           <button
             type="button"
             onClick={() => onSelect(section.id)}
