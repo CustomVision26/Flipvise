@@ -19,6 +19,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "overview",
         title: "Screen layout",
         bullets: [
+          "Open personal dashboard guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
           "Deck grid or list toggle for browsing your library.",
           "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional first card front image, and gradient.",
           "Edit deck updates the same metadata and first card front image from a deck card menu.",
@@ -34,20 +35,38 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         bullets: [
           "Chips scroll in a soft accent ticker in the top bar; each add-on keeps a distinct tint (e.g. teal for AI Essay, rose for Live Classroom).",
           "Locked chips open Unlock Feature (monthly/yearly Stripe add-on checkout).",
-          "Unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay; hover pauses the marquee.",
+          "Unlocked AI Essay opens the AI Essay workspace; hover pauses the marquee.",
           "Access also comes from Team Admin assignment or a platform admin grant.",
         ],
       },
       {
         id: "limits",
         title: "Plan limits (personal workspace)",
+        bullets: [
+          "Usage banners on Personal Dashboard follow the deck and cards-per-deck columns below.",
+          "Team Basic, Team Gold, Platinum, Enterprise, Education Gold, and Education Enterprise use Pro Plus personal deck and card limits (15 decks, 52 cards per deck).",
+          "Education Plus is personal only — Teacher Dashboard tools, no team workspaces.",
+          "Team workspace and member caps are enforced on Manage Workspaces, not on the personal deck grid.",
+        ],
         table: {
-          headers: ["Plan", "Decks", "Cards per deck"],
+          headers: [
+            "Plan",
+            "Decks",
+            "Cards per deck",
+            "Team workspaces",
+            "Members per workspace",
+          ],
           rows: [
-            ["Free", "2", "5"],
-            ["Pro", "10", "30"],
-            ["Pro Plus / team-tier personal", "15", "52"],
-            ["Education Plus", "15", "52"],
+            ["Free", "2", "5", "—", "—"],
+            ["Pro", "10", "30", "—", "—"],
+            ["Pro Plus", "15", "52", "—", "—"],
+            ["Education Plus", "15", "52", "Personal only", "—"],
+            ["Team Basic", "15", "52", "2", "5"],
+            ["Team Gold", "15", "52", "5", "15"],
+            ["Education Gold", "15", "52", "10", "25"],
+            ["Platinum", "15", "52", "10", "25"],
+            ["Enterprise", "15", "52", "20", "35"],
+            ["Education Enterprise", "15", "52", "30", "45"],
           ],
         },
       },
@@ -91,42 +110,6 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
     ],
   ),
   a(
-    "ai-essay",
-    "AI Essay — In-Depth Guide",
-    "AI Essay is an optional premium add-on at /dashboard/ai-doc-studio/ai-essay. It stacks on your current plan — it is not a separate subscription.",
-    [
-      {
-        id: "access",
-        title: "How access is granted",
-        bullets: [
-          "Purchase from the Add-on Catalog or the Unlock Feature dialog (monthly or yearly Stripe prices). Eligible plans include Pro, Pro Plus, team, and education plans; platform admins with complimentary Pro Plus can also purchase.",
-          "Workspace member assignment of AI Essay is coming soon; members see Coming soon instead of unlock.",
-          "Platform admins can grant or revoke complimentary access at /admin/add-ons.",
-          "Server-side checks use canAccessAddon(access, \"ai_essay\") — never trust the client alone.",
-        ],
-      },
-      {
-        id: "surfaces",
-        title: "Screens",
-        bullets: [
-          "How it work? (header) — brief workflow dialog with a link to this AI Essay user guide (/docs#ai-essay).",
-          "Overview — recent essays and recent AI feedback with counts, date/time stamps, and Clear all (confirm before delete); also continue draft, generate, and assignments summary.",
-          "Generate Essay — subject, grade, type, difficulty, topic, optional learning standard, word count, timer, and include flags.",
-          "My Essays / Drafts / Assignments — library of generated activities, open drafts, and Team Admin assignments.",
-          "Writing workspace — prompt, instructions, word counter, optional timer, save, submit, AI feedback; model essay stays hidden until revealed.",
-        ],
-      },
-      {
-        id: "offline",
-        title: "Offline behavior",
-        bullets: [
-          "Prompts and writing area remain usable offline; drafts cache in localStorage and sync when online.",
-          "AI generation and AI feedback require an internet connection.",
-        ],
-      },
-    ],
-  ),
-  a(
     "team-workspace-dashboard",
     "Team Workspace View — In-Depth Guide",
     "Invited members and co-admins switch to a team workspace dashboard (/dashboard?team=…). Plan owners keep decks on Personal Dash and manage workspaces in Team Admin.",
@@ -156,7 +139,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Add-ons on Team Dashboard",
         bullets: [
           "The same premium add-ons running banner appears above the workspace heading.",
-          "Unlocked members can open /dashboard/ai-doc-studio/ai-essay from the AI Essay chip.",
+          "Unlocked members can open the AI Essay workspace from the AI Essay chip.",
         ],
       },
       {
@@ -183,7 +166,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
   a(
     "manage-workspaces",
     "Manage Workspaces — In-Depth Guide",
-    "Team-tier subscribers manage owned workspaces at /dashboard/workspaces.",
+    "Team and Education team subscribers manage owned workspaces from Manage Workspaces.",
     [
       {
         id: "actions",
@@ -205,6 +188,8 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
             ["Team Gold", "5", "15"],
             ["Platinum", "10", "25"],
             ["Enterprise", "20", "35"],
+            ["Education Gold", "10", "25"],
+            ["Education Enterprise", "30", "45"],
           ],
         },
       },
@@ -212,8 +197,9 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "access",
         title: "Who can access this page",
         bullets: [
-          "Requires an active team-tier subscription and at least one owned workspace.",
-          "Invited co-admins without their own team-tier plan cannot manage workspaces here — they use Team Admin for assigned workspaces only.",
+          "Requires an active team-tier or education team subscription (Team Basic, Team Gold, Platinum, Enterprise, Education Gold, or Education Enterprise) and at least one owned workspace.",
+          "Education Plus is personal only — it does not include Manage Workspaces.",
+          "Invited co-admins without their own qualifying plan cannot manage workspaces here — they use Team Admin for assigned workspaces only.",
         ],
       },
     ],

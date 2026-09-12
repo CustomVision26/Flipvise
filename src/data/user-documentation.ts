@@ -18,7 +18,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Use Sign In to open the Clerk authentication modal. Sign up from that modal uses the Flipvise account form (not Clerk’s hosted Sign Up).",
           "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation).",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
-          "After sign-in you are redirected to your personal dashboard automatically (or to account details if phone, mailing address, or type are still missing). Account details mailing address uses a State / province / parish field; Jamaica parish names do not repeat the word Parish in the list.",
+          "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them before the dashboard becomes available.",
+          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse.",
         ],
         requirements: ["None — guests can browse pricing and documentation."],
         doNots: [
@@ -30,14 +31,16 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         id: "header-navigation",
         title: "Top Navigation Bar",
         purpose:
-          "Quick links to Home, Documentation, and Contact Support from anywhere in the app.",
+          "Quick links to Home, Documentation, Plans, UI Guides, and Contact Support from anywhere in the app.",
         howItWorks: [
           "Home returns to your dashboard when signed in, or the homepage when signed out.",
           "Documentation opens this guide.",
+          "Plans opens Plans & Pricing so you can compare tiers and start checkout.",
           "Contact Us appears in the top nav for guests only — it opens the public Contact Support page with live chat.",
-          "Signed-in users open Documentation from the book icon beside Help and Inbox (right side of the header).",
-          "Guest homepage nav shows Contact Us only; on /docs or /contact you also see Home and Documentation.",
-          "Signed-in users also see plan label, workspace switcher, inbox, and account menu.",
+          "Signed-in users open Documentation from the book icon beside Help and Inbox (right side of the header). Plans also appears as a header link next to Teacher and Affiliate.",
+          "UI Guides in the header lists every Flipvise UI guide. Guests see it in the top nav; signed-in users see it beside Inbox.",
+          "Guest homepage nav shows Plans and Contact Us; on Documentation or Contact Us you also see Home and Documentation.",
+          "Signed-in users also see plan label, workspace switcher, inbox, UI Guides, and account menu. The plan label still opens Plans & Pricing.",
         ],
         requirements: ["Signed in for inbox and account controls."],
         doNots: [
@@ -58,11 +61,12 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Create, organize, and open your personal flashcard decks.",
         howItWorks: [
+          "Open personal dashboard guide to walk through the dashboard, inbox, Help Center, documentation, New Deck, and Manage account screens in order. The guide stays open while you browse.",
           "View decks in grid or list mode.",
           "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional first card front image, and background gradient.",
           "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
-          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
+          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
@@ -71,38 +75,19 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Signed-in account.",
           "Free: up to 2 decks, 5 cards per deck.",
           "Pro: up to 10 decks, 30 cards per deck.",
-          "Pro Plus / team-tier personal: up to 15 decks, 52 cards per deck.",
-          "Education Plus: up to 15 decks, 52 cards per deck (same personal limits as Pro Plus, plus Teacher Dashboard tools).",
+          "Pro Plus: up to 15 decks, 52 cards per deck.",
+          "Education Plus: up to 15 decks, 52 cards per deck (same personal limits as Pro Plus, plus Teacher Dashboard tools; no team workspaces).",
+          "Team Basic: Pro Plus personal limits, plus 2 team workspaces and 5 members per workspace.",
+          "Team Gold: Pro Plus personal limits, plus 5 team workspaces and 15 members per workspace.",
+          "Education Gold: Pro Plus personal limits, plus Education Plus teacher tools, 10 team workspaces, and 25 members per workspace.",
+          "Platinum: Pro Plus personal limits, plus 10 team workspaces and 25 members per workspace.",
+          "Enterprise: Pro Plus personal limits, plus 20 team workspaces and 35 members per workspace.",
+          "Education Enterprise: Pro Plus personal limits, plus Education Gold teacher and school tools, 30 team workspaces, and 45 members per workspace.",
         ],
         doNots: [
           "Do not create decks beyond your plan limit — the Add Deck action is blocked at the cap.",
           "Team-tier subscribers author decks here, not on a duplicate team deck dashboard.",
           "Do not change another user’s userid query parameter in the URL.",
-        ],
-      },
-      {
-        id: "ai-essay",
-        title: "AI Essay",
-        route: "/dashboard/ai-doc-studio/ai-essay",
-        purpose:
-          "Premium add-on for generating essay activities, writing drafts, submitting work, and receiving AI feedback.",
-        howItWorks: [
-          "Unlock via Stripe purchase, Team Admin assignment, or platform admin grant — then open /dashboard/ai-doc-studio/ai-essay.",
-          "How it work? next to Unlocked opens a short overview of the Essay Generator workflow and links to the in-depth AI Essay guide in Documentation (/docs#ai-essay).",
-          "Overview shows recent essays and recent AI feedback with total counts and date/time on each row; Clear all removes every essay you own or every feedback record after confirmation.",
-          "Overview also shows continue draft, generate, and assigned essays.",
-          "Generate Essay creates a prompt, objectives, optional outline/vocabulary/rubric, and an optional hidden model essay.",
-          "Writing workspace includes word count, optional timer, save draft (local cache when offline), submit, and AI feedback.",
-          "Assignments lists Team Admin–created essay activities assigned to you.",
-          "AI generation and AI feedback require internet; reading prompts and drafting can continue offline with local draft sync.",
-        ],
-        requirements: [
-          "Active AI Essay add-on entitlement (Stripe or admin). Team member assignment is coming soon.",
-          "Eligible paid plan for self-serve purchase (Pro, Pro Plus, team, or education). Platform admins with complimentary Pro Plus can also purchase.",
-        ],
-        doNots: [
-          "Do not expect the model essay to appear automatically — owners must reveal it.",
-          "Do not treat AI Essay as a separate subscription plan.",
         ],
       },
       {
@@ -114,7 +99,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
-          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature, unlocked AI Essay opens /dashboard/ai-doc-studio/ai-essay.",
+          "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
           "Assigned members see only decks assigned to them.",
           "Team context is stored in a cookie when invited members switch workspaces.",
         ],
@@ -133,7 +118,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Manage Workspaces",
         route: "/dashboard/workspaces",
         purpose:
-          "Team-tier subscribers create, rename, delete, and review history for owned team workspaces.",
+          "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
           "Add workspaces up to your plan’s workspace limit.",
           "Rename or delete workspaces you own.",
@@ -145,7 +130,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         doNots: [
           "Deleting a workspace removes associated team data — confirm before deleting.",
-          "Invited co-admins cannot access this page unless they own a team-tier subscription.",
+          "Invited co-admins cannot access this page unless they own a team-tier or education team subscription.",
         ],
       },
     ],
@@ -618,6 +603,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",
@@ -627,7 +613,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Enter a promotion code in the field above the plan cards (optional). Codes can also pre-fill from ?promo= in the URL.",
           "Active public codes appear as quick-fill chips under the promo field when a tier’s general sale is running.",
           "Signed-in users see a Current plan badge; active subscribers also get Manage subscription.",
-          "When the platform admin publishes the Add-on Catalog, /pricing/add-ons lists optional features (such as AI Essay) that stack on your current plan — monthly or yearly where configured.",
+          "When the Add-on Catalog is published, it lists optional features (such as AI Essay) that stack on your current plan — monthly or yearly where configured.",
           "Choose a plan → review on /pricing/checkout → pay on /pricing/checkout/pay.",
         ],
         requirements: [
@@ -646,27 +632,32 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         title: "Add-on Catalog",
         route: "/pricing/add-ons",
         purpose:
-          "Purchase optional premium add-ons (for example AI Essay) that attach to your existing subscription.",
+          "Purchase optional premium add-ons (for example AI Essay and Live Classroom™) that attach to your existing subscription.",
         howItWorks: [
-          "Visible only when a platform admin enables the catalog and publishes individual add-ons.",
-          "Each card shows Addon Plans prices (monthly, and yearly when configured) with a period toggle. Stripe fills the amount only when the catalog omits a price.",
-          "Guests can browse prices and use Sign in to purchase (Clerk modal). Signed-in eligible plans can buy via Stripe. Eligibility includes your personal plan, team or education-team plan, and complimentary admin Pro Plus — Team Gold still unlocks Live Classroom if you also have complimentary Pro Plus.",
-          "If your plan is not eligible, View eligible plans opens /pricing so you can upgrade.",
-          "After you slide to subscribe, a success toast appears and you return to your personal dashboard; Inbox receives a formal add-on confirmation.",
-          "During a plan change, if the catalog is published, locked add-ons may also be offered in a checkout dialog before payment.",
-          "Access can also come from a Team Admin assignment or a platform admin complimentary grant.",
-          "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay for generation, drafts, submissions, and AI feedback.",
-          "Live Classroom™ is an organization add-on for Team and Enterprise plans — purchased by the subscription owner; participant limits inherit licensed seats.",
+          "The catalog is available when published. Each card shows monthly and yearly prices when both are offered.",
+          "Guests can browse prices and sign in to purchase. Signed-in users on an eligible plan can subscribe.",
+          "If your plan cannot buy that add-on, View eligible plans takes you to Pricing so you can upgrade.",
+          "After you subscribe, you return to your personal dashboard with a confirmation; Inbox also receives a confirmation.",
+          "During a plan change, locked add-ons you do not already have may be offered before payment.",
+          "Access can also come from a Team Admin assignment or a complimentary grant from Flipvise.",
+          "AI Essay unlocks generation, drafts, submissions, and AI feedback. Open it from the add-ons banner on your dashboard after purchase or grant.",
+          "How it work? in the AI Essay header explains the Essay Generator workflow and links to this Add-on Catalog guide.",
+          "Overview shows recent essays and recent AI feedback, continue draft, generate, and assigned essays.",
+          "Generate Essay creates a prompt, objectives, optional outline, vocabulary, rubric, and an optional hidden model essay.",
+          "The writing workspace includes word count, an optional timer, save draft (including offline cache), submit, and AI feedback.",
+          "AI generation and AI feedback need internet; reading prompts and drafting can continue offline.",
+          "Live Classroom™ is an organization add-on for Team and Enterprise plans — purchased by the subscription owner; participant limits follow licensed seats.",
         ],
         requirements: [
-          "Signed-in account on an eligible paid plan (or a team/admin grant).",
-          "Matching STRIPE_ADDON_*_PRICE_ID environment variables for self-serve purchase.",
-          "Live Classroom requires a Team Basic/Gold/Platinum/Enterprise or Education Gold/Enterprise plan.",
+          "Signed-in account on an eligible paid plan (or a team or complimentary grant).",
+          "AI Essay self-serve purchase: Pro, Pro Plus, team, or education plan.",
+          "Live Classroom requires a Team Basic, Team Gold, Platinum, Enterprise, Education Gold, or Education Enterprise plan.",
         ],
         doNots: [
           "Do not treat add-ons as separate subscription plans — they stack on your current plan.",
-          "Do not expect Team Admin to cancel a Stripe-paid add-on — only team-sourced grants can be removed there.",
-          "Do not expect Live Classroom on individual Free/Pro/Pro Plus/Education Plus plans.",
+          "Do not expect the model essay to appear automatically — you must reveal it.",
+          "Do not expect Team Admin to cancel a paid add-on — only team-sourced grants can be removed there.",
+          "Do not expect Live Classroom on individual Free, Pro, Pro Plus, or Education Plus plans.",
         ],
       },
       {
@@ -1217,8 +1208,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Homework Generator (/teacher/homework) — take-home assignments aligned to deck content. The same assigned-deck original lesson plans appear in the From saved lesson plan picker for team members. Multi-day lesson plans use the same All Days / single-day scope dialog (with day captions) as Quiz before generation. Reading / Language Arts homework lets you set Number of passages and Questions per passage, then includes titled reading passages in Preview, Edit, and PDF so questions link to the full text. Math graph answers (number line / coordinate plane) render as figures in the Answer Key.",
           "Study Guide Generator (/teacher/study-guides) — structured study materials with PDF export. The lesson plan picker includes assigned-deck originals for team members the same way as Quiz and Homework. Multi-day lesson plans generate from the full plan (All Days) without a day-scope dialog.",
           "Worksheet Generator (/teacher/worksheets) — printable practice sheets with answer keys.",
-          "Generate AI Essay (/dashboard/ai-doc-studio/ai-essay/generate) — premium add-on listed beside other AI tools; requires AI Essay entitlement (purchase or platform admin). Workspace member assignment is coming soon.",
-          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage (Essay uses its own topic form under /dashboard/ai-doc-studio/ai-essay).",
+          "Generate AI Essay — premium add-on listed beside other AI tools; requires the AI Essay add-on (purchase or complimentary grant). Workspace member assignment is coming soon.",
+          "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage. Essay uses its own topic form in the AI Essay workspace.",
           "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library.",
         ],
         requirements: [
@@ -1230,7 +1221,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not run AI tools offline — generation requires a connection.",
           "Do not skip deck linking — AI output quality depends on your flashcard content.",
-          "Do not expect Generate AI Essay without the add-on — locked users are sent to the Essay unlock flow.",
+          "Do not expect Generate AI Essay without the add-on — locked users are sent to the unlock flow. See Add-on Catalog for how to purchase and use AI Essay.",
         ],
       },
       {

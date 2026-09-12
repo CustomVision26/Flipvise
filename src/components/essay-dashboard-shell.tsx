@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 
-const AI_ESSAY_USER_GUIDE_HREF = "/docs#ai-essay";
+const AI_ESSAY_USER_GUIDE_HREF = "/docs#article-pricing-add-ons";
 
 const HOW_AI_ESSAY_WORKS_STEPS = [
   {

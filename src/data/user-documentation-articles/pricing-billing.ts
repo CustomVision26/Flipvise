@@ -19,6 +19,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "ui",
         title: "Page features",
         bullets: [
+          "Open pricing guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
           "Toggle monthly vs yearly billing — yearly shows effective monthly rate.",
           "View plans dropdown filters the grid or show all tiers.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, Enterprise.",
@@ -27,7 +28,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Promotion code field above plan cards — optional; ?promo= in URL can pre-fill.",
           "Active public codes appear as quick-fill chips during sales.",
           "Signed-in users see Current plan badge and Manage subscription when applicable.",
-          "When published by a platform admin, an Add-on Catalog link leads to /pricing/add-ons for optional features such as AI Essay.",
+          "When published, an Add-on Catalog link leads to optional features such as AI Essay.",
         ],
       },
       {
@@ -56,21 +57,50 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
   a(
     "pricing-add-ons",
     "Add-on Catalog — In-Depth Guide",
-    "Optional premium add-ons at /pricing/add-ons stack on your current plan.",
+    "Optional premium add-ons stack on your current plan. They are not separate subscriptions.",
     [
       {
         id: "purchase",
         title: "Buying an add-on",
         bullets: [
-          "Catalog is visible only when a platform admin enables it and publishes add-ons.",
-          "Cards show Addon Plans monthly/yearly amounts (same values as /admin/addon-plans); Stripe is used only when the catalog omits a price. Guests sign in via modal to purchase. Unlock Feature in the header banner uses the same checkout.",
-          "Choose monthly or yearly when a yearly price is configured.",
-          "If you are signed in on a plan that cannot buy that add-on, View eligible plans takes you to /pricing.",
-          "Checkout opens an add-on subscription (separate from your base plan subscription).",
+          "The catalog is visible when it is published. Each card shows monthly and yearly amounts when both are offered.",
+          "Guests can browse prices and sign in to purchase. Unlock Feature in the dashboard banner uses the same checkout.",
+          "Choose monthly or yearly when a yearly price is offered.",
+          "If you are signed in on a plan that cannot buy that add-on, View eligible plans takes you to Pricing.",
+          "Checkout opens an add-on subscription that stacks on your base plan.",
           "Plan-change checkout can offer locked published add-ons in a dialog before payment.",
-          "AI Essay unlocks /dashboard/ai-doc-studio/ai-essay after purchase or grant.",
-          "Live Classroom™ is an organization add-on for Team/Enterprise plans — purchased by the subscription owner; participant limits inherit licensed seats.",
-          "Platform admins with complimentary Pro Plus (no Stripe billingPlan) are eligible for add-ons that list Pro Plus. Team-only add-ons such as Live Classroom still require a team or education team plan — but an active Team Gold (or other listed team) plan counts even when complimentary Pro Plus is also present.",
+          "Live Classroom™ is an organization add-on for Team and Enterprise plans — purchased by the subscription owner; participant limits follow licensed seats.",
+          "Complimentary Pro Plus still counts for add-ons that list Pro Plus. Team-only add-ons such as Live Classroom still need a team or education team plan.",
+        ],
+      },
+      {
+        id: "ai-essay",
+        title: "AI Essay",
+        bullets: [
+          "AI Essay unlocks generation, drafts, submissions, and AI feedback after purchase or grant.",
+          "Open it from the add-ons banner on your dashboard (or from Teacher Dashboard tools when the add-on is unlocked).",
+          "How it work? in the header opens a short workflow dialog with a link to this Add-on Catalog guide.",
+          "Overview shows recent essays and recent AI feedback with counts and date/time stamps, plus continue draft, generate, and assignments.",
+          "Generate Essay: subject, grade, type, difficulty, topic, optional learning standard, word count, timer, and include flags.",
+          "My Essays, Drafts, and Assignments keep generated activities, open drafts, and Team Admin assignments.",
+          "Writing workspace: prompt, instructions, word counter, optional timer, save, submit, and AI feedback. The model essay stays hidden until you reveal it.",
+        ],
+      },
+      {
+        id: "ai-essay-access",
+        title: "How AI Essay access is granted",
+        bullets: [
+          "Purchase from the Add-on Catalog or Unlock Feature (monthly or yearly). Eligible plans include Pro, Pro Plus, team, and education plans.",
+          "Workspace member assignment is coming soon; members see Coming soon instead of unlock.",
+          "Flipvise can also grant complimentary access.",
+        ],
+      },
+      {
+        id: "ai-essay-offline",
+        title: "AI Essay offline",
+        bullets: [
+          "Prompts and writing remain usable offline; drafts cache on your device and sync when you are back online.",
+          "AI generation and AI feedback need an internet connection.",
         ],
       },
       {
@@ -78,8 +108,8 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         title: "Other ways to unlock",
         bullets: [
           "Team Admin → Add-ons will assign member add-ons later; AI Essay member assignment is coming soon (plan owner personal use only for now).",
-          "Platform admins can grant complimentary access at /admin/add-ons.",
-          "Live Classroom™ organization ownership is granted to the subscription owner (Stripe or platform admin).",
+          "Flipvise can grant complimentary access.",
+          "Live Classroom™ organization ownership is granted to the subscription owner (purchase or complimentary grant).",
         ],
       },
     ],

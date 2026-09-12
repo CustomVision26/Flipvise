@@ -12,6 +12,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/account-recovery-fields.tsx",
     "src/actions/account-recovery-profile.ts",
     "src/app/onboarding/account-recovery/page.tsx",
+    "src/components/docs-ui-guide-provider.tsx",
+    "src/lib/flipvise-ui-guides.ts",
   ],
   "header-navigation": [
     "src/components/app-top-nav.tsx",
@@ -40,8 +42,17 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/deck-delete-warning-copy.ts",
     "src/db/queries/deck-delete-impact.ts",
     "src/components/dashboard-addons-banner.tsx",
+    "src/components/docs-ui-guide-provider.tsx",
+    "src/lib/flipvise-ui-guides.ts",
   ],
-  "ai-essay": [
+  "pricing-add-ons": [
+    "src/app/pricing/add-ons/page.tsx",
+    "src/components/pricing-addons-catalog.tsx",
+    "src/components/plan-change-addons-dialog.tsx",
+    "src/actions/addons.ts",
+    "src/lib/stripe-addon-price-display.ts",
+    "src/lib/addon-catalog-price-labels.ts",
+    "src/lib/addon-plan-eligibility.ts",
     "src/app/dashboard/ai-doc-studio/page.tsx",
     "src/app/dashboard/ai-doc-studio/ai-essay/page.tsx",
     "src/app/dashboard/ai-doc-studio/ai-essay/generate/page.tsx",
@@ -52,15 +63,6 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/essay.ts",
     "src/lib/essay-access.ts",
     "src/lib/addon-keys.ts",
-  ],
-  "pricing-add-ons": [
-    "src/app/pricing/add-ons/page.tsx",
-    "src/components/pricing-addons-catalog.tsx",
-    "src/components/plan-change-addons-dialog.tsx",
-    "src/actions/addons.ts",
-    "src/lib/stripe-addon-price-display.ts",
-    "src/lib/addon-catalog-price-labels.ts",
-    "src/lib/addon-plan-eligibility.ts",
   ],
   "team-admin-add-ons": [
     "src/app/dashboard/(team-admin)/team-admin/add-ons/page.tsx",
@@ -157,7 +159,12 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "contact-us-live-chat": ["src/components/contact-support-view.tsx", "src/components/contact-us-thread-view.tsx"],
   "contact-us-guest-vs-signed-in": ["src/components/contact-support-view.tsx"],
   "contact-us-vs-help-center": ["src/components/contact-support-view.tsx", "src/components/help-center.tsx"],
-  pricing: ["src/components/pricing-content.tsx", "src/data/plans-config.json"],
+  pricing: [
+    "src/components/pricing-content.tsx",
+    "src/data/plans-config.json",
+    "src/components/docs-ui-guide-provider.tsx",
+    "src/lib/flipvise-ui-guides.ts",
+  ],
   "stripe-billing-payment": [
     "src/actions/stripe.ts",
     "src/components/stripe-checkout-button.tsx",

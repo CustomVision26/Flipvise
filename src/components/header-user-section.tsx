@@ -16,6 +16,7 @@ import { DocsNavIconButton } from "@/components/docs-nav-icon-button";
 import { HelpCenterNavIconButton } from "@/components/help-center-nav-icon-button";
 import { TeacherNavIconButton } from "@/components/teacher-nav-icon-button";
 import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
+import { DocsUiGuidesMenuButton } from "@/components/docs-ui-guide-provider";
 import {
   shouldHidePlatformAdminNav,
   shouldHideWorkspaceSwitcher,
@@ -274,6 +275,8 @@ export function HeaderUserSection({
   const isTeamAdminRoute =
     pathname === "/dashboard/team-admin" ||
     pathname.startsWith("/dashboard/team-admin/");
+  const isPricing =
+    pathname === "/pricing" || pathname.startsWith("/pricing/");
 
   const showTeacherNavButton = showTeacherDashboard && isTeamAdminRoute;
 
@@ -307,6 +310,21 @@ export function HeaderUserSection({
           data-header-promo-links
           className="mr-0.5 flex shrink-0 items-center gap-1 sm:mr-1"
         >
+          <HeaderNavTooltip label="Plans & Pricing">
+            <Link
+              href="/pricing"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "inline-flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs sm:px-3",
+                isPricing && "bg-muted/70 text-foreground",
+              )}
+              aria-current={isPricing ? "page" : undefined}
+              aria-label="Plans"
+            >
+              <CreditCard className="size-3.5 shrink-0" aria-hidden />
+              <span className="hidden min-[420px]:inline">Plans</span>
+            </Link>
+          </HeaderNavTooltip>
           {showTeacherNavButton ? (
             <span className="inline-flex shrink-0 items-center">
               <TeacherNavIconButton />
@@ -411,6 +429,7 @@ export function HeaderUserSection({
             <InboxNavIconButton unreadCount={inboxUnreadCount} />
           </span>
         ) : null}
+        {portalsReady ? <DocsUiGuidesMenuButton /> : null}
         </div>
       </div>
 

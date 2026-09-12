@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, Mail } from "lucide-react";
+import { BookOpen, CreditCard, Home, Mail } from "lucide-react";
 import { HeaderNavTooltip } from "@/components/header-nav-tooltip";
+import { DocsUiGuidesMenuButton } from "@/components/docs-ui-guide-provider";
 import { cn } from "@/lib/utils";
 
 type AppTopNavProps = {
@@ -24,6 +25,7 @@ export function AppTopNav({
   const pathname = usePathname() ?? "";
   const isDocs = pathname === "/docs" || pathname.startsWith("/docs/");
   const isContact = pathname === "/contact" || pathname.startsWith("/contact/");
+  const isPricing = pathname === "/pricing" || pathname.startsWith("/pricing/");
   const isHome =
     pathname === "/" ||
     pathname === homeHref ||
@@ -55,6 +57,14 @@ export function AppTopNav({
           },
         ]
       : []),
+    {
+      href: "/pricing",
+      label: "Plans",
+      shortLabel: "Plans",
+      tooltip: "Plans & Pricing",
+      icon: CreditCard,
+      active: isPricing,
+    },
   ] as const;
 
   return (
@@ -100,6 +110,7 @@ export function AppTopNav({
           </Link>
         </HeaderNavTooltip>
       )}
+      <DocsUiGuidesMenuButton className="h-8 rounded-full border-transparent bg-transparent px-3 text-xs font-medium text-muted-foreground shadow-none hover:bg-muted/40 hover:text-foreground sm:text-sm" />
     </nav>
   );
 }

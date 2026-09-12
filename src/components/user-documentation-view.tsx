@@ -22,6 +22,10 @@ import {
 } from "@/lib/user-documentation-article-types";
 import { PublicPageIntro } from "@/components/public-page-intro";
 import {
+  DocsUiGuideStartButton,
+  HomepageScreenshotViewButton,
+} from "@/components/docs-ui-guide-provider";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -138,11 +142,24 @@ function DocPagePanel({
           Edit quick reference
         </Button>
       ) : null}
-      {locationLabel ? (
-        <p className="inline-flex rounded-md border border-border/60 bg-muted/30 px-2.5 py-1 font-mono text-xs text-muted-foreground">
-          {locationLabel}
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {locationLabel ? (
+          <p className="inline-flex rounded-md border border-border/60 bg-muted/30 px-2.5 py-1 font-mono text-xs text-muted-foreground">
+            {locationLabel}
+          </p>
+        ) : null}
+        {page.id === "homepage" ? <HomepageScreenshotViewButton /> : null}
+        {page.id === "personal-dashboard" ? (
+          <DocsUiGuideStartButton guideId="personal-dashboard">
+            Open personal dashboard guide
+          </DocsUiGuideStartButton>
+        ) : null}
+        {page.id === "pricing" ? (
+          <DocsUiGuideStartButton guideId="pricing">
+            Open pricing guide
+          </DocsUiGuideStartButton>
+        ) : null}
+      </div>
 
       {showArticleLink && onOpenArticle ? (
         <button
@@ -217,10 +234,40 @@ function DocPagePanel({
   );
 }
 
-function DocArticleSectionBody({ section }: { section: DocArticleSection }) {
+function articleSectionGuide(pageId: string, sectionId: string) {
+  if (sectionId === "sign-up") {
+    return { id: "signup" as const, label: "Open sign-up guide" };
+  }
+  if (sectionId === "sign-in") {
+    return { id: "signin" as const, label: "Open sign-in steps" };
+  }
+  if (pageId === "personal-dashboard" && sectionId === "overview") {
+    return {
+      id: "personal-dashboard" as const,
+      label: "Open personal dashboard guide",
+    };
+  }
+  if (pageId === "pricing" && sectionId === "ui") {
+    return { id: "pricing" as const, label: "Open pricing guide" };
+  }
+  return null;
+}
+
+function DocArticleSectionBody({
+  section,
+  pageId,
+}: {
+  section: DocArticleSection;
+  pageId: string;
+}) {
+  const guide = articleSectionGuide(pageId, section.id);
+
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold tracking-tight text-foreground">{section.title}</h3>
+      {guide ? (
+        <DocsUiGuideStartButton guideId={guide.id}>{guide.label}</DocsUiGuideStartButton>
+      ) : null}
       {section.paragraphs?.map((paragraph) => (
         <p key={paragraph} className="text-muted-foreground">
           {paragraph}
@@ -324,7 +371,7 @@ function DocArticlePanel({
         {article.sections.map((articleSection, index) => (
           <div key={articleSection.id} className="space-y-8">
             {index > 0 ? <Separator className="bg-border/60" /> : null}
-            <DocArticleSectionBody section={articleSection} />
+            <DocArticleSectionBody pageId={page.id} section={articleSection} />
           </div>
         ))}
       </CardContent>

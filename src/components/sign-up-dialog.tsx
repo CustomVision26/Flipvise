@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth, useSignUp } from "@clerk/nextjs";
-import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
+import { ChevronRight, Eye, EyeOff, Loader2, Pencil, ShieldAlert } from "lucide-react";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,8 +26,65 @@ import {
   type OpenFlipviseSignUpDetail,
 } from "@/lib/flipvise-sign-up";
 import { authContinueUrl, DEFAULT_AUTH_REDIRECT } from "@/lib/safe-redirect-path";
+import { cn } from "@/lib/utils";
 
 const VERIFICATION_CODE_LENGTH = 6;
+const RESEND_CODE_COOLDOWN_SEC = 30;
+
+function SignUpResendCodeControl({
+  onResend,
+  disabled,
+}: {
+  onResend: () => Promise<void>;
+  disabled?: boolean;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_CODE_COOLDOWN_SEC);
+  const [resending, setResending] = useState(false);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = window.setTimeout(
+      () => setSecondsLeft((prev) => Math.max(0, prev - 1)),
+      1000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [secondsLeft]);
+
+  async function handleResend() {
+    if (secondsLeft > 0 || resending || disabled) return;
+    setResending(true);
+    try {
+      await onResend();
+      setSecondsLeft(RESEND_CODE_COOLDOWN_SEC);
+    } catch {
+      // Error is already shown in the dialog.
+    } finally {
+      setResending(false);
+    }
+  }
+
+  return (
+    <p className="text-center text-sm text-muted-foreground" aria-live="polite">
+      Didn’t receive a code?{" "}
+      {secondsLeft > 0 ? (
+        <span>Resend ({secondsLeft})</span>
+      ) : (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto px-0 text-foreground"
+          disabled={resending || disabled}
+          onClick={() => {
+            void handleResend();
+          }}
+        >
+          {resending ? "Sending…" : "Resend"}
+        </Button>
+      )}
+    </p>
+  );
+}
 
 function describeClerkError(err: unknown): string {
   if (!err) return "";
@@ -238,6 +295,21 @@ export function SignUpDialog({
     }
   }
 
+  async function resendEmailCode() {
+    if (!isLoaded || !signUp) return;
+    const { error: sendErr } = await signUp.verifications.sendEmailCode();
+    if (sendErr) {
+      fail("Couldn't resend verification code", sendErr);
+      throw sendErr;
+    }
+  }
+
+  function backToDetails() {
+    setStep("details");
+    setCode("");
+    setError(null);
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {showTrigger ? (
@@ -245,14 +317,40 @@ export function SignUpDialog({
           {triggerLabel}
         </DialogTrigger>
       ) : null}
-      <DialogContent className="max-h-[min(90vh,820px)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create your account</DialogTitle>
-          <DialogDescription>
-            {step === "code"
-              ? `Enter the verification code we sent to ${email}.`
-              : "Welcome! Enter your name, email, and password. After verification you’ll complete contact details and security questions."}
-          </DialogDescription>
+      <DialogContent
+        className={cn(
+          "max-h-[min(90vh,820px)] overflow-y-auto",
+          step === "code" ? "sm:max-w-sm" : "sm:max-w-lg",
+        )}
+      >
+        <DialogHeader className={step === "code" ? "items-center text-center" : undefined}>
+          {step === "code" ? (
+            <>
+              <DialogTitle>Check your email</DialogTitle>
+              <DialogDescription>to continue to Flipvise</DialogDescription>
+              <div className="flex items-center justify-center gap-1 text-sm font-medium text-foreground">
+                <span className="truncate">{email}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Change email"
+                  disabled={busy}
+                  onClick={backToDetails}
+                >
+                  <Pencil className="size-3.5" aria-hidden />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogTitle>Create your account</DialogTitle>
+              <DialogDescription>
+                Welcome! Enter your name, email, and password. After verification you’ll complete
+                contact details and security questions.
+              </DialogDescription>
+            </>
+          )}
         </DialogHeader>
 
         {error ? (
@@ -347,56 +445,67 @@ export function SignUpDialog({
               event.preventDefault();
               void verifyWithCode(code);
             }}
-            className="flex flex-col gap-4"
+            className="flex flex-col items-center gap-4"
           >
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="signup-verification-code">Verification code</Label>
-              <InputOTP
-                id="signup-verification-code"
-                maxLength={VERIFICATION_CODE_LENGTH}
-                value={code}
-                disabled={busy}
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                pattern="\d*"
-                onChange={(next) => {
-                  const digits = next
-                    .replace(/\D/g, "")
-                    .slice(0, VERIFICATION_CODE_LENGTH);
-                  setCode(digits);
-                  if (digits.length === VERIFICATION_CODE_LENGTH) {
-                    void verifyWithCode(digits);
-                  }
-                }}
-              >
-                <InputOTPGroup className="w-full justify-between gap-1.5">
-                  {Array.from({ length: VERIFICATION_CODE_LENGTH }, (_, index) => (
-                    <InputOTPSlot key={index} index={index} />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-            </div>
-            <Button type="submit" disabled={busy || code.length < VERIFICATION_CODE_LENGTH}>
+            <InputOTP
+              id="signup-verification-code"
+              maxLength={VERIFICATION_CODE_LENGTH}
+              value={code}
+              disabled={busy}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="\d*"
+              containerClassName="justify-center"
+              aria-label="Verification code"
+              onChange={(next) => {
+                const digits = next
+                  .replace(/\D/g, "")
+                  .slice(0, VERIFICATION_CODE_LENGTH);
+                setCode(digits);
+                if (digits.length === VERIFICATION_CODE_LENGTH) {
+                  void verifyWithCode(digits);
+                }
+              }}
+            >
+              <InputOTPGroup>
+                {Array.from({ length: VERIFICATION_CODE_LENGTH }, (_, index) => (
+                  <InputOTPSlot
+                    key={index}
+                    index={index}
+                    className="size-11 text-base font-medium"
+                  />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+            <SignUpResendCodeControl
+              disabled={busy || !isLoaded}
+              onResend={resendEmailCode}
+            />
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={busy || code.length < VERIFICATION_CODE_LENGTH}
+            >
               {busy ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Verifying…
                 </>
               ) : (
-                "Verify and continue"
+                <>
+                  Continue
+                  <ChevronRight className="size-4" aria-hidden />
+                </>
               )}
             </Button>
             <Button
               type="button"
               variant="ghost"
+              size="sm"
               disabled={busy}
-              onClick={() => {
-                setStep("details");
-                setCode("");
-                setError(null);
-              }}
+              onClick={backToDetails}
             >
-              Back to details
+              Use another method
             </Button>
           </form>
         )}

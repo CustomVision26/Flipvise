@@ -6,6 +6,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { GuestSignUpHost } from "@/components/guest-sign-up-host";
+import { DocsUiGuideProvider } from "@/components/docs-ui-guide-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { flipviseSignUpUrl } from "@/lib/flipvise-sign-up";
 import { Toaster } from "@/components/ui/sonner";
@@ -70,14 +71,16 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <ThemeStorageNormalize>
-        <ClerkWithTheme>
-          <NativeAppBootstrap />
-          <NativeNotificationBootstrap />
-          <OfflineBanner />
-          {children}
-          <Toaster richColors closeButton position="top-right" />
-          <ServiceWorkerRegister />
-        </ClerkWithTheme>
+        <DocsUiGuideProvider>
+          <ClerkWithTheme>
+            <NativeAppBootstrap />
+            <NativeNotificationBootstrap />
+            <OfflineBanner />
+            {children}
+            <Toaster richColors closeButton position="top-right" />
+            <ServiceWorkerRegister />
+          </ClerkWithTheme>
+        </DocsUiGuideProvider>
       </ThemeStorageNormalize>
     </ThemeProvider>
   );
