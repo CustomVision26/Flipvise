@@ -4,7 +4,11 @@ export type DocsUiGuideId =
   | "personal-dashboard"
   | "pricing"
   | "subscribe"
-  | "create-deck";
+  | "create-deck"
+  | "ai-created-cards"
+  | "manual-added-cards"
+  | "manual-add-mcq"
+  | "add-card-from-source";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -15,6 +19,10 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "pricing",
   "subscribe",
   "create-deck",
+  "ai-created-cards",
+  "manual-added-cards",
+  "manual-add-mcq",
+  "add-card-from-source",
 ];
 
 export type DocsUiGuideStep = {
@@ -341,6 +349,208 @@ export const CREATE_DECK_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+export const AI_CREATED_CARDS_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("08 Flipvise - AI created cards - 01.png"),
+    title: "Open the deck",
+    caption:
+      "On Personal Dashboard, click a deck tile once to open its menu. Choose Open deck to enter Deck Editor. Edit deck and Delete deck are also in this menu.",
+  },
+  {
+    src: uiSrc("08 Flipvise - AI created cards - 02.png"),
+    title: "Choose a batch size",
+    caption:
+      "In AI generation, open the count dropdown to pick how many cards to generate. Remaining slots and AI quota are shown above Generate.",
+  },
+  {
+    src: uiSrc("08 Flipvise - AI created cards - 03.png"),
+    title: "Generate the batch",
+    caption:
+      "Select a count (for example 5 cards through 50, limited by remaining slots), then choose Generate. AI matches your deck’s style and avoids duplicates.",
+  },
+  {
+    src: uiSrc("08 Flipvise - AI created cards - 04.png"),
+    title: "Review AI cards",
+    caption:
+      "New cards appear in the Cards list with an AI badge. Edit or Delete any card. AI quota and remaining slots update after generation.",
+  },
+];
+
+export const MANUAL_ADDED_CARDS_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 01.png"),
+    title: "Open the deck",
+    caption:
+      "On Personal Dashboard, click a deck tile once to open its menu, then choose Open deck.",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 02.png"),
+    title: "Add a card",
+    caption:
+      "In Deck Editor, choose + Add Card (or Add your first card when the list is empty).",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 03 - 1a.png"),
+    title: "Use the Standard tab",
+    caption:
+      "Standard is for a single front-and-back card. Multiple Choice and From source are other formats in this dialog.",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 03 - 1b.png"),
+    title: "Enter front and back",
+    caption:
+      "Type the front (question or term). Use the microphone for voice input, Add image for an optional picture on either side, and type the back or generate it with AI.",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 03 - 1c.png"),
+    title: "Open Generate answer",
+    caption:
+      "Click the sparkle icon beside the front text to generate an answer that matches this deck’s topic, tone, and existing cards.",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 03 - 1d.png"),
+    title: "Choose answer and image options",
+    caption:
+      "Place a decorative image on Front of card or Back of card, then pick Answer with diagram, Answer with image, or Answer only.",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 03 - 1e.png"),
+    title: "Save the card",
+    caption:
+      "Review the generated back text and image, then choose Add Card to save it to the deck.",
+  },
+  {
+    src: uiSrc("09 Flipvise - Manual added cards - 03 - 1f.png"),
+    title: "Card in the list",
+    caption:
+      "The new Standard card appears in Cards. Hover to preview the answer. Manual count increases; AI-generated cards stay marked with the AI badge.",
+  },
+];
+
+export const MANUAL_ADD_MCQ_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 01.png"),
+    title: "Open the deck",
+    caption:
+      "On Personal Dashboard, click a deck tile once to open its menu, then choose Open deck.",
+  },
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 02.png"),
+    title: "Add a card",
+    caption: "In Deck Editor, choose + Add Card.",
+  },
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 03.png"),
+    title: "Choose Multiple Choice",
+    caption:
+      "Select the Multiple Choice tab to write a question, one correct answer, and three required wrong answers.",
+  },
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 04.png"),
+    title: "Enter the question",
+    caption:
+      "Type or dictate the question with the microphone. Then choose AI generate to fill the correct answer and three distractors — or type them yourself.",
+  },
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 05.png"),
+    title: "Pick Answers + image or Answers only",
+    caption:
+      "Answers + image generates the correct answer, wrong answers, and a question illustration (saved when you add the card). Answers only fills the text fields.",
+  },
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 06.png"),
+    title: "Review and save",
+    caption:
+      "Check the optional image, correct answer, and three wrong answers. Edit any field, then choose Add Card.",
+  },
+  {
+    src: uiSrc("10 Flipvise - Manual Add MCQ - 07.png"),
+    title: "MCQ in the list",
+    caption:
+      "The new card appears with an MC badge. Hover to preview the correct answer. Manual count increases.",
+  },
+];
+
+export const ADD_CARD_FROM_SOURCE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 01.png"),
+    title: "Open the deck",
+    caption:
+      "On Personal Dashboard, click a deck tile once to open its menu, then choose Open deck.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 02.png"),
+    title: "Add a card",
+    caption: "In Deck Editor, choose + Add Card.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 03.png"),
+    title: "Choose From source",
+    caption:
+      "Select the From source tab, then pick a source type: Website URL, Plain text, PDF, Word, PowerPoint, or Handwritten. AI reads the material once and does not store it.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 04.png"),
+    title: "Website URL example",
+    caption:
+      "A public article or quiz page can be a Website URL source. Wikipedia and articles usually work best for URLs.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 05.png"),
+    title: "Printed or PDF pages",
+    caption:
+      "Clear scans or photos of printed pages, textbooks, or PDF exports work as PDF or Handwritten uploads.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 06.png"),
+    title: "Handwritten notes",
+    caption:
+      "Upload a clear photo (JPG, PNG, or WebP) of handwritten or printed notes when you choose Handwritten.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 07.png"),
+    title: "Set count and generate for review",
+    caption:
+      "Choose how many cards to generate. Optionally check Reading passage + multiple choice so each front includes a short passage and question. Then choose Generate for review — cards are not saved yet.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 08.png"),
+    title: "Unrelated source warning",
+    caption:
+      "If the upload does not match the deck name and topic, Flipvise warns you. Change source, or choose Generate anyway.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 09.png"),
+    title: "Review drafted cards",
+    caption:
+      "Edit front, back, and quiz wrong answers before saving. Check a card to include it. With reading-passage mode, the front has a passage and question; the back holds the answer.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 10.png"),
+    title: "Edit quiz wrong answers",
+    caption:
+      "Scroll each card to preview three quiz wrong answers. Edit the fields or use Regenerate to refresh them from AI.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 11.png"),
+    title: "Swap and distractor side",
+    caption:
+      "Use Swap to flip front and back. Wrong answers from original front is off by default (distractors match the answer side). Turn it on after Swap when the saved back is the short term or question.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 12.png"),
+    title: "Add selected cards",
+    caption:
+      "When the drafts look right, choose Add N selected to save the checked cards to the deck.",
+  },
+  {
+    src: uiSrc("11 Flipvise - Add card from source - 13.png"),
+    title: "Cards from source",
+    caption:
+      "Imported cards appear in the Cards list with an AI badge. Edit or Delete any card. Remaining slots update after you save.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -374,5 +584,25 @@ export const DOCS_UI_GUIDES: Record<
     title: "Create a deck",
     summary: "Add a deck from Personal Dashboard, including an optional cover image.",
     steps: CREATE_DECK_GUIDE_STEPS,
+  },
+  "ai-created-cards": {
+    title: "Generate cards with AI",
+    summary: "Open a deck, choose a batch size, and generate AI flashcards.",
+    steps: AI_CREATED_CARDS_GUIDE_STEPS,
+  },
+  "manual-added-cards": {
+    title: "Add a standard card",
+    summary: "Add a front-and-back card by hand, with optional AI answer and image.",
+    steps: MANUAL_ADDED_CARDS_GUIDE_STEPS,
+  },
+  "manual-add-mcq": {
+    title: "Add a multiple-choice card",
+    summary: "Create an MCQ with a correct answer and three quiz distractors.",
+    steps: MANUAL_ADD_MCQ_GUIDE_STEPS,
+  },
+  "add-card-from-source": {
+    title: "Add cards from a source",
+    summary: "Import from a URL or file, review drafts, then save selected cards.",
+    steps: ADD_CARD_FROM_SOURCE_GUIDE_STEPS,
   },
 };

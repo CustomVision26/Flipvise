@@ -63,7 +63,43 @@ export async function uploadToS3(options: UploadOptions): Promise<string> {
   await upload.done();
 
   if (CDN_URL) {
-    return `${CDN_URL}/${key}`;
+    return `${CDN_URL.replace(/\/+$/, "")}/${key}`;
+  }
+
+  return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
+
+export async function uploadCardImageBufferToS3(options: {
+  userId: string;
+  deckId: number;
+  fileName: string;
+  contentType: string;
+  body: Buffer;
+}): Promise<string> {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 15);
+  const lastDot = options.fileName.lastIndexOf(".");
+  const extension = lastDot >= 0 ? options.fileName.slice(lastDot) : "";
+  const nameWithoutExt =
+    lastDot > 0 ? options.fileName.slice(0, lastDot) : "card-image";
+  const fileName = `${nameWithoutExt}-${timestamp}-${randomString}${extension}`;
+  const key = `card-images/${options.userId}/${options.deckId}/${fileName}`;
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: options.body,
+      ContentType: options.contentType,
+      CacheControl: "public, max-age=31536000, immutable",
+    },
+  });
+
+  await upload.done();
+
+  if (CDN_URL) {
+    return `${CDN_URL.replace(/\/+$/, "")}/${key}`;
   }
 
   return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;

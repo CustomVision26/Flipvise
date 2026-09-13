@@ -32,7 +32,8 @@ import {
   updateCardAction,
   updateMultipleChoiceCardAction,
 } from "@/actions/cards";
-import { uploadCardImage } from "@/lib/upload-card-image-client";
+import { uploadCardImage, persistableHttpImageUrl } from "@/lib/upload-card-image-client";
+import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import {
   ImagePlus,
   Mic,
@@ -741,22 +742,27 @@ function StandardEditForm({
         const choiceImageUrls = showWrongAnswers
           ? buildChoiceImageTuple(backImageUrl, wrongImageUrls)
           : undefined;
-        await updateCardAction({
+        const saved = await updateCardAction({
           cardId: card.id,
           deckId,
           front,
-          frontImageUrl,
+          frontImageUrl: persistableHttpImageUrl(frontImageUrl),
           back,
-          backImageUrl,
+          backImageUrl: persistableHttpImageUrl(backImageUrl),
           oldFrontImageUrl: card.frontImageUrl ?? null,
           oldBackImageUrl: card.backImageUrl ?? null,
           distractors: distractorsToSend,
           choiceImageUrls,
           oldChoiceImageUrls: showWrongAnswers ? initialChoiceImageTuple : undefined,
         });
+        if (!saved.ok) {
+          throw new Error(saved.error);
+        }
         onClose();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(
+          userFacingServerActionError(err, "Couldn't save this card. Try again."),
+        );
       }
     });
   }
@@ -1234,20 +1240,25 @@ function MultipleChoiceEditForm({
     correctSpeech.stop();
     startTransition(async () => {
       try {
-        await updateMultipleChoiceCardAction({
+        const saved = await updateMultipleChoiceCardAction({
           cardId: card.id,
           deckId,
           question,
-          questionImageUrl,
+          questionImageUrl: persistableHttpImageUrl(questionImageUrl),
           oldQuestionImageUrl: card.frontImageUrl ?? null,
           correctAnswer,
           distractors,
           choiceImageUrls: buildChoiceImageTuple(correctAnswerImageUrl, wrongImageUrls),
           oldChoiceImageUrls: initialChoiceImageTuple,
         });
+        if (!saved.ok) {
+          throw new Error(saved.error);
+        }
         onClose();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(
+          userFacingServerActionError(err, "Couldn't save this card. Try again."),
+        );
       }
     });
   }

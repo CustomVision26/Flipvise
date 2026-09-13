@@ -37,6 +37,8 @@ import {
 import { useOnlineStatus } from "@/lib/use-online-status";
 import { getUnsupportedImportUrlReason } from "@/lib/source-import-url-validation";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import {
   ArrowUpDown,
   Camera,
@@ -48,6 +50,7 @@ import {
   RefreshCw,
   Sparkles,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -123,6 +126,11 @@ function defaultCardCountInput(maxCount: number): string {
   return String(Math.min(DEFAULT_SOURCE_CARD_COUNT, maxCount));
 }
 
+function isPreviewableImageFile(picked: File): boolean {
+  if (picked.type.startsWith("image/")) return true;
+  return /\.(jpe?g|png|webp|gif)$/i.test(picked.name);
+}
+
 function isFileSourceAvailable(
   id: FileSourcePickerId,
   hasAdvancedSourceImport: boolean,
@@ -146,6 +154,8 @@ export function FromSourceCardForm({
   const [sourceMode, setSourceMode] = useState<SourcePickerId | null>(null);
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [cardCountInput, setCardCountInput] = useState(() =>
     defaultCardCountInput(maxGeneratableCount(remainingAiSlots, remainingDeckSlots)),
   );
@@ -169,6 +179,19 @@ export function FromSourceCardForm({
       setCardCountInput(String(maxCount));
     }
   }, [maxCount, cardCountInput]);
+
+  useEffect(() => {
+    if (!file || !isPreviewableImageFile(file)) {
+      setImagePreviewUrl(null);
+      setImagePreviewOpen(false);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
 
   function commitCardCountInput() {
     const parsed = parseCardCountInput(cardCountInput, maxCount);
@@ -727,6 +750,53 @@ export function FromSourceCardForm({
                 Selected: <span className="font-medium">{file.name}</span>
               </p>
             ) : null}
+            {imagePreviewUrl ? (
+              <div
+                className="relative w-full h-32 sm:h-48 rounded-lg overflow-hidden border border-border bg-muted/30 cursor-zoom-in"
+                title="Double-click to enlarge"
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  setImagePreviewOpen(true);
+                }}
+              >
+                <Image
+                  src={imagePreviewUrl}
+                  alt={file?.name ?? "Uploaded notes"}
+                  fill
+                  unoptimized
+                  className="object-contain pointer-events-none"
+                />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6 sm:h-7 sm:w-7"
+                        disabled={isBusy}
+                        onClick={() => {
+                          setFile(null);
+                          setImagePreviewOpen(false);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        aria-label="Remove image"
+                      />
+                    }
+                  >
+                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent>Remove image</TooltipContent>
+                </Tooltip>
+              </div>
+            ) : null}
+            <ImageEnlargeOverlay
+              open={imagePreviewOpen && !!imagePreviewUrl}
+              onClose={() => setImagePreviewOpen(false)}
+              src={imagePreviewUrl ?? ""}
+              alt={file?.name ?? "Uploaded notes"}
+              title={file?.name ?? "Image preview"}
+            />
           </div>
         ) : null}
 

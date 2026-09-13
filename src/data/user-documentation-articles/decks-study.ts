@@ -34,6 +34,9 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Whenever you use batch Generate, Add card → From source, or Generate answer, Flipvise builds context from your deck name, description, and a sample of cards already in that deck. The model treats those existing cards as the reference for subject scope, question style, answer length, and difficulty — so new cards feel like they belong in the same deck.",
         ],
         bullets: [
+          "Open AI created cards guide to walk through opening a deck, choosing a batch size, generating, and seeing AI cards in the list. The guide stays open while you browse.",
+          "Open manual cards guide to walk through + Add Card → Standard, optional AI answer and image, and saving a front-and-back card.",
+          "Open manual MCQ guide to walk through + Add Card → Multiple Choice, AI generate for the correct answer and three distractors, and saving.",
           "Use a specific deck name and a short description that states the topic clearly (for example, \"AP Biology — cell division\" rather than a vague title like \"Bio\").",
           "Add several representative cards by hand before your first large AI batch — even three to five well-written examples usually produces much more consistent output.",
           "Keep your manual cards consistent in format (all definitions, all worked problems, and so on) so the AI can mirror that pattern.",
@@ -51,6 +54,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "source-import-review",
         title: "From source — review, swap, and quiz distractors",
         bullets: [
+          "Open add from source guide to walk through choosing a source type, generating for review, editing swap and quiz wrong answers, and adding selected cards. The guide stays open while you browse.",
           "After AI drafts cards from a URL or file, review each card before adding it to the deck.",
           "Swap flips the front and back you save — e.g. move a definition to the front and the term to the back.",
           "Three quiz wrong answers are generated when you save; by default they match the original back (answer) style, such as other definitions, numbers, or fact lists.",

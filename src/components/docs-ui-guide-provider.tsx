@@ -208,13 +208,13 @@ function DocsUiGuidePanel({
       <Card
         size="sm"
         className={cn(
-          "pointer-events-auto border-border/70 bg-card/95 shadow-2xl ring-1 ring-primary/20 backdrop-blur-md animate-in fade-in-0 duration-300",
+          "pointer-events-auto flex flex-col overflow-hidden border-border/70 bg-card/95 shadow-2xl ring-1 ring-primary/20 backdrop-blur-md animate-in fade-in-0 duration-300",
           expanded
-            ? "flex h-full max-h-full w-full max-w-[min(92rem,100%)] flex-col slide-in-from-bottom-2"
-            : "w-full max-w-[32rem] slide-in-from-bottom-3",
+            ? "h-full max-h-full w-full max-w-[min(92rem,100%)] slide-in-from-bottom-2"
+            : "max-h-[min(92vh,52rem)] w-full max-w-[32rem] slide-in-from-bottom-3",
         )}
       >
-        <CardHeader className="gap-2 border-b border-border/50 pb-3">
+        <CardHeader className="shrink-0 gap-2 border-b border-border/50 pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 space-y-2">
               <Badge variant="secondary">{FLIPVISE_UI_GUIDE_LABEL}</Badge>
@@ -225,6 +225,7 @@ function DocsUiGuidePanel({
                 className={cn(
                   "border-primary/50 bg-primary/10 text-foreground shadow-lg shadow-primary/15",
                   "animate-in fade-in-0 slide-in-from-top-1 duration-500",
+                  expanded && "py-1.5",
                 )}
               >
                 <span
@@ -286,37 +287,30 @@ function DocsUiGuidePanel({
             <ProgressValue className="text-xs" />
           </Progress>
         </CardHeader>
-        <CardContent
-          className={cn("space-y-3 pt-3", expanded && "flex min-h-0 flex-1 flex-col")}
-        >
+        <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pt-3">
           <div
             className={cn(
-              "relative overflow-hidden rounded-lg bg-muted/40 ring-1 ring-border/60",
-              expanded && "min-h-0 flex-1",
+              "min-h-0 overflow-auto rounded-lg bg-muted/40 ring-1 ring-border/60",
+              expanded ? "flex-1" : "max-h-[min(50vh,22rem)] shrink-0",
             )}
           >
-            <div
-              className={cn(
-                "relative w-full",
-                expanded ? "h-full min-h-[min(70vh,42rem)]" : "aspect-[16/10]",
-              )}
-            >
-              <Image
-                key={step.src}
-                src={step.src}
-                alt={step.title}
-                fill
-                sizes={expanded ? "92vw" : "(max-width: 640px) 100vw, 32rem"}
-                className="object-contain animate-in fade-in-0 zoom-in-95 duration-300"
-                unoptimized
-                priority
-              />
-            </div>
+            <Image
+              key={step.src}
+              src={step.src}
+              alt={step.title}
+              width={1920}
+              height={1080}
+              sizes={expanded ? "92vw" : "(max-width: 640px) 100vw, 32rem"}
+              className="h-auto w-full animate-in fade-in-0 zoom-in-95 duration-300"
+              style={{ width: "100%", height: "auto", aspectRatio: "auto" }}
+              unoptimized
+              priority
+            />
           </div>
           <Alert
             key={session.step}
             className={cn(
-              "overflow-hidden border-primary/55 bg-primary/12 text-foreground shadow-lg shadow-primary/20",
+              "shrink-0 border-primary/55 bg-primary/12 text-foreground shadow-lg shadow-primary/20",
               "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-500",
             )}
           >
@@ -343,7 +337,7 @@ function DocsUiGuidePanel({
             </AlertDescription>
           </Alert>
         </CardContent>
-        <CardFooter className="justify-between gap-2">
+        <CardFooter className="shrink-0 justify-between gap-2">
           <Button
             type="button"
             variant="outline"
@@ -442,7 +436,7 @@ export function DocsUiGuidesMenuButton({
             Choose a walkthrough. It stays open while you browse Flipvise.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2">
+        <div className="flex max-h-[min(70vh,32rem)] flex-col gap-2 overflow-y-auto pr-1">
           {DOCS_UI_GUIDE_ORDER.map((id) => {
             const item = DOCS_UI_GUIDES[id];
             if (!item) return null;

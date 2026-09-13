@@ -19,7 +19,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation).",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them before the dashboard becomes available.",
-          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck.",
+          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck and deck editor card walkthroughs.",
         ],
         requirements: ["None — guests can browse pricing and documentation."],
         doNots: [
@@ -162,6 +162,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "From source review: preview and edit three quiz wrong answers per card before saving; Regenerate refreshes them from AI.",
           "Upload a deck cover image when creating or editing a deck. The cover appears on dashboard deck cards and is not counted as a flashcard.",
           "Open create deck guide from Editor features to walk through + New Deck, details, cover image, and the new deck on Personal Dashboard.",
+          "Open AI created cards, manual cards, and manual MCQ guides from Getting reliable AI-generated cards to walk through batch Generate, Standard, and Multiple Choice.",
+          "Open add from source guide from From source — review, swap, and quiz distractors to walk through URL or file import, review, and save.",
           "Open Study to start flashcard review or quiz mode.",
           "AI generation needs an internet connection — the Generate button is disabled while offline.",
         ],
@@ -606,7 +608,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
-          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck and Subscribe.",
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, and deck editor card walkthroughs.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",
@@ -696,7 +698,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Confirm plan, billing period, promo, and amount due before Stripe payment.",
         howItWorks: [
-          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse. UI Guides in the header also lists Create a deck.",
+          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse. UI Guides in the header also lists Create a deck and deck editor card walkthroughs.",
           "Review selected plan name, monthly vs yearly period, and list price.",
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",

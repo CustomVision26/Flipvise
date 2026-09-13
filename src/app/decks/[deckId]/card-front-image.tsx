@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { persistableHttpImageUrl } from "@/lib/persistable-image-url";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { cn } from "@/lib/utils";
 import { useCardHoverPreview } from "./card-hover-preview-context";
@@ -24,6 +25,8 @@ export function CardFrontImage({
 }: CardFrontImageProps) {
   const [open, setOpen] = useState(false);
   const hoverPreview = useCardHoverPreview();
+  const remoteSrc = persistableHttpImageUrl(src);
+  if (!remoteSrc) return null;
 
   return (
     <>
@@ -47,9 +50,10 @@ export function CardFrontImage({
         }}
       >
         <Image
-          src={src}
+          src={remoteSrc}
           alt={alt}
           fill
+          unoptimized
           className="object-contain pointer-events-none"
           sizes={variant === "tile" ? "120px" : "64px"}
           draggable={false}
@@ -59,7 +63,7 @@ export function CardFrontImage({
       <ImageEnlargeOverlay
         open={open}
         onClose={() => setOpen(false)}
-        src={src}
+        src={remoteSrc}
         alt={alt}
         title={label ?? "Front image"}
       />

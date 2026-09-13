@@ -39,7 +39,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         bullets: [
           "Sign Up opens the Flipvise account form: name, email, password, and password confirmation.",
           "After email verification, complete contact details, account type, and security questions. The dashboard unlocks when those steps are saved.",
-          "Open sign-up guide to walk through every screenshot in order, like a Flipvise UI guide. You may navigate anywhere in Flipvise while it remains open. UI Guides in the header also includes Create a deck after you have an account.",
+          "Open sign-up guide to walk through every screenshot in order, like a Flipvise UI guide. You may navigate anywhere in Flipvise while it remains open. UI Guides in the header also includes Create a deck and deck editor card walkthroughs after you have an account.",
         ],
       },
       {
@@ -102,7 +102,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         title: "Support and inbox",
         bullets: [
           "Documentation — book icon on the right of the header (beside Help and Inbox).",
-          "UI Guides — header button that lists every Flipvise UI guide (sign-up, sign-in, Personal Dashboard, Pricing, Subscribe, and Create a deck). Choose one to open the walkthrough; it stays open while you browse.",
+          "UI Guides — header button that lists every Flipvise UI guide (sign-up, sign-in, Personal Dashboard, Pricing, Subscribe, Create a deck, AI created cards, manual cards, MCQ, and add from source). Choose one to open the walkthrough; it stays open while you browse.",
           "Plans — signed-in header button (and your plan label) open Plans & Pricing.",
           "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",

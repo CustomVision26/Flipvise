@@ -6,10 +6,6 @@ import Image from "next/image";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-function isLocalImageSrc(src: string): boolean {
-  return src.startsWith("blob:") || src.startsWith("data:");
-}
-
 type ImageEnlargeOverlayProps = {
   open: boolean;
   onClose: () => void;
@@ -61,7 +57,7 @@ export function ImageEnlargeOverlay({
             width={1200}
             height={900}
             className="mx-auto block h-auto max-h-[min(78vh,42rem)] w-auto max-w-full rounded-md border border-border/60 bg-muted object-contain"
-            unoptimized={isLocalImageSrc(src)}
+            unoptimized
             priority
           />
           {footer ? <div className="mt-3">{footer}</div> : null}

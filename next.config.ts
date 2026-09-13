@@ -1,5 +1,16 @@
 import type { NextConfig } from "next";
 
+function cloudFrontHostnamePattern(): { protocol: "https"; hostname: string }[] {
+  const raw = process.env.AWS_CLOUDFRONT_URL?.trim();
+  if (!raw) return [];
+  try {
+    const url = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    return url.hostname ? [{ protocol: "https", hostname: url.hostname }] : [];
+  } catch {
+    return [];
+  }
+}
+
 const nextConfig: NextConfig = {
   async redirects() {
     return [
@@ -38,6 +49,11 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-icons",
       "recharts",
     ],
+    // Card images are up to 5 MB; the default 1 MB Server Action body drops them
+    // as a production digest before the upload action can run.
+    serverActions: {
+      bodySizeLimit: "8mb",
+    },
   },
 
   // Do not set Cache-Control on /_next/* in development — Next/Turbopack warn that
@@ -61,6 +77,15 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.s3.*.amazonaws.com",
       },
+      {
+        protocol: "https",
+        hostname: "**.cloudfront.net",
+      },
+      {
+        protocol: "https",
+        hostname: "**.amazonaws.com",
+      },
+      ...cloudFrontHostnamePattern(),
     ],
   },
 };

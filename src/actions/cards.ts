@@ -18,7 +18,7 @@ import {
   isNextControlFlowError,
   userFacingServerActionError,
 } from "@/lib/server-action-client-error";
-import { uploadToS3, deleteFromS3 } from "@/lib/s3";
+import { deleteFromS3, uploadCardImageBufferToS3 } from "@/lib/s3";
 import {
   createCard,
   updateCard,
@@ -54,6 +54,7 @@ import {
 } from "@/lib/source-import-types";
 import type { ExtractedSource } from "@/lib/document-extract";
 import { cleanReadingPassageFront, READING_PASSAGE_MC_GENERATION_PROMPT } from "@/lib/source-import-reading-passage";
+import { persistableHttpImageUrl } from "@/lib/persistable-image-url";
 import {
   isRenderableMathDiagram,
   mathDiagramRequiredAiOutputSchema,
@@ -70,31 +71,11 @@ async function requireDeckEditor(userId: string, deckId: number) {
   return bundle.deck;
 }
 
-/** Empty string → null so saves never fail Zod with "Invalid URL". */
-const nullableImageUrl = z.preprocess(
-  (value) => (value === "" || value === undefined ? null : value),
-  z.union([z.string().url(), z.null()]),
+/** Empty string / blob / data URLs → null so saves never fail Zod with "Invalid URL". */
+const optionalPersistedImageUrl = z.preprocess(
+  persistableHttpImageUrl,
+  z.union([z.string().url(), z.null()]).optional(),
 );
-
-const optionalPersistedImageUrl = z.preprocess((value) => {
-  if (value === "" || value === undefined || value === null) return null;
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (
-    trimmed.startsWith("blob:") ||
-    trimmed.startsWith("data:") ||
-    trimmed.length === 0
-  ) {
-    return null;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") return trimmed;
-  } catch {
-    // drop invalid URLs instead of failing the whole save
-  }
-  return null;
-}, z.union([z.string().url(), z.null()]).optional());
 
 function failCardMutation(
   error: unknown,
@@ -173,10 +154,20 @@ const updateCardSchema = z
       .nullable()
       .optional(),
     choiceImageUrls: z
-      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .tuple([
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+      ])
       .optional(),
     oldChoiceImageUrls: z
-      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .tuple([
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+      ])
       .optional(),
   })
   .refine((d) => d.front.trim().length > 0 || !!d.frontImageUrl, {
@@ -203,6 +194,9 @@ const updateCardSchema = z
 
 const uploadCardImageSchema = z.object({
   deckId: z.number().int().positive(),
+  fileName: z.string().min(1).max(255),
+  mediaType: z.string().min(1).max(100),
+  bytesBase64: z.string().min(1),
 });
 
 const deleteCardSchema = z.object({
@@ -455,7 +449,6 @@ type UploadCardImageInput = z.infer<typeof uploadCardImageSchema>;
 
 export async function uploadCardImageAction(
   data: UploadCardImageInput,
-  formData: FormData,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   try {
     const { userId } = await auth();
@@ -464,31 +457,34 @@ export async function uploadCardImageAction(
     const parsed = uploadCardImageSchema.safeParse(data);
     if (!parsed.success) return { ok: false, error: "Invalid input" };
 
-    const { deckId } = parsed.data;
+    const { deckId, fileName, mediaType: rawMediaType, bytesBase64 } = parsed.data;
     await requireDeckEditor(userId, deckId);
 
-    const file = formData.get("image");
-    if (!(file instanceof File)) return { ok: false, error: "No image file provided" };
+    let body: Buffer;
+    try {
+      body = Buffer.from(bytesBase64, "base64");
+    } catch {
+      return { ok: false, error: "Couldn't read this image. Try another file." };
+    }
+    if (body.length === 0) {
+      return { ok: false, error: "No image file provided" };
+    }
+    if (body.length > 5 * 1024 * 1024) {
+      return { ok: false, error: "Image must be under 5 MB" };
+    }
 
-    const mediaType = resolveCardImageMediaType(file);
+    const typedFile = new File([body], fileName, { type: rawMediaType });
+    const mediaType = resolveCardImageMediaType(typedFile);
     if (!mediaType) {
       return { ok: false, error: "Only JPEG, PNG, WebP, and GIF images are allowed" };
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      return { ok: false, error: "Image must be under 5 MB" };
-    }
-
-    const typedFile =
-      file.type === mediaType
-        ? file
-        : new File([file], file.name, { type: mediaType });
-
-    const url = await uploadToS3({
+    const url = await uploadCardImageBufferToS3({
       userId,
       deckId,
-      file: typedFile,
-      addRandomSuffix: true,
+      fileName,
+      contentType: mediaType,
+      body,
     });
 
     return { ok: true, url };
@@ -617,98 +613,109 @@ export async function createCardAction(
   }
 }
 
-export async function updateCardAction(data: UpdateCardInput) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+export async function updateCardAction(
+  data: UpdateCardInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { ok: false, error: "Unauthorized" };
 
-  const parsed = updateCardSchema.safeParse(data);
-  if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
-    throw new Error(firstError?.message ?? "Invalid input");
-  }
-
-  const {
-    cardId,
-    deckId,
-    front,
-    frontImageUrl,
-    back,
-    backImageUrl,
-    oldFrontImageUrl,
-    oldBackImageUrl,
-    distractors,
-    choiceImageUrls,
-    oldChoiceImageUrls,
-  } = parsed.data;
-
-  const deck = await requireDeckEditor(userId, deckId);
-
-  if (oldFrontImageUrl && oldFrontImageUrl !== frontImageUrl) {
-    try {
-      await deleteFromS3(oldFrontImageUrl);
-    } catch {
-      // Silently ignore deletion errors — card update should still succeed
+    const parsed = updateCardSchema.safeParse(data);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      return { ok: false, error: firstError?.message ?? "Invalid input" };
     }
-  }
 
-  if (oldBackImageUrl && oldBackImageUrl !== backImageUrl) {
-    try {
-      await deleteFromS3(oldBackImageUrl);
-    } catch {
-      // Silently ignore deletion errors — card update should still succeed
+    const {
+      cardId,
+      deckId,
+      front,
+      frontImageUrl,
+      back,
+      backImageUrl,
+      oldFrontImageUrl,
+      oldBackImageUrl,
+      distractors,
+      choiceImageUrls,
+      oldChoiceImageUrls,
+    } = parsed.data;
+
+    await requireDeckEditor(userId, deckId);
+
+    if (oldFrontImageUrl && oldFrontImageUrl !== frontImageUrl) {
+      try {
+        await deleteFromS3(oldFrontImageUrl);
+      } catch {
+        // Silently ignore deletion errors — card update should still succeed
+      }
     }
-  }
 
-  if (oldChoiceImageUrls && choiceImageUrls) {
-    for (let i = 0; i < oldChoiceImageUrls.length; i++) {
-      const oldUrl = oldChoiceImageUrls[i];
-      const nextUrl = choiceImageUrls[i] ?? null;
-      if (oldUrl && oldUrl !== nextUrl) {
-        try {
-          await deleteFromS3(oldUrl);
-        } catch {
-          // ignore
+    if (oldBackImageUrl && oldBackImageUrl !== backImageUrl) {
+      try {
+        await deleteFromS3(oldBackImageUrl);
+      } catch {
+        // Silently ignore deletion errors — card update should still succeed
+      }
+    }
+
+    if (oldChoiceImageUrls && choiceImageUrls) {
+      for (let i = 0; i < oldChoiceImageUrls.length; i++) {
+        const oldUrl = oldChoiceImageUrls[i];
+        const nextUrl = choiceImageUrls[i] ?? null;
+        if (oldUrl && oldUrl !== nextUrl) {
+          try {
+            await deleteFromS3(oldUrl);
+          } catch {
+            // ignore
+          }
         }
       }
     }
-  }
 
-  const backText = cleanUserText(back) || null;
+    const backText = cleanUserText(back) || null;
 
-  await updateCard(
-    cardId,
-    deckId,
-    cleanUserText(front) || null,
-    frontImageUrl ?? null,
-    backText,
-    backImageUrl ?? null,
-  );
-
-  const providedDistractors =
-    Array.isArray(distractors) && distractors.length === 3 && backText
-      ? [
-          cleanUserText(distractors[0]) || "",
-          cleanUserText(distractors[1]) || "",
-          cleanUserText(distractors[2]) || "",
-        ]
-      : null;
-  const distractorsValid =
-    providedDistractors != null &&
-    providedDistractors.every((text, index) => {
-      const image = choiceImageUrls?.[index + 1] ?? null;
-      return text.length > 0 || !!image;
-    });
-  if (backText && providedDistractors && distractorsValid) {
-    await updateCardChoices(
+    await updateCard(
       cardId,
       deckId,
-      [backText, ...providedDistractors],
-      0,
-      choiceImageUrls ?? null,
+      cleanUserText(front) || null,
+      frontImageUrl ?? null,
+      backText,
+      backImageUrl ?? null,
+    );
+
+    const providedDistractors =
+      Array.isArray(distractors) && distractors.length === 3 && backText
+        ? [
+            cleanUserText(distractors[0]) || "",
+            cleanUserText(distractors[1]) || "",
+            cleanUserText(distractors[2]) || "",
+          ]
+        : null;
+    const distractorsValid =
+      providedDistractors != null &&
+      providedDistractors.every((text, index) => {
+        const image = choiceImageUrls?.[index + 1] ?? null;
+        return text.length > 0 || !!image;
+      });
+    if (backText && providedDistractors && distractorsValid) {
+      await updateCardChoices(
+        cardId,
+        deckId,
+        [backText, ...providedDistractors],
+        0,
+        choiceImageUrls ?? null,
+      );
+    }
+
+    revalidatePath(`/decks/${deckId}`);
+    return { ok: true };
+  } catch (error) {
+    return failCardMutation(
+      error,
+      "Couldn't save this card. Try again.",
+      "updateCardAction",
     );
   }
-
-  revalidatePath(`/decks/${deckId}`);
 }
 
 export async function deleteCardAction(data: DeleteCardInput) {
@@ -1350,11 +1357,16 @@ const createMultipleChoiceCardSchema = z
   .object({
     deckId: z.number().int().positive(),
     question: z.string(),
-    questionImageUrl: nullableImageUrl.optional(),
+    questionImageUrl: optionalPersistedImageUrl,
     correctAnswer: z.string(),
     distractors: z.array(z.string()).length(3, "Exactly 3 wrong answers are required"),
     choiceImageUrls: z
-      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .tuple([
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+      ])
       .optional(),
   })
   .refine((d) => d.question.trim().length > 0 || !!d.questionImageUrl, {
@@ -1371,15 +1383,25 @@ const updateMultipleChoiceCardSchema = z
     cardId: z.number().int().positive(),
     deckId: z.number().int().positive(),
     question: z.string(),
-    questionImageUrl: nullableImageUrl.optional(),
-    oldQuestionImageUrl: nullableImageUrl.optional(),
+    questionImageUrl: optionalPersistedImageUrl,
+    oldQuestionImageUrl: optionalPersistedImageUrl,
     correctAnswer: z.string(),
     distractors: z.array(z.string()).length(3, "Exactly 3 wrong answers are required"),
     choiceImageUrls: z
-      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .tuple([
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+      ])
       .optional(),
     oldChoiceImageUrls: z
-      .tuple([nullableImageUrl, nullableImageUrl, nullableImageUrl, nullableImageUrl])
+      .tuple([
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+        optionalPersistedImageUrl,
+      ])
       .optional(),
   })
   .refine((d) => d.question.trim().length > 0 || !!d.questionImageUrl, {
@@ -1418,121 +1440,147 @@ type UpdateMultipleChoiceCardInput = {
 };
 type GenerateMultipleChoiceInput = z.infer<typeof generateMultipleChoiceSchema>;
 
-export async function createMultipleChoiceCardAction(data: CreateMultipleChoiceCardInput) {
-  const { userId, maxCardsPerDeck } = await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+export async function createMultipleChoiceCardAction(
+  data: CreateMultipleChoiceCardInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { userId, maxCardsPerDeck } = await getAccessContext();
+    if (!userId) return { ok: false, error: "Unauthorized" };
 
-  const parsed = createMultipleChoiceCardSchema.safeParse(data);
-  if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
-    throw new Error(firstError?.message ?? "Invalid input");
-  }
+    const parsed = createMultipleChoiceCardSchema.safeParse(data);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      return { ok: false, error: firstError?.message ?? "Invalid input" };
+    }
 
-  const { deckId, question, questionImageUrl, correctAnswer, distractors, choiceImageUrls } =
-    parsed.data;
+    const { deckId, question, questionImageUrl, correctAnswer, distractors, choiceImageUrls } =
+      parsed.data;
 
-  const deck = await requireDeckEditor(userId, deckId);
-  const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const deckCardLimit = resolveDeckCardCap({
-    teamTierProWorkspace: teamTierPro,
-    personalMaxCardsPerDeck: maxCardsPerDeck,
-  });
-  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
+    const deck = await requireDeckEditor(userId, deckId);
+    const teamTierPro = await deckHasTeamTierProFeatures(deck);
+    const deckCardLimit = resolveDeckCardCap({
+      teamTierProWorkspace: teamTierPro,
+      personalMaxCardsPerDeck: maxCardsPerDeck,
+    });
+    const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
 
-  if (!paidCardTier) {
-    throw new Error(
-      "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
+    if (!paidCardTier) {
+      return {
+        ok: false,
+        error:
+          "Multiple-choice cards require Pro. Upgrade your personal plan on the Pricing page.",
+      };
+    }
+
+    const existingCards = await getCardsByDeckUnscoped(deckId);
+    if (existingCards.length >= deckCardLimit) {
+      return {
+        ok: false,
+        error: paidCardTier
+          ? `Plan limit: ${deckCardLimit} cards per deck for this workspace. Delete cards to add more.`
+          : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade on Pricing for higher limits (up to ${CARDS_PER_DECK_LIMIT_PRO_PLUS} on Pro Plus).`,
+      };
+    }
+
+    const choices = [
+      cleanUserText(correctAnswer),
+      ...distractors.map((d) => cleanUserText(d)),
+    ];
+
+    await createMultipleChoiceCard(
+      deckId,
+      cleanUserText(question),
+      questionImageUrl ?? null,
+      choices,
+      0,
+      false,
+      choiceImageUrls ?? null,
+    );
+
+    revalidatePath(`/decks/${deckId}`);
+    return { ok: true };
+  } catch (error) {
+    return failCardMutation(
+      error,
+      "Couldn't add this card. Try again.",
+      "createMultipleChoiceCardAction",
     );
   }
-
-  const existingCards = await getCardsByDeckUnscoped(deckId);
-  if (existingCards.length >= deckCardLimit) {
-    throw new Error(
-      paidCardTier
-        ? `Plan limit: ${deckCardLimit} cards per deck for this workspace. Delete cards to add more.`
-        : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade on Pricing for higher limits (up to ${CARDS_PER_DECK_LIMIT_PRO_PLUS} on Pro Plus).`,
-    );
-  }
-
-  const choices = [
-    cleanUserText(correctAnswer),
-    ...distractors.map((d) => cleanUserText(d)),
-  ];
-
-  await createMultipleChoiceCard(
-    deckId,
-    cleanUserText(question),
-    questionImageUrl ?? null,
-    choices,
-    0,
-    false,
-    choiceImageUrls ?? null,
-  );
-
 }
 
-export async function updateMultipleChoiceCardAction(data: UpdateMultipleChoiceCardInput) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+export async function updateMultipleChoiceCardAction(
+  data: UpdateMultipleChoiceCardInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { ok: false, error: "Unauthorized" };
 
-  const parsed = updateMultipleChoiceCardSchema.safeParse(data);
-  if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
-    throw new Error(firstError?.message ?? "Invalid input");
-  }
-
-  const {
-    cardId,
-    deckId,
-    question,
-    questionImageUrl,
-    oldQuestionImageUrl,
-    correctAnswer,
-    distractors,
-    choiceImageUrls,
-    oldChoiceImageUrls,
-  } = parsed.data;
-
-  const deck = await requireDeckEditor(userId, deckId);
-
-  if (oldQuestionImageUrl && oldQuestionImageUrl !== questionImageUrl) {
-    try {
-      await deleteFromS3(oldQuestionImageUrl);
-    } catch {
-      // Silently ignore deletion errors — card update should still succeed
+    const parsed = updateMultipleChoiceCardSchema.safeParse(data);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      return { ok: false, error: firstError?.message ?? "Invalid input" };
     }
-  }
 
-  if (oldChoiceImageUrls && choiceImageUrls) {
-    for (let i = 0; i < oldChoiceImageUrls.length; i++) {
-      const oldUrl = oldChoiceImageUrls[i];
-      const nextUrl = choiceImageUrls[i] ?? null;
-      if (oldUrl && oldUrl !== nextUrl) {
-        try {
-          await deleteFromS3(oldUrl);
-        } catch {
-          // ignore
+    const {
+      cardId,
+      deckId,
+      question,
+      questionImageUrl,
+      oldQuestionImageUrl,
+      correctAnswer,
+      distractors,
+      choiceImageUrls,
+      oldChoiceImageUrls,
+    } = parsed.data;
+
+    await requireDeckEditor(userId, deckId);
+
+    if (oldQuestionImageUrl && oldQuestionImageUrl !== questionImageUrl) {
+      try {
+        await deleteFromS3(oldQuestionImageUrl);
+      } catch {
+        // Silently ignore deletion errors — card update should still succeed
+      }
+    }
+
+    if (oldChoiceImageUrls && choiceImageUrls) {
+      for (let i = 0; i < oldChoiceImageUrls.length; i++) {
+        const oldUrl = oldChoiceImageUrls[i];
+        const nextUrl = choiceImageUrls[i] ?? null;
+        if (oldUrl && oldUrl !== nextUrl) {
+          try {
+            await deleteFromS3(oldUrl);
+          } catch {
+            // ignore
+          }
         }
       }
     }
+
+    const choices = [
+      cleanUserText(correctAnswer),
+      ...distractors.map((d) => cleanUserText(d)),
+    ];
+
+    await updateMultipleChoiceCard(
+      cardId,
+      deckId,
+      cleanUserText(question),
+      questionImageUrl ?? null,
+      choices,
+      0,
+      choiceImageUrls ?? null,
+    );
+
+    revalidatePath(`/decks/${deckId}`);
+    return { ok: true };
+  } catch (error) {
+    return failCardMutation(
+      error,
+      "Couldn't save this card. Try again.",
+      "updateMultipleChoiceCardAction",
+    );
   }
-
-  const choices = [
-    cleanUserText(correctAnswer),
-    ...distractors.map((d) => cleanUserText(d)),
-  ];
-
-  await updateMultipleChoiceCard(
-    cardId,
-    deckId,
-    cleanUserText(question),
-    questionImageUrl ?? null,
-    choices,
-    0,
-    choiceImageUrls ?? null,
-  );
-
-  revalidatePath(`/decks/${deckId}`);
 }
 
 export async function generateMultipleChoiceAction(

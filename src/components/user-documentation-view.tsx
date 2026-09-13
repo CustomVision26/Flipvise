@@ -25,6 +25,7 @@ import {
   DocsUiGuideStartButton,
   HomepageScreenshotViewButton,
 } from "@/components/docs-ui-guide-provider";
+import type { DocsUiGuideId } from "@/lib/flipvise-ui-guides";
 import {
   Accordion,
   AccordionContent,
@@ -244,32 +245,42 @@ function DocPagePanel({
   );
 }
 
-function articleSectionGuide(pageId: string, sectionId: string) {
+function articleSectionGuides(
+  pageId: string,
+  sectionId: string,
+): { id: DocsUiGuideId; label: string }[] {
   if (sectionId === "sign-up") {
-    return { id: "signup" as const, label: "Open sign-up guide" };
+    return [{ id: "signup", label: "Open sign-up guide" }];
   }
   if (sectionId === "sign-in") {
-    return { id: "signin" as const, label: "Open sign-in steps" };
+    return [{ id: "signin", label: "Open sign-in steps" }];
   }
   if (pageId === "personal-dashboard" && sectionId === "overview") {
-    return {
-      id: "personal-dashboard" as const,
-      label: "Open personal dashboard guide",
-    };
+    return [{ id: "personal-dashboard", label: "Open personal dashboard guide" }];
   }
   if (pageId === "pricing" && sectionId === "ui") {
-    return { id: "pricing" as const, label: "Open pricing guide" };
+    return [{ id: "pricing", label: "Open pricing guide" }];
   }
   if (pageId === "pricing" && sectionId === "checkout-path") {
-    return { id: "subscribe" as const, label: "Open subscribe guide" };
+    return [{ id: "subscribe", label: "Open subscribe guide" }];
   }
   if (pageId === "checkout" && sectionId === "new-vs-change") {
-    return { id: "subscribe" as const, label: "Open subscribe guide" };
+    return [{ id: "subscribe", label: "Open subscribe guide" }];
   }
   if (pageId === "deck-editor" && sectionId === "features") {
-    return { id: "create-deck" as const, label: "Open create deck guide" };
+    return [{ id: "create-deck", label: "Open create deck guide" }];
   }
-  return null;
+  if (pageId === "deck-editor" && sectionId === "ai-generation-quality") {
+    return [
+      { id: "ai-created-cards", label: "Open AI created cards guide" },
+      { id: "manual-added-cards", label: "Open manual cards guide" },
+      { id: "manual-add-mcq", label: "Open manual MCQ guide" },
+    ];
+  }
+  if (pageId === "deck-editor" && sectionId === "source-import-review") {
+    return [{ id: "add-card-from-source", label: "Open add from source guide" }];
+  }
+  return [];
 }
 
 function DocArticleSectionBody({
@@ -279,13 +290,19 @@ function DocArticleSectionBody({
   section: DocArticleSection;
   pageId: string;
 }) {
-  const guide = articleSectionGuide(pageId, section.id);
+  const guides = articleSectionGuides(pageId, section.id);
 
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold tracking-tight text-foreground">{section.title}</h3>
-      {guide ? (
-        <DocsUiGuideStartButton guideId={guide.id}>{guide.label}</DocsUiGuideStartButton>
+      {guides.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {guides.map((guide) => (
+            <DocsUiGuideStartButton key={guide.id} guideId={guide.id}>
+              {guide.label}
+            </DocsUiGuideStartButton>
+          ))}
+        </div>
       ) : null}
       {section.paragraphs?.map((paragraph) => (
         <p key={paragraph} className="text-muted-foreground">

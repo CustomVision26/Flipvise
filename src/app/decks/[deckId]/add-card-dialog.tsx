@@ -35,7 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { uploadCardImage } from "@/lib/upload-card-image-client";
+import { uploadCardImage, resolveCardImageForSave } from "@/lib/upload-card-image-client";
 import {
   AnswerChoiceImageControl,
   buildChoiceImageTuple,
@@ -109,10 +109,11 @@ function extensionForMediaType(mediaType: string): string {
 }
 
 function blobToPendingFile(blob: Blob): File {
-  const mediaType = blob.type || "image/webp";
+  const rawType = (blob.type || "image/webp").toLowerCase();
+  const mediaType = ALLOWED_IMAGE_TYPES.includes(rawType) ? rawType : "image/webp";
   return new File(
     [blob],
-    `ai-back-${Date.now()}.${extensionForMediaType(mediaType)}`,
+    `ai-card-${Date.now()}.${extensionForMediaType(mediaType)}`,
     { type: mediaType },
   );
 }
@@ -497,25 +498,16 @@ function StandardCardForm({
         : null;
     startTransition(async () => {
       try {
-        let resolvedFrontImageUrl = frontImageUrl;
-        if (frontPendingFile && !frontImageUrl) {
-          setIsUploadingFront(true);
-          try {
-            resolvedFrontImageUrl = await uploadCardImage(deckId, frontPendingFile);
-          } finally {
-            setIsUploadingFront(false);
-          }
-        }
-
-        let resolvedBackImageUrl = backImageUrl;
-        if (backPendingFile && !backImageUrl) {
-          setIsUploadingBack(true);
-          try {
-            resolvedBackImageUrl = await uploadCardImage(deckId, backPendingFile);
-          } finally {
-            setIsUploadingBack(false);
-          }
-        }
+        const resolvedFrontImageUrl = await resolveCardImageForSave(
+          deckId,
+          frontPendingFile,
+          frontImageUrl,
+        );
+        const resolvedBackImageUrl = await resolveCardImageForSave(
+          deckId,
+          backPendingFile,
+          backImageUrl,
+        );
 
         const created = await createCardAction({
           deckId,
@@ -1206,20 +1198,13 @@ function MultipleChoiceCardForm({
     speech.stop();
     startTransition(async () => {
       try {
-        let resolvedQuestionImageUrl = questionImageUrl;
-        if (questionPendingFile && !questionImageUrl) {
-          setIsUploadingImage(true);
-          try {
-            resolvedQuestionImageUrl = await uploadCardImage(
-              deckId,
-              questionPendingFile,
-            );
-          } finally {
-            setIsUploadingImage(false);
-          }
-        }
+        const resolvedQuestionImageUrl = await resolveCardImageForSave(
+          deckId,
+          questionPendingFile,
+          questionImageUrl,
+        );
 
-        await createMultipleChoiceCardAction({
+        const created = await createMultipleChoiceCardAction({
           deckId,
           question,
           questionImageUrl: resolvedQuestionImageUrl,
@@ -1227,6 +1212,9 @@ function MultipleChoiceCardForm({
           distractors,
           choiceImageUrls: buildChoiceImageTuple(correctAnswerImageUrl, wrongImageUrls),
         });
+        if (!created.ok) {
+          throw new Error(created.error);
+        }
         setQuestion("");
         setQuestionImageUrl(null);
         setQuestionImagePreview(null);
@@ -1239,7 +1227,9 @@ function MultipleChoiceCardForm({
         setWrongImagePreviews([null, null, null]);
         onSuccess();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(
+          userFacingServerActionError(err, "Couldn't add this card. Try again."),
+        );
       }
     });
   }
