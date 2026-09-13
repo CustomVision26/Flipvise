@@ -133,36 +133,40 @@ export async function getCardsByDeckUnscoped(deckId: number) {
 export async function promoteCoverPlaceholderCardsForDeck(
   deckId: number,
 ): Promise<void> {
-  const deck = await getDeckRowById(deckId);
-  if (!deck) return;
+  try {
+    const deck = await getDeckRowById(deckId);
+    if (!deck) return;
 
-  const all = await selectCardsByDeck(deckId, undefined, {
-    includeCoverPlaceholders: true,
-  });
-  const placeholders = all
-    .filter(isCoverPlaceholderCard)
-    .sort(
-      (a, b) =>
-        a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
-    );
-  if (placeholders.length === 0) return;
+    const all = await selectCardsByDeck(deckId, undefined, {
+      includeCoverPlaceholders: true,
+    });
+    const placeholders = all
+      .filter(isCoverPlaceholderCard)
+      .sort(
+        (a, b) =>
+          a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
+      );
+    if (placeholders.length === 0) return;
 
-  const oldest = placeholders[0];
-  const coverUrl = deck.coverImageUrl?.trim() || oldest.frontImageUrl;
-  if (!deck.coverImageUrl && oldest.frontImageUrl) {
-    await setDeckCoverImageUrl(deckId, deck.userId, oldest.frontImageUrl);
-  }
-
-  for (const card of placeholders) {
-    const imageUrl = card.frontImageUrl?.trim() ?? "";
-    if (imageUrl && imageUrl !== coverUrl) {
-      try {
-        await deleteFromS3(imageUrl);
-      } catch {
-        // keep going — card row must still be removed
-      }
+    const oldest = placeholders[0];
+    const coverUrl = deck.coverImageUrl?.trim() || oldest.frontImageUrl;
+    if (!deck.coverImageUrl && oldest.frontImageUrl) {
+      await setDeckCoverImageUrl(deckId, deck.userId, oldest.frontImageUrl);
     }
-    await deleteCard(card.id, deckId);
+
+    for (const card of placeholders) {
+      const imageUrl = card.frontImageUrl?.trim() ?? "";
+      if (imageUrl && imageUrl !== coverUrl) {
+        try {
+          await deleteFromS3(imageUrl);
+        } catch {
+          // keep going — card row must still be removed
+        }
+      }
+      await deleteCard(card.id, deckId);
+    }
+  } catch (error) {
+    console.error("promoteCoverPlaceholderCardsForDeck failed", { deckId, error });
   }
 }
 

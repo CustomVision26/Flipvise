@@ -150,6 +150,7 @@ function DocsUiGuidePanel({
   onClose: () => void;
 }) {
   const guide = DOCS_UI_GUIDES[session.id];
+  if (!guide) return null;
   const total = guide.steps.length;
   const step = guide.steps[session.step] ?? guide.steps[0];
   const progress = Math.round(((session.step + 1) / total) * 100);
@@ -444,6 +445,7 @@ export function DocsUiGuidesMenuButton({
         <div className="flex flex-col gap-2">
           {DOCS_UI_GUIDE_ORDER.map((id) => {
             const item = DOCS_UI_GUIDES[id];
+            if (!item) return null;
             return (
               <Button
                 key={id}
