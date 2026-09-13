@@ -111,6 +111,13 @@ function resolveCardImageMediaType(file: File): string | null {
   return null;
 }
 
+function asChoiceImageUrls(
+  urls: readonly (string | null | undefined)[] | null | undefined,
+): (string | null)[] | null {
+  if (!urls) return null;
+  return Array.from(urls, (url) => url ?? null);
+}
+
 const createCardSchema = z
   .object({
     deckId: z.number().int().positive(),
@@ -473,7 +480,7 @@ export async function uploadCardImageAction(
       return { ok: false, error: "Image must be under 5 MB" };
     }
 
-    const typedFile = new File([body], fileName, { type: rawMediaType });
+    const typedFile = new File([], fileName, { type: rawMediaType });
     const mediaType = resolveCardImageMediaType(typedFile);
     if (!mediaType) {
       return { ok: false, error: "Only JPEG, PNG, WebP, and GIF images are allowed" };
@@ -703,7 +710,7 @@ export async function updateCardAction(
         deckId,
         [backText, ...providedDistractors],
         0,
-        choiceImageUrls ?? null,
+        asChoiceImageUrls(choiceImageUrls),
       );
     }
 
@@ -1341,7 +1348,7 @@ const multipleChoiceAnswerRefine = (data: {
   questionImageUrl?: string | null;
   correctAnswer: string;
   distractors: string[];
-  choiceImageUrls?: [string | null, string | null, string | null, string | null] | null;
+  choiceImageUrls?: readonly (string | null | undefined)[] | null;
 }) => {
   if (!(data.question.trim().length > 0 || !!data.questionImageUrl)) return false;
   const correctImage = data.choiceImageUrls?.[0] ?? null;
@@ -1494,7 +1501,7 @@ export async function createMultipleChoiceCardAction(
       choices,
       0,
       false,
-      choiceImageUrls ?? null,
+      asChoiceImageUrls(choiceImageUrls),
     );
 
     revalidatePath(`/decks/${deckId}`);
@@ -1569,7 +1576,7 @@ export async function updateMultipleChoiceCardAction(
       questionImageUrl ?? null,
       choices,
       0,
-      choiceImageUrls ?? null,
+      asChoiceImageUrls(choiceImageUrls),
     );
 
     revalidatePath(`/decks/${deckId}`);
