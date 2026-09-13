@@ -51,7 +51,6 @@ import {
   generateAnswerAction,
   generateMultipleChoiceAction,
 } from "@/actions/cards";
-import { uploadCardImage } from "@/lib/upload-card-image-client";
 import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import { AI_GENERATION_CAP_PER_DECK } from "@/lib/deck-limits";
 
