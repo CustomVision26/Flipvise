@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { uploadCardImage } from "@/lib/upload-card-image-client";
 import {
   AnswerChoiceImageControl,
   buildChoiceImageTuple,
@@ -49,8 +50,9 @@ import {
   createMultipleChoiceCardAction,
   generateAnswerAction,
   generateMultipleChoiceAction,
-  uploadCardImageAction,
 } from "@/actions/cards";
+import { uploadCardImage } from "@/lib/upload-card-image-client";
+import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import { AI_GENERATION_CAP_PER_DECK } from "@/lib/deck-limits";
 
 const FromSourceCardForm = dynamic(
@@ -472,9 +474,7 @@ function StandardCardForm({
     setIsUploading(true);
     setPreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setUrl(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed.");
@@ -502,9 +502,7 @@ function StandardCardForm({
         if (frontPendingFile && !frontImageUrl) {
           setIsUploadingFront(true);
           try {
-            const formData = new FormData();
-            formData.append("image", frontPendingFile);
-            resolvedFrontImageUrl = await uploadCardImageAction({ deckId }, formData);
+            resolvedFrontImageUrl = await uploadCardImage(deckId, frontPendingFile);
           } finally {
             setIsUploadingFront(false);
           }
@@ -514,15 +512,13 @@ function StandardCardForm({
         if (backPendingFile && !backImageUrl) {
           setIsUploadingBack(true);
           try {
-            const formData = new FormData();
-            formData.append("image", backPendingFile);
-            resolvedBackImageUrl = await uploadCardImageAction({ deckId }, formData);
+            resolvedBackImageUrl = await uploadCardImage(deckId, backPendingFile);
           } finally {
             setIsUploadingBack(false);
           }
         }
 
-        await createCardAction({
+        const created = await createCardAction({
           deckId,
           front,
           frontImageUrl: resolvedFrontImageUrl,
@@ -530,6 +526,9 @@ function StandardCardForm({
           backImageUrl: resolvedBackImageUrl,
           distractors: distractorsToSend,
         });
+        if (!created.ok) {
+          throw new Error(created.error);
+        }
         setFront("");
         setFrontImageUrl(null);
         setFrontImagePreview(null);
@@ -542,7 +541,9 @@ function StandardCardForm({
         setAiDistractorsFor(null);
         onSuccess();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(
+          userFacingServerActionError(err, "Couldn't add this card. Try again."),
+        );
       }
     });
   }
@@ -656,7 +657,9 @@ function StandardCardForm({
         setIsGeneratingBackImage(false);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate answer.");
+      setError(
+        userFacingServerActionError(err, "Failed to generate answer."),
+      );
       setIsGeneratingAnswer(false);
       setIsGeneratingBackImage(false);
       setIsGeneratingDiagram(false);
@@ -1009,9 +1012,7 @@ function MultipleChoiceCardForm({
     setIsUploadingImage(true);
     setQuestionImagePreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setQuestionImageUrl(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed.");
@@ -1043,9 +1044,7 @@ function MultipleChoiceCardForm({
     setIsUploadingCorrectImage(true);
     setCorrectAnswerImagePreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setCorrectAnswerImageUrl(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed.");
@@ -1078,9 +1077,7 @@ function MultipleChoiceCardForm({
       return next;
     });
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setWrongImageUrls((prev) => {
         const next: [string | null, string | null, string | null] = [...prev];
         next[index] = url;
@@ -1214,9 +1211,10 @@ function MultipleChoiceCardForm({
         if (questionPendingFile && !questionImageUrl) {
           setIsUploadingImage(true);
           try {
-            const formData = new FormData();
-            formData.append("image", questionPendingFile);
-            resolvedQuestionImageUrl = await uploadCardImageAction({ deckId }, formData);
+            resolvedQuestionImageUrl = await uploadCardImage(
+              deckId,
+              questionPendingFile,
+            );
           } finally {
             setIsUploadingImage(false);
           }

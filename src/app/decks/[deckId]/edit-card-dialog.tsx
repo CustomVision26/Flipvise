@@ -31,8 +31,8 @@ import {
   generateMultipleChoiceAction,
   updateCardAction,
   updateMultipleChoiceCardAction,
-  uploadCardImageAction,
 } from "@/actions/cards";
+import { uploadCardImage } from "@/lib/upload-card-image-client";
 import {
   ImagePlus,
   Mic,
@@ -531,9 +531,7 @@ function StandardEditForm({
       return next;
     });
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setWrongImageUrls((prev) => {
         const next: [string | null, string | null, string | null] = [...prev];
         next[index] = url;
@@ -619,9 +617,7 @@ function StandardEditForm({
     setIsUploading(true);
     setPreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setUrl(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed.");
@@ -683,9 +679,7 @@ function StandardEditForm({
       try {
         async function uploadDiagram(diagram: NonNullable<typeof frontDiagram>) {
           const { file } = await buildMathDiagramPngFile(diagram);
-          const formData = new FormData();
-          formData.append("image", file);
-          const url = await uploadCardImageAction({ deckId }, formData);
+          const url = await uploadCardImage(deckId, file);
           return { url, preview: URL.createObjectURL(file) };
         }
 
@@ -1105,9 +1099,7 @@ function MultipleChoiceEditForm({
     setIsUploadingCorrectImage(true);
     setCorrectAnswerImagePreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setCorrectAnswerImageUrl(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed.");
@@ -1131,9 +1123,7 @@ function MultipleChoiceEditForm({
     setIsUploadingImage(true);
     setQuestionImagePreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setQuestionImageUrl(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed.");
@@ -1174,9 +1164,7 @@ function MultipleChoiceEditForm({
       return next;
     });
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const url = await uploadCardImageAction({ deckId }, formData);
+      const url = await uploadCardImage(deckId, file);
       setWrongImageUrls((prev) => {
         const next: [string | null, string | null, string | null] = [...prev];
         next[index] = url;

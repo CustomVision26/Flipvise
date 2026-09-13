@@ -14,6 +14,10 @@ import {
   isAiAccessDisabledError,
   isAiUsageLimitError,
 } from "@/lib/ai-usage/errors";
+import {
+  isNextControlFlowError,
+  userFacingServerActionError,
+} from "@/lib/server-action-client-error";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
 import {
   createCard,
@@ -72,16 +76,59 @@ const nullableImageUrl = z.preprocess(
   z.union([z.string().url(), z.null()]),
 );
 
-const optionalPersistedImageUrl = z.preprocess(
-  (value) => {
-    if (value === "" || value === undefined) return null;
-    if (typeof value === "string" && (value.startsWith("blob:") || value.startsWith("data:"))) {
-      return null;
-    }
-    return value;
-  },
-  z.union([z.string().url(), z.null()]).optional(),
-);
+const optionalPersistedImageUrl = z.preprocess((value) => {
+  if (value === "" || value === undefined || value === null) return null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (
+    trimmed.startsWith("blob:") ||
+    trimmed.startsWith("data:") ||
+    trimmed.length === 0
+  ) {
+    return null;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return trimmed;
+  } catch {
+    // drop invalid URLs instead of failing the whole save
+  }
+  return null;
+}, z.union([z.string().url(), z.null()]).optional());
+
+function failCardMutation(
+  error: unknown,
+  fallback: string,
+  logLabel: string,
+): { ok: false; error: string } {
+  if (isNextControlFlowError(error)) throw error;
+  console.error(`[${logLabel}]`, error);
+  return {
+    ok: false,
+    error: userFacingServerActionError(error, fallback),
+  };
+}
+
+const ALLOWED_CARD_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+] as const;
+
+function resolveCardImageMediaType(file: File): string | null {
+  const type = file.type.trim().toLowerCase();
+  if ((ALLOWED_CARD_IMAGE_TYPES as readonly string[]).includes(type)) {
+    return type === "image/jpg" ? "image/jpeg" : type;
+  }
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".gif")) return "image/gif";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  return null;
+}
 
 const createCardSchema = z
   .object({
@@ -409,69 +456,86 @@ type UploadCardImageInput = z.infer<typeof uploadCardImageSchema>;
 export async function uploadCardImageAction(
   data: UploadCardImageInput,
   formData: FormData,
-): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    const { userId } = await auth();
+    if (!userId) return { ok: false, error: "Unauthorized" };
 
-  const parsed = uploadCardImageSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid input");
+    const parsed = uploadCardImageSchema.safeParse(data);
+    if (!parsed.success) return { ok: false, error: "Invalid input" };
 
-  const { deckId } = parsed.data;
+    const { deckId } = parsed.data;
+    await requireDeckEditor(userId, deckId);
 
-  const deck = await requireDeckEditor(userId, deckId);
+    const file = formData.get("image");
+    if (!(file instanceof File)) return { ok: false, error: "No image file provided" };
 
-  const file = formData.get("image");
-  if (!(file instanceof File)) throw new Error("No image file provided");
+    const mediaType = resolveCardImageMediaType(file);
+    if (!mediaType) {
+      return { ok: false, error: "Only JPEG, PNG, WebP, and GIF images are allowed" };
+    }
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error("Only JPEG, PNG, WebP, and GIF images are allowed");
-  }
+    if (file.size > 5 * 1024 * 1024) {
+      return { ok: false, error: "Image must be under 5 MB" };
+    }
 
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Image must be under 5 MB");
-  }
+    const typedFile =
+      file.type === mediaType
+        ? file
+        : new File([file], file.name, { type: mediaType });
 
-  const url = await uploadToS3({
-    userId,
-    deckId,
-    file,
-    addRandomSuffix: true,
-  });
+    const url = await uploadToS3({
+      userId,
+      deckId,
+      file: typedFile,
+      addRandomSuffix: true,
+    });
 
-  return url;
-}
-
-export async function createCardAction(data: CreateCardInput) {
-  const access = await getAccessContext();
-  if (!access.userId) throw new Error("Unauthorized");
-  const { userId, maxCardsPerDeck } = access;
-
-  const parsed = createCardSchema.safeParse(data);
-  if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
-    throw new Error(firstError?.message ?? "Invalid input");
-  }
-
-  const { deckId, front, frontImageUrl, back, backImageUrl, distractors } = parsed.data;
-
-  const deck = await requireDeckEditor(userId, deckId);
-  const teamTierPro = await deckHasTeamTierProFeatures(deck);
-  const deckCardLimit = resolveDeckCardCap({
-    teamTierProWorkspace: teamTierPro,
-    personalMaxCardsPerDeck: maxCardsPerDeck,
-  });
-  const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
-  const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
-
-  const existingCards = await getCardsByDeckUnscoped(deckId);
-  if (existingCards.length >= deckCardLimit) {
-    throw new Error(
-      paidCardTier
-        ? `Plan limit: ${deckCardLimit} cards per deck for this workspace. Delete cards to add more.`
-        : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade on Pricing for higher limits (up to ${CARDS_PER_DECK_LIMIT_PRO_PLUS} on Pro Plus).`,
+    return { ok: true, url };
+  } catch (error) {
+    return failCardMutation(
+      error,
+      "Couldn't upload this image. Try another file, or save the card without an image.",
+      "uploadCardImageAction",
     );
   }
+}
+
+export async function createCardAction(
+  data: CreateCardInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const access = await getAccessContext();
+    if (!access.userId) return { ok: false, error: "Unauthorized" };
+    const { userId, maxCardsPerDeck } = access;
+
+    const parsed = createCardSchema.safeParse(data);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      return { ok: false, error: firstError?.message ?? "Invalid input" };
+    }
+
+    const { deckId, front, frontImageUrl, back, backImageUrl, distractors } =
+      parsed.data;
+
+    const deck = await requireDeckEditor(userId, deckId);
+    const teamTierPro = await deckHasTeamTierProFeatures(deck);
+    const deckCardLimit = resolveDeckCardCap({
+      teamTierProWorkspace: teamTierPro,
+      personalMaxCardsPerDeck: maxCardsPerDeck,
+    });
+    const paidCardTier = deckCardLimit > CARDS_PER_DECK_LIMIT_FREE;
+    const effectiveAI = canUseDeckAiFeatures(access, teamTierPro);
+
+    const existingCards = await getCardsByDeckUnscoped(deckId);
+    if (existingCards.length >= deckCardLimit) {
+      return {
+        ok: false,
+        error: paidCardTier
+          ? `Plan limit: ${deckCardLimit} cards per deck for this workspace. Delete cards to add more.`
+          : `Free plan limit: ${CARDS_PER_DECK_LIMIT_FREE} cards per deck. Upgrade on Pricing for higher limits (up to ${CARDS_PER_DECK_LIMIT_PRO_PLUS} on Pro Plus).`,
+      };
+    }
 
   const frontText = cleanUserText(front) || null;
   const backText = cleanUserText(back) || null;
@@ -514,7 +578,7 @@ export async function createCardAction(data: CreateCardInput) {
       );
     } catch (error) {
       if (isAiUsageLimitError(error) || isAiAccessDisabledError(error)) {
-        throw new Error(error.message);
+        return { ok: false, error: error.message };
       }
       // Best-effort — card still saves without stored wrong answers.
     }
@@ -523,18 +587,34 @@ export async function createCardAction(data: CreateCardInput) {
   const choices =
     resolvedDistractors && backText ? [backText, ...resolvedDistractors] : null;
 
-  await createCard(
-    deckId,
-    frontText,
-    frontImageUrl ?? null,
-    backText,
-    backImageUrl ?? null,
-    false,
-    choices,
-    choices ? 0 : null,
-  );
+  try {
+    await createCard(
+      deckId,
+      frontText,
+      frontImageUrl ?? null,
+      backText,
+      backImageUrl ?? null,
+      false,
+      choices,
+      choices ? 0 : null,
+    );
+  } catch (error) {
+    return failCardMutation(
+      error,
+      "Couldn't save this card. Try again.",
+      "createCardAction.insert",
+    );
+  }
 
   revalidatePath(`/decks/${deckId}`);
+  return { ok: true };
+  } catch (error) {
+    return failCardMutation(
+      error,
+      "Couldn't add this card. Try again.",
+      "createCardAction",
+    );
+  }
 }
 
 export async function updateCardAction(data: UpdateCardInput) {
