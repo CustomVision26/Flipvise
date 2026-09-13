@@ -75,10 +75,10 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           rows: [
             ["Home", "Homepage", "Personal dashboard"],
             ["Documentation", "Top nav pill", "Book icon (right, beside Help)"],
-            ["Plans", "Top nav pill to Plans & Pricing", "Plans button + plan label (both open Plans & Pricing)"],
+            ["Plans", "Top nav pill to Plans & Pricing", "Plans button + plan label (both open Plans & Pricing). Complimentary / assigned / affiliate access labels that button Complimentary"],
             ["Contact Us", "Top nav link", "Use Contact Us or inbox"],
             ["Help Center", "Docs section", "Docs section + /contact"],
-            ["Plan label", "Hidden", "Shows effective plan"],
+            ["Plan label", "Hidden", "Shows effective plan (hover Complimentary to confirm it is not a paid subscription)"],
             ["Workspace switcher", "Hidden", "Personal + team workspaces"],
             ["Inbox", "Hidden", "Badge when unread items"],
             ["Affiliate link", "Hidden", "When active affiliate"],
@@ -103,7 +103,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         bullets: [
           "Documentation — book icon on the right of the header (beside Help and Inbox).",
           "UI Guides — header button that lists every Flipvise UI guide (sign-up, sign-in, Personal Dashboard, Pricing, Subscribe, Create a deck, AI created cards, manual cards, MCQ, and add from source). Choose one to open the walkthrough; it stays open while you browse.",
-          "Plans — signed-in header button (and your plan label) open Plans & Pricing.",
+          "Plans — signed-in header button (and your plan label) open Plans & Pricing. If your plan is complimentary, assigned, or affiliate, that button is labeled Complimentary so it is not mistaken for a paid subscription.",
           "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",
           "Badge count reflects actionable unread items.",

@@ -33,6 +33,8 @@ interface GenerateCardsButtonProps {
   aiGeneratedCount: number;
   hasAI: boolean;
   deckCardLimit: number;
+  /** Free plan, Paid plan, or Complimentary — how capacity is sourced. */
+  planCapacityLabel?: string;
   /** Higher-contrast copy when the panel sits on a deck gradient. */
   onGradient?: boolean;
 }
@@ -82,6 +84,7 @@ export function GenerateCardsButton({
   aiGeneratedCount,
   hasAI,
   deckCardLimit,
+  planCapacityLabel,
   onGradient = false,
 }: GenerateCardsButtonProps) {
   const [isPending, startTransition] = useTransition();
@@ -270,7 +273,8 @@ export function GenerateCardsButton({
             />
           </div>
           <p className={cn("text-[11px] tabular-nums", softClass)}>
-            {deckCardLimit} max · {paidDeckCards ? "Paid plan" : "Free plan"}
+            {deckCardLimit} max ·{" "}
+            {planCapacityLabel ?? (paidDeckCards ? "Paid plan" : "Free plan")}
           </p>
         </div>
       </div>

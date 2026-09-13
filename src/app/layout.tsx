@@ -345,6 +345,7 @@ export default async function RootLayout({
                         personalAccountPlanLabel={
                           shell.personalAccountPlanLabel
                         }
+                        personalPlanAccessType={shell.personalPlanAccessType}
                         showAffiliatePortal={shell.showAffiliatePortal}
                         teamDashFallback={shell.teamDashFallback}
                         resolvedIsPro={isPro}

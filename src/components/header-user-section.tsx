@@ -31,7 +31,12 @@ import {
 } from "@/lib/offline/is-flipvise-native-app";
 import { useClientMounted } from "@/lib/use-client-mounted";
 import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
-import { CreditCard, IdCard, Megaphone, Palette, Shield } from "lucide-react";
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
+import {
+  headerPlansNavLabel,
+  isNonStripePersonalPlanGrant,
+} from "@/lib/personal-plan-access-ui";
+import { CreditCard, Gift, IdCard, Megaphone, Palette, Shield } from "lucide-react";
 
 const profilePageLoading = () => (
   <p className="px-1 py-4 text-sm text-muted-foreground">Loading…</p>
@@ -85,6 +90,8 @@ interface HeaderUserSectionProps {
   personalPlanLabelForWorkspace?: string;
   /** Billing tier link to `/pricing` (e.g. Team Basic, Pro Plus). */
   personalAccountPlanLabel?: string;
+  /** How the personal plan is sourced — Paid vs Complimentary / Assigned / Affiliate / Free. */
+  personalPlanAccessType?: AdminUserPlanAccessType;
   /** Active marketing-affiliate arrangement — show link to `/dashboard/affiliate`. */
   showAffiliatePortal?: boolean;
   /** When nav has no owned team-tier row, Team Dash href still targets this admin workspace. */
@@ -123,6 +130,7 @@ export function HeaderUserSection({
   personalWorkspaceHref = "/dashboard",
   personalPlanLabelForWorkspace = "Free",
   personalAccountPlanLabel = "Free",
+  personalPlanAccessType = "Free",
   showAffiliatePortal = false,
   teamDashFallback = null,
   resolvedIsPro = false,
@@ -296,6 +304,20 @@ export function HeaderUserSection({
     !hideWorkspaceSwitcherOnPricingForTeamTier;
 
   const toolIconClass = "h-8 w-8 shrink-0 rounded-full";
+  const isComplimentaryGrant = isNonStripePersonalPlanGrant(
+    personalPlanAccessType,
+  );
+  const plansNavLabel = headerPlansNavLabel(personalPlanAccessType);
+  const plansTooltip = isComplimentaryGrant
+    ? `${personalAccountPlanLabel} is complimentary — not a paid subscription. View plans & pricing.`
+    : "Plans & Pricing";
+  const plansAriaLabel = isComplimentaryGrant
+    ? "Complimentary plan — view pricing"
+    : "Plans";
+  const planNameTooltip = isComplimentaryGrant
+    ? `${personalAccountPlanLabel} is complimentary — not a paid subscription. View plans & pricing.`
+    : `${personalAccountPlanLabel} plan — view pricing`;
+  const PlansIcon = isComplimentaryGrant ? Gift : CreditCard;
 
   return (
     <div
@@ -310,7 +332,7 @@ export function HeaderUserSection({
           data-header-promo-links
           className="mr-0.5 flex shrink-0 items-center gap-1 sm:mr-1"
         >
-          <HeaderNavTooltip label="Plans & Pricing">
+          <HeaderNavTooltip label={plansTooltip}>
             <Link
               href="/pricing"
               className={cn(
@@ -319,10 +341,10 @@ export function HeaderUserSection({
                 isPricing && "bg-muted/70 text-foreground",
               )}
               aria-current={isPricing ? "page" : undefined}
-              aria-label="Plans"
+              aria-label={plansAriaLabel}
             >
-              <CreditCard className="size-3.5 shrink-0" aria-hidden />
-              <span className="hidden min-[420px]:inline">Plans</span>
+              <PlansIcon className="size-3.5 shrink-0" aria-hidden />
+              <span className="hidden min-[420px]:inline">{plansNavLabel}</span>
             </Link>
           </HeaderNavTooltip>
           {showTeacherNavButton ? (
@@ -351,14 +373,14 @@ export function HeaderUserSection({
           className="flex shrink-0 items-center gap-0.5 sm:gap-1"
         >
         {portalsReady ? (
-          <HeaderNavTooltip label={`${personalAccountPlanLabel} plan — view pricing`}>
+          <HeaderNavTooltip label={planNameTooltip}>
             <Link
               href="/pricing"
               className={cn(
                 "mr-0.5 inline-block max-w-[5.5rem] shrink-0 truncate text-xs font-medium text-muted-foreground transition-colors hover:text-foreground min-[380px]:max-w-[7rem] sm:mr-1 sm:max-w-[9rem] sm:text-sm lg:max-w-[11rem]",
                 isPro && "text-foreground",
               )}
-              aria-label={`${personalAccountPlanLabel} plan — view pricing`}
+              aria-label={planNameTooltip}
             >
               {personalAccountPlanLabel}
             </Link>

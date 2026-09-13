@@ -4,7 +4,7 @@ import { getAccessContext } from "@/lib/access";
 import { canUseAdvancedSourceImport } from "@/lib/source-import-access";
 import { canUseDeckAiFeatures } from "@/lib/deck-ai-access";
 import Link from "next/link";
-import { ArrowLeft, BookOpen, CalendarDays, Layers3, Sparkles } from "lucide-react";
+import { ArrowLeft, BadgeCheck, BookOpen, CalendarDays, Gift, Layers3, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,6 +39,14 @@ import {
   formatDeckCardDisplayName,
   formatLessonPlanDayCardLabel,
 } from "@/lib/teacher-generation-titles";
+import {
+  getPersonalPlanAccessType,
+  personalWorkspacePlanDisplayLabel,
+} from "@/lib/personal-workspace-plan-label";
+import {
+  deckPlanCapacitySourceLabel,
+  isNonStripePersonalPlanGrant,
+} from "@/lib/personal-plan-access-ui";
 import { cn } from "@/lib/utils";
 
 interface DeckPageProps {
@@ -49,7 +57,15 @@ interface DeckPageProps {
 export default async function DeckPage({ params, searchParams }: DeckPageProps) {
   const access = await getAccessContext();
   if (!access.userId) redirect("/");
-  const { userId, hasAiReading, maxCardsPerDeck } = access;
+  const {
+    userId,
+    hasAiReading,
+    maxCardsPerDeck,
+    activeTeamPlan,
+    isPro,
+    hasProPlusInterfacePalette,
+    effectivePlanSlug,
+  } = access;
 
   const { deckId } = await params;
   const id = Number(deckId);
@@ -105,6 +121,17 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
     teamTierProWorkspace: teamTierPro,
   });
   const isFreePlan = !paidDeckCards;
+  const planAccessType = await getPersonalPlanAccessType();
+  const isComplimentaryGrant = isNonStripePersonalPlanGrant(planAccessType);
+  const planCapacityLabel = isFreePlan
+    ? "Free plan"
+    : deckPlanCapacitySourceLabel(planAccessType);
+  const planDisplayLabel = personalWorkspacePlanDisplayLabel({
+    activeTeamPlan,
+    isPro,
+    hasProPlusInterfacePalette,
+    effectivePlanSlug,
+  });
   const isAtCardLimit = cards.length >= deckCardLimit;
   const fillPercent =
     deckCardLimit > 0
@@ -281,15 +308,52 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                     <Layers3 className="size-3 opacity-80" />
                     {cards.length} / {deckCardLimit} cards
                   </Badge>
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      hasGradient &&
-                        "border border-white/15 bg-white/10 text-white hover:bg-white/15",
-                    )}
-                  >
-                    {isFreePlan ? "Free plan" : "Paid plan"}
-                  </Badge>
+                  {isFreePlan ? (
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        hasGradient &&
+                          "border border-white/15 bg-white/10 text-white hover:bg-white/15",
+                      )}
+                    >
+                      Free plan
+                    </Badge>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Badge
+                              variant={isComplimentaryGrant ? "secondary" : "default"}
+                              className={cn(
+                                "gap-1.5",
+                                isComplimentaryGrant &&
+                                  hasGradient &&
+                                  "border border-white/15 bg-white/10 text-white hover:bg-white/15",
+                              )}
+                              aria-label={
+                                isComplimentaryGrant
+                                  ? `Complimentary ${planDisplayLabel} — not a paid subscription`
+                                  : `Paid plan: ${planDisplayLabel}`
+                              }
+                            />
+                          }
+                        >
+                          {isComplimentaryGrant ? (
+                            <Gift className="size-3" aria-hidden />
+                          ) : (
+                            <BadgeCheck className="size-3" aria-hidden />
+                          )}
+                          {planCapacityLabel}
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {isComplimentaryGrant
+                            ? `${planDisplayLabel} — complimentary, not a paid subscription. Up to ${deckCardLimit} cards per deck`
+                            : `${planDisplayLabel} — up to ${deckCardLimit} cards per deck`}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   <Badge
                     variant="secondary"
                     className={cn(
@@ -348,6 +412,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
                   aiGeneratedCount={aiGeneratedCount}
                   hasAI={effectiveAI}
                   deckCardLimit={deckCardLimit}
+                  planCapacityLabel={planCapacityLabel}
                   onGradient={hasGradient}
                 />
               ) : (

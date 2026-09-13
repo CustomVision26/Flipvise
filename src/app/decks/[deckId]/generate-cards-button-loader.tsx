@@ -10,6 +10,8 @@ export type GenerateCardsButtonLoaderProps = {
   aiGeneratedCount: number;
   hasAI: boolean;
   deckCardLimit: number;
+  /** Free plan, Paid plan, or Complimentary — how capacity is sourced. */
+  planCapacityLabel?: string;
   onGradient?: boolean;
 };
 

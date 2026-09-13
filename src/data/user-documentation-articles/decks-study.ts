@@ -20,9 +20,9 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Editor features",
         bullets: [
           "Open create deck guide to walk through + New Deck from Personal Dashboard, filling in details, adding an optional cover, and seeing the new deck in your library. The guide stays open while you browse.",
-          "Add, edit, reorder, and delete cards.",
+          "Card count vs plan cap, a Free plan, Paid plan, or Complimentary badge (hover Paid plan or Complimentary for your tier; Complimentary is grant access, not a paid subscription), last updated date, and deck capacity.",
           "AI card generation on Pro, Pro Plus, Education Plus, and team-tier / education team workspaces.",
-          "Deck cover image on create or edit — shown on dashboard deck cards, not counted as a flashcard.",
+          "Deck cover image on create or edit — shown on dashboard tiles; hover a tile to preview the cover. The cover is not a flashcard.",
           "Open Study to launch flashcard review or quiz mode.",
           "AI generation requires a connection — the Generate button is disabled and explains why when you are offline.",
         ],

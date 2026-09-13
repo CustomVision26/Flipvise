@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, BookOpen, GraduationCap, Trash2, Loader2, Pencil } from "lucide-react";
@@ -74,6 +75,63 @@ type PreviewCard = {
 
 export type DeckView = ItemWatermarkView;
 
+function coverPreviewStyle(anchor: DOMRect): React.CSSProperties {
+  const width = Math.min(320, Math.max(160, window.innerWidth - 24));
+  const gap = 10;
+  const estimatedHeight = width * (10 / 16) + 8;
+  const left = Math.min(
+    Math.max(12, anchor.left + anchor.width / 2 - width / 2),
+    window.innerWidth - width - 12,
+  );
+  const placeAbove = anchor.top >= estimatedHeight + gap + 8;
+  if (placeAbove) {
+    return {
+      left,
+      top: anchor.top - gap,
+      width,
+      transform: "translateY(-100%)",
+    };
+  }
+  return {
+    left,
+    top: anchor.bottom + gap,
+    width,
+    transform: "none",
+  };
+}
+
+function CoverHoverPreview({
+  src,
+  label,
+  anchor,
+}: {
+  src: string;
+  label: string;
+  anchor: DOMRect;
+}) {
+  return (
+    <Card
+      size="sm"
+      className="pointer-events-none fixed z-[200] overflow-hidden p-0 shadow-xl ring-1 ring-foreground/15"
+      style={coverPreviewStyle(anchor)}
+      aria-hidden
+    >
+      <div className="relative aspect-[16/10] w-full bg-muted/40">
+        <Image
+          src={src}
+          alt=""
+          fill
+          className="object-contain"
+          sizes="320px"
+        />
+      </div>
+      <p className="truncate px-2.5 py-1.5 text-xs font-medium text-foreground">
+        {label}
+      </p>
+    </Card>
+  );
+}
+
 interface DeckCardPopoverProps {
   deck: {
     id: number;
@@ -132,6 +190,8 @@ export function DeckCardPopover({
   const [deleteImpact, setDeleteImpact] =
     React.useState<DeckDeleteImpact | null>(null);
   const [deleteImpactLoading, setDeleteImpactLoading] = React.useState(false);
+
+  const [coverAnchor, setCoverAnchor] = React.useState<DOMRect | null>(null);
 
   const displayName = formatDeckCardDisplayName(deck.name);
   const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
@@ -234,43 +294,39 @@ export function DeckCardPopover({
     <div tabIndex={0} aria-label={`Quick actions for ${deck.name}`} />
   );
 
-  /**
-   * Grid (detail) view: inline cover omitted — show cover on hover via CSS only.
-   * Do not use Tooltip here: it portals into document.body while the card sits
-   * inside Popover/Dialog triggers, and dual portal teardown races → removeChild(null).
-   */
-  function withGridCoverHover(card: React.ReactNode) {
-    if (view !== "grid" || !deck.coverImageUrl) return card;
-    const overlayOpen = popoverOpen || teamWorkspaceDialogOpen || previewOpen;
-    return (
-      <div className="group/cover-preview relative block w-full min-h-0 rounded-xl">
-        {card}
-        {!overlayOpen ? (
-          <div
-            className={cn(
-              "pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-[100] hidden -translate-x-1/2",
-              "rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg ring-1 ring-foreground/10",
-              "group-hover/cover-preview:block",
-            )}
-            aria-hidden
-          >
-            <p className="mb-1.5 max-w-[10.5rem] truncate text-[11px] font-medium leading-tight text-foreground sm:max-w-[11rem] sm:text-xs">
-              {deck.name}
-            </p>
-            <div className="relative h-[5.25rem] w-[9.25rem] overflow-hidden rounded-md border border-border bg-muted/30 sm:h-24 sm:w-40">
-              <Image
-                src={deck.coverImageUrl}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="160px"
-              />
-            </div>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
+  const menuLocked =
+    popoverOpen ||
+    teamWorkspaceDialogOpen ||
+    previewOpen ||
+    editDialogOpen ||
+    deleteOpen;
+
+  React.useEffect(() => {
+    if (menuLocked) setCoverAnchor(null);
+  }, [menuLocked]);
+
+  React.useEffect(() => {
+    if (!coverAnchor) return;
+    const close = () => setCoverAnchor(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [coverAnchor]);
+
+  const coverPreview =
+    deck.coverImageUrl && coverAnchor && !menuLocked && typeof document !== "undefined"
+      ? createPortal(
+          <CoverHoverPreview
+            src={deck.coverImageUrl}
+            label={displayName}
+            anchor={coverAnchor}
+          />,
+          document.body,
+        )
+      : null;
 
   function previewControlsFor(compact: boolean) {
     const rowGhost = cn(
@@ -610,7 +666,16 @@ export function DeckCardPopover({
   );
 
   return (
-    <div className={wrapperClass}>
+    <div
+      className={wrapperClass}
+      onPointerEnter={(event) => {
+        if (!deck.coverImageUrl || menuLocked) return;
+        setCoverAnchor(event.currentTarget.getBoundingClientRect());
+      }}
+      onPointerLeave={() => setCoverAnchor(null)}
+      onPointerDown={() => setCoverAnchor(null)}
+    >
+      {coverPreview}
       {variant === "team-preview" ? (
         <Dialog
           open={teamWorkspaceDialogOpen}
@@ -621,7 +686,7 @@ export function DeckCardPopover({
             render={deckTriggerRender}
             className={triggerClassName}
           >
-            {withGridCoverHover(deckCard)}
+            {deckCard}
           </DialogTrigger>
           <DialogContent
             className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto gap-0 p-0 sm:max-w-sm"
@@ -703,7 +768,7 @@ export function DeckCardPopover({
             render={deckTriggerRender}
             className={triggerClassName}
           >
-            {withGridCoverHover(deckCard)}
+            {deckCard}
           </PopoverTrigger>
 
           <PopoverContent

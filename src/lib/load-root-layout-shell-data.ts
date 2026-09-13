@@ -7,7 +7,9 @@ import type { TeamWorkspaceNavTeam } from "@/lib/team-workspace-url";
 import { getActiveAffiliateForUser } from "@/db/queries/affiliates";
 import type { AccessContext } from "@/lib/access";
 import { getInboxUnreadCountForUser } from "@/lib/inbox-unread-count";
+import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
 import {
+  getPersonalPlanAccessType,
   getPersonalWorkspaceAccessLabel,
   getPersonalWorkspaceAccountPlanLabel,
   personalWorkspaceLabelsFromAccessContext,
@@ -48,6 +50,8 @@ export type RootLayoutShellData = {
   showAffiliatePortal: boolean;
   personalPlanLabelForWorkspace: string;
   personalAccountPlanLabel: string;
+  /** How the personal plan is sourced — Paid vs Complimentary / Assigned / Affiliate / Free. */
+  personalPlanAccessType: AdminUserPlanAccessType;
   showWorkspaceSwitcher: boolean;
   teamDashFallback: RootLayoutTeamDashFallback;
   showTeacherDashboard: boolean;
@@ -137,8 +141,20 @@ export async function loadRootLayoutShellData(input: {
 }): Promise<RootLayoutShellData> {
   const { pathname, access, teamContextCookie } = input;
   const profile = resolveRootLayoutShellProfile(pathname, access.userId);
-  const { userId, isAdmin, adminGranted, activeTeamPlan, activeEducationTeamPlan, isPro, primaryEmail, effectivePlanSlug } =
-    access;
+  const {
+    userId,
+    isAdmin,
+    isSuperadmin,
+    adminGranted,
+    activeTeamPlan,
+    activeEducationTeamPlan,
+    isPro,
+    primaryEmail,
+    effectivePlanSlug,
+  } = access;
+
+  const fallbackPlanAccessType: AdminUserPlanAccessType =
+    isSuperadmin || isAdmin ? "Complimentary" : isPro ? "Paid" : "Free";
 
   const emptyGuest: RootLayoutShellData = {
     profile,
@@ -150,6 +166,7 @@ export async function loadRootLayoutShellData(input: {
     showAffiliatePortal: false,
     personalPlanLabelForWorkspace: "Free",
     personalAccountPlanLabel: "Free",
+    personalPlanAccessType: "Free",
     showWorkspaceSwitcher: false,
     teamDashFallback: null,
     showTeacherDashboard: false,
@@ -207,19 +224,23 @@ export async function loadRootLayoutShellData(input: {
     teamNavPayload.workspaceNav.totalEligibleCount;
   const hasTeamMembership = teamNavPayload.teamMembershipCount > 0;
 
+  const fallbackLabels = personalWorkspaceLabelsFromAccessContext(access);
   const planLabels = needsFullPlanLabels
     ? {
         personalPlanLabelForWorkspace: await getPersonalWorkspaceAccessLabel().catch(
-          () =>
-            personalWorkspaceLabelsFromAccessContext(access)
-              .personalPlanLabelForWorkspace,
+          () => fallbackLabels.personalPlanLabelForWorkspace,
         ),
         personalAccountPlanLabel: await getPersonalWorkspaceAccountPlanLabel().catch(
-          () =>
-            personalWorkspaceLabelsFromAccessContext(access).personalAccountPlanLabel,
+          () => fallbackLabels.personalAccountPlanLabel,
+        ),
+        personalPlanAccessType: await getPersonalPlanAccessType().catch(
+          () => fallbackPlanAccessType,
         ),
       }
-    : personalWorkspaceLabelsFromAccessContext(access);
+    : {
+        ...fallbackLabels,
+        personalPlanAccessType: fallbackPlanAccessType,
+      };
 
   const teamDashFallback = resolveTeamDashFallback(
     userId,
@@ -248,6 +269,7 @@ export async function loadRootLayoutShellData(input: {
     showAffiliatePortal: activeAffiliateRow != null,
     personalPlanLabelForWorkspace: planLabels.personalPlanLabelForWorkspace,
     personalAccountPlanLabel: planLabels.personalAccountPlanLabel,
+    personalPlanAccessType: planLabels.personalPlanAccessType,
     showWorkspaceSwitcher: resolveShowWorkspaceSwitcher({
       workspaceTeamsTotalEligible,
       activeTeamPlan,
