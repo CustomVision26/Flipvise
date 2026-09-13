@@ -1,8 +1,12 @@
 import type { CardQuizVariants } from "@/lib/card-quiz-variants";
 import { db } from "@/db";
-import { cards, decks, type DeckRow } from "@/db/schema";
+import { cards, decks } from "@/db/schema";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
-import { and, asc, desc, eq, getTableColumns, inArray } from "drizzle-orm";
+import { getDeckRowById, setDeckCoverImageUrl } from "@/db/queries/decks";
+import { coverPlaceholderCardSql } from "@/db/queries/cover-placeholder-cards";
+import { isCoverPlaceholderCard } from "@/lib/cover-placeholder-card";
+import { deleteFromS3 } from "@/lib/s3";
+import { and, asc, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 
 type CardRow = typeof cards.$inferSelect;
 
@@ -62,40 +66,49 @@ function normalizeChoiceImageUrlsForDb(
   return urls.map((url) => url ?? "");
 }
 
-async function selectCardsByDeck(deckId: number, scopedUserId?: string) {
+async function selectCardsByDeck(
+  deckId: number,
+  scopedUserId?: string,
+  options?: { includeCoverPlaceholders?: boolean },
+) {
   const order = desc(cards.updatedAt);
+  let rows: CardRow[];
   try {
     if (scopedUserId != null) {
-      return await db
+      rows = await db
         .select(getTableColumns(cards))
         .from(cards)
         .innerJoin(decks, eq(cards.deckId, decks.id))
         .where(and(eq(cards.deckId, deckId), eq(decks.userId, scopedUserId)))
         .orderBy(order);
+    } else {
+      rows = await db
+        .select(getTableColumns(cards))
+        .from(cards)
+        .where(eq(cards.deckId, deckId))
+        .orderBy(order);
     }
-    return await db
-      .select(getTableColumns(cards))
-      .from(cards)
-      .where(eq(cards.deckId, deckId))
-      .orderBy(order);
   } catch (e) {
     if (!isMissingChoiceImageUrlsColumnError(e)) throw e;
     if (scopedUserId != null) {
-      const rows = await db
+      const fallback = await db
         .select(cardRowSelectWithoutChoiceImages)
         .from(cards)
         .innerJoin(decks, eq(cards.deckId, decks.id))
         .where(and(eq(cards.deckId, deckId), eq(decks.userId, scopedUserId)))
         .orderBy(order);
-      return rows.map(withNullChoiceImages);
+      rows = fallback.map(withNullChoiceImages);
+    } else {
+      const fallback = await db
+        .select(cardRowSelectWithoutChoiceImages)
+        .from(cards)
+        .where(eq(cards.deckId, deckId))
+        .orderBy(order);
+      rows = fallback.map(withNullChoiceImages);
     }
-    const rows = await db
-      .select(cardRowSelectWithoutChoiceImages)
-      .from(cards)
-      .where(eq(cards.deckId, deckId))
-      .orderBy(order);
-    return rows.map(withNullChoiceImages);
   }
+  if (options?.includeCoverPlaceholders) return rows;
+  return rows.filter((card) => !isCoverPlaceholderCard(card));
 }
 
 /**
@@ -114,15 +127,56 @@ export async function getCardsByDeckUnscoped(deckId: number) {
 }
 
 /**
- * Oldest card in the deck (create order) — used for “first card front image”
- * on create/edit deck.
+ * Moves leftover Create Deck cover stubs onto `decks.coverImageUrl` and deletes
+ * those rows so they are not counted or studied as flashcards.
  */
+export async function promoteCoverPlaceholderCardsForDeck(
+  deckId: number,
+): Promise<void> {
+  const deck = await getDeckRowById(deckId);
+  if (!deck) return;
+
+  const all = await selectCardsByDeck(deckId, undefined, {
+    includeCoverPlaceholders: true,
+  });
+  const placeholders = all
+    .filter(isCoverPlaceholderCard)
+    .sort(
+      (a, b) =>
+        a.createdAt.getTime() - b.createdAt.getTime() || a.id - b.id,
+    );
+  if (placeholders.length === 0) return;
+
+  const oldest = placeholders[0];
+  const coverUrl = deck.coverImageUrl?.trim() || oldest.frontImageUrl;
+  if (!deck.coverImageUrl && oldest.frontImageUrl) {
+    await setDeckCoverImageUrl(deckId, deck.userId, oldest.frontImageUrl);
+  }
+
+  for (const card of placeholders) {
+    const imageUrl = card.frontImageUrl?.trim() ?? "";
+    if (imageUrl && imageUrl !== coverUrl) {
+      try {
+        await deleteFromS3(imageUrl);
+      } catch {
+        // keep going — card row must still be removed
+      }
+    }
+    await deleteCard(card.id, deckId);
+  }
+}
+
+/** Oldest real flashcard in the deck (create order). Cover stubs are skipped. */
 export async function getOldestCardInDeck(deckId: number) {
+  const studyCard = and(
+    eq(cards.deckId, deckId),
+    sql`NOT (${coverPlaceholderCardSql})`,
+  );
   try {
     const [row] = await db
       .select(getTableColumns(cards))
       .from(cards)
-      .where(eq(cards.deckId, deckId))
+      .where(studyCard)
       .orderBy(asc(cards.createdAt), asc(cards.id))
       .limit(1);
     return row ?? null;
@@ -131,7 +185,7 @@ export async function getOldestCardInDeck(deckId: number) {
     const [row] = await db
       .select(cardRowSelectWithoutChoiceImages)
       .from(cards)
-      .where(eq(cards.deckId, deckId))
+      .where(studyCard)
       .orderBy(asc(cards.createdAt), asc(cards.id))
       .limit(1);
     return row ? withNullChoiceImages(row) : null;
@@ -164,7 +218,12 @@ export async function getFirstPreviewCardFrontByDeckIds(
       updatedAt: cards.updatedAt,
     })
     .from(cards)
-    .where(inArray(cards.deckId, unique));
+    .where(
+      and(
+        inArray(cards.deckId, unique),
+        sql`NOT (${coverPlaceholderCardSql})`,
+      ),
+    );
 
   const best = new Map<number, { t: number; img: string | null }>();
   for (const id of unique) {

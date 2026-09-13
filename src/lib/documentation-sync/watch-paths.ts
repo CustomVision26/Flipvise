@@ -34,6 +34,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/math-diagrams/schema.ts",
     "src/lib/math-diagrams/render.ts",
     "src/app/api/ai/card-diagram/route.ts",
+    "src/lib/flipvise-ui-guides.ts",
+    "src/components/docs-ui-guide-provider.tsx",
+    "src/components/add-deck-dialog.tsx",
   ],
   "personal-dashboard": [
     "src/components/offline-availability-button.tsx",

@@ -3,7 +3,8 @@ export type DocsUiGuideId =
   | "signin"
   | "personal-dashboard"
   | "pricing"
-  | "subscribe";
+  | "subscribe"
+  | "create-deck";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -13,6 +14,7 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "personal-dashboard",
   "pricing",
   "subscribe",
+  "create-deck",
 ];
 
 export type DocsUiGuideStep = {
@@ -312,6 +314,33 @@ export const SUBSCRIBE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+export const CREATE_DECK_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("07 Flipvise - Create Deck From Personal DB - 01.png"),
+    title: "Open New Deck",
+    caption:
+      "On Personal Dashboard, choose + New Deck (or Create your first deck when the library is empty).",
+  },
+  {
+    src: uiSrc("07 Flipvise - Create Deck From Personal DB - 02.png"),
+    title: "Fill in deck details",
+    caption:
+      "Enter a name/subject/course, description/topic, and optional grade and difficulty. You can add a cover image and a background gradient.",
+  },
+  {
+    src: uiSrc("07 Flipvise - Create Deck From Personal DB - 03.png"),
+    title: "Add an optional cover",
+    caption:
+      "Choose a cover image for the deck card on your dashboard. The cover is not a flashcard and does not count toward your cards-per-deck limit.",
+  },
+  {
+    src: uiSrc("07 Flipvise - Create Deck From Personal DB - 04.png"),
+    title: "Deck created",
+    caption:
+      "The new deck appears on Personal Dashboard. Open it to add flashcards or generate them with AI.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -340,5 +369,10 @@ export const DOCS_UI_GUIDES: Record<
     title: "Subscribe to a plan",
     summary: "Choose a plan, complete Stripe checkout, and open your receipt.",
     steps: SUBSCRIBE_GUIDE_STEPS,
+  },
+  "create-deck": {
+    title: "Create a deck",
+    summary: "Add a deck from Personal Dashboard, including an optional cover image.",
+    steps: CREATE_DECK_GUIDE_STEPS,
   },
 };

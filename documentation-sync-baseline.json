@@ -1,34 +1,34 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-12T22:41:38.985Z",
+  "updatedAt": "2026-09-13T00:36:25.596Z",
   "pages": {
     "homepage": {
-      "watchFingerprint": "b789914efdad8dafd4d9ec8dae16571926628561bc530655700301fead7fdd05",
-      "docFingerprint": "4c50adca2bab1a708dc193d4bcfd11a62200c77741d9e6737581242d2bc4b89b"
+      "watchFingerprint": "2ea3036ff0028862c66682809c3f673829670f57a1aaa4dd834ce9171af89b81",
+      "docFingerprint": "f44750f738e0f28a363190d87e36a499718b8191a1aa30e674c1e2accac0ee9a"
     },
     "header-navigation": {
       "watchFingerprint": "b0346afe313043146c791ffe9f2e91fbfc8bd9126f542e49f22b2a8786340a54",
-      "docFingerprint": "0c760fcc961b6d5bd973a560626ac6f16a51da9fe63d9ed29f4080ea0d406435"
+      "docFingerprint": "36f2a3ee49c82a6e6e7ec18f849eb2af47e77b4b6486a0c7cde6216fe9620edf"
     },
     "personal-dashboard": {
-      "watchFingerprint": "09acbf2a9545824d25b1b622f21f3979012997cbf3a0281e5e773d5110d62f07",
-      "docFingerprint": "51ac239eed1a7f5fc64f028c5acbbe05b153b5081956b3bfe12cba8e471f901f"
+      "watchFingerprint": "a03fa45c88fe75f291495eac7857cd9af51908e4f711ff483c07add309ce90d1",
+      "docFingerprint": "8bd68b02be8e577b38f49bdd593d2fee08df6e1954659e861a26ad1187b8d314"
     },
     "team-workspace-dashboard": {
-      "watchFingerprint": "fc2e8c32ffd52d763755735b307d79e255e570b139d96146b6473c8b68250a67",
-      "docFingerprint": "b431e3e56f1eadb4081ca9a52812b350da63a5812d90f88b6ac0a4d6f45a2867"
+      "watchFingerprint": "16dc33be0c2313341e523232bef2b1b3e2016cb150400ef9a90a016ff73c123d",
+      "docFingerprint": "2756acce1cf2c214cddeb681a54066054d314ccd73747eb6ddcb19140f20974e"
     },
     "manage-workspaces": {
       "watchFingerprint": "760959c948b76d439d2aca9a91466d5dc8fa47a39410c9a97a6264517bbf783d",
       "docFingerprint": "d4e9de338ea71c4a2fce4aa907b46ad55077cb1a764bb773f591a94fe41770bc"
     },
     "deck-editor": {
-      "watchFingerprint": "07e3521d098c4825cf98d3aed9e5fc2b80e9298ea9fe98438c12d6b1c098048b",
-      "docFingerprint": "7a09742aceacc09f7981ec73939d65a01f8322552b5f986ac5d029153970f608"
+      "watchFingerprint": "f481fcd4b40f12843c8b37131116c5ddbc73894c293273404f3e316fcc034cea",
+      "docFingerprint": "6ce8c97928bf3bfb11aa00aadc20f853ee270af2b9499e0753b6cf7855218c7a"
     },
     "study-session": {
-      "watchFingerprint": "d2734e1a723a06c898d98fa6d94a46e97338be343f6a9d80e707f8b2f5491df5",
-      "docFingerprint": "329bcf11528c3bbc40f4112973d794b4cef60a4c4c3ef9c5f5729b3613eb7ae2"
+      "watchFingerprint": "ceb52a1009ffbe9c45876fb546f07faebce382bfc786d11ceac634ea200aa5cc",
+      "docFingerprint": "207ff440188463dde9412a47c31c77fb271e5ab43f7de1368a272288e6394e48"
     },
     "quiz-result-detail": {
       "watchFingerprint": "b132a4bc7de1c6b87dc4783a702ecfea7ad25030c35f241242122a6639df961f",
@@ -95,8 +95,8 @@
       "docFingerprint": "a9b1735c5fe68f2f13cb8e2ce7110901e1ef028bd75a126e1262cd13d1441d53"
     },
     "pricing": {
-      "watchFingerprint": "2f6a874a64fa2895ebeea67c13a75aa116e54faa851115e25d9d23494ea807e7",
-      "docFingerprint": "6be4b321dfea2928c7c7a4a9ecde943c73277680cac8becb94931181c3c87b75"
+      "watchFingerprint": "7b32a29e8827b44c54f688dd0ad71e91639b9964e646b59714a904d2c497c79f",
+      "docFingerprint": "684c1a86d900c5ac7bfb8bfc7693c1293f5128f5a72a199a45ffaf127d0a8571"
     },
     "pricing-add-ons": {
       "watchFingerprint": "c7a956fdb89ef71614788949411a74831894897212d770a5179f103551b951c9",
@@ -107,8 +107,8 @@
       "docFingerprint": "c51b9a432890beda18c6a25f4b19eef21224598129dbe9d49f0c02cd7aee1bf9"
     },
     "checkout": {
-      "watchFingerprint": "0666a661ca0a59d09cfc645461636788b7ea896fa4c5eb7b98e74ea1a5e7d29c",
-      "docFingerprint": "3708a815d65d68d4ef951e6841a963d53e61fcb86553b20eb44d76e1c420f5f9"
+      "watchFingerprint": "ab1a7963a0fbd2539c707cb5c74d3cfa54568b9c073feadbc0700f07086de762",
+      "docFingerprint": "452c3e29941aa2fb2722765455d23ea5d766f8bc38bd16e4fd144f13982c26e7"
     },
     "manage-subscription": {
       "watchFingerprint": "323b3798a94df849a8500e916bb13e63ab988d0ea71cb2cefcbfef8193805ac0",

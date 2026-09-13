@@ -164,6 +164,11 @@ function DocPagePanel({
             Open subscribe guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "deck-editor" ? (
+          <DocsUiGuideStartButton guideId="create-deck">
+            Open create deck guide
+          </DocsUiGuideStartButton>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -260,6 +265,9 @@ function articleSectionGuide(pageId: string, sectionId: string) {
   }
   if (pageId === "checkout" && sectionId === "new-vs-change") {
     return { id: "subscribe" as const, label: "Open subscribe guide" };
+  }
+  if (pageId === "deck-editor" && sectionId === "features") {
+    return { id: "create-deck" as const, label: "Open create deck guide" };
   }
   return null;
 }

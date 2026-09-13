@@ -19,10 +19,10 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "features",
         title: "Editor features",
         bullets: [
+          "Open create deck guide to walk through + New Deck from Personal Dashboard, filling in details, adding an optional cover, and seeing the new deck in your library. The guide stays open while you browse.",
           "Add, edit, reorder, and delete cards.",
           "AI card generation on Pro, Pro Plus, Education Plus, and team-tier / education team workspaces.",
-          "Deck cover image upload when your plan allows (Pro personal, team-tier workspace).",
-          "Edit deck can set or replace the oldest card’s front image (first card front image).",
+          "Deck cover image on create or edit — shown on dashboard deck cards, not counted as a flashcard.",
           "Open Study to launch flashcard review or quiz mode.",
           "AI generation requires a connection — the Generate button is disabled and explains why when you are offline.",
         ],
@@ -87,7 +87,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "modes",
         title: "Study modes",
         bullets: [
-          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered.",
+          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered. A deck cover image is not a flashcard and is not included in study or quiz.",
           "Standard Review — flip cards to reveal answers, then Next. Works online and offline (browser PWA / Capacitor). No Correct/Incorrect self-grading.",
           "Double-click the front or back image on a flashcard to open a full-size preview; Escape or click outside closes it.",
           "AI Recall™ — answer first (type, voice, or draw) before the solution unlocks; AI evaluates understanding, then Continue or Review Again. Requires Pro Plus / Education Plus / team plans and an internet connection.",

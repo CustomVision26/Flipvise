@@ -19,7 +19,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "ui",
         title: "Page features",
         bullets: [
-          "Open pricing guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
+          "Open pricing guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished. UI Guides in the header also lists Create a deck and Subscribe.",
           "Toggle monthly vs yearly billing — yearly shows effective monthly rate.",
           "View plans dropdown filters the grid or show all tiers.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, Enterprise.",
@@ -154,7 +154,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "new-vs-change",
         title: "New subscription vs plan change",
         bullets: [
-          "Open subscribe guide to follow choosing a plan, Stripe checkout, and opening your receipt.",
+          "Open subscribe guide to follow choosing a plan, Stripe checkout, and opening your receipt. UI Guides in the header also lists Create a deck.",
           "New subscribers: promo field applies; discount shows on payment step.",
           "Free trial checkout: no promo field — trial terms and acknowledgment checkbox instead.",
           "Existing subscribers: proration preview instead of promo — promos blocked on plan changes.",

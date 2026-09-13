@@ -19,7 +19,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation).",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them before the dashboard becomes available.",
-          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse.",
+          "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck.",
         ],
         requirements: ["None — guests can browse pricing and documentation."],
         doNots: [
@@ -64,8 +64,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Open personal dashboard guide to walk through the dashboard, inbox, Help Center, documentation, New Deck, and Manage account screens in order. The guide stays open while you browse.",
           "View decks in grid or list mode.",
-          "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional first card front image, and background gradient.",
-          "Edit deck (from a deck card menu) updates the same metadata and first card front image; cover images remain plan-gated where applicable.",
+          "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional deck cover image, and background gradient. Open create deck guide from Deck Editor to walk through that flow.",
+          "Edit deck (from a deck card menu) updates the same metadata and optional cover image; the cover is not a flashcard.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
           "Click a deck to edit cards or start studying.",
@@ -101,7 +101,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
           "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
-          "Assigned members see only decks assigned to them.",
+          "Assigned members see only decks assigned to them. Card counts exclude the optional deck cover image — it is not a flashcard.",
           "Team context is stored in a cookie when invited members switch workspaces.",
           "Plan owners create, rename, and delete workspaces from Manage Workspaces, listed under this topic in the sidebar.",
         ],
@@ -160,15 +160,15 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Double-click a front, back, or wrong-answer image thumbnail while editing a card to enlarge it.",
           "From source review: Swap flips front and back before save; choose whether quiz wrong answers match the original answer (default) or original question/term.",
           "From source review: preview and edit three quiz wrong answers per card before saving; Regenerate refreshes them from AI.",
-          "Upload a deck cover image when your plan allows.",
-          "Edit deck can set or replace the oldest card’s front image (first card front image).",
+          "Upload a deck cover image when creating or editing a deck. The cover appears on dashboard deck cards and is not counted as a flashcard.",
+          "Open create deck guide from Editor features to walk through + New Deck, details, cover image, and the new deck on Personal Dashboard.",
           "Open Study to start flashcard review or quiz mode.",
           "AI generation needs an internet connection — the Generate button is disabled while offline.",
         ],
         requirements: [
           "Deck owner or team admin/co-admin with edit access.",
           "AI generation: Pro, Pro Plus, Education Plus, or team-tier / education team workspace.",
-          "Cover images: Pro on personal workspace, or team-tier / education team workspace.",
+          "Cover images: available when creating or editing a deck — they are not flashcards and do not use a card slot.",
         ],
         doNots: [
           "Plain team members are redirected to study — they cannot edit deck content.",
@@ -183,7 +183,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Review flashcards with Standard Review, practice Active Recall with AI Recall™, or take quizzes.",
         howItWorks: [
-          "Study Mode selector: Standard Review (offline-friendly flip cards), AI Recall™ (Pro Plus+ Active Recall with AI evaluation), and Quiz. Your last mode is remembered.",
+          "Study Mode selector: Standard Review (offline-friendly flip cards), AI Recall™ (Pro Plus+ Active Recall with AI evaluation), and Quiz. Your last mode is remembered. A deck cover image is not a flashcard and is not included in study or quiz.",
           "Standard Review flips cards to reveal answers, then Next — no Correct/Incorrect self-grading.",
           "AI Recall™ asks you to answer (type, voice mic, or draw) before unlocking the solution; AI evaluates understanding (feedback shown; score/confidence percentages are hidden). Requires Pro Plus / Education Plus / team plans and internet; offline users continue with Standard Review.",
           "AI Recall™ session complete shows Reviewed / Correct / Incorrect / Forced unlocks, Session score (correct ÷ reviewed), and an AI motivational quote with author (tiers: under 50% improve, 50–90% encourage, over 90% flower of excellence). Results are not saved automatically.",
@@ -606,7 +606,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
-          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse.",
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck and Subscribe.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",
@@ -696,7 +696,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Confirm plan, billing period, promo, and amount due before Stripe payment.",
         howItWorks: [
-          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse.",
+          "Open subscribe guide to walk through choosing a plan, Stripe checkout, Inbox confirmation, and the Flipvise receipt. The guide stays open while you browse. UI Guides in the header also lists Create a deck.",
           "Review selected plan name, monthly vs yearly period, and list price.",
           "New subscribers: promo field applies here; discount shows on the payment step if valid.",
           "Existing subscribers upgrading/downgrading: see a proration preview instead of a fresh promo (promos are blocked on plan changes).",

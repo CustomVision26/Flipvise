@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { decks, cards, type DeckRow } from "@/db/schema";
 import { and, count, eq, inArray, isNull, max } from "drizzle-orm";
+import { studyCardsLeftJoinOnDeck } from "@/db/queries/cover-placeholder-cards";
 export type { DeckRow };
 
 /**
@@ -186,7 +187,7 @@ export async function getDecksByUserWithCardCount(userId: string) {
       cardCount: count(cards.id),
     })
     .from(decks)
-    .leftJoin(cards, eq(cards.deckId, decks.id))
+    .leftJoin(cards, studyCardsLeftJoinOnDeck())
     .where(eq(decks.userId, userId))
     .groupBy(
       decks.id,
@@ -226,7 +227,7 @@ export async function getPersonalDecksByUserWithCardCount(
       cardCount: count(cards.id),
     })
     .from(decks)
-    .leftJoin(cards, eq(cards.deckId, decks.id))
+    .leftJoin(cards, studyCardsLeftJoinOnDeck())
     .where(where)
     .groupBy(
       decks.id,

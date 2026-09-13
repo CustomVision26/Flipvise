@@ -382,10 +382,10 @@ export function EditDeckDialog({
             Edit deck
           </DialogTitle>
           <DialogDescription className="text-xs leading-relaxed sm:text-sm">
-            Update the name/subject/course, description/topic, grade level, difficulty, and
-            optional first card front image for this deck.
+          Update the name/subject/course, description/topic, grade level, difficulty, and
+            optional cover image for this deck.
             {showTeamDeckCover
-              ? " Team decks can use an optional cover image on dashboard deck cards."
+              ? " The cover appears on dashboard deck cards and is not counted as a flashcard."
               : ""}
           </DialogDescription>
         </DialogHeader>
@@ -599,14 +599,19 @@ export function EditDeckDialog({
             </div>
           </div>
 
+          {!showTeamDeckCover && (
           <div className="flex flex-col gap-2">
             <Label
               htmlFor="deck-first-card-front-image"
               className="flex items-start gap-2 text-xs font-medium sm:items-center sm:text-sm"
             >
               <ImagePlus className="mt-0.5 size-4 shrink-0 text-muted-foreground sm:mt-0" aria-hidden />
-              <span className="leading-snug">First card front image (optional)</span>
+              <span className="leading-snug">Deck cover image (optional)</span>
             </Label>
+            <p className="text-[11px] text-muted-foreground sm:text-xs">
+              Shown on dashboard deck cards. Not a flashcard and not counted toward your
+              cards-per-deck limit.
+            </p>
             <Input
               ref={firstCardFrontFileRef}
               id="deck-first-card-front-image"
@@ -621,7 +626,7 @@ export function EditDeckDialog({
                 <div className="relative mx-auto aspect-[5/2] w-full max-h-[7.5rem] overflow-hidden rounded-md border border-border bg-muted/30 sm:aspect-[2/1] sm:max-h-[10rem]">
                   <Image
                     src={firstCardFrontUrl}
-                    alt="First card front preview"
+                    alt="Deck cover preview"
                     fill
                     className="object-contain"
                     sizes="(max-width: 400px) 92vw, 448px"
@@ -636,14 +641,14 @@ export function EditDeckDialog({
                   disabled={isPending || firstCardFrontUploading}
                 >
                   <X className="size-3.5" aria-hidden />
-                  Remove front image
+                  Remove cover
                 </Button>
               </div>
             ) : null}
             {firstCardFrontUploading && (
               <div className="flex items-center gap-2 text-muted-foreground text-[11px] sm:text-xs">
                 <Loader2 className="size-3.5 animate-spin shrink-0" aria-hidden />
-                Updating front image…
+                Updating cover…
               </div>
             )}
             {firstCardFrontError && (
@@ -652,6 +657,7 @@ export function EditDeckDialog({
               </p>
             )}
           </div>
+          )}
 
           {showTeamDeckCover && (
             <div className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/20 p-2.5 sm:p-3">
@@ -660,8 +666,12 @@ export function EditDeckDialog({
                 className="flex items-start gap-2 text-xs font-medium sm:items-center sm:text-sm"
               >
                 <ImagePlus className="mt-0.5 size-4 shrink-0 text-muted-foreground sm:mt-0" aria-hidden />
-                <span className="leading-snug">Cover image (optional)</span>
+                <span className="leading-snug">Deck cover image (optional)</span>
               </Label>
+              <p className="text-[11px] text-muted-foreground sm:text-xs">
+                Shown on dashboard deck cards. Not a flashcard and not counted toward your
+                cards-per-deck limit.
+              </p>
               <Input
                 ref={coverFileRef}
                 id="deck-cover-image"

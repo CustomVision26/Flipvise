@@ -16,7 +16,6 @@ import { getTeamById, getDecksForTeam, getTeamsForTeamDashboard } from "@/db/que
 import { getPrimaryLinkedLessonPlanForDeck, reassignLessonPlansBeforeDeckDelete } from "@/db/queries/saved-lesson-plans";
 import { getAccessContext } from "@/lib/access";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
-import { deckHasTeamTierProFeatures } from "@/lib/team-deck-pro-features";
 import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { teamMemberUrlParamForTeamAdmin } from "@/lib/resolve-team-admin-dashboard-selection";
 import { userHasTeacherToolsAccess } from "@/lib/teacher-access";
@@ -214,8 +213,8 @@ const uploadDeckCoverImageSchema = z.object({
 type UploadDeckCoverImageInput = z.infer<typeof uploadDeckCoverImageSchema>;
 
 /**
- * Upload or replace the deck cover — allowed when {@link deckHasTeamTierProFeatures} is true
- * for the subscriber’s deck (`team-tier` workspaces).
+ * Upload or replace the deck cover. Covers are not flashcards and do not count
+ * toward the cards-per-deck limit.
  */
 export async function uploadDeckCoverImageAction(
   data: UploadDeckCoverImageInput,
@@ -233,11 +232,6 @@ export async function uploadDeckCoverImageAction(
   }
 
   const deck = bundle.deck;
-  if (!(await deckHasTeamTierProFeatures(deck))) {
-    throw new Error(
-      "Cover images are available on decks for subscribers with a team-tier workspace.",
-    );
-  }
 
   const file = formData.get("image");
   if (!(file instanceof File)) throw new Error("No image file provided");
@@ -295,7 +289,7 @@ const removeDeckCoverImageSchema = z.object({
 
 type RemoveDeckCoverImageInput = z.infer<typeof removeDeckCoverImageSchema>;
 
-/** Remove the subscriber’s team-tier deck cover image. */
+/** Remove the deck cover image. */
 export async function removeDeckCoverImageAction(data: RemoveDeckCoverImageInput) {
   const { userId } = await getAccessContext();
   if (!userId) throw new Error("Unauthorized");
@@ -309,11 +303,6 @@ export async function removeDeckCoverImageAction(data: RemoveDeckCoverImageInput
   }
 
   const deck = bundle.deck;
-  if (!(await deckHasTeamTierProFeatures(deck))) {
-    throw new Error(
-      "Cover images are available on decks for subscribers with a team-tier workspace.",
-    );
-  }
 
   if (deck.coverImageUrl) {
     try {

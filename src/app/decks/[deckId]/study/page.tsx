@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getCardsForDeckViewer } from "@/db/queries/cards";
+import { getCardsForDeckViewer, promoteCoverPlaceholderCardsForDeck } from "@/db/queries/cards";
 import {
   getDeckAssignmentStudyPrivilege,
   getMemberRecord,
@@ -142,6 +142,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
     personalMaxCardsPerDeck: maxCardsPerDeck,
   });
   const allowsQuizStudy = deckCap > CARDS_PER_DECK_LIMIT_FREE;
+  await promoteCoverPlaceholderCardsForDeck(id);
   const cards = await getCardsForDeckViewer(id, userId);
   if (cards.length === 0) {
     if (access.kind === "team_member") {

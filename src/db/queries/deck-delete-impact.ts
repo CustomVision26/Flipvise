@@ -15,8 +15,9 @@ import {
   teacherClasses,
   teamDeckAssignments,
 } from "@/db/schema";
+import { coverPlaceholderCardSql } from "@/db/queries/cover-placeholder-cards";
 import { getLessonPlanFatesForDeckDelete } from "@/db/queries/saved-lesson-plans";
-import { and, count, eq, isNotNull, or } from "drizzle-orm";
+import { and, count, eq, isNotNull, or, sql } from "drizzle-orm";
 
 /** Snapshot of what deleting a deck will remove or break (schema-accurate). */
 export type DeckDeleteImpact = {
@@ -83,13 +84,16 @@ export async function getDeckDeleteImpact(
     db
       .select({ value: count() })
       .from(cards)
-      .where(eq(cards.deckId, deckId)),
+      .where(
+        and(eq(cards.deckId, deckId), sql`NOT (${coverPlaceholderCardSql})`),
+      ),
     db
       .select({ value: count() })
       .from(cards)
       .where(
         and(
           eq(cards.deckId, deckId),
+          sql`NOT (${coverPlaceholderCardSql})`,
           or(isNotNull(cards.frontImageUrl), isNotNull(cards.backImageUrl)),
         ),
       ),

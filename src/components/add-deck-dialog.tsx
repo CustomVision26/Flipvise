@@ -37,8 +37,7 @@ import {
   TeacherNameFieldHelpContent,
   TeacherTopicFieldHelpContent,
 } from "@/components/teacher-field-help-content";
-import { createDeckAction } from "@/actions/decks";
-import { createCardAction, uploadCardImageAction } from "@/actions/cards";
+import { createDeckAction, uploadDeckCoverImageAction } from "@/actions/decks";
 import { cn } from "@/lib/utils";
 import { GradientPicker } from "@/components/gradient-picker";
 import type { GradientSlug } from "@/lib/deck-gradients";
@@ -399,13 +398,7 @@ export function AddDeckDialog({
       if (showDeckFrontImage && frontImageFile) {
         const fd = new FormData();
         fd.append("image", frontImageFile);
-        const url = await uploadCardImageAction({ deckId }, fd);
-        await createCardAction({
-          deckId,
-          front: "",
-          frontImageUrl: url,
-          back: "Add the answer on this side",
-        });
+        await uploadDeckCoverImageAction({ deckId }, fd);
       }
 
       setOpen(false);
@@ -504,7 +497,7 @@ export function AddDeckDialog({
             difficulty.
             {showSpeechUi ? " Use the microphone to dictate into the fields." : ""}
             {showDeckFrontImage
-              ? " Optionally add an image for the first card’s front (question side)."
+              ? " Optionally add a cover image for this deck (shown on your dashboard, not counted as a flashcard)."
               : ""}
           </DialogDescription>
         </DialogHeader>
@@ -702,7 +695,7 @@ export function AddDeckDialog({
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="deck-front-image" className="flex items-center gap-2">
                   <ImagePlus className="size-4 text-muted-foreground" aria-hidden />
-                  First card front image (optional)
+                  Deck cover image (optional)
                 </Label>
                 <Input
                   id="deck-front-image"
@@ -712,12 +705,16 @@ export function AddDeckDialog({
                   disabled={isPending}
                   className="cursor-pointer bg-background text-sm text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-sm file:font-medium file:text-foreground"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Shown on dashboard deck cards. Not a flashcard and not counted toward your
+                  cards-per-deck limit.
+                </p>
                 {frontImagePreviewUrl && (
                   <div className="relative mt-1 overflow-hidden rounded-md border border-border">
                     {/* eslint-disable-next-line @next/next/no-img-element -- user-selected local preview blob URL */}
                     <img
                       src={frontImagePreviewUrl}
-                      alt="Selected front image preview"
+                      alt="Selected deck cover preview"
                       className="max-h-40 w-full object-contain bg-muted/30"
                     />
                   </div>

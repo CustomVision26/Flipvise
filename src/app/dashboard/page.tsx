@@ -33,7 +33,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getFirstPreviewCardFrontByDeckIds } from "@/db/queries/cards";
+import { getFirstPreviewCardFrontByDeckIds, promoteCoverPlaceholderCardsForDeck } from "@/db/queries/cards";
 import { getPersonalDecksByUserWithCardCount } from "@/db/queries/decks";
 import {
   countTeamsForOwner,
@@ -651,11 +651,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  const [decksRaw, teamCount, dashboardSessionUser] = await Promise.all([
+  const [decksPreview, teamCount, dashboardSessionUser] = await Promise.all([
     getPersonalDecksByUserWithCardCount(userId),
     tryTeamQuery(() => countTeamsForOwner(userId), 0),
     currentUser(),
   ]);
+  await Promise.all(
+    decksPreview.map((deck) => promoteCoverPlaceholderCardsForDeck(deck.id)),
+  );
+  const decksRaw = await getPersonalDecksByUserWithCardCount(userId);
   const decks = ownSubscriberTeamTierExtras
     ? await mergePreviewThumbsForDecks(decksRaw)
     : decksRaw;

@@ -21,7 +21,7 @@ export type AddDeckDialogProps = {
    */
   speechToTextEnabled?: boolean;
   /**
-   * When true, shows the optional first-card front image picker.
+   * When true, shows the optional deck cover image picker.
    * Defaults to on for personal/team workspace create flows.
    */
   deckFrontImageUploadEnabled?: boolean;

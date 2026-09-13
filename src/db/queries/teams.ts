@@ -74,6 +74,7 @@ import {
   sql,
 } from "drizzle-orm";
 import type { InferSelectModel, SQL } from "drizzle-orm";
+import { studyCardsLeftJoinOnDeck } from "@/db/queries/cover-placeholder-cards";
 
 export type { TeamMemberRow, TeamInvitationRow };
 
@@ -777,7 +778,7 @@ export async function getDecksForTeamWithCardCount(
         cardCount: count(cards.id),
       })
       .from(decks)
-      .leftJoin(cards, eq(cards.deckId, decks.id))
+      .leftJoin(cards, studyCardsLeftJoinOnDeck())
       .where(where)
       .groupBy(
         decks.id,
@@ -869,7 +870,7 @@ export async function getAssignedDecksForMemberWithCardCount(
     })
     .from(teamDeckAssignments)
     .innerJoin(decks, eq(teamDeckAssignments.deckId, decks.id))
-    .leftJoin(cards, eq(cards.deckId, decks.id))
+    .leftJoin(cards, studyCardsLeftJoinOnDeck())
     .where(
       and(
         eq(teamDeckAssignments.teamId, teamId),

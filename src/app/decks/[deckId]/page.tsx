@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getCardsByDeckUnscoped } from "@/db/queries/cards";
+import { getCardsByDeckUnscoped, promoteCoverPlaceholderCardsForDeck } from "@/db/queries/cards";
 import { isDeckLinkedToWorkspace } from "@/db/queries/teams";
 import { canEditDeckContent, getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import {
@@ -79,6 +79,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
 
   const deck = bundle.deck;
   const { heading: teamDeckHeading, teamTierPro } = await getTeamDeckContext(deck);
+  await promoteCoverPlaceholderCardsForDeck(id);
   const inWorkspaceContext =
     teamWorkspaceUrl != null &&
     ((deck.teamId != null && deck.teamId === teamWorkspaceUrl.teamId) ||

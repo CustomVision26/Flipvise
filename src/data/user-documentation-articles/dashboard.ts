@@ -21,8 +21,8 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         bullets: [
           "Open personal dashboard guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
           "Deck grid or list toggle for browsing your library.",
-          "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional first card front image, and gradient.",
-          "Edit deck updates the same metadata and first card front image from a deck card menu.",
+          "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional deck cover image, and gradient.",
+          "Edit deck updates the same metadata and cover image from a deck card menu. The cover is not a flashcard.",
           "Delete deck confirms first. Education plans get a detailed impact list: linked lesson plans stay in the Resource Library; Edit and Create Quiz stay available when another related deck (for example a quiz deck from that plan) can take over the link, and become unavailable only when this is the last linked deck. On a non-Education plan with leftover Education lesson-plan links, the dialog warns that the Education link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "Each deck card links to the deck editor and study session.",
           "Premium add-ons appear as a running colored banner above the workspace header (not a large mid-page card).",
@@ -139,6 +139,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Add-ons on Team Dashboard",
         bullets: [
           "The same premium add-ons running banner appears above the workspace heading.",
+          "Deck card counts exclude the optional cover image — covers are not flashcards.",
           "Unlocked members can open the AI Essay workspace from the AI Essay chip.",
         ],
       },
