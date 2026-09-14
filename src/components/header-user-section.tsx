@@ -219,10 +219,6 @@ export function HeaderUserSection({
   const { openUserProfile } = useClerk();
   const { user } = useUser();
   const clientMounted = useClientMounted();
-  const [accountProfileStartPath, setAccountProfileStartPath] = useState<
-    string | undefined
-  >(undefined);
-  const openBillingPendingRef = useRef(false);
 
   /**
    * Sign-out teardown guard. Clerk's `<UserButton>` flips `userId` to null the
@@ -345,25 +341,6 @@ export function HeaderUserSection({
     };
   }, [userId, clientMounted, authLoaded]);
 
-  useEffect(() => {
-    if (
-      !openBillingPendingRef.current ||
-      accountProfileStartPath !== CLERK_BILLING_START_PATH
-    ) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void (async () => {
-        await openClerkAccountBillingModal(openUserProfile);
-        openBillingPendingRef.current = false;
-        setAccountProfileStartPath(undefined);
-      })();
-    }, 40);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [accountProfileStartPath, openUserProfile]);
-
   // Never signed in on this page → nothing to render. When signing out we keep
   // the tree (and the Clerk UserButton) mounted until `window.location.replace`
   // reloads, to avoid the React 19 portal-teardown crash.
@@ -411,8 +388,7 @@ export function HeaderUserSection({
   const PlansIcon = isComplimentaryGrant ? Gift : CreditCard;
 
   function openAccountBilling() {
-    openBillingPendingRef.current = true;
-    setAccountProfileStartPath(CLERK_BILLING_START_PATH);
+    void openClerkAccountBillingModal(openUserProfile);
   }
 
   return (
@@ -491,13 +467,7 @@ export function HeaderUserSection({
               className="inline-flex shrink-0 items-center"
               title="Account — profile, account details, appearance, and billing"
             >
-              <UserButton
-                userProfileProps={
-                  accountProfileStartPath
-                    ? { __experimental_startPath: accountProfileStartPath }
-                    : undefined
-                }
-              >
+              <UserButton>
                 {isAdmin && !hidePlatformAdminLink ? (
                   <UserButton.MenuItems>
                     <UserButton.Link
