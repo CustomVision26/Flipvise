@@ -123,7 +123,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
-          "Add workspaces up to your plan’s workspace limit. Choose who the workspace is for and fill in the matching fields; the unique name is generated from abbreviations (duplicates get a suffix such as -2).",
+          "Add workspaces up to your plan’s workspace limit. Choose who the workspace is for, then fill in the matching fields (Change hides those fields until you pick again); the unique name is generated from abbreviations (duplicates get a suffix such as -2).",
           "Rename or delete workspaces you own.",
           "Workspace history shows create/rename/delete audit events.",
         ],
@@ -752,6 +752,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Badge on plan-change payment: “Prorated adjustment — no additional promo discount”.",
           "Previous promotion discounts do not carry over to plan changes — only the prorated difference is billed.",
           "Switching monthly ↔ yearly on the same tier also reprices with proration.",
+          "If confirmation runs again after Stripe already has the new plan, Flipvise records success instead of showing “You are already on this plan.”",
         ],
         requirements: ["Active Stripe subscription managed by Flipvise."],
         doNots: [
@@ -1140,7 +1141,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/onboarding/team",
         purpose: "Create your first team workspace after purchasing a team-tier plan.",
         howItWorks: [
-          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), then hides the other options. Use Change to pick a different option.",
+          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), then hides the other options. Use Change to pick a different option — detail fields stay hidden until you choose.",
           "Corporation or Government: region, education level, school name, department/faculty, and class name.",
           "Education Institution: education level, school name, department/faculty, and class name.",
           "Teacher or Tutor: education level, school name, and class name.",

@@ -131,7 +131,7 @@ export async function isSamePlanAndPeriod(input: {
   const sub = await stripe.subscriptions.retrieve(input.live.subscriptionId, {
     expand: ["items.data.price"],
   });
-  const currentPlan = sub.metadata?.plan?.trim();
+  const currentPlan = asPaidPlanId(sub.metadata?.plan);
   const currentPeriod = await detectBillingPeriod(input.live.subscriptionId);
   const targetPriceId = await resolveTargetPriceId(
     input.targetPlanSlug,

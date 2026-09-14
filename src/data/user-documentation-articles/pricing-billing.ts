@@ -229,6 +229,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Optional locked add-on (when catalog is published): review plan proration + add-on list price, then complete plan change and a separate add-on checkout without a Stripe session id in the URL.",
           "Previous promo discounts do not carry over — proration only.",
           "Monthly ↔ yearly on same tier also reprices with proration.",
+          "If confirmation runs again after Stripe already has the new plan, Flipvise records success instead of showing “You are already on this plan.”",
         ],
       },
     ],

@@ -19,6 +19,11 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/app-top-nav.tsx",
     "src/components/header-user-section.tsx",
   ],
+  "team-onboarding": [
+    "src/components/team-onboarding-wizard.tsx",
+    "src/components/workspace-create-profile-fields.tsx",
+    "src/components/add-team-dialog.tsx",
+  ],
   "team-workspace-dashboard": ["src/app/dashboard/workspace/page.tsx"],
   "deck-editor": [
     "src/app/decks/[deckId]/page.tsx",
@@ -217,6 +222,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "prorations-plan-changes": [
     "src/actions/stripe.ts",
     "src/actions/plan-change-checkout.ts",
+    "src/lib/apply-plan-upgrade.ts",
     "src/app/pricing/checkout/plan-change/pay/page.tsx",
     "src/components/plan-change-checkout-payment.tsx",
     "src/components/plan-change-addons-dialog.tsx",

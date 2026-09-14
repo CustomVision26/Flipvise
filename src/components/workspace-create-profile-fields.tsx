@@ -104,7 +104,7 @@ export function WorkspaceCreateProfileFields({
         <Label id={`${idPrefix}-kind-label`}>Who is this workspace for?</Label>
         <RadioGroup
           aria-labelledby={`${idPrefix}-kind-label`}
-          value={kind || undefined}
+          value={kind}
           disabled={disabled}
           onValueChange={(value) => {
             if (
@@ -124,18 +124,25 @@ export function WorkspaceCreateProfileFields({
             <div
               key={option.value}
               className={cn(
-                "flex items-start gap-3 rounded-lg border p-3",
+                "flex items-start justify-between gap-3 rounded-lg border p-3",
                 kind === option.value && "border-primary bg-muted/40",
               )}
             >
               <label
                 className={cn(
-                  "flex min-w-0 flex-1 cursor-pointer items-start gap-3",
+                  "flex min-w-0 items-start gap-3",
+                  showAllKinds && "flex-1 cursor-pointer",
+                  !showAllKinds && "cursor-default",
                   disabled && "cursor-not-allowed opacity-50",
                 )}
+                onClick={() => {
+                  if (showAllKinds && option.value === kind) {
+                    setPickingKind(false);
+                  }
+                }}
               >
                 <RadioGroupItem value={option.value} className="mt-0.5" />
-                <span className="grid min-w-0 flex-1 gap-0.5">
+                <span className="grid min-w-0 gap-0.5">
                   <span className="text-sm font-medium text-foreground">{option.label}</span>
                   <span className="text-xs text-muted-foreground">{option.description}</span>
                 </span>
@@ -162,7 +169,7 @@ export function WorkspaceCreateProfileFields({
         ) : null}
       </div>
 
-      {kind !== "" ? (
+      {kind !== "" && !showAllKinds ? (
         <>
           <Alert>
             <AlertTitle>Example workspace name</AlertTitle>
@@ -175,7 +182,7 @@ export function WorkspaceCreateProfileFields({
           {showLevel ? (
             <Field htmlFor={`${idPrefix}-level`} label="Level of education">
               <Select
-                value={draft.educationLevel || undefined}
+                value={draft.educationLevel || null}
                 disabled={disabled}
                 onValueChange={(value) => {
                   if (

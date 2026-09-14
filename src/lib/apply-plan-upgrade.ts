@@ -21,6 +21,7 @@ import {
   STRIPE_CLEAR_SUBSCRIPTION_ITEM_DISCOUNTS,
 } from "@/lib/stripe-clear-discounts";
 import {
+  asPaidPlanId,
   findActiveSubscriptionForClerkUser,
   setStripeBillingState,
   syncActiveSubscriptionFromStripeForUser,
@@ -392,11 +393,37 @@ async function swapStripeSubscriptionPlan(input: {
   }
   const currentPriceId = priceIdOnSubscriptionItem(current.items?.data?.[0]);
   const currentPlanMeta = current.metadata?.plan?.trim();
-  if (
+  const alreadyOnTargetPriceAndPlan =
+    Boolean(currentPriceId) &&
     currentPriceId === newPriceId &&
-    currentPlanMeta === input.planSlug
-  ) {
-    throw new Error("You are already on this plan.");
+    asPaidPlanId(currentPlanMeta) === input.planSlug;
+
+  // Finalize / Strict Mode can run this twice. Stripe may already be on the
+  // target price from the first swap — treat that as success, not an error.
+  if (alreadyOnTargetPriceAndPlan) {
+    if (
+      currentPlanMeta !== input.planSlug ||
+      current.metadata?.period !== input.period
+    ) {
+      await stripe.subscriptions.update(input.stripeSubscriptionId, {
+        metadata: {
+          ...current.metadata,
+          clerkUserId: input.userId,
+          plan: input.planSlug,
+          period: input.period,
+        },
+      });
+    }
+
+    const billingStatus =
+      current.status === "trialing" ? "trialing" : "active";
+    await setStripeBillingState(input.userId, input.planSlug, billingStatus);
+    await upsertStripeSubscriptionFromStripeSub(
+      input.userId,
+      current,
+      input.planSlug,
+    );
+    return newPriceId;
   }
 
   const updated = await stripe.subscriptions.update(input.stripeSubscriptionId, {
