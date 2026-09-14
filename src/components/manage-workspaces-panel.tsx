@@ -163,6 +163,7 @@ export function ManageWorkspacesPanel({
           <AddTeamDialog
             planSlug={addTeamPlanSlug}
             isAtLimit={isAtTeamLimit}
+            existingWorkspaceNames={teams.map((t) => t.name)}
           />
         </div>
 

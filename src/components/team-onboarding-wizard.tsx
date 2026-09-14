@@ -3,10 +3,15 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { WorkspaceCreateProfileFields } from "@/components/workspace-create-profile-fields";
 import { createTeamAction } from "@/actions/teams";
 import type { WorkspaceCreatePlanId } from "@/lib/education-plans";
+import {
+  EMPTY_WORKSPACE_CREATE_DRAFT,
+  previewWorkspaceName,
+  workspaceCreateProfileSchema,
+  type WorkspaceCreateDraft,
+} from "@/lib/workspace-creation-profile";
 
 interface TeamOnboardingWizardProps {
   planSlug: WorkspaceCreatePlanId;
@@ -14,16 +19,24 @@ interface TeamOnboardingWizardProps {
 
 export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
   const router = useRouter();
-  const [name, setName] = React.useState("");
+  const [draft, setDraft] = React.useState<WorkspaceCreateDraft>(() => ({
+    ...EMPTY_WORKSPACE_CREATE_DRAFT,
+  }));
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+  const canSubmit = previewWorkspaceName(draft).length > 0;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const parsed = workspaceCreateProfileSchema.safeParse(draft);
+    if (!parsed.success) {
+      setError("Choose an option and fill in every required field.");
+      return;
+    }
     setPending(true);
     try {
-      await createTeamAction({ name, planSlug });
+      await createTeamAction({ ...parsed.data, planSlug });
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
@@ -35,24 +48,18 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="team-name">Team name</Label>
-        <Input
-          id="team-name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. New York High School"
-          disabled={pending}
-          maxLength={255}
-        />
-      </div>
-      {error && (
+      <WorkspaceCreateProfileFields
+        idPrefix="team-onboarding"
+        draft={draft}
+        onChange={setDraft}
+        disabled={pending}
+      />
+      {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
-      )}
-      <Button type="submit" disabled={pending}>
+      ) : null}
+      <Button type="submit" disabled={pending || !canSubmit}>
         {pending ? "Creating…" : "Continue to Personal dashboard"}
       </Button>
     </form>

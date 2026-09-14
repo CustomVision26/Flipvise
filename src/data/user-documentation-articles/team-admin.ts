@@ -43,6 +43,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Dashboard structure",
         bullets: [
           "Quick navigation — personal dashboard vs workspace dashboard.",
+          "Info opens workspace details (name, plan, owner, created date, and setup fields saved when the workspace was created).",
           "Workspace overview stats — workspaces, members, decks, cards vs plan limits.",
           "Add workspace button for owners at plan cap check.",
           "Main tabs: Members, Deck Manager, Add-ons, Workspace history, Invite members, Quiz results.",

@@ -211,6 +211,8 @@ export const teams = pgTable('teams', {
   createdAt: timestamp().notNull().defaultNow(),
   /** Set when owner marks workspace inactive during plan reconciliation (restorable on upgrade). */
   inactiveAt: timestamp(),
+  /** Fields collected when the workspace was created (kind, school, class, …). */
+  creationProfile: json().$type<import("@/lib/workspace-creation-profile").WorkspaceCreateProfile>(),
 });
 
 /** Subscriber default timed-quiz length — applies to all owned workspaces without an override. */

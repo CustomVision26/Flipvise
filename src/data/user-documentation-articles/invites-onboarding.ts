@@ -19,7 +19,8 @@ export const INVITES_ONBOARDING_ARTICLES: DocArticle[] = [
         id: "wizard",
         title: "Onboarding wizard",
         bullets: [
-          "Prompts for team (workspace) name.",
+          "Prompts for who the workspace is for, then the matching fields (region, education level, school, department, class, or child name depending on the option).",
+          "Creates a unique workspace name from abbreviations of two or three fields (example: Kingston High School + Form 4B becomes KHS-F4B). Duplicate names get a suffix such as -2.",
           "Creates the workspace linked to your subscription.",
           "Redirects to Team Admin or dashboard when complete.",
         ],

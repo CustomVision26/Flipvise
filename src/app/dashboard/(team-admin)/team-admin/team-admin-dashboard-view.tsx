@@ -38,7 +38,6 @@ import { listTeamMemberHistoryForTeam } from "@/db/queries/team-member-history";
 import { getQuizResultsForTeam } from "@/db/queries/quiz-results";
 import {
   getClerkPrimaryEmailsByUserIds,
-  getClerkUserDisplayNameById,
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
 import {
@@ -48,6 +47,8 @@ import {
 } from "@/lib/team-admin-dynamic-components";
 import { TeamAdminHome } from "@/components/team-admin-home";
 import { TeamAdminPageChrome } from "@/components/team-admin-page-chrome";
+import { TeamWorkspaceInfoButton } from "@/components/team-workspace-info-button";
+import { buildTeamWorkspaceInfo } from "@/lib/workspace-creation-profile";
 
 interface TeamAdminDashboardViewProps {
   searchParams: Promise<{
@@ -73,6 +74,7 @@ export default async function TeamAdminDashboardView({
     viewerTeamMemberUrlParam,
     isOwner,
     planLabel,
+    ownerDisplayName,
   } = ctx;
 
   const pageMeta = teamAdminPageMetaForPath(buildCanonicalPath(0, 0).split("?")[0] ?? "");
@@ -87,7 +89,6 @@ export default async function TeamAdminDashboardView({
       workspaceHistory,
       memberHistory,
       teamDecksWithCardCounts,
-      ownerDisplayName,
       workspaceQuizSnapshots,
     ],
     assignWorkspaceSnapshots,
@@ -100,7 +101,6 @@ export default async function TeamAdminDashboardView({
       listTeamWorkspaceEventsForTeam(selected.ownerUserId, selected.id),
       listTeamMemberHistoryForTeam(selected.ownerUserId, selected.id),
       getDecksForTeamWithCardCount(selected.id, selected.ownerUserId),
-      getClerkUserDisplayNameById(selected.ownerUserId),
       Promise.all(
         teamsForSubscriber.map(async (t) => {
           const [allMembers, results] = await Promise.all([
@@ -328,8 +328,28 @@ export default async function TeamAdminDashboardView({
       <AddTeamDialog
         planSlug={selected.planSlug}
         isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
+        existingWorkspaceNames={teamsForSubscriber.map((t) => t.name)}
       />
     ) : null;
+
+  const workspaceInfo = buildTeamWorkspaceInfo({
+    name: selected.name,
+    planLabel,
+    ownerDisplayName,
+    createdAt: selected.createdAt,
+    inactiveAt: selected.inactiveAt,
+    creationProfile: selected.creationProfile,
+    extraRows: [
+      {
+        label: "Members",
+        value: `${memberCount} / ${limits.maxMembersPerTeam}`,
+      },
+      {
+        label: "Decks",
+        value: String(teamDecksWithCardCounts.length),
+      },
+    ],
+  });
 
   if (TEAM_ADMIN_SIDEBAR_NAV_ENABLED) {
     return (
@@ -339,6 +359,7 @@ export default async function TeamAdminDashboardView({
         description={pageMeta.description}
         workspaceName={selected.name}
         planLabel={planLabel}
+        workspaceInfo={workspaceInfo}
         headerAside={pageMeta.isOverview ? addTeamAside : undefined}
       >
         {pageMeta.isOverview ? (
@@ -388,7 +409,10 @@ export default async function TeamAdminDashboardView({
               Manage teams, members, and deck access for your subscription.
             </p>
           </div>
-          {addTeamAside}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <TeamWorkspaceInfoButton info={workspaceInfo} />
+            {addTeamAside}
+          </div>
         </div>
       </div>
 

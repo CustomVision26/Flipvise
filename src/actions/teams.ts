@@ -51,6 +51,8 @@ import {
   updateOwnerQuizDefaultSettings,
   getOwnerQuizDefaultSettings,
   getTeamsByOwner,
+  getTeamNamesForOwner,
+  isTeamNameTakenForOwner,
   syncQuizDurationMinutesToWorkspaceDecks,
   syncOwnerQuizDurationToAllOwnedWorkspaceDecks,
   isDeckLinkedToWorkspace,
@@ -81,6 +83,11 @@ import {
 } from "@/lib/clerk-user-display";
 import { loopsSendTeamInvitationEmail } from "@/lib/loops";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
+import {
+  allocateUniqueWorkspaceName,
+  buildWorkspaceNameFromProfile,
+  workspaceCreateProfileSchema,
+} from "@/lib/workspace-creation-profile";
 import {
   formatTeamInviteSubjectLine,
   teamInviteRoleLabel,
@@ -142,14 +149,15 @@ const WORKSPACE_CREATE_PLAN_IDS = [
   ...EDUCATION_TEAM_PLAN_IDS,
 ] as const;
 
-const createTeamSchema = z.object({
-  name: z.string().min(1).max(255),
-  planSlug: z
-    .string()
-    .refine((v): v is (typeof WORKSPACE_CREATE_PLAN_IDS)[number] =>
-      (WORKSPACE_CREATE_PLAN_IDS as readonly string[]).includes(v),
-    ),
-});
+const createTeamSchema = workspaceCreateProfileSchema.and(
+  z.object({
+    planSlug: z
+      .string()
+      .refine((v): v is (typeof WORKSPACE_CREATE_PLAN_IDS)[number] =>
+        (WORKSPACE_CREATE_PLAN_IDS as readonly string[]).includes(v),
+      ),
+  }),
+);
 
 export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {
   const { userId, activeTeamPlan, activeEducationTeamPlan, isAdmin } =
@@ -176,15 +184,25 @@ export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {
     throw new Error(`Your plan allows up to ${limits.maxTeams} team(s).`);
   }
 
-  const id = await insertTeam(userId, parsed.data.name, parsed.data.planSlug);
+  const existingNames = await getTeamNamesForOwner(userId, {
+    includeInactive: true,
+  });
+  const name = allocateUniqueWorkspaceName(
+    buildWorkspaceNameFromProfile(parsed.data),
+    existingNames,
+  );
+
+  const { planSlug, ...profileFields } = parsed.data;
+  const creationProfile = workspaceCreateProfileSchema.parse(profileFields);
+  const id = await insertTeam(userId, name, planSlug, creationProfile);
   if (!id) throw new Error("Could not create team.");
 
   await insertTeamWorkspaceEvent({
     ownerUserId: userId,
     action: "created",
     teamId: id,
-    teamName: parsed.data.name,
-    planSlug: parsed.data.planSlug,
+    teamName: name,
+    planSlug,
     previousTeamName: null,
   });
 
@@ -264,6 +282,10 @@ export async function updateTeamWorkspaceNameAction(
   if (team.name === nextName) {
     revalidatePath("/dashboard/workspaces");
     return;
+  }
+
+  if (await isTeamNameTakenForOwner(userId, nextName, parsed.data.teamId)) {
+    throw new Error("A workspace with this name already exists.");
   }
 
   const updated = await updateOwnedTeamName(userId, parsed.data.teamId, nextName);

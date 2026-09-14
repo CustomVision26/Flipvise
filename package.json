@@ -68,6 +68,7 @@
     "test:live-classroom": "tsx --test src/lib/live-classroom-eligibility.test.ts",
     "db:ensure-essay-sections-content": "tsx scripts/ensure-essay-sections-content.ts",
     "db:ensure-team-member-max-create-decks": "tsx scripts/ensure-team-member-max-create-decks.ts",
+    "db:ensure-team-creation-profile": "tsx scripts/ensure-team-creation-profile.ts",
     "db:ensure-ai-usage-tables": "tsx scripts/ensure-ai-usage-tables.ts",
     "test:ai-recall": "tsx --test src/lib/ai-recall-eligibility.test.ts src/lib/ai-recall-mastery.test.ts src/lib/ai-recall-motivation.test.ts src/db/queries/ai-recall-analytics.test.ts",
     "test:ai-usage": "tsx --test src/lib/ai-usage/pricing.test.ts src/lib/ai-usage/limits.test.ts src/lib/ai-usage/csv.test.ts src/lib/ai-usage/period.test.ts src/lib/ai-usage/abuse.test.ts",

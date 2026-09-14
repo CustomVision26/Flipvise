@@ -21,10 +21,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { WorkspaceCreateProfileFields } from "@/components/workspace-create-profile-fields";
 import { createTeamAction } from "@/actions/teams";
 import type { WorkspaceCreatePlanId } from "@/lib/education-plans";
+import {
+  EMPTY_WORKSPACE_CREATE_DRAFT,
+  previewWorkspaceName,
+  workspaceCreateProfileSchema,
+  type WorkspaceCreateDraft,
+} from "@/lib/workspace-creation-profile";
 
 interface AddTeamDialogProps {
   planSlug: WorkspaceCreatePlanId;
@@ -32,6 +38,7 @@ interface AddTeamDialogProps {
   triggerLabel?: string;
   /** Shown on hover. Omit to use the default help text. Pass `""` to disable. */
   triggerTooltip?: string;
+  existingWorkspaceNames?: string[];
 }
 
 const DEFAULT_ADD_WORKSPACE_TOOLTIP =
@@ -42,30 +49,34 @@ export function AddTeamDialog({
   isAtLimit = false,
   triggerLabel = "Add Workspace",
   triggerTooltip = DEFAULT_ADD_WORKSPACE_TOOLTIP,
+  existingWorkspaceNames = [],
 }: AddTeamDialogProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [name, setName] = React.useState("");
+  const [draft, setDraft] = React.useState<WorkspaceCreateDraft>(() => ({
+    ...EMPTY_WORKSPACE_CREATE_DRAFT,
+  }));
   const [isPending, setIsPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const canSubmit = previewWorkspaceName(draft).length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError("Team name is required.");
+    const parsed = workspaceCreateProfileSchema.safeParse(draft);
+    if (!parsed.success) {
+      setError("Choose an option and fill in every required field.");
       return;
     }
 
     setIsPending(true);
     try {
       await createTeamAction({
-        name: trimmed,
+        ...parsed.data,
         planSlug,
       });
       setOpen(false);
-      setName("");
+      setDraft({ ...EMPTY_WORKSPACE_CREATE_DRAFT });
       router.push("/dashboard/workspaces");
       router.refresh();
     } catch (err) {
@@ -80,7 +91,7 @@ export function AddTeamDialog({
       setOpen(nextOpen);
       if (!nextOpen) {
         setError(null);
-        setName("");
+        setDraft({ ...EMPTY_WORKSPACE_CREATE_DRAFT });
       }
     }
   }
@@ -143,39 +154,42 @@ export function AddTeamDialog({
           {triggerLabel}
         </DialogTrigger>
       )}
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-lg mx-4 sm:mx-auto">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Create a team</DialogTitle>
           <DialogDescription className="text-sm">
-            Name your team. You can invite members after it is created.
+            Choose who this workspace is for. Flipvise builds a unique name from your
+            details. You can invite members after it is created.
           </DialogDescription>
         </DialogHeader>
 
         <form id="add-team-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-team-name">Team name</Label>
-            <Input
-              id="new-team-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Science department"
+          <ScrollArea className="max-h-[min(70vh,32rem)] pr-3">
+            <WorkspaceCreateProfileFields
+              idPrefix="add-team"
+              draft={draft}
+              onChange={setDraft}
               disabled={isPending}
-              maxLength={255}
-              autoFocus
+              existingWorkspaceNames={existingWorkspaceNames}
+              nestedInModal
             />
-          </div>
-          {error && (
+          </ScrollArea>
+          {error ? (
             <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
-          )}
+          ) : null}
         </form>
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" type="button" />} disabled={isPending}>
             Cancel
           </DialogClose>
-          <Button type="submit" form="add-team-form" disabled={isPending}>
+          <Button
+            type="submit"
+            form="add-team-form"
+            disabled={isPending || !canSubmit}
+          >
             {isPending ? "Creating…" : "Create team"}
           </Button>
         </DialogFooter>

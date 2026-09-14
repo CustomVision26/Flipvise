@@ -3,6 +3,7 @@ import { TEAM_ADMIN_SIDEBAR_NAV_ENABLED } from "@/lib/team-admin-dashboard-nav";
 import { teamAdminPageMetaForPath } from "@/lib/team-admin-page-meta";
 import type { TeamAdminPageContext } from "@/lib/load-team-admin-page-context";
 import { TeamAdminPageChrome } from "@/components/team-admin-page-chrome";
+import { buildTeamWorkspaceInfo } from "@/lib/workspace-creation-profile";
 
 export function TeamAdminToolPageLayout({
   pathname,
@@ -33,6 +34,14 @@ export function TeamAdminToolPageLayout({
       description={meta.description}
       workspaceName={ctx.selected.name}
       planLabel={ctx.planLabel}
+      workspaceInfo={buildTeamWorkspaceInfo({
+        name: ctx.selected.name,
+        planLabel: ctx.planLabel,
+        ownerDisplayName: ctx.ownerDisplayName,
+        createdAt: ctx.selected.createdAt,
+        inactiveAt: ctx.selected.inactiveAt,
+        creationProfile: ctx.selected.creationProfile,
+      })}
     >
       {children}
     </TeamAdminPageChrome>

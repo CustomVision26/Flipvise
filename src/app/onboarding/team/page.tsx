@@ -37,15 +37,17 @@ export default async function TeamOnboardingPage() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-start gap-8 p-4 sm:p-8 pt-10 sm:pt-16">
-      <div className="w-full max-w-lg flex flex-col gap-6">
+      <div className="w-full max-w-xl flex flex-col gap-6">
         <div className="flex flex-col items-center gap-3 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
             <Users className="h-7 w-7 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Create your team</h1>
-            <p className="text-muted-foreground mt-1 text-sm max-w-sm">
-              You subscribed to a team plan. Name your first team, then invite members to start collaborating.
+            <p className="text-muted-foreground mt-1 text-sm max-w-md">
+              You subscribed to a team plan. Choose who this workspace is for, then
+              fill in the details. Flipvise builds a unique workspace name from those
+              details.
             </p>
           </div>
         </div>

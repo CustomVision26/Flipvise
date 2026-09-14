@@ -123,7 +123,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
-          "Add workspaces up to your plan’s workspace limit.",
+          "Add workspaces up to your plan’s workspace limit. Choose who the workspace is for and fill in the matching fields; the unique name is generated from abbreviations (duplicates get a suffix such as -2).",
           "Rename or delete workspaces you own.",
           "Workspace history shows create/rename/delete audit events.",
         ],
@@ -974,6 +974,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Access via workspace switcher → WS Admin Dash (invited workspaces) or Team Admin Dash (personal), or /dashboard/team-admin?team= and teamMemberId=. The member Team Dashboard is /dashboard?team=<id> only.",
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
+          "Info opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation).",
           "Add-ons → Member add-ons covers upcoming member feature assignment; AI Essay is plan-owner personal only for now (member access coming soon).",
           "Live Classroom™ opens from Team Admin → Add-ons → Live Classroom™ when the organization owns the Live Classroom add-on.",
         ],
@@ -1139,7 +1140,13 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/onboarding/team",
         purpose: "Create your first team workspace after purchasing a team-tier plan.",
         howItWorks: [
-          "Wizard prompts for team name and creates the workspace.",
+          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), then shows the matching fields.",
+          "Corporation or Government: region, education level, school name, department/faculty, and class name.",
+          "Education Institution: education level, school name, department/faculty, and class name.",
+          "Teacher or Tutor: education level, school name, and class name.",
+          "Parent or Guardian: education level, school/child name, and class name.",
+          "Student or Study Group: education level and class name.",
+          "Flipvise builds a unique workspace name from abbreviations of two or three fields (example: Caribbean + Kingston High School + Form 4B becomes Car-KHS-F4B). Duplicate names get a suffix such as -2.",
           "Redirects to Team Admin or dashboard when complete.",
           "Banner on personal dashboard links here if you have a team plan but no team yet.",
         ],

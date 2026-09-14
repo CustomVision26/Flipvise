@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
+import { TeamWorkspaceInfoButton } from "@/components/team-workspace-info-button";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import { cn } from "@/lib/utils";
+import type { TeamWorkspaceInfo } from "@/lib/workspace-creation-profile";
 
 type TeamAdminPageChromeProps = {
   section: string;
@@ -10,6 +12,7 @@ type TeamAdminPageChromeProps = {
   description: string;
   workspaceName: string;
   planLabel: string;
+  workspaceInfo?: TeamWorkspaceInfo;
   headerAside?: ReactNode;
   children?: ReactNode;
 };
@@ -20,6 +23,7 @@ export function TeamAdminPageChrome({
   description,
   workspaceName,
   planLabel,
+  workspaceInfo,
   headerAside,
   children,
 }: TeamAdminPageChromeProps) {
@@ -51,8 +55,13 @@ export function TeamAdminPageChrome({
                   {description}
                 </CardDescription>
               </div>
-              {headerAside ? (
-                <div className="flex shrink-0 justify-stretch sm:justify-end">{headerAside}</div>
+              {workspaceInfo || headerAside ? (
+                <div className="flex shrink-0 flex-wrap items-center justify-stretch gap-2 sm:justify-end">
+                  {workspaceInfo ? (
+                    <TeamWorkspaceInfoButton info={workspaceInfo} />
+                  ) : null}
+                  {headerAside}
+                </div>
               ) : null}
             </div>
           </div>

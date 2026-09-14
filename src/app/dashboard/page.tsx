@@ -746,7 +746,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <Alert className="animate-in fade-in-0 slide-in-from-top-2 duration-500 fill-mode-both">
           <AlertTitle>Finish team setup</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center gap-2">
-            Create your team name and invite members.
+            Create your first workspace and invite members.
             <Link
               href="/onboarding/team"
               className={buttonVariants({ size: "sm" }) + " shrink-0"}

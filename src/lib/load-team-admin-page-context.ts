@@ -6,6 +6,7 @@ import { auth } from "@/lib/clerk-auth";
 import { getTeamsForTeamDashboard } from "@/db/queries/teams";
 import { hasEducationPlan } from "@/lib/education-plans";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
+import { getClerkUserDisplayNameById } from "@/lib/clerk-user-display";
 import { getAccessContext } from "@/lib/access";
 import { personalDashboardPlanQueryValue } from "@/lib/team-plans";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
@@ -29,6 +30,7 @@ export type TeamAdminPageContext = {
   viewerTeamMemberUrlParam: number;
   isOwner: boolean;
   planLabel: string;
+  ownerDisplayName: string;
   mainDashboardHref: string;
   workspaceDashboardHref: string;
   showTeacherDashboard: boolean;
@@ -72,7 +74,10 @@ export async function loadTeamAdminPageContext(
   const { selected, teamsForSubscriber, subscriberTeamIds, viewerTeamMemberUrlParam } =
     resolution;
 
-  const access = await getAccessContext();
+  const [access, ownerDisplayName] = await Promise.all([
+    getAccessContext(),
+    getClerkUserDisplayNameById(selected.ownerUserId),
+  ]);
   const personalStripeSlug = access.hasClerkPersonalProPlus
     ? ("pro_plus" as const)
     : access.hasClerkPersonalPro
@@ -105,6 +110,7 @@ export async function loadTeamAdminPageContext(
     viewerTeamMemberUrlParam,
     isOwner,
     planLabel: displayNameForBillingPlanSlug(selected.planSlug),
+    ownerDisplayName,
     mainDashboardHref,
     workspaceDashboardHref,
     showTeacherDashboard: hasEducationPlan(selected.planSlug),

@@ -75,6 +75,7 @@ import {
 } from "drizzle-orm";
 import type { InferSelectModel, SQL } from "drizzle-orm";
 import { studyCardsLeftJoinOnDeck } from "@/db/queries/cover-placeholder-cards";
+import type { WorkspaceCreateProfile } from "@/lib/workspace-creation-profile";
 
 export type { TeamMemberRow, TeamInvitationRow };
 
@@ -341,6 +342,7 @@ function withDefaultTeamQuizSchedule(
     | "quizSecurityApplyToMembers"
     | "quizSecurityApplyToTeamAdmins"
     | "aiRecallSessionCardCount"
+    | "creationProfile"
   > &
     Partial<
       Pick<
@@ -359,6 +361,7 @@ function withDefaultTeamQuizSchedule(
     quizSecurityApplyToMembers: row.quizSecurityApplyToMembers !== false,
     quizSecurityApplyToTeamAdmins: Boolean(row.quizSecurityApplyToTeamAdmins),
     aiRecallSessionCardCount: row.aiRecallSessionCardCount ?? null,
+    creationProfile: null,
   };
 }
 
@@ -377,10 +380,62 @@ function isMissingQuizScheduleColumnError(error: unknown): boolean {
   return /quizStartScheduleEnabled|quizStartAt|quiz_start_schedule/i.test(msg);
 }
 
+let warnedMissingCreationProfileColumn = false;
+function warnMissingCreationProfileColumnOnce() {
+  if (warnedMissingCreationProfileColumn) return;
+  warnedMissingCreationProfileColumn = true;
+  console.warn(
+    "[db] teams.creationProfile is missing. Run: npm run db:ensure-team-creation-profile",
+  );
+}
+
+function isMissingCreationProfileColumnError(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /creationProfile/i.test(msg);
+}
+
+const teamRowSelectWithoutCreationProfile = {
+  id: teams.id,
+  ownerUserId: teams.ownerUserId,
+  name: teams.name,
+  planSlug: teams.planSlug,
+  quizDurationMinutes: teams.quizDurationMinutes,
+  quizSecurityEnabled: teams.quizSecurityEnabled,
+  quizSecurityApplyToMembers: teams.quizSecurityApplyToMembers,
+  quizSecurityApplyToTeamAdmins: teams.quizSecurityApplyToTeamAdmins,
+  quizStartScheduleEnabled: teams.quizStartScheduleEnabled,
+  quizStartAt: teams.quizStartAt,
+  quizFormatMultipleChoice: teams.quizFormatMultipleChoice,
+  quizFormatTrueFalse: teams.quizFormatTrueFalse,
+  quizFormatFillInBlank: teams.quizFormatFillInBlank,
+  aiRecallSessionCardCount: teams.aiRecallSessionCardCount,
+  createdAt: teams.createdAt,
+  inactiveAt: teams.inactiveAt,
+} as const;
+
 async function selectTeamRows(where: SQL): Promise<TeamRow[]> {
   try {
     return await db.select().from(teams).where(where);
   } catch (e) {
+    if (isMissingCreationProfileColumnError(e)) {
+      warnMissingCreationProfileColumnOnce();
+      try {
+        const rows = await db
+          .select(teamRowSelectWithoutCreationProfile)
+          .from(teams)
+          .where(where);
+        return rows.map((row) => ({ ...row, creationProfile: null }));
+      } catch (inner) {
+        if (!isMissingQuizScheduleColumnError(inner)) throw inner;
+        warnMissingQuizScheduleColumnOnce();
+        const rows = await db
+          .select(teamRowSelectWithoutQuizSchedule)
+          .from(teams)
+          .where(where);
+        return rows.map(withDefaultTeamQuizSchedule);
+      }
+    }
     if (!isMissingQuizScheduleColumnError(e)) throw e;
     warnMissingQuizScheduleColumnOnce();
     const rows = await db.select(teamRowSelectWithoutQuizSchedule).from(teams).where(where);
@@ -397,6 +452,29 @@ export async function getTeamsByOwner(
     ? base
     : (and(base, isNull(teams.inactiveAt)) ?? base);
   return selectTeamRows(where);
+}
+
+export async function getTeamNamesForOwner(
+  ownerUserId: string,
+  options?: { includeInactive?: boolean },
+): Promise<string[]> {
+  const rows = await getTeamsByOwner(ownerUserId, options);
+  return rows.map((row) => row.name);
+}
+
+export async function isTeamNameTakenForOwner(
+  ownerUserId: string,
+  name: string,
+  exceptTeamId?: number,
+): Promise<boolean> {
+  const needle = name.trim().toLowerCase();
+  if (!needle) return false;
+  const rows = await getTeamsByOwner(ownerUserId, { includeInactive: true });
+  return rows.some(
+    (row) =>
+      row.name.trim().toLowerCase() === needle &&
+      (exceptTeamId == null || row.id !== exceptTeamId),
+  );
 }
 
 export async function getTeamById(teamId: number) {
@@ -1565,12 +1643,28 @@ export async function insertTeam(
   ownerUserId: string,
   name: string,
   planSlug: string,
+  creationProfile?: WorkspaceCreateProfile | null,
 ) {
-  const [row] = await db
-    .insert(teams)
-    .values({ ownerUserId, name, planSlug })
-    .returning({ id: teams.id });
-  return row?.id;
+  try {
+    const [row] = await db
+      .insert(teams)
+      .values({
+        ownerUserId,
+        name,
+        planSlug,
+        creationProfile: creationProfile ?? null,
+      })
+      .returning({ id: teams.id });
+    return row?.id;
+  } catch (e) {
+    if (!isMissingCreationProfileColumnError(e)) throw e;
+    warnMissingCreationProfileColumnOnce();
+    const [row] = await db
+      .insert(teams)
+      .values({ ownerUserId, name, planSlug })
+      .returning({ id: teams.id });
+    return row?.id;
+  }
 }
 
 /**
