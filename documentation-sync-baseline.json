@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-14T00:50:20.848Z",
+  "updatedAt": "2026-09-14T01:03:57.241Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "96be8b8bcda20619bb35d1f2031267bdddfbee7d24f7d2c7403a3a02e94f06bc",
@@ -188,7 +188,7 @@
     },
     "team-onboarding": {
       "watchFingerprint": "e06a0eca2019b8827873758975a089ee7bed64c4e09a0311977e44216522687a",
-      "docFingerprint": "8100894f2e4e1b15f99fefad6501d294f0d2b9879b7430171b81dfee7d05f875"
+      "docFingerprint": "2cd35a73649a82a860e4445a683dcb7ae94474adc836e1ee90227ca748314a05"
     },
     "accept-team-invite": {
       "watchFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

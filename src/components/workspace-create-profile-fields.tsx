@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +64,12 @@ export function WorkspaceCreateProfileFields({
   nestedInModal = false,
 }: WorkspaceCreateProfileFieldsProps) {
   const kind = draft.kind;
+  const [pickingKind, setPickingKind] = useState(kind === "");
+
+  useEffect(() => {
+    if (kind === "") setPickingKind(true);
+  }, [kind]);
+
   const example =
     kind === "" ? WORKSPACE_NAME_EXAMPLES.corporation_government : WORKSPACE_NAME_EXAMPLES[kind];
   const previewBase = previewWorkspaceName(draft);
@@ -85,6 +92,11 @@ export function WorkspaceCreateProfileFields({
     kind === "corporation_government" || kind === "education_institution";
   const showClass = kind !== "";
   const showLevel = kind !== "";
+  const showAllKinds = pickingKind || kind === "";
+  const visibleKindOptions = showAllKinds
+    ? WORKSPACE_KIND_OPTIONS
+    : WORKSPACE_KIND_OPTIONS.filter((option) => option.value === kind);
+  const selectedKindOption = WORKSPACE_KIND_OPTIONS.find((option) => option.value === kind);
 
   return (
     <div className="space-y-4">
@@ -103,27 +115,51 @@ export function WorkspaceCreateProfileFields({
               value === "student_study_group"
             ) {
               patch({ kind: value });
+              setPickingKind(false);
             }
           }}
           className="grid gap-2"
         >
-          {WORKSPACE_KIND_OPTIONS.map((option) => (
-            <label
+          {visibleKindOptions.map((option) => (
+            <div
               key={option.value}
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-lg border p-3",
+                "flex items-start gap-3 rounded-lg border p-3",
                 kind === option.value && "border-primary bg-muted/40",
-                disabled && "cursor-not-allowed opacity-50",
               )}
             >
-              <RadioGroupItem value={option.value} className="mt-0.5" />
-              <span className="grid min-w-0 gap-0.5">
-                <span className="text-sm font-medium text-foreground">{option.label}</span>
-                <span className="text-xs text-muted-foreground">{option.description}</span>
-              </span>
-            </label>
+              <label
+                className={cn(
+                  "flex min-w-0 flex-1 cursor-pointer items-start gap-3",
+                  disabled && "cursor-not-allowed opacity-50",
+                )}
+              >
+                <RadioGroupItem value={option.value} className="mt-0.5" />
+                <span className="grid min-w-0 flex-1 gap-0.5">
+                  <span className="text-sm font-medium text-foreground">{option.label}</span>
+                  <span className="text-xs text-muted-foreground">{option.description}</span>
+                </span>
+              </label>
+              {kind === option.value && !showAllKinds ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={disabled}
+                  onClick={() => setPickingKind(true)}
+                >
+                  Change
+                </Button>
+              ) : null}
+            </div>
           ))}
         </RadioGroup>
+        {kind !== "" && showAllKinds && selectedKindOption ? (
+          <p className="text-xs text-muted-foreground">
+            Choose a different option, or keep {selectedKindOption.label}.
+          </p>
+        ) : null}
       </div>
 
       {kind !== "" ? (

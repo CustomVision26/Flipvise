@@ -1140,7 +1140,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/onboarding/team",
         purpose: "Create your first team workspace after purchasing a team-tier plan.",
         howItWorks: [
-          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), then shows the matching fields.",
+          "Wizard asks who the workspace is for (Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, Student or Study Group), then hides the other options. Use Change to pick a different option.",
           "Corporation or Government: region, education level, school name, department/faculty, and class name.",
           "Education Institution: education level, school name, department/faculty, and class name.",
           "Teacher or Tutor: education level, school name, and class name.",
