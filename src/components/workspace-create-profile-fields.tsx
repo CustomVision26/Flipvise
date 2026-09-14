@@ -67,7 +67,11 @@ export function WorkspaceCreateProfileFields({
   const [pickingKind, setPickingKind] = useState(kind === "");
 
   useEffect(() => {
-    if (kind === "") setPickingKind(true);
+    if (kind === "") {
+      setPickingKind(true);
+      return;
+    }
+    setPickingKind(false);
   }, [kind]);
 
   const example =
@@ -114,8 +118,7 @@ export function WorkspaceCreateProfileFields({
               value === "parent_guardian" ||
               value === "student_study_group"
             ) {
-              patch({ kind: value });
-              setPickingKind(false);
+              patch({ kind: value satisfies WorkspaceKind });
             }
           }}
           className="grid gap-2"

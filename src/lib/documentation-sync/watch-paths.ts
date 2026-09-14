@@ -25,6 +25,13 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/add-team-dialog.tsx",
   ],
   "team-workspace-dashboard": ["src/app/dashboard/workspace/page.tsx"],
+  "manage-workspaces": [
+    "src/app/dashboard/workspaces/page.tsx",
+    "src/components/manage-workspaces-panel.tsx",
+    "src/components/add-team-dialog.tsx",
+    "src/components/team-switcher-dropdown.tsx",
+    "src/app/dashboard/(team-admin)/team-admin/team-admin-dashboard-view.tsx",
+  ],
   "deck-editor": [
     "src/app/decks/[deckId]/page.tsx",
     "src/app/decks/[deckId]/card-grid.tsx",
@@ -258,6 +265,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "team-admin-overview": [
     "src/components/team-admin-manage-tabs.tsx",
     "src/components/team-admin-quick-nav-panel.tsx",
+    "src/app/dashboard/(team-admin)/team-admin/team-admin-dashboard-view.tsx",
   ],
   members: [
     "src/components/team-admin-invitation-tables.tsx",

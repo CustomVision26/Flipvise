@@ -14,8 +14,12 @@ import { ManageWorkspacesPanel } from "@/components/manage-workspaces-panel";
 import { cn } from "@/lib/utils";
 import { listTeamWorkspaceEventsForOwner } from "@/db/queries/team-workspace-events";
 import { getTeamsByOwner } from "@/db/queries/teams";
-import { isTeamPlanId, limitsForPlan, type TeamPlanId } from "@/lib/team-plans";
+import { limitsForPlan } from "@/lib/team-plans";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
+import {
+  isWorkspaceSubscriptionPlanSlug,
+  type WorkspaceCreatePlanId,
+} from "@/lib/education-plans";
 
 export default async function ManageWorkspacesPage() {
   const { userId } = await auth();
@@ -26,12 +30,15 @@ export default async function ManageWorkspacesPage() {
     redirect("/dashboard");
   }
 
-  const { activeTeamPlan } = await getAccessContext();
+  const { activeTeamPlan, activeEducationTeamPlan } = await getAccessContext();
 
-  const planForNewTeam: TeamPlanId | null =
+  const ownedPlan = ownedTeams.find((t) =>
+    isWorkspaceSubscriptionPlanSlug(t.planSlug),
+  )?.planSlug;
+  const planForNewTeam: WorkspaceCreatePlanId | null =
     activeTeamPlan ??
-    (ownedTeams.find((t) => isTeamPlanId(t.planSlug))?.planSlug as TeamPlanId | undefined) ??
-    null;
+    activeEducationTeamPlan ??
+    (ownedPlan && isWorkspaceSubscriptionPlanSlug(ownedPlan) ? ownedPlan : null);
 
   if (!planForNewTeam) {
     redirect("/dashboard");

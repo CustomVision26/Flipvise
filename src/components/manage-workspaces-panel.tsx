@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/table";
 import type { TeamWorkspaceEventRow } from "@/db/queries/team-workspace-events";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
-import { isTeamPlanId, type TeamPlanId } from "@/lib/team-plans";
+import type { WorkspaceCreatePlanId } from "@/lib/education-plans";
 
 function formatEventTime(d: Date | string) {
   const dt = typeof d === "string" ? new Date(d) : d;
@@ -60,7 +60,7 @@ export type ManageWorkspacesTeamRow = {
 interface ManageWorkspacesPanelProps {
   teams: ManageWorkspacesTeamRow[];
   events: TeamWorkspaceEventRow[];
-  addTeamPlanSlug: TeamPlanId;
+  addTeamPlanSlug: WorkspaceCreatePlanId;
   isAtTeamLimit: boolean;
 }
 

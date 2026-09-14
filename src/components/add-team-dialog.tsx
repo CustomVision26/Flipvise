@@ -99,10 +99,8 @@ export function AddTeamDialog({
   function handleOpenChange(nextOpen: boolean) {
     if (!isPending) {
       setOpen(nextOpen);
-      if (!nextOpen) {
-        setError(null);
-        setDraft({ ...EMPTY_WORKSPACE_CREATE_DRAFT });
-      }
+      setDraft({ ...EMPTY_WORKSPACE_CREATE_DRAFT });
+      setError(null);
     }
   }
 
@@ -176,6 +174,7 @@ export function AddTeamDialog({
         <form id="add-team-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
           <ScrollArea className="max-h-[min(70vh,32rem)] pr-3">
             <WorkspaceCreateProfileFields
+              key={open ? "add-team-open" : "add-team-closed"}
               idPrefix="add-team"
               draft={draft}
               onChange={setDraft}

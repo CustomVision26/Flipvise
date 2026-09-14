@@ -41,7 +41,6 @@ import {
   getClerkUserFieldDisplaysByIds,
 } from "@/lib/clerk-user-display";
 import {
-  AddTeamDialog,
   TeamAdminManageTabs,
   TeamAdminWorkspaceStatsPanel,
 } from "@/lib/team-admin-dynamic-components";
@@ -49,6 +48,10 @@ import { TeamAdminHome } from "@/components/team-admin-home";
 import { TeamAdminPageChrome } from "@/components/team-admin-page-chrome";
 import { TeamWorkspaceInfoButton } from "@/components/team-workspace-info-button";
 import { buildTeamWorkspaceInfo } from "@/lib/workspace-creation-profile";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { MANAGE_WORKSPACES_HREF } from "@/lib/team-workspace-url";
+import Link from "next/link";
 
 interface TeamAdminDashboardViewProps {
   searchParams: Promise<{
@@ -325,11 +328,12 @@ export default async function TeamAdminDashboardView({
 
   const addTeamAside =
     isOwner && isWorkspaceSubscriptionPlanSlug(selected.planSlug) ? (
-      <AddTeamDialog
-        planSlug={selected.planSlug}
-        isAtLimit={teamsForSubscriber.length >= limits.maxTeams}
-        existingWorkspaceNames={teamsForSubscriber.map((t) => t.name)}
-      />
+      <Link
+        href={MANAGE_WORKSPACES_HREF}
+        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+      >
+        Add Workspace
+      </Link>
     ) : null;
 
   const workspaceInfo = buildTeamWorkspaceInfo({

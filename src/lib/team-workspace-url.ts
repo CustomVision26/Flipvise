@@ -9,6 +9,9 @@ export const TEAM_WORKSPACE_QUERY = {
   teamMemberId: "teamMemberId",
 } as const;
 
+/** Subscriber-owned workspace create / rename / delete. */
+export const MANAGE_WORKSPACES_HREF = "/dashboard/workspaces";
+
 export type TeamWorkspaceNavTeam = {
   id: number;
   name: string;

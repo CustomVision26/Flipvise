@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, ChevronDown, Search, Settings2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { buildTeamAdminPath } from "@/lib/team-admin-url";
+import { MANAGE_WORKSPACES_HREF } from "@/lib/team-workspace-url";
 
 export type TeamSwitcherTeam = {
   id: number;
@@ -165,12 +167,10 @@ export function TeamSwitcherDropdown({
                 <DropdownMenuSeparator className="my-1" />
                 <DropdownMenuItem
                   className="cursor-pointer gap-2"
+                  render={<Link href={MANAGE_WORKSPACES_HREF} />}
                   onClick={() => {
                     setOpen(false);
                     setQuery("");
-                    requestAnimationFrame(() => {
-                      router.push("/dashboard/workspaces");
-                    });
                   }}
                 >
                   <Settings2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />

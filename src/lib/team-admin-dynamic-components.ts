@@ -24,11 +24,6 @@ export const TeamAdminManageTabs = dynamic(
   { loading: clientLoading },
 );
 
-export const AddTeamDialog = dynamic(
-  () => import("@/components/add-team-dialog").then((mod) => mod.AddTeamDialog),
-  { loading: clientLoading },
-);
-
 export const TeamDeckManagerSubTabs = dynamic(
   () => import("@/components/team-deck-manager-sub-tabs").then((mod) => mod.TeamDeckManagerSubTabs),
   { loading: clientLoading },
