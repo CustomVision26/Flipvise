@@ -390,9 +390,24 @@ function warnMissingCreationProfileColumnOnce() {
 }
 
 function isMissingCreationProfileColumnError(error: unknown): boolean {
-  if (error === null || error === undefined) return false;
-  const msg = error instanceof Error ? error.message : String(error);
-  return /creationProfile/i.test(msg);
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const o = current as Record<string, unknown>;
+    const message = typeof o.message === "string" ? o.message : "";
+    const code = String(o.code ?? "");
+    if (
+      /creationProfile/i.test(message) &&
+      (/does not exist/i.test(message) || code === "42703")
+    ) {
+      return true;
+    }
+    if (code === "42703" && /creationProfile/i.test(String(error))) {
+      return true;
+    }
+    current = o.cause;
+  }
+  const flat = String(error);
+  return /creationProfile/i.test(flat) && /does not exist|42703/i.test(flat);
 }
 
 const teamRowSelectWithoutCreationProfile = {

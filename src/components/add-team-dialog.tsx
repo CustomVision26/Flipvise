@@ -24,6 +24,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WorkspaceCreateProfileFields } from "@/components/workspace-create-profile-fields";
 import { createTeamAction } from "@/actions/teams";
+import { isProductionOmittedServerError } from "@/lib/server-action-client-error";
 import type { WorkspaceCreatePlanId } from "@/lib/education-plans";
 import {
   EMPTY_WORKSPACE_CREATE_DRAFT,
@@ -71,16 +72,25 @@ export function AddTeamDialog({
 
     setIsPending(true);
     try {
-      await createTeamAction({
+      const result = await createTeamAction({
         ...parsed.data,
         planSlug,
       });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       setOpen(false);
       setDraft({ ...EMPTY_WORKSPACE_CREATE_DRAFT });
       router.push("/dashboard/workspaces");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create team.");
+      const raw = err instanceof Error ? err.message : "";
+      setError(
+        raw && !isProductionOmittedServerError(raw)
+          ? raw
+          : "Could not create the workspace. Please try again.",
+      );
     } finally {
       setIsPending(false);
     }

@@ -81,6 +81,10 @@ import {
   getClerkUserDisplayNameById,
   getClerkUserFieldDisplayById,
 } from "@/lib/clerk-user-display";
+import {
+  isNextControlFlowError,
+  userFacingServerActionError,
+} from "@/lib/server-action-client-error";
 import { loopsSendTeamInvitationEmail } from "@/lib/loops";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import {
@@ -159,57 +163,83 @@ const createTeamSchema = workspaceCreateProfileSchema.and(
   }),
 );
 
-export async function createTeamAction(data: z.infer<typeof createTeamSchema>) {
-  const { userId, activeTeamPlan, activeEducationTeamPlan, isAdmin } =
-    await getAccessContext();
-  if (!userId) throw new Error("Unauthorized");
+export async function createTeamAction(
+  data: z.infer<typeof createTeamSchema>,
+): Promise<
+  { ok: true; teamId: number; ownerUserId: string } | { ok: false; error: string }
+> {
+  try {
+    const { userId, activeTeamPlan, activeEducationTeamPlan, isAdmin } =
+      await getAccessContext();
+    if (!userId) return { ok: false, error: "Unauthorized" };
 
-  const parsed = createTeamSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid input");
+    const parsed = createTeamSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, error: "Choose an option and fill in every required field." };
+    }
 
-  if (isAdmin) {
-    throw new Error(
-      "Platform administrators cannot subscribe to team plans or create team workspaces. Join a subscriber’s team using an invitation.",
+    if (isAdmin) {
+      return {
+        ok: false,
+        error:
+          "Platform administrators cannot subscribe to team plans or create team workspaces. Join a subscriber’s team using an invitation.",
+      };
+    }
+
+    const expectedPlan = activeTeamPlan ?? activeEducationTeamPlan;
+    if (!expectedPlan || expectedPlan !== parsed.data.planSlug) {
+      return { ok: false, error: "Plan mismatch — refresh and try again." };
+    }
+
+    const limits = limitsForPlan(parsed.data.planSlug);
+    const existing = await countTeamsForOwner(userId);
+    if (existing >= limits.maxTeams) {
+      return {
+        ok: false,
+        error: `Your plan allows up to ${limits.maxTeams} team(s).`,
+      };
+    }
+
+    const existingNames = await getTeamNamesForOwner(userId, {
+      includeInactive: true,
+    });
+    const name = allocateUniqueWorkspaceName(
+      buildWorkspaceNameFromProfile(parsed.data),
+      existingNames,
     );
+
+    const { planSlug, ...profileFields } = parsed.data;
+    const profileParsed = workspaceCreateProfileSchema.safeParse(profileFields);
+    if (!profileParsed.success) {
+      return { ok: false, error: "Choose an option and fill in every required field." };
+    }
+    const id = await insertTeam(userId, name, planSlug, profileParsed.data);
+    if (!id) return { ok: false, error: "Could not create the workspace. Please try again." };
+
+    await insertTeamWorkspaceEvent({
+      ownerUserId: userId,
+      action: "created",
+      teamId: id,
+      teamName: name,
+      planSlug,
+      previousTeamName: null,
+    });
+
+    revalidatePath("/dashboard/team-admin", "layout");
+    revalidatePath("/dashboard/workspaces");
+    revalidatePath("/onboarding/team");
+    return { ok: true, teamId: id, ownerUserId: userId };
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    console.error("[createTeamAction]", error);
+    return {
+      ok: false,
+      error: userFacingServerActionError(
+        error,
+        "Could not create the workspace. Please try again.",
+      ),
+    };
   }
-
-  const expectedPlan = activeTeamPlan ?? activeEducationTeamPlan;
-  if (!expectedPlan || expectedPlan !== parsed.data.planSlug) {
-    throw new Error("Plan mismatch — refresh and try again.");
-  }
-
-  const limits = limitsForPlan(parsed.data.planSlug);
-  const existing = await countTeamsForOwner(userId);
-  if (existing >= limits.maxTeams) {
-    throw new Error(`Your plan allows up to ${limits.maxTeams} team(s).`);
-  }
-
-  const existingNames = await getTeamNamesForOwner(userId, {
-    includeInactive: true,
-  });
-  const name = allocateUniqueWorkspaceName(
-    buildWorkspaceNameFromProfile(parsed.data),
-    existingNames,
-  );
-
-  const { planSlug, ...profileFields } = parsed.data;
-  const creationProfile = workspaceCreateProfileSchema.parse(profileFields);
-  const id = await insertTeam(userId, name, planSlug, creationProfile);
-  if (!id) throw new Error("Could not create team.");
-
-  await insertTeamWorkspaceEvent({
-    ownerUserId: userId,
-    action: "created",
-    teamId: id,
-    teamName: name,
-    planSlug,
-    previousTeamName: null,
-  });
-
-  revalidatePath("/dashboard/team-admin", "layout");
-  revalidatePath("/dashboard/workspaces");
-  revalidatePath("/onboarding/team");
-  return { teamId: id, ownerUserId: userId };
 }
 
 /** Normalize workspace id from Server Action payload (string is JSON-safe for dev traces; RSC may deliver bigint). */

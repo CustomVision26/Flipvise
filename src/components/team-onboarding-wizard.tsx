@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { WorkspaceCreateProfileFields } from "@/components/workspace-create-profile-fields";
 import { createTeamAction } from "@/actions/teams";
+import { isProductionOmittedServerError } from "@/lib/server-action-client-error";
 import type { WorkspaceCreatePlanId } from "@/lib/education-plans";
 import {
   EMPTY_WORKSPACE_CREATE_DRAFT,
@@ -36,11 +37,20 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
     }
     setPending(true);
     try {
-      await createTeamAction({ ...parsed.data, planSlug });
+      const result = await createTeamAction({ ...parsed.data, planSlug });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create team");
+      const raw = err instanceof Error ? err.message : "";
+      setError(
+        raw && !isProductionOmittedServerError(raw)
+          ? raw
+          : "Could not create the workspace. Please try again.",
+      );
     } finally {
       setPending(false);
     }
