@@ -254,6 +254,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   ],
   "appearance-settings": ["src/components/header-user-section.tsx"],
   "billing-tab": [
+    "src/components/header-user-section.tsx",
     "src/components/user-billing-page.tsx",
     "src/actions/stripe.ts",
     "src/lib/flipvise-invoice-receipt.ts",
@@ -266,6 +267,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/team-admin-manage-tabs.tsx",
     "src/components/team-admin-quick-nav-panel.tsx",
     "src/app/dashboard/(team-admin)/team-admin/team-admin-dashboard-view.tsx",
+    "src/lib/team-admin-dashboard-nav.ts",
+    "src/components/team-admin-dashboard-nav.tsx",
+    "src/components/team-admin-home.tsx",
   ],
   members: [
     "src/components/team-admin-invitation-tables.tsx",

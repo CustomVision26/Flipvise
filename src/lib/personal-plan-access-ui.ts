@@ -11,14 +11,6 @@ export function isNonStripePersonalPlanGrant(
   );
 }
 
-/**
- * Signed-in header Plans control. Grant access is labeled Complimentary so it
- * is not mistaken for a paid subscription.
- */
-export function headerPlansNavLabel(type: AdminUserPlanAccessType): string {
-  return isNonStripePersonalPlanGrant(type) ? "Complimentary" : "Plans";
-}
-
 /** Deck editor / AI panel label for how card capacity is sourced. */
 export function deckPlanCapacitySourceLabel(
   type: AdminUserPlanAccessType,

@@ -105,7 +105,7 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
         id: "features",
         title: "Tab features",
         bullets: [
-          "Effective plan label and access subtitle.",
+          "Effective plan label and access subtitle. The plan name in the signed-in header opens this tab.",
           "Manage billing → Stripe Customer Portal (card, address, invoices).",
           "Cancel subscription: with active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both. Access continues until period end.",
           "Add-on-only cancel keeps the base plan renewing and writes an Inbox notice. If plan renewal was canceled, use Keep renewing plan to resume.",

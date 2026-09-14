@@ -297,7 +297,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Per-add-on Active, Published (header banner), and On pricing switches control purchase, banner chips, and catalog listing.",
           "Complimentary assignment searches registered users by name or email, shows a selection summary, then assign or revoke.",
           "AI Essay usage section shows entitlement, activity, and token metric cards plus an event breakdown list.",
-          "Team Admins assign the same catalog keys from Team Admin → Add-ons without a separate admin product. Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
+          "Team Admins assign the same catalog keys from /dashboard/team-admin/add-ons without a separate admin product. Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
         ],
         requirements: [
           "Platform admin access.",

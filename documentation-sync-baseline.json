@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-14T03:47:28.001Z",
+  "updatedAt": "2026-09-14T19:47:12.899Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "96be8b8bcda20619bb35d1f2031267bdddfbee7d24f7d2c7403a3a02e94f06bc",
       "docFingerprint": "13ff4ca77afa11182d0f1a53ebd44002b74d102c38b3556b5c79f03d647d1af1"
     },
     "header-navigation": {
-      "watchFingerprint": "5f5ce71028fe28ae418196bbb9abd0365885d0765253a96b78d14d2425125b86",
-      "docFingerprint": "f21fee4ddbd2b58a39521ff270bb4a0e512f961b1495ce31cd9833864022f92e"
+      "watchFingerprint": "50a6759a95557a84bc8275047378b89ec19ad0f3b51eb9b9f0eee3f4e9b0104d",
+      "docFingerprint": "b8a13baa5adcefa0e677765c5ffe78ecf600c3b358ea9c9f9fdc2e61fd75060c"
     },
     "personal-dashboard": {
       "watchFingerprint": "780eb3e473b50d33375c3b7c77956aded1923c445774df78c0bad06ea2f7037e",
@@ -100,7 +100,7 @@
     },
     "pricing-add-ons": {
       "watchFingerprint": "c7a956fdb89ef71614788949411a74831894897212d770a5179f103551b951c9",
-      "docFingerprint": "2ed1b9ffcb97c293c1d70b0f55045e193319fb622ae4bff98d6891a78840d8f7"
+      "docFingerprint": "536355e191f391359526d8ae86cf249cb3cf1b1a99b6fd7aa2a9e224c0b44e50"
     },
     "stripe-billing-payment": {
       "watchFingerprint": "d6cf569b6564719406f06bf8c4801d7ae283f857942c1628f2b4730e72ab50f2",
@@ -135,36 +135,36 @@
       "docFingerprint": "96b17ed3905685f6743a2b291b26a72466d3b51b91b4daa0473b4c710196a403"
     },
     "clerk-profile": {
-      "watchFingerprint": "bcb3709739d41c0bdfc2b485a634dc862c04a1b58384b05d21a18876f8676140",
+      "watchFingerprint": "4b73650a94776b435d1da5dde0521bb6268607ee7a75c395e2f1adf151990a6f",
       "docFingerprint": "939db4870cf2b381096ca5783451baf0c795e0f7c9e6f276cf01f469119a2ade"
     },
     "account-details-settings": {
-      "watchFingerprint": "78c2848e9243a4c1018d7921c6a1de50db96722b54ad3fb11fa79a8feb8c873e",
+      "watchFingerprint": "b6cf3d953131ad0e531c9989eac8aab2812e5f206ff038c5f9fed337148c4c3d",
       "docFingerprint": "2b5932248f5cfcb2a0e1cdb4267ba32d3c6b4ce659ec60d244ea4a21437e5fd1"
     },
     "appearance-settings": {
-      "watchFingerprint": "5e793f9ce2311d2a1e9582b191988ff6c04a2c5407ab68bc233b989d30f4906d",
+      "watchFingerprint": "c9c661c333f43cb547c5232ade60a7bb7c321722d781e75e1832a3b074cf6ff6",
       "docFingerprint": "78cabd71f0a8030bc6c759d69677dbf75804661b85e1905e74d2c7a5e3b80d74"
     },
     "billing-tab": {
-      "watchFingerprint": "9326e4e691558e88ff3504c1542c65066f4219c06da6cd0631afda54017aa749",
-      "docFingerprint": "21af4abaa6237eaad26cbf8517cf2b7122f0540ff741cefe27211d4bfaf92419"
+      "watchFingerprint": "5de3be9c48528d9eb251f7606b4006a0f97fdfe76b1f4b3e96c4cc3820683fa8",
+      "docFingerprint": "c5f841ebd1f69a610693b1c7d296eef5787929c4f7765d0b6837e699a3c766de"
     },
     "account-delete": {
       "watchFingerprint": "8237211751a54516df3135926d8a3df9f9ab545d792cb386edad4d53d47297ab",
       "docFingerprint": "7566f9ba03902c638d1c395233e8c8dce2300b147a75f73df1fb06464dfbf88a"
     },
     "team-admin-overview": {
-      "watchFingerprint": "0280f374ca4f9be23bc8791343af3cbc04db0bb8b44fb07e1221972561199448",
-      "docFingerprint": "903b40adb10c4d6728c67b9780da504a4b6b61a55f0549586a89f407080dbdf9"
+      "watchFingerprint": "1e177aaf37ed77fa8047f3f4fd351d2167f3589117b601c8250e1db1e3476bdc",
+      "docFingerprint": "acf3c67b2ddca4aea02fc96a9968c202fb76eb7eedbd906d0c64e34af18530dd"
     },
     "team-admin-add-ons": {
       "watchFingerprint": "d9ee1ab1ce12f9e36d8612e523578dc99de1a4a90d57c1cc541f6ac4b951c477",
-      "docFingerprint": "3aa23fd6fde9789cb4cffe95d2ef0a99e5106eac858e8b5a15083a3bdb2c7652"
+      "docFingerprint": "1f5cc10a02bcbe5d6d35dd19e789af9fed576e50942e5023f23da609b74e8120"
     },
     "live-classroom": {
       "watchFingerprint": "1b4f3efb5e1c6f015a5202ed619acaae33daaf82e9797b8e0ba595c672ee0fb4",
-      "docFingerprint": "bce43ccf2fa9f83086a21174150426744d69f528526208ef08dbebbfbab13051"
+      "docFingerprint": "30b617ea19313fd1de3e3f75323a77f16e6f69742b3c07585064e03d895b72b6"
     },
     "members": {
       "watchFingerprint": "464d03f514e4f0a9d905c83de529a3d45359521970a3b9a9ffe49b079a4340ba",
@@ -276,7 +276,7 @@
     },
     "admin-add-ons": {
       "watchFingerprint": "7b3ce0e9e1931d86cfb7ea0c0afb40f0c3376f513c33178f873e023701bfb4c9",
-      "docFingerprint": "a63cf2dd3bdb95b158626a0c7b63c8733df56892f5fc8daec6a3b10c36fb2b35"
+      "docFingerprint": "05e45db08fb09f24a16a2beec87c088e95d0ec9a202e52a93c12deec85201628"
     },
     "plan-history": {
       "watchFingerprint": "2853840c9e2bb609f4f52292a00cbdfd1787b1efee3a9586fd516de5ced82cc0",

@@ -12,7 +12,7 @@ export function TeamAdminHome() {
         <h2 className="text-base font-semibold text-foreground">Welcome</h2>
         <CardDescription className="text-sm leading-relaxed">
           Use the sidebar to open any team admin page. Team & members, deck manager,
-          Study Modes (including Quiz Mode), and add-ons are grouped by category. You
+          and Study Modes (including Quiz Mode) are grouped by category. You
           have {linkCount} pages available in this workspace.
         </CardDescription>
       </CardHeader>

@@ -109,7 +109,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         id: "other-grants",
         title: "Other ways to unlock",
         bullets: [
-          "Team Admin → Add-ons will assign member add-ons later; AI Essay member assignment is coming soon (plan owner personal use only for now).",
+          "Member add-ons at /dashboard/team-admin/add-ons will assign member features later; AI Essay member assignment is coming soon (plan owner personal use only for now).",
           "Flipvise can grant complimentary access.",
           "Live Classroom™ organization ownership is granted to the subscription owner (purchase or complimentary grant).",
         ],

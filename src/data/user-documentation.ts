@@ -35,12 +35,12 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Home returns to your dashboard when signed in, or the homepage when signed out.",
           "Documentation opens this guide.",
-          "Plans opens Plans & Pricing so you can compare tiers and start checkout. Complimentary, assigned, or affiliate access shows Complimentary on that button instead of Plans — it is not a paid subscription.",
+          "Plans opens Plans & Pricing so you can compare tiers and start checkout. Complimentary, assigned, or affiliate access still uses the Plans label — hover the button to confirm it is not a paid subscription.",
           "Contact Us appears in the top nav for guests only — it opens the public Contact Support page with live chat.",
           "Signed-in users open Documentation from the book icon beside Help and Inbox (right side of the header). Plans also appears as a header link next to Teacher and Affiliate.",
           "UI Guides in the header lists every Flipvise UI guide. Guests see it in the top nav; signed-in users see it beside Inbox.",
           "Guest homepage nav shows Plans and Contact Us; on Documentation or Contact Us you also see Home and Documentation.",
-          "Signed-in users also see plan label, workspace switcher, inbox, UI Guides, and account menu. The plan label still opens Plans & Pricing. Hover Complimentary or the plan name to confirm grant access is not a paid subscription.",
+          "Signed-in users also see plan label, workspace switcher, inbox, UI Guides, and account menu. The plan name opens Account → Billing (current plan, complimentary badge, and plan history). Hover the plan name to confirm grant access is not a paid subscription.",
           "Personal Dash is /dashboard; invited workspaces use /dashboard?team=<id> — Clerk user ids are not placed in the address bar.",
         ],
         requirements: ["Signed in for inbox and account controls."],
@@ -925,7 +925,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "View current plan, Stripe portal access, cancellation, and plan history (plans and add-ons listed separately with their own receipts).",
         howItWorks: [
-          "Shows effective plan label and access subtitle.",
+          "Shows effective plan label and access subtitle. The plan name in the signed-in header also opens this tab.",
           "Manage billing opens Stripe Customer Portal — update overseas billing address, card, download invoices.",
           "Cancel subscription: if you have active Stripe add-ons, choose add-on(s) only (default), plan (add-ons stop with the plan), or both — access continues until period end.",
           "Add-on-only cancel leaves your base plan renewing; an Inbox billing notice confirms that. Plan cancel shows Keep renewing plan if you need to reverse it.",
@@ -977,8 +977,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
           "Info opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation).",
           "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace.",
-          "Add-ons → Member add-ons covers upcoming member feature assignment; AI Essay is plan-owner personal only for now (member access coming soon).",
-          "Live Classroom™ opens from Team Admin → Add-ons → Live Classroom™ when the organization owns the Live Classroom add-on.",
+          "Member add-ons remain at /dashboard/team-admin/add-ons; AI Essay is plan-owner personal only for now (member access coming soon).",
+          "Live Classroom™ opens from the dashboard banner or /dashboard/live-classroom when the organization owns the Live Classroom add-on.",
         ],
         requirements: [
           "Team owner or invited team_admin role.",
@@ -996,10 +996,10 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Review member add-on availability and organization add-ons such as Live Classroom™. AI Essay member assignment is coming soon.",
         howItWorks: [
-          "Open Add-ons → Member add-ons for the selected workspace.",
+          "Open /dashboard/team-admin/add-ons for the selected workspace.",
           "AI Essay is not assignable to workspace members yet — only the plan owner can use it on their personal dashboard.",
           "Workspace members who open AI Essay see a Coming soon message until member add-ons ship.",
-          "Live Classroom™ is listed under Add-ons and is an organization add-on purchased by the subscription owner — then assign members to the Live Classroom team in Settings; participant limits inherit licensed seats.",
+          "Live Classroom™ is an organization add-on purchased by the subscription owner — then assign members to the Live Classroom team in Settings; participant limits inherit licensed seats.",
           "Future member add-ons reuse the same Team Admin surface without a new admin system. Catalog purchase still uses /pricing/add-ons/pay without a Stripe session id in the URL.",
         ],
         requirements: ["Team owner or team_admin."],

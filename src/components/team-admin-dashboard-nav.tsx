@@ -20,10 +20,8 @@ import {
   type TeamAdminNavLeaf,
 } from "@/lib/team-admin-dashboard-nav";
 import {
-  buildTeamAdminLiveClassroomPath,
   buildTeamAdminMembersPath,
   buildTeamAdminNavHref,
-  TEAM_ADMIN_LIVE_CLASSROOM_PATH,
 } from "@/lib/team-admin-url";
 import { cn } from "@/lib/utils";
 
@@ -56,9 +54,6 @@ function hrefForNavLeaf(
   teamId: number | null,
   teamMemberId: number,
 ): string {
-  if (item.path === TEAM_ADMIN_LIVE_CLASSROOM_PATH) {
-    return buildTeamAdminLiveClassroomPath(teamId);
-  }
   return buildTeamAdminNavHref(item.path, teamId, teamMemberId);
 }
 

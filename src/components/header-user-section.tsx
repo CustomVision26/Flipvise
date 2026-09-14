@@ -1,10 +1,11 @@
 "use client";
 
-import { UserButton, useAuth, useUser } from "@clerk/nextjs";
+import { UserButton, useAuth, useClerk, useUser } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import type { ProUiThemeId } from "@/lib/pro-ui-theme";
 import type { FreeUiThemeId } from "@/lib/free-ui-theme";
@@ -32,10 +33,7 @@ import {
 import { useClientMounted } from "@/lib/use-client-mounted";
 import { NATIVE_SIGNING_OUT_KEY } from "@/components/native-home-sign-out-guard";
 import type { AdminUserPlanAccessType } from "@/lib/admin-user-plan-label";
-import {
-  headerPlansNavLabel,
-  isNonStripePersonalPlanGrant,
-} from "@/lib/personal-plan-access-ui";
+import { isNonStripePersonalPlanGrant } from "@/lib/personal-plan-access-ui";
 import { CreditCard, Gift, IdCard, Megaphone, Palette, Shield } from "lucide-react";
 
 const profilePageLoading = () => (
@@ -74,6 +72,79 @@ const AccountDeleteDialog = dynamic(
 );
 
 const NATIVE_AFTER_SIGN_OUT_URL = "/native-signout";
+const CLERK_BILLING_START_PATH = "/billing";
+const CLERK_USER_BUTTON_TRIGGER = ".cl-userButtonTrigger";
+const CLERK_MANAGE_ACCOUNT_ACTION =
+  "[data-localization-key='userButton.action__manageAccount']";
+
+function clickHtmlElement(el: Element | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  el.click();
+  return true;
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function clickClerkUserButtonTrigger(): boolean {
+  const menu = document.querySelector("[data-header-account-menu]");
+  return clickHtmlElement(
+    menu?.querySelector(CLERK_USER_BUTTON_TRIGGER) ?? null,
+  );
+}
+
+function clickClerkManageAccount(): boolean {
+  return clickHtmlElement(document.querySelector(CLERK_MANAGE_ACCOUNT_ACTION));
+}
+
+function clickClerkBillingNav(): boolean {
+  const labeled = document.querySelector(
+    "[data-localization-key='userProfile.navbar.billing']",
+  );
+  if (clickHtmlElement(labeled)) return true;
+
+  const navButtons = document.querySelectorAll(".cl-navbarButton");
+  for (const button of navButtons) {
+    const text = button.textContent?.replace(/\s+/g, " ").trim();
+    if (text === "Billing") {
+      return clickHtmlElement(button);
+    }
+  }
+  return false;
+}
+
+async function openClerkAccountBillingModal(
+  fallbackOpenUserProfile: (props: {
+    __experimental_startPath: string;
+  }) => void,
+): Promise<void> {
+  if (clickClerkUserButtonTrigger()) {
+    let openedManageAccount = false;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await waitMs(40);
+      if (clickClerkManageAccount()) {
+        openedManageAccount = true;
+        break;
+      }
+    }
+    if (!openedManageAccount) {
+      fallbackOpenUserProfile({
+        __experimental_startPath: CLERK_BILLING_START_PATH,
+      });
+    }
+  } else {
+    fallbackOpenUserProfile({
+      __experimental_startPath: CLERK_BILLING_START_PATH,
+    });
+  }
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await waitMs(60);
+    if (clickClerkBillingNav()) return;
+  }
+}
 
 interface HeaderUserSectionProps {
   currentProTheme?: ProUiThemeId;
@@ -145,8 +216,13 @@ export function HeaderUserSection({
 }: HeaderUserSectionProps) {
   const pathname = usePathname();
   const { userId, isLoaded: authLoaded } = useAuth();
+  const { openUserProfile } = useClerk();
   const { user } = useUser();
   const clientMounted = useClientMounted();
+  const [accountProfileStartPath, setAccountProfileStartPath] = useState<
+    string | undefined
+  >(undefined);
+  const openBillingPendingRef = useRef(false);
 
   /**
    * Sign-out teardown guard. Clerk's `<UserButton>` flips `userId` to null the
@@ -269,6 +345,25 @@ export function HeaderUserSection({
     };
   }, [userId, clientMounted, authLoaded]);
 
+  useEffect(() => {
+    if (
+      !openBillingPendingRef.current ||
+      accountProfileStartPath !== CLERK_BILLING_START_PATH
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        await openClerkAccountBillingModal(openUserProfile);
+        openBillingPendingRef.current = false;
+        setAccountProfileStartPath(undefined);
+      })();
+    }, 40);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [accountProfileStartPath, openUserProfile]);
+
   // Never signed in on this page → nothing to render. When signing out we keep
   // the tree (and the Clerk UserButton) mounted until `window.location.replace`
   // reloads, to avoid the React 19 portal-teardown crash.
@@ -307,17 +402,18 @@ export function HeaderUserSection({
   const isComplimentaryGrant = isNonStripePersonalPlanGrant(
     personalPlanAccessType,
   );
-  const plansNavLabel = headerPlansNavLabel(personalPlanAccessType);
   const plansTooltip = isComplimentaryGrant
     ? `${personalAccountPlanLabel} is complimentary — not a paid subscription. View plans & pricing.`
     : "Plans & Pricing";
-  const plansAriaLabel = isComplimentaryGrant
-    ? "Complimentary plan — view pricing"
-    : "Plans";
   const planNameTooltip = isComplimentaryGrant
-    ? `${personalAccountPlanLabel} is complimentary — not a paid subscription. View plans & pricing.`
-    : `${personalAccountPlanLabel} plan — view pricing`;
+    ? `${personalAccountPlanLabel} is complimentary — not a paid subscription. View account billing.`
+    : `${personalAccountPlanLabel} plan — view account billing`;
   const PlansIcon = isComplimentaryGrant ? Gift : CreditCard;
+
+  function openAccountBilling() {
+    openBillingPendingRef.current = true;
+    setAccountProfileStartPath(CLERK_BILLING_START_PATH);
+  }
 
   return (
     <div
@@ -341,10 +437,10 @@ export function HeaderUserSection({
                 isPricing && "bg-muted/70 text-foreground",
               )}
               aria-current={isPricing ? "page" : undefined}
-              aria-label={plansAriaLabel}
+              aria-label="Plans"
             >
               <PlansIcon className="size-3.5 shrink-0" aria-hidden />
-              <span className="hidden min-[420px]:inline">{plansNavLabel}</span>
+              <span className="hidden min-[420px]:inline">Plans</span>
             </Link>
           </HeaderNavTooltip>
           {showTeacherNavButton ? (
@@ -374,25 +470,34 @@ export function HeaderUserSection({
         >
         {portalsReady ? (
           <HeaderNavTooltip label={planNameTooltip}>
-            <Link
-              href="/pricing"
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={openAccountBilling}
               className={cn(
-                "mr-0.5 inline-block max-w-[5.5rem] shrink-0 truncate text-xs font-medium text-muted-foreground transition-colors hover:text-foreground min-[380px]:max-w-[7rem] sm:mr-1 sm:max-w-[9rem] sm:text-sm lg:max-w-[11rem]",
+                "mr-0.5 h-auto max-w-[5.5rem] shrink-0 truncate px-0 py-0 text-xs font-medium text-muted-foreground hover:bg-transparent hover:text-foreground min-[380px]:max-w-[7rem] sm:mr-1 sm:max-w-[9rem] sm:text-sm lg:max-w-[11rem]",
                 isPro && "text-foreground",
               )}
               aria-label={planNameTooltip}
             >
               {personalAccountPlanLabel}
-            </Link>
+            </Button>
           </HeaderNavTooltip>
         ) : null}
         {portalsReady ? (
           <>
             <span
+              data-header-account-menu
               className="inline-flex shrink-0 items-center"
               title="Account — profile, account details, appearance, and billing"
             >
-              <UserButton>
+              <UserButton
+                userProfileProps={
+                  accountProfileStartPath
+                    ? { __experimental_startPath: accountProfileStartPath }
+                    : undefined
+                }
+              >
                 {isAdmin && !hidePlatformAdminLink ? (
                   <UserButton.MenuItems>
                     <UserButton.Link
