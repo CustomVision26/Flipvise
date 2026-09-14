@@ -14,14 +14,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import {
-  TEAM_ADMIN_DASHBOARD_NAV,
   isTeamAdminOverviewActive,
+  teamAdminAddonNavFlagsForTeam,
+  teamAdminDashboardNavForAddons,
+  type TeamAdminAddonNavTeamSets,
   type TeamAdminNavItem,
   type TeamAdminNavLeaf,
 } from "@/lib/team-admin-dashboard-nav";
 import {
+  buildTeamAdminLiveClassroomPath,
   buildTeamAdminMembersPath,
   buildTeamAdminNavHref,
+  TEAM_ADMIN_LIVE_CLASSROOM_PATH,
 } from "@/lib/team-admin-url";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +58,9 @@ function hrefForNavLeaf(
   teamId: number | null,
   teamMemberId: number,
 ): string {
+  if (item.path === TEAM_ADMIN_LIVE_CLASSROOM_PATH) {
+    return buildTeamAdminLiveClassroomPath(teamId);
+  }
   return buildTeamAdminNavHref(item.path, teamId, teamMemberId);
 }
 
@@ -127,13 +134,21 @@ function TeamAdminNavDropdownItem({
 export function TeamAdminDashboardNav({
   onNavigate,
   className,
+  addonNav,
 }: {
   onNavigate?: () => void;
   className?: string;
+  addonNav?: TeamAdminAddonNavTeamSets;
 }) {
   const pathname = usePathname() ?? "";
   const { teamId, teamMemberId } = useTeamAdminNavWorkspace();
   const overviewActive = isTeamAdminOverviewActive(pathname);
+  const sections = teamAdminDashboardNavForAddons(
+    teamAdminAddonNavFlagsForTeam(
+      teamId,
+      addonNav ?? { liveClassroomTeamIds: [], memberAddonTeamIds: [] },
+    ),
+  );
 
   return (
     <nav
@@ -155,7 +170,7 @@ export function TeamAdminDashboardNav({
         </Link>
       </div>
 
-      {TEAM_ADMIN_DASHBOARD_NAV.map((section, sectionIndex) => (
+      {sections.map((section, sectionIndex) => (
         <div key={section.title}>
           {sectionIndex > 0 ? <Separator className="mb-5 bg-border/60" /> : null}
           <div className="mb-2 space-y-0.5 px-2.5">
@@ -208,9 +223,11 @@ export function TeamAdminDashboardNav({
 export function TeamAdminDashboardNavPanel({
   onNavigate,
   className,
+  addonNav,
 }: {
   onNavigate?: () => void;
   className?: string;
+  addonNav?: TeamAdminAddonNavTeamSets;
 }) {
   return (
     <div
@@ -220,7 +237,7 @@ export function TeamAdminDashboardNavPanel({
         className,
       )}
     >
-      <TeamAdminDashboardNav onNavigate={onNavigate} />
+      <TeamAdminDashboardNav onNavigate={onNavigate} addonNav={addonNav} />
     </div>
   );
 }

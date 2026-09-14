@@ -8,6 +8,8 @@ import {
   LayoutList,
   ListChecks,
   Mail,
+  Presentation,
+  Puzzle,
   Send,
   Shield,
   Timer,
@@ -18,10 +20,12 @@ import {
   isTeamAdminActiveRecallAnalyticsPath,
   isTeamAdminActiveRecallPath,
   isTeamAdminActiveRecallSessionCardsPath,
+  isTeamAdminAddonsPath,
   isTeamAdminAssignDecksToMembersPath,
   isTeamAdminInviteHistoryPath,
   isTeamAdminInvitePendingPath,
   isTeamAdminInviteSendPath,
+  isTeamAdminLiveClassroomPath,
   isTeamAdminMembersHistoryPath,
   isTeamAdminMembersPath,
   isTeamAdminQuizFormatsPath,
@@ -33,10 +37,12 @@ import {
   isTeamAdminWsHistoryPath,
   TEAM_ADMIN_ACTIVE_RECALL_PATH,
   TEAM_ADMIN_ACTIVE_RECALL_SESSION_CARDS_PATH,
+  TEAM_ADMIN_ADDONS_PATH,
   TEAM_ADMIN_ASSIGN_DECKS_TO_MEMBERS_PATH,
   TEAM_ADMIN_INVITE_HISTORY_PATH,
   TEAM_ADMIN_INVITE_PENDING_PATH,
   TEAM_ADMIN_INVITE_SEND_PATH,
+  TEAM_ADMIN_LIVE_CLASSROOM_PATH,
   TEAM_ADMIN_MEMBERS_HISTORY_PATH,
   TEAM_ADMIN_MEMBERS_PATH,
   TEAM_ADMIN_QUIZ_FORMATS_PATH,
@@ -210,6 +216,74 @@ export const TEAM_ADMIN_DASHBOARD_NAV: TeamAdminNavSection[] = [
     ],
   },
 ];
+
+/** Paid or assigned add-ons that belong on Team Admin for the current workspace. */
+export type TeamAdminAddonNavFlags = {
+  showLiveClassroom: boolean;
+  showMemberAddons: boolean;
+};
+
+export type TeamAdminAddonNavTeamSets = {
+  liveClassroomTeamIds: number[];
+  memberAddonTeamIds: number[];
+};
+
+export function teamAdminAddonNavFlagsForTeam(
+  teamId: number | null,
+  sets: TeamAdminAddonNavTeamSets,
+): TeamAdminAddonNavFlags {
+  if (teamId == null || teamId <= 0) {
+    return { showLiveClassroom: false, showMemberAddons: false };
+  }
+  return {
+    showLiveClassroom: sets.liveClassroomTeamIds.includes(teamId),
+    showMemberAddons: sets.memberAddonTeamIds.includes(teamId),
+  };
+}
+
+const TEAM_ADMIN_MEMBER_ADDONS_NAV_ITEM: TeamAdminNavItem = {
+  title: "Member add-ons",
+  path: TEAM_ADMIN_ADDONS_PATH,
+  icon: Puzzle,
+  isActive: isTeamAdminAddonsPath,
+};
+
+const TEAM_ADMIN_LIVE_CLASSROOM_NAV_ITEM: TeamAdminNavItem = {
+  title: "Live Classroom™",
+  path: TEAM_ADMIN_LIVE_CLASSROOM_PATH,
+  icon: Presentation,
+  isActive: isTeamAdminLiveClassroomPath,
+};
+
+/**
+ * Inserts the Add-ons sidebar block only when this workspace has a paid or
+ * assigned add-on that is compatible with its plan.
+ */
+export function teamAdminDashboardNavForAddons(
+  flags: TeamAdminAddonNavFlags,
+): TeamAdminNavSection[] {
+  const items: TeamAdminNavItem[] = [];
+  if (flags.showMemberAddons) items.push(TEAM_ADMIN_MEMBER_ADDONS_NAV_ITEM);
+  if (flags.showLiveClassroom) items.push(TEAM_ADMIN_LIVE_CLASSROOM_NAV_ITEM);
+  if (items.length === 0) return TEAM_ADMIN_DASHBOARD_NAV;
+
+  const addonsSection: TeamAdminNavSection = {
+    title: "Add-ons",
+    description: flags.showLiveClassroom
+      ? "Member add-ons and organization add-ons such as Live Classroom™."
+      : "Member add-on availability for this workspace.",
+    items,
+  };
+
+  const nav = [...TEAM_ADMIN_DASHBOARD_NAV];
+  const studyIdx = nav.findIndex((section) => section.title === "Study Modes");
+  if (studyIdx >= 0) {
+    nav.splice(studyIdx, 0, addonsSection);
+  } else {
+    nav.push(addonsSection);
+  }
+  return nav;
+}
 
 export function countTeamAdminNavLeaves(
   sections: TeamAdminNavSection[] = TEAM_ADMIN_DASHBOARD_NAV,

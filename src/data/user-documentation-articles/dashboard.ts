@@ -36,7 +36,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "Chips scroll in a soft accent ticker in the top bar; each add-on keeps a distinct tint (e.g. teal for AI Essay, rose for Live Classroom).",
           "Locked chips open Unlock Feature (monthly/yearly Stripe add-on checkout).",
           "Unlocked AI Essay opens the AI Essay workspace; hover pauses the marquee.",
-          "Access also comes from Team Admin assignment or a platform admin grant.",
+          "A Live Classroom™ button on Personal Dashboard appears only when that add-on is paid or assigned on your account.",
         ],
       },
       {

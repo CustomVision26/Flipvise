@@ -46,7 +46,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Info opens workspace details (name, plan, owner, created date, and setup fields saved when the workspace was created).",
           "Workspace overview stats — workspaces, members, decks, cards vs plan limits.",
           "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace.",
-          "Main tabs: Members, Deck Manager, Workspace history, Invite members, Quiz results.",
+          "Main tabs: Members, Deck Manager, Add-ons (only when a paid or assigned add-on matches this workspace plan), Workspace history, Invite members, Quiz results.",
         ],
       },
       {
@@ -363,7 +363,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "workflow",
         title: "Typical session flow",
         bullets: [
-          "Open /dashboard/live-classroom?team=<id> (also linked from the Live Classroom™ dashboard banner).",
+          "Open /dashboard/live-classroom?team=<id> (also linked from Personal Dashboard and Team Admin → Add-ons → Live Classroom™ when that add-on is paid or assigned on a compatible plan).",
           "Assign members to the Live Classroom team under Settings before they can join.",
           "Start Session: choose deck or AI warm-up, battle type/mode, timing, and team assignment.",
           "Assigned members join with the lobby code (Join with code); host randomizes battle teams, then starts.",

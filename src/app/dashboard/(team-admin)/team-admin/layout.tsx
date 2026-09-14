@@ -8,6 +8,7 @@ import { tryTeamQuery } from "@/lib/team-query-fallback";
 import { TeamAdminDashboardShell } from "@/components/team-admin-dashboard-shell";
 import { TeamAdminTopDashboardBar } from "@/components/team-admin-top-dashboard-bar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { listTeamAdminAddonNavTeamSets } from "@/lib/resolve-team-admin-addon-nav";
 
 export const metadata: Metadata = {
   title: "Team Admin",
@@ -42,6 +43,8 @@ export default async function TeamAdminRouteGroupLayout({
     redirect("/dashboard");
   }
 
+  const addonNav = await listTeamAdminAddonNavTeamSets(userId);
+
   return (
     <section
       aria-label="Team administration"
@@ -49,6 +52,7 @@ export default async function TeamAdminRouteGroupLayout({
       data-route-group="team-admin"
     >
       <TeamAdminDashboardShell
+        addonNav={addonNav}
         topBar={
           <Suspense fallback={<TeamAdminTopBarSkeleton />}>
             <TeamAdminTopDashboardBar />

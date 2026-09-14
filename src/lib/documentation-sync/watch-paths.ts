@@ -57,6 +57,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/deck-delete-warning-copy.ts",
     "src/db/queries/deck-delete-impact.ts",
     "src/components/dashboard-addons-banner.tsx",
+    "src/components/live-classroom-dashboard-entry.tsx",
+    "src/app/dashboard/page.tsx",
     "src/components/docs-ui-guide-provider.tsx",
     "src/lib/flipvise-ui-guides.ts",
   ],
@@ -270,6 +272,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/team-admin-dashboard-nav.ts",
     "src/components/team-admin-dashboard-nav.tsx",
     "src/components/team-admin-home.tsx",
+    "src/lib/resolve-team-admin-addon-nav.ts",
   ],
   members: [
     "src/components/team-admin-invitation-tables.tsx",

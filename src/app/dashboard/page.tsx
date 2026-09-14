@@ -3,8 +3,7 @@ import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { currentUser } from "@/lib/clerk-auth";
-import { getAccessContext } from "@/lib/access";
-import { userCanEnterLiveClassroomBridge } from "@/lib/live-classroom-bridge";
+import { accessHasAddon, getAccessContext } from "@/lib/access";
 import { teamOwnsLiveClassroom } from "@/lib/live-classroom-access";
 import { getLiveClassroomTeacherGrant } from "@/db/queries/live-classroom";
 import { redirectIfAccountRecoveryIncomplete } from "@/lib/account-recovery-gate";
@@ -55,6 +54,7 @@ import { AiDocumentStudioDashboardEntry } from "@/components/ai-document-studio-
 import { LiveClassroomDashboardEntry } from "@/components/live-classroom-dashboard-entry";
 import {
   hasAnyAiDocumentStudioAddon,
+  LIVE_CLASSROOM_ADDON_KEY,
 } from "@/lib/addon-keys";
 import { DECKS_VIEW_COOKIE, resolveViewMode } from "@/lib/view-mode";
 import { TEAM_CONTEXT_COOKIE } from "@/lib/team-context-cookie";
@@ -718,10 +718,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showAiDocumentStudio = hasAnyAiDocumentStudioAddon(
     access.activeAddonKeys,
   );
-  const showLiveClassroom = await userCanEnterLiveClassroomBridge(
-    userId,
-    access,
-  );
+  const showLiveClassroom = accessHasAddon(access, LIVE_CLASSROOM_ADDON_KEY);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

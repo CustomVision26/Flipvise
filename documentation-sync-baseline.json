@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-09-14T19:47:12.899Z",
+  "updatedAt": "2026-09-14T21:20:01.611Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "96be8b8bcda20619bb35d1f2031267bdddfbee7d24f7d2c7403a3a02e94f06bc",
@@ -11,15 +11,15 @@
       "docFingerprint": "b8a13baa5adcefa0e677765c5ffe78ecf600c3b358ea9c9f9fdc2e61fd75060c"
     },
     "personal-dashboard": {
-      "watchFingerprint": "780eb3e473b50d33375c3b7c77956aded1923c445774df78c0bad06ea2f7037e",
-      "docFingerprint": "a9a7caef1270cde921706681315d432a579a1f50ea6b6a5a99f4a009c13553d6"
+      "watchFingerprint": "cd25ecd90a3745d5f36e48977c54a72efa963a89a3e83316386f29a3f2eb5bf5",
+      "docFingerprint": "3609181db09a481ef2784a16a9b9599585c2d797a6082da1504f96af569d53c3"
     },
     "team-workspace-dashboard": {
-      "watchFingerprint": "dfaf435dca1a7ea228a4271c8c8138f7613fa6484f7806aa544ede02d11b54c6",
+      "watchFingerprint": "dff7f722db02e4749b6361430531fd3cb942471548f68db40ef92df7de2d54f3",
       "docFingerprint": "ec643fcd9b1f9fa96bd1b50ecfb4cf41213227023a698b808719a969f484cad4"
     },
     "manage-workspaces": {
-      "watchFingerprint": "78b629e3269cc2195d101e1247cb49b2f954a0028a3cc107ab249c655de0c852",
+      "watchFingerprint": "2eb054ec40ce0b030945397c9261669939e66a816c9746c7c162bf4cc69fb380",
       "docFingerprint": "7e7988ed8d28c90ca0537e78da282909d6a59a0749e35667ca479fefa41e1847"
     },
     "deck-editor": {
@@ -155,16 +155,16 @@
       "docFingerprint": "7566f9ba03902c638d1c395233e8c8dce2300b147a75f73df1fb06464dfbf88a"
     },
     "team-admin-overview": {
-      "watchFingerprint": "1e177aaf37ed77fa8047f3f4fd351d2167f3589117b601c8250e1db1e3476bdc",
-      "docFingerprint": "acf3c67b2ddca4aea02fc96a9968c202fb76eb7eedbd906d0c64e34af18530dd"
+      "watchFingerprint": "c979fc8a76077e5f13d4e2f6d51b868b28a6b0f7f1d37fdbbff38365f9e1ddaa",
+      "docFingerprint": "bd5f04bb0cfaf922bb05d847b90f4f0ddfdf41a79f6542f7ca5b8a92f6541656"
     },
     "team-admin-add-ons": {
       "watchFingerprint": "d9ee1ab1ce12f9e36d8612e523578dc99de1a4a90d57c1cc541f6ac4b951c477",
-      "docFingerprint": "1f5cc10a02bcbe5d6d35dd19e789af9fed576e50942e5023f23da609b74e8120"
+      "docFingerprint": "dbdccf3922e7f085d36dcdf71b9c1175c0bd2d8b673356d3b96096403284045b"
     },
     "live-classroom": {
       "watchFingerprint": "1b4f3efb5e1c6f015a5202ed619acaae33daaf82e9797b8e0ba595c672ee0fb4",
-      "docFingerprint": "30b617ea19313fd1de3e3f75323a77f16e6f69742b3c07585064e03d895b72b6"
+      "docFingerprint": "f41b26c7aa9f2425e264bdb6eeb64a79149cda559ace1f175b66e175b2977423"
     },
     "members": {
       "watchFingerprint": "464d03f514e4f0a9d905c83de529a3d45359521970a3b9a9ffe49b079a4340ba",

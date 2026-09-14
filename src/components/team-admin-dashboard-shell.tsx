@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TeamAdminDashboardNavPanel } from "@/components/team-admin-dashboard-nav";
+import type { TeamAdminAddonNavTeamSets } from "@/lib/team-admin-dashboard-nav";
 
 function TeamAdminNavSkeleton() {
   return (
@@ -28,10 +29,12 @@ function TeamAdminNavSkeleton() {
 export function TeamAdminDashboardShell({
   children,
   topBar,
+  addonNav,
 }: {
   children: ReactNode;
   /** Server-rendered Personal / Team / Team Admin dashboard shortcuts. */
   topBar?: ReactNode;
+  addonNav?: TeamAdminAddonNavTeamSets;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -40,7 +43,7 @@ export function TeamAdminDashboardShell({
       <aside className="hidden w-60 shrink-0 lg:block xl:w-64">
         <div className="sticky top-20">
           <Suspense fallback={<TeamAdminNavSkeleton />}>
-            <TeamAdminDashboardNavPanel />
+            <TeamAdminDashboardNavPanel addonNav={addonNav} />
           </Suspense>
         </div>
       </aside>
@@ -67,6 +70,7 @@ export function TeamAdminDashboardShell({
                   <TeamAdminDashboardNavPanel
                     className="border-0 bg-transparent p-0 shadow-none backdrop-blur-none"
                     onNavigate={() => setMobileOpen(false)}
+                    addonNav={addonNav}
                   />
                 </Suspense>
               </div>

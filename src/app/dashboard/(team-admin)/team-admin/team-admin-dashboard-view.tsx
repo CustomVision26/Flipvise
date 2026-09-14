@@ -31,7 +31,8 @@ import {
   buildTeamAdminWsHistoryPath,
 } from "@/lib/team-admin-url";
 import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
-import { TEAM_ADMIN_SIDEBAR_NAV_ENABLED } from "@/lib/team-admin-dashboard-nav";
+import { TEAM_ADMIN_SIDEBAR_NAV_ENABLED, teamAdminAddonNavFlagsForTeam } from "@/lib/team-admin-dashboard-nav";
+import { listTeamAdminAddonNavTeamSets } from "@/lib/resolve-team-admin-addon-nav";
 import { teamAdminPageMetaForPath } from "@/lib/team-admin-page-meta";
 import { listTeamWorkspaceEventsForTeam } from "@/db/queries/team-workspace-events";
 import { listTeamMemberHistoryForTeam } from "@/db/queries/team-member-history";
@@ -79,6 +80,11 @@ export default async function TeamAdminDashboardView({
     planLabel,
     ownerDisplayName,
   } = ctx;
+
+  const addonNavFlags = teamAdminAddonNavFlagsForTeam(
+    selected.id,
+    await listTeamAdminAddonNavTeamSets(userId),
+  );
 
   const pageMeta = teamAdminPageMetaForPath(buildCanonicalPath(0, 0).split("?")[0] ?? "");
   const limits = limitsForPlan(selected.planSlug);
@@ -368,7 +374,7 @@ export default async function TeamAdminDashboardView({
       >
         {pageMeta.isOverview ? (
           <>
-            <TeamAdminHome />
+            <TeamAdminHome addonNavFlags={addonNavFlags} />
             <TeamAdminWorkspaceStatsPanel
               workspacesCount={teamsForSubscriber.length}
               maxWorkspaces={limits.maxTeams}

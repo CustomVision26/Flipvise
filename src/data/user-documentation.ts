@@ -68,6 +68,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Edit deck (from a deck card menu) updates the same metadata and optional cover image; the cover is not a flashcard.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
           "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
+          "A Live Classroom™ button appears on Personal Dashboard only when that add-on is paid or assigned (admin grant) on your account.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
           "In the Flipvise mobile app, “Offline study” and “Make available offline” buttons appear next to Add Deck; both are hidden in a web browser and the installed website (PWA) because they only work in the native iOS/Android app.",
@@ -977,8 +978,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
           "Info opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation).",
           "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace.",
-          "Member add-ons remain at /dashboard/team-admin/add-ons; AI Essay is plan-owner personal only for now (member access coming soon).",
-          "Live Classroom™ opens from the dashboard banner or /dashboard/live-classroom when the organization owns the Live Classroom add-on.",
+          "The Add-ons sidebar appears only when this workspace has a paid or assigned add-on that is compatible with its plan (for example Live Classroom™ on Education Gold).",
+          "Live Classroom™ opens from Team Admin → Add-ons when that add-on is active, or from /dashboard/live-classroom.",
         ],
         requirements: [
           "Team owner or invited team_admin role.",
@@ -996,7 +997,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Review member add-on availability and organization add-ons such as Live Classroom™. AI Essay member assignment is coming soon.",
         howItWorks: [
-          "Open /dashboard/team-admin/add-ons for the selected workspace.",
+          "Open /dashboard/team-admin/add-ons for the selected workspace when Member add-ons is listed under Add-ons.",
           "AI Essay is not assignable to workspace members yet — only the plan owner can use it on their personal dashboard.",
           "Workspace members who open AI Essay see a Coming soon message until member add-ons ship.",
           "Live Classroom™ is an organization add-on purchased by the subscription owner — then assign members to the Live Classroom team in Settings; participant limits inherit licensed seats.",
@@ -1017,6 +1018,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Run real-time interactive sessions with warm-up battles, team competitions, exit tickets, strategy cards, projector mode, and AI session reports.",
         howItWorks: [
           "Visible when the organization owns the Live Classroom™ add-on (subscription owner purchase or complimentary admin grant to that owner).",
+          "Team Admin shows an Add-ons → Live Classroom™ link only when that add-on is paid or assigned and the workspace plan is eligible.",
+          "Personal Dashboard shows the same Live Classroom™ button only for accounts with that paid or assigned add-on.",
           "Assign workspace members to the Live Classroom™ team under Settings — membership alone does not grant access.",
           "Sidebar: Dashboard, Start Session, Join with code, Scheduled Sessions, Battle History, Reports, Settings.",
           "Start Session configures name, deck or AI warm-up, battle type/mode, timing, strategy cards, and team assignment.",
