@@ -49,12 +49,20 @@ export async function resolveTeamAdminTopDashboardLinks(
     manageTeams[0]!;
 
   const isOwner = selected.ownerUserId === userId;
-  let teamMemberUrlParam = 0;
-  if (!isOwner) {
-    const member = await getMemberRecord(selected.id, userId);
-    teamMemberUrlParam = member?.id ?? 0;
+  // Owners already use Personal Dashboard for decks (and are already on Team Admin
+  // here). Team Dashboard is the invited-member surface — do not offer it.
+  if (isOwner) {
+    return {
+      personalDashboardHref,
+      teamDashboardHref: null,
+      teamDashboardTeamId: null,
+      teamAdminHref: null,
+      teamAdminTeamId: null,
+    };
   }
 
+  const member = await getMemberRecord(selected.id, userId);
+  const teamMemberUrlParam = member?.id ?? 0;
   const teamDashboardHref = buildTeamWorkspaceDashboardPath({
     teamId: selected.id,
     ownerUserId: selected.ownerUserId,

@@ -273,6 +273,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/team-admin-dashboard-nav.tsx",
     "src/components/team-admin-home.tsx",
     "src/lib/resolve-team-admin-addon-nav.ts",
+    "src/lib/resolve-team-admin-top-dashboard-links.ts",
+    "src/components/team-admin-top-dashboard-bar.tsx",
+    "src/components/teacher-top-dashboard-buttons.tsx",
   ],
   members: [
     "src/components/team-admin-invitation-tables.tsx",
@@ -315,6 +318,9 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/teacher-dashboard-shell.tsx",
     "src/lib/teacher-dashboard-nav.ts",
     "src/lib/teacher-access.ts",
+    "src/lib/resolve-teacher-top-dashboard-links.ts",
+    "src/components/teacher-top-dashboard-bar.tsx",
+    "src/components/teacher-top-dashboard-buttons.tsx",
   ],
   "teacher-ai-content-tools": [
     "src/app/teacher/lesson-builder/page.tsx",

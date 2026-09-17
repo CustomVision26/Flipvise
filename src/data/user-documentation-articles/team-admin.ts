@@ -42,7 +42,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "structure",
         title: "Dashboard structure",
         bullets: [
-          "Quick navigation — personal dashboard vs workspace dashboard.",
+          "Dashboards bar — owners see Personal Dashboard only. Team Dashboard is omitted because owners already use Personal Dash for workspace decks; Team Admin is omitted because they are already on that dashboard. Invited co-admins still get Team Dashboard (and Team Admin).",
           "Info opens workspace details (name, plan, owner, created date, and setup fields saved when the workspace was created).",
           "Workspace overview stats — workspaces, members, decks, cards vs plan limits.",
           "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace.",

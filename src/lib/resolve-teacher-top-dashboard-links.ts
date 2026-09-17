@@ -11,7 +11,7 @@ import { buildTeamWorkspaceDashboardPath } from "@/lib/team-workspace-url";
 
 export type TeacherTopDashboardLinks = {
   personalDashboardHref: string;
-  /** `/dashboard?team=…` when an education workspace is available. */
+  /** `/dashboard?team=…` for invited co-admins only — owners use Personal Dashboard. */
   teamDashboardHref: string | null;
   teamDashboardTeamId: number | null;
   /** Team Admin when the viewer can manage an education workspace. */
@@ -59,10 +59,20 @@ export async function resolveTeacherTopDashboardLinks(
     manageTeams[0]!;
 
   const isOwner = selected.ownerUserId === userId;
-  let teamMemberUrlParam = 0;
-  if (!isOwner) {
-    const member = await getMemberRecord(selected.id, userId);
-    teamMemberUrlParam = member?.id ?? 0;
+  const teamMemberUrlParam = isOwner
+    ? 0
+    : ((await getMemberRecord(selected.id, userId))?.id ?? 0);
+  const teamAdminHref = buildTeamAdminPath(selected.id, teamMemberUrlParam);
+
+  // Owners browse owned-workspace decks on Personal Dashboard, not `/dashboard?team=`.
+  if (isOwner) {
+    return {
+      personalDashboardHref,
+      teamDashboardHref: null,
+      teamDashboardTeamId: null,
+      teamAdminHref,
+      teamAdminTeamId: selected.id,
+    };
   }
 
   const teamDashboardHref = buildTeamWorkspaceDashboardPath({
@@ -71,8 +81,6 @@ export async function resolveTeacherTopDashboardLinks(
     planSlug: selected.planSlug,
     teamMemberUrlParam,
   });
-
-  const teamAdminHref = buildTeamAdminPath(selected.id, teamMemberUrlParam);
 
   return {
     personalDashboardHref,

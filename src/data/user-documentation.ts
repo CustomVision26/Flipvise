@@ -974,6 +974,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Central hub for members, deck assignment, invites, quiz settings, and workspace history.",
         howItWorks: [
           "Access via workspace switcher → WS Admin Dash (invited workspaces) or Team Admin Dash (personal), or /dashboard/team-admin?team= and teamMemberId=. The member Team Dashboard is /dashboard?team=<id> only.",
+          "The Dashboards bar: owners see Personal Dashboard only (Team Dashboard and Team Admin are omitted — Team Dashboard duplicates Personal Dash, and they are already on Team Admin). Invited co-admins still see Team Dashboard.",
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
           "Info opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation).",
@@ -1207,7 +1208,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Open from the header Teacher link when you have Education Plus or education team access.",
           "Welcome card shows your plan badge (Education Plus, Education Gold, or Education Enterprise).",
           "Sidebar groups tools: AI content tools, Classroom management, and Resources.",
-          "Education Gold/Enterprise subscribers with team admin access see a Team Admin Dashboard shortcut.",
+          "Education Gold/Enterprise subscribers with team admin access see a Team Admin Dashboard shortcut. Owners do not see a Team Dashboard shortcut there — Personal Dashboard already lists their workspace decks.",
           "Workspace selector in the sidebar scopes tools to personal or team context when applicable.",
         ],
         requirements: [

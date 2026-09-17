@@ -39,7 +39,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "Welcome card shows your plan badge and workspace guidance.",
           "Left sidebar lists AI content tools, Classroom management, and Resources.",
           "Workspace selector scopes deck pickers to personal or team context on Education Gold/Enterprise.",
-          "Team Admin Dashboard shortcut appears when you can manage an education team workspace.",
+          "Team Admin Dashboard shortcut appears when you can manage an education team workspace. Owners do not get a Team Dashboard shortcut — that surface is for invited members; owners use Personal Dashboard.",
         ],
       },
       {
