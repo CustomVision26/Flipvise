@@ -170,6 +170,16 @@ function DocPagePanel({
             Open create deck guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "manage-workspaces" ? (
+          <DocsUiGuideStartButton guideId="create-workspace">
+            Open create workspace guide
+          </DocsUiGuideStartButton>
+        ) : null}
+        {page.id === "invite-members" || page.id === "accept-team-invite" ? (
+          <DocsUiGuideStartButton guideId="invite-unregistered-member">
+            Open invite unregistered member guide
+          </DocsUiGuideStartButton>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -279,6 +289,28 @@ function articleSectionGuides(
   }
   if (pageId === "deck-editor" && sectionId === "source-import-review") {
     return [{ id: "add-card-from-source", label: "Open add from source guide" }];
+  }
+  if (pageId === "manage-workspaces" && sectionId === "actions") {
+    return [{ id: "create-workspace", label: "Open create workspace guide" }];
+  }
+  if (pageId === "team-admin-overview" && sectionId === "structure") {
+    return [{ id: "create-workspace", label: "Open create workspace guide" }];
+  }
+  if (pageId === "invite-members" && sectionId === "send") {
+    return [
+      {
+        id: "invite-unregistered-member",
+        label: "Open invite unregistered member guide",
+      },
+    ];
+  }
+  if (pageId === "accept-team-invite" && sectionId === "flow") {
+    return [
+      {
+        id: "invite-unregistered-member",
+        label: "Open invite unregistered member guide",
+      },
+    ];
   }
   return [];
 }

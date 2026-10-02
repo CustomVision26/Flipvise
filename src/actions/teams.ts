@@ -88,8 +88,9 @@ import {
 import { loopsSendTeamInvitationEmail } from "@/lib/loops";
 import { notifyNativeInboxPush } from "@/lib/notify-native-inbox-push";
 import {
-  allocateUniqueWorkspaceName,
+  WORKSPACE_DISPLAY_NAME_MAX,
   buildWorkspaceNameFromProfile,
+  resolveCreateWorkspaceDisplayName,
   workspaceCreateProfileSchema,
 } from "@/lib/workspace-creation-profile";
 import {
@@ -160,6 +161,12 @@ const createTeamSchema = workspaceCreateProfileSchema.and(
       .refine((v): v is (typeof WORKSPACE_CREATE_PLAN_IDS)[number] =>
         (WORKSPACE_CREATE_PLAN_IDS as readonly string[]).includes(v),
       ),
+    workspaceName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(WORKSPACE_DISPLAY_NAME_MAX)
+      .optional(),
   }),
 );
 
@@ -203,16 +210,21 @@ export async function createTeamAction(
     const existingNames = await getTeamNamesForOwner(userId, {
       includeInactive: true,
     });
-    const name = allocateUniqueWorkspaceName(
-      buildWorkspaceNameFromProfile(parsed.data),
-      existingNames,
-    );
-
-    const { planSlug, ...profileFields } = parsed.data;
+    const { planSlug, workspaceName: customWorkspaceName, ...profileFields } =
+      parsed.data;
     const profileParsed = workspaceCreateProfileSchema.safeParse(profileFields);
     if (!profileParsed.success) {
       return { ok: false, error: "Choose an option and fill in every required field." };
     }
+    const resolvedName = resolveCreateWorkspaceDisplayName({
+      suggestedBase: buildWorkspaceNameFromProfile(profileParsed.data),
+      customName: customWorkspaceName,
+      existingNames,
+    });
+    if (!resolvedName.ok) {
+      return { ok: false, error: resolvedName.error };
+    }
+    const name = resolvedName.name;
     const id = await insertTeam(userId, name, planSlug, profileParsed.data);
     if (!id) return { ok: false, error: "Could not create the workspace. Please try again." };
 

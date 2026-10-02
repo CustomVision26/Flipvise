@@ -8,7 +8,9 @@ export type DocsUiGuideId =
   | "ai-created-cards"
   | "manual-added-cards"
   | "manual-add-mcq"
-  | "add-card-from-source";
+  | "add-card-from-source"
+  | "create-workspace"
+  | "invite-unregistered-member";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -23,6 +25,8 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "manual-added-cards",
   "manual-add-mcq",
   "add-card-from-source",
+  "create-workspace",
+  "invite-unregistered-member",
 ];
 
 export type DocsUiGuideStep = {
@@ -551,6 +555,165 @@ export const ADD_CARD_FROM_SOURCE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+export const CREATE_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc("13 Flipvise - Team Tier Plan - Create a new workspace - 01.png"),
+    title: "Open Add Workspace",
+    caption:
+      "On Team Admin home, the selected workspace name appears as the subtitle and in the header switcher. Plan owners add another workspace with Add Workspace, or open Manage workspaces from the switcher.",
+  },
+  {
+    src: uiSrc("13 Flipvise - Team Tier Plan - Create a new workspace - 02.png"),
+    title: "Manage workspaces",
+    caption:
+      "Manage workspaces lists the workspaces you own (name, plan, rename, and delete) and a history of creates, renames, and deletes. Choose Add Workspace to open Create a team.",
+  },
+  {
+    src: uiSrc("13 Flipvise - Team Tier Plan - Create a new workspace - 03.png"),
+    title: "Choose who it is for",
+    caption:
+      "Pick Corporation or Government, Education Institution, Teacher or Tutor, Parent or Guardian, or Student or Study Group. That choice decides which details Flipvise uses for the suggested name.",
+  },
+  {
+    src: uiSrc("13 Flipvise - Team Tier Plan - Create a new workspace - 04.png"),
+    title: "Fill in the details",
+    caption:
+      "After you pick an option, fill every matching field (for Teacher or Tutor: level of education, school name, and class name). Use Change if you need a different option.",
+  },
+  {
+    src: uiSrc("13 Flipvise - Team Tier Plan - Create a new workspace - 05.png"),
+    title: "Review the name and create",
+    caption:
+      "Flipvise suggests an abbreviated workspace name from your details. You can edit that name, then choose Create team. Duplicate auto-generated names get a suffix such as -2.",
+  },
+  {
+    src: uiSrc("13 Flipvise - Team Tier Plan - Create a new workspace - 06.png"),
+    title: "New workspace listed",
+    caption:
+      "The new workspace appears in Your workspaces and in Workspace history. Back To Team Dashboard returns to Team Admin.",
+  },
+];
+
+const INVITE_UNREGISTERED_MEMBER_FILE =
+  "14 Flipvise - Team Tier Plan - Invite Unregistered Member";
+
+export const INVITE_UNREGISTERED_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 01.png`),
+    title: "Team Admin home",
+    caption:
+      "On Team Admin home, confirm the workspace name under the heading. The members table lists the owner. Use Team & members in the sidebar for roster, Send invite, Pending invitations, and Invitation history.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 02.png`),
+    title: "Send invite",
+    caption:
+      "Open Send invite. Choose the workspace, enter the invitee’s email and name, then pick Member or Team admin. Fill every field, then choose Send invitation. People without a Flipvise account get email; registered users see the invite in Inbox.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 03.png`),
+    title: "Copy the invitation link",
+    caption:
+      "After you send, Invitation link shows the /invite/team URL. Copy it if you need to share the link besides the email.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 04.png`),
+    title: "Pending invitations",
+    caption:
+      "Pending invitations lists open invites for this workspace. Use View URL to copy the link, or Revoke to withdraw it before it is accepted or expires.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 05.png`),
+    title: "Workspace history",
+    caption:
+      "Workspace history records when this workspace was created, renamed, or removed. Invitation status stays on Pending invitations and Invitation history.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 06.png`),
+    title: "Invitation email arrives",
+    caption:
+      "The invitee who does not yet have a Flipvise account receives email from Flipvise Studio, for example Invitation to join UC-K26.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 07.png`),
+    title: "Open Accept invitation",
+    caption:
+      "The email names the workspace and role. Choose Accept invitation, or paste the link into a browser. The invite expires in 3 days.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 08.png`),
+    title: "Accept on the invite page",
+    caption:
+      "You’re invited! shows the workspace and role. Sign in with the invited email, then choose Accept and join team. If another account is signed in, sign out and continue with the invited address.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 09.png`),
+    title: "Continue with the invited email",
+    caption:
+      "Clerk opens Continue to Flipvise Studio with the invited email filled in. Choose Continue to sign up or sign in.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 10.png`),
+    title: "Create a password",
+    caption:
+      "On Create your account, keep the invited email and set a password, then Continue. Sign up with a different email cannot accept this invite.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 11.png`),
+    title: "Verify your email",
+    caption:
+      "Enter the six-digit verification code sent to the invited address.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 12.png`),
+    title: "Copy the verification code",
+    caption:
+      "Open the Flipvise Studio verification email and copy the code. Do not share this code.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 13.png`),
+    title: "Account created",
+    caption:
+      "A Welcome to Flipvise toast confirms the new account. Return to You’re invited! and choose Accept and join team with the invited email.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 14.png`),
+    title: "Contact information",
+    caption:
+      "Complete account recovery step 1: phone number and mailing address, then Continue.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 15.png`),
+    title: "Account type",
+    caption:
+      "Step 2: choose how you use Flipvise (for example Student), then Continue.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 16.png`),
+    title: "Security questions",
+    caption:
+      "Step 3: choose three different security questions and answers known only to you, then Save and continue.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 17.png`),
+    title: "Personal Dashboard",
+    caption:
+      "The invitee’s Personal Dashboard opens on the Free plan. The account menu shows the invited email.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 18.png`),
+    title: "Open the invited workspace",
+    caption:
+      "In the workspace switcher, Invited workspaces lists the team (for example Team: UC-K26). Choose it to open Team Dashboard for that workspace.",
+  },
+  {
+    src: uiSrc(`${INVITE_UNREGISTERED_MEMBER_FILE} - 19.png`),
+    title: "Member on the roster",
+    caption:
+      "Back on Team Admin → Members roster, the owner sees the new member, role, and who added them.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -604,5 +767,17 @@ export const DOCS_UI_GUIDES: Record<
     title: "Add cards from a source",
     summary: "Import from a URL or file, review drafts, then save selected cards.",
     steps: ADD_CARD_FROM_SOURCE_GUIDE_STEPS,
+  },
+  "create-workspace": {
+    title: "Create a new workspace",
+    summary:
+      "Add another team workspace from Team Admin or Manage workspaces, then review the new row.",
+    steps: CREATE_WORKSPACE_GUIDE_STEPS,
+  },
+  "invite-unregistered-member": {
+    title: "Invite an unregistered member",
+    summary:
+      "Send a team invite to someone without a Flipvise account, then they sign up and join.",
+    steps: INVITE_UNREGISTERED_MEMBER_GUIDE_STEPS,
   },
 };

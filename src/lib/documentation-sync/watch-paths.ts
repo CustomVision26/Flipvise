@@ -18,17 +18,22 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "header-navigation": [
     "src/components/app-top-nav.tsx",
     "src/components/header-user-section.tsx",
+    "src/lib/flipvise-ui-guides.ts",
   ],
   "team-onboarding": [
     "src/components/team-onboarding-wizard.tsx",
     "src/components/workspace-create-profile-fields.tsx",
     "src/components/add-team-dialog.tsx",
+    "src/lib/workspace-creation-profile.ts",
   ],
   "team-workspace-dashboard": ["src/app/dashboard/workspace/page.tsx"],
   "manage-workspaces": [
     "src/app/dashboard/workspaces/page.tsx",
     "src/components/manage-workspaces-panel.tsx",
     "src/components/add-team-dialog.tsx",
+    "src/components/workspace-create-profile-fields.tsx",
+    "src/lib/workspace-creation-profile.ts",
+    "src/lib/flipvise-ui-guides.ts",
     "src/components/team-switcher-dropdown.tsx",
     "src/app/dashboard/(team-admin)/team-admin/team-admin-dashboard-view.tsx",
   ],
@@ -276,6 +281,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/resolve-team-admin-top-dashboard-links.ts",
     "src/components/team-admin-top-dashboard-bar.tsx",
     "src/components/teacher-top-dashboard-buttons.tsx",
+    "src/lib/flipvise-ui-guides.ts",
   ],
   members: [
     "src/components/team-admin-invitation-tables.tsx",
@@ -292,6 +298,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/app/dashboard/(team-admin)/team-admin/invite-members/invitation-history/page.tsx",
     "src/components/team-invite-form.tsx",
     "src/actions/teams.ts",
+    "src/lib/flipvise-ui-guides.ts",
   ],
   "quiz-results-admin": [
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-security/page.tsx",

@@ -124,7 +124,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
-          "Add workspaces up to your plan’s workspace limit from this page (Education Gold and Education Enterprise included). Open it from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for, then fill in the matching fields (Change hides those fields until you pick again); the unique name is generated from abbreviations (duplicates get a suffix such as -2).",
+          "Add workspaces up to your plan’s workspace limit from this page (Education Gold and Education Enterprise included). Open create workspace guide to follow adding another workspace from Team Admin or Manage workspaces. Open it from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for, then fill in the matching fields (Change hides those fields until you pick again); Flipvise suggests an abbreviated name you can edit before creating (duplicate auto-generated names get a suffix such as -2).",
           "Rename or delete workspaces you own.",
           "Workspace history shows create/rename/delete audit events.",
         ],
@@ -978,7 +978,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
           "Info opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation).",
-          "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace.",
+          "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace. Open create workspace guide for the screenshot walkthrough.",
           "The Add-ons sidebar appears only when this workspace has a paid or assigned add-on that is compatible with its plan (for example Live Classroom™ on Education Gold).",
           "Live Classroom™ opens from Team Admin → Add-ons when that add-on is active, or from /dashboard/live-classroom.",
         ],
@@ -1086,7 +1086,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/team-admin/invite-members/send-invite",
         purpose: "Send, track, and revoke team invitations.",
         howItWorks: [
-          "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only.",
+          "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only. Open invite unregistered member guide to follow sending the invite, the email, sign-up, and the new roster row.",
           "Invitee name is required and auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account.",
           "Pending Invitations lists revocable open invites.",
           "Invite History shows past invitations.",
@@ -1152,7 +1152,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Teacher or Tutor: education level, school name, and class name.",
           "Parent or Guardian: education level, school/child name, and class name.",
           "Student or Study Group: education level and class name.",
-          "Flipvise builds a unique workspace name from abbreviations of two or three fields (example: Caribbean + Kingston High School + Form 4B becomes Car-KHS-F4B). Duplicate names get a suffix such as -2.",
+          "Flipvise suggests a unique workspace name from abbreviations of two or three fields (example: Caribbean + Kingston High School + Form 4B becomes Car-KHS-F4B). You can edit that name before creating. Duplicate auto-generated names get a suffix such as -2.",
           "Submit creates the workspace, shows a confirmation toast, then opens the personal dashboard.",
           "Banner on personal dashboard links here if you have a team plan but no team yet.",
         ],
@@ -1165,7 +1165,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/invite/team/[token]",
         purpose: "Join a team workspace from an email invitation link.",
         howItWorks: [
-          "Shows team name and assigned role before acceptance.",
+          "Shows team name and assigned role before acceptance. Open invite unregistered member guide to follow email, sign-up with the invited address, and joining the workspace.",
           "Sign in with the invited email address, then accept.",
           "Redirects to dashboard in team context after success.",
         ],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import {
   allocateUniqueWorkspaceName,
   EDUCATION_LEVEL_OPTIONS,
   previewWorkspaceName,
+  WORKSPACE_DISPLAY_NAME_MAX,
   WORKSPACE_KIND_OPTIONS,
   WORKSPACE_NAME_EXAMPLES,
   type EducationLevel,
@@ -65,6 +66,7 @@ export function WorkspaceCreateProfileFields({
 }: WorkspaceCreateProfileFieldsProps) {
   const kind = draft.kind;
   const [pickingKind, setPickingKind] = useState(kind === "");
+  const [nameEdited, setNameEdited] = useState(false);
 
   useEffect(() => {
     if (kind === "") {
@@ -74,6 +76,10 @@ export function WorkspaceCreateProfileFields({
     setPickingKind(false);
   }, [kind]);
 
+  useEffect(() => {
+    setNameEdited(false);
+  }, [kind]);
+
   const example =
     kind === "" ? WORKSPACE_NAME_EXAMPLES.corporation_government : WORKSPACE_NAME_EXAMPLES[kind];
   const previewBase = previewWorkspaceName(draft);
@@ -81,6 +87,14 @@ export function WorkspaceCreateProfileFields({
     previewBase.length > 0
       ? allocateUniqueWorkspaceName(previewBase, existingWorkspaceNames)
       : "";
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  useEffect(() => {
+    if (nameEdited) return;
+    if (draftRef.current.workspaceName === previewName) return;
+    onChange({ ...draftRef.current, workspaceName: previewName });
+  }, [nameEdited, onChange, previewName]);
 
   function patch(partial: Partial<WorkspaceCreateDraft>) {
     onChange({ ...draft, ...partial });
@@ -291,17 +305,45 @@ export function WorkspaceCreateProfileFields({
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Workspace name</CardTitle>
               <CardDescription>
-                Built from abbreviations of your details so each workspace stays unique.
+                Suggested from abbreviations of your details. You can edit it before
+                creating the workspace.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {previewName ? (
-                <p className="font-medium text-foreground">{previewName}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Fill in the fields above to preview the workspace name.
-                </p>
-              )}
+            <CardContent className="space-y-2">
+              <Label htmlFor={`${idPrefix}-workspace-name`} className="sr-only">
+                Workspace name
+              </Label>
+              <Input
+                id={`${idPrefix}-workspace-name`}
+                value={draft.workspaceName}
+                onChange={(e) => {
+                  setNameEdited(true);
+                  patch({ workspaceName: e.target.value });
+                }}
+                placeholder={
+                  previewName
+                    ? previewName
+                    : "Fill in the fields above to preview the workspace name."
+                }
+                disabled={disabled || (!previewName && !nameEdited)}
+                maxLength={WORKSPACE_DISPLAY_NAME_MAX}
+                autoComplete="off"
+              />
+              {previewName && nameEdited && draft.workspaceName.trim() !== previewName ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-0 text-xs text-muted-foreground"
+                  disabled={disabled}
+                  onClick={() => {
+                    setNameEdited(false);
+                    patch({ workspaceName: previewName });
+                  }}
+                >
+                  Use suggested name ({previewName})
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         </>

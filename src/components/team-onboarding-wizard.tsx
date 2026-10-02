@@ -26,7 +26,8 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
   }));
   const [pending, setPending] = React.useState(false);
   const previewName = previewWorkspaceName(draft);
-  const canSubmit = previewName.length > 0;
+  const canSubmit =
+    previewName.length > 0 && draft.workspaceName.trim().length > 0;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,14 +38,18 @@ export function TeamOnboardingWizard({ planSlug }: TeamOnboardingWizardProps) {
     }
     setPending(true);
     try {
-      const result = await createTeamAction({ ...parsed.data, planSlug });
+      const result = await createTeamAction({
+        ...parsed.data,
+        planSlug,
+        workspaceName: draft.workspaceName.trim() || undefined,
+      });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       toast.success("Workspace created", {
-        description: previewName
-          ? `${previewName} is ready.`
+        description: draft.workspaceName.trim()
+          ? `${draft.workspaceName.trim()} is ready.`
           : "Opening your personal dashboard…",
       });
       router.push("/dashboard");

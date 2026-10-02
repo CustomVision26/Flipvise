@@ -4,6 +4,7 @@ import {
   allocateUniqueWorkspaceName,
   buildWorkspaceNameFromProfile,
   previewWorkspaceName,
+  resolveCreateWorkspaceDisplayName,
   workspaceCreationProfileDetailRows,
   WORKSPACE_NAME_EXAMPLES,
 } from "./workspace-creation-profile";
@@ -85,6 +86,38 @@ describe("allocateUniqueWorkspaceName", () => {
   });
 });
 
+describe("resolveCreateWorkspaceDisplayName", () => {
+  it("uses a custom name that differs from the suggestion", () => {
+    const result = resolveCreateWorkspaceDisplayName({
+      suggestedBase: "SJH-72",
+      customName: "St. Jago 7-2",
+      existingNames: ["Sci-Club"],
+    });
+    assert.deepEqual(result, { ok: true, name: "St. Jago 7-2" });
+  });
+
+  it("rejects a custom name that is already taken", () => {
+    const result = resolveCreateWorkspaceDisplayName({
+      suggestedBase: "SJH-72",
+      customName: "Sci-Club",
+      existingNames: ["Sci-Club"],
+    });
+    assert.deepEqual(result, {
+      ok: false,
+      error: "A workspace with this name already exists.",
+    });
+  });
+
+  it("keeps uniqueness suffixes when the custom name matches the suggestion", () => {
+    const result = resolveCreateWorkspaceDisplayName({
+      suggestedBase: "KHS-F4B",
+      customName: "KHS-F4B",
+      existingNames: ["khs-f4b"],
+    });
+    assert.deepEqual(result, { ok: true, name: "KHS-F4B-2" });
+  });
+});
+
 describe("previewWorkspaceName", () => {
   it("is empty until required fields are filled", () => {
     assert.equal(
@@ -96,6 +129,7 @@ describe("previewWorkspaceName", () => {
         schoolOrChildName: "",
         department: "",
         className: "",
+        workspaceName: "",
       }),
       "",
     );

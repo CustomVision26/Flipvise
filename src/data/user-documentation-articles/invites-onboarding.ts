@@ -20,7 +20,7 @@ export const INVITES_ONBOARDING_ARTICLES: DocArticle[] = [
         title: "Onboarding wizard",
         bullets: [
           "Prompts for who the workspace is for, then hides the other options. Use Change to pick a different option — matching fields stay hidden until you choose. Matching fields then appear (region, education level, school, department, class, or child name depending on the option).",
-          "Creates a unique workspace name from abbreviations of two or three fields (example: Kingston High School + Form 4B becomes KHS-F4B). Duplicate names get a suffix such as -2.",
+          "Creates a unique workspace name from abbreviations of two or three fields (example: Kingston High School + Form 4B becomes KHS-F4B). You can edit that suggested name before creating. Duplicate auto-generated names get a suffix such as -2.",
           "Creates the workspace linked to your subscription.",
           "Submit creates the workspace, shows a confirmation toast, then opens the personal dashboard.",
         ],
@@ -45,7 +45,7 @@ export const INVITES_ONBOARDING_ARTICLES: DocArticle[] = [
         id: "flow",
         title: "Acceptance flow",
         bullets: [
-          "Page shows team name and assigned role before you accept.",
+          "Page shows team name and assigned role before you accept. Open invite unregistered member guide if the invitee does not yet have a Flipvise account.",
           "Sign in with the invited email address.",
           "Accept joins the workspace and redirects to dashboard in team context.",
           "If you already have a Flipvise account, the invite appears in dashboard inbox; email is sent only when you are not registered yet.",

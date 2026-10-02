@@ -59,7 +59,8 @@ export function AddTeamDialog({
   }));
   const [isPending, setIsPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const canSubmit = previewWorkspaceName(draft).length > 0;
+  const canSubmit =
+    previewWorkspaceName(draft).length > 0 && draft.workspaceName.trim().length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +76,7 @@ export function AddTeamDialog({
       const result = await createTeamAction({
         ...parsed.data,
         planSlug,
+        workspaceName: draft.workspaceName.trim() || undefined,
       });
       if (!result.ok) {
         setError(result.error);
@@ -166,8 +168,9 @@ export function AddTeamDialog({
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">Create a team</DialogTitle>
           <DialogDescription className="text-sm">
-            Choose who this workspace is for. Flipvise builds a unique name from your
-            details. You can invite members after it is created.
+            Choose who this workspace is for. Flipvise suggests a unique name from
+            your details — you can edit it before creating. You can invite members
+            after it is created.
           </DialogDescription>
         </DialogHeader>
 

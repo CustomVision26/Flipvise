@@ -174,7 +174,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "actions",
         title: "Available actions",
         bullets: [
-          "Create new workspaces up to your plan’s workspace limit (including Education Gold / Education Enterprise). Open Manage Workspaces from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for and fill in the matching fields; Flipvise generates a unique abbreviated name and appends -2 if that name is already used.",
+          "Create new workspaces up to your plan’s workspace limit (including Education Gold / Education Enterprise). Open create workspace guide to follow the screenshots in order. Open Manage Workspaces from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for and fill in the matching fields; Flipvise suggests a unique abbreviated name you can edit before creating, and appends -2 if an auto-generated name is already used.",
           "Rename workspaces you own.",
           "Delete workspaces — this removes associated team data permanently.",
           "View workspace history (create, rename, delete audit events).",

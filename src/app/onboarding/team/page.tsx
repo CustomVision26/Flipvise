@@ -46,8 +46,8 @@ export default async function TeamOnboardingPage() {
             <h1 className="text-2xl font-bold tracking-tight">Create your team</h1>
             <p className="text-muted-foreground mt-1 text-sm max-w-md">
               You subscribed to a team plan. Choose who this workspace is for, then
-              fill in the details. Flipvise builds a unique workspace name from those
-              details.
+              fill in the details. Flipvise suggests a unique workspace name from those
+              details — you can edit it before creating.
             </p>
           </div>
         </div>

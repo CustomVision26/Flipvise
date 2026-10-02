@@ -104,6 +104,14 @@ export const workspaceCreateProfileSchema = z.discriminatedUnion("kind", [
 
 export type WorkspaceCreateProfile = z.infer<typeof workspaceCreateProfileSchema>;
 
+export const WORKSPACE_DISPLAY_NAME_MAX = 255;
+
+export const workspaceDisplayNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(WORKSPACE_DISPLAY_NAME_MAX);
+
 export type WorkspaceCreateDraft = {
   kind: WorkspaceKind | "";
   region: string;
@@ -112,6 +120,8 @@ export type WorkspaceCreateDraft = {
   schoolOrChildName: string;
   department: string;
   className: string;
+  /** Editable display name; filled from the abbreviation preview until the user changes it. */
+  workspaceName: string;
 };
 
 export const EMPTY_WORKSPACE_CREATE_DRAFT: WorkspaceCreateDraft = {
@@ -122,6 +132,7 @@ export const EMPTY_WORKSPACE_CREATE_DRAFT: WorkspaceCreateDraft = {
   schoolOrChildName: "",
   department: "",
   className: "",
+  workspaceName: "",
 };
 
 const STOP_WORDS = new Set([
@@ -240,6 +251,64 @@ export function allocateUniqueWorkspaceName(
     if (!taken.has(candidate.toLowerCase())) return candidate;
   }
   throw new Error("Could not allocate a unique workspace name.");
+}
+
+function isWorkspaceNameTaken(name: string, existingNames: string[]): boolean {
+  const needle = name.trim().toLowerCase();
+  if (!needle) return false;
+  return existingNames.some((existing) => existing.trim().toLowerCase() === needle);
+}
+
+/**
+ * Custom typed name wins when it differs from the abbreviation preview.
+ * Matching or empty custom names keep the unique suggested name (with -2, -3, …).
+ */
+export function resolveCreateWorkspaceDisplayName(input: {
+  suggestedBase: string;
+  customName?: string | null;
+  existingNames: string[];
+}): { ok: true; name: string } | { ok: false; error: string } {
+  const custom = input.customName?.trim() ?? "";
+  const suggested = input.suggestedBase.trim();
+
+  if (custom) {
+    const parsed = workspaceDisplayNameSchema.safeParse(custom);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: `Enter a workspace name (1–${WORKSPACE_DISPLAY_NAME_MAX} characters).`,
+      };
+    }
+    const name = parsed.data;
+    if (name.toLowerCase() !== suggested.toLowerCase()) {
+      if (isWorkspaceNameTaken(name, input.existingNames)) {
+        return { ok: false, error: "A workspace with this name already exists." };
+      }
+      return { ok: true, name };
+    }
+  }
+
+  if (!suggested) {
+    return {
+      ok: false,
+      error: "Choose an option and fill in every required field.",
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      name: allocateUniqueWorkspaceName(suggested, input.existingNames),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not build a workspace name from those details.",
+    };
+  }
 }
 
 export const WORKSPACE_NAME_EXAMPLES: Record<

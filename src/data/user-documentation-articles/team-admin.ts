@@ -45,7 +45,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Dashboards bar — owners see Personal Dashboard only. Team Dashboard is omitted because owners already use Personal Dash for workspace decks; Team Admin is omitted because they are already on that dashboard. Invited co-admins still get Team Dashboard (and Team Admin).",
           "Info opens workspace details (name, plan, owner, created date, and setup fields saved when the workspace was created).",
           "Workspace overview stats — workspaces, members, decks, cards vs plan limits.",
-          "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace.",
+          "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace. Open create workspace guide for the screenshot walkthrough.",
           "Main tabs: Members, Deck Manager, Add-ons (only when a paid or assigned add-on matches this workspace plan), Workspace history, Invite members, Quiz results.",
         ],
       },
@@ -174,7 +174,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "send",
         title: "Send invite",
         bullets: [
-          "Choose workspace, email, invitee name (required), and role (Member or Team admin).",
+          "Choose workspace, email, invitee name (required), and role (Member or Team admin). Open invite unregistered member guide to follow the screenshots from Send invite through the new member on the roster.",
           "Email must match the address they will sign in with.",
           "Invitee name auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account (you can still edit it).",
           "Invites expire in 3 days — expired invites must be resent.",

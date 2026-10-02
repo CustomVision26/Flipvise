@@ -102,7 +102,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         title: "Support and inbox",
         bullets: [
           "Documentation — book icon on the right of the header (beside Help and Inbox).",
-          "UI Guides — header button that lists every Flipvise UI guide (sign-up, sign-in, Personal Dashboard, Pricing, Subscribe, Create a deck, AI created cards, manual cards, MCQ, and add from source). Choose one to open the walkthrough; it stays open while you browse.",
+          "UI Guides — header button that lists every Flipvise UI guide (sign-up, sign-in, Personal Dashboard, Pricing, Subscribe, Create a deck, AI created cards, manual cards, MCQ, add from source, Create a new workspace, and Invite an unregistered member). Choose one to open the walkthrough; it stays open while you browse.",
           "Plans — signed-in header button opens Plans & Pricing. Your plan name (next to the account avatar) opens Account Billing. Complimentary, assigned, or affiliate access still uses the Plans label; hover Plans or the plan name to confirm it is not a paid subscription.",
           "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",
