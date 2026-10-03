@@ -20,6 +20,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Screen layout",
         bullets: [
           "Open personal dashboard guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
+          "The heading shows Personal Dashboard : your name, or your email if no name is on the account.",
           "Deck grid, list, or compact tiles. Hover a deck tile to preview its cover image when one is set (the cover is not a flashcard).",
           "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional deck cover image, and gradient.",
           "Edit deck updates the same metadata and cover image from a deck card menu. The cover is not a flashcard.",
@@ -139,7 +140,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         title: "Add-ons on Team Dashboard",
         bullets: [
           "The same premium add-ons running banner appears above the workspace heading.",
-          "Hover a deck tile to preview its cover image when one is set. Deck card counts exclude the optional cover image — covers are not flashcards.",
+          "Hover a deck tile to preview its cover image when one is set. Click a deck once to open the compact menu (Study and Preview cards). Open deck, Edit deck, and Delete deck appear only for decks you created. Deck card counts exclude the optional cover image — covers are not flashcards.",
           "Unlocked members can open the AI Essay workspace from the AI Essay chip.",
         ],
       },

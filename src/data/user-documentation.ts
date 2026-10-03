@@ -63,6 +63,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Create, organize, and open your personal flashcard decks.",
         howItWorks: [
           "Open personal dashboard guide to walk through the dashboard, inbox, Help Center, documentation, New Deck, and Manage account screens in order. The guide stays open while you browse.",
+          "The heading shows Personal Dashboard : your name, or your email if no name is on the account.",
           "View decks in grid, list, or compact tiles. Hover a deck tile to preview the cover image when one is set.",
           "Add Deck opens the creation dialog: name/subject/course, description/topic, grade level, difficulty, optional deck cover image, and background gradient. Open create deck guide from Deck Editor to walk through that flow.",
           "Edit deck (from a deck card menu) updates the same metadata and optional cover image; the cover is not a flashcard.",
@@ -102,7 +103,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
           "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
-          "Assigned members see only decks assigned to them. Hover a deck tile to preview its cover image when one is set. Card counts exclude the optional deck cover image — it is not a flashcard.",
+          "Assigned members see only decks assigned to them. Click a deck once to open its menu (Study and Preview cards). Open deck, Edit deck, and Delete deck appear only for decks you may change. Hover a deck tile to preview its cover image when one is set. Card counts exclude the optional deck cover image — it is not a flashcard.",
           "Team context is stored in a cookie when invited members switch workspaces.",
           "Plan owners create, rename, and delete workspaces from Manage Workspaces, listed under this topic in the sidebar.",
         ],
@@ -1066,7 +1067,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/team-admin/deck-manager/assign-decks-to-members",
         purpose: "Link subscriber decks to the workspace and assign them to members.",
         howItWorks: [
-          "Assign decks from the subscriber’s personal library to team members.",
+          "Link a Personal Dashboard deck to the workspace on Assign decks, then assign it to members. Open link deck to workspace guide to follow choosing the workspace, picking a personal deck, and linking it.",
           "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) controls Standard Review, AI Recall™, and Quiz access per member per deck.",
           "Workspace selector shows the workspace name (not the numeric id).",
           "Quiz question formats (workspace defaults, per-deck overrides, publish) live under Study Modes → Quiz Mode → Quiz formats.",

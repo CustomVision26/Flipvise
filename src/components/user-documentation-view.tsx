@@ -180,6 +180,11 @@ function DocPagePanel({
             Open invite unregistered member to a workspace guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "deck-manager" ? (
+          <DocsUiGuideStartButton guideId="link-deck-to-workspace">
+            Open link deck to workspace guide
+          </DocsUiGuideStartButton>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -309,6 +314,14 @@ function articleSectionGuides(
       {
         id: "invite-unregistered-member",
         label: "Open invite unregistered member to a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "deck-manager" && sectionId === "link") {
+    return [
+      {
+        id: "link-deck-to-workspace",
+        label: "Open link deck to workspace guide",
       },
     ];
   }

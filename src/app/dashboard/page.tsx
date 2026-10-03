@@ -8,7 +8,6 @@ import { teamOwnsLiveClassroom } from "@/lib/live-classroom-access";
 import { getLiveClassroomTeacherGrant } from "@/db/queries/live-classroom";
 import { redirectIfAccountRecoveryIncomplete } from "@/lib/account-recovery-gate";
 import {
-  formatSessionUserDisplayName,
   getClerkUserDisplayNameById,
 } from "@/lib/clerk-user-display";
 import Link from "next/link";
@@ -98,21 +97,41 @@ function teamWorkspaceHasTierExtras(
   );
 }
 
+function personalDashboardOwnerLabel(user: {
+  fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
+  primaryEmailAddress?: { emailAddress: string } | null;
+}): string | null {
+  const full = user.fullName?.trim();
+  if (full) return full;
+  const combined = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  if (combined) return combined;
+  const email = user.primaryEmailAddress?.emailAddress?.trim();
+  if (email) return email;
+  const username = user.username?.trim();
+  return username || null;
+}
+
 function DashboardPersonalHeading({
-  showTeamTierExtras,
   viewerName,
 }: {
-  showTeamTierExtras: boolean;
   viewerName: string | null;
 }) {
   return (
     <h1 className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0 text-2xl sm:text-3xl font-semibold tracking-tight">
       <span className="min-w-0 text-foreground">
         Personal Dashboard
-        {showTeamTierExtras && viewerName ? (
+        {viewerName ? (
           <>
             <span className="text-muted-foreground">{" "}:{" "}</span>
-            <span className="font-medium text-muted-foreground">{viewerName}</span>
+            <span
+              className="inline-block max-w-full truncate font-medium text-muted-foreground"
+              title={viewerName}
+            >
+              {viewerName}
+            </span>
           </>
         ) : null}
       </span>
@@ -677,8 +696,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     : maxCardsPerDeck;
 
   let personalViewerName: string | null = null;
-  if (ownSubscriberTeamTierExtras && dashboardSessionUser) {
-    personalViewerName = formatSessionUserDisplayName({
+  if (dashboardSessionUser) {
+    personalViewerName = personalDashboardOwnerLabel({
       fullName: dashboardSessionUser.fullName,
       firstName: dashboardSessionUser.firstName,
       lastName: dashboardSessionUser.lastName,
@@ -762,14 +781,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <Layers className="size-3" />
             Workspace
           </Badge>
-          {ownSubscriberTeamTierExtras ? (
-            <DashboardPersonalHeading
-              showTeamTierExtras
-              viewerName={personalViewerName}
-            />
-          ) : (
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Personal Dashboard</h1>
-          )}
+          <DashboardPersonalHeading viewerName={personalViewerName} />
           <p className="text-muted-foreground text-sm sm:text-base">
             Manage your flashcard decks
           </p>

@@ -292,6 +292,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/team-deck-assign-list.tsx",
     "src/components/team-deck-manager-sub-tabs.tsx",
     "src/app/dashboard/(team-admin)/team-admin/deck-manager/study-privileges/page.tsx",
+    "src/lib/flipvise-ui-guides.ts",
   ],
   "invite-members": [
     "src/app/dashboard/(team-admin)/team-admin/invite-members/pending-invitations/page.tsx",

@@ -28,18 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import { deleteDeckAction, getDeckDeleteImpactAction } from "@/actions/decks";
@@ -150,7 +139,7 @@ interface DeckCardPopoverProps {
   view?: DeckView;
   /** When set, append to deck and study links (team workspace URL context). */
   workspaceQueryString?: string;
-  /** `team-preview`: study + preview only (assigned team members). */
+  /** `team-preview`: assigned team members — same compact menu; Open/Edit/Delete only if they created the deck. */
   variant?: "full" | "team-preview";
   /** Education co-admin — true when this admin created the deck in the workspace. */
   canEditContent?: boolean;
@@ -179,8 +168,6 @@ export function DeckCardPopover({
   detailedDeleteWarning = false,
 }: DeckCardPopoverProps) {
   const [popoverOpen, setPopoverOpen] = React.useState(false);
-  const [teamWorkspaceDialogOpen, setTeamWorkspaceDialogOpen] =
-    React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -200,11 +187,7 @@ export function DeckCardPopover({
   );
 
   async function handlePreview() {
-    if (variant === "team-preview") {
-      setTeamWorkspaceDialogOpen(false);
-    } else {
-      setPopoverOpen(false);
-    }
+    setPopoverOpen(false);
     setLoadingPreview(true);
     try {
       const cards =
@@ -294,12 +277,7 @@ export function DeckCardPopover({
     <div tabIndex={0} aria-label={`Quick actions for ${deck.name}`} />
   );
 
-  const menuLocked =
-    popoverOpen ||
-    teamWorkspaceDialogOpen ||
-    previewOpen ||
-    editDialogOpen ||
-    deleteOpen;
+  const menuLocked = popoverOpen || previewOpen || editDialogOpen || deleteOpen;
 
   React.useEffect(() => {
     if (menuLocked) setCoverAnchor(null);
@@ -335,7 +313,7 @@ export function DeckCardPopover({
         ? "w-full justify-start gap-2 px-2 font-normal rounded-md"
         : "w-full justify-start gap-2.5 h-9 px-2.5 font-normal",
     );
-    if (teamTierPreviewPromo && deck.cardCount > 0) {
+    if (variant !== "team-preview" && teamTierPreviewPromo && deck.cardCount > 0) {
       const previewButton = (
         <button
           type="button"
@@ -676,93 +654,7 @@ export function DeckCardPopover({
       onPointerDown={() => setCoverAnchor(null)}
     >
       {coverPreview}
-      {variant === "team-preview" ? (
-        <Dialog
-          open={teamWorkspaceDialogOpen}
-          onOpenChange={setTeamWorkspaceDialogOpen}
-        >
-          <DialogTrigger
-            nativeButton={false}
-            render={deckTriggerRender}
-            className={triggerClassName}
-          >
-            {deckCard}
-          </DialogTrigger>
-          <DialogContent
-            className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto gap-0 p-0 sm:max-w-sm"
-            showCloseButton={false}
-          >
-            <div className="grid gap-4 p-4 pt-5">
-              <DialogHeader className="text-left sm:text-left gap-1.5">
-                <DialogTitle className="text-base sm:text-lg pr-8">
-                  {deck.name}
-                </DialogTitle>
-                <DialogDescription className="text-xs sm:text-sm text-pretty">
-                  {deck.description ?? "No description provided."}
-                  <span className="mt-2 block text-muted-foreground tabular-nums">
-                    {deck.cardCount}{" "}
-                    {deck.cardCount === 1 ? "card" : "cards"}
-                    {" · "}Updated {updatedLabel}
-                  </span>
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-2">
-                {canEditContent ? (
-                  <Link
-                    href={openDeckHref}
-                    className={cn(
-                      buttonVariants({ variant: "default", size: "sm" }),
-                      "w-full justify-center gap-2 font-medium no-underline",
-                    )}
-                    onClick={() => setTeamWorkspaceDialogOpen(false)}
-                  >
-                    <BookOpen className="size-4 shrink-0" aria-hidden />
-                    Open deck
-                  </Link>
-                ) : null}
-                <Link
-                  href={studyHref}
-                  className={cn(
-                    buttonVariants({
-                      variant: canEditContent ? "outline" : "default",
-                      size: "sm",
-                    }),
-                    "w-full justify-center gap-2 font-medium no-underline",
-                  )}
-                  onClick={() => setTeamWorkspaceDialogOpen(false)}
-                >
-                  <GraduationCap className="size-4 shrink-0" aria-hidden />
-                  Study
-                </Link>
-                {previewControlsFor(false)}
-                {deckEditMenuButton(false, () => setTeamWorkspaceDialogOpen(false))}
-                {canEditContent ? (
-                  <button
-                    type="button"
-                    className={cn(
-                      buttonVariants({ variant: "ghost", size: "sm" }),
-                      "w-full justify-center gap-2 font-medium text-destructive hover:bg-destructive/10 hover:text-destructive",
-                    )}
-                    onClick={() => {
-                      setTeamWorkspaceDialogOpen(false);
-                      setDeleteOpen(true);
-                    }}
-                  >
-                    <Trash2 className="size-4 shrink-0" aria-hidden />
-                    Delete deck
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            <DialogFooter className="sm:gap-0">
-              <DialogClose render={<Button variant="outline" type="button" className="w-full sm:w-auto" />}>
-                Cancel
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
           <PopoverTrigger
             nativeButton={false}
             render={deckTriggerRender}
@@ -774,7 +666,9 @@ export function DeckCardPopover({
           <PopoverContent
             className={cn(
               "gap-0 p-1 shadow-md",
-              teamTierPreviewPromo && deck.cardCount > 0
+              variant !== "team-preview" &&
+                teamTierPreviewPromo &&
+                deck.cardCount > 0
                 ? "w-[min(13.5rem,calc(100vw-1.25rem))] sm:w-56"
                 : "w-[min(11.25rem,calc(100vw-1.25rem))]",
             )}
@@ -787,17 +681,19 @@ export function DeckCardPopover({
               </PopoverTitle>
             </PopoverHeader>
             <div className="flex flex-col gap-px px-1 pb-1">
-              <Link
-                href={openDeckHref}
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "xs" }),
-                  "w-full justify-start gap-2 px-2 font-normal rounded-md",
-                )}
-                onClick={() => setPopoverOpen(false)}
-              >
-                <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
-                Open deck
-              </Link>
+              {showDeckEdit ? (
+                <Link
+                  href={openDeckHref}
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "xs" }),
+                    "w-full justify-start gap-2 px-2 font-normal rounded-md",
+                  )}
+                  onClick={() => setPopoverOpen(false)}
+                >
+                  <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                  Open deck
+                </Link>
+              ) : null}
 
               <Link
                 href={studyHref}
@@ -818,27 +714,30 @@ export function DeckCardPopover({
 
               {deckEditMenuButton(true, () => setPopoverOpen(false))}
 
-              <div className="my-0.5 h-px bg-border" />
+              {showDeckEdit ? (
+                <>
+                  <div className="my-0.5 h-px bg-border" />
 
-              <button
-                type="button"
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "xs" }),
-                  "w-full justify-start gap-2 px-2 font-normal rounded-md",
-                  "text-destructive hover:text-destructive hover:bg-destructive/10",
-                )}
-                onClick={() => {
-                  setPopoverOpen(false);
-                  setDeleteOpen(true);
-                }}
-              >
-                <Trash2 className="size-3.5 shrink-0" />
-                Delete deck
-              </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "xs" }),
+                      "w-full justify-start gap-2 px-2 font-normal rounded-md",
+                      "text-destructive hover:text-destructive hover:bg-destructive/10",
+                    )}
+                    onClick={() => {
+                      setPopoverOpen(false);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="size-3.5 shrink-0" />
+                    Delete deck
+                  </button>
+                </>
+              ) : null}
             </div>
           </PopoverContent>
         </Popover>
-      )}
 
       {/* Loading overlay on card while fetching preview */}
       {loadingPreview && (

@@ -10,7 +10,8 @@ export type DocsUiGuideId =
   | "manual-add-mcq"
   | "add-card-from-source"
   | "create-workspace"
-  | "invite-unregistered-member";
+  | "invite-unregistered-member"
+  | "link-deck-to-workspace";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -27,6 +28,7 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "add-card-from-source",
   "create-workspace",
   "invite-unregistered-member",
+  "link-deck-to-workspace",
 ];
 
 export type DocsUiGuideStep = {
@@ -714,6 +716,42 @@ export const INVITE_UNREGISTERED_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] 
   },
 ];
 
+const LINKING_DECK_TO_WORKSPACE_FILE =
+  "15 Flipvise - Team Tier Plan - Linking Deck To Workspace";
+
+export const LINKING_DECK_TO_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${LINKING_DECK_TO_WORKSPACE_FILE} - 01.png`),
+    title: "Open Assign decks",
+    caption:
+      "On Team Admin, open Deck Manager → Assign decks. Confirm the workspace under the heading and in Team workspace (for example UC-K26). Deck from Personal Dashboard is where the owner ties a personal deck to this workspace.",
+  },
+  {
+    src: uiSrc(`${LINKING_DECK_TO_WORKSPACE_FILE} - 02.png`),
+    title: "Choose a personal deck",
+    caption:
+      "Open Choose a personal deck to link. The list is the owner’s Personal Dashboard decks (for example Social Studies: British History and Math: Alegbra 1).",
+  },
+  {
+    src: uiSrc(`${LINKING_DECK_TO_WORKSPACE_FILE} - 03.png`),
+    title: "Decks on Personal Dashboard",
+    caption:
+      "Those decks live on the owner’s Personal Dashboard — create and edit them there, then return to Assign decks to link them. Card counts and names match what the picker shows.",
+  },
+  {
+    src: uiSrc(`${LINKING_DECK_TO_WORKSPACE_FILE} - 04.png`),
+    title: "Link deck to workspace",
+    caption:
+      "Select the deck (for example Social Studies: British History), then choose Link deck to workspace. Linking attaches it to this workspace so you can assign it to members or co-admins below.",
+  },
+  {
+    src: uiSrc(`${LINKING_DECK_TO_WORKSPACE_FILE} - 05.png`),
+    title: "Already linked",
+    caption:
+      "Linked decks show (already linked) in the picker. Unlinked decks stay listed without that label. Assign deck and Remove assignment appear once a workspace-linked deck is available.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -779,5 +817,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "Send a team invite to someone without a Flipvise account, then they sign up and join the workspace.",
     steps: INVITE_UNREGISTERED_MEMBER_GUIDE_STEPS,
+  },
+  "link-deck-to-workspace": {
+    title: "Link a deck to a workspace",
+    summary:
+      "On Assign decks, choose a Personal Dashboard deck and link it to the selected team workspace.",
+    steps: LINKING_DECK_TO_WORKSPACE_GUIDE_STEPS,
   },
 };
