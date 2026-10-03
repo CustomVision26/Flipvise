@@ -18,6 +18,18 @@ import {
   needsReviewLevel,
   nextMasteryLevel,
 } from "@/lib/ai-recall-mastery";
+import {
+  buildTeamAiRecallDashboardStats,
+  type TeamAiRecallDashboardStats,
+} from "@/lib/ai-recall-team-stats";
+
+export type {
+  TeamAiRecallDashboardStats,
+  TeamAiRecallDeckRollup,
+  TeamAiRecallMemberRollup,
+  TeamAiRecallSessionAggregateInput,
+  TeamAiRecallSessionSummary,
+} from "@/lib/ai-recall-team-stats";
 
 export type SaveAiRecallSessionInput = {
   userId: string;
@@ -221,18 +233,6 @@ export async function getTeacherAiRecallStatsForWorkspace(
   };
 }
 
-export type TeamAiRecallDashboardStats = {
-  /** Saved AI Recall™ sessions included in the rollup (capped query window). */
-  sessionCount: number;
-  teamRecallAccuracy: number | null;
-  averageAiScore: number | null;
-  averageSessionTimeMs: number | null;
-  mostMissedCards: { question: string; misses: number }[];
-  mostMissedDecks: { deckName: string; misses: number }[];
-  topLearners: { userId: string; averageScore: number; sessions: number }[];
-  weakestSubjects: { deckName: string; averageScore: number }[];
-};
-
 export async function getTeamAiRecallStats(
   teamId: number,
 ): Promise<TeamAiRecallDashboardStats> {
@@ -243,118 +243,23 @@ export async function getTeamAiRecallStats(
     .orderBy(desc(aiRecallSessions.savedAt))
     .limit(1000);
 
-  if (sessions.length === 0) {
-    return {
-      sessionCount: 0,
-      teamRecallAccuracy: null,
-      averageAiScore: null,
-      averageSessionTimeMs: null,
-      mostMissedCards: [],
-      mostMissedDecks: [],
-      topLearners: [],
-      weakestSubjects: [],
-    };
-  }
-
-  const totalCorrect = sessions.reduce((s, r) => s + r.correct, 0);
-  const totalReviewed = sessions.reduce((s, r) => s + r.cardsReviewed, 0);
-  const teamRecallAccuracy =
-    totalReviewed > 0
-      ? Math.round((totalCorrect / totalReviewed) * 100)
-      : null;
-
-  const scored = sessions.filter((s) => s.averageAiScore != null);
-  const averageAiScore =
-    scored.length > 0
-      ? Math.round(
-          scored.reduce((sum, s) => sum + (s.averageAiScore ?? 0), 0) /
-            scored.length,
-        )
-      : null;
-
-  const averageSessionTimeMs = Math.round(
-    sessions.reduce((sum, s) => sum + s.sessionDurationMs, 0) / sessions.length,
+  return buildTeamAiRecallDashboardStats(
+    sessions.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      deckId: row.deckId,
+      deckName: row.deckName,
+      cardsReviewed: row.cardsReviewed,
+      correct: row.correct,
+      incorrect: row.incorrect,
+      forcedUnlocks: row.forcedUnlocks,
+      averageAiScore: row.averageAiScore,
+      sessionDurationMs: row.sessionDurationMs,
+      savedAt:
+        row.savedAt instanceof Date ? row.savedAt : new Date(row.savedAt),
+      perCard: row.perCard ?? null,
+    })),
   );
-
-  const cardMisses = new Map<string, number>();
-  const deckMisses = new Map<string, number>();
-  const learnerScores = new Map<
-    string,
-    { total: number; count: number; sessions: number }
-  >();
-
-  for (const s of sessions) {
-    const learner = learnerScores.get(s.userId) ?? {
-      total: 0,
-      count: 0,
-      sessions: 0,
-    };
-    learner.sessions += 1;
-    if (s.averageAiScore != null) {
-      learner.total += s.averageAiScore;
-      learner.count += 1;
-    }
-    learnerScores.set(s.userId, learner);
-
-    deckMisses.set(
-      s.deckName,
-      (deckMisses.get(s.deckName) ?? 0) + s.incorrect + s.forcedUnlocks,
-    );
-
-    for (const card of s.perCard ?? []) {
-      if (card.outcome === "incorrect" || card.outcome === "forced_unlock") {
-        const q = card.question?.trim() || `Card #${card.cardId}`;
-        cardMisses.set(q, (cardMisses.get(q) ?? 0) + 1);
-      }
-    }
-  }
-
-  const mostMissedCards = [...cardMisses.entries()]
-    .map(([question, misses]) => ({ question, misses }))
-    .sort((a, b) => b.misses - a.misses)
-    .slice(0, 8);
-
-  const mostMissedDecks = [...deckMisses.entries()]
-    .map(([deckName, misses]) => ({ deckName, misses }))
-    .sort((a, b) => b.misses - a.misses)
-    .slice(0, 8);
-
-  const topLearners = [...learnerScores.entries()]
-    .filter(([, v]) => v.count > 0)
-    .map(([userId, v]) => ({
-      userId,
-      averageScore: Math.round(v.total / v.count),
-      sessions: v.sessions,
-    }))
-    .sort((a, b) => b.averageScore - a.averageScore)
-    .slice(0, 8);
-
-  const weakestSubjects = mostMissedDecks
-    .slice(0, 5)
-    .map((d) => {
-      const deckSessions = sessions.filter((s) => s.deckName === d.deckName);
-      const withScore = deckSessions.filter((s) => s.averageAiScore != null);
-      const averageScore =
-        withScore.length > 0
-          ? Math.round(
-              withScore.reduce((sum, s) => sum + (s.averageAiScore ?? 0), 0) /
-                withScore.length,
-            )
-          : 0;
-      return { deckName: d.deckName, averageScore };
-    })
-    .sort((a, b) => a.averageScore - b.averageScore);
-
-  return {
-    sessionCount: sessions.length,
-    teamRecallAccuracy,
-    averageAiScore,
-    averageSessionTimeMs,
-    mostMissedCards,
-    mostMissedDecks,
-    topLearners,
-    weakestSubjects,
-  };
 }
 
 export async function deleteAiRecallDataForUser(userId: string): Promise<void> {

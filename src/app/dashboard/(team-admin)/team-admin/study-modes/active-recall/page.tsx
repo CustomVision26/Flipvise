@@ -27,17 +27,30 @@ export default async function TeamAdminActiveRecallPage({
   const { selected } = ctx;
 
   const stats = await getTeamAiRecallStats(selected.id);
-  const learnerIds = stats.topLearners.map((l) => l.userId);
+  const learnerIds = [
+    ...new Set(stats.members.map((member) => member.userId)),
+  ];
   const displays =
     learnerIds.length > 0
       ? await getClerkUserFieldDisplaysByIds(learnerIds)
       : {};
 
+  const labelFor = (userId: string) =>
+    displays[userId]?.primaryLine ?? userId;
+
   const statsWithNames = {
     ...stats,
-    topLearners: stats.topLearners.map((l) => ({
-      ...l,
-      userId: displays[l.userId]?.primaryLine ?? l.userId,
+    members: stats.members.map((member) => ({
+      ...member,
+      memberLabel: labelFor(member.userId),
+    })),
+    sessions: stats.sessions.map((session) => ({
+      ...session,
+      memberLabel: labelFor(session.userId),
+    })),
+    topLearners: stats.topLearners.map((learner) => ({
+      ...learner,
+      memberLabel: labelFor(learner.userId),
     })),
   };
 

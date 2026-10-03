@@ -12,7 +12,8 @@ export type DocsUiGuideId =
   | "create-workspace"
   | "invite-unregistered-member"
   | "link-deck-to-workspace"
-  | "assign-deck-to-member";
+  | "assign-deck-to-member"
+  | "change-study-mode-privileges";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -31,6 +32,7 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "invite-unregistered-member",
   "link-deck-to-workspace",
   "assign-deck-to-member",
+  "change-study-mode-privileges",
 ];
 
 export type DocsUiGuideStep = {
@@ -820,6 +822,42 @@ export const ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+const CHANGE_STUDY_MODE_PRIVILEGES_FILE =
+  "17 Flipvise - Team Tier Plan - Change Study Mode Privileges From Workspace Member";
+
+export const CHANGE_STUDY_MODE_PRIVILEGES_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${CHANGE_STUDY_MODE_PRIVILEGES_FILE} - 01.png`),
+    title: "Open Study privileges",
+    caption:
+      "On Team Admin, open Deck Manager → Study privileges. Member study modes lists every assignment in a table (member, deck, workspace, and access granted).",
+  },
+  {
+    src: uiSrc(`${CHANGE_STUDY_MODE_PRIVILEGES_FILE} - 02.png`),
+    title: "Open an assignment",
+    caption:
+      "Click a row to open that assignment. The panel shows the member, deck, workspace, access granted, Study modes, and Save changes.",
+  },
+  {
+    src: uiSrc(`${CHANGE_STUDY_MODE_PRIVILEGES_FILE} - 03.png`),
+    title: "Choose study modes",
+    caption:
+      "Open Study modes and pick a single mode or a combination (Standard Review, AI Recall™, Quiz, or pairs, or all three). Then choose Save changes. Updates apply on the member’s next study session.",
+  },
+  {
+    src: uiSrc(`${CHANGE_STUDY_MODE_PRIVILEGES_FILE} - 04.png`),
+    title: "Access granted updates",
+    caption:
+      "After you save, Access granted in the table and in the open panel match the new set (for example AI Recall™ & Quiz). You can change modes again and Save changes.",
+  },
+  {
+    src: uiSrc(`${CHANGE_STUDY_MODE_PRIVILEGES_FILE} - 05.png`),
+    title: "Member sees the new modes",
+    caption:
+      "When the member opens Study for that deck, only the granted modes appear (for example AI Recall™ and Quiz). Standard Review is hidden if it was removed.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -897,5 +935,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Assign decks, choose a member and a linked deck, then confirm the assignment on Team Dashboard.",
     steps: ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS,
+  },
+  "change-study-mode-privileges": {
+    title: "Change study mode privileges for a workspace member",
+    summary:
+      "On Study privileges, open an assignment, change study modes, and confirm the member’s study session.",
+    steps: CHANGE_STUDY_MODE_PRIVILEGES_GUIDE_STEPS,
   },
 };

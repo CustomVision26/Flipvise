@@ -188,6 +188,9 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="assign-deck-to-member">
               Open assign deck to member in a workspace guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="change-study-mode-privileges">
+              Open change study mode privileges guide
+            </DocsUiGuideStartButton>
           </>
         ) : null}
         {page.id === "team-workspace-dashboard" ? (
@@ -343,11 +346,27 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "deck-manager" && sectionId === "privileges") {
+    return [
+      {
+        id: "change-study-mode-privileges",
+        label: "Open change study mode privileges guide",
+      },
+    ];
+  }
   if (pageId === "team-workspace-dashboard" && sectionId === "who-sees-what") {
     return [
       {
         id: "assign-deck-to-member",
         label: "Open assign deck to member in a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "team-workspace-dashboard" && sectionId === "study") {
+    return [
+      {
+        id: "change-study-mode-privileges",
+        label: "Open change study mode privileges guide",
       },
     ];
   }

@@ -8,6 +8,8 @@ const ROUTE_APP_PAGE_OVERRIDES: Readonly<Record<string, string>> = {
     "src/app/dashboard/(team-admin)/team-admin/invite-members/send-invite/page.tsx",
   "/dashboard/team-admin/quiz-results":
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/page.tsx",
+  "/dashboard/team-admin/study-modes/active-recall":
+    "src/app/dashboard/(team-admin)/team-admin/study-modes/active-recall/page.tsx",
   "/dashboard/team-admin/ws-history":
     "src/app/dashboard/(team-admin)/team-admin/ws-history/page.tsx",
 };

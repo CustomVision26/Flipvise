@@ -304,6 +304,13 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/teams.ts",
     "src/lib/flipvise-ui-guides.ts",
   ],
+  "study-modes-active-recall": [
+    "src/app/dashboard/(team-admin)/team-admin/study-modes/active-recall/page.tsx",
+    "src/components/ai-recall-team-stats-panel.tsx",
+    "src/components/ai-recall-team-monitor.tsx",
+    "src/db/queries/ai-recall.ts",
+    "src/lib/ai-recall-team-stats.ts",
+  ],
   "quiz-results-admin": [
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-security/page.tsx",
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-timer/page.tsx",

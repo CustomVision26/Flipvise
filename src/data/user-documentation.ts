@@ -1069,7 +1069,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Link a Personal Dashboard deck to the workspace on Assign decks, then assign it to members. Open link deck to workspace guide to follow choosing the workspace, picking a personal deck, and linking it.",
           "Open assign deck to member in a workspace guide to follow choosing a member, a linked deck, study modes, Assign deck, and the member opening the deck on Team Dashboard.",
-          "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) lists every assignment in a table. Click a row to open Standard Review, AI Recall™, and Quiz access for that member and deck.",
+          "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) lists every assignment in a table. Click a row to open Standard Review, AI Recall™, and Quiz access for that member and deck. Open change study mode privileges guide to follow opening a row, changing modes, Save changes, and the member’s updated study session.",
           "Workspace selector shows the workspace name (not the numeric id).",
           "Quiz question formats (workspace defaults, per-deck overrides, publish) live under Study Modes → Quiz Mode → Quiz formats.",
         ],
@@ -1080,6 +1080,24 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         doNots: [
           "Do not expect members to see unassigned decks.",
           "Do not disable all study modes without notifying members.",
+        ],
+      },
+      {
+        id: "study-modes-active-recall",
+        title: "Active Recall Mode",
+        route: "/dashboard/team-admin/study-modes/active-recall",
+        purpose:
+          "Monitor saved AI Recall™ session results for workspace members and decks.",
+        howItWorks: [
+          "Team Admin → Study Modes → Active Recall Mode → Performance shows workspace KPIs after members save a completed AI Recall™ session.",
+          "Track members lists every learner with saved sessions (accuracy, average AI score, average time, last session). Click a row to open that member’s session history.",
+          "Track decks lists every deck with saved sessions (sessions, members, accuracy, average AI score, misses). Click a row to open sessions for that deck.",
+          "Instructional insights still highlight missed cards, missed decks, top learners, and weaker subjects.",
+          "Session cards (under Active Recall Mode) sets how many cards appear in a member AI Recall™ session.",
+        ],
+        requirements: ["Team owner or team_admin.", "Members must complete and save an AI Recall™ session."],
+        doNots: [
+          "Do not expect on-screen study results that were not saved to appear here.",
         ],
       },
       {

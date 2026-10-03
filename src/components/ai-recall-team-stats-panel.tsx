@@ -27,8 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { TeamAiRecallDashboardStats } from "@/db/queries/ai-recall";
+import type { TeamAiRecallDashboardStats } from "@/lib/ai-recall-team-stats";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
+import { AiRecallTeamMonitor } from "@/components/ai-recall-team-monitor";
 import { cn } from "@/lib/utils";
 
 function formatMs(ms: number | null): string {
@@ -93,8 +94,8 @@ export function AiRecallTeamStatsPanel({
         <CardContent className="space-y-3 pt-5">
           <p className="text-sm leading-relaxed text-muted-foreground">
             Use this page to monitor how well the organization retains material
-            under Active Recall, identify cards and decks that need reteaching,
-            and recognize strong performers.
+            under Active Recall. Track saved session results for individual
+            members, and review the same results rolled up by deck.
           </p>
         </CardContent>
       </Card>
@@ -105,9 +106,9 @@ export function AiRecallTeamStatsPanel({
           <AlertTitle>No saved AI Recall™ sessions yet</AlertTitle>
           <AlertDescription className="leading-relaxed">
             When members complete and save an AI Recall™ session on an assigned
-            deck, summary accuracy, session length, missed items, and learner
-            rankings will appear here. On-screen results that are not saved are
-            not included.
+            deck, member and deck monitors, summary accuracy, session length,
+            missed items, and learner rankings appear here. On-screen results
+            that are not saved are not included.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -146,6 +147,8 @@ export function AiRecallTeamStatsPanel({
         </div>
       </section>
 
+      <AiRecallTeamMonitor stats={stats} />
+
       <Separator className="bg-border/60" />
 
       <section className="space-y-3" aria-labelledby="active-recall-insights">
@@ -161,7 +164,8 @@ export function AiRecallTeamStatsPanel({
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Missed items and weaker subjects help prioritize review. Top learners
-            highlight members with the strongest saved-session scores.
+            highlight members with the strongest saved-session scores. Use Track
+            members and decks above for the full session history.
           </p>
         </div>
 
@@ -195,7 +199,7 @@ export function AiRecallTeamStatsPanel({
             empty="No learner scores available yet."
             columns={["Member", "Avg. score", "Sessions"]}
             rows={stats.topLearners.map((l) => [
-              l.userId,
+              l.memberLabel,
               `${l.averageScore}%`,
               String(l.sessions),
             ])}

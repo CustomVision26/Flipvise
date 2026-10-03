@@ -157,11 +157,52 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Study privileges sub-tab",
         bullets: [
           "/dashboard/team-admin/deck-manager/study-privileges",
-          "The table lists every eligible assignment. Click a row to open that member’s study modes (Standard Review, AI Recall™, Quiz, or combinations) and Save changes.",
+          "The table lists every eligible assignment. Click a row to open that member’s study modes (Standard Review, AI Recall™, Quiz, or combinations) and Save changes. Open change study mode privileges guide to follow the table, the open panel, Save changes, and the member’s study session.",
           "Change Standard Review, AI Recall™, and/or Quiz access per member per assigned deck.",
           "Options include single modes and combinations (e.g. AI Recall™ only, Standard Review & AI Recall™, all three).",
           "Applies to team members in the privileges table (and Education Gold / Enterprise team admins).",
           "Quiz question formats (workspace defaults, per-deck overrides, publish) are under Study Modes → Quiz Mode → Quiz formats.",
+        ],
+      },
+    ],
+  ),
+  a(
+    "study-modes-active-recall",
+    "Active Recall Mode — In-Depth Guide",
+    "Monitor saved AI Recall™ results at /dashboard/team-admin/study-modes/active-recall.",
+    [
+      {
+        id: "performance",
+        title: "Performance overview",
+        bullets: [
+          "Team recall accuracy, average AI score, and average session time roll up every saved session in the workspace.",
+          "Metrics update when a member completes and saves an AI Recall™ session on an assigned deck.",
+        ],
+      },
+      {
+        id: "members",
+        title: "Track members",
+        bullets: [
+          "The Members tab lists each learner with at least one saved session: session count, accuracy, average AI score, average time, and last session.",
+          "Click a member row to open that person’s saved sessions (deck, accuracy, AI score, duration, cards, correct answers, and misses).",
+          "Search filters the member list by name.",
+        ],
+      },
+      {
+        id: "decks",
+        title: "Track decks",
+        bullets: [
+          "The Decks tab lists each deck with saved sessions: session count, unique members, accuracy, average AI score, misses, and last session.",
+          "Click a deck row to open every saved session on that material, including which member completed it.",
+          "Search filters the deck list by deck name.",
+        ],
+      },
+      {
+        id: "insights",
+        title: "Instructional insights",
+        bullets: [
+          "Most missed cards and decks, top learners, and weakest subjects help prioritize reteaching.",
+          "Use Track members and decks for the full session history, not only the insight shortlists.",
         ],
       },
     ],

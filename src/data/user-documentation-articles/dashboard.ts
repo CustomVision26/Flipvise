@@ -159,7 +159,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "study",
         title: "Studying in team context",
         bullets: [
-          "Review vs quiz modes depend on study privileges set per assignment.",
+          "Review vs quiz modes depend on study privileges set per assignment. Open change study mode privileges guide to follow changing modes on Study privileges and what the member sees on Study.",
           "Team quizzes may enforce timer, schedule, and Exam Mode rules from Team Admin.",
           "Quiz results sync to team admin reporting and your inbox when applicable.",
         ],
