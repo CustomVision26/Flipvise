@@ -26,7 +26,10 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/add-team-dialog.tsx",
     "src/lib/workspace-creation-profile.ts",
   ],
-  "team-workspace-dashboard": ["src/app/dashboard/workspace/page.tsx"],
+  "team-workspace-dashboard": [
+    "src/app/dashboard/workspace/page.tsx",
+    "src/lib/flipvise-ui-guides.ts",
+  ],
   "manage-workspaces": [
     "src/app/dashboard/workspaces/page.tsx",
     "src/components/manage-workspaces-panel.tsx",

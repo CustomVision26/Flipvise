@@ -145,7 +145,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "assign",
         title: "Step 2 — Assign to members",
         bullets: [
-          "Assign to members and team admins (not the owner row).",
+          "Assign to members and team admins (not the owner row). Open assign deck to member in a workspace guide to follow choosing the member, linked deck, and study modes, then Assign deck and the member’s Team Dashboard.",
           "Records who assigned and when.",
           "Set study privilege on assign: Standard Review, AI Recall™, Quiz, or combinations (default: all three).",
           "Unassign removes member access to that deck in the workspace.",
@@ -157,6 +157,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Study privileges sub-tab",
         bullets: [
           "/dashboard/team-admin/deck-manager/study-privileges",
+          "The table lists every eligible assignment. Click a row to open that member’s study modes (Standard Review, AI Recall™, Quiz, or combinations) and Save changes.",
           "Change Standard Review, AI Recall™, and/or Quiz access per member per assigned deck.",
           "Options include single modes and combinations (e.g. AI Recall™ only, Standard Review & AI Recall™, all three).",
           "Applies to team members in the privileges table (and Education Gold / Enterprise team admins).",

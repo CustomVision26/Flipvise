@@ -312,6 +312,23 @@ export function TeamAdminRecordSlider<
     scrollToIndex(next);
   }
 
+  function expandedDetailRow(item: T) {
+    if (!renderBelowActive || activeKey !== item.key) return null;
+    const panel = renderBelowActive(item);
+    if (!panel) return null;
+    return (
+      <TableRow className="hover:bg-transparent">
+        <TableCell
+          colSpan={tableColumns?.length ?? 1}
+          className="bg-muted/15 p-4"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {panel}
+        </TableCell>
+      </TableRow>
+    );
+  }
+
   const resolvedSortLabels = { ...SORT_LABELS, ...sortLabelMap };
 
   const effectiveLayout: "slider" | "table" =
@@ -467,8 +484,8 @@ export function TeamAdminRecordSlider<
                         const isActive = activeKey === item.key;
                         const isFirstInGroup = rowInGroup === 0;
                         return (
+                          <React.Fragment key={item.key}>
                           <TableRow
-                            key={item.key}
                             className={cn("cursor-pointer", isActive && "bg-muted/40")}
                             onClick={() => onActivate?.(item)}
                             aria-selected={isActive}
@@ -492,14 +509,16 @@ export function TeamAdminRecordSlider<
                               </TableCell>
                             ))}
                           </TableRow>
+                          {expandedDetailRow(item)}
+                          </React.Fragment>
                         );
                       }),
                     )
                   : tablePagination.flatRows.map((item) => {
                       const isActive = activeKey === item.key;
                       return (
+                        <React.Fragment key={item.key}>
                         <TableRow
-                          key={item.key}
                           className={cn("cursor-pointer", isActive && "bg-muted/40")}
                           onClick={() => onActivate?.(item)}
                           aria-selected={isActive}
@@ -510,6 +529,8 @@ export function TeamAdminRecordSlider<
                             </TableCell>
                           ))}
                         </TableRow>
+                        {expandedDetailRow(item)}
+                        </React.Fragment>
                       );
                     })}
               </TableBody>
@@ -553,10 +574,6 @@ export function TeamAdminRecordSlider<
               </Button>
             </div>
           </div>
-
-          {activeItem && renderBelowActive ? (
-            <div>{renderBelowActive(activeItem)}</div>
-          ) : null}
         </>
       ) : (
         <>

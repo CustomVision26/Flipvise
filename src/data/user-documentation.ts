@@ -100,7 +100,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Invited team members and co-admins study or preview decks inside a workspace.",
         howItWorks: [
-          "Invited users switch to a workspace from the header dropdown to open Team Dashboard.",
+          "Invited users switch to a workspace from the header dropdown to open Team Dashboard. Open assign deck to member in a workspace guide to follow an assignment through the member’s Team Dashboard, Preview cards, and Study.",
           "Plan owners keep decks on Personal Dash and use Team Admin Dash — they are not shown Team Dashboard for owned workspaces.",
           "The premium add-ons running banner sits in the top bar (and under the logo on small screens) as a soft accent ticker — each add-on keeps a distinct tint; locked chips open Unlock Feature; unlocked AI Essay opens the AI Essay workspace.",
           "Assigned members see only decks assigned to them. Click a deck once to open its menu (Study and Preview cards). Open deck, Edit deck, and Delete deck appear only for decks you may change. Hover a deck tile to preview its cover image when one is set. Card counts exclude the optional deck cover image — it is not a flashcard.",
@@ -1068,7 +1068,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Link subscriber decks to the workspace and assign them to members.",
         howItWorks: [
           "Link a Personal Dashboard deck to the workspace on Assign decks, then assign it to members. Open link deck to workspace guide to follow choosing the workspace, picking a personal deck, and linking it.",
-          "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) controls Standard Review, AI Recall™, and Quiz access per member per deck.",
+          "Open assign deck to member in a workspace guide to follow choosing a member, a linked deck, study modes, Assign deck, and the member opening the deck on Team Dashboard.",
+          "Study Privileges sub-tab (/dashboard/team-admin/deck-manager/study-privileges) lists every assignment in a table. Click a row to open Standard Review, AI Recall™, and Quiz access for that member and deck.",
           "Workspace selector shows the workspace name (not the numeric id).",
           "Quiz question formats (workspace defaults, per-deck overrides, publish) live under Study Modes → Quiz Mode → Quiz formats.",
         ],

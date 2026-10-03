@@ -181,8 +181,18 @@ function DocPagePanel({
           </DocsUiGuideStartButton>
         ) : null}
         {page.id === "deck-manager" ? (
-          <DocsUiGuideStartButton guideId="link-deck-to-workspace">
-            Open link deck to workspace guide
+          <>
+            <DocsUiGuideStartButton guideId="link-deck-to-workspace">
+              Open link deck to workspace guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="assign-deck-to-member">
+              Open assign deck to member in a workspace guide
+            </DocsUiGuideStartButton>
+          </>
+        ) : null}
+        {page.id === "team-workspace-dashboard" ? (
+          <DocsUiGuideStartButton guideId="assign-deck-to-member">
+            Open assign deck to member in a workspace guide
           </DocsUiGuideStartButton>
         ) : null}
       </div>
@@ -322,6 +332,22 @@ function articleSectionGuides(
       {
         id: "link-deck-to-workspace",
         label: "Open link deck to workspace guide",
+      },
+    ];
+  }
+  if (pageId === "deck-manager" && sectionId === "assign") {
+    return [
+      {
+        id: "assign-deck-to-member",
+        label: "Open assign deck to member in a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "team-workspace-dashboard" && sectionId === "who-sees-what") {
+    return [
+      {
+        id: "assign-deck-to-member",
+        label: "Open assign deck to member in a workspace guide",
       },
     ];
   }

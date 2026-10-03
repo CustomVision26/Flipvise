@@ -11,7 +11,8 @@ export type DocsUiGuideId =
   | "add-card-from-source"
   | "create-workspace"
   | "invite-unregistered-member"
-  | "link-deck-to-workspace";
+  | "link-deck-to-workspace"
+  | "assign-deck-to-member";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -29,6 +30,7 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "create-workspace",
   "invite-unregistered-member",
   "link-deck-to-workspace",
+  "assign-deck-to-member",
 ];
 
 export type DocsUiGuideStep = {
@@ -752,6 +754,72 @@ export const LINKING_DECK_TO_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] =
   },
 ];
 
+const ASSIGN_DECK_TO_MEMBER_FILE =
+  "16 Flipvise - Team Tier Plan - Assign Deck to Member in a Workspace";
+
+export const ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 01.png`),
+    title: "Linked deck ready to assign",
+    caption:
+      "On Team Admin → Assign decks, confirm the workspace (for example UC-K26). Deck from Personal Dashboard is only for linking or unlinking. Once a deck is linked, use Member or co-admin and Deck below to assign it.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 02.png`),
+    title: "Choose member, deck, and study modes",
+    caption:
+      "Select the workspace, a member or co-admin (for example williams.bruce2698), a linked deck (for example Social Studies: British History), and Study modes. Default is all — Standard Review, AI Recall™, and Quiz.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 03.png`),
+    title: "Assign deck",
+    caption:
+      "Study modes lists single modes and combinations (Standard Review only, AI Recall™ only, Quiz only, or pairs, or all three). Choose Assign deck to give that member access in this workspace.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 04.png`),
+    title: "Assignment recorded",
+    caption:
+      "Assignments by member lists the member, deck, workspace, who signed, and when. Update assignment changes study modes. Remove assignment takes the deck off that member’s Team Dashboard — it stays linked to the workspace.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 05.png`),
+    title: "Member opens the workspace",
+    caption:
+      "The member signs in and opens the workspace switcher. Under Invited workspaces, choose the team (for example Team: UC-K26) to open Team Dashboard.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 06.png`),
+    title: "Assigned deck on Team Dashboard",
+    caption:
+      "Team Dashboard shows the workspace name and the plan owner. Assigned decks appear here (for example Social Studies: British History). The account menu is the member’s email.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 07.png`),
+    title: "Open the deck menu",
+    caption:
+      "Click the deck once to open its menu. Assigned members see Study and Preview cards.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 08.png`),
+    title: "Preview cards",
+    caption:
+      "Preview cards opens a full-screen walkthrough of the deck (question and answer) without starting a study session. Close returns to Team Dashboard.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 09.png`),
+    title: "Start Study",
+    caption:
+      "From the same deck menu, choose Study to open the study session for this assigned deck.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 10.png`),
+    title: "Study modes in the session",
+    caption:
+      "The study page shows the deck and the modes granted on the assignment — Standard Review, AI Recall™, and Quiz when all were selected. The member studies from their own account.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -823,5 +891,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Assign decks, choose a Personal Dashboard deck and link it to the selected team workspace.",
     steps: LINKING_DECK_TO_WORKSPACE_GUIDE_STEPS,
+  },
+  "assign-deck-to-member": {
+    title: "Assign deck to member in a workspace",
+    summary:
+      "On Assign decks, choose a member and a linked deck, then confirm the assignment on Team Dashboard.",
+    steps: ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS,
   },
 };

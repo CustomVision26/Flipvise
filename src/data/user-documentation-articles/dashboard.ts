@@ -148,7 +148,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "switching",
         title: "Switching workspaces",
         bullets: [
-          "Use the header workspace switcher — Personal Dash for owners; invited workspaces open Team Dashboard.",
+          "Use the header workspace switcher — Personal Dash for owners; invited workspaces open Team Dashboard. Open assign deck to member in a workspace guide to follow an assignment from Assign decks through the member’s Team Dashboard, Preview cards, and Study.",
           "Owners open Team Admin Dash from the switcher (owned workspaces are not Team Dashboard rows).",
           "Plan owners create, rename, and delete owned workspaces from Manage Workspaces, listed under Team Workspace View in this sidebar.",
           "Team context is stored in a cookie when invited members switch.",
