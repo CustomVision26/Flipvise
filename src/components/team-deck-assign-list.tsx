@@ -27,12 +27,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  assignDeckToMemberAction,
-  unassignDeckFromMemberAction,
-  linkPersonalDeckToTeamWorkspaceAction,
-  unlinkPersonalDeckFromTeamWorkspaceAction,
-  updateTeamAdminMaxCreateDecksAction,
-} from "@/actions/teams";
+  STALE_SERVER_ACTION_MESSAGE,
+  userFacingServerActionError,
+} from "@/lib/server-action-client-error";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import type { DeckRow, TeamMemberRow } from "@/db/schema";
@@ -88,6 +85,8 @@ export type TeamAssignWorkspaceSnapshot = {
   assignments: AssignmentRow[];
 };
 
+type TeamDeckIdInput = { teamId: number; deckId: number };
+
 export interface TeamDeckAssignListProps {
   workspaces: TeamAssignWorkspaceSnapshot[];
   defaultWorkspaceId: number;
@@ -101,6 +100,23 @@ export interface TeamDeckAssignListProps {
     /** True when this deck already appears in this workspace (linked or assigned here). */
     alreadyLinked?: boolean;
   }>;
+  /** Bound on the Server Component so action ids stay on this route (not a `next/dynamic` chunk). */
+  linkPersonalDeckToTeamWorkspaceAction: (data: TeamDeckIdInput) => Promise<void>;
+  unlinkPersonalDeckFromTeamWorkspaceAction: (data: TeamDeckIdInput) => Promise<void>;
+  assignDeckToMemberAction: (
+    data: TeamDeckIdInput & {
+      memberUserId: string;
+      studyPrivilege: TeamMemberStudyPrivilege;
+    },
+  ) => Promise<void>;
+  unassignDeckFromMemberAction: (
+    data: TeamDeckIdInput & { memberUserId: string },
+  ) => Promise<void>;
+  updateTeamAdminMaxCreateDecksAction: (data: {
+    teamId: number;
+    memberUserId: string;
+    maxCreateDecks: number | null;
+  }) => Promise<void>;
 }
 
 function memberOptionLabel(
@@ -225,6 +241,11 @@ export function TeamDeckAssignList({
   userFieldDisplayById,
   viewerIsSubscriberOwner = false,
   subscriberPersonalUnlinkedDecks,
+  linkPersonalDeckToTeamWorkspaceAction,
+  unlinkPersonalDeckFromTeamWorkspaceAction,
+  assignDeckToMemberAction,
+  unassignDeckFromMemberAction,
+  updateTeamAdminMaxCreateDecksAction,
 }: TeamDeckAssignListProps) {
   const { userId: clerkUserId } = useAuth();
   const router = useRouter();
@@ -353,7 +374,7 @@ export function TeamDeckAssignList({
       router.refresh();
     } catch (e) {
       setAdminMaxCreateError(
-        e instanceof Error ? e.message : "Could not save deck create limit.",
+        userFacingServerActionError(e, "Could not save deck create limit."),
       );
     } finally {
       setAdminMaxCreateBusy(false);
@@ -629,7 +650,7 @@ export function TeamDeckAssignList({
       setLinkDeckId(LINK_NO_DECK);
       router.refresh();
     } catch (e) {
-      setLinkError(e instanceof Error ? e.message : "Link failed.");
+      setLinkError(userFacingServerActionError(e, "Link failed."));
     } finally {
       setLinkBusy(false);
     }
@@ -648,7 +669,7 @@ export function TeamDeckAssignList({
       setLinkDeckId(LINK_NO_DECK);
       router.refresh();
     } catch (e) {
-      setLinkError(e instanceof Error ? e.message : "Unlink failed.");
+      setLinkError(userFacingServerActionError(e, "Unlink failed."));
     } finally {
       setUnlinkBusy(false);
     }
@@ -690,7 +711,7 @@ export function TeamDeckAssignList({
       });
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Assign failed");
+      setError(userFacingServerActionError(e, "Assign failed"));
     } finally {
       setBusy(null);
     }
@@ -708,7 +729,7 @@ export function TeamDeckAssignList({
       });
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unassign failed");
+      setError(userFacingServerActionError(e, "Unassign failed"));
     } finally {
       setBusy(null);
     }
@@ -808,7 +829,7 @@ export function TeamDeckAssignList({
       setExpandedAssignmentKey((prev) => (prev === collapseKey ? null : prev));
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Remove access failed");
+      setError(userFacingServerActionError(e, "Remove access failed"));
     } finally {
       setBusy(null);
     }
@@ -826,7 +847,7 @@ export function TeamDeckAssignList({
     <>
     <div className="w-full max-w-3xl space-y-6">
         {(error || linkError) && (
-          <div className="space-y-1">
+          <div className="space-y-2">
             {error ? (
               <p className="text-sm text-destructive" role="alert">
                 {error}
@@ -836,6 +857,17 @@ export function TeamDeckAssignList({
               <p className="text-sm text-destructive" role="alert">
                 {linkError}
               </p>
+            ) : null}
+            {error === STALE_SERVER_ACTION_MESSAGE ||
+            linkError === STALE_SERVER_ACTION_MESSAGE ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.reload()}
+              >
+                Refresh page
+              </Button>
             ) : null}
           </div>
         )}
@@ -1072,9 +1104,21 @@ export function TeamDeckAssignList({
                 Applies to Teacher tools and this admin’s Team Dashboard create count.
               </p>
               {adminMaxCreateError ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {adminMaxCreateError}
-                </p>
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive" role="alert">
+                    {adminMaxCreateError}
+                  </p>
+                  {adminMaxCreateError === STALE_SERVER_ACTION_MESSAGE ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.reload()}
+                    >
+                      Refresh page
+                    </Button>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}

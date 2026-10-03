@@ -174,7 +174,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "send",
         title: "Send invite",
         bullets: [
-          "Choose workspace, email, invitee name (required), and role (Member or Team admin). Open invite unregistered member guide to follow the screenshots from Send invite through the new member on the roster.",
+          "Choose workspace, email, invitee name (required), and role (Member or Team admin). Open invite unregistered member to a workspace guide to follow the screenshots from Send invite through the new member on the roster.",
           "Email must match the address they will sign in with.",
           "Invitee name auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account (you can still edit it).",
           "Invites expire in 3 days — expired invites must be resent.",

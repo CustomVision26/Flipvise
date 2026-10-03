@@ -177,7 +177,7 @@ function DocPagePanel({
         ) : null}
         {page.id === "invite-members" || page.id === "accept-team-invite" ? (
           <DocsUiGuideStartButton guideId="invite-unregistered-member">
-            Open invite unregistered member guide
+            Open invite unregistered member to a workspace guide
           </DocsUiGuideStartButton>
         ) : null}
       </div>
@@ -300,7 +300,7 @@ function articleSectionGuides(
     return [
       {
         id: "invite-unregistered-member",
-        label: "Open invite unregistered member guide",
+        label: "Open invite unregistered member to a workspace guide",
       },
     ];
   }
@@ -308,7 +308,7 @@ function articleSectionGuides(
     return [
       {
         id: "invite-unregistered-member",
-        label: "Open invite unregistered member guide",
+        label: "Open invite unregistered member to a workspace guide",
       },
     ];
   }

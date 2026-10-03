@@ -18,6 +18,18 @@ export function isProductionOmittedServerError(message: string): boolean {
   );
 }
 
+/** Next.js client still holds an old action id after HMR or a deploy. */
+export const STALE_SERVER_ACTION_MESSAGE =
+  "This page is out of date. Refresh and try again.";
+
+export function isStaleServerActionError(message: string): boolean {
+  return (
+    /was not found on the server/i.test(message) ||
+    /failed-to-find-server-action/i.test(message) ||
+    message === STALE_SERVER_ACTION_MESSAGE
+  );
+}
+
 export function userFacingServerActionError(
   error: unknown,
   fallback: string,
@@ -25,6 +37,9 @@ export function userFacingServerActionError(
   const raw = error instanceof Error ? error.message : fallback;
   if (!raw.trim() || isProductionOmittedServerError(raw)) {
     return fallback;
+  }
+  if (isStaleServerActionError(raw)) {
+    return STALE_SERVER_ACTION_MESSAGE;
   }
   return raw;
 }

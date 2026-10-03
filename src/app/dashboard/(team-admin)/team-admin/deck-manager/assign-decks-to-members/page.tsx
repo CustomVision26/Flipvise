@@ -23,9 +23,17 @@ import {
 } from "@/lib/team-admin-url";
 import { loadTeamAdminPageContext } from "@/lib/load-team-admin-page-context";
 import {
+  assignDeckToMemberAction,
+  linkPersonalDeckToTeamWorkspaceAction,
+  unassignDeckFromMemberAction,
+  unlinkPersonalDeckFromTeamWorkspaceAction,
+  updateTeamAdminMaxCreateDecksAction,
+} from "@/actions/teams";
+/** Static import so link/assign Server Actions register on this route (not a `next/dynamic` chunk). */
+import { TeamDeckAssignListLoader } from "@/components/team-deck-assign-list-loader";
+import {
   TeamAdminPanelScroll,
   TeamAdminWorkspaceStatsPanel,
-  TeamDeckAssignListLoader,
   TeamDeckManagerSubTabs,
 } from "@/lib/team-admin-dynamic-components";
 import {
@@ -125,6 +133,17 @@ export default async function TeamAdminAssignDecksToMembersPage({ searchParams }
             subscriberPersonalUnlinkedDecks
               ? toClientJson(subscriberPersonalUnlinkedDecks)
               : undefined
+          }
+          linkPersonalDeckToTeamWorkspaceAction={
+            linkPersonalDeckToTeamWorkspaceAction
+          }
+          unlinkPersonalDeckFromTeamWorkspaceAction={
+            unlinkPersonalDeckFromTeamWorkspaceAction
+          }
+          assignDeckToMemberAction={assignDeckToMemberAction}
+          unassignDeckFromMemberAction={unassignDeckFromMemberAction}
+          updateTeamAdminMaxCreateDecksAction={
+            updateTeamAdminMaxCreateDecksAction
           }
         />
       </CardContent>

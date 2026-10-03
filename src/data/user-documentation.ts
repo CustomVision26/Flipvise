@@ -1086,7 +1086,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/team-admin/invite-members/send-invite",
         purpose: "Send, track, and revoke team invitations.",
         howItWorks: [
-          "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only. Open invite unregistered member guide to follow sending the invite, the email, sign-up, and the new roster row.",
+          "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only. Open invite unregistered member to a workspace guide to follow sending the invite, the email, sign-up, and the new roster row.",
           "Invitee name is required and auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account.",
           "Pending Invitations lists revocable open invites.",
           "Invite History shows past invitations.",
@@ -1165,7 +1165,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/invite/team/[token]",
         purpose: "Join a team workspace from an email invitation link.",
         howItWorks: [
-          "Shows team name and assigned role before acceptance. Open invite unregistered member guide to follow email, sign-up with the invited address, and joining the workspace.",
+          "Shows team name and assigned role before acceptance. Open invite unregistered member to a workspace guide to follow email, sign-up with the invited address, and joining the workspace.",
           "Sign in with the invited email address, then accept.",
           "Redirects to dashboard in team context after success.",
         ],

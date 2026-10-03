@@ -595,7 +595,7 @@ export const CREATE_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
 ];
 
 const INVITE_UNREGISTERED_MEMBER_FILE =
-  "14 Flipvise - Team Tier Plan - Invite Unregistered Member";
+  "14 Flipvise - Team Tier Plan - Invite Unregistered Member A Workspace";
 
 export const INVITE_UNREGISTERED_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   {
@@ -775,9 +775,9 @@ export const DOCS_UI_GUIDES: Record<
     steps: CREATE_WORKSPACE_GUIDE_STEPS,
   },
   "invite-unregistered-member": {
-    title: "Invite an unregistered member",
+    title: "Invite unregistered member to a workspace",
     summary:
-      "Send a team invite to someone without a Flipvise account, then they sign up and join.",
+      "Send a team invite to someone without a Flipvise account, then they sign up and join the workspace.",
     steps: INVITE_UNREGISTERED_MEMBER_GUIDE_STEPS,
   },
 };

@@ -1,6 +1,7 @@
 /**
  * Turbopack: load team-admin client UI via `next/dynamic` from Server Components.
- * Do not statically import `"use client"` modules from team-admin pages.
+ * Do not statically import `"use client"` modules from team-admin pages,
+ * except Assign decks (`TeamDeckAssignListLoader`) which must register Server Actions on the route.
  */
 import dynamic from "next/dynamic";
 
@@ -26,12 +27,6 @@ export const TeamAdminManageTabs = dynamic(
 
 export const TeamDeckManagerSubTabs = dynamic(
   () => import("@/components/team-deck-manager-sub-tabs").then((mod) => mod.TeamDeckManagerSubTabs),
-  { loading: clientLoading },
-);
-
-export const TeamDeckAssignListLoader = dynamic(
-  () =>
-    import("@/components/team-deck-assign-list-loader").then((mod) => mod.TeamDeckAssignListLoader),
   { loading: clientLoading },
 );
 

@@ -45,7 +45,7 @@ export const INVITES_ONBOARDING_ARTICLES: DocArticle[] = [
         id: "flow",
         title: "Acceptance flow",
         bullets: [
-          "Page shows team name and assigned role before you accept. Open invite unregistered member guide if the invitee does not yet have a Flipvise account.",
+          "Page shows team name and assigned role before you accept. Open invite unregistered member to a workspace guide if the invitee does not yet have a Flipvise account.",
           "Sign in with the invited email address.",
           "Accept joins the workspace and redirects to dashboard in team context.",
           "If you already have a Flipvise account, the invite appears in dashboard inbox; email is sent only when you are not registered yet.",
