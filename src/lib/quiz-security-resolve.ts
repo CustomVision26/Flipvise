@@ -5,12 +5,20 @@ export type QuizSecuritySettingFields = {
 export type QuizSecurityAudienceFields = {
   quizSecurityApplyToMembers: boolean | null;
   quizSecurityApplyToTeamAdmins: boolean | null;
+  quizSecurityApplyToOwner: boolean | null;
 };
 
 export type QuizSecurityWorkspaceAudience = {
   quizSecurityEnabled: boolean;
   quizSecurityApplyToMembers: boolean;
   quizSecurityApplyToTeamAdmins: boolean;
+  quizSecurityApplyToOwner: boolean;
+};
+
+export type QuizSecurityAudience = {
+  applyToMembers: boolean;
+  applyToTeamAdmins: boolean;
+  applyToOwner: boolean;
 };
 
 export type QuizSecurityViewerRole = "owner" | "team_admin" | "team_member";
@@ -28,7 +36,7 @@ export function resolveQuizSecurityEnabled(
 export function resolveQuizSecurityAudience(
   deck: QuizSecurityAudienceFields,
   workspace: Omit<QuizSecurityWorkspaceAudience, "quizSecurityEnabled">,
-): { applyToMembers: boolean; applyToTeamAdmins: boolean } {
+): QuizSecurityAudience {
   return {
     applyToMembers:
       deck.quizSecurityApplyToMembers !== null &&
@@ -40,18 +48,23 @@ export function resolveQuizSecurityAudience(
       deck.quizSecurityApplyToTeamAdmins !== undefined
         ? deck.quizSecurityApplyToTeamAdmins
         : workspace.quizSecurityApplyToTeamAdmins,
+    applyToOwner:
+      deck.quizSecurityApplyToOwner !== null &&
+      deck.quizSecurityApplyToOwner !== undefined
+        ? deck.quizSecurityApplyToOwner
+        : workspace.quizSecurityApplyToOwner,
   };
 }
 
 /**
  * Whether quiz security restrictions apply to this viewer.
- * Plan owner is always restricted when security is on.
+ * Plan owner is restricted only when applyToOwner is on (owner-only setting).
  */
 export function quizSecurityAppliesToViewer(
   viewerRole: QuizSecurityViewerRole,
-  audience: { applyToMembers: boolean; applyToTeamAdmins: boolean },
+  audience: QuizSecurityAudience,
 ): boolean {
-  if (viewerRole === "owner") return true;
+  if (viewerRole === "owner") return audience.applyToOwner;
   if (viewerRole === "team_admin") return audience.applyToTeamAdmins;
   return audience.applyToMembers;
 }
@@ -65,17 +78,23 @@ export function nextDeckQuizSecurityExplicit(
 
 /** Null when matching workspace audience (inherit); otherwise explicit. */
 export function nextDeckQuizSecurityAudienceExplicit(
-  workspace: { applyToMembers: boolean; applyToTeamAdmins: boolean },
-  next: { applyToMembers: boolean; applyToTeamAdmins: boolean },
-): { applyToMembers: boolean | null; applyToTeamAdmins: boolean | null } {
+  workspace: QuizSecurityAudience,
+  next: QuizSecurityAudience,
+): {
+  applyToMembers: boolean | null;
+  applyToTeamAdmins: boolean | null;
+  applyToOwner: boolean | null;
+} {
   const matchesWorkspace =
     next.applyToMembers === workspace.applyToMembers &&
-    next.applyToTeamAdmins === workspace.applyToTeamAdmins;
+    next.applyToTeamAdmins === workspace.applyToTeamAdmins &&
+    next.applyToOwner === workspace.applyToOwner;
   if (matchesWorkspace) {
-    return { applyToMembers: null, applyToTeamAdmins: null };
+    return { applyToMembers: null, applyToTeamAdmins: null, applyToOwner: null };
   }
   return {
     applyToMembers: next.applyToMembers,
     applyToTeamAdmins: next.applyToTeamAdmins,
+    applyToOwner: next.applyToOwner,
   };
 }

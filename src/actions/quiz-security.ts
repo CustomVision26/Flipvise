@@ -14,6 +14,7 @@ import {
   grantQuizSecuritySessionResume,
   isDeckQuizSecurityEnabled,
   isQuizSecurityActiveForViewer,
+  getDeckQuizSecurityApplyToOwner,
   terminateQuizSecuritySession,
   updateDeckQuizSecuritySettings,
   updateQuizSecuritySession,
@@ -203,6 +204,7 @@ const updateTeamSecuritySchema = z.object({
   enabled: z.boolean(),
   applyToMembers: z.boolean(),
   applyToTeamAdmins: z.boolean(),
+  applyToOwner: z.boolean(),
 });
 
 export async function updateTeamQuizSecurityAction(data: z.infer<typeof updateTeamSecuritySchema>) {
@@ -212,11 +214,17 @@ export async function updateTeamQuizSecurityAction(data: z.infer<typeof updateTe
   const parsed = updateTeamSecuritySchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  await assertCanManageTeam(userId, parsed.data.teamId);
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  const isOwner = team.ownerUserId === userId;
+  const applyToOwner = isOwner
+    ? parsed.data.applyToOwner
+    : Boolean(team.quizSecurityApplyToOwner);
+
   await updateTeamQuizSecuritySettings(parsed.data.teamId, {
     enabled: parsed.data.enabled,
     applyToMembers: parsed.data.applyToMembers,
     applyToTeamAdmins: parsed.data.applyToTeamAdmins,
+    applyToOwner,
   });
   if (!parsed.data.enabled) {
     await clearQuizSecuritySessionsOnDisable(parsed.data.teamId);
@@ -233,6 +241,7 @@ const updateDeckSecuritySchema = z.object({
   enabled: z.boolean().nullable(),
   applyToMembers: z.boolean().nullable(),
   applyToTeamAdmins: z.boolean().nullable(),
+  applyToOwner: z.boolean().nullable(),
 });
 
 export async function updateDeckQuizSecurityAction(
@@ -252,11 +261,16 @@ export async function updateDeckQuizSecurityAction(
   );
 
   const wasEnabled = await isDeckQuizSecurityEnabled(parsed.data.teamId, parsed.data.deckId);
+  const isOwner = team.ownerUserId === userId;
+  const applyToOwner = isOwner
+    ? parsed.data.applyToOwner
+    : await getDeckQuizSecurityApplyToOwner(parsed.data.deckId, team.ownerUserId);
 
   await updateDeckQuizSecuritySettings(parsed.data.deckId, team.ownerUserId, {
     enabled: parsed.data.enabled,
     applyToMembers: parsed.data.applyToMembers,
     applyToTeamAdmins: parsed.data.applyToTeamAdmins,
+    applyToOwner,
   });
 
   const workspaceEnabled = Boolean(team.quizSecurityEnabled);

@@ -341,6 +341,7 @@ function withDefaultTeamQuizSchedule(
     | "quizStartAt"
     | "quizSecurityApplyToMembers"
     | "quizSecurityApplyToTeamAdmins"
+    | "quizSecurityApplyToOwner"
     | "aiRecallSessionCardCount"
     | "creationProfile"
   > &
@@ -349,6 +350,7 @@ function withDefaultTeamQuizSchedule(
         TeamRow,
         | "quizSecurityApplyToMembers"
         | "quizSecurityApplyToTeamAdmins"
+        | "quizSecurityApplyToOwner"
         | "aiRecallSessionCardCount"
       >
     >,
@@ -360,6 +362,7 @@ function withDefaultTeamQuizSchedule(
     inactiveAt: row.inactiveAt ?? null,
     quizSecurityApplyToMembers: row.quizSecurityApplyToMembers !== false,
     quizSecurityApplyToTeamAdmins: Boolean(row.quizSecurityApplyToTeamAdmins),
+    quizSecurityApplyToOwner: Boolean(row.quizSecurityApplyToOwner),
     aiRecallSessionCardCount: row.aiRecallSessionCardCount ?? null,
     creationProfile: null,
   };
@@ -419,6 +422,7 @@ const teamRowSelectWithoutCreationProfile = {
   quizSecurityEnabled: teams.quizSecurityEnabled,
   quizSecurityApplyToMembers: teams.quizSecurityApplyToMembers,
   quizSecurityApplyToTeamAdmins: teams.quizSecurityApplyToTeamAdmins,
+  quizSecurityApplyToOwner: teams.quizSecurityApplyToOwner,
   quizStartScheduleEnabled: teams.quizStartScheduleEnabled,
   quizStartAt: teams.quizStartAt,
   quizFormatMultipleChoice: teams.quizFormatMultipleChoice,

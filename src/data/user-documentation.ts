@@ -1129,7 +1129,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Republish to quiz replaces the previous published mix (all cards or a newly chosen subset).",
           "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck. The table lists every linked deck; click a row to open that deck’s timer. Open quiz timer for a workspace guide to follow a workspace-wide time, a per-deck override, and the member’s Timed quiz clock.",
           "Quiz Schedule: restrict when quizzes can be taken. The Timed quiz lobby shows the scheduled start date and time and greys out Start quiz until that moment, unless a team admin or owner enables it. Open quiz schedule for a workspace guide to follow a workspace or per-deck start time through the member’s unlock countdown.",
-          "Exam Mode: anti-cheating and session rules.",
+          "Exam Mode: anti-cheating and session rules for selected Plan owner, Team Admins, and/or Members. Only the plan owner can enable Exam Mode for themselves.",
         ],
         requirements: [
           "Team owner or team_admin.",

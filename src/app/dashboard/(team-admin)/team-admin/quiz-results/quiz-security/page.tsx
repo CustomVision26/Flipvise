@@ -169,6 +169,7 @@ export default async function TeamAdminQuizSecurityPage({ searchParams }: PagePr
               workspaces={toClientJson(workspaceSnapshots)}
               decksByWorkspaceId={toClientJson(decksByWorkspaceId)}
               defaultWorkspaceId={selected.id}
+              canEditOwnerAudience={ctx.isOwner}
             />
           ) : null}
         </CardContent>

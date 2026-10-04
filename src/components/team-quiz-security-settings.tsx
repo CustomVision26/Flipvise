@@ -35,28 +35,34 @@ const PLACEHOLDER_WORKSPACE = "Choose a team workspace…";
 type AudienceState = {
   applyToMembers: boolean;
   applyToTeamAdmins: boolean;
+  applyToOwner: boolean;
 };
 
 type DeckAudienceStored = {
   applyToMembers: boolean | null;
   applyToTeamAdmins: boolean | null;
+  applyToOwner: boolean | null;
 };
 
 type TeamQuizSecuritySettingsProps = {
   workspaces: QuizSecurityWorkspaceSnapshot[];
   decksByWorkspaceId: Record<number, QuizSecurityDeckSnapshot[]>;
   defaultWorkspaceId: number;
+  /** Only the plan owner may change Exam Mode for themselves. */
+  canEditOwnerAudience: boolean;
 };
 
 function SecurityAudienceCheckboxes({
   idPrefix,
   value,
   disabled,
+  canEditOwnerAudience,
   onChange,
 }: {
   idPrefix: string;
   value: AudienceState;
   disabled?: boolean;
+  canEditOwnerAudience: boolean;
   onChange: (next: AudienceState) => void;
 }) {
   return (
@@ -65,9 +71,28 @@ function SecurityAudienceCheckboxes({
         Apply Exam Mode to
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">
-        Plan owner is always restricted when Exam Mode is on.
+        Only the plan owner can enable or disable Exam Mode for the plan owner.
       </p>
       <div className="flex flex-wrap gap-4">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`${idPrefix}-owner`}
+            checked={value.applyToOwner}
+            disabled={disabled || !canEditOwnerAudience}
+            onCheckedChange={(checked) =>
+              onChange({
+                ...value,
+                applyToOwner: checked === true,
+              })
+            }
+          />
+          <Label
+            htmlFor={`${idPrefix}-owner`}
+            className="text-sm font-normal text-foreground"
+          >
+            Plan owner
+          </Label>
+        </div>
         <div className="flex items-center gap-2">
           <Checkbox
             id={`${idPrefix}-team-admin`}
@@ -115,6 +140,7 @@ export function TeamQuizSecuritySettings({
   workspaces,
   decksByWorkspaceId,
   defaultWorkspaceId,
+  canEditOwnerAudience,
 }: TeamQuizSecuritySettingsProps) {
   const [selectedId, setSelectedId] = React.useState(defaultWorkspaceId);
   const [workspaceEnabledById, setWorkspaceEnabledById] = React.useState<Record<number, boolean>>(
@@ -129,6 +155,7 @@ export function TeamQuizSecuritySettings({
         {
           applyToMembers: w.quizSecurityApplyToMembers,
           applyToTeamAdmins: w.quizSecurityApplyToTeamAdmins,
+          applyToOwner: w.quizSecurityApplyToOwner,
         },
       ]),
     ),
@@ -164,6 +191,7 @@ export function TeamQuizSecuritySettings({
           {
             applyToMembers: w.quizSecurityApplyToMembers,
             applyToTeamAdmins: w.quizSecurityApplyToTeamAdmins,
+            applyToOwner: w.quizSecurityApplyToOwner,
           },
         ]),
       ),
@@ -184,6 +212,7 @@ export function TeamQuizSecuritySettings({
         next[deck.id] = {
           applyToMembers: deck.quizSecurityApplyToMembers,
           applyToTeamAdmins: deck.quizSecurityApplyToTeamAdmins,
+          applyToOwner: deck.quizSecurityApplyToOwner,
         };
       }
       return next;
@@ -197,8 +226,9 @@ export function TeamQuizSecuritySettings({
     ? (workspaceAudienceById[selected.id] ?? {
         applyToMembers: true,
         applyToTeamAdmins: false,
+        applyToOwner: false,
       })
-    : { applyToMembers: true, applyToTeamAdmins: false };
+    : { applyToMembers: true, applyToTeamAdmins: false, applyToOwner: false };
 
   async function persistWorkspaceSettings(
     enabled: boolean,
@@ -218,6 +248,7 @@ export function TeamQuizSecuritySettings({
         enabled,
         applyToMembers: audience.applyToMembers,
         applyToTeamAdmins: audience.applyToTeamAdmins,
+        applyToOwner: audience.applyToOwner,
       });
     } catch (e) {
       setWorkspaceEnabledById((prev) => ({
@@ -254,6 +285,7 @@ export function TeamQuizSecuritySettings({
     const previousAudience = deckAudienceById[deckId] ?? {
       applyToMembers: null,
       applyToTeamAdmins: null,
+      applyToOwner: null,
     };
 
     setDeckErrorById((prev) => {
@@ -272,6 +304,7 @@ export function TeamQuizSecuritySettings({
         enabled: enabledExplicit,
         applyToMembers: audienceStored.applyToMembers,
         applyToTeamAdmins: audienceStored.applyToTeamAdmins,
+        applyToOwner: audienceStored.applyToOwner,
       });
     } catch (e) {
       setDeckEnabledById((prev) => ({ ...prev, [deckId]: previousEnabled }));
@@ -290,16 +323,24 @@ export function TeamQuizSecuritySettings({
     const storedAudience = deckAudienceById[deckId] ?? {
       applyToMembers: null,
       applyToTeamAdmins: null,
+      applyToOwner: null,
     };
     await persistDeckSettings(deckId, nextExplicit, storedAudience);
   }
 
   async function handleDeckAudienceChange(deckId: number, audience: AudienceState) {
     const enabledExplicit = deckEnabledById[deckId] ?? null;
+    const nextAudience = canEditOwnerAudience
+      ? audience
+      : { ...audience, applyToOwner: workspaceAudience.applyToOwner };
+    const stored = deckAudienceById[deckId];
     const audienceStored = nextDeckQuizSecurityAudienceExplicit(
       workspaceAudience,
-      audience,
+      nextAudience,
     );
+    if (!canEditOwnerAudience) {
+      audienceStored.applyToOwner = stored?.applyToOwner ?? null;
+    }
     await persistDeckSettings(deckId, enabledExplicit, audienceStored);
   }
 
@@ -307,6 +348,7 @@ export function TeamQuizSecuritySettings({
     await persistDeckSettings(deckId, null, {
       applyToMembers: null,
       applyToTeamAdmins: null,
+      applyToOwner: null,
     });
   }
 
@@ -375,6 +417,7 @@ export function TeamQuizSecuritySettings({
                   idPrefix={`workspace-${selected.id}`}
                   value={workspaceAudience}
                   disabled={workspaceSaving}
+                  canEditOwnerAudience={canEditOwnerAudience}
                   onChange={(audience) => void handleWorkspaceAudienceChange(audience)}
                 />
               ) : null}
@@ -423,21 +466,25 @@ export function TeamQuizSecuritySettings({
               const storedAudience = deckAudienceById[deck.id] ?? {
                 applyToMembers: deck.quizSecurityApplyToMembers,
                 applyToTeamAdmins: deck.quizSecurityApplyToTeamAdmins,
+                applyToOwner: deck.quizSecurityApplyToOwner,
               };
               const effectiveAudience = resolveQuizSecurityAudience(
                 {
                   quizSecurityApplyToMembers: storedAudience.applyToMembers,
                   quizSecurityApplyToTeamAdmins: storedAudience.applyToTeamAdmins,
+                  quizSecurityApplyToOwner: storedAudience.applyToOwner,
                 },
                 {
                   quizSecurityApplyToMembers: workspaceAudience.applyToMembers,
                   quizSecurityApplyToTeamAdmins: workspaceAudience.applyToTeamAdmins,
+                  quizSecurityApplyToOwner: workspaceAudience.applyToOwner,
                 },
               );
               const usesWorkspaceDefault =
                 explicit === null &&
                 storedAudience.applyToMembers === null &&
-                storedAudience.applyToTeamAdmins === null;
+                storedAudience.applyToTeamAdmins === null &&
+                storedAudience.applyToOwner === null;
               const saving = deckSavingId === deck.id;
               const deckError = deckErrorById[deck.id];
 
@@ -466,6 +513,7 @@ export function TeamQuizSecuritySettings({
                         idPrefix={`deck-${deck.id}`}
                         value={effectiveAudience}
                         disabled={saving || workspaceSaving}
+                        canEditOwnerAudience={canEditOwnerAudience}
                         onChange={(audience) =>
                           void handleDeckAudienceChange(deck.id, audience)
                         }

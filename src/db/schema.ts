@@ -185,14 +185,17 @@ export const teams = pgTable('teams', {
   quizSecurityEnabled: boolean().notNull().default(false),
   /**
    * When quiz security is on, apply restrictions to invited `team_member` roles.
-   * Plan owner is always restricted when security is on.
    */
   quizSecurityApplyToMembers: boolean().notNull().default(true),
   /**
    * When quiz security is on, apply restrictions to invited `team_admin` roles.
-   * Plan owner is always restricted when security is on.
    */
   quizSecurityApplyToTeamAdmins: boolean().notNull().default(false),
+  /**
+   * When quiz security is on, apply restrictions to the plan owner.
+   * Only the plan owner may change this setting. Default off.
+   */
+  quizSecurityApplyToOwner: boolean().notNull().default(false),
   /** When true, quizzes in this workspace cannot start before {@link quizStartAt}. */
   quizStartScheduleEnabled: boolean().notNull().default(false),
   /** Earliest moment members may start a quiz (workspace default when deck schedule is off). */
@@ -259,6 +262,11 @@ export const decks = pgTable('decks', {
    * Per-deck audience override. Null inherits workspace {@link teams.quizSecurityApplyToTeamAdmins}.
    */
   quizSecurityApplyToTeamAdmins: boolean(),
+  /**
+   * Per-deck audience override. Null inherits workspace {@link teams.quizSecurityApplyToOwner}.
+   * Only the plan owner may change this setting.
+   */
+  quizSecurityApplyToOwner: boolean(),
   /** Per-deck quiz format overrides — null inherits workspace defaults. */
   quizFormatMultipleChoice: boolean(),
   quizFormatTrueFalse: boolean(),

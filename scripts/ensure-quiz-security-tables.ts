@@ -168,6 +168,14 @@ async function main() {
     ALTER TABLE "decks"
     ADD COLUMN IF NOT EXISTS "quizSecurityApplyToTeamAdmins" boolean
   `;
+  await sql`
+    ALTER TABLE "teams"
+    ADD COLUMN IF NOT EXISTS "quizSecurityApplyToOwner" boolean NOT NULL DEFAULT false
+  `;
+  await sql`
+    ALTER TABLE "decks"
+    ADD COLUMN IF NOT EXISTS "quizSecurityApplyToOwner" boolean
+  `;
 
   console.log("Quiz security schema is present (created or already existed).");
 

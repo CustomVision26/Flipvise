@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-04T23:13:29.344Z",
+  "updatedAt": "2026-10-04T23:49:14.787Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "8efeea3a471a1bf3f3db1ed4af7f72dde96e1bb11bd2f3e5c389ab7a297a726c",
@@ -28,7 +28,7 @@
     },
     "study-session": {
       "watchFingerprint": "519ec491e4b3a5d5d1bbf3d422fe5401fcae8f5abe316df3d046fdfef4d9624a",
-      "docFingerprint": "871ea17efa786447b280bc7516e0438159f33657d96cf977344e38eb8dc39a01"
+      "docFingerprint": "c1b55a6f7087a5ee7294c97434335667125f9de699a76b9bb9d8b8ca0ea27bee"
     },
     "quiz-result-detail": {
       "watchFingerprint": "b132a4bc7de1c6b87dc4783a702ecfea7ad25030c35f241242122a6639df961f",
@@ -183,8 +183,8 @@
       "docFingerprint": "8df0919ee60e647e3651499893ee77747fb4973a568f63631ebd40718ae39623"
     },
     "quiz-results-admin": {
-      "watchFingerprint": "e490f29f6e636f9fe12d8484611507b7dede8fa954b9f5aa9c98a1fbed3717d3",
-      "docFingerprint": "1ce4f267924e5ec0be7630355efe89d537fe9bb1eec32bb6104fe97dfe48ee56"
+      "watchFingerprint": "43c66946969c1366234088b0665e1d4da4a7373a271b7f753d8a4af3ef09ca31",
+      "docFingerprint": "24d921cbf743002389c62a808b4b6f9d5cf4aa953368439e4a7237cd5872170d"
     },
     "ws-history": {
       "watchFingerprint": "ef6a5bce2f9002f7345e670a451907e6218bc74b970b3e09a362c75d567dfd36",

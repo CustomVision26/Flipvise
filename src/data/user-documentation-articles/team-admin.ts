@@ -356,7 +356,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Exam Mode",
         bullets: [
           "Workspace toggle applies to all decks unless deck overrides.",
-          "Choose Team Admin and/or Member checkboxes for whom Exam Mode applies; the plan owner is always restricted when Exam Mode is on.",
+          "Choose Plan owner, Team Admin, and/or Member checkboxes for whom Exam Mode applies. Only the plan owner can enable or disable Exam Mode for the plan owner; team admins cannot change that checkbox.",
           "Per-deck checkboxes can override the workspace audience default.",
           "Sessions can lock, complete, or terminate.",
           "Admins grant resume, restart/redo, or terminate from sessions table.",

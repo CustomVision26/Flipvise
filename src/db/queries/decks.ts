@@ -107,6 +107,7 @@ export function withNullCover<
     | "quizDurationMinutes"
     | "quizSecurityApplyToMembers"
     | "quizSecurityApplyToTeamAdmins"
+    | "quizSecurityApplyToOwner"
     | "quizCardOrderShuffledAt"
     | "aiRecallSessionCardCount"
   >,
@@ -131,6 +132,11 @@ export function withNullCover<
       "quizSecurityApplyToTeamAdmins" in row
         ? ((row as { quizSecurityApplyToTeamAdmins?: boolean | null })
             .quizSecurityApplyToTeamAdmins ?? null)
+        : null,
+    quizSecurityApplyToOwner:
+      "quizSecurityApplyToOwner" in row
+        ? ((row as { quizSecurityApplyToOwner?: boolean | null })
+            .quizSecurityApplyToOwner ?? null)
         : null,
     quizCardOrderShuffledAt:
       "quizCardOrderShuffledAt" in row
