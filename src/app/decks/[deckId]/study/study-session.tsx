@@ -76,6 +76,8 @@ export interface StudySessionProps {
   ownerInboxAvailable?: boolean;
   /** Workspace owner / team admin — can cancel out of the unanswered-submit dialog. */
   allowQuizCancelExit?: boolean;
+  /** Workspace owner / team admin may start before the scheduled unlock time. */
+  canBypassQuizSchedule?: boolean;
   /** Scheduled quiz start — members cannot begin before this time. */
   quizSchedule?: {
     enabled: boolean;
@@ -159,6 +161,7 @@ export function StudySession({
   exitLabel,
   ownerInboxAvailable = false,
   allowQuizCancelExit = false,
+  canBypassQuizSchedule = false,
   quizSchedule,
   quizSecurity,
   quizFormats,
@@ -392,6 +395,7 @@ export function StudySession({
               exitLabel={exitLabel}
               ownerInboxAvailable={ownerInboxAvailable}
               allowQuizCancelExit={allowQuizCancelExit}
+              canBypassQuizSchedule={canBypassQuizSchedule}
               quizSchedule={quizSchedule}
               quizSecurity={quizSecurity}
               quizFormats={quizFormats}

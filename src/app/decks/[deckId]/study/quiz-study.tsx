@@ -166,6 +166,8 @@ interface QuizStudyProps {
   ownerInboxAvailable?: boolean;
   /** Workspace owner / team admin — Cancel exits the quiz without submitting. */
   allowQuizCancelExit?: boolean;
+  /** Workspace owner / team admin may start before the scheduled unlock time. */
+  canBypassQuizSchedule?: boolean;
   quizSchedule?: {
     enabled: boolean;
     startAtIso: string;
@@ -291,6 +293,7 @@ export function QuizStudy({
   exitLabel,
   ownerInboxAvailable = false,
   allowQuizCancelExit = false,
+  canBypassQuizSchedule = false,
   quizSchedule,
   quizSecurity,
   quizFormats = { multipleChoice: true, trueFalse: false, fillInBlank: false },
@@ -580,10 +583,22 @@ export function QuizStudy({
     return () => window.clearInterval(timerId);
   }, [activeSchedule]);
 
+  const scheduleWaiting = useMemo(() => {
+    if (!activeSchedule) return false;
+    return scheduleSecondsRemaining > 0 || !isQuizStartAllowed(activeSchedule);
+  }, [activeSchedule, scheduleSecondsRemaining]);
+
   const scheduleBlocksStart = useMemo(() => {
-    if (!activeSchedule || grantedResume || grantedFreshStart) return false;
-    return !isQuizStartAllowed(activeSchedule);
-  }, [activeSchedule, grantedResume, grantedFreshStart, scheduleSecondsRemaining]);
+    if (!scheduleWaiting || canBypassQuizSchedule || grantedResume || grantedFreshStart) {
+      return false;
+    }
+    return true;
+  }, [
+    scheduleWaiting,
+    canBypassQuizSchedule,
+    grantedResume,
+    grantedFreshStart,
+  ]);
 
   const canStartQuiz = canStartSecuredQuiz && !scheduleBlocksStart;
 
@@ -946,6 +961,7 @@ export function QuizStudy({
   }
 
   async function handleStartQuiz() {
+    if (!canStartQuiz) return;
     if (securityEnabled && quizSecurity) {
       const sessionState = buildQuizSessionState(
         questions,
@@ -1417,7 +1433,7 @@ export function QuizStudy({
               <div
                 className={cn(
                   "rounded-lg border px-3 py-2 text-left",
-                  scheduleBlocksStart
+                  scheduleWaiting
                     ? "border-amber-500/30 bg-amber-500/10"
                     : "border-border/60 bg-muted/20",
                 )}
@@ -1425,17 +1441,17 @@ export function QuizStudy({
                 <p
                   className={cn(
                     "flex items-center justify-center gap-1.5 text-xs font-medium",
-                    scheduleBlocksStart ? "text-amber-400" : "text-foreground",
+                    scheduleWaiting ? "text-amber-400" : "text-foreground",
                   )}
                 >
                   <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-                  {scheduleBlocksStart ? "Quiz unlocks" : "Scheduled start"}
+                  {scheduleWaiting ? "Quiz unlocks" : "Scheduled start"}
                 </p>
                 <p className="mt-0.5 text-center text-[11px] text-muted-foreground">
                   {formatQuizStartSchedule(activeSchedule.startAt)}
                   {activeSchedule.source === "deck" ? " · this deck" : " · this workspace"}
                 </p>
-                {scheduleBlocksStart ? (
+                {scheduleWaiting ? (
                   <p className="mt-1 text-center text-[11px] text-muted-foreground">
                     Time remaining:{" "}
                     <span className="font-medium tabular-nums text-foreground">
@@ -1518,40 +1534,49 @@ export function QuizStudy({
                 : grantedFreshStart
                   ? "Your team admin granted access to start this quiz over from the beginning."
                   : scheduleBlocksStart
-                    ? "The start button unlocks when the scheduled time arrives."
-                    : "Press start when you are ready. The timer begins only after you start."}
+                    ? "Start quiz is unavailable until the scheduled time, unless a team admin or owner enables it."
+                    : scheduleWaiting && canBypassQuizSchedule
+                      ? "Members cannot start until the scheduled time. You can start now as owner or team admin."
+                      : "Press start when you are ready. The timer begins only after you start."}
             </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            {canStartQuiz ? (
+            {canStartSecuredQuiz ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger
                     render={
-                      <Button
-                        size="default"
-                        className={cn(
-                          "w-full gap-2 sm:w-auto sm:min-w-40",
-                          deckAccent.hasDeckAccent &&
-                            "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
-                        )}
-                        onClick={handleStartQuiz}
-                      />
+                      <span className="inline-flex w-full sm:w-auto" tabIndex={0} />
                     }
                   >
-                    <Play className="h-4 w-4" />
-                    {grantedResume
-                      ? "Resume quiz"
-                      : grantedFreshStart
-                        ? "Start over"
-                        : "Start quiz"}
+                    <Button
+                      type="button"
+                      size="default"
+                      disabled={!canStartQuiz}
+                      className={cn(
+                        "w-full gap-2 sm:w-auto sm:min-w-40",
+                        canStartQuiz &&
+                          deckAccent.hasDeckAccent &&
+                          "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
+                      )}
+                      onClick={handleStartQuiz}
+                    >
+                      <Play className="h-4 w-4" />
+                      {grantedResume
+                        ? "Resume quiz"
+                        : grantedFreshStart
+                          ? "Start over"
+                          : "Start quiz"}
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {grantedResume
-                      ? "Continue your in-progress quiz"
-                      : grantedFreshStart
-                        ? "Start this quiz over from the beginning"
-                        : "Begin the timed quiz"}
+                    {scheduleBlocksStart && activeSchedule
+                      ? `Start quiz unlocks at ${formatQuizStartSchedule(activeSchedule.startAt)}. A team admin or owner can enable it before then.`
+                      : grantedResume
+                        ? "Continue your in-progress quiz"
+                        : grantedFreshStart
+                          ? "Start this quiz over from the beginning"
+                          : "Begin the timed quiz"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

@@ -442,6 +442,11 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
             allowQuizCancelExit={
               access.kind === "owner" || access.kind === "team_admin"
             }
+            canBypassQuizSchedule={
+              access.kind === "owner" ||
+              access.kind === "team_admin" ||
+              isWorkspaceOwnerViewer
+            }
             isEducationTeamPlan={isEducationTeamPlan}
             quizFormats={quizFormats}
             quizFormatAssignmentPlan={quizFormatAssignmentPlan}

@@ -1128,7 +1128,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Publish opens a choice: Publish all cards (auto-assign formats for your counts) or Choose cards (set quiz size, browse quiz-taker previews, check specific cards, then Publish settings).",
           "Republish to quiz replaces the previous published mix (all cards or a newly chosen subset).",
           "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck. The table lists every linked deck; click a row to open that deck’s timer. Open quiz timer for a workspace guide to follow a workspace-wide time, a per-deck override, and the member’s Timed quiz clock.",
-          "Quiz Schedule: restrict when quizzes can be taken. The Timed quiz lobby shows the scheduled start date and time; Start quiz stays locked until that moment.",
+          "Quiz Schedule: restrict when quizzes can be taken. The Timed quiz lobby shows the scheduled start date and time and greys out Start quiz until that moment, unless a team admin or owner enables it.",
           "Exam Mode: anti-cheating and session rules.",
         ],
         requirements: [

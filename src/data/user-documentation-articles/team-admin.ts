@@ -348,7 +348,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         bullets: [
           "Workspace-level: enable + start date/time for all decks.",
           "Deck-level overrides for specific start times.",
-          "Members cannot start quizzes before the scheduled time. Timed quiz shows that date and time (and a countdown while the quiz is still locked).",
+          "Members cannot start quizzes before the scheduled time — Start quiz is greyed out until then, unless a team admin or owner enables it. Timed quiz shows that date and time (and a countdown while the quiz is still locked).",
         ],
       },
       {
