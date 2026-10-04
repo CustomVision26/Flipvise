@@ -145,8 +145,8 @@ export default async function TeamAdminQuizSchedulePage({ searchParams }: PagePr
             </span>
           </CardTitle>
           <CardDescription className="text-sm leading-relaxed">
-            Toggle scheduling on or off for each workspace and deck. Members see a countdown until
-            the quiz unlocks.
+            Toggle scheduling on or off for each workspace and deck. Members see the start date and
+            time on Timed quiz, plus a countdown until the quiz unlocks.
           </CardDescription>
         </CardHeader>
         <CardContent>

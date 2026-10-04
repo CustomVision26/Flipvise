@@ -15,7 +15,9 @@ export type DocsUiGuideId =
   | "assign-deck-to-member"
   | "change-study-mode-privileges"
   | "workspace-study-mode-settings"
-  | "ai-recall-session-cards";
+  | "ai-recall-session-cards"
+  | "quiz-formats-workspace"
+  | "quiz-timer-workspace";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -37,6 +39,8 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "change-study-mode-privileges",
   "workspace-study-mode-settings",
   "ai-recall-session-cards",
+  "quiz-formats-workspace",
+  "quiz-timer-workspace",
 ];
 
 export type DocsUiGuideStep = {
@@ -940,6 +944,96 @@ export const AI_RECALL_SESSION_CARDS_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+const QUIZ_FORMATS_WORKSPACE_FILE =
+  "20 Flipvise - Team Tier Plan - Study Mode Quiz Format for Workspace";
+
+export const QUIZ_FORMATS_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 01.png`),
+    title: "Open Quiz formats",
+    caption:
+      "On Team Admin, open Study Modes → Quiz Mode → Quiz formats. Choose question types, set questions per format, and publish the quiz mix for workspace decks (for example UC-K26).",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 02.png`),
+    title: "Workspace defaults and per-deck overrides",
+    caption:
+      "Workspace defaults apply to linked decks that inherit settings (multiple choice, true/false, fill in the blank). Shuffle card order gives each assignee a unique sequence. Per-deck overrides can set formats for one deck (for example Social Studies: British History).",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 03.png`),
+    title: "Save a deck’s formats",
+    caption:
+      "Uncheck Use workspace defaults to set formats for that deck. Enable the types you want, then Save deck formats before entering question counts.",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 04.png`),
+    title: "Set counts and generate AI sentences",
+    caption:
+      "Enter Questions per format so the total is within the deck size (for example 5 multiple choice, 3 true/false, 2 fill in the blank on a 10-card deck). Then Generate AI quiz sentences when true/false or fill-in-the-blank still need content.",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 05.png`),
+    title: "Preview and republish",
+    caption:
+      "When counts are valid and AI content is ready, Preview shows how each card will appear. Republish to quiz replaces the published mix so members see it on their next quiz.",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 07.png`),
+    title: "Preview true/false",
+    caption:
+      "In Quiz format preview, true/false shows What quiz takers see and the answer. The original card question and MCQ options stay preserved. Choose Edit to change only the quiz format on that card.",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 08.png`),
+    title: "Preview fill-in-the-blank",
+    caption:
+      "Fill in the blank shows the generated prompt (with a blank) and accepted answers, plus the original card question and MCQ options. Close returns to Quiz formats.",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 09.png`),
+    title: "Republish the mix",
+    caption:
+      "After preview, Republish to quiz publishes the mix (for example 5 multiple choice, 3 true/false, 2 fill-in-the-blank). Members see this mix the next time they start Quiz.",
+  },
+  {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 10.png`),
+    title: "Member sees the published formats",
+    caption:
+      "When the member opens Quiz on that deck, Timed quiz lists the formats in this quiz (for example 5 multiple choice, 3 true/false, 2 fill-in-the-blank) and Start quiz.",
+  },
+];
+
+const QUIZ_TIMER_WORKSPACE_FILE =
+  "21 Flipvise - Team Tier Plan - Study Mode Quiz Timer for Workspace";
+
+export const QUIZ_TIMER_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${QUIZ_TIMER_WORKSPACE_FILE} - 01.png`),
+    title: "Open Quiz timer",
+    caption:
+      "On Team Admin, open Study Modes → Quiz Mode → Quiz timer. Set a general quiz time for linked decks, or choose timed-quiz minutes for each deck (for example UC-K26). Factory default is 10 minutes.",
+  },
+  {
+    src: uiSrc(`${QUIZ_TIMER_WORKSPACE_FILE} - 02.png`),
+    title: "Workspace-wide time or a per-deck row",
+    caption:
+      "Turn on Use one quiz time for all decks linked to each workspace to apply Quick Presets to every linked deck, then Save general quiz time for linked decks. Deck quiz timers lists every linked deck; click a row (for example Social Studies: British History) to set a timed-quiz length for that deck.",
+  },
+  {
+    src: uiSrc(`${QUIZ_TIMER_WORKSPACE_FILE} - 03.png`),
+    title: "Save a deck timer",
+    caption:
+      "Choose a Quick Preset for that deck (for example 20 minutes), then Save deck timer. A confirmation shows Deck quiz timer updated. Use workspace default clears the custom override.",
+  },
+  {
+    src: uiSrc(`${QUIZ_TIMER_WORKSPACE_FILE} - 04.png`),
+    title: "Member sees the clock",
+    caption:
+      "When the member opens Quiz on that deck, Timed quiz shows the limit on the clock (for example 10 questions · 20:00 on the clock) and Start quiz.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1035,5 +1129,17 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Session cards, set a workspace default or per-deck override, then confirm the member’s AI Recall™ lobby.",
     steps: AI_RECALL_SESSION_CARDS_GUIDE_STEPS,
+  },
+  "quiz-formats-workspace": {
+    title: "Quiz formats for a workspace",
+    summary:
+      "On Quiz formats, set workspace or per-deck question types, generate AI sentences, preview, and republish the mix.",
+    steps: QUIZ_FORMATS_WORKSPACE_GUIDE_STEPS,
+  },
+  "quiz-timer-workspace": {
+    title: "Quiz timer for a workspace",
+    summary:
+      "On Quiz timer, set a workspace-wide duration or a per-deck override, then confirm the member’s Timed quiz clock.",
+    steps: QUIZ_TIMER_WORKSPACE_GUIDE_STEPS,
   },
 };

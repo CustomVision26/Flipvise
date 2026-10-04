@@ -8,7 +8,7 @@ export type ResolvedQuizStartSchedule = {
 
 export type QuizStartScheduleFields = {
   quizStartScheduleEnabled: boolean;
-  quizStartAt: Date | null;
+  quizStartAt: Date | string | null;
 };
 
 /** `datetime-local` value (`YYYY-MM-DDTHH:mm`) in the viewer's local timezone. */
@@ -37,21 +37,29 @@ export function formatQuizStartSchedule(value: Date | string): string {
   }
 }
 
+function coerceQuizStartAt(value: Date | string | null): Date | null {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function resolveQuizStartSchedule(
   deck: QuizStartScheduleFields,
   workspace: QuizStartScheduleFields,
 ): ResolvedQuizStartSchedule | null {
-  if (deck.quizStartScheduleEnabled && deck.quizStartAt) {
+  const deckStartAt = coerceQuizStartAt(deck.quizStartAt);
+  if (deck.quizStartScheduleEnabled && deckStartAt) {
     return {
       enabled: true,
-      startAt: deck.quizStartAt,
+      startAt: deckStartAt,
       source: "deck",
     };
   }
-  if (workspace.quizStartScheduleEnabled && workspace.quizStartAt) {
+  const workspaceStartAt = coerceQuizStartAt(workspace.quizStartAt);
+  if (workspace.quizStartScheduleEnabled && workspaceStartAt) {
     return {
       enabled: true,
-      startAt: workspace.quizStartAt,
+      startAt: workspaceStartAt,
       source: "workspace",
     };
   }

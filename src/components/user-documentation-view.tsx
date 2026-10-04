@@ -208,6 +208,16 @@ function DocPagePanel({
             </DocsUiGuideStartButton>
           </>
         ) : null}
+        {page.id === "quiz-results-admin" ? (
+          <>
+            <DocsUiGuideStartButton guideId="quiz-formats-workspace">
+              Open quiz formats for a workspace guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="quiz-timer-workspace">
+              Open quiz timer for a workspace guide
+            </DocsUiGuideStartButton>
+          </>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -380,6 +390,14 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "study-modes-active-recall" && sectionId === "performance") {
+    return [
+      {
+        id: "workspace-study-mode-settings",
+        label: "Open AI Recall™ study mode control and settings for a workspace guide",
+      },
+    ];
+  }
   if (pageId === "study-modes-active-recall" && sectionId === "session-cards") {
     return [
       {
@@ -388,11 +406,38 @@ function articleSectionGuides(
       },
     ];
   }
-  if (pageId === "study-modes-active-recall") {
+  if (pageId === "quiz-results-admin" &&
+    (sectionId === "quiz-formats" ||
+      sectionId === "quiz-format-distribution" ||
+      sectionId === "quiz-formats-workflow")) {
     return [
       {
-        id: "workspace-study-mode-settings",
-        label: "Open AI Recall™ study mode control and settings for a workspace guide",
+        id: "quiz-formats-workspace",
+        label: "Open quiz formats for a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "study-session" && sectionId === "quiz-formats") {
+    return [
+      {
+        id: "quiz-formats-workspace",
+        label: "Open quiz formats for a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "quiz-results-admin" && sectionId === "timer") {
+    return [
+      {
+        id: "quiz-timer-workspace",
+        label: "Open quiz timer for a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "study-session" && sectionId === "team-policies") {
+    return [
+      {
+        id: "quiz-timer-workspace",
+        label: "Open quiz timer for a workspace guide",
       },
     ];
   }

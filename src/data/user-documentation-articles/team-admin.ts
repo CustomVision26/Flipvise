@@ -273,6 +273,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Quiz formats",
         bullets: [
           "Route: /dashboard/team-admin/quiz-results/quiz-formats",
+          "Open quiz formats for a workspace guide to follow workspace defaults, a per-deck override, questions per format, Generate AI quiz sentences, Preview, Republish to quiz, and the member’s Timed quiz lobby.",
           "Workspace selector shows the workspace name — pick the workspace before editing defaults or per-deck overrides.",
           "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
           "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",
@@ -336,7 +337,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "timer",
         title: "Quiz timer",
         bullets: [
-          "Owner sets a general quiz duration (minutes) for linked decks, or locks one time across workspaces.",
+          "Owner sets a general quiz duration (minutes) for linked decks, or locks one time across workspaces. Open quiz timer for a workspace guide to follow a workspace-wide time, a per-deck override, Save deck timer, and the member’s Timed quiz clock.",
           "Owner/team admin can set a timed-quiz length per individual deck (presets 5–120 minutes) when not locked. The table lists every linked deck; click a row to open that deck’s timer.",
           "Per-deck timer overrides the workspace/subscriber default when set.",
         ],
@@ -347,7 +348,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         bullets: [
           "Workspace-level: enable + start date/time for all decks.",
           "Deck-level overrides for specific start times.",
-          "Members cannot start quizzes before the scheduled time.",
+          "Members cannot start quizzes before the scheduled time. Timed quiz shows that date and time (and a countdown while the quiz is still locked).",
         ],
       },
       {

@@ -44,11 +44,11 @@ function QuizPreviewText({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-sky-400/90">
+    <div className="space-y-2.5">
+      <p className="text-sm font-semibold uppercase tracking-wide text-sky-300">
         {label}
       </p>
-      <div className="max-h-[min(24rem,50vh)] overflow-y-auto overflow-x-hidden rounded-md border border-sky-500/40 bg-sky-500/10 p-4 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground shadow-[inset_0_0_0_1px_rgba(56,189,248,0.08)]">
+      <div className="max-h-[min(28rem,45vh)] overflow-y-auto overflow-x-hidden rounded-lg border-2 border-sky-400/50 bg-sky-500/15 p-5 text-base leading-relaxed whitespace-pre-wrap break-words text-foreground sm:text-lg">
         {children}
       </div>
     </div>
@@ -68,11 +68,11 @@ function McqOptionsList({
 }) {
   if (options.length === 0) return null;
   return (
-    <div className="space-y-1 rounded-md border border-border/70 bg-muted/30 p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-4">
+      <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Original MCQ options (preserved)
       </p>
-      <ul className="space-y-1 text-sm">
+      <ul className="space-y-1.5 text-base leading-relaxed">
         {options.map((opt, index) => (
           <li key={`${index}-${opt.text}`} className="flex gap-2">
             <span className="text-muted-foreground">{String.fromCharCode(65 + index)}.</span>
@@ -152,15 +152,15 @@ function PreviewItemCard({
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-border/80 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="space-y-5 rounded-xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm font-semibold uppercase tracking-wide text-foreground">
           {formatPreviewTypeLabel(item.formatType)}
         </p>
         {item.editable ? (
           <Button
             type="button"
-            size="sm"
+            size="default"
             variant="outline"
             className="gap-1.5"
             disabled={saving || Boolean(item.buildError)}
@@ -181,7 +181,7 @@ function PreviewItemCard({
           <QuizPreviewText label="What quiz takers see">
             {item.multipleChoice.question}
           </QuizPreviewText>
-          <ul className="space-y-1 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-sm">
+          <ul className="space-y-2 rounded-lg border-2 border-sky-400/40 bg-sky-500/10 p-4 text-base leading-relaxed sm:text-lg">
             {item.multipleChoice.options.map((opt, index) => (
               <li key={`${index}-${opt}`} className="break-words">
                 {String.fromCharCode(65 + index)}. {opt}
@@ -189,7 +189,7 @@ function PreviewItemCard({
               </li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             Multiple-choice uses the card&apos;s stored options. Edit the card on the deck page to
             change the original.
           </p>
@@ -236,7 +236,7 @@ function PreviewItemCard({
             <QuizPreviewText label="What quiz takers see">
               {item.trueFalse.statement}
             </QuizPreviewText>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-foreground">
               Answer: {item.trueFalse.correctAnswer ? "True" : "False"}
             </p>
           </div>
@@ -272,7 +272,7 @@ function PreviewItemCard({
             <QuizPreviewText label="What quiz takers see">
               {item.fillInBlank.promptText}
             </QuizPreviewText>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-foreground">
               Answer: {item.fillInBlank.acceptedAnswers.join(" / ")}
             </p>
           </div>
@@ -282,11 +282,11 @@ function PreviewItemCard({
       ) : null}
 
       {item.originalQuestion ? (
-        <details className="rounded-md border border-border/50 bg-muted/10 px-3 py-2 text-sm">
-          <summary className="cursor-pointer text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <details className="rounded-lg border border-border bg-muted/20 px-4 py-3 text-base">
+          <summary className="cursor-pointer text-sm font-semibold uppercase tracking-wide text-foreground">
             Original card question (preserved for reformatting)
           </summary>
-          <p className="mt-2 break-words whitespace-pre-wrap text-muted-foreground">
+          <p className="mt-3 break-words whitespace-pre-wrap leading-relaxed text-foreground">
             {item.originalQuestion}
           </p>
         </details>
@@ -354,10 +354,12 @@ export function QuizFormatPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(92vh,56rem)] max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-5 sm:max-w-6xl">
-        <DialogHeader className="shrink-0 pb-4">
-          <DialogTitle>Quiz format preview — {deckName}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="flex h-[min(96vh,84rem)] max-h-[96vh] w-[min(96vw,90rem)] max-w-[90rem] flex-col gap-0 overflow-hidden p-6 text-base sm:max-w-[90rem] sm:p-8">
+        <DialogHeader className="shrink-0 space-y-2 pb-5 pr-8">
+          <DialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Quiz format preview — {deckName}
+          </DialogTitle>
+          <DialogDescription className="text-base leading-relaxed text-muted-foreground">
             Review how each card will appear in the quiz. Edits save only the quiz format (T/F or
             FIB) on this card — the original question and MCQ options stay unchanged for future
             reformatting.
@@ -371,16 +373,16 @@ export function QuizFormatPreviewDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+            <div className="flex items-center justify-center gap-2 py-16 text-base text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
               Loading preview…
             </div>
           ) : error ? (
-            <p className="py-8 text-center text-sm text-destructive">{error}</p>
+            <p className="py-12 text-center text-base text-destructive">{error}</p>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No preview items.</p>
+            <p className="py-12 text-center text-base text-muted-foreground">No preview items.</p>
           ) : (
-            <div className="space-y-4 pb-4">
+            <div className="space-y-5 pb-4">
               {items.map((item) => (
                 <PreviewItemCard
                   key={`${item.cardId}-${item.formatType}`}
@@ -394,8 +396,8 @@ export function QuizFormatPreviewDialog({
           )}
         </div>
 
-        <DialogFooter className="shrink-0 border-t pt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="-mx-6 -mb-6 border-t px-6 py-4 sm:-mx-8 sm:-mb-8 sm:px-8 sm:py-5">
+          <Button type="button" size="lg" variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
         </DialogFooter>

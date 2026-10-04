@@ -65,6 +65,7 @@ import {
   PenLine,
   ToggleLeft,
   Shuffle,
+  CalendarClock,
 } from "lucide-react";
 import { shuffleDeckQuizCardOrdersAction } from "@/actions/quiz-card-orders";
 import {
@@ -1412,6 +1413,38 @@ export function QuizStudy({
               </span>{" "}
               on the clock
             </p>
+            {activeSchedule ? (
+              <div
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-left",
+                  scheduleBlocksStart
+                    ? "border-amber-500/30 bg-amber-500/10"
+                    : "border-border/60 bg-muted/20",
+                )}
+              >
+                <p
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 text-xs font-medium",
+                    scheduleBlocksStart ? "text-amber-400" : "text-foreground",
+                  )}
+                >
+                  <CalendarClock className="size-3.5 shrink-0" aria-hidden />
+                  {scheduleBlocksStart ? "Quiz unlocks" : "Scheduled start"}
+                </p>
+                <p className="mt-0.5 text-center text-[11px] text-muted-foreground">
+                  {formatQuizStartSchedule(activeSchedule.startAt)}
+                  {activeSchedule.source === "deck" ? " · this deck" : " · this workspace"}
+                </p>
+                {scheduleBlocksStart ? (
+                  <p className="mt-1 text-center text-[11px] text-muted-foreground">
+                    Time remaining:{" "}
+                    <span className="font-medium tabular-nums text-foreground">
+                      {formatCountdown(scheduleSecondsRemaining)}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {enabledFormats.length > 0 ? (
               <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-3 text-left">
                 <p className="text-center text-xs font-medium text-foreground">
@@ -1475,16 +1508,6 @@ export function QuizStudy({
               <p className="text-xs text-amber-400/90">
                 Exam Mode is on. Stay on this tab until you submit — leaving will lock your
                 session.
-              </p>
-            ) : null}
-            {scheduleBlocksStart && activeSchedule ? (
-              <p className="text-xs text-amber-400/90">
-                This quiz unlocks at {formatQuizStartSchedule(activeSchedule.startAt)} (
-                {activeSchedule.source === "deck" ? "deck schedule" : "workspace schedule"}). Time
-                remaining:{" "}
-                <span className="font-medium tabular-nums text-foreground">
-                  {formatCountdown(scheduleSecondsRemaining)}
-                </span>
               </p>
             ) : null}
             <p className="text-xs">

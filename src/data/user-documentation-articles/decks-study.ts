@@ -126,7 +126,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Fill in the blank — type the missing word or phrase in an AI-generated sentence.",
           "Pro Plus and Education Plus (Stripe paid, admin-assigned, or affiliate grant): on your personal deck’s quiz lobby, use Format Quiz Question to enable formats, set Questions per format counts, set a Quiz time limit (minutes), Generate AI quiz sentences when needed, then Publish to quiz (or Republish to quiz).",
           "Eligibility follows your effective Pro Plus / Education Plus entitlement — the same plan shown in Billing and the header plan badge.",
-          "Team admins configure formats in Team Admin → Study Modes → Quiz Mode → Quiz formats (not via Format Quiz Question on personal decks).",
+          "Team admins configure formats in Team Admin → Study Modes → Quiz Mode → Quiz formats (not via Format Quiz Question on personal decks). Open quiz formats for a workspace guide to follow that Team Admin flow.",
         ],
       },
       {
@@ -137,7 +137,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
           "Draft formats and counts stay in the dialog until you click Publish to quiz — then the lobby, timer, and question mix update.",
           "Questions per format counts may total up to the deck’s eligible card total before Generate or Publish.",
           "Quiz time limit is 1–180 minutes; Publish saves it for this deck’s personal timed quiz clock.",
-          "Team workspace quizzes still use the team admin Quiz Timer when you study from a workplace assignment.",
+          "Team workspace quizzes still use the team admin Quiz Timer when you study from a workplace assignment. Open quiz timer for a workspace guide to follow that Team Admin flow.",
         ],
       },
       {
@@ -165,8 +165,8 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "team-policies",
         title: "Team quiz policies",
         bullets: [
-          "Quiz timer — time limit per attempt set by team admin (or by you via Format Quiz Question on personal Pro Plus / Education Plus decks).",
-          "Quiz schedule — quizzes cannot start before the configured date/time.",
+          "Quiz timer — time limit per attempt set by team admin (or by you via Format Quiz Question on personal Pro Plus / Education Plus decks). Open quiz timer for a workspace guide to follow Team Admin Quiz timer through the member’s Timed quiz clock.",
+          "Quiz schedule — quizzes cannot start before the configured date/time. Timed quiz shows that start date and time on the lobby.",
           "Exam Mode — session locking, admin grant to resume/restart, one controlled attempt per deck. Applies to the plan owner whenever Exam Mode is on, plus Team Admins and/or Members selected in Exam Mode settings. When active for you, the Timed quiz lobby shows a green Exam Mode on light.",
           "Owners and team admins get a Cancel button on the unanswered-submit dialog — it returns to the Resume quiz lobby without submitting (members only see Keep answering / Submit anyway).",
           "Workspace deck study links canonicalize to /decks/[deckId]/study?team=.",

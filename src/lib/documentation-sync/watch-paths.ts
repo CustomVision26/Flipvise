@@ -140,6 +140,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/account-recovery-profile.ts",
   ],
   "study-session": [
+    "src/lib/flipvise-ui-guides.ts",
     "src/app/decks/[deckId]/study/page.tsx",
     "src/app/decks/[deckId]/study/flashcard-study.tsx",
     "src/app/decks/[deckId]/study/quiz-study.tsx",
@@ -315,6 +316,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/ai-recall-session-cards-settings.tsx",
   ],
   "quiz-results-admin": [
+    "src/lib/flipvise-ui-guides.ts",
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-security/page.tsx",
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-timer/page.tsx",
     "src/app/dashboard/(team-admin)/team-admin/quiz-results/quiz-schedule/page.tsx",
