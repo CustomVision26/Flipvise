@@ -13,7 +13,9 @@ export type DocsUiGuideId =
   | "invite-unregistered-member"
   | "link-deck-to-workspace"
   | "assign-deck-to-member"
-  | "change-study-mode-privileges";
+  | "change-study-mode-privileges"
+  | "workspace-study-mode-settings"
+  | "ai-recall-session-cards";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -33,6 +35,8 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "link-deck-to-workspace",
   "assign-deck-to-member",
   "change-study-mode-privileges",
+  "workspace-study-mode-settings",
+  "ai-recall-session-cards",
 ];
 
 export type DocsUiGuideStep = {
@@ -858,6 +862,84 @@ export const CHANGE_STUDY_MODE_PRIVILEGES_GUIDE_STEPS: readonly DocsUiGuideStep[
   },
 ];
 
+const WORKSPACE_STUDY_MODE_SETTINGS_FILE =
+  "18 Flipvise - Team Tier Plan - AI-Recall Study Mode Control and Settings for Workspace";
+
+export const WORKSPACE_STUDY_MODE_SETTINGS_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 01.png`),
+    title: "Open Active Recall Performance",
+    caption:
+      "On Team Admin, open Study Modes → Active Recall Mode → Performance. Review saved AI Recall™ results for the workspace (for example UC-K26). Performance and Session cards sit under Active Recall Mode.",
+  },
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 02.png`),
+    title: "Empty insights until a session is saved",
+    caption:
+      "Key indicators and Where to focus next stay empty until a member completes and saves an AI Recall™ session. Most missed cards, most missed decks, top learners, and weakest subjects fill in from saved results.",
+  },
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 03.png`),
+    title: "Member starts AI Recall™",
+    caption:
+      "A workspace member opens an assigned deck (for example Social Studies: British History), chooses AI Recall™, checks cards this session and cards in the deck, then Ready to start.",
+  },
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 04.png`),
+    title: "Session complete",
+    caption:
+      "When the session finishes, the member sees reviewed, correct, incorrect, and forced unlocks, plus a session score. Results save to Active Recall analytics and the member’s inbox.",
+  },
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 05.png`),
+    title: "Performance updates",
+    caption:
+      "Back on Team Admin → Active Recall Mode → Performance, Key indicators update (team recall accuracy, average AI score, and average session time). Track members and decks appears below.",
+  },
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 06.png`),
+    title: "Monitor decks",
+    caption:
+      "In Saved session monitor, open Decks to see each deck with saved sessions (for example Social Studies: British History — sessions, members, accuracy, average AI score, misses, and last session). Instructional insights list missed cards, missed decks, top learners, and weakest subjects.",
+  },
+  {
+    src: uiSrc(`${WORKSPACE_STUDY_MODE_SETTINGS_FILE} - 07.png`),
+    title: "Monitor members",
+    caption:
+      "Open Members and click a learner (for example williams.bruce2698) to expand that person’s saved session — date, deck, accuracy, AI score, time, cards, correct, and misses.",
+  },
+];
+
+const AI_RECALL_SESSION_CARDS_FILE =
+  "19 Flipvise - Team Tier Plan - Study Mode AI-Recall Session Card for Workspace";
+
+export const AI_RECALL_SESSION_CARDS_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${AI_RECALL_SESSION_CARDS_FILE} - 01.png`),
+    title: "Open Session cards",
+    caption:
+      "On Team Admin, open Study Modes → Active Recall Mode → Session cards. Set a workspace default and optional per-deck overrides for how many cards members see in each AI Recall™ session (for example workspace UC-K26).",
+  },
+  {
+    src: uiSrc(`${AI_RECALL_SESSION_CARDS_FILE} - 02.png`),
+    title: "Workspace default and per-deck overrides",
+    caption:
+      "Workspace default applies to linked decks without an override (All cards in the deck, or a fixed number per session). Per-deck overrides can use the workspace default, all cards in that deck, or a fixed count for one deck (for example Social Studies: British History).",
+  },
+  {
+    src: uiSrc(`${AI_RECALL_SESSION_CARDS_FILE} - 03.png`),
+    title: "Save a deck override",
+    caption:
+      "Choose Fixed number of cards for that deck, enter the count (for example 5), then Save deck. A confirmation shows the override (for example 5 cards per session).",
+  },
+  {
+    src: uiSrc(`${AI_RECALL_SESSION_CARDS_FILE} - 04.png`),
+    title: "Member sees the new count",
+    caption:
+      "When the member opens AI Recall™ on that deck, Cards this session matches the override (for example 5) and Cards in deck still shows the full deck size (for example 10).",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -941,5 +1023,17 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Study privileges, open an assignment, change study modes, and confirm the member’s study session.",
     steps: CHANGE_STUDY_MODE_PRIVILEGES_GUIDE_STEPS,
+  },
+  "workspace-study-mode-settings": {
+    title: "AI Recall™ study mode control and settings for a workspace",
+    summary:
+      "Open Active Recall Mode on Team Admin, have a member complete a session, then monitor results by deck and by member.",
+    steps: WORKSPACE_STUDY_MODE_SETTINGS_GUIDE_STEPS,
+  },
+  "ai-recall-session-cards": {
+    title: "AI Recall™ session cards for a workspace",
+    summary:
+      "On Session cards, set a workspace default or per-deck override, then confirm the member’s AI Recall™ lobby.",
+    steps: AI_RECALL_SESSION_CARDS_GUIDE_STEPS,
   },
 };

@@ -1089,11 +1089,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Monitor saved AI Recall™ session results for workspace members and decks.",
         howItWorks: [
-          "Team Admin → Study Modes → Active Recall Mode → Performance shows workspace KPIs after members save a completed AI Recall™ session.",
+          "Team Admin → Study Modes → Active Recall Mode → Performance shows workspace KPIs after members save a completed AI Recall™ session. Open AI Recall™ study mode control and settings for a workspace guide to follow Performance, a member completing AI Recall™, then deck and member monitors.",
           "Track members lists every learner with saved sessions (accuracy, average AI score, average time, last session). Click a row to open that member’s session history.",
           "Track decks lists every deck with saved sessions (sessions, members, accuracy, average AI score, misses). Click a row to open sessions for that deck.",
           "Instructional insights still highlight missed cards, missed decks, top learners, and weaker subjects.",
-          "Session cards (under Active Recall Mode) sets how many cards appear in a member AI Recall™ session.",
+          "Session cards (under Active Recall Mode) sets how many cards appear in a member AI Recall™ session. Open AI Recall™ session cards for a workspace guide to follow the workspace default, a per-deck override, and the member’s Cards this session count.",
         ],
         requirements: ["Team owner or team_admin.", "Members must complete and save an AI Recall™ session."],
         doNots: [
@@ -1127,7 +1127,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Quiz formats (/dashboard/team-admin/quiz-results/quiz-formats): workspace defaults and per-deck overrides for multiple choice, true/false, and fill-in-the-blank; set Questions per format; Generate AI quiz sentences when needed; Publish all cards or Choose cards.",
           "Publish opens a choice: Publish all cards (auto-assign formats for your counts) or Choose cards (set quiz size, browse quiz-taker previews, check specific cards, then Publish settings).",
           "Republish to quiz replaces the previous published mix (all cards or a newly chosen subset).",
-          "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck in each workspace.",
+          "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck. The table lists every linked deck; click a row to open that deck’s timer.",
           "Quiz Schedule: restrict when quizzes can be taken.",
           "Exam Mode: anti-cheating and session rules.",
         ],

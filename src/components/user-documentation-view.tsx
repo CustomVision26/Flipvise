@@ -198,6 +198,16 @@ function DocPagePanel({
             Open assign deck to member in a workspace guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "study-modes-active-recall" ? (
+          <>
+            <DocsUiGuideStartButton guideId="workspace-study-mode-settings">
+              Open AI Recall™ study mode control and settings for a workspace guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="ai-recall-session-cards">
+              Open AI Recall™ session cards for a workspace guide
+            </DocsUiGuideStartButton>
+          </>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -367,6 +377,22 @@ function articleSectionGuides(
       {
         id: "change-study-mode-privileges",
         label: "Open change study mode privileges guide",
+      },
+    ];
+  }
+  if (pageId === "study-modes-active-recall" && sectionId === "session-cards") {
+    return [
+      {
+        id: "ai-recall-session-cards",
+        label: "Open AI Recall™ session cards for a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "study-modes-active-recall") {
+    return [
+      {
+        id: "workspace-study-mode-settings",
+        label: "Open AI Recall™ study mode control and settings for a workspace guide",
       },
     ];
   }

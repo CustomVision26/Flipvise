@@ -172,6 +172,8 @@ export type TeamAdminRecordSliderProps<
   tableGroupByMember?: boolean;
   /** Assignment rows per page; member groups are never split across pages. */
   tablePageSize?: number;
+  tableRowNoun?: { singular: string; plural: string };
+  tableGroupNoun?: { singular: string; plural: string };
 };
 
 export function TeamAdminRecordSlider<
@@ -201,6 +203,8 @@ export function TeamAdminRecordSlider<
   tableColumns,
   tableGroupByMember = false,
   tablePageSize = 10,
+  tableRowNoun = { singular: "assignment", plural: "assignments" },
+  tableGroupNoun = { singular: "member", plural: "members" },
 }: TeamAdminRecordSliderProps<T>) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState<TeamAdminRecordSort>("member_az");
@@ -539,9 +543,14 @@ export function TeamAdminRecordSlider<
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
-              {filteredItems.length} assignment{filteredItems.length === 1 ? "" : "s"}
+              {filteredItems.length}{" "}
+              {filteredItems.length === 1 ? tableRowNoun.singular : tableRowNoun.plural}
               {tableGroupByMember && memberGroups
-                ? ` · ${memberGroups.length} member${memberGroups.length === 1 ? "" : "s"}`
+                ? ` · ${memberGroups.length} ${
+                    memberGroups.length === 1
+                      ? tableGroupNoun.singular
+                      : tableGroupNoun.plural
+                  }`
                 : null}
             </p>
             <div className="flex items-center gap-2">

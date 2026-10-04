@@ -175,7 +175,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "performance",
         title: "Performance overview",
         bullets: [
-          "Team recall accuracy, average AI score, and average session time roll up every saved session in the workspace.",
+          "Team recall accuracy, average AI score, and average session time roll up every saved session in the workspace. Open AI Recall™ study mode control and settings for a workspace guide to follow Performance, a member completing AI Recall™, then deck and member monitors.",
           "Metrics update when a member completes and saves an AI Recall™ session on an assigned deck.",
         ],
       },
@@ -203,6 +203,16 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         bullets: [
           "Most missed cards and decks, top learners, and weakest subjects help prioritize reteaching.",
           "Use Track members and decks for the full session history, not only the insight shortlists.",
+        ],
+      },
+      {
+        id: "session-cards",
+        title: "Session cards",
+        bullets: [
+          "Route: /dashboard/team-admin/study-modes/active-recall/session-cards",
+          "Workspace default applies to linked decks without an override — all cards in the deck, or a fixed number per session. Open AI Recall™ session cards for a workspace guide to follow the default, a per-deck override, Save deck, and the member’s lobby counts.",
+          "Per-deck overrides can inherit the workspace default, use all cards in that deck, or set a fixed count.",
+          "Members see Cards this session from the effective setting and Cards in deck as the full deck size.",
         ],
       },
     ],
@@ -327,7 +337,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Quiz timer",
         bullets: [
           "Owner sets a general quiz duration (minutes) for linked decks, or locks one time across workspaces.",
-          "Owner/team admin can set a timed-quiz length per individual deck (presets 5–120 minutes) when not locked.",
+          "Owner/team admin can set a timed-quiz length per individual deck (presets 5–120 minutes) when not locked. The table lists every linked deck; click a row to open that deck’s timer.",
           "Per-deck timer overrides the workspace/subscriber default when set.",
         ],
       },
