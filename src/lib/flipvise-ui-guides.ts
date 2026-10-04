@@ -17,7 +17,8 @@ export type DocsUiGuideId =
   | "workspace-study-mode-settings"
   | "ai-recall-session-cards"
   | "quiz-formats-workspace"
-  | "quiz-timer-workspace";
+  | "quiz-timer-workspace"
+  | "quiz-schedule-workspace";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -41,6 +42,7 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "ai-recall-session-cards",
   "quiz-formats-workspace",
   "quiz-timer-workspace",
+  "quiz-schedule-workspace",
 ];
 
 export type DocsUiGuideStep = {
@@ -1034,6 +1036,36 @@ export const QUIZ_TIMER_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+const QUIZ_SCHEDULE_WORKSPACE_FILE =
+  "22 Flipvise - Team Tier Plan - Study Mode Quiz Schedule for Workspace";
+
+export const QUIZ_SCHEDULE_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${QUIZ_SCHEDULE_WORKSPACE_FILE} - 01.png`),
+    title: "Open Quiz schedule",
+    caption:
+      "On Team Admin, open Study Modes → Quiz Mode → Quiz schedule. Configure when quizzes may start for this workspace (for example UC-K26), for every linked deck or for one deck.",
+  },
+  {
+    src: uiSrc(`${QUIZ_SCHEDULE_WORKSPACE_FILE} - 02.png`),
+    title: "Workspace or per-deck start times",
+    caption:
+      "Turn on scheduling for the workspace to set one start date and time for every quiz, then Save schedule. Deck quiz start overrides that for a single deck (for example Social Studies: British History). When a deck schedule is off, the workspace schedule applies.",
+  },
+  {
+    src: uiSrc(`${QUIZ_SCHEDULE_WORKSPACE_FILE} - 03.png`),
+    title: "Save a deck schedule",
+    caption:
+      "Enable the deck toggle, choose Start date & time (for example Oct 5, 2026, 11:40 AM), then Save schedule. A confirmation shows Schedule saved. Members cannot start that deck’s quiz until this moment.",
+  },
+  {
+    src: uiSrc(`${QUIZ_SCHEDULE_WORKSPACE_FILE} - 04.png`),
+    title: "Member waits until unlock",
+    caption:
+      "When the member opens Quiz on that deck, Timed quiz shows Quiz unlocks with the date and time (for example Oct 5, 2026, 11:40 AM) and a countdown. Start quiz stays greyed out until that time, unless a team admin or owner enables it.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1141,5 +1173,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Quiz timer, set a workspace-wide duration or a per-deck override, then confirm the member’s Timed quiz clock.",
     steps: QUIZ_TIMER_WORKSPACE_GUIDE_STEPS,
+  },
+  "quiz-schedule-workspace": {
+    title: "Quiz schedule for a workspace",
+    summary:
+      "On Quiz schedule, set a workspace or per-deck start time, then confirm the member’s Timed quiz unlock and greyed-out Start quiz.",
+    steps: QUIZ_SCHEDULE_WORKSPACE_GUIDE_STEPS,
   },
 };

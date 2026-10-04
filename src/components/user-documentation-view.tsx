@@ -216,6 +216,9 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="quiz-timer-workspace">
               Open quiz timer for a workspace guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="quiz-schedule-workspace">
+              Open quiz schedule for a workspace guide
+            </DocsUiGuideStartButton>
           </>
         ) : null}
       </div>
@@ -433,11 +436,23 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "quiz-results-admin" && sectionId === "schedule") {
+    return [
+      {
+        id: "quiz-schedule-workspace",
+        label: "Open quiz schedule for a workspace guide",
+      },
+    ];
+  }
   if (pageId === "study-session" && sectionId === "team-policies") {
     return [
       {
         id: "quiz-timer-workspace",
         label: "Open quiz timer for a workspace guide",
+      },
+      {
+        id: "quiz-schedule-workspace",
+        label: "Open quiz schedule for a workspace guide",
       },
     ];
   }
