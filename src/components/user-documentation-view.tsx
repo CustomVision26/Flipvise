@@ -210,6 +210,9 @@ function DocPagePanel({
         ) : null}
         {page.id === "quiz-results-admin" ? (
           <>
+            <DocsUiGuideStartButton guideId="quiz-results-workspace">
+              Open quiz results for a workspace guide
+            </DocsUiGuideStartButton>
             <DocsUiGuideStartButton guideId="quiz-formats-workspace">
               Open quiz formats for a workspace guide
             </DocsUiGuideStartButton>
@@ -219,7 +222,15 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="quiz-schedule-workspace">
               Open quiz schedule for a workspace guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="quiz-exam-mode-workspace">
+              Open quiz Exam Mode for a workspace guide
+            </DocsUiGuideStartButton>
           </>
+        ) : null}
+        {page.id === "quiz-result-detail" ? (
+          <DocsUiGuideStartButton guideId="quiz-results-workspace">
+            Open quiz results for a workspace guide
+          </DocsUiGuideStartButton>
         ) : null}
       </div>
 
@@ -409,6 +420,14 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "quiz-results-admin" && sectionId === "results") {
+    return [
+      {
+        id: "quiz-results-workspace",
+        label: "Open quiz results for a workspace guide",
+      },
+    ];
+  }
   if (pageId === "quiz-results-admin" &&
     (sectionId === "quiz-formats" ||
       sectionId === "quiz-format-distribution" ||
@@ -428,6 +447,23 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "study-session" && sectionId === "quiz-results-review") {
+    return [
+      {
+        id: "quiz-results-workspace",
+        label: "Open quiz results for a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "quiz-result-detail" &&
+    (sectionId === "content" || sectionId === "access")) {
+    return [
+      {
+        id: "quiz-results-workspace",
+        label: "Open quiz results for a workspace guide",
+      },
+    ];
+  }
   if (pageId === "quiz-results-admin" && sectionId === "timer") {
     return [
       {
@@ -444,6 +480,14 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "quiz-results-admin" && sectionId === "security") {
+    return [
+      {
+        id: "quiz-exam-mode-workspace",
+        label: "Open quiz Exam Mode for a workspace guide",
+      },
+    ];
+  }
   if (pageId === "study-session" && sectionId === "team-policies") {
     return [
       {
@@ -453,6 +497,10 @@ function articleSectionGuides(
       {
         id: "quiz-schedule-workspace",
         label: "Open quiz schedule for a workspace guide",
+      },
+      {
+        id: "quiz-exam-mode-workspace",
+        label: "Open quiz Exam Mode for a workspace guide",
       },
     ];
   }

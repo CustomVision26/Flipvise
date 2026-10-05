@@ -156,6 +156,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/education-plans.ts",
   ],
   "quiz-result-detail": [
+    "src/lib/flipvise-ui-guides.ts",
     "src/app/dashboard/quiz-results/[resultId]/page.tsx",
     "src/components/quiz-result-detail-view.tsx",
     "src/lib/quiz-pdf-server.ts",

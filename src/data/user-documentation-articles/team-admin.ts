@@ -263,7 +263,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "results",
         title: "Quiz results tab",
         bullets: [
-          "Table: workspace, member, email, deck, score, counts, time, saved date.",
+          "Table: workspace, member, email, deck, score, counts, time, saved date. Open quiz results for a workspace guide to follow the results table, View, Quiz sheets, and the member’s saved score and Review.",
           "Search and filter by workspace and deck.",
           "View full attempt detail; delete result records.",
         ],
@@ -355,7 +355,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "security",
         title: "Exam Mode",
         bullets: [
-          "Workspace toggle applies to all decks unless deck overrides.",
+          "Workspace toggle applies to all decks unless deck overrides. Open quiz Exam Mode for a workspace guide to follow workspace and per-deck locks, Continue, Start over, and Terminate.",
           "Choose Plan owner, Team Admin, and/or Member checkboxes for whom Exam Mode applies. Only the plan owner can enable or disable Exam Mode for the plan owner; team admins cannot change that checkbox.",
           "Per-deck checkboxes can override the workspace audience default.",
           "Sessions can lock, complete, or terminate.",

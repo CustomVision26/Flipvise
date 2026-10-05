@@ -200,7 +200,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "When formats have been published, each card keeps its assigned format until published again; otherwise formats are chosen at random per card.",
           "Team study URLs use /decks/[deckId]/study?team= (workspace id is filled when you open a workspace deck).",
           "Workspace owners and team admins see Cancel on the unanswered-submit dialog to return to the Resume quiz lobby without submitting.",
-          "Team quizzes may enforce timers, schedules, and Exam Mode rules set by admins; when Exam Mode is on for members, the Timed quiz lobby shows a green Exam Mode on light. When a quiz schedule is on, Timed quiz shows the start date and time (and a countdown while locked). Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question. Open quiz timer for a workspace guide to follow Team Admin Quiz timer through the member’s clock. Open quiz schedule for a workspace guide to follow a start time through the member’s greyed-out Start quiz.",
+          "Team quizzes may enforce timers, schedules, and Exam Mode rules set by admins; when Exam Mode is on for members, the Timed quiz lobby shows a green Exam Mode on light. When a quiz schedule is on, Timed quiz shows the start date and time (and a countdown while locked). Personal Pro Plus / Education Plus decks can set their own Quiz time limit in Format Quiz Question. Open quiz timer for a workspace guide to follow Team Admin Quiz timer through the member’s clock. Open quiz schedule for a workspace guide to follow a start time through the member’s greyed-out Start quiz. Open quiz Exam Mode for a workspace guide to follow Exam Mode locks through Continue, Start over, and Terminate.",
           "AI Reading (text-to-speech) is available on Pro Plus when enabled.",
         ],
         requirements: [
@@ -226,7 +226,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Shows score, answers, and timing for a specific quiz result.",
           "Each question in the review lists its format (MCQ, True/False, or Fill in the blank) next to the question number.",
-          "Linked from inbox notifications for team quiz activity.",
+          "Linked from inbox notifications for team quiz activity. Open quiz results for a workspace guide to follow Team Admin Quiz results through the member’s saved score and Review.",
           "PDF downloads include the format label on each question when available.",
         ],
         requirements: ["You must be the result owner or have permission to view it."],
@@ -1123,13 +1123,13 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/team-admin/quiz-results",
         purpose: "Review member quiz scores and configure quiz policies.",
         howItWorks: [
-          "View and filter quiz results across members.",
+          "View and filter quiz results across members. Use View to expand details, or double-click a row to open Quiz sheets (Question sheet and Answer key). Open quiz results for a workspace guide to follow the results table through View, Quiz sheets, and the member’s saved score and Review.",
           "Quiz formats (/dashboard/team-admin/quiz-results/quiz-formats): workspace defaults and per-deck overrides for multiple choice, true/false, and fill-in-the-blank; set Questions per format; Generate AI quiz sentences when needed; Preview and Publish all cards or Choose cards. Open quiz formats for a workspace guide to follow formats, counts, preview, republish, and the member’s Timed quiz lobby.",
           "Publish opens a choice: Publish all cards (auto-assign formats for your counts) or Choose cards (set quiz size, browse quiz-taker previews, check specific cards, then Publish settings).",
           "Republish to quiz replaces the previous published mix (all cards or a newly chosen subset).",
           "Quiz Timer: set a general timed-quiz length for linked decks, or choose minutes per individual deck. The table lists every linked deck; click a row to open that deck’s timer. Open quiz timer for a workspace guide to follow a workspace-wide time, a per-deck override, and the member’s Timed quiz clock.",
           "Quiz Schedule: restrict when quizzes can be taken. The Timed quiz lobby shows the scheduled start date and time and greys out Start quiz until that moment, unless a team admin or owner enables it. Open quiz schedule for a workspace guide to follow a workspace or per-deck start time through the member’s unlock countdown.",
-          "Exam Mode: anti-cheating and session rules for selected Plan owner, Team Admins, and/or Members. Only the plan owner can enable Exam Mode for themselves.",
+          "Exam Mode: anti-cheating and session rules for selected Plan owner, Team Admins, and/or Members. Only the plan owner can enable Exam Mode for themselves. Locked & terminated sessions lists Continue (resume a lock), Start over (fresh attempt), and Terminate. Open quiz Exam Mode for a workspace guide to follow workspace and per-deck locks through the member’s Timed quiz, Quiz paused, and Quiz terminated screens.",
         ],
         requirements: [
           "Team owner or team_admin.",

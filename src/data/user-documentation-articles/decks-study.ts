@@ -156,7 +156,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "quiz-results-review",
         title: "Quiz results review",
         bullets: [
-          "After you submit a quiz, the Review section labels each question with its format: Question N (MCQ), (True/False), or (Fill in the blank).",
+          "After you submit a quiz, the Review section labels each question with its format: Question N (MCQ), (True/False), or (Fill in the blank). Open quiz results for a workspace guide to follow Team Admin Quiz results through the member’s saved score and Review.",
           "Saved results in your inbox and on /dashboard/quiz-results/[id] show the same format labels.",
           "PDF exports include the format on each question line when the result was saved with format metadata.",
         ],
@@ -167,7 +167,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         bullets: [
           "Quiz timer — time limit per attempt set by team admin (or by you via Format Quiz Question on personal Pro Plus / Education Plus decks). Open quiz timer for a workspace guide to follow Team Admin Quiz timer through the member’s Timed quiz clock.",
           "Quiz schedule — quizzes cannot start before the configured date/time. Timed quiz greys out Start quiz until that moment (or until a team admin or owner enables it) and shows the start date and time on the lobby. Open quiz schedule for a workspace guide to follow that Team Admin flow.",
-          "Exam Mode — session locking, admin grant to resume/restart, one controlled attempt per deck. Applies to Plan owner, Team Admins, and/or Members selected in Exam Mode settings. Only the plan owner can turn Exam Mode on or off for themselves. When active for you, the Timed quiz lobby shows a green Exam Mode on light.",
+          "Exam Mode — session locking, admin grant to resume/restart, one controlled attempt per deck. Applies to Plan owner, Team Admins, and/or Members selected in Exam Mode settings. Only the plan owner can turn Exam Mode on or off for themselves. When active for you, the Timed quiz lobby shows a green Exam Mode on light. Open quiz Exam Mode for a workspace guide to follow Team Admin Exam Mode through lock, Continue, and Start over.",
           "Owners and team admins get a Cancel button on the unanswered-submit dialog — it returns to the Resume quiz lobby without submitting (members only see Keep answering / Submit anyway).",
           "Workspace deck study links canonicalize to /decks/[deckId]/study?team=.",
         ],
@@ -219,7 +219,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Access",
         bullets: [
           "You must be the result owner or have permission to view the attempt.",
-          "Team admins can view and delete results from Team Admin → Quiz results.",
+          "Team admins can view and delete results from Team Admin → Quiz results. Open quiz results for a workspace guide to follow that table through View and Quiz sheets.",
           "Do not share result URLs — access is tied to your account session.",
         ],
       },

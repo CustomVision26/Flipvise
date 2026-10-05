@@ -18,7 +18,9 @@ export type DocsUiGuideId =
   | "ai-recall-session-cards"
   | "quiz-formats-workspace"
   | "quiz-timer-workspace"
-  | "quiz-schedule-workspace";
+  | "quiz-schedule-workspace"
+  | "quiz-exam-mode-workspace"
+  | "quiz-results-workspace";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -43,6 +45,8 @@ export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
   "quiz-formats-workspace",
   "quiz-timer-workspace",
   "quiz-schedule-workspace",
+  "quiz-exam-mode-workspace",
+  "quiz-results-workspace",
 ];
 
 export type DocsUiGuideStep = {
@@ -1066,6 +1070,168 @@ export const QUIZ_SCHEDULE_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+const QUIZ_EXAM_MODE_WORKSPACE_FILE =
+  "23 Flipvise - Team Tier Plan - Study Mode Quiz Exam Mode for Workspace";
+
+export const QUIZ_EXAM_MODE_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 01.png`),
+    title: "Open Exam Mode",
+    caption:
+      "On Team Admin, open Study Modes → Quiz Mode → Exam Mode. Manage quiz lock settings and review locked sessions for this workspace (for example UC-K26). Members on a quiz in Exam Mode cannot switch tabs or leave until they submit.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 02.png`),
+    title: "Workspace Exam Mode and who it applies to",
+    caption:
+      "Select the workspace, then turn on Workspace Exam Mode so every linked deck uses this default unless a deck has its own setting. Apply Exam Mode to Plan owner, Team Admin, and/or Member. Only the plan owner can enable or disable Exam Mode for the plan owner.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 03.png`),
+    title: "Confirm each member’s role",
+    caption:
+      "On Members roster, check Role so you know who Exam Mode will apply to (for example Owner (subscriber), Member, or Team admin).",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 04.png`),
+    title: "Deck Exam Mode",
+    caption:
+      "Deck Exam Mode sets Exam Mode for one linked deck (for example Social Studies: British History). Decks without a custom setting use the workspace default above.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 05.png`),
+    title: "Member sees Exam Mode on",
+    caption:
+      "When a member (for example williams.bruce2698) opens Quiz on that deck, Timed quiz shows a green Exam Mode on light and: Exam Mode is on. Stay on this tab until you submit — leaving will lock your session.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 06.png`),
+    title: "Locked & terminated sessions",
+    caption:
+      "Locked & terminated sessions lists members who left a quiz, finished and need a redo, or were terminated. Continue lets them resume, Start over is a fresh attempt, and Terminate ends an active lock. The table stays empty until one of those events happens.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 07.png`),
+    title: "Start the Exam Mode quiz",
+    caption:
+      "The member chooses Start quiz on Timed quiz to begin. They must stay on this tab until they submit.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 08.png`),
+    title: "Stay on the quiz",
+    caption:
+      "While answering, the member remains on the quiz (timer and questions). Opening another page, tab, or window can lock them out until a team admin or plan owner grants access.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 09.png`),
+    title: "Grant Continue after a lock",
+    caption:
+      "When a member leaves, Locked & terminated sessions lists them (for example williams.bruce2698 on Social Studies: British History) with Status Locked. Continue lets them resume where they stopped; Terminate ends the session. Only a team admin or plan owner can grant access.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 10.png`),
+    title: "Member sees Quiz paused",
+    caption:
+      "The member sees Quiz paused: You left the quiz window. Your session is locked until your team admin grants access. After Continue is granted, they choose Check for access to resume.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 11.png`),
+    title: "Continue granted",
+    caption:
+      "After Continue, Status shows Continue granted — the member can resume after Check for access. Terminate is still available.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 12.png`),
+    title: "Member resumes the quiz",
+    caption:
+      "Once access is restored, the member sees Resume quiz with remaining time and prior answers, then Resume quiz to continue from where they left off.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 13.png`),
+    title: "Active quizzes stay off the table",
+    caption:
+      "While a member is actively taking the quiz, their row does not appear in Locked & terminated sessions until they leave, finish, or are terminated.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 14.png`),
+    title: "Terminate a session",
+    caption:
+      "Terminate immediately ends that member’s quiz. They cannot resume or retake until a team admin or plan owner grants Start over.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 15.png`),
+    title: "Session terminated",
+    caption:
+      "Status shows Terminated with Session terminated. Start over grants a fresh attempt.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 16.png`),
+    title: "Member sees Quiz terminated",
+    caption:
+      "The member sees Quiz terminated: This quiz was ended by your team admin. After Start over is granted, they choose Check for access; otherwise they can return to Dashboard.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 17.png`),
+    title: "Grant Start over",
+    caption:
+      "Start over lets the member begin a new quiz with full time. Only a team admin or plan owner can grant it.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 18.png`),
+    title: "Start over granted",
+    caption:
+      "Status shows Start over granted — the member can begin a fresh quiz after Check for access. Terminate is still available.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 19.png`),
+    title: "Member starts over",
+    caption:
+      "The member sees Start over with full time (for example 20:00 on the clock) and Start over. Exam Mode is still on. Stay on this tab until you submit — leaving will lock your session.",
+  },
+  {
+    src: uiSrc(`${QUIZ_EXAM_MODE_WORKSPACE_FILE} - 20.png`),
+    title: "Confirm the grant",
+    caption:
+      "Locked & terminated sessions still shows Start over granted until the member starts the new attempt. Terminate remains available if you need to end that grant.",
+  },
+];
+
+const QUIZ_RESULTS_WORKSPACE_FILE =
+  "24 Flipvise - Team Tier Plan - Study Mode Quiz Results for Workspace";
+
+export const QUIZ_RESULTS_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${QUIZ_RESULTS_WORKSPACE_FILE} - 01.png`),
+    title: "Open Quiz results",
+    caption:
+      "On Team Admin, open Study Modes → Quiz Mode → Quiz results. Review member quiz attempts across your workspaces (for example UC-K26). The table lists saved attempts by workspace and member (for example williams.bruce2698 on Social Studies: British History) with score, correct, wrong, skipped, and cards.",
+  },
+  {
+    src: uiSrc(`${QUIZ_RESULTS_WORKSPACE_FILE} - 02.png`),
+    title: "View or delete an attempt",
+    caption:
+      "Use View to expand full details below the table, or Delete to remove the record. Double-click a row to open the quiz question sheet and answer key.",
+  },
+  {
+    src: uiSrc(`${QUIZ_RESULTS_WORKSPACE_FILE} - 03.png`),
+    title: "Quiz sheets",
+    caption:
+      "Quiz sheets shows Question sheet and Answer key for that attempt (for example Social Studies: British History). Download question sheet, Close, or Save to resources. Double-click a result row anytime to reopen these sheets.",
+  },
+  {
+    src: uiSrc(`${QUIZ_RESULTS_WORKSPACE_FILE} - 04.png`),
+    title: "Member sees the saved result",
+    caption:
+      "When the member finishes Quiz, they see their score (for example Nice Progress!, 50 / 100, 5 Correct, 2 Incorrect, 3 Unanswered) and Result saved — check your inbox; your team owner was notified.",
+  },
+  {
+    src: uiSrc(`${QUIZ_RESULTS_WORKSPACE_FILE} - 05.png`),
+    title: "Member Review",
+    caption:
+      "Review lists each question as correct, incorrect, or unanswered, with Your answer and the Correct answer on missed or unanswered items.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1179,5 +1345,17 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Quiz schedule, set a workspace or per-deck start time, then confirm the member’s Timed quiz unlock and greyed-out Start quiz.",
     steps: QUIZ_SCHEDULE_WORKSPACE_GUIDE_STEPS,
+  },
+  "quiz-exam-mode-workspace": {
+    title: "Quiz Exam Mode for a workspace",
+    summary:
+      "On Exam Mode, turn on workspace or per-deck locks for selected roles, then Continue, Start over, or Terminate sessions from Locked & terminated sessions.",
+    steps: QUIZ_EXAM_MODE_WORKSPACE_GUIDE_STEPS,
+  },
+  "quiz-results-workspace": {
+    title: "Quiz results for a workspace",
+    summary:
+      "On Quiz results, review member attempts, open View or the question sheet, then confirm the member’s saved score and Review.",
+    steps: QUIZ_RESULTS_WORKSPACE_GUIDE_STEPS,
   },
 };
