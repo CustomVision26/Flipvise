@@ -30,24 +30,24 @@ const Toaster = ({ offset, mobileOffset, ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      className="toaster group z-[200000]"
       offset={nativeInset ?? offset}
       mobileOffset={nativeInset ?? mobileOffset}
       icons={{
         success: (
-          <CircleCheckIcon className="size-4" />
+          <CircleCheckIcon className="size-4 text-emerald-400" />
         ),
         info: (
-          <InfoIcon className="size-4" />
+          <InfoIcon className="size-4 text-cyan-400" />
         ),
         warning: (
-          <TriangleAlertIcon className="size-4" />
+          <TriangleAlertIcon className="size-4 text-amber-400" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <OctagonXIcon className="size-4 text-red-400" />
         ),
         loading: (
-          <Loader2Icon className="size-4 animate-spin" />
+          <Loader2Icon className="size-4 animate-spin text-cyan-400" />
         ),
       }}
       style={
@@ -56,11 +56,18 @@ const Toaster = ({ offset, mobileOffset, ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          "--success-bg": "oklch(0.28 0.07 160)",
+          "--success-border": "oklch(0.72 0.14 160)",
+          "--error-bg": "oklch(0.28 0.09 25)",
+          "--error-border": "oklch(0.7 0.16 25)",
+          "--info-bg": "oklch(0.28 0.07 210)",
+          "--info-border": "oklch(0.72 0.12 210)",
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          toast:
+            "cn-toast shadow-lg shadow-cyan-500/15 ring-1 ring-cyan-400/20",
         },
       }}
       {...props}

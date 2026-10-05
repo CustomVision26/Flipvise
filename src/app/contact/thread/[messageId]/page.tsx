@@ -41,8 +41,8 @@ export default async function ContactUsThreadPage({ params, searchParams }: Page
   return (
     <PublicMarketingPageChrome homeHref={homeHref} isSignedIn={isSignedIn}>
       <div className="mx-auto w-full max-w-2xl space-y-6">
-        <Card className="border-border/60 bg-card/40 shadow-none ring-1 ring-border/30">
-          <CardHeader className="gap-2 border-b border-border/40 pb-4">
+        <Card className="border-teal-400/30 bg-card/50 shadow-none ring-1 ring-teal-400/20">
+          <CardHeader className="gap-2 border-b border-teal-400/20 pb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 space-y-2">
                 <CardTitle className="text-xl font-semibold">Contact conversation</CardTitle>

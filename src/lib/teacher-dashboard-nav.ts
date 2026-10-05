@@ -65,6 +65,12 @@ export const TEACHER_DASHBOARD_NAV: TeacherNavSection[] = [
         icon: FileText,
         summary: "Create printable practice worksheets and answer keys from your deck vocabulary and concepts.",
       },
+    ],
+  },
+  {
+    title: "Add-ons",
+    description: "Premium add-ons you can purchase or that an admin can grant.",
+    items: [
       {
         title: "AI Document Studio",
         suffix: "/essay",

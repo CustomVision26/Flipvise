@@ -37,7 +37,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         bullets: [
           "Header Teacher link appears when you qualify for education features.",
           "Welcome card shows your plan badge and workspace guidance.",
-          "Left sidebar lists AI content tools, Classroom management, and Resources.",
+          "Left sidebar lists AI content tools, Add-ons, Classroom management, and Resources.",
           "Workspace selector scopes deck pickers to personal or team context on Education Gold/Enterprise.",
           "Team Admin Dashboard shortcut appears when you can manage an education team workspace. Owners do not get a Team Dashboard shortcut — that surface is for invited members; owners use Personal Dashboard.",
         ],
@@ -93,7 +93,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "Homework Generator (/teacher/homework) — take-home practice aligned to deck content. From saved lesson plan includes the same assigned-deck originals for team members. Multi-day plans show the same All Days / day picker (with day captions) before Generate. For Reading / Language Arts / Literature topics, set Number of passages and Questions per passage (total = passages × questions). Generate produces concrete practice from lesson vocabulary (math: solvable problems; reading: titled passages with linked questions) in Preview, Edit, and PDF. Math answers that require a number-line or coordinate graph include a drawn figure in the Answer Key (not only a text description).",
           "Study Guide Generator (/teacher/study-guides) — structured review materials with PDF export. Lesson plan picker includes assigned-deck originals for team members. Multi-day lesson plans generate from the full plan (All Days) without a day-scope dialog.",
           "Worksheet Generator (/teacher/worksheets) — printable sheets with answer keys.",
-          "Generate AI Essay — premium add-on; requires the AI Essay add-on. See Add-on Catalog for how to unlock and use it.",
+          "Generate AI Essay — premium add-on under the sidebar Add-ons category (AI Document Studio). Requires the AI Essay add-on. See Add-on Catalog for how to unlock and use it.",
         ],
       },
       {

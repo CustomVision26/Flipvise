@@ -186,8 +186,21 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   "help-center-account": ["src/components/help-center.tsx"],
   "help-center-my-tickets": ["src/components/help-center-my-tickets.tsx"],
   "help-center-priority-support": ["src/components/help-center.tsx"],
-  "contact-us-page": ["src/components/contact-support-view.tsx", "src/lib/platform-company-address.ts"],
-  "contact-us-live-chat": ["src/components/contact-support-view.tsx", "src/components/contact-us-thread-view.tsx"],
+  "contact-us-page": [
+    "src/components/contact-support-view.tsx",
+    "src/components/contact-support-form.tsx",
+    "src/components/public-marketing-page-chrome.tsx",
+    "src/components/public-page-atmosphere.tsx",
+    "src/components/public-page-intro.tsx",
+    "src/lib/platform-company-address.ts",
+  ],
+  "contact-us-live-chat": [
+    "src/components/contact-support-view.tsx",
+    "src/components/contact-us-thread-view.tsx",
+    "src/components/contact-us-thread-client.tsx",
+    "src/components/contact-us-thread-close-button.tsx",
+    "src/app/contact/thread/[messageId]/page.tsx",
+  ],
   "contact-us-guest-vs-signed-in": ["src/components/contact-support-view.tsx"],
   "contact-us-vs-help-center": ["src/components/contact-support-view.tsx", "src/components/help-center.tsx"],
   pricing: [

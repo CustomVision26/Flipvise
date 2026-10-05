@@ -76,7 +76,7 @@ export function DocumentationSearchPanel({
     <div className={cn("space-y-3", className)}>
       <div className="relative">
         <Search
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cyan-600 dark:text-cyan-300"
           aria-hidden
         />
         <Input
@@ -86,7 +86,7 @@ export function DocumentationSearchPanel({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           aria-label="Search documentation"
-          className="h-11 border-border/70 bg-card/60 pl-9 pr-10 text-sm shadow-sm backdrop-blur-sm"
+          className="h-11 border-cyan-400/30 bg-card/70 pl-9 pr-10 text-sm shadow-sm shadow-cyan-500/10 backdrop-blur-sm focus-visible:border-cyan-400/60"
         />
         {query ? (
           <Button
@@ -104,7 +104,7 @@ export function DocumentationSearchPanel({
 
       {showResults ? (
         <div
-          className="overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-md ring-1 ring-border/30 backdrop-blur-sm"
+          className="overflow-hidden rounded-xl border border-cyan-400/30 bg-card/80 shadow-md shadow-cyan-500/10 ring-1 ring-cyan-400/15 backdrop-blur-sm"
           role="listbox"
           aria-label="Documentation search results"
         >

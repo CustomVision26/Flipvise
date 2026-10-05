@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare, SendHorizonal } from "lucide-react";
+import { toast } from "sonner";
 import { submitContactUsMessageAction } from "@/actions/contact-us";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,9 +41,13 @@ export function ContactSupportForm({
       });
       if (!result.ok) {
         setError(result.error);
+        toast.error("Could not start the conversation", { description: result.error });
         return;
       }
       setThreadHref(result.threadHref);
+      toast.success("Conversation started", {
+        description: "Opening live chat with the Flipvise team.",
+      });
       router.push(result.threadHref);
     });
   }

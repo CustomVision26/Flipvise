@@ -688,7 +688,7 @@ function PlanLimitsCard() {
   ] as const;
 
   return (
-    <Card className="border-primary/20 bg-primary/5 shadow-none ring-1 ring-primary/15">
+    <Card className="border-cyan-400/30 bg-cyan-500/5 shadow-none ring-1 ring-cyan-400/20">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
           Quick plan limits (personal)
@@ -714,7 +714,7 @@ function PlanLimitsCard() {
 
 function NeedHelpCard({ onSelect }: { onSelect: (id: string) => void }) {
   return (
-    <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
+    <Card className="border-teal-400/30 bg-teal-500/5 shadow-none ring-1 ring-teal-400/20">
       <CardHeader>
         <CardTitle className="text-base font-semibold">Need help?</CardTitle>
         <CardDescription>
@@ -928,7 +928,7 @@ function DocContentPanel({
     return (
       <div className="space-y-6">
         <PlanLimitsCard />
-        <Card className="border-border/70 bg-card/50 shadow-none ring-1 ring-border/40">
+        <Card className="border-cyan-400/25 bg-card/50 shadow-none ring-1 ring-cyan-400/15">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Browse the guide</CardTitle>
             <CardDescription>
@@ -1126,6 +1126,7 @@ export function UserDocumentationView({
           badge="User guide"
           title="Flipvise Documentation"
           description="Quick reference and in-depth guides for every customer-facing screen — purpose, workflows, plan requirements, and restrictions."
+          accent="cyan"
         />
       ) : null}
 
@@ -1148,7 +1149,7 @@ export function UserDocumentationView({
         >
           <div
             className={cn(
-              "rounded-xl border border-border/70 bg-card/40 p-4 ring-1 ring-border/30",
+              "rounded-xl border border-cyan-400/25 bg-card/50 p-4 ring-1 ring-cyan-400/15",
               "max-h-[calc(100vh-6rem)] overflow-y-auto lg:p-5",
             )}
           >

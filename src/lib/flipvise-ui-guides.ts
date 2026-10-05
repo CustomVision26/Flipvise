@@ -24,30 +24,87 @@ export type DocsUiGuideId =
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
-export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] = [
-  "signup",
-  "signin",
-  "personal-dashboard",
-  "pricing",
-  "subscribe",
-  "create-deck",
-  "ai-created-cards",
-  "manual-added-cards",
-  "manual-add-mcq",
-  "add-card-from-source",
-  "create-workspace",
-  "invite-unregistered-member",
-  "link-deck-to-workspace",
-  "assign-deck-to-member",
-  "change-study-mode-privileges",
-  "workspace-study-mode-settings",
-  "ai-recall-session-cards",
-  "quiz-formats-workspace",
-  "quiz-timer-workspace",
-  "quiz-schedule-workspace",
-  "quiz-exam-mode-workspace",
-  "quiz-results-workspace",
+export type DocsUiGuideCategoryId =
+  | "getting-started"
+  | "decks-and-cards"
+  | "team-tier";
+
+export type DocsUiGuideNestedGroup = {
+  id: string;
+  title: string;
+  description: string;
+  guideIds: readonly DocsUiGuideId[];
+};
+
+export type DocsUiGuideCategory = {
+  id: DocsUiGuideCategoryId;
+  title: string;
+  description: string;
+  guideIds: readonly DocsUiGuideId[];
+  nested?: readonly DocsUiGuideNestedGroup[];
+};
+
+export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
+  {
+    id: "getting-started",
+    title: "Getting started",
+    description: "Account access, Personal Dashboard, plans, and checkout.",
+    guideIds: [
+      "signup",
+      "signin",
+      "personal-dashboard",
+      "pricing",
+      "subscribe",
+    ],
+  },
+  {
+    id: "decks-and-cards",
+    title: "Decks and cards",
+    description: "Create decks and add cards from Personal Dashboard.",
+    guideIds: [
+      "create-deck",
+      "ai-created-cards",
+      "manual-added-cards",
+      "manual-add-mcq",
+      "add-card-from-source",
+    ],
+  },
+  {
+    id: "team-tier",
+    title: "Team Tier Plan",
+    description:
+      "Workspaces, members, study-mode privileges, AI Recall™, and quiz policy.",
+    guideIds: [
+      "create-workspace",
+      "invite-unregistered-member",
+      "link-deck-to-workspace",
+      "assign-deck-to-member",
+      "change-study-mode-privileges",
+      "workspace-study-mode-settings",
+      "ai-recall-session-cards",
+      "quiz-formats-workspace",
+      "quiz-timer-workspace",
+      "quiz-schedule-workspace",
+      "quiz-exam-mode-workspace",
+      "quiz-results-workspace",
+    ],
+    nested: [
+      {
+        id: "team-tier-education-teacher",
+        title: "Education Teacher",
+        description:
+          "Teacher Dashboard walkthroughs for Education Gold and Education Enterprise team plans.",
+        guideIds: [],
+      },
+    ],
+  },
 ];
+
+export const DOCS_UI_GUIDE_ORDER: readonly DocsUiGuideId[] =
+  DOCS_UI_GUIDE_CATEGORIES.flatMap((category) => [
+    ...category.guideIds,
+    ...(category.nested?.flatMap((group) => group.guideIds) ?? []),
+  ]);
 
 export type DocsUiGuideStep = {
   src: string;

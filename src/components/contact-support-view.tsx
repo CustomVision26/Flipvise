@@ -36,8 +36,9 @@ function SupportOptionIcon({
   return (
     <span
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-muted/25",
-        className,
+        "flex size-10 shrink-0 items-center justify-center rounded-xl border shadow-[0_0_16px]",
+        className ??
+          "border-teal-400/45 bg-teal-500/15 text-teal-700 shadow-teal-400/25 dark:text-teal-300",
       )}
     >
       {children}
@@ -78,14 +79,15 @@ export function ContactSupportView({
         title="Contact Support"
         description="Send us a message, reach our team by email, or use the in-app Help Center when you are signed in."
         centered
+        accent="teal"
       />
 
       <div className="grid gap-4">
-        <Card className="overflow-hidden border-border/60 bg-card/40 shadow-none ring-1 ring-border/30">
-          <CardHeader className="gap-3 border-b border-border/40 pb-4">
+        <Card className="overflow-hidden border-teal-400/30 bg-card/50 shadow-none ring-1 ring-teal-400/20 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+          <CardHeader className="gap-3 border-b border-teal-400/20 pb-4">
             <div className="flex items-start gap-3">
               <SupportOptionIcon>
-                <MessageSquare className="size-4 text-foreground/80" aria-hidden />
+                <MessageSquare className="size-4" aria-hidden />
               </SupportOptionIcon>
               <div className="min-w-0 space-y-1">
                 <CardTitle className="text-base font-semibold">Send a message</CardTitle>
@@ -111,11 +113,11 @@ export function ContactSupportView({
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-border/60 bg-card/40 shadow-none ring-1 ring-border/30">
-          <CardHeader className="gap-3 border-b border-border/40 pb-4">
+        <Card className="overflow-hidden border-cyan-400/30 bg-card/50 shadow-none ring-1 ring-cyan-400/20 animate-in fade-in-0 slide-in-from-bottom-3 fill-mode-both duration-500">
+          <CardHeader className="gap-3 border-b border-cyan-400/20 pb-4">
             <div className="flex items-start gap-3">
-              <SupportOptionIcon>
-                <Mail className="size-4 text-foreground/80" aria-hidden />
+              <SupportOptionIcon className="border-cyan-400/45 bg-cyan-500/15 text-cyan-700 shadow-cyan-400/25 dark:text-cyan-300">
+                <Mail className="size-4" aria-hidden />
               </SupportOptionIcon>
               <div className="min-w-0 space-y-1">
                 <CardTitle className="text-base font-semibold">Contact details</CardTitle>
@@ -213,11 +215,11 @@ export function ContactSupportView({
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-card/40 shadow-none ring-1 ring-border/30">
+        <Card className="border-violet-400/30 bg-card/50 shadow-none ring-1 ring-violet-400/20">
           <CardHeader className="gap-3 pb-2">
             <div className="flex items-start gap-3">
-              <SupportOptionIcon>
-                <HelpCircle className="size-4 text-foreground/80" aria-hidden />
+              <SupportOptionIcon className="border-violet-400/45 bg-violet-500/15 text-violet-700 shadow-violet-400/25 dark:text-violet-300">
+                <HelpCircle className="size-4" aria-hidden />
               </SupportOptionIcon>
               <div className="min-w-0 space-y-1">
                 <CardTitle className="text-base font-semibold">In-app Help Center</CardTitle>
@@ -243,11 +245,11 @@ export function ContactSupportView({
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 bg-muted/10 shadow-none ring-1 ring-border/30">
+        <Card className="border-cyan-400/25 bg-cyan-500/5 shadow-none ring-1 ring-cyan-400/20">
           <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <SupportOptionIcon className="bg-background/40">
-                <MessageSquare className="size-4 text-foreground/80" aria-hidden />
+              <SupportOptionIcon className="border-cyan-400/45 bg-cyan-500/15 text-cyan-700 shadow-cyan-400/25 dark:text-cyan-300">
+                <MessageSquare className="size-4" aria-hidden />
               </SupportOptionIcon>
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-foreground">Check the documentation first</p>

@@ -81,7 +81,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
             <NativeNotificationBootstrap />
             <OfflineBanner />
             {children}
-            <Toaster richColors closeButton position="top-right" />
+            <Toaster
+              richColors
+              closeButton
+              position="top-right"
+              visibleToasts={6}
+              expand
+            />
             <ServiceWorkerRegister />
           </ClerkWithTheme>
         </DocsUiGuideProvider>

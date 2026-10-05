@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 import { userResolveContactUsThreadAction } from "@/actions/contact-us";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,9 @@ export function ContactUsThreadCloseButton({
     startTransition(async () => {
       try {
         await userResolveContactUsThreadAction({ messageId, token: accessToken });
+        toast.success("Conversation closed");
       } catch {
-        // Still navigate away if resolve fails (e.g. already resolved).
+        toast.error("Could not close the conversation. Returning to Contact Us.");
       }
       router.push(href);
     });

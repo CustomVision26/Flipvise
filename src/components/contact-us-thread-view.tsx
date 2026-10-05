@@ -173,8 +173,12 @@ export function ContactUsThreadView({
         await onSendReply({ message: text, imageUrl });
         setReplyText("");
         setReplyImageUrl(null);
+        toast.success("Message sent");
       } catch (err) {
-        setReplyError(err instanceof Error ? err.message : "Failed to send reply");
+        const description =
+          err instanceof Error ? err.message : "Failed to send reply";
+        setReplyError(description);
+        toast.error("Could not send message", { description });
       }
     });
   }
