@@ -180,17 +180,41 @@ export async function listQuizSecurityDeckSnapshots(
   const deckIds = teamDecks.map((deck) => deck.id);
   if (deckIds.length === 0) return [];
 
-  const rows = await db
-    .select({
-      id: decks.id,
-      name: decks.name,
-      quizSecurityEnabled: decks.quizSecurityEnabled,
-      quizSecurityApplyToMembers: decks.quizSecurityApplyToMembers,
-      quizSecurityApplyToTeamAdmins: decks.quizSecurityApplyToTeamAdmins,
-      quizSecurityApplyToOwner: decks.quizSecurityApplyToOwner,
-    })
-    .from(decks)
-    .where(eq(decks.userId, ownerUserId));
+  let rows: {
+    id: number;
+    name: string;
+    quizSecurityEnabled: boolean | null;
+    quizSecurityApplyToMembers: boolean | null;
+    quizSecurityApplyToTeamAdmins: boolean | null;
+    quizSecurityApplyToOwner: boolean | null;
+  }[];
+  try {
+    rows = await db
+      .select({
+        id: decks.id,
+        name: decks.name,
+        quizSecurityEnabled: decks.quizSecurityEnabled,
+        quizSecurityApplyToMembers: decks.quizSecurityApplyToMembers,
+        quizSecurityApplyToTeamAdmins: decks.quizSecurityApplyToTeamAdmins,
+        quizSecurityApplyToOwner: decks.quizSecurityApplyToOwner,
+      })
+      .from(decks)
+      .where(eq(decks.userId, ownerUserId));
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!/quizSecurityApplyToOwner/i.test(msg)) throw error;
+    const fallback = await db
+      .select({
+        id: decks.id,
+        name: decks.name,
+        quizSecurityEnabled: decks.quizSecurityEnabled,
+        quizSecurityApplyToMembers: decks.quizSecurityApplyToMembers,
+        quizSecurityApplyToTeamAdmins: decks.quizSecurityApplyToTeamAdmins,
+      })
+      .from(decks)
+      .where(eq(decks.userId, ownerUserId));
+    rows = fallback.map((row) => ({ ...row, quizSecurityApplyToOwner: null }));
+  }
 
   const deckIdSet = new Set(deckIds);
   return rows

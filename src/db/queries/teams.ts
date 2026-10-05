@@ -433,10 +433,50 @@ const teamRowSelectWithoutCreationProfile = {
   inactiveAt: teams.inactiveAt,
 } as const;
 
+function isMissingQuizSecurityApplyToOwnerColumnError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    /quizSecurityApplyToOwner/i.test(msg) &&
+    (/42703/i.test(msg) || /does not exist/i.test(msg) || /Failed query/i.test(msg))
+  );
+}
+
+const teamRowSelectWithoutApplyToOwner = {
+  id: teams.id,
+  ownerUserId: teams.ownerUserId,
+  name: teams.name,
+  planSlug: teams.planSlug,
+  quizDurationMinutes: teams.quizDurationMinutes,
+  quizSecurityEnabled: teams.quizSecurityEnabled,
+  quizSecurityApplyToMembers: teams.quizSecurityApplyToMembers,
+  quizSecurityApplyToTeamAdmins: teams.quizSecurityApplyToTeamAdmins,
+  quizStartScheduleEnabled: teams.quizStartScheduleEnabled,
+  quizStartAt: teams.quizStartAt,
+  quizFormatMultipleChoice: teams.quizFormatMultipleChoice,
+  quizFormatTrueFalse: teams.quizFormatTrueFalse,
+  quizFormatFillInBlank: teams.quizFormatFillInBlank,
+  aiRecallSessionCardCount: teams.aiRecallSessionCardCount,
+  createdAt: teams.createdAt,
+  inactiveAt: teams.inactiveAt,
+  creationProfile: teams.creationProfile,
+} as const;
+
 async function selectTeamRows(where: SQL): Promise<TeamRow[]> {
   try {
     return await db.select().from(teams).where(where);
-  } catch (e) {
+  } catch (caught) {
+    let e: unknown = caught;
+    if (isMissingQuizSecurityApplyToOwnerColumnError(e)) {
+      try {
+        const rows = await db
+          .select(teamRowSelectWithoutApplyToOwner)
+          .from(teams)
+          .where(where);
+        return rows.map((row) => ({ ...row, quizSecurityApplyToOwner: false }));
+      } catch (inner) {
+        e = inner;
+      }
+    }
     if (isMissingCreationProfileColumnError(e)) {
       warnMissingCreationProfileColumnOnce();
       try {
