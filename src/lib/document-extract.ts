@@ -255,32 +255,52 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 }
 
 async function extractDocxText(buffer: Buffer): Promise<string> {
-  const mammoth = await import("mammoth");
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value ?? "";
+  try {
+    const mammothMod = await import("mammoth");
+    const mammoth =
+      typeof mammothMod.extractRawText === "function"
+        ? mammothMod
+        : (mammothMod as { default: typeof mammothMod }).default;
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value ?? "";
+  } catch {
+    throw new Error(
+      "Could not read this Word document. Save it as .docx and upload again.",
+    );
+  }
 }
 
 async function extractPptxText(buffer: Buffer): Promise<string> {
-  const JSZip = (await import("jszip")).default;
-  const zip = await JSZip.loadAsync(buffer);
-  const slideNames = Object.keys(zip.files)
-    .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
-    .sort((a, b) => {
-      const slideNum = (path: string) =>
-        Number.parseInt(path.match(/slide(\d+)\.xml$/i)?.[1] ?? "0", 10);
-      return slideNum(a) - slideNum(b);
-    });
+  try {
+    const jszipMod = await import("jszip");
+    const JSZip = jszipMod.default ?? jszipMod;
+    const zip = await JSZip.loadAsync(buffer);
+    const slideNames = Object.keys(zip.files)
+      .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
+      .sort((a, b) => {
+        const slideNum = (path: string) =>
+          Number.parseInt(path.match(/slide(\d+)\.xml$/i)?.[1] ?? "0", 10);
+        return slideNum(a) - slideNum(b);
+      });
 
-  const parts: string[] = [];
-  for (const name of slideNames) {
-    const entry = zip.file(name);
-    if (!entry) continue;
-    const xml = await entry.async("text");
-    const textBits = [...xml.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((m) => m[1]);
-    const slideText = textBits.join(" ").replace(/\s+/g, " ").trim();
-    if (slideText) parts.push(slideText);
+    const parts: string[] = [];
+    for (const name of slideNames) {
+      const entry = zip.file(name);
+      if (!entry) continue;
+      const xml = await entry.async("text");
+      const textBits = [...xml.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((m) => m[1]);
+      const slideText = textBits.join(" ").replace(/\s+/g, " ").trim();
+      if (slideText) parts.push(slideText);
+    }
+    return parts.join("\n\n");
+  } catch (err) {
+    if (err instanceof Error && /Could not read this PowerPoint/i.test(err.message)) {
+      throw err;
+    }
+    throw new Error(
+      "Could not read this PowerPoint file. Save it as .pptx and upload again.",
+    );
   }
-  return parts.join("\n\n");
 }
 
 async function extractHandwritingText(buffer: Buffer, mimeType: string): Promise<string> {
@@ -366,6 +386,17 @@ async function extractTextFromFileBuffer(
 }
 
 export function resolveFileSourceFormat(file: File): SourceFormat {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".doc") && !lower.endsWith(".docx")) {
+    throw new Error(
+      "Upload a Word .docx file. Older .doc files are not supported — save as .docx in Word and try again.",
+    );
+  }
+  if (lower.endsWith(".ppt") && !lower.endsWith(".pptx")) {
+    throw new Error(
+      "Upload a PowerPoint .pptx file. Older .ppt files are not supported — save as .pptx and try again.",
+    );
+  }
   const format = mimeToSourceFormat(file.type, file.name);
   if (!format || format === "url") {
     throw new Error("Unsupported file type. Use a supported text or document format.");

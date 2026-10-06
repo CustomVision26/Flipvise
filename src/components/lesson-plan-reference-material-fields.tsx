@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { TeacherReviewFieldLabel } from "@/components/teacher-field-label";
 import {
   acceptAttributeForFileSource,
-  acceptAttributeForUpload,
   fileSourcePickerHint,
   fileSourcePickerLabel,
   isFileSourceProPlusOnly,
@@ -190,9 +189,14 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
     if (id === "url") {
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-    } else {
-      setUrl("");
+      return;
     }
+    setUrl("");
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.accept = acceptAttributeForFileSource(id);
+    input.value = "";
+    input.click();
   }
 
   function handleUrlChange(nextUrl: string) {
@@ -324,6 +328,22 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
             </div>
           </div>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={
+              activeFileSource
+                ? acceptAttributeForFileSource(activeFileSource)
+                : undefined
+            }
+            className="hidden"
+            disabled={!canAddMore}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              handleFileChange(file);
+            }}
+          />
+
           {sourceMode === "url" ? (
             <div className="space-y-2">
               <Label htmlFor="lesson-reference-url" className="text-xs flex items-center gap-1.5">
@@ -375,21 +395,6 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 {fileSourcePickerHint(activeFileSource)}
               </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={
-                  activeFileSource === "txt"
-                    ? acceptAttributeForFileSource(activeFileSource)
-                    : acceptAttributeForUpload(hasAdvancedSourceImport)
-                }
-                className="hidden"
-                disabled={!canAddMore}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  handleFileChange(file);
-                }}
-              />
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"

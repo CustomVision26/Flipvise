@@ -1128,6 +1128,7 @@ export async function extractLessonPlanReferenceAction(
     const advancedImport = canUseAdvancedSourceImport({
       hasAiReading: ctx.hasAiReading,
       teamTierProWorkspace: ctx.activeEducationTeamPlan !== null,
+      hasTeacherTools: true,
     });
 
     if (url) {

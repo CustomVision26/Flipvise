@@ -39,8 +39,8 @@ const nextConfig: NextConfig = {
     "http://localhost:3000",
   ],
 
-  // pdf-parse / pdfjs must run natively on the server (not bundled for edge).
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  // pdf-parse / pdfjs / mammoth must run natively on the server (not bundled for edge).
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "mammoth", "jszip"],
 
   // Tree-shake large icon / UI libraries at build time — reduces JS sent to the browser
   experimental: {
@@ -49,10 +49,11 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-icons",
       "recharts",
     ],
-    // Card images are up to 5 MB; the default 1 MB Server Action body drops them
-    // as a production digest before the upload action can run.
+    // Card images are up to 5 MB; lesson-plan Word/PPT/photo references can be
+    // up to 15 MB. The default 1 MB Server Action body drops them as a production
+    // digest before the upload action can run.
     serverActions: {
-      bodySizeLimit: "8mb",
+      bodySizeLimit: "16mb",
     },
   },
 

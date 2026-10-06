@@ -129,6 +129,7 @@ export default async function TeacherLessonBuilderPage({
   const hasAdvancedSourceImport = canUseAdvancedSourceImport({
     hasAiReading: ctx.hasAiReading,
     teamTierProWorkspace: ctx.activeEducationTeamPlan !== null,
+    hasTeacherTools: true,
   });
 
   return (

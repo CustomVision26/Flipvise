@@ -67,6 +67,7 @@ export default async function TeacherStudyGuidesPage({
   const hasAdvancedSourceImport = canUseAdvancedSourceImport({
     hasAiReading: ctx.hasAiReading,
     teamTierProWorkspace: ctx.activeEducationTeamPlan !== null,
+    hasTeacherTools: true,
   });
 
   const [savedLessonPlans, savedHomework, ownerLessonPlanPicker, ownerHomeworkPicker] =

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-05T16:14:02.753Z",
+  "updatedAt": "2026-10-06T01:09:09.012Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "61eab728f0d39237f8ffbc626e0f0ee1be3f9db931b0de86d13c495b15994dcd",
@@ -83,7 +83,7 @@
       "docFingerprint": "c8887a44893a42c7091af72093a614cfa0a215bb4e43f092f6555e2bef19f348"
     },
     "contact-us-live-chat": {
-      "watchFingerprint": "58bb390cee641f5d2a02f4710020f9695bb3e475e5740e91d6f41a52f9876e4d",
+      "watchFingerprint": "f285325fb8fd2e24bf4d3400eb9751e9f6cdcc39b26c750bbc60df4608ca976e",
       "docFingerprint": "afe1a6557877bfdeb02d1730a78c71df2b3a3bdda283bf6cf7d68acae4896b3c"
     },
     "contact-us-guest-vs-signed-in": {
@@ -207,8 +207,8 @@
       "docFingerprint": "821087e2a6f503e1c40c60832f1f973a62a0561fce576d4f477088004993c12d"
     },
     "teacher-ai-content-tools": {
-      "watchFingerprint": "1ef84ea662b2a0976b4ebc844cc7525c263cef489d40d53afc072c4a3a15153d",
-      "docFingerprint": "f622d8a0bf59b811cb87981a1d4988f84252847e22bedcd399a2a5876ef1fe49"
+      "watchFingerprint": "e1f887d39277a1c86dacc5ae958b9e76f7db104f654f2245de448cf4fa5ff090",
+      "docFingerprint": "5cbef6e304f93fe35cc18b3e0775f3b6ba5a6b4a99191eea2603c4e5b687187d"
     },
     "teacher-classroom": {
       "watchFingerprint": "3c49f67e8911bdf103ddf7fc858e2a920c07ae9b6db49ee4eeb255361d90d006",

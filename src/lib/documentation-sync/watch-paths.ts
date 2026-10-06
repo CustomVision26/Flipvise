@@ -376,6 +376,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/teacher-lesson-plan.ts",
     "src/lib/server-action-client-error.ts",
     "src/lib/document-extract.ts",
+    "src/lib/source-import-access.ts",
+    "src/lib/source-import-formats.ts",
     "src/components/lesson-plan-reference-material-fields.tsx",
     "src/db/queries/saved-lesson-plans.ts",
     "src/data/jamaica-nsc-lesson-guidelines.ts",
