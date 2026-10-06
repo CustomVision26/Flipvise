@@ -378,6 +378,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/adapt-lesson-plan-to-intake.ts",
     "src/lib/lesson-plan-similarity.ts",
     "src/lib/deck-edit-lesson-plan-sync.ts",
+    "src/lib/deck-subject-topic.ts",
     "src/actions/teacher-lesson-plan.ts",
     "src/lib/server-action-client-error.ts",
     "src/lib/document-extract.ts",

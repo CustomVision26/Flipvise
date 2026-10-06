@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-06T19:33:58.733Z",
+  "updatedAt": "2026-10-06T21:06:34.422Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "85d9464dc7332c2edeb88ca6127bc2d3f8c6e2db230474e367bc35e7ff1b693f",
@@ -23,8 +23,8 @@
       "docFingerprint": "513d847cd830daa23a48a7a2efe7db770d601bf368aa77d83a9bbd05c1497675"
     },
     "deck-editor": {
-      "watchFingerprint": "238c67cb621cbc796f7349b2f3910126a8cc9d67e14e7a9dfa25cdf5e55752c1",
-      "docFingerprint": "8bf8200ec6ec0efd79ee33219b1dde6c5e9895d5fda1d2da3affa523c8d21394"
+      "watchFingerprint": "204c535a16188539984bf6f8750a64e41976c017717e51cdc87cd44ed7500ae0",
+      "docFingerprint": "b37c61dda238dfb0eda9d2f6514832222aa7fe18382861558265814ea5f46b89"
     },
     "study-session": {
       "watchFingerprint": "9b76c752011c39564d14245cb651527fcdc1600da372c146f2bff16449a5e309",
@@ -207,8 +207,8 @@
       "docFingerprint": "821087e2a6f503e1c40c60832f1f973a62a0561fce576d4f477088004993c12d"
     },
     "teacher-ai-content-tools": {
-      "watchFingerprint": "1ebecc14a3924dbfa778e0300d02189f8d013ddfc11e2a0ef044968e6ab83f63",
-      "docFingerprint": "4de90e2ac9878b0ca3f673ff5f226f9941bd8c1cb73e4b045236ff8d8b9bf106"
+      "watchFingerprint": "6d12c294ef6da1716be46be192d6b74c11089e47e582588adf335034a8911236",
+      "docFingerprint": "d1156a81ea2d3b22b3b4f2fae5f0bb33337a70483dc4c9e9d5735b9afce9d977"
     },
     "teacher-classroom": {
       "watchFingerprint": "3c49f67e8911bdf103ddf7fc858e2a920c07ae9b6db49ee4eeb255361d90d006",

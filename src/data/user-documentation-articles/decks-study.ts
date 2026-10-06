@@ -56,6 +56,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         bullets: [
           "Open add from source guide to walk through choosing a source type, generating for review, editing swap and quiz wrong answers, and adding selected cards. The guide stays open while you browse.",
           "After AI drafts cards from a URL or file, review each card before adding it to the deck.",
+          "If a Website URL blocks access, Flipvise tells you and suggests pasting the page text with Plain text, uploading a file, or trying a public page such as Wikipedia.",
           "Swap flips the front and back you save — e.g. move a definition to the front and the term to the back.",
           "Three quiz wrong answers are generated when you save; by default they match the original back (answer) style, such as other definitions, numbers, or fact lists.",
           "Wrong answers from original front — enable per card after Swap when the saved back holds the short term or question; distractors then match that side (other terms, parallel questions like \"what is 5+5?\", etc.).",

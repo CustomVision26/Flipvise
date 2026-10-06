@@ -78,6 +78,7 @@ import { VOCABULARY_TEACHING_APPROACH_OPTIONS } from "@/lib/lesson-plan-vocabula
 import {
   DEFAULT_PLAN_PERIOD_DAYS,
   PLAN_PERIOD_DAY_OPTIONS,
+  formatLessonPlanPeriodOptionLabel,
   normalizeLessonPlanResultDayLabels,
 } from "@/lib/lesson-plan-weekly-schedule";
 import {
@@ -96,7 +97,6 @@ import {
   type TeacherWorkspaceContext,
 } from "@/lib/teacher-url";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
-import { resolveDeckSubjectAndTopic } from "@/lib/deck-subject-topic";
 import { afterOverlayDismiss, dismissOpenOverlays } from "@/lib/dismiss-open-overlays";
 import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import {
@@ -204,11 +204,10 @@ function lessonFormDefaultsFromDeck(deck: DeckRow): Pick<
   "subject" | "gradeLevel" | "topic" | "difficultyLevel"
 > {
   const base = deckToHomeworkDefaults(deck);
-  const { subject, topic } = resolveDeckSubjectAndTopic(deck);
   return {
-    subject: subject || base.subject,
+    subject: base.subject,
     gradeLevel: base.gradeLevel,
-    topic: topic || base.topic,
+    topic: base.topic,
     difficultyLevel: lessonDifficultyFromDeck(base),
   };
 }
@@ -221,6 +220,7 @@ function validateLessonPlanFormForGeneration(
   if (!form.gradeLevel.trim()) return "Enter a grade level.";
   if (!form.topic.trim()) return "Enter a topic.";
   if (!form.lessonDuration.trim()) return "Enter a lesson duration.";
+  if (!form.learningStandard?.trim()) return "Enter a learning standard.";
   if (
     !DIFFICULTY_LEVEL_OPTIONS.includes(
       form.difficultyLevel as (typeof DIFFICULTY_LEVEL_OPTIONS)[number],
@@ -484,6 +484,8 @@ export function TeacherLessonBuilderForm({
     (isEditingExistingPlan && initialSavedPlan.sourceDeckName
       ? initialSavedPlan.sourceDeckName
       : null);
+  const intakeLockedUntilDeck =
+    !isEditingExistingPlan && deckTargetMode === "existing" && deckId == null;
 
   function deckHaystack(deck: DeckRow): string {
     return [deck.name, deck.description, deck.gradeLevel]
@@ -1249,6 +1251,10 @@ export function TeacherLessonBuilderForm({
         onBackClick={handleBackNavigationAttempt}
         showResult={showResult && result != null}
         isGenerating={isGenerating}
+        submitDisabled={intakeLockedUntilDeck}
+        generateTooltip={
+          intakeLockedUntilDeck ? "Select a deck before filling in the lesson details." : undefined
+        }
         errorMessage={errorMessage ?? referenceError}
         onGenerate={requestGenerateFromIntake}
         result={
@@ -1687,6 +1693,13 @@ export function TeacherLessonBuilderForm({
             </div>
           )}
 
+          <div
+            className={cn(
+              "grid gap-4 sm:col-span-2 sm:grid-cols-2",
+              intakeLockedUntilDeck && "opacity-50",
+            )}
+            aria-disabled={intakeLockedUntilDeck}
+          >
           <div className="space-y-2">
             <TeacherFieldLabel
               htmlFor="subject"
@@ -1704,6 +1717,7 @@ export function TeacherLessonBuilderForm({
               value={form.subject}
               onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
               required
+              disabled={intakeLockedUntilDeck}
             />
           </div>
           <div className="space-y-2">
@@ -1727,6 +1741,7 @@ export function TeacherLessonBuilderForm({
               value={form.gradeLevel}
               onChange={(e) => setForm((f) => ({ ...f, gradeLevel: e.target.value }))}
               required
+              disabled={intakeLockedUntilDeck}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -1741,6 +1756,7 @@ export function TeacherLessonBuilderForm({
               value={form.topic}
               onChange={(e) => setForm((f) => ({ ...f, topic: e.target.value }))}
               required
+              disabled={intakeLockedUntilDeck}
             />
           </div>
           <div className="space-y-2">
@@ -1762,6 +1778,7 @@ export function TeacherLessonBuilderForm({
                 setForm((f) => ({ ...f, lessonDuration: e.target.value }))
               }
               required
+              disabled={intakeLockedUntilDeck}
             />
           </div>
           <div className="space-y-2">
@@ -1780,6 +1797,7 @@ export function TeacherLessonBuilderForm({
             />
             <Select
               value={String(form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS)}
+              disabled={intakeLockedUntilDeck}
               onValueChange={(value) => {
                 if (value == null) return;
                 setForm((f) => ({
@@ -1792,12 +1810,16 @@ export function TeacherLessonBuilderForm({
                 id="planPeriodDays"
                 className="h-10 w-full bg-background"
               >
-                <SelectValue placeholder="Select plan period" />
+                <SelectValue placeholder="Select plan period">
+                  {formatLessonPlanPeriodOptionLabel(
+                    form.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PLAN_PERIOD_DAY_OPTIONS.map((days) => (
                   <SelectItem key={days} value={String(days)}>
-                    {days === 1 ? "1 day (single lesson)" : `${days} days`}
+                    {formatLessonPlanPeriodOptionLabel(days)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1824,6 +1846,7 @@ export function TeacherLessonBuilderForm({
             />
             <Select
               value={form.difficultyLevel}
+              disabled={intakeLockedUntilDeck}
               onValueChange={(value) => {
                 if (value == null) return;
                 setForm((f) => ({ ...f, difficultyLevel: value }));
@@ -1848,7 +1871,7 @@ export function TeacherLessonBuilderForm({
           <div className="space-y-2">
             <TeacherFieldLabel
               htmlFor="learningStandard"
-              label="Learning Standard (optional)"
+              label="Learning Standard"
               help={
                 <>
                   <p className="mb-1 font-semibold">Examples:</p>
@@ -1875,6 +1898,8 @@ export function TeacherLessonBuilderForm({
               onChange={(e) =>
                 setForm((f) => ({ ...f, learningStandard: e.target.value }))
               }
+              required
+              disabled={intakeLockedUntilDeck}
             />
           </div>
           <div className="space-y-2">
@@ -1893,6 +1918,7 @@ export function TeacherLessonBuilderForm({
               placeholder="e.g. 23"
               value={form.classSize}
               onChange={(e) => setForm((f) => ({ ...f, classSize: e.target.value }))}
+              disabled={intakeLockedUntilDeck}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
@@ -1923,17 +1949,19 @@ export function TeacherLessonBuilderForm({
                 setForm((f) => ({ ...f, specialInstructions: e.target.value }))
               }
               rows={3}
+              disabled={intakeLockedUntilDeck}
             />
           </div>
 
           <LessonPlanReferenceMaterialFields
             ref={referenceFieldsRef}
             hasAdvancedSourceImport={hasAdvancedSourceImport}
-            disabled={isGenerating}
+            disabled={isGenerating || intakeLockedUntilDeck}
             value={referenceMaterials}
             onChange={setReferenceMaterials}
             onError={setReferenceError}
           />
+          </div>
         </div>
       </TooltipProvider>
       </TeacherToolPageShell>

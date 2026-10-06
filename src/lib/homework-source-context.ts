@@ -79,7 +79,7 @@ export function deckToHomeworkDefaults(deck: DeckRow): {
   gradeLevel: string;
   difficultyLevel: string;
 } {
-  // Deck edit "Description/Topic" → homework Topic; name → Subject (and topic fallback).
+  // Quiz/lesson-plan decks store topic + subject in a metadata description; ordinary decks use Description/Topic as topic.
   const { subject, topic } = resolveDeckSubjectAndTopic(deck);
   return {
     subject,

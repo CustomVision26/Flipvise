@@ -22,6 +22,7 @@ import {
   coerceLessonPlanDayVocabularyDetail,
   coerceLessonPlanResultAi,
   lessonPlanDayVocabularyDetailAiSchema,
+  lessonPlanGenerateInputSchema,
   lessonPlanInputSchema,
   lessonPlanResultAiSchema,
   lessonPlanResultSchema,
@@ -116,6 +117,7 @@ const LESSON_PLAN_FIELD_LABELS: Record<string, string> = {
   gradeLevel: "Enter a grade level.",
   topic: "Enter a topic.",
   lessonDuration: "Enter a lesson duration.",
+  learningStandard: "Enter a learning standard.",
   difficultyLevel: "Select a difficulty level.",
 };
 
@@ -358,7 +360,7 @@ export async function generateLessonPlanAction(
     "Lesson Builder requires an education plan.",
   );
 
-  const parsed = lessonPlanInputSchema.safeParse(normalizeLessonPlanActionInput(data));
+  const parsed = lessonPlanGenerateInputSchema.safeParse(normalizeLessonPlanActionInput(data));
   if (!parsed.success) {
     throw new Error(lessonPlanValidationError(parsed.error));
   }
@@ -1170,7 +1172,7 @@ export async function extractLessonPlanReferenceAction(
   } catch (error) {
     return failLessonPlanAction(
       error,
-      "Could not read that reference material. Try another source.",
+      "Could not read that reference. Paste the page text with Plain text, try a public page such as Wikipedia, or upload a different file.",
       "extractLessonPlanReferenceAction",
     );
   }
@@ -1845,7 +1847,7 @@ export async function keepLessonPlanOnExitAction(data: {
 
 const adaptAssignedLessonPlanSchema = z.object({
   lessonPlanId: z.number().int().positive(),
-  input: lessonPlanInputSchema,
+  input: lessonPlanGenerateInputSchema,
   teamId: z.number().int().positive().optional(),
   sourceDeckName: z.string().max(255).nullable().optional(),
 });

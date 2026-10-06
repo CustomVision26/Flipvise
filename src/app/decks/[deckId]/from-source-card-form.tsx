@@ -716,7 +716,9 @@ export function FromSourceCardForm({
               autoFocus
             />
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Article and wiki pages work best. App store links are not supported.
+              Article and wiki pages work best. If a site blocks access, paste the
+              page text with Plain text or upload a file. App store links are not
+              supported.
             </p>
             {unsupportedUrlReason ? (
               <p className="text-xs text-amber-400 leading-relaxed" role="status">

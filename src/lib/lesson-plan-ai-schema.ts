@@ -3,9 +3,13 @@ import { SOURCE_IMPORT_MAX_EXTRACTED_CHARS } from "@/lib/source-import-formats";
 import { MAX_LESSON_PLAN_REFERENCES } from "@/lib/lesson-plan-reference-material";
 import { TEACHER_CLASS_DAY_OPTIONS } from "@/lib/teacher-class-form";
 
-export const PLAN_PERIOD_DAY_OPTIONS = [1, 3, 5, 7] as const;
+export const PLAN_PERIOD_DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 export type PlanPeriodDays = (typeof PLAN_PERIOD_DAY_OPTIONS)[number];
 export const DEFAULT_PLAN_PERIOD_DAYS: PlanPeriodDays = 5;
+
+export function formatLessonPlanPeriodOptionLabel(days: number): string {
+  return days === 1 ? "1 day" : `${days} days`;
+}
 
 export const lessonPlanReferenceMaterialSchema = z.object({
   text: z.string().max(SOURCE_IMPORT_MAX_EXTRACTED_CHARS),
@@ -260,6 +264,11 @@ export const lessonPlanInputSchema = z.object({
 });
 
 export type LessonPlanActionInput = z.infer<typeof lessonPlanInputSchema>;
+
+/** Generate/adapt require a learning standard; saved plans may still have an empty value. */
+export const lessonPlanGenerateInputSchema = lessonPlanInputSchema.extend({
+  learningStandard: z.string().trim().min(1),
+});
 
 export const lessonPlanResultSchema = z.object({
   lessonTitle: z.string().min(1),

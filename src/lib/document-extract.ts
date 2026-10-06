@@ -12,7 +12,12 @@ import {
   mimeToSourceFormat,
   type SourceFormat,
 } from "@/lib/source-import-formats";
-import { getUnsupportedImportUrlReason, isPrivateChatImportUrl } from "@/lib/source-import-url-validation";
+import {
+  getUnsupportedImportUrlReason,
+  isPrivateChatImportUrl,
+  WEBSITE_BLOCKED_MESSAGE,
+  WEBSITE_TEMPORARILY_BLOCKED_MESSAGE,
+} from "@/lib/source-import-url-validation";
 import { isYouTubeUrl } from "@/lib/youtube-url";
 import { extractYouTubeTranscript } from "@/lib/youtube-transcript";
 
@@ -93,12 +98,15 @@ function fetchErrorMessage(status: number, parsed: URL): string {
     ) {
       return "This site blocks automated access. Try a public article (e.g. Wikipedia) or upload a .txt or PDF file instead.";
     }
-    return `Access to that URL was denied (HTTP ${status}). Try a different public page or upload a file.`;
+    return WEBSITE_BLOCKED_MESSAGE;
+  }
+  if (status === 429 || status === 503) {
+    return WEBSITE_TEMPORARILY_BLOCKED_MESSAGE;
   }
   if (host.includes("play.google.com") || host.includes("apps.apple.com")) {
     return `Could not read that app store page (HTTP ${status}). App listings are poor sources for flashcards — use an article, notes file, or PDF instead.`;
   }
-  return `Could not fetch that URL (HTTP ${status}). Check the link or upload a file instead.`;
+  return `Could not fetch that URL (HTTP ${status}). Check the link, paste the page text with Plain text, or upload a file.`;
 }
 
 const URL_FETCH_HEADERS = {
@@ -195,6 +203,7 @@ async function fetchUrlViaJinaNode(parsed: URL): Promise<ExtractedSource> {
   if (response.ok) {
     const extracted = extractedFromJinaBody(body);
     if (extracted) return extracted;
+    throw new Error(WEBSITE_BLOCKED_MESSAGE);
   }
   throw new Error(fetchErrorMessage(response.status, parsed));
 }
@@ -245,7 +254,7 @@ async function fetchUrlViaJinaCurl(parsed: URL): Promise<ExtractedSource> {
   }
   const extracted = extractedFromJinaBody(body);
   if (!extracted) {
-    throw new Error(fetchErrorMessage(status || 403, parsed));
+    throw new Error(WEBSITE_BLOCKED_MESSAGE);
   }
   return extracted;
 }
@@ -434,9 +443,7 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
       }
     }
     if (err instanceof Error) throw err;
-    throw new Error(
-      "Could not read that website. Try another page or upload a file.",
-    );
+    throw new Error(WEBSITE_BLOCKED_MESSAGE);
   }
 }
 

@@ -2,11 +2,16 @@ import type { LessonPlanDaySchedule } from "@/lib/lesson-plan-ai-schema";
 import {
   DEFAULT_PLAN_PERIOD_DAYS,
   PLAN_PERIOD_DAY_OPTIONS,
+  formatLessonPlanPeriodOptionLabel,
   type PlanPeriodDays,
 } from "@/lib/lesson-plan-ai-schema";
 import { TEACHER_CLASS_DAY_OPTIONS } from "@/lib/teacher-class-form";
 
-export { DEFAULT_PLAN_PERIOD_DAYS, PLAN_PERIOD_DAY_OPTIONS };
+export {
+  DEFAULT_PLAN_PERIOD_DAYS,
+  PLAN_PERIOD_DAY_OPTIONS,
+  formatLessonPlanPeriodOptionLabel,
+};
 export type { PlanPeriodDays };
 
 export const LESSON_PLAN_DAY_OF_WEEK_NONE = "__none__";
@@ -105,10 +110,11 @@ export function isPlanPeriodDays(value: number): value is PlanPeriodDays {
 
 export function clampPlanPeriodDays(value: number): PlanPeriodDays {
   if (isPlanPeriodDays(value)) return value;
-  if (value <= 1) return 1;
-  if (value <= 3) return 3;
-  if (value <= 5) return 5;
-  return 7;
+  if (!Number.isFinite(value)) return DEFAULT_PLAN_PERIOD_DAYS;
+  const rounded = Math.round(value);
+  if (rounded <= 1) return 1;
+  if (rounded >= 7) return 7;
+  return rounded as PlanPeriodDays;
 }
 
 /** Human-readable unit header, e.g. "7-day unit · 45 minutes per class". */

@@ -1,47 +1,92 @@
-/** Splits teacher/quiz deck names formatted as `Subject — Topic` or `Subject : Topic`. */
-const DECK_NAME_SEPARATOR = /\s+(?:[—–-]|:)\s+/;
+import { stripLessonPlanScopedDeckSuffix } from "@/lib/teacher-generation-titles";
+
+/** Subject — Topic in the deck name. Colons stay inside the subject (e.g. Science : Environmental Science). */
+const NAME_SUBJECT_TOPIC_SPLIT = /\s+[—–-]\s+/;
+const DESCRIPTION_SEGMENT_SPLIT = /\s*[·•]\s*/;
+
+function isTeacherToolMetadataSegment(segment: string): boolean {
+  return (
+    /^teacher quiz deck$/i.test(segment) ||
+    /^teacher lesson plan deck$/i.test(segment) ||
+    /^lesson plan #\d+/i.test(segment) ||
+    /^lesson scope:/i.test(segment) ||
+    /^grade\s+/i.test(segment) ||
+    /\bdifficulty$/i.test(segment)
+  );
+}
+
+function isTeacherToolDeckDescription(description: string): boolean {
+  return (
+    /teacher quiz deck/i.test(description) ||
+    /teacher lesson plan deck/i.test(description)
+  );
+}
+
+function parseStructuredTeacherDeckDescription(
+  description: string | null | undefined,
+): { subject: string; topic: string } | null {
+  const raw = description?.trim();
+  if (!raw || !isTeacherToolDeckDescription(raw)) return null;
+
+  const segments = raw
+    .split(DESCRIPTION_SEGMENT_SPLIT)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const content = segments.filter((segment) => !isTeacherToolMetadataSegment(segment));
+  if (content.length >= 2) {
+    return { topic: content[0] ?? "", subject: content[1] ?? "" };
+  }
+  if (content.length === 1) {
+    return { topic: content[0] ?? "", subject: "" };
+  }
+  return null;
+}
+
+function parseSubjectTopicFromName(name: string): { subject: string; topic: string } {
+  const stripped = stripLessonPlanScopedDeckSuffix(name.trim());
+  if (!stripped) {
+    return { subject: "", topic: "" };
+  }
+
+  const dashParts = stripped
+    .split(NAME_SUBJECT_TOPIC_SPLIT)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (dashParts.length >= 2) {
+    return {
+      subject: dashParts[0] ?? "",
+      topic: dashParts.slice(1).join(" — "),
+    };
+  }
+
+  return { subject: stripped, topic: "" };
+}
 
 export function parseDeckSubjectTopic(deck: {
   name: string;
   description?: string | null;
 }): { subject: string; topic: string } {
-  const name = deck.name.trim();
-  if (!name) {
-    return { subject: "", topic: "" };
-  }
+  const fromDescription = parseStructuredTeacherDeckDescription(deck.description);
+  const fromName = parseSubjectTopicFromName(deck.name);
 
-  const nameParts = name.split(DECK_NAME_SEPARATOR).map((part) => part.trim()).filter(Boolean);
-  if (nameParts.length >= 2) {
+  if (fromDescription) {
     return {
-      subject: nameParts[0] ?? "",
-      topic: nameParts.slice(1).join(" — "),
+      subject: fromDescription.subject || fromName.subject,
+      topic: fromDescription.topic || fromName.topic,
     };
   }
 
-  const description = deck.description?.trim();
-  if (description) {
-    const segments = description.split("·").map((part) => part.trim()).filter(Boolean);
-    if (segments.length >= 2) {
-      const topic = segments[0] ?? "";
-      const subject = segments[1] ?? "";
-      if (subject && !subject.toLowerCase().includes("teacher quiz")) {
-        return { subject, topic };
-      }
-    }
-  }
-
-  return { subject: name, topic: "" };
+  const topicFromDescription = deck.description?.trim() ?? "";
+  return {
+    subject: fromName.subject,
+    topic: topicFromDescription || fromName.topic,
+  };
 }
 
-/** Deck name → subject; deck `description` field → topic (Description/Topic in edit deck). */
+/** Deck name → subject; Description/Topic → topic, unless the description is quiz/lesson-plan metadata. */
 export function resolveDeckSubjectAndTopic(deck: {
   name: string;
   description?: string | null;
 }): { subject: string; topic: string } {
-  const parsed = parseDeckSubjectTopic(deck);
-  const topicFromDescription = deck.description?.trim() ?? "";
-  return {
-    subject: parsed.subject,
-    topic: topicFromDescription || parsed.topic,
-  };
+  return parseDeckSubjectTopic(deck);
 }

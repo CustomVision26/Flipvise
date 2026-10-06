@@ -6,6 +6,13 @@ const APP_STORE_MESSAGE =
 const PRIVATE_CHAT_MESSAGE =
   "Private chat links (ChatGPT, Claude, etc.) cannot be fetched. Copy the text from your chat and add it using Plain text, or upload a file.";
 
+/** Shown when a public page refuses server-side fetch (Cloudflare, login walls, etc.). */
+export const WEBSITE_BLOCKED_MESSAGE =
+  "This website blocked access from Flipvise. Paste the page text with Plain text, upload a file, or try a public page such as Wikipedia.";
+
+export const WEBSITE_TEMPORARILY_BLOCKED_MESSAGE =
+  "This website is temporarily blocking requests. Wait a moment and try again, or paste the page text with Plain text.";
+
 const PRIVATE_CHAT_HOSTS = [
   "chatgpt.com",
   "chat.openai.com",

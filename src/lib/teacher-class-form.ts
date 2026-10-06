@@ -30,7 +30,7 @@ export function periodPlaceholder(dayNumber: number): string {
 }
 
 export function formatPlanPeriodLabel(planPeriodDays: number): string {
-  return planPeriodDays === 1 ? "1 day (single lesson)" : String(planPeriodDays);
+  return planPeriodDays === 1 ? "1 day (single lesson)" : `${planPeriodDays} days`;
 }
 
 export function formatStoredClassPeriods(periodValues: string[]): string {

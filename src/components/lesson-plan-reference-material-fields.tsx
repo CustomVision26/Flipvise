@@ -17,7 +17,10 @@ import {
   type FileSourcePickerId,
   type SourcePickerId,
 } from "@/lib/source-import-formats";
-import { getUnsupportedImportUrlReason } from "@/lib/source-import-url-validation";
+import {
+  getUnsupportedImportUrlReason,
+  WEBSITE_BLOCKED_MESSAGE,
+} from "@/lib/source-import-url-validation";
 import {
   MAX_LESSON_PLAN_REFERENCES,
   normalizeLessonPlanReferenceMaterial,
@@ -147,7 +150,7 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
     } catch (error) {
       const message = userFacingServerActionError(
         error,
-        "Could not read that website. Try Add URL again, or paste the page text with Plain text.",
+        WEBSITE_BLOCKED_MESSAGE,
       );
       lastExtractErrorRef.current = message;
       onError(message);
@@ -379,7 +382,7 @@ export const LessonPlanReferenceMaterialFields = forwardRef<
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 {isYouTubeUrl(url)
                   ? "YouTube links use the video captions (manual or auto-generated) when available."
-                  : "Article and curriculum pages work best."}
+                  : "Article and curriculum pages work best. If a site blocks access, paste the page text with Plain text or upload a file."}
               </p>
               {unsupportedUrlReason ? (
                 <p className="text-xs text-amber-400 leading-relaxed" role="status">
