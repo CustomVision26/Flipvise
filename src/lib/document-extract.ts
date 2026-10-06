@@ -111,15 +111,12 @@ const URL_FETCH_HEADERS = {
 } as const;
 
 const URL_READER_FALLBACK_STATUSES = new Set([401, 403, 429, 503]);
-const URL_DIRECT_FETCH_MS = 20_000;
-const URL_READER_FETCH_MS = 40_000;
+const URL_DIRECT_FETCH_MS = 12_000;
+const URL_READER_FETCH_MS = 18_000;
 const CURL_STATUS_MARKER = "__HTTP_STATUS__:";
+const WIKIPEDIA_USER_AGENT =
+  "FlipviseLessonBuilder/1.0 (https://learn.flipvisestudio.com/contact; lesson-plan reference)";
 const execFileAsync = promisify(execFile);
-
-const WIKIPEDIA_FALLBACK_HOSTS = new Set([
-  "britannica.com",
-  "merriam-webster.com",
-]);
 
 function isBotChallengeBody(body: string): boolean {
   const sample = body.slice(0, 6_000).toLowerCase();
@@ -209,7 +206,7 @@ async function fetchUrlViaJinaCurl(parsed: URL): Promise<ExtractedSource> {
     "-sS",
     "-L",
     "--max-time",
-    "38",
+    "12",
     "-A",
     URL_FETCH_HEADERS["User-Agent"],
     "-H",
@@ -268,38 +265,62 @@ function wikipediaTitleFromPath(pathname: string): string | null {
   return title;
 }
 
-async function tryWikipediaFallback(parsed: URL): Promise<ExtractedSource | null> {
-  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
-  if (!WIKIPEDIA_FALLBACK_HOSTS.has(host)) return null;
-  const title = wikipediaTitleFromPath(parsed.pathname);
-  if (!title) return null;
+function hostAllowsWikipediaFallback(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^www\./, "");
+  return (
+    host === "britannica.com" ||
+    host.endsWith(".britannica.com") ||
+    host === "merriam-webster.com" ||
+    host.endsWith(".merriam-webster.com") ||
+    host === "encyclopedia.com" ||
+    host.endsWith(".encyclopedia.com")
+  );
+}
 
+async function wikipediaQuery(
+  searchParams: Record<string, string>,
+): Promise<unknown> {
   const api = new URL("https://en.wikipedia.org/w/api.php");
-  api.searchParams.set("action", "query");
-  api.searchParams.set("prop", "extracts");
-  api.searchParams.set("explaintext", "1");
-  api.searchParams.set("redirects", "1");
-  api.searchParams.set("format", "json");
-  api.searchParams.set("titles", title);
-
+  for (const [key, value] of Object.entries(searchParams)) {
+    api.searchParams.set(key, value);
+  }
   const response = await fetchWithTimeout(
     api.toString(),
     {
       headers: {
         Accept: "application/json",
-        "User-Agent": "Flipvise/1.0 (lesson-plan-reference; https://learn.flipvisestudio.com)",
+        "User-Agent": WIKIPEDIA_USER_AGENT,
+        "Api-User-Agent": WIKIPEDIA_USER_AGENT,
       },
     },
-    20_000,
+    12_000,
   );
   if (!response.ok) return null;
-  const data = (await response.json()) as {
-    query?: { pages?: Record<string, { title?: string; extract?: string; missing?: string }> };
-  };
+  return response.json();
+}
+
+async function wikipediaExtractByTitle(
+  title: string,
+): Promise<ExtractedSource | null> {
+  const data = (await wikipediaQuery({
+    action: "query",
+    prop: "extracts",
+    explaintext: "1",
+    redirects: "1",
+    format: "json",
+    titles: title,
+  })) as {
+    query?: {
+      pages?: Record<
+        string,
+        { title?: string; extract?: string; missing?: unknown }
+      >;
+    };
+  } | null;
+  if (!data) return null;
   const page = Object.values(data.query?.pages ?? {})[0];
   const extract = page?.extract?.trim();
   if (!extract || page?.missing != null) return null;
-
   return {
     format: "url",
     text: truncateExtractedText(extract),
@@ -307,19 +328,42 @@ async function tryWikipediaFallback(parsed: URL): Promise<ExtractedSource | null
   };
 }
 
+async function wikipediaSearchTitle(query: string): Promise<string | null> {
+  const data = (await wikipediaQuery({
+    action: "query",
+    list: "search",
+    srsearch: query,
+    srlimit: "1",
+    srnamespace: "0",
+    format: "json",
+  })) as { query?: { search?: { title?: string }[] } } | null;
+  const title = data?.query?.search?.[0]?.title?.trim();
+  return title || null;
+}
+
+async function tryWikipediaFallback(parsed: URL): Promise<ExtractedSource | null> {
+  if (!hostAllowsWikipediaFallback(parsed.hostname)) return null;
+  const slug = wikipediaTitleFromPath(parsed.pathname);
+  if (!slug) return null;
+
+  const direct = await wikipediaExtractByTitle(slug);
+  if (direct) return direct;
+
+  const found = await wikipediaSearchTitle(slug.replaceAll("_", " "));
+  if (!found) return null;
+  return wikipediaExtractByTitle(found);
+}
+
 async function fetchUrlViaReaderProxy(parsed: URL): Promise<ExtractedSource> {
+  const wikipedia = await tryWikipediaFallback(parsed).catch(() => null);
+  if (wikipedia) return wikipedia;
+
   try {
     return await fetchUrlViaJinaNode(parsed);
   } catch (nodeErr) {
     try {
       return await fetchUrlViaJinaCurl(parsed);
     } catch {
-      try {
-        const wikipedia = await tryWikipediaFallback(parsed);
-        if (wikipedia) return wikipedia;
-      } catch {
-        // Original URL still owns the user-facing error.
-      }
       throw nodeErr;
     }
   }
