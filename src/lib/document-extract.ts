@@ -256,12 +256,8 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
 
 async function extractDocxText(buffer: Buffer): Promise<string> {
   try {
-    const mammothMod = await import("mammoth");
-    const mammoth =
-      typeof mammothMod.extractRawText === "function"
-        ? mammothMod
-        : (mammothMod as { default: typeof mammothMod }).default;
-    const result = await mammoth.extractRawText({ buffer });
+    const { extractRawText } = await import("mammoth");
+    const result = await extractRawText({ buffer });
     return result.value ?? "";
   } catch {
     throw new Error(
