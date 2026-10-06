@@ -489,10 +489,10 @@ export function AddDeckDialog({
           {triggerLabel}
         </DialogTrigger>
       )}
-      <DialogContent className="mx-4 w-[calc(100vw-2rem)] max-h-[min(92dvh,40rem)] max-w-md overflow-y-auto sm:mx-auto">
+      <DialogContent className="mx-4 flex w-[calc(100vw-2rem)] max-h-[min(92dvh,56rem)] max-w-2xl flex-col gap-6 overflow-y-auto p-6 text-base sm:mx-auto sm:max-w-2xl sm:p-8 md:max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">Create a new deck</DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogTitle className="text-xl sm:text-2xl">Create a new deck</DialogTitle>
+          <DialogDescription className="text-sm sm:text-base">
             Give your deck a name/subject/course, description/topic, and optional grade and
             difficulty.
             {showSpeechUi ? " Use the microphone to dictate into the fields." : ""}
@@ -503,7 +503,7 @@ export function AddDeckDialog({
         </DialogHeader>
 
         <TooltipProvider>
-          <form id="add-deck-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form id="add-deck-form" onSubmit={handleSubmit} className="flex flex-col gap-5 sm:gap-6">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -551,7 +551,7 @@ export function AddDeckDialog({
                 placeholder="e.g. Spanish Vocabulary"
                 autoFocus
                 disabled={isPending}
-                className="text-sm"
+                className="h-10 text-sm sm:h-11 sm:text-base"
               />
             </div>
 
@@ -609,8 +609,8 @@ export function AddDeckDialog({
                 name="description"
                 placeholder="e.g. Learning Jamaica's independence and national identity"
                 disabled={isPending}
-                rows={3}
-                className="text-sm"
+                rows={4}
+                className="min-h-[6.5rem] text-sm sm:text-base"
               />
             </div>
 
@@ -641,7 +641,7 @@ export function AddDeckDialog({
                   name="gradeLevel"
                   placeholder="e.g. Grade 6"
                   disabled={isPending}
-                  className="text-sm"
+                  className="h-10 text-sm sm:h-11 sm:text-base"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -673,7 +673,7 @@ export function AddDeckDialog({
                 >
                   <SelectTrigger
                     id="deck-difficulty-level"
-                    className="h-8 w-full bg-background text-sm sm:h-9"
+                    className="h-10 w-full bg-background text-sm sm:h-11 sm:text-base"
                     disabled={isPending}
                   >
                     <SelectValue placeholder="Select difficulty" />
@@ -703,7 +703,7 @@ export function AddDeckDialog({
                   accept={ALLOWED_IMAGE_TYPES.join(",")}
                   onChange={onFrontImageChange}
                   disabled={isPending}
-                  className="cursor-pointer bg-background text-sm text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1 file:text-sm file:font-medium file:text-foreground"
+                  className="h-10 cursor-pointer bg-background text-sm text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground sm:h-11 sm:text-base"
                 />
                 <p className="text-xs text-muted-foreground">
                   Shown on dashboard deck cards. Not a flashcard and not counted toward your
@@ -715,7 +715,7 @@ export function AddDeckDialog({
                     <img
                       src={frontImagePreviewUrl}
                       alt="Selected deck cover preview"
-                      className="max-h-40 w-full object-contain bg-muted/30"
+                      className="max-h-52 w-full object-contain bg-muted/30 sm:max-h-64"
                     />
                   </div>
                 )}
@@ -728,11 +728,11 @@ export function AddDeckDialog({
           </form>
         </TooltipProvider>
 
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" type="button" />}>
+        <DialogFooter className="gap-2 sm:gap-3">
+          <DialogClose render={<Button variant="outline" type="button" className="h-10 sm:h-11" />}>
             Cancel
           </DialogClose>
-          <Button type="submit" form="add-deck-form" disabled={isPending}>
+          <Button type="submit" form="add-deck-form" disabled={isPending} className="h-10 sm:h-11">
             {isPending ? "Creating…" : "Create Deck"}
           </Button>
         </DialogFooter>

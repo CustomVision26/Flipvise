@@ -1,5 +1,8 @@
 import "server-only";
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import {
   SOURCE_IMPORT_MAX_EXTRACTED_CHARS,
   SOURCE_IMPORT_MAX_FILE_BYTES,
@@ -108,6 +111,27 @@ const URL_FETCH_HEADERS = {
 } as const;
 
 const URL_READER_FALLBACK_STATUSES = new Set([401, 403, 429, 503]);
+const URL_DIRECT_FETCH_MS = 20_000;
+const URL_READER_FETCH_MS = 40_000;
+const CURL_STATUS_MARKER = "__HTTP_STATUS__:";
+const execFileAsync = promisify(execFile);
+
+const WIKIPEDIA_FALLBACK_HOSTS = new Set([
+  "britannica.com",
+  "merriam-webster.com",
+]);
+
+function isBotChallengeBody(body: string): boolean {
+  const sample = body.slice(0, 6_000).toLowerCase();
+  return (
+    sample.includes("just a moment") ||
+    sample.includes("cf-mitigated") ||
+    sample.includes("_cf_chl_opt") ||
+    sample.includes("challenges.cloudflare.com") ||
+    sample.includes("enable javascript and cookies to continue") ||
+    sample.includes("attention required! | cloudflare")
+  );
+}
 
 function parseJinaReaderResponse(body: string): { title?: string; text: string } {
   const titleMatch = body.match(/^Title:\s*(.+)$/m);
@@ -119,35 +143,186 @@ function parseJinaReaderResponse(body: string): { title?: string; text: string }
   return { title, text };
 }
 
-async function fetchUrlViaReaderProxy(
-  parsed: URL,
-  signal: AbortSignal,
-): Promise<ExtractedSource> {
-  const readerUrl = `https://r.jina.ai/${parsed.toString()}`;
-  const response = await fetch(readerUrl, {
-    headers: {
-      Accept: "text/plain",
-      "User-Agent": URL_FETCH_HEADERS["User-Agent"],
-    },
-    signal,
-    redirect: "follow",
-  });
-
-  if (!response.ok) {
-    throw new Error(fetchErrorMessage(response.status, parsed));
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+      redirect: "follow",
+    });
+  } finally {
+    clearTimeout(timeout);
   }
+}
 
-  const body = await response.text();
+function jinaReaderHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "text/plain",
+    "User-Agent": URL_FETCH_HEADERS["User-Agent"],
+    "X-Engine": "browser",
+    "X-Return-Format": "markdown",
+    "X-Timeout": "30",
+  };
+  const apiKey = process.env.JINA_API_KEY?.trim();
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
+function extractedFromJinaBody(body: string): ExtractedSource | null {
+  if (!body.trim() || isBotChallengeBody(body)) return null;
   const { title, text } = parseJinaReaderResponse(body);
-  if (!text.trim()) {
-    throw new Error("No readable text was found at that URL.");
-  }
-
+  if (!text.trim() || isBotChallengeBody(text)) return null;
   return {
     format: "url",
     text: truncateExtractedText(text),
     sourceTitle: title,
   };
+}
+
+async function fetchUrlViaJinaNode(parsed: URL): Promise<ExtractedSource> {
+  const readerUrl = `https://r.jina.ai/${parsed.toString()}`;
+  const response = await fetchWithTimeout(
+    readerUrl,
+    { headers: jinaReaderHeaders() },
+    URL_READER_FETCH_MS,
+  );
+  const body = await response.text();
+  if (response.ok) {
+    const extracted = extractedFromJinaBody(body);
+    if (extracted) return extracted;
+  }
+  throw new Error(fetchErrorMessage(response.status, parsed));
+}
+
+async function fetchUrlViaJinaCurl(parsed: URL): Promise<ExtractedSource> {
+  const readerUrl = `https://r.jina.ai/${parsed.toString()}`;
+  const curlBin = process.platform === "win32" ? "curl.exe" : "curl";
+  const args = [
+    "-sS",
+    "-L",
+    "--max-time",
+    "38",
+    "-A",
+    URL_FETCH_HEADERS["User-Agent"],
+    "-H",
+    "Accept: text/plain",
+    "-H",
+    "X-Engine: browser",
+    "-H",
+    "X-Return-Format: markdown",
+    "-H",
+    "X-Timeout: 30",
+    "-w",
+    `\n${CURL_STATUS_MARKER}%{http_code}`,
+    readerUrl,
+  ];
+  const apiKey = process.env.JINA_API_KEY?.trim();
+  if (apiKey) {
+    args.splice(args.length - 1, 0, "-H", `Authorization: Bearer ${apiKey}`);
+  }
+
+  const { stdout } = await execFileAsync(curlBin, args, {
+    timeout: URL_READER_FETCH_MS + 2_000,
+    maxBuffer: 8 * 1024 * 1024,
+    windowsHide: true,
+  });
+  const markerIndex = stdout.lastIndexOf(CURL_STATUS_MARKER);
+  const body =
+    markerIndex >= 0 ? stdout.slice(0, markerIndex) : stdout;
+  const status = Number.parseInt(
+    markerIndex >= 0
+      ? stdout.slice(markerIndex + CURL_STATUS_MARKER.length).trim()
+      : "0",
+    10,
+  );
+  if (status && status >= 400) {
+    throw new Error(fetchErrorMessage(status, parsed));
+  }
+  const extracted = extractedFromJinaBody(body);
+  if (!extracted) {
+    throw new Error(fetchErrorMessage(status || 403, parsed));
+  }
+  return extracted;
+}
+
+function wikipediaTitleFromPath(pathname: string): string | null {
+  const segment = pathname.split("/").filter(Boolean).pop();
+  if (!segment) return null;
+  let decoded = segment;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+  const title = decoded.replace(/-/g, "_").trim();
+  if (title.length < 2 || title.length > 180) return null;
+  if (/[/?#]/.test(title)) return null;
+  return title;
+}
+
+async function tryWikipediaFallback(parsed: URL): Promise<ExtractedSource | null> {
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+  if (!WIKIPEDIA_FALLBACK_HOSTS.has(host)) return null;
+  const title = wikipediaTitleFromPath(parsed.pathname);
+  if (!title) return null;
+
+  const api = new URL("https://en.wikipedia.org/w/api.php");
+  api.searchParams.set("action", "query");
+  api.searchParams.set("prop", "extracts");
+  api.searchParams.set("explaintext", "1");
+  api.searchParams.set("redirects", "1");
+  api.searchParams.set("format", "json");
+  api.searchParams.set("titles", title);
+
+  const response = await fetchWithTimeout(
+    api.toString(),
+    {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Flipvise/1.0 (lesson-plan-reference; https://learn.flipvisestudio.com)",
+      },
+    },
+    20_000,
+  );
+  if (!response.ok) return null;
+  const data = (await response.json()) as {
+    query?: { pages?: Record<string, { title?: string; extract?: string; missing?: string }> };
+  };
+  const page = Object.values(data.query?.pages ?? {})[0];
+  const extract = page?.extract?.trim();
+  if (!extract || page?.missing != null) return null;
+
+  return {
+    format: "url",
+    text: truncateExtractedText(extract),
+    sourceTitle: `${page.title ?? title.replaceAll("_", " ")} (Wikipedia)`,
+  };
+}
+
+async function fetchUrlViaReaderProxy(parsed: URL): Promise<ExtractedSource> {
+  try {
+    return await fetchUrlViaJinaNode(parsed);
+  } catch (nodeErr) {
+    try {
+      return await fetchUrlViaJinaCurl(parsed);
+    } catch {
+      try {
+        const wikipedia = await tryWikipediaFallback(parsed);
+        if (wikipedia) return wikipedia;
+      } catch {
+        // Original URL still owns the user-facing error.
+      }
+      throw nodeErr;
+    }
+  }
 }
 
 export async function extractTextFromUrl(url: string): Promise<ExtractedSource> {
@@ -163,44 +338,41 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
   }
 
   const parsed = parsePublicHttpUrl(trimmed);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
   try {
-    const response = await fetch(parsed.toString(), {
-      headers: URL_FETCH_HEADERS,
-      signal: controller.signal,
-      redirect: "follow",
-    });
+    const response = await fetchWithTimeout(
+      parsed.toString(),
+      { headers: URL_FETCH_HEADERS },
+      URL_DIRECT_FETCH_MS,
+    );
 
     if (!response.ok) {
       if (URL_READER_FALLBACK_STATUSES.has(response.status)) {
-        return await fetchUrlViaReaderProxy(parsed, controller.signal);
+        return await fetchUrlViaReaderProxy(parsed);
       }
       throw new Error(fetchErrorMessage(response.status, parsed));
     }
 
     const contentType = response.headers.get("content-type") ?? "";
     const body = await response.text();
+    if (isBotChallengeBody(body)) {
+      return await fetchUrlViaReaderProxy(parsed);
+    }
     const text =
       contentType.includes("text/html") || contentType.includes("application/xhtml")
         ? stripHtml(body)
         : body;
     if (!text.trim()) {
-      return await fetchUrlViaReaderProxy(parsed, controller.signal);
+      return await fetchUrlViaReaderProxy(parsed);
     }
     return { format: "url", text: truncateExtractedText(text) };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("Fetching the URL timed out. Try a shorter page or upload a file instead.");
-    }
-    if (
-      err instanceof Error &&
-      /Access to that URL was denied|blocks automated access/i.test(err.message)
-    ) {
       try {
-        return await fetchUrlViaReaderProxy(parsed, controller.signal);
+        return await fetchUrlViaReaderProxy(parsed);
       } catch {
-        throw err;
+        throw new Error(
+          "Fetching the URL timed out. Try a shorter page or paste the page text with Plain text.",
+        );
       }
     }
     if (
@@ -210,7 +382,7 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
       )
     ) {
       try {
-        return await fetchUrlViaReaderProxy(parsed, controller.signal);
+        return await fetchUrlViaReaderProxy(parsed);
       } catch {
         throw new Error(
           "Could not reach that website. Check the link, or paste the page text with Plain text.",
@@ -221,8 +393,6 @@ export async function extractTextFromUrl(url: string): Promise<ExtractedSource> 
     throw new Error(
       "Could not read that website. Try another page or upload a file.",
     );
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

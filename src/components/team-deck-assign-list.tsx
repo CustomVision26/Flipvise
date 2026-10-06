@@ -46,6 +46,7 @@ import {
   isEducationTeamPlanId,
   limitsForEducationTeamPlan,
 } from "@/lib/education-plans";
+import { canManageMemberAsOwnerOrInviter } from "@/lib/team-member-inviter-access";
 
 type MemberRow = TeamMemberRow;
 type AssignmentRow = TeamDeckAssignmentListRow;
@@ -69,6 +70,10 @@ type AssignmentTableDisplayRow = {
    * `creator` — Education Gold/Enterprise co-admin created the deck (Team Dashboard access).
    */
   accessSource: "assignment" | "creator";
+  /** Education Gold/Enterprise team admin create cap; null when the member cannot create workspace decks. */
+  createLimitAllowed: number | null;
+  createLimitCreated: number;
+  memberAddedByUserId: string | null;
 };
 
 export type TeamAssignWorkspaceSnapshot = {
@@ -196,6 +201,23 @@ const CAPTION_NORMAL_MEMBER =
 const CAPTION_TEAM_ADMIN_MAX_CREATE_DECKS =
   "Owner only — how many decks this team admin may create in this Education Gold / Enterprise workspace (Teacher tools and Team Dashboard). Leave blank to use the workspace plan limit. Cannot exceed the workspace plan maximum.";
 
+function resolveTeamAdminCreateLimit(
+  member: MemberRow | undefined,
+  workspace: Pick<TeamAssignWorkspaceSnapshot, "planSlug" | "decks">,
+): { allowed: number | null; created: number } {
+  if (member?.role !== "team_admin" || !isEducationTeamPlanId(workspace.planSlug)) {
+    return { allowed: null, created: 0 };
+  }
+  const planMax = limitsForEducationTeamPlan(workspace.planSlug).maxDecksPerWorkspace;
+  const override = member.maxCreateDecks;
+  const allowed =
+    override != null && Number.isFinite(override) && override > 0
+      ? Math.min(override, planMax)
+      : planMax;
+  const created = workspace.decks.filter((d) => d.createdByUserId === member.userId).length;
+  return { allowed, created };
+}
+
 const CAPTION_DECK =
   "Only decks linked to this workspace appear here — create on your Personal Dashboard, then link deck to this workspace below, or create a deck directly scoped to this workspace. Decks the selected co-admin already created for this workspace are omitted; they already appear on that admin’s Team Dashboard.";
 
@@ -295,10 +317,17 @@ export function TeamDeckAssignList({
     workspace && clerkUserId && workspace.ownerUserId === clerkUserId,
   );
 
-  function isAssignmentRowWorkspaceOwner(row: AssignmentTableDisplayRow) {
+  function canViewerRemoveMemberAssignment(row: AssignmentTableDisplayRow) {
+    if (row.accessSource === "creator") return false;
     if (!clerkUserId) return false;
     const w = workspaces.find((x) => x.id === row.teamId);
-    return w?.ownerUserId === clerkUserId;
+    if (!w) return false;
+    return canManageMemberAsOwnerOrInviter({
+      viewerUserId: clerkUserId,
+      ownerUserId: w.ownerUserId,
+      memberUserId: row.memberUserId,
+      addedByUserId: row.memberAddedByUserId,
+    });
   }
 
   /** When true, the next `workspaceId` change must not clear member/deck (e.g. loading a row from the table). */
@@ -337,6 +366,17 @@ export function TeamDeckAssignList({
     workspace != null &&
     isEducationTeamPlanId(workspace.planSlug) &&
     selectedMember?.role === "team_admin";
+
+  const canUnassignSelectedMember =
+    selectedMember != null &&
+    clerkUserId != null &&
+    workspace != null &&
+    canManageMemberAsOwnerOrInviter({
+      viewerUserId: clerkUserId,
+      ownerUserId: workspace.ownerUserId,
+      memberUserId: selectedMember.userId,
+      addedByUserId: selectedMember.addedByUserId,
+    });
 
   React.useEffect(() => {
     if (!showOwnerTeamAdminCreateLimit || selectedMember == null) {
@@ -416,6 +456,7 @@ export function TeamDeckAssignList({
         }
         const deck = w.decks.find((d) => d.id === a.deckId);
         const memberRecord = w.allMembers.find((m) => m.userId === a.memberUserId);
+        const createLimit = resolveTeamAdminCreateLimit(memberRecord, w);
         const byId = a.assignedByUserId;
         const signedByLabel = assignmentAuditSignedByLabel(
           byId,
@@ -444,6 +485,9 @@ export function TeamDeckAssignList({
           studyPrivilege: a.studyPrivilege ?? defaultTeamMemberStudyPrivilege(),
           memberRole: memberRecord?.role ?? null,
           accessSource: "assignment",
+          createLimitAllowed: createLimit.allowed,
+          createLimitCreated: createLimit.created,
+          memberAddedByUserId: memberRecord?.addedByUserId ?? null,
         });
       }
 
@@ -471,6 +515,7 @@ export function TeamDeckAssignList({
             creatorId,
             userFieldDisplayById[creatorId],
           );
+          const createLimit = resolveTeamAdminCreateLimit(memberRecord, w);
           out.push({
             key: `creator:${key}`,
             teamId: w.id,
@@ -485,6 +530,9 @@ export function TeamDeckAssignList({
             studyPrivilege: defaultTeamMemberStudyPrivilege(),
             memberRole: memberRecord.role,
             accessSource: "creator",
+            createLimitAllowed: createLimit.allowed,
+            createLimitCreated: createLimit.created,
+            memberAddedByUserId: memberRecord.addedByUserId ?? null,
           });
         }
       }
@@ -523,6 +571,22 @@ export function TeamDeckAssignList({
               </div>
             );
           },
+        },
+        {
+          id: "createLimit",
+          header: "Decks allowed",
+          className: "min-w-[7rem]",
+          cell: (row: AssignmentTableDisplayRow) =>
+            row.createLimitAllowed == null ? (
+              <span className="text-sm text-muted-foreground">—</span>
+            ) : (
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-sm text-foreground">{row.createLimitAllowed}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {row.createLimitCreated} created
+                </span>
+              </span>
+            ),
         },
         {
           id: "deck",
@@ -577,7 +641,8 @@ export function TeamDeckAssignList({
               ) : null}
             </span>
           ),
-        },      ] as const,
+        },
+      ] as const,
     [userFieldDisplayById, viewerIsSubscriberOwner],
   );
 
@@ -592,6 +657,7 @@ export function TeamDeckAssignList({
       row.memberLabel,
       row.deckName,
       row.workspaceName,
+      row.createLimitAllowed != null ? String(row.createLimitAllowed) : "",
       display?.primaryEmail,
       display?.secondaryLine,
       row.memberUserId,
@@ -718,7 +784,7 @@ export function TeamDeckAssignList({
   }
 
   async function onUnassign() {
-    if (!canSubmit || !assigned || !viewerOwnsSelectedWorkspace) return;
+    if (!canSubmit || !assigned || !canUnassignSelectedMember) return;
     setError(null);
     setBusy("unassign");
     try {
@@ -783,7 +849,7 @@ export function TeamDeckAssignList({
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           Access management
         </p>
-        {isAssignmentRowWorkspaceOwner(row) ? (
+        {canViewerRemoveMemberAssignment(row) ? (
           <Button
             type="button"
             variant="destructive"
@@ -799,7 +865,8 @@ export function TeamDeckAssignList({
           </Button>
         ) : (
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Only the workspace subscriber (owner) can remove this member&apos;s access to this deck.
+            Only the workspace owner, or the team admin who invited this member, can remove
+            this deck assignment.
           </p>
         )}
       </div>
@@ -810,7 +877,7 @@ export function TeamDeckAssignList({
     const target = removeAccessRow;
     if (
       !target ||
-      !isAssignmentRowWorkspaceOwner(target) ||
+      !canViewerRemoveMemberAssignment(target) ||
       target.accessSource === "creator"
     ) {
       return;
@@ -1259,17 +1326,17 @@ export function TeamDeckAssignList({
                   variant="outline"
                   className="h-10 w-full"
                   disabled={
-                    !canSubmit || !assigned || busy !== null || !viewerOwnsSelectedWorkspace
+                    !canSubmit || !assigned || busy !== null || !canUnassignSelectedMember
                   }
                   onClick={onUnassign}
                 >
                   {busy === "unassign" ? "Removing…" : "Remove assignment"}
                 </Button>
               </div>
-              {!viewerOwnsSelectedWorkspace ? (
+              {!canUnassignSelectedMember && assigned ? (
                 <p className="text-xs text-muted-foreground">
-                  Only the workspace subscriber (owner) can remove a member&apos;s deck access. Assign
-                  and link actions stay available for team admins.
+                  Only the workspace owner, or the team admin who invited this member (Added by),
+                  can remove this deck assignment. You can still update study modes.
                 </p>
               ) : null}
             </>
@@ -1284,8 +1351,8 @@ export function TeamDeckAssignList({
           <h3 className="text-sm font-semibold text-foreground">Assignments by member</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">
             {viewerIsSubscriberOwner
-              ? "All members and deck assignments across your workspaces, including decks co-admins created for Education Gold / Enterprise workspaces. Click a row to load it into the form above. Only you can remove formal assignments."
-              : "Members and deck assignments for this workspace only, including decks you or other co-admins created. Click a row to load it into the form above. Only the workspace owner can remove formal assignments."}
+              ? "All members and deck assignments across your workspaces, including decks co-admins created for Education Gold / Enterprise workspaces. Click a row to load it into the form above. You can remove any formal assignment. Team admins can update assignments and can remove a member only if they invited that member."
+              : "Members and deck assignments for this workspace only, including decks you or other co-admins created. Click a row to load it into the form above. You can update assignments. You can remove a member’s deck access only if you invited that member (Added by)."}
           </p>
         </div>
 

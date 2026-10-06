@@ -188,6 +188,9 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="assign-deck-to-member">
               Open assign deck to member in a workspace guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="assign-deck-to-team-admin">
+              Open assign deck to team admin in a workspace guide
+            </DocsUiGuideStartButton>
             <DocsUiGuideStartButton guideId="change-study-mode-privileges">
               Open change study mode privileges guide
             </DocsUiGuideStartButton>
@@ -377,6 +380,10 @@ function articleSectionGuides(
       {
         id: "assign-deck-to-member",
         label: "Open assign deck to member in a workspace guide",
+      },
+      {
+        id: "assign-deck-to-team-admin",
+        label: "Open assign deck to team admin in a workspace guide",
       },
     ];
   }

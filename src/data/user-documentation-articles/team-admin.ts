@@ -120,7 +120,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Promote member to Team admin or demote co-admin to Member.",
           "Remove member — they lose workspace access immediately.",
           "Cannot change your own role or remove yourself from the table.",
-          "Co-admins cannot demote other team admins (owner only).",
+          "Team admins can change role and remove a member only when Added by (inviter) is that team admin. The workspace owner can manage every member.",
           "Removing a member does not auto-clean deck assignments — review separately.",
         ],
       },
@@ -145,11 +145,11 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "assign",
         title: "Step 2 — Assign to members",
         bullets: [
-          "Assign to members and team admins (not the owner row). Open assign deck to member in a workspace guide to follow choosing the member, linked deck, and study modes, then Assign deck and the member’s Team Dashboard.",
+          "Assign to members and team admins (not the owner row). Open assign deck to member in a workspace guide to follow choosing the member, linked deck, and study modes, then Assign deck and the member’s Team Dashboard. Open assign deck to team admin in a workspace guide to follow choosing a co-admin, setting Decks this team admin may create, Assign deck, the Members roster, and Assignments by member.",
           "Records who assigned and when.",
           "Set study privilege on assign: Standard Review, AI Recall™, Quiz, or combinations (default: all three).",
           "Unassign removes member access to that deck in the workspace.",
-          "Assignments by member table — workspace owner sees all members and workspaces; team admins see only the current workspace’s members (no Workspace column).",
+          "Assignments by member table — workspace owner sees all members and workspaces; team admins see only the current workspace’s members (no Workspace column). Decks allowed shows how many decks an Education Gold / Enterprise team admin may create in that workspace (owner-set cap, or the plan default) and how many they have already created. Regular members show an em dash. Team admins can update assignments. They can remove a member’s deck access only if they invited that member (Added by).",
         ],
       },
       {

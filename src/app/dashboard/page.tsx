@@ -439,6 +439,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               detailedDeleteWarning || isEducationTeamAdminViewer
             }
             createQuota={createQuotaDisplay}
+            groupOwnerAssignedFromCreated={isEducationTeamAdminViewer}
           />
         )}
       </div>

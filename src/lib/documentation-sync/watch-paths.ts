@@ -28,6 +28,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   ],
   "team-workspace-dashboard": [
     "src/app/dashboard/workspace/page.tsx",
+    "src/app/dashboard/page.tsx",
+    "src/app/dashboard/deck-grid.tsx",
     "src/lib/flipvise-ui-guides.ts",
   ],
   "manage-workspaces": [
@@ -67,6 +69,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/dashboard-addons-banner.tsx",
     "src/components/live-classroom-dashboard-entry.tsx",
     "src/app/dashboard/page.tsx",
+    "src/app/dashboard/deck-grid.tsx",
     "src/components/docs-ui-guide-provider.tsx",
     "src/lib/flipvise-ui-guides.ts",
   ],
@@ -304,10 +307,12 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
   members: [
     "src/components/team-admin-invitation-tables.tsx",
     "src/components/team-member-table.tsx",
+    "src/lib/team-member-inviter-access.ts",
     "src/actions/teams.ts",
   ],
   "deck-manager": [
     "src/components/team-deck-assign-list.tsx",
+    "src/lib/team-member-inviter-access.ts",
     "src/components/team-deck-manager-sub-tabs.tsx",
     "src/app/dashboard/(team-admin)/team-admin/deck-manager/study-privileges/page.tsx",
     "src/lib/flipvise-ui-guides.ts",

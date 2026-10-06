@@ -128,7 +128,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
             ],
             [
               "Team admin (invited)",
-              "Team Dashboard — created decks (education) and/or assigned decks",
+              "Team Dashboard — owner-assigned decks above a divider from decks you created (education)",
               "Edit decks they created (education); assign via Team Admin; study assigned decks",
             ],
             ["Team member (invited)", "Assigned decks only on Team Dashboard", "Study only — no deck editor"],
@@ -142,6 +142,14 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "The same premium add-ons running banner appears above the workspace heading.",
           "Hover a deck tile to preview its cover image when one is set. Click a deck once to open the compact menu (Study and Preview cards). Open deck, Edit deck, and Delete deck appear only for decks you created. Deck card counts exclude the optional cover image — covers are not flashcards.",
           "Unlocked members can open the AI Essay workspace from the AI Essay chip.",
+        ],
+      },
+      {
+        id: "education-admin-deck-groups",
+        title: "Owner-assigned vs created decks",
+        bullets: [
+          "Education Gold and Education Enterprise team admins see two groups on Team Dashboard, separated by a divider line: Assigned by workspace owner (study and preview) and Created by you (edit).",
+          "The Created used / max count next to Showing counts decks you created toward the owner-set create allowance. Assigned decks do not count against that allowance.",
         ],
       },
       {

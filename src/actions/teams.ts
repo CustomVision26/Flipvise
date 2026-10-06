@@ -31,6 +31,10 @@ import {
   memberRoleQualifiesForStudyPrivileges,
 } from "@/lib/team-study-privilege";
 import {
+  TEAM_ADMIN_INVITER_ONLY_MESSAGE,
+  canManageMemberAsOwnerOrInviter,
+} from "@/lib/team-member-inviter-access";
+import {
   countTeamsForOwner,
   deleteInvitation,
   deleteTeamMember,
@@ -297,6 +301,29 @@ async function assertCanManageTeam(userId: string, teamId: number) {
     return team;
   }
   throw new Error("Forbidden");
+}
+
+function assertOwnerOrInvitingAdmin(
+  team: { ownerUserId: string },
+  actorUserId: string,
+  member: { userId: string; addedByUserId: string | null },
+) {
+  if (member.userId === actorUserId) {
+    throw new Error("You cannot change your own membership this way.");
+  }
+  if (member.userId === team.ownerUserId) {
+    throw new Error("Cannot change the owner.");
+  }
+  if (
+    !canManageMemberAsOwnerOrInviter({
+      viewerUserId: actorUserId,
+      ownerUserId: team.ownerUserId,
+      memberUserId: member.userId,
+      addedByUserId: member.addedByUserId,
+    })
+  ) {
+    throw new Error(TEAM_ADMIN_INVITER_ONLY_MESSAGE);
+  }
 }
 
 async function assertTeamOwner(userId: string, teamId: number) {
@@ -1076,7 +1103,10 @@ export async function unassignDeckFromMemberAction(data: z.infer<typeof unassign
   const parsed = unassignDeckSchema.safeParse(data);
   if (!parsed.success) throw new Error("Invalid input");
 
-  await assertTeamOwner(userId, parsed.data.teamId);
+  const team = await assertCanManageTeam(userId, parsed.data.teamId);
+  const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
+  if (!member) throw new Error("Member not found.");
+  assertOwnerOrInvitingAdmin(team, userId, member);
 
   await deleteDeckAssignment(
     parsed.data.teamId,
@@ -1171,7 +1201,9 @@ export async function updateTeamMemberRoleAction(data: z.infer<typeof roleSchema
   if (!parsed.success) throw new Error("Invalid input");
 
   const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  if (parsed.data.memberUserId === team.ownerUserId) throw new Error("Cannot change owner role.");
+  const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
+  if (!member) throw new Error("Member not found.");
+  assertOwnerOrInvitingAdmin(team, userId, member);
 
   await updateTeamMemberRole(parsed.data.teamId, parsed.data.memberUserId, parsed.data.role);
 
@@ -1245,10 +1277,9 @@ export async function removeTeamMemberAction(data: z.infer<typeof removeMemberSc
   if (!parsed.success) throw new Error("Invalid input");
 
   const team = await assertCanManageTeam(userId, parsed.data.teamId);
-  if (parsed.data.memberUserId === team.ownerUserId) throw new Error("Cannot remove the owner.");
-
   const member = await getMemberRecord(parsed.data.teamId, parsed.data.memberUserId);
   if (!member) throw new Error("Member not found.");
+  assertOwnerOrInvitingAdmin(team, userId, member);
 
   await deleteTeamMember(parsed.data.teamId, parsed.data.memberUserId);
 

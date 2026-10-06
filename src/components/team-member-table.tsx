@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import type { TeamMemberRow } from "@/db/schema";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
+import { canManageMemberAsOwnerOrInviter } from "@/lib/team-member-inviter-access";
 
 type MemberRow = TeamMemberRow;
 
@@ -331,6 +332,17 @@ export function TeamMemberTable({
               <TableCell className="text-end text-muted-foreground text-xs">—</TableCell>
             </TableRow>
             {members.map((m) => {
+              const canManageThisMember = canManageMemberAsOwnerOrInviter({
+                viewerUserId: currentUserId,
+                ownerUserId,
+                memberUserId: m.userId,
+                addedByUserId: m.addedByUserId,
+              });
+              const manageHint = canManageThisMember
+                ? undefined
+                : isOwner
+                  ? undefined
+                  : "You can only update or remove members you invited.";
               return (
                 <TableRow
                   key={m.id}
@@ -370,13 +382,9 @@ export function TeamMemberTable({
                       onValueChange={(v) =>
                         onRoleChange(m.userId, v as "team_admin" | "team_member")
                       }
-                      disabled={
-                        busy === m.userId ||
-                        m.userId === currentUserId ||
-                        (!isOwner && m.role === "team_admin")
-                      }
+                      disabled={busy === m.userId || !canManageThisMember}
                     >
-                      <SelectTrigger className="w-[160px]">
+                      <SelectTrigger className="w-[160px]" title={manageHint}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -390,11 +398,8 @@ export function TeamMemberTable({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={
-                        busy === m.userId ||
-                        m.userId === currentUserId ||
-                        m.userId === ownerUserId
-                      }
+                      disabled={busy === m.userId || !canManageThisMember}
+                      title={manageHint}
                       onClick={() => {
                         setError(null);
                         removeTargetUserIdRef.current = m.userId;

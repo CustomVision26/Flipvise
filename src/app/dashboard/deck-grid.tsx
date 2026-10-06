@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { Hash } from "lucide-react";
 import { setViewModeAction } from "@/actions/view-mode";
 import {
@@ -19,12 +19,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Separator } from "@/components/ui/separator";
 import { DeckCardPopover } from "@/components/deck-card-popover";
 import {
   ViewModeDropdown,
   type ViewMode,
   type SortOption as DropdownSortOption,
 } from "@/components/view-mode-dropdown";
+import { cn } from "@/lib/utils";
 
 type DeckData = {
   id: number;
@@ -73,6 +75,51 @@ function resolveDeckPopoverVariant(
   if (deck.canEditContent === true) return "full";
   if (deck.canEditContent === false) return "team-preview";
   return defaultVariant;
+}
+
+function isTeamAdminCreatedDeck(deck: DeckData): boolean {
+  return deck.canEditContent === true;
+}
+
+function TeamAdminDeckGroupDivider({
+  label,
+  compact,
+}: {
+  label: string;
+  compact: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-2 py-2",
+        compact && "col-span-full",
+      )}
+    >
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <Separator />
+    </div>
+  );
+}
+
+function TeamAdminDeckGroupEmpty({
+  message,
+  compact,
+}: {
+  message: string;
+  compact: boolean;
+}) {
+  return (
+    <p
+      className={cn(
+        "text-muted-foreground px-1 pb-2 text-xs",
+        compact && "col-span-full",
+      )}
+    >
+      {message}
+    </p>
+  );
 }
 
 function sortDecks(decks: DeckData[], sort: SortOption): DeckData[] {
@@ -134,6 +181,11 @@ interface DeckGridProps {
    * (or plan) create allowance. Shown beside the “Showing …” range on Team Dash.
    */
   createQuota?: { used: number; max: number } | null;
+  /**
+   * Education team admin Team Dashboard — split owner-assigned decks from decks
+   * this admin created, with a labeled divider between the groups.
+   */
+  groupOwnerAssignedFromCreated?: boolean;
 }
 
 export function DeckGrid({
@@ -146,6 +198,7 @@ export function DeckGrid({
   hasAiReading = false,
   detailedDeleteWarning = false,
   createQuota = null,
+  groupOwnerAssignedFromCreated = false,
 }: DeckGridProps) {
   const [sort, setSort] = useState<SortOption>("newest");
   const [pageSize, setPageSize] = useState<PageSize>(9);
@@ -160,7 +213,36 @@ export function DeckGrid({
     });
   }
 
-  const sorted = useMemo(() => sortDecks(decks, sort), [decks, sort]);
+  const assignedSorted = useMemo(
+    () =>
+      groupOwnerAssignedFromCreated
+        ? sortDecks(
+            decks.filter((deck) => !isTeamAdminCreatedDeck(deck)),
+            sort,
+          )
+        : [],
+    [decks, groupOwnerAssignedFromCreated, sort],
+  );
+  const createdSorted = useMemo(
+    () =>
+      groupOwnerAssignedFromCreated
+        ? sortDecks(decks.filter(isTeamAdminCreatedDeck), sort)
+        : [],
+    [decks, groupOwnerAssignedFromCreated, sort],
+  );
+  const sorted = useMemo(
+    () =>
+      groupOwnerAssignedFromCreated
+        ? [...assignedSorted, ...createdSorted]
+        : sortDecks(decks, sort),
+    [
+      assignedSorted,
+      createdSorted,
+      decks,
+      groupOwnerAssignedFromCreated,
+      sort,
+    ],
+  );
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -243,20 +325,77 @@ export function DeckGrid({
               : "flex flex-col gap-3"
         }
       >
-        {paginated.map((deck) => (
-          <DeckCardPopover
-            key={deck.id}
-            deck={deck}
-            view={view}
-            workspaceQueryString={workspaceQueryString}
-            variant={resolveDeckPopoverVariant(deck, deckPopoverVariant)}
-            canEditContent={deck.canEditContent}
-            allowCoverUpload={allowCoverUpload}
-            teamTierPreviewPromo={teamTierPreviewPromo}
-            hasAiReading={hasAiReading}
-            detailedDeleteWarning={detailedDeleteWarning}
-          />
-        ))}
+        {groupOwnerAssignedFromCreated &&
+        assignedSorted.length === 0 &&
+        safePage === 1 ? (
+          <>
+            <TeamAdminDeckGroupDivider
+              label="Assigned by workspace owner"
+              compact={view === "compact"}
+            />
+            <TeamAdminDeckGroupEmpty
+              message="None assigned yet."
+              compact={view === "compact"}
+            />
+          </>
+        ) : null}
+        {paginated.map((deck, index) => {
+          const created = isTeamAdminCreatedDeck(deck);
+          const previous = index === 0 ? null : paginated[index - 1];
+          const previousCreated =
+            previous != null ? isTeamAdminCreatedDeck(previous) : false;
+          const showAssignedHeader =
+            groupOwnerAssignedFromCreated &&
+            !created &&
+            (index === 0 || previousCreated);
+          const showCreatedHeader =
+            groupOwnerAssignedFromCreated &&
+            created &&
+            (index === 0 || !previousCreated);
+          const compact = view === "compact";
+
+          return (
+            <Fragment key={deck.id}>
+              {showAssignedHeader ? (
+                <TeamAdminDeckGroupDivider
+                  label="Assigned by workspace owner"
+                  compact={compact}
+                />
+              ) : null}
+              {showCreatedHeader ? (
+                <TeamAdminDeckGroupDivider
+                  label="Created by you"
+                  compact={compact}
+                />
+              ) : null}
+              <DeckCardPopover
+                deck={deck}
+                view={view}
+                workspaceQueryString={workspaceQueryString}
+                variant={resolveDeckPopoverVariant(deck, deckPopoverVariant)}
+                canEditContent={deck.canEditContent}
+                allowCoverUpload={allowCoverUpload}
+                teamTierPreviewPromo={teamTierPreviewPromo}
+                hasAiReading={hasAiReading}
+                detailedDeleteWarning={detailedDeleteWarning}
+              />
+            </Fragment>
+          );
+        })}
+        {groupOwnerAssignedFromCreated &&
+        createdSorted.length === 0 &&
+        safePage === totalPages ? (
+          <>
+            <TeamAdminDeckGroupDivider
+              label="Created by you"
+              compact={view === "compact"}
+            />
+            <TeamAdminDeckGroupEmpty
+              message="None yet — create decks from Teacher tools."
+              compact={view === "compact"}
+            />
+          </>
+        ) : null}
       </div>
 
       {/* Pagination */}

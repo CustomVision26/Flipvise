@@ -13,6 +13,7 @@ export type DocsUiGuideId =
   | "invite-unregistered-member"
   | "link-deck-to-workspace"
   | "assign-deck-to-member"
+  | "assign-deck-to-team-admin"
   | "change-study-mode-privileges"
   | "workspace-study-mode-settings"
   | "ai-recall-session-cards"
@@ -79,6 +80,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
       "invite-unregistered-member",
       "link-deck-to-workspace",
       "assign-deck-to-member",
+      "assign-deck-to-team-admin",
       "change-study-mode-privileges",
       "workspace-study-mode-settings",
       "ai-recall-session-cards",
@@ -853,7 +855,7 @@ export const ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
     src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 04.png`),
     title: "Assignment recorded",
     caption:
-      "Assignments by member lists the member, deck, workspace, who signed, and when. Update assignment changes study modes. Remove assignment takes the deck off that member’s Team Dashboard — it stays linked to the workspace.",
+      "Assignments by member lists the member, decks allowed for Education Gold / Enterprise team admins, deck, workspace, who signed, and when. Update assignment changes study modes. Remove assignment takes the deck off that member’s Team Dashboard — it stays linked to the workspace. Team admins can remove an assignment only when they invited that member (Added by); the workspace owner can remove any assignment.",
   },
   {
     src: uiSrc(`${ASSIGN_DECK_TO_MEMBER_FILE} - 05.png`),
@@ -890,6 +892,30 @@ export const ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
     title: "Study modes in the session",
     caption:
       "The study page shows the deck and the modes granted on the assignment — Standard Review, AI Recall™, and Quiz when all were selected. The member studies from their own account.",
+  },
+];
+
+const ASSIGN_DECK_TO_TEAM_ADMIN_FILE =
+  "16 Flipvise - Team Tier Plan - Assign Deck to Team Admin in a Workspace";
+
+export const ASSIGN_DECK_TO_TEAM_ADMIN_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_TEAM_ADMIN_FILE} - 01.png`),
+    title: "Assign a deck and set the create limit",
+    caption:
+      "On Team Admin → Assign decks, choose the workspace (for example UC-K26). Select Member or co-admin (for example Teddy Watt). For Education Gold / Enterprise, Decks this team admin may create appears — enter a cap (for example 5) and Save create limit. Choose a linked deck (for example Social Studies: British History) and Study modes (for example AI Recall™ and Quiz), then Assign deck.",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_TEAM_ADMIN_FILE} - 02.png`),
+    title: "Confirm the team admin on the roster",
+    caption:
+      "Team Admin home → Members roster lists the co-admin (for example Teddy Watt) with Role team_admin and Added by (inviter). Workspace overview Decks shows used versus allowed on the plan (for example 2 / 15 on Education Gold).",
+  },
+  {
+    src: uiSrc(`${ASSIGN_DECK_TO_TEAM_ADMIN_FILE} - 03.png`),
+    title: "Assignment recorded for the team admin",
+    caption:
+      "Assignments by member lists the team admin row — member, deck (for example Social Studies: British History), workspace (for example UC-K26), who signed, and when. Click a row to load it into the form above.",
   },
 ];
 
@@ -1366,6 +1392,12 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Assign decks, choose a member and a linked deck, then confirm the assignment on Team Dashboard.",
     steps: ASSIGN_DECK_TO_MEMBER_GUIDE_STEPS,
+  },
+  "assign-deck-to-team-admin": {
+    title: "Assign deck to team admin in a workspace",
+    summary:
+      "On Assign decks, choose a co-admin, set how many decks they may create, assign a linked deck, then confirm the roster and Assignments by member.",
+    steps: ASSIGN_DECK_TO_TEAM_ADMIN_GUIDE_STEPS,
   },
   "change-study-mode-privileges": {
     title: "Change study mode privileges for a workspace member",
