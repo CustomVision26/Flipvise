@@ -275,7 +275,9 @@ export function EducationOwnerWorkspaceDecks({
                 id="education-owner-workspace"
                 className="w-full sm:w-56"
               >
-                <SelectValue placeholder="Select a workspace" />
+                <SelectValue placeholder="Select a workspace">
+                  {selected.name}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {workspaces.map((workspace) => (

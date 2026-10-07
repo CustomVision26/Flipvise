@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-07T01:41:06.849Z",
+  "updatedAt": "2026-10-07T01:55:28.504Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "f53fbd76963bab98a74e8b5c5ee91455008277149803f3a9e6df4b06f4348f39",
@@ -11,8 +11,8 @@
       "docFingerprint": "c0fdc8f299d9e9ad70db52d5e9a7f751f7d2eb2a65bf5cbb96cc928a5a893b55"
     },
     "personal-dashboard": {
-      "watchFingerprint": "d4a2222b9ef3d4b84b454a782cd07540a0d2cc732b4368f89a9d85df8b9d29e8",
-      "docFingerprint": "b2ace6720649b55ce74f9063b63a9e760eb750c4179ff77bfcb7c6fa70537a84"
+      "watchFingerprint": "1d23c7c44158cde08796edd8d95022a23c81d396d37cda94e8fe6b8920a0db41",
+      "docFingerprint": "3112b7bf5310722346f075b82b2c31b08c436293c6d34dc2db91273a9af98a37"
     },
     "team-workspace-dashboard": {
       "watchFingerprint": "fc2365a5d9c77fa29c8723258068d36a37cb094b91ac36521d5f370d8a9db3be",
