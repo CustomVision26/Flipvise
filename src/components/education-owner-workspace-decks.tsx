@@ -267,7 +267,9 @@ export function EducationOwnerWorkspaceDecks({
             <Label htmlFor="education-owner-workspace">Workspace</Label>
             <Select
               value={String(selected.id)}
-              onValueChange={setWorkspaceId}
+              onValueChange={(value) => {
+                if (value) setWorkspaceId(value);
+              }}
             >
               <SelectTrigger
                 id="education-owner-workspace"

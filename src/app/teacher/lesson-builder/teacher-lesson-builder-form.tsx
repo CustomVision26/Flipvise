@@ -530,7 +530,7 @@ export function TeacherLessonBuilderForm({
     setReferenceMaterials([]);
     const loaded = await getDeckLessonPlanReferencesAction({
       deckId: nextDeckId,
-      teamId: teacherWorkspace?.teamId,
+      teamId: teacherWorkspace?.teamId ?? undefined,
     });
     if (requestId !== deckDefaultsRequestIdRef.current) return;
     if (!loaded.ok) return;
