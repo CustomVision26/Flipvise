@@ -20,6 +20,10 @@ import {
   getCardsByDeckUnscoped,
 } from "@/db/queries/cards";
 import { linkDeckToTeamWorkspace } from "@/db/queries/teams";
+import {
+  canEditDeckContent,
+  getDeckWithViewerAccess,
+} from "@/lib/team-deck-access";
 import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
 import {
   isLessonPlanDayScopeAll,
@@ -748,6 +752,44 @@ export async function saveTeacherQuizDeckAction(
     throw new Error(
       `Up to ${saveTarget.maxCardsPerDeck} cards per deck on your ${saveTarget.planLabel} plan.`,
     );
+  }
+
+  if (input.existingDeckId != null) {
+    const bundle = await getDeckWithViewerAccess(input.existingDeckId, userId);
+    if (!bundle || !canEditDeckContent(bundle.access)) {
+      throw new Error("You can only add cards to a deck you may edit.");
+    }
+
+    const existingCards = await getCardsByDeckUnscoped(bundle.deck.id);
+    if (existingCards.length + cards.length > saveTarget.maxCardsPerDeck) {
+      throw new Error(
+        `This deck already has ${existingCards.length} card(s). Adding ${cards.length} would exceed the ${saveTarget.maxCardsPerDeck}-card limit on your ${saveTarget.planLabel} plan.`,
+      );
+    }
+
+    for (const card of cards) {
+      const front = card.front.trim();
+      const back = card.back.trim();
+      const distractors = card.distractors.map((item) => item.trim()) as [
+        string,
+        string,
+        string,
+      ];
+      const choices = [back, ...distractors];
+      await createMultipleChoiceCard(bundle.deck.id, front, null, choices, 0, true);
+    }
+
+    revalidatePath("/teacher/quizzes");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/team-admin", "layout");
+    revalidatePath(`/decks/${bundle.deck.id}`);
+
+    return {
+      deckId: bundle.deck.id,
+      deckName: bundle.deck.name,
+      cardCount: cards.length,
+      created: false,
+    };
   }
 
   const resolved = await resolveLessonPlanQuizDeckSaveTarget({

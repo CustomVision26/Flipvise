@@ -241,9 +241,14 @@ function DocPagePanel({
           </DocsUiGuideStartButton>
         ) : null}
         {page.id === "teacher-ai-content-tools" ? (
-          <DocsUiGuideStartButton guideId="edu-teacher-lesson-plan-owner">
-            Open AI Lesson Builder for the plan owner guide
-          </DocsUiGuideStartButton>
+          <>
+            <DocsUiGuideStartButton guideId="edu-teacher-lesson-plan-owner">
+              Open AI Lesson Builder for the plan owner guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-lesson-plan-owner-new-deck">
+              Open AI Lesson Builder for a new deck guide
+            </DocsUiGuideStartButton>
+          </>
         ) : null}
       </div>
 
@@ -518,6 +523,10 @@ function articleSectionGuides(
       {
         id: "edu-teacher-lesson-plan-owner",
         label: "Open AI Lesson Builder for the plan owner guide",
+      },
+      {
+        id: "edu-teacher-lesson-plan-owner-new-deck",
+        label: "Open AI Lesson Builder for a new deck guide",
       },
     ];
   }

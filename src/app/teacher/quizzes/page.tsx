@@ -30,7 +30,7 @@ export default async function TeacherQuizzesPage({
   const [savedLessonPlans, ownerPicker, deckContext] = await Promise.all([
     getSavedLessonPlansForQuizPicker(userId, workspace.teamId),
     loadOwnerQuizLessonPlanPicker(userId, workspace.teamId),
-    loadTeacherDeckContext(userId),
+    loadTeacherDeckContext(userId, workspace.teamId),
   ]);
 
   return (
@@ -39,6 +39,7 @@ export default async function TeacherQuizzesPage({
       ownerPicker={ownerPicker}
       decks={deckContext.decks}
       deckQuota={deckContext.quota}
+      viewerUserId={userId}
       initialLessonPlanId={
         Number.isFinite(initialLessonPlanId) ? initialLessonPlanId : undefined
       }

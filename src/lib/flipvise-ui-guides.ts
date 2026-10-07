@@ -23,7 +23,8 @@ export type DocsUiGuideId =
   | "quiz-exam-mode-workspace"
   | "quiz-results-workspace"
   | "edu-teacher-dashboard"
-  | "edu-teacher-lesson-plan-owner";
+  | "edu-teacher-lesson-plan-owner"
+  | "edu-teacher-lesson-plan-owner-new-deck";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -98,7 +99,11 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
         title: "Education Teacher",
         description:
           "Teacher Dashboard walkthroughs for Education Gold and Education Enterprise team plans.",
-        guideIds: ["edu-teacher-dashboard", "edu-teacher-lesson-plan-owner"],
+        guideIds: [
+          "edu-teacher-dashboard",
+          "edu-teacher-lesson-plan-owner",
+          "edu-teacher-lesson-plan-owner-new-deck",
+        ],
       },
     ],
   },
@@ -1404,7 +1409,80 @@ export const EDU_TEACHER_LESSON_PLAN_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep
       src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 11.png`),
       title: "Preview after another generate",
       caption:
-        "Generating again replaces the preview. This pass is a 5-day unit, 45 minutes per class, still titled Understanding Air Pollution, with updated objectives and vocabulary (for example Fossil Fuel). Day 1’s weekday stays --none-- until you choose the teaching day. Edit, Regenerate, Save Lesson Plan, Download PDF, and Download vocabulary PDF stay on the preview.",
+        "Generating again replaces the preview. This pass is a 5-day unit, 45 minutes per class, still titled Understanding Air Pollution, with updated objectives and vocabulary (for example Fossil Fuel). Day 1’s weekday stays --none-- until you choose the teaching day. Edit, Regenerate, Save Lesson Plan, Download PDF, and Download vocabulary PDF stay on the preview. Save Lesson Plan stores the plan in Teacher Resource Library and creates a new deck on the owner’s Personal Dashboard under Owner lesson plans. That deck is not copied onto the team admin’s Team Dashboard.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 12.png`),
+      title: "Owner lesson-plan deck on Personal Dashboard",
+      caption:
+        "Open the plan owner’s Personal Dashboard after saving. Personal still lists the owner’s own decks that have no lesson plan (for example Social Studies: British History and Math: Alegbra 1). Under Workspaces, the Workspace menu shows the workspace name (UC-K26). Created by team admin lists decks that team admin made in the workspace (Teddy Watt’s Science : Environmental Science — Air pollution quiz deck, Lesson plan Day 1). Owner lesson plans lists the deck created for the owner from that team-admin deck and its lesson (the Teacher lesson plan deck). The owner deck stays on this dashboard.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 13.png`),
+      title: "Saved lesson plans in Teacher Resource Library",
+      caption:
+        "On Teacher Dashboard for UC-K26, open Teacher Resource Library and Saved Lesson Plans. Plans are grouped by who saved them, then by subject. The owner’s plan (John Brown, Understanding Air Pollution, Science : Environmental Science, grade 7, Intermediate, from the owner lesson-plan deck) is under the owner. The team admin’s plan (Teddy Watt, Air Pollution and its Effects, from Science : Environmental Science — Air pollution LP Day 1) is under the team admin. Each row offers PDF, Edit, Create Quiz, Rename, and Delete.",
+    },
+  ];
+
+const EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE =
+  "27 Flipvise - Team Tier Edu Plan - Teacher DB AI-Lesson Plan owner new deck";
+
+export const EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 01.png`),
+      title: "Choose New deck",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), open AI Lesson Builder and set Save to deck to New deck. A new deck is created when you save, using Subject — Topic as the deck name. Each field has a help icon. Learning Standard (for example NGSS, Common Core, or Jamaica NSC) steers the curriculum framework. Special need or Accommodations and reference material (Website URL, Plain text, PDF, Word, PowerPoint, Handwritten) give the AI more context. Choose Generate when the form is ready.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 02.png`),
+      title: "Preview the generated plan",
+      caption:
+        "The generated plan appears under Generate (for example Understanding Air Pollution, a 3-day unit, 45 minutes per class). Preview is the current view. Edit changes the plan before you save. Regenerate builds a new version from the same inputs without re-entering them. Save Lesson Plan stores it in Teacher Resource Library. Download PDF saves a summary. Download vocabulary PDF saves the plan with expanded vocabulary.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 03.png`),
+      title: "Objectives, materials, and vocabulary",
+      caption:
+        "Learning Objectives and Materials Needed recommend what students should achieve and which resources support the class. Re-expand all day vocabulary (AI) writes a deeper explanation of every vocabulary term (context, definitions, and examples). View detail opens that expanded vocabulary for the day.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 04.png`),
+      title: "Daily schedule",
+      caption:
+        "Each day has the same layout: a weekday, Daily focus, Vocabulary, and Class timeline sized to the lesson length (for example 45 minutes). Day 1 does not have to stay Monday — set the weekday to the day you will teach (Day 1 on Wednesday, Day 2 on Friday, and so on). Focus, vocabulary, and activities can differ by day.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 05.png`),
+      title: "Full-unit overview",
+      caption:
+        "Further down, the plan gives a full-unit overview: vocabulary for the unit, unit pacing, warm-up, main teaching steps, classroom activity, assessment questions, homework, differentiated instruction, and teacher notes. Use it as the delivery guide, and adjust activities and accommodations for the class.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 06.png`),
+      title: "What each closing section is for",
+      caption:
+        "Vocabulary (full unit) lists terms for the whole unit. Unit pacing overview spreads topics across the teaching days. Warm-Up activates prior knowledge. Main Teaching Steps is the instructional sequence. Classroom Activity is student practice. Assessment Questions check understanding. Homework reinforces learning outside class. Differentiated Instruction offers supports for different needs. Teacher Notes add standards alignment and delivery guidance.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 07.png`),
+      title: "Save the plan and create the deck",
+      caption:
+        "Save Lesson Plan stores the plan in Teacher Resource Library and creates a new deck on the owner’s Personal Dashboard. The deck name comes from Subject — Topic. Edit, Regenerate, Download PDF, and Download vocabulary PDF stay on the preview.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 08.png`),
+      title: "New deck on Personal Dashboard",
+      caption:
+        "Open the plan owner’s Personal Dashboard after saving. Personal still lists the owner’s own decks that have no lesson plan (for example Social Studies: British History and Math: Alegbra 1). Under Workspaces, the Workspace menu shows the workspace name (UC-K26). Created by team admin lists decks that team admin made in the workspace. Owner lesson plans lists the deck created when you saved with New deck (the Teacher lesson plan deck). That deck stays on this dashboard.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_FILE} - 09.png`),
+      title: "Saved lesson plans in Teacher Resource Library",
+      caption:
+        "On Teacher Dashboard for UC-K26, open Teacher Resource Library and Saved Lesson Plans. Plans are grouped by who saved them, then by subject. The owner’s plan (John Brown, Understanding Air Pollution) is under the owner. The team admin’s plan (Teddy Watt, Air Pollution and its Effects) is under the team admin. Each row offers PDF, Edit, Create Quiz, Rename, and Delete.",
     },
   ];
 
@@ -1549,7 +1627,13 @@ export const DOCS_UI_GUIDES: Record<
   "edu-teacher-lesson-plan-owner": {
     title: "AI Lesson Builder for the plan owner",
     summary:
-      "On Teacher Dashboard, build a lesson plan from an existing team-admin deck, then preview, edit, regenerate, save, and download it.",
+      "On Teacher Dashboard, build a lesson plan from an existing team-admin deck, save it, then find the new owner deck under Owner lesson plans and the plan in Teacher Resource Library.",
     steps: EDU_TEACHER_LESSON_PLAN_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-lesson-plan-owner-new-deck": {
+    title: "AI Lesson Builder for a new deck",
+    summary:
+      "On Teacher Dashboard, choose New deck, generate a lesson plan, save it, then find that deck under Owner lesson plans and the plan in Teacher Resource Library.",
+    steps: EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_GUIDE_STEPS,
   },
 };

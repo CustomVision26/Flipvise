@@ -39,7 +39,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         bullets: [
           "Sign Up opens the Flipvise account form: name, email, password, and password confirmation.",
           "After email verification, complete contact details, account type, and security questions. The dashboard unlocks when those steps are saved.",
-          "Open sign-up guide to walk through every screenshot in order, like a Flipvise UI guide. You may navigate anywhere in Flipvise while it remains open. UI Guides in the header also includes Create a deck and deck editor card walkthroughs after you have an account.",
+          "Open sign-up guide to walk through every screenshot in order, like a Flipvise UI guide. You may navigate anywhere in Flipvise while it remains open. UI Guides in the header also includes Create a deck, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
         ],
       },
       {
@@ -102,7 +102,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         title: "Support and inbox",
         bullets: [
           "Documentation — book icon on the right of the header (beside Help and Inbox).",
-          "UI Guides — header button that opens a catalog of Flipvise UI guides grouped as Getting started, Decks and cards, and Team Tier Plan (with Education Teacher nested under Team Tier Plan, including Teacher Dashboard and AI Lesson Builder for the plan owner). Choose one to open the walkthrough; it stays open while you browse.",
+          "UI Guides — header button that opens a catalog of Flipvise UI guides grouped as Getting started, Decks and cards, and Team Tier Plan (with Education Teacher nested under Team Tier Plan, including Teacher Dashboard, AI Lesson Builder for the plan owner, and AI Lesson Builder for a new deck). Choose one to open the walkthrough; it stays open while you browse.",
           "Plans — signed-in header button opens Plans & Pricing. Your plan name (next to the account avatar) opens Account Billing. Complimentary, assigned, or affiliate access still uses the Plans label; hover Plans or the plan name to confirm it is not a paid subscription.",
           "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",

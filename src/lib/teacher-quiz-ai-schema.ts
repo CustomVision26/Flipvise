@@ -24,6 +24,11 @@ export const saveTeacherQuizDeckSchema = z.object({
   topic: z.string().min(1),
   difficultyLevel: z.string().min(1),
   teamId: z.number().int().positive().optional(),
+  /**
+   * When set, generated cards are appended to this deck.
+   * Omit to create (or reuse) the usual lesson-plan quiz deck.
+   */
+  existingDeckId: z.number().int().positive().optional(),
   /** Day scope used when the quiz was generated from a multi-day lesson plan. */
   dayScope: lessonPlanDayScopeSchema.optional(),
   cards: z

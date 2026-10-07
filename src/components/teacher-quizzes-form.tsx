@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants, Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TeacherToolPageShell } from "@/components/teacher-tool-page-shell";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { TeacherTopicFieldHelpContent } from "@/components/teacher-field-help-content";
@@ -108,6 +109,9 @@ type QuizDeckSliderItem = {
 };
 
 const SAVED_PLAN_NONE = "__none__";
+const EXISTING_DECK_NONE = "__deck_none__";
+
+type QuizDeckTargetMode = "existing" | "new";
 
 function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
   return [
@@ -172,6 +176,7 @@ export function TeacherQuizzesForm({
   initialLessonPlanId,
   decks,
   deckQuota,
+  viewerUserId,
   backHref = "/teacher",
   teacherWorkspace,
 }: {
@@ -180,6 +185,7 @@ export function TeacherQuizzesForm({
   initialLessonPlanId?: number;
   decks: DeckRow[];
   deckQuota: TeacherDeckQuota;
+  viewerUserId: string;
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
 }) {
@@ -190,6 +196,8 @@ export function TeacherQuizzesForm({
     numberOfCards: defaultNumberOfCards(deckQuota.maxCardsPerDeck),
   }));
   const [selectedPlanKey, setSelectedPlanKey] = useState<string>(SAVED_PLAN_NONE);
+  const [deckTargetMode, setDeckTargetMode] = useState<QuizDeckTargetMode>("new");
+  const [existingDeckKey, setExistingDeckKey] = useState(EXISTING_DECK_NONE);
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
   const [lessonPlanSearchQuery, setLessonPlanSearchQuery] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -555,6 +563,11 @@ export function TeacherQuizzesForm({
       return;
     }
 
+    if (deckTargetMode === "existing" && selectedExistingDeck == null) {
+      setErrorMessage("Select an existing deck before saving.");
+      return;
+    }
+
     const missingDistractors = selected.some(
       (row) =>
         row.distractorsLoading || row.distractors.some((distractor) => !distractor.trim()),
@@ -580,6 +593,10 @@ export function TeacherQuizzesForm({
         dayScope:
           form.savedLessonPlanId != null && dayScopeOptions.length > 0
             ? generationDayScope
+            : undefined,
+        existingDeckId:
+          deckTargetMode === "existing" && existingDeckKey !== EXISTING_DECK_NONE
+            ? Number(existingDeckKey)
             : undefined,
         cards: selected.map((row) => ({
           front: row.front.trim(),
@@ -634,9 +651,26 @@ export function TeacherQuizzesForm({
 
   const selectedCreatorIsWorkspaceOwner = selectedAdminLabel?.isWorkspaceOwner === true;
 
+  const editableDecks = useMemo(() => {
+    if (isWorkspaceOwner) return decks;
+    return decks.filter((deck) => deck.createdByUserId === viewerUserId);
+  }, [decks, isWorkspaceOwner, viewerUserId]);
+
+  const selectedExistingDeck =
+    deckTargetMode === "existing"
+      ? editableDecks.find((deck) => String(deck.id) === existingDeckKey) ?? null
+      : null;
+
+  const existingDeckMissing = deckTargetMode === "existing" && selectedExistingDeck == null;
+
+  const effectiveSaveDestination = selectedExistingDeck
+    ? { mode: "append" as const, deckName: selectedExistingDeck.name }
+    : saveDestination;
+
   const decksSectionTitle = teacherDeckSectionTitle(deckQuota);
   const quotaLabel = teacherDeckQuotaLabel(deckQuota);
-  const cannotSaveDeck = deckQuota.atLimit || deckQuota.needsWorkspace;
+  const cannotSaveDeck =
+    deckQuota.needsWorkspace || (deckQuota.atLimit && deckTargetMode !== "existing");
 
   const deckSliderItems = useMemo<QuizDeckSliderItem[]>(
     () =>
@@ -737,9 +771,11 @@ export function TeacherQuizzesForm({
         : "Set at least one question on a passage, or turn off Include reading passage."
       : readingPassageQuestions && combinedCardCount < 1
         ? "Enter at least one regular quiz card or one question linked to a reading passage."
-        : deckQuota.atLimit
+        : deckQuota.atLimit && deckTargetMode === "new"
           ? `Deck limit reached — up to ${deckQuota.maxDecks} decks on your plan.`
-          : deckQuota.needsWorkspace
+          : existingDeckMissing
+            ? "Select an existing deck to add the generated cards to."
+            : deckQuota.needsWorkspace
             ? "Select a workspace from the header to create team decks."
             : readingPassageQuestions
               ? "AI generates regular quiz cards plus curriculum-driven reading passages from the selected Lesson Plan (unique educational situations; vocabulary supports the lesson)."
@@ -763,6 +799,7 @@ export function TeacherQuizzesForm({
       onGenerate={handleGenerate}
       submitDisabled={
         cannotSaveDeck ||
+        existingDeckMissing ||
         combinedOverLimit ||
         passageModeInvalid ||
         (readingPassageQuestions && combinedCardCount < 1)
@@ -778,7 +815,7 @@ export function TeacherQuizzesForm({
               topic: form.topic,
               difficultyLevel: form.difficultyLevel,
             }}
-            saveDestination={saveDestination}
+            saveDestination={effectiveSaveDestination}
             onRowsChange={setReviewRows}
             disabled={isBusy}
           />
@@ -804,20 +841,28 @@ export function TeacherQuizzesForm({
             <TeacherTooltipButton
               type="button"
               size="sm"
-              disabled={isBusy || selectedCount === 0 || anyDistractorsLoading || cannotSaveDeck}
+              disabled={
+                isBusy ||
+                selectedCount === 0 ||
+                anyDistractorsLoading ||
+                cannotSaveDeck ||
+                existingDeckMissing
+              }
               onClick={handleSaveDeck}
               tooltip={
                 cannotSaveDeck
                   ? deckQuota.needsWorkspace
                     ? `Create an ${deckQuota.planLabel} workspace before saving.`
                     : `Deck limit reached on your ${deckQuota.planLabel} plan.`
-                  : selectedCount === 0
+                  : existingDeckMissing
+                    ? "Select an existing deck before saving."
+                    : selectedCount === 0
                     ? "Select at least one card to save."
                     : anyDistractorsLoading
                       ? "Wait for wrong answers to finish generating."
-                      : saveDestination.mode === "append"
-                        ? `Save ${selectedCount} selected card(s) to ${saveDestination.deckName} with one correct answer and three wrong answers each.`
-                        : `Save ${selectedCount} selected card(s) to the new deck ${saveDestination.deckName} with one correct answer and three wrong answers each.`
+                      : effectiveSaveDestination.mode === "append"
+                        ? `Save ${selectedCount} selected card(s) to ${effectiveSaveDestination.deckName} with one correct answer and three wrong answers each.`
+                        : `Save ${selectedCount} selected card(s) to the new deck ${effectiveSaveDestination.deckName} with one correct answer and three wrong answers each.`
               }
             >
               {isSaving ? "Saving…" : `Save ${selectedCount} selected`}
@@ -1180,7 +1225,93 @@ export function TeacherQuizzesForm({
                 ),
               )}
             </SelectContent>
-          </Select>
+            </Select>
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <TeacherFieldLabel
+            htmlFor="quizDeckTargetMode"
+            label="Save to deck"
+            help={
+              <>
+                <p className="mb-2">
+                  Choose where the generated quiz cards are saved.
+                </p>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  <li>
+                    <strong>Existing deck</strong> — add the new cards to a deck you
+                    can already edit. A team admin sees decks they created. The workspace
+                    owner sees every deck in this workspace.
+                  </li>
+                  <li>
+                    <strong>New deck</strong> — create a quiz deck from the subject and
+                    topic, or the lesson-plan day deck when a saved lesson plan is selected.
+                  </li>
+                </ul>
+              </>
+            }
+          />
+          <ToggleGroup
+            id="quizDeckTargetMode"
+            value={[deckTargetMode]}
+            onValueChange={(next) => {
+              const value = next[0] as QuizDeckTargetMode | undefined;
+              if (!value) return;
+              setDeckTargetMode(value);
+              if (value === "new") setExistingDeckKey(EXISTING_DECK_NONE);
+            }}
+            variant="outline"
+            spacing={0}
+            className="flex w-full"
+            disabled={isBusy}
+          >
+            <ToggleGroupItem value="existing" className="h-10 flex-1 px-3">
+              Existing deck
+            </ToggleGroupItem>
+            <ToggleGroupItem value="new" className="h-10 flex-1 px-3">
+              New deck
+            </ToggleGroupItem>
+          </ToggleGroup>
+          {deckTargetMode === "existing" ? (
+            <div className="space-y-2 pt-1">
+              <TeacherFieldLabel
+                htmlFor="existingQuizDeck"
+                label="Deck"
+                help="Generated cards are added to this deck. The deck’s card limit still applies."
+              />
+              <Select
+                value={existingDeckKey}
+                onValueChange={(value) => {
+                  if (value) setExistingDeckKey(value);
+                }}
+                disabled={isBusy || editableDecks.length === 0}
+              >
+                <SelectTrigger id="existingQuizDeck" className="h-10 w-full bg-background">
+                  <SelectValue placeholder="Select a deck">
+                    {selectedExistingDeck?.name ?? "Select a deck"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EXISTING_DECK_NONE}>Select a deck</SelectItem>
+                  {editableDecks.map((deck) => (
+                    <SelectItem key={deck.id} value={String(deck.id)}>
+                      {deck.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editableDecks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {isWorkspaceOwner
+                    ? "This workspace has no decks yet. Choose New deck to create one."
+                    : "You have no decks you can add cards to yet. Choose New deck to create one."}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Cards are added to the selected deck. A new deck is not created.
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
         <div className="space-y-2 sm:col-span-2 sm:max-w-xs">
           <TeacherFieldLabel
