@@ -10,6 +10,7 @@ import {
   keepLessonPlanOnExitAction,
   adaptAssignedLessonPlanToIntakeAction,
   generateAllDaysVocabularyDetailAction,
+  getDeckLessonPlanReferencesAction,
 } from "@/actions/teacher-lesson-plan";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -310,6 +311,7 @@ export function TeacherLessonBuilderForm({
       : null;
 
   const referenceFieldsRef = useRef<LessonPlanReferenceMaterialFieldsHandle>(null);
+  const deckDefaultsRequestIdRef = useRef(0);
   const [referenceMaterials, setReferenceMaterials] = useState<
     LessonPlanReferenceMaterial[]
   >(
@@ -495,6 +497,7 @@ export function TeacherLessonBuilderForm({
   }
 
   function handleDeckAdminChange(adminUserId: string) {
+    deckDefaultsRequestIdRef.current += 1;
     setSelectedDeckAdminUserId(adminUserId);
     setSelectedDeckKey(DECK_NONE);
     setDeckId(undefined);
@@ -506,6 +509,7 @@ export function TeacherLessonBuilderForm({
         topic: "",
         difficultyLevel: "Intermediate",
       }));
+      setReferenceMaterials([]);
     }
   }
 
@@ -518,6 +522,19 @@ export function TeacherLessonBuilderForm({
       topic: defaults.topic,
       difficultyLevel: defaults.difficultyLevel,
     }));
+    void loadReferencesForDeck(deck.id);
+  }
+
+  async function loadReferencesForDeck(nextDeckId: number) {
+    const requestId = ++deckDefaultsRequestIdRef.current;
+    setReferenceMaterials([]);
+    const loaded = await getDeckLessonPlanReferencesAction({
+      deckId: nextDeckId,
+      teamId: teacherWorkspace?.teamId,
+    });
+    if (requestId !== deckDefaultsRequestIdRef.current) return;
+    if (!loaded.ok) return;
+    setReferenceMaterials(loaded.references);
   }
 
   function handleDeckChange(value: string | null) {
@@ -526,6 +543,7 @@ export function TeacherLessonBuilderForm({
     afterOverlayDismiss(() => {
       setSelectedDeckKey(next);
       if (next === DECK_NONE) {
+        deckDefaultsRequestIdRef.current += 1;
         setDeckId(undefined);
         if (!isEditingExistingPlan) {
           setForm((prev) => ({
@@ -535,6 +553,7 @@ export function TeacherLessonBuilderForm({
             topic: "",
             difficultyLevel: "Intermediate",
           }));
+          setReferenceMaterials([]);
         }
         return;
       }
@@ -1617,7 +1636,7 @@ export function TeacherLessonBuilderForm({
                 getItemLabel={(deck) => deck.name}
                 getItemHaystack={deckHaystack}
                 searchPlaceholder="Search decks by name, subject, or description…"
-                resourceHelp="Only decks without an existing lesson plan are listed."
+                resourceHelp="Your own decks are listed only when they do not already have a lesson plan. A team admin’s decks stay listed so you can save your own lesson from them. That lesson is stored on your Personal Dashboard and does not replace their deck."
                 resourceFooter={
                   selectedDeck ? (
                     <p className="text-xs text-muted-foreground">

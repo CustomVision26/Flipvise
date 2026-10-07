@@ -46,6 +46,7 @@ import {
   dayLessonTimelineLooksLikeFiveE,
   parseVocabularyLine,
   resolveFiveEClassTimelineOutline,
+  formatVocabularyExampleLine,
 } from "@/lib/lesson-plan-vocabulary-detail";
 import { toast } from "sonner";
 
@@ -273,6 +274,7 @@ function EditableVocabularySummaryBox({
 }
 
 function VocabularyTermBlock({ term }: { term: LessonPlanVocabularyTermDetail }) {
+  const exampleLine = formatVocabularyExampleLine(term.example);
   return (
     <li className="space-y-1">
       <p className="text-sm text-foreground">
@@ -280,8 +282,8 @@ function VocabularyTermBlock({ term }: { term: LessonPlanVocabularyTermDetail })
         {" — "}
         {term.definition}
       </p>
-      {term.example ? (
-        <p className="text-sm italic text-muted-foreground">{term.example}</p>
+      {exampleLine ? (
+        <p className="text-sm italic text-muted-foreground">{exampleLine}</p>
       ) : null}
     </li>
   );

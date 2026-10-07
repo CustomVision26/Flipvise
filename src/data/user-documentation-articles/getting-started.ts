@@ -102,7 +102,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         title: "Support and inbox",
         bullets: [
           "Documentation — book icon on the right of the header (beside Help and Inbox).",
-          "UI Guides — header button that opens a catalog of Flipvise UI guides grouped as Getting started, Decks and cards, and Team Tier Plan (with Education Teacher nested under Team Tier Plan). Choose one to open the walkthrough; it stays open while you browse.",
+          "UI Guides — header button that opens a catalog of Flipvise UI guides grouped as Getting started, Decks and cards, and Team Tier Plan (with Education Teacher nested under Team Tier Plan, including Teacher Dashboard and AI Lesson Builder for the plan owner). Choose one to open the walkthrough; it stays open while you browse.",
           "Plans — signed-in header button opens Plans & Pricing. Your plan name (next to the account avatar) opens Account Billing. Complimentary, assigned, or affiliate access still uses the Plans label; hover Plans or the plan name to confirm it is not a paid subscription.",
           "Help Center ticket categories and workflows are documented under Help Center in this guide; use Contact Us (/contact) for live chat.",
           "Inbox aggregates invites, billing, quiz results, affiliate messages, and Contact Us replies.",

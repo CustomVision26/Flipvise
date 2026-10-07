@@ -235,6 +235,16 @@ function DocPagePanel({
             Open quiz results for a workspace guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "teacher-dashboard" ? (
+          <DocsUiGuideStartButton guideId="edu-teacher-dashboard">
+            Open Teacher Dashboard guide
+          </DocsUiGuideStartButton>
+        ) : null}
+        {page.id === "teacher-ai-content-tools" ? (
+          <DocsUiGuideStartButton guideId="edu-teacher-lesson-plan-owner">
+            Open AI Lesson Builder for the plan owner guide
+          </DocsUiGuideStartButton>
+        ) : null}
       </div>
 
       {showArticleLink && onOpenArticle ? (
@@ -492,6 +502,22 @@ function articleSectionGuides(
       {
         id: "quiz-exam-mode-workspace",
         label: "Open quiz Exam Mode for a workspace guide",
+      },
+    ];
+  }
+  if (pageId === "teacher-dashboard" && sectionId === "layout") {
+    return [
+      {
+        id: "edu-teacher-dashboard",
+        label: "Open Teacher Dashboard guide",
+      },
+    ];
+  }
+  if (pageId === "teacher-ai-content-tools" && sectionId === "lesson-builder") {
+    return [
+      {
+        id: "edu-teacher-lesson-plan-owner",
+        label: "Open AI Lesson Builder for the plan owner guide",
       },
     ];
   }

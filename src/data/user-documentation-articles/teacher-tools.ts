@@ -37,7 +37,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         bullets: [
           "Header Teacher link appears when you qualify for education features.",
           "Welcome card shows your plan badge and workspace guidance.",
-          "Left sidebar lists AI content tools, Add-ons, Classroom management, and Resources.",
+          "Left sidebar lists AI content tools, Add-ons, Classroom management, and Resources. Open Teacher Dashboard guide for the Education Gold screenshots: Teacher Dash from Personal Dashboard, then the workspace sidebar.",
           "Workspace selector scopes deck pickers to personal or team context on Education Gold/Enterprise.",
           "Team Admin Dashboard shortcut appears when you can manage an education team workspace. Owners do not get a Team Dashboard shortcut — that surface is for invited members; owners use Personal Dashboard.",
         ],
@@ -47,7 +47,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         title: "Deck workflow for teachers",
         bullets: [
           "Education Plus: create decks on your personal dashboard, then link them in teacher tools.",
-          "Education Gold/Enterprise team admins: create decks for assigned workspaces — they appear on the plan owner's personal dashboard grouped by workspace.",
+          "Education Gold/Enterprise team admins: create decks for assigned workspaces. On the plan owner's Personal Dashboard, select that workspace to see those decks under Created by team admin, separate from Owner lesson plans. A lesson-plan deck the owner saves from a team-admin deck stays in Owner lesson plans and is not copied onto the team admin Team Dashboard.",
           "AI tools use linked deck cards as source context — add representative cards before generating.",
         ],
       },
@@ -74,10 +74,11 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         id: "lesson-builder",
         title: "AI Lesson Builder (/teacher/lesson-builder)",
         bullets: [
+          "Open AI Lesson Builder for the plan owner guide for the screenshot walkthrough (existing team-admin deck, generate, preview, save, and download).",
           "Multi-day lesson plans with objectives, warm-ups, activities, and assessments.",
-          "Save to Existing deck lists workspace decks without a linked lesson plan — including decks assigned to you on the Team Dashboard. Subject through Reference material stay greyed out until you select a deck. Selecting a deck fills Subject, Topic, Grade Level, and Difficulty from that deck (quiz/lesson-plan decks use the stored topic and subject — for example Topic Air pollution and Subject Science : Environmental Science — not the full deck description).",
+          "Save to Existing deck lists your own workspace decks that do not already have a linked lesson plan, plus every deck a selected team admin created — including decks assigned to you on the Team Dashboard. A team admin’s deck stays in that list after you save your own lesson from it. Subject through Reference material stay greyed out until you select a deck. Selecting a deck fills Subject, Topic, Grade Level, Difficulty, and any Reference material from that deck or a related lesson plan (quiz/lesson-plan decks use the stored topic and subject — for example Topic Air pollution and Subject Science : Environmental Science — not the full deck description). When the workspace owner saves from a team-admin deck, Flipvise stores that plan on an owner lesson-plan deck under Owner lesson plans on the owner’s Personal Dashboard and does not copy that deck onto the team admin’s Team Dashboard.",
           "Weekly schedule with a Plan Period of 1–7 days (shown as 1 day, 2 days, …). Learning Standard is required (for example NGSS, Common Core, Jamaica NSC).",
-          "Vocabulary detail expands definitions, examples, process steps, and learning goals per schedule day.",
+          "Vocabulary detail expands definitions, examples, process steps, and learning goals per schedule day. Preview, lesson-plan PDF, and vocabulary-detail PDF example lines use a single Example: label.",
           "Reference material: Website URL, Plain text, PDF, Word (.docx), PowerPoint (.pptx), or a photo of handwritten notes. Add URL before Generate when a website is still in the field. Encyclopedia pages that block automated access (for example Britannica) are loaded from the matching Wikipedia article. If a site still blocks access, Flipvise tells you and suggests pasting the page text with Plain text, uploading a file, or trying a public page such as Wikipedia.",
           "When Learning Standard is linked to Jamaica (confirmed by AI), generation follows stored Jamaica NSC guidelines — 5E class timelines (Engage → Evaluate), inquiry-based design, inclusive education, and culturally relevant examples. Non-Jamaica standards do not use Jamaica NSC or forced 5E outlines.",
           "Save and reopen from Teacher Resource Library; download PDF.",

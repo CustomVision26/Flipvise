@@ -1,3 +1,4 @@
+import { formatVocabularyExampleLine } from "@/lib/lesson-plan-vocabulary-detail";
 import type { LessonPlanDayVocabularyDetail } from "@/lib/lesson-plan-ai-schema";
 import {
   formatLessonPlanDayScopeLabel,
@@ -17,8 +18,9 @@ function formatVocabularyDetailForContext(
 
   for (const term of detail.terms) {
     lines.push(`- ${term.term} — ${term.definition}`);
-    if (term.example) {
-      lines.push(`  Example: ${term.example}`);
+    const exampleLine = formatVocabularyExampleLine(term.example);
+    if (exampleLine) {
+      lines.push(`  ${exampleLine}`);
     }
   }
 
@@ -66,8 +68,9 @@ function formatVocabularyDetailForContext(
     lines.push("", "Additional vocabulary:");
     for (const term of detail.additionalVocabulary) {
       lines.push(`- ${term.term} — ${term.definition}`);
-      if (term.example) {
-        lines.push(`  Example: ${term.example}`);
+      const exampleLine = formatVocabularyExampleLine(term.example);
+      if (exampleLine) {
+        lines.push(`  ${exampleLine}`);
       }
     }
   }

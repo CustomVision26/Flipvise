@@ -12,6 +12,7 @@ import {
   filterDecksWithoutLessonPlans,
   filterOwnerDeckPickerWithoutLessonPlans,
 } from "@/lib/filter-decks-without-lesson-plans";
+import { relocateOwnerLessonPlansOffTeamAdminDecks } from "@/db/queries/owner-lesson-plan-deck-placement";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import { buildTeacherSubPath } from "@/lib/teacher-url";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
@@ -84,6 +85,10 @@ export default async function TeacherLessonBuilderPage({
       : false;
 
   const keepDeckId = savedPlan?.deckId ?? initialDeckIdFromParams;
+
+  if (workspace.teamId != null && workspace.teamMemberId === 0) {
+    await relocateOwnerLessonPlansOffTeamAdminDecks(userId, workspace.teamId);
+  }
 
   const [deckContext, ownerDeckPickerRaw, ctx] = await Promise.all([
     loadTeacherDeckContext(userId, workspace.teamId),

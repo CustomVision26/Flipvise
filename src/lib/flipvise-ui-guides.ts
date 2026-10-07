@@ -21,7 +21,9 @@ export type DocsUiGuideId =
   | "quiz-timer-workspace"
   | "quiz-schedule-workspace"
   | "quiz-exam-mode-workspace"
-  | "quiz-results-workspace";
+  | "quiz-results-workspace"
+  | "edu-teacher-dashboard"
+  | "edu-teacher-lesson-plan-owner";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -96,7 +98,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
         title: "Education Teacher",
         description:
           "Teacher Dashboard walkthroughs for Education Gold and Education Enterprise team plans.",
-        guideIds: [],
+        guideIds: ["edu-teacher-dashboard", "edu-teacher-lesson-plan-owner"],
       },
     ],
   },
@@ -1315,6 +1317,97 @@ export const QUIZ_RESULTS_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
   },
 ];
 
+const EDU_TEACHER_DASHBOARD_FILE =
+  "25 Flipvise - Team Tier Edu Plan - Teacher DB";
+
+export const EDU_TEACHER_DASHBOARD_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${EDU_TEACHER_DASHBOARD_FILE} - 01.png`),
+    title: "Open Teacher Dashboard",
+    caption:
+      "On the plan owner’s Personal Dashboard (for example John Brown on Education Gold), open the workspace switcher. Personal Dash is the current workspace. Teacher Dash opens the Teacher Dashboard. Team Admin Dash is listed too, because this Education Gold subscription includes both. Personal decks stay on this dashboard (for example Social Studies: British History).",
+  },
+  {
+    src: uiSrc(`${EDU_TEACHER_DASHBOARD_FILE} - 02.png`),
+    title: "Teacher Dashboard for the workspace",
+    caption:
+      "Teacher Dashboard shows the Education Gold badge for the selected workspace (UC-K26). Personal Dashboard and Team Admin Dashboard are at the top. The sidebar groups AI content tools (AI Lesson Builder, AI Quiz/Test Generator, Homework Generator, Study Guide Generator, Worksheet Generator, and AI Document Studio), Classroom management (Classes and Student Progress), and Resources (Teacher Resource Library). Using your teacher tools walks through three steps: select a tool, link source decks, then generate, refine, and save.",
+  },
+];
+
+const EDU_TEACHER_LESSON_PLAN_OWNER_FILE =
+  "26 Flipvise - Team Tier Edu Plan - Teacher DB AI-Lesson Plan owner";
+
+export const EDU_TEACHER_LESSON_PLAN_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 01.png`),
+      title: "Open AI Lesson Builder",
+      caption:
+        "On Teacher Dashboard, open AI Lesson Builder. Save to deck is set to Existing deck for workspace UC-K26 (Education Gold). Subject, Topic, Grade Level, Lesson Duration, Plan Period, Difficulty, Learning Standard, Class Size, special needs, and reference material (Website URL, Plain text, PDF, Word, PowerPoint, Handwritten) are on the form.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 02.png`),
+      title: "Choose whose decks to use",
+      caption:
+        "Workspace owner or team admin is how the plan owner picks decks for the lesson plan. The owner can use their own personal decks and team decks that a team admin created on the Team Dashboard. A team admin’s personal decks stay private to that member.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 03.png`),
+      title: "Owner and team admin records",
+      caption:
+        "Open Workspace owner or team admin. The list shows the subscriber (owner) record, for example John Brown — Workspace owner, and the team admin record, for example Teddy Watt. The workspace selector still shows UC-K26.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 04.png`),
+      title: "Select the team admin’s deck",
+      caption:
+        "With the team admin selected (Teddy Watt) and Existing deck still on, open Deck and choose that admin’s team deck (for example Science : Environmental Science — Air pollution LP Day 1). Selecting the deck fills the fields below from the deck.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 05.png`),
+      title: "Review the filled form and Generate",
+      caption:
+        "The deck fills Subject (Science : Environmental Science), Topic (Air pollution), Grade Level (grade 7), Lesson Duration (45 minutes), Plan Period (3 days), Difficulty (Intermediate), and Learning Standard (NGSS). Each field has a help icon. Learning Standard steers the curriculum framework. Special need or Accommodations (for example large print and reading support) and reference material (Website URL, Plain text, PDF, Word, PowerPoint, Handwritten) give the AI more context. When the required fields are complete, choose Generate.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 06.png`),
+      title: "Preview the generated plan",
+      caption:
+        "The generated plan appears under Generate (for example Understanding Air Pollution, a 3-day unit, 45 minutes per class), with learning objectives, materials, and the daily schedule. Preview is the current view. Edit changes the plan before you save. Regenerate builds a new version from the same inputs. Save Lesson Plan stores it in the Teacher Resource Library. Download PDF saves a summary. Download vocabulary PDF saves the plan with expanded vocabulary.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 07.png`),
+      title: "Objectives, materials, and vocabulary",
+      caption:
+        "Learning Objectives and Materials Needed recommend what students should achieve and which resources support the class. Re-expand all day vocabulary (AI) writes a deeper explanation of every vocabulary term (context, definitions, and examples). View detail opens that expanded vocabulary for the day.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 08.png`),
+      title: "Daily schedule",
+      caption:
+        "Each day has the same layout: a weekday, Daily focus, Vocabulary, and Class timeline sized to the lesson length (for example 45 minutes). Day 1 does not have to stay Monday — set the weekday to the day you will teach (Day 1 on Wednesday, Day 2 on Friday, and so on). Focus, vocabulary, and activities can differ by day.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 09.png`),
+      title: "Full-unit overview",
+      caption:
+        "Further down, the plan gives a full-unit overview: vocabulary for the unit, unit pacing, warm-up, main teaching steps, classroom activity, assessment questions, homework, differentiated instruction, and teacher notes. Use it as the delivery guide, and adjust activities and accommodations for the class.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 10.png`),
+      title: "What each closing section is for",
+      caption:
+        "Vocabulary (full unit) lists terms for the whole unit. Unit pacing overview spreads topics across the teaching days. Warm-Up activates prior knowledge. Main Teaching Steps is the instructional sequence. Classroom Activity is student practice. Assessment Questions check understanding. Homework reinforces learning outside class. Differentiated Instruction offers supports for different needs. Teacher Notes add standards alignment and delivery guidance.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_LESSON_PLAN_OWNER_FILE} - 11.png`),
+      title: "Preview after another generate",
+      caption:
+        "Generating again replaces the preview. This pass is a 5-day unit, 45 minutes per class, still titled Understanding Air Pollution, with updated objectives and vocabulary (for example Fossil Fuel). Day 1’s weekday stays --none-- until you choose the teaching day. Edit, Regenerate, Save Lesson Plan, Download PDF, and Download vocabulary PDF stay on the preview.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1446,5 +1539,17 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Quiz results, review member attempts, open View or the question sheet, then confirm the member’s saved score and Review.",
     steps: QUIZ_RESULTS_WORKSPACE_GUIDE_STEPS,
+  },
+  "edu-teacher-dashboard": {
+    title: "Teacher Dashboard",
+    summary:
+      "From the Education Gold plan owner’s Personal Dashboard, open Teacher Dashboard and review the workspace tools.",
+    steps: EDU_TEACHER_DASHBOARD_GUIDE_STEPS,
+  },
+  "edu-teacher-lesson-plan-owner": {
+    title: "AI Lesson Builder for the plan owner",
+    summary:
+      "On Teacher Dashboard, build a lesson plan from an existing team-admin deck, then preview, edit, regenerate, save, and download it.",
+    steps: EDU_TEACHER_LESSON_PLAN_OWNER_GUIDE_STEPS,
   },
 };

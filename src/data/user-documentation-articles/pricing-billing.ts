@@ -335,7 +335,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
         bullets: [
           "Education Plus: create decks on personal dashboard; link in teacher tools.",
           "Education Gold/Enterprise team admins: create decks for assigned workspaces.",
-          "Team-owned decks appear on the plan owner's personal dashboard grouped by workspace.",
+          "Team-owned decks appear on the plan owner's personal dashboard. Education Gold and Education Enterprise owners select the workspace there; team-admin decks are listed apart from the owner's lesson-plan decks. A lesson-plan deck the owner saves from a team-admin deck stays in Owner lesson plans and is not copied onto the team admin Team Dashboard.",
           "Only the deck creator can edit or delete team dashboard decks.",
         ],
       },

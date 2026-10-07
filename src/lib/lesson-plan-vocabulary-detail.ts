@@ -207,6 +207,51 @@ export function vocabularyLineFromTerm(term: LessonPlanVocabularyTermDetail): st
   return `${term.term} — ${term.shortDefinition}`;
 }
 
+const EXAMPLE_LABEL_PREFIX = /^(?:example)\s*[:\-–—]\s*/i;
+
+function normalizeExampleLabelSource(text: string): string {
+  return text
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\u00a0/g, " ");
+}
+
+/** Remove repeated `Example:` prefixes the model often prepends. */
+export function stripVocabularyExampleLabel(text: string): string {
+  let next = normalizeExampleLabelSource(text).trim();
+  while (EXAMPLE_LABEL_PREFIX.test(next)) {
+    next = next.replace(EXAMPLE_LABEL_PREFIX, "").trim();
+  }
+  return next;
+}
+
+/** Keep a single `Example:` when a line repeats the label. */
+export function collapseRepeatedExampleLabel(text: string): string {
+  return normalizeExampleLabelSource(text).replace(
+    /(^|\n)([ \t]*)(?:example\s*[:\-–—]\s*)+/gi,
+    (_match, start: string, indent: string) => `${start}${indent}Example: `,
+  );
+}
+
+export function formatVocabularyExampleLine(
+  example: string | null | undefined,
+): string | null {
+  const stripped = example ? stripVocabularyExampleLabel(example) : "";
+  if (!stripped) return null;
+  return `Example: ${stripped}`;
+}
+
+function withStrippedExample(
+  term: LessonPlanVocabularyTermDetail,
+): LessonPlanVocabularyTermDetail {
+  if (!term.example) return term;
+  const example = stripVocabularyExampleLabel(term.example);
+  if (!example) {
+    const { example: _removed, ...rest } = term;
+    return rest;
+  }
+  return { ...term, example };
+}
+
 function bankEntryToTermDetail(
   entry: VocabularyBankEntry,
   topic: string,
@@ -215,7 +260,7 @@ function bankEntryToTermDetail(
     term: entry.term,
     shortDefinition: entry.shortDefinition,
     definition: `${entry.term} refers to ${entry.shortDefinition}. Students should use this concept when working on ${topic}.`,
-    example: `Example: Students use ${entry.term.toLowerCase()} while practicing ${topic}.`,
+    example: `Students use ${entry.term.toLowerCase()} while practicing ${topic}.`,
   };
 }
 
@@ -245,7 +290,7 @@ function resolveDayVocabularyTerms(input: {
       term: entry.term,
       shortDefinition: entry.shortDefinition,
       definition: `${entry.term} refers to ${entry.shortDefinition.charAt(0).toLowerCase()}${entry.shortDefinition.slice(1)}. Students should use this concept when working on ${input.topic}.`,
-      example: `Example: Students apply ${entry.term.toLowerCase()} while practicing ${input.topic}.`,
+      example: `Students apply ${entry.term.toLowerCase()} while practicing ${input.topic}.`,
     }));
   }
 
@@ -258,7 +303,7 @@ function resolveDayVocabularyTerms(input: {
     term: entry.term,
     shortDefinition: entry.shortDefinition,
     definition: `${entry.term} refers to ${entry.shortDefinition.charAt(0).toLowerCase()}${entry.shortDefinition.slice(1)}. Students should use this concept when working on ${input.topic}.`,
-    example: `Example: Students apply ${entry.term.toLowerCase()} while practicing ${input.topic}.`,
+    example: `Students apply ${entry.term.toLowerCase()} while practicing ${input.topic}.`,
   }));
 }
 
@@ -290,14 +335,14 @@ function buildAdditionalVocabulary(
       term: "Evidence",
       shortDefinition: "facts, observations, or data that support claims",
       definition: `Information collected through observation, measurement, or research that supports a conclusion about the topic${pepNote}.`,
-      example: `Example: A chart showing class survey results is evidence for conclusions about ${topic}.`,
+      example: `A chart showing class survey results is evidence for conclusions about ${topic}.`,
     },
     {
       term: "Interpret",
       shortDefinition: "to explain what information or data shows",
       definition:
         "To describe the meaning of data, text, or observations in clear, grade-appropriate language.",
-      example: "Example: Students interpret a graph by explaining what trend it shows.",
+      example: "Students interpret a graph by explaining what trend it shows.",
     },
   ];
 }
@@ -326,7 +371,7 @@ export function sanitizeDayVocabularyDetail(
 
   const terms =
     usableTerms.length > 0
-      ? usableTerms
+      ? usableTerms.map(withStrippedExample)
       : resolveDayVocabularyTerms(input);
 
   const existingAdditional = (detail.additionalVocabulary ?? []).filter(
@@ -336,7 +381,7 @@ export function sanitizeDayVocabularyDetail(
 
   const additionalVocabulary =
     existingAdditional.length >= 4
-      ? existingAdditional
+      ? existingAdditional.map(withStrippedExample)
       : buildAdditionalVocabulary(
           input.subject,
           input.topic,

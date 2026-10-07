@@ -22,6 +22,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
           "Open personal dashboard guide to follow the screenshots in order. The guide stays open if you leave this page — close it only when you are finished.",
           "The heading shows Personal Dashboard : your name, or your email if no name is on the account.",
           "Deck grid, list, or compact tiles. Hover a deck tile to preview its cover image when one is set (the cover is not a flashcard).",
+          "Education Gold and Education Enterprise keep personal decks in the Personal section. Under Workspaces, select a workspace to list team-admin decks apart from your lesson-plan decks. A lesson-plan deck you save from a team admin’s deck is stored only under Owner lesson plans and is not copied onto that team admin’s Team Dashboard.",
           "Add Deck opens creation: name/subject/course, description/topic, grade, difficulty, optional deck cover image, and gradient.",
           "Edit deck updates the same metadata and cover image from a deck card menu. The cover is not a flashcard.",
           "Delete deck confirms first. Education plans get a detailed impact list: linked lesson plans stay in the Resource Library; Edit and Create Quiz stay available when another related deck (for example a quiz deck from that plan) can take over the link, and become unavailable only when this is the last linked deck. On a non-Education plan with leftover Education lesson-plan links, the dialog warns that the Education link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
@@ -148,7 +149,7 @@ export const DASHBOARD_ARTICLES: DocArticle[] = [
         id: "education-admin-deck-groups",
         title: "Owner-assigned vs created decks",
         bullets: [
-          "Education Gold and Education Enterprise team admins see two groups on Team Dashboard, separated by a divider line: Assigned by workspace owner (study and preview) and Created by you (edit).",
+          "Education Gold and Education Enterprise team admins see two groups on Team Dashboard, separated by a divider line: Assigned by workspace owner (study and preview) and Created by you (edit). Lesson-plan decks the workspace owner saves from a team-admin deck stay on the owner’s Personal Dashboard and are not listed in either group.",
           "The Created used / max count next to Showing counts decks you created toward the owner-set create allowance. Assigned decks do not count against that allowance.",
         ],
       },

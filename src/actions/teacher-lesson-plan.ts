@@ -73,6 +73,7 @@ import {
 } from "@/db/queries/saved-lesson-plans";
 import { areLessonPlanSnapshotsSimilar } from "@/lib/lesson-plan-similarity";
 import { createDeck, getDeckRowById } from "@/db/queries/decks";
+import { ensureOwnerLessonPlanDeckApartFromTeamAdminDeck } from "@/db/queries/owner-lesson-plan-deck-placement";
 import {
   getTeamById,
   linkDeckToTeamWorkspace,
@@ -102,7 +103,10 @@ import {
   formatMultipleLessonPlanReferencesForPrompt,
   normalizeLessonPlanReferenceMaterial,
   referenceSourceSummaryLabel,
+  type LessonPlanReferenceMaterial,
 } from "@/lib/lesson-plan-reference-material";
+import { getLessonPlanReferenceMaterialsForDeckSource } from "@/db/queries/lesson-plan-deck-references";
+import { getDeckWithViewerAccess } from "@/lib/team-deck-access";
 import { isYouTubeUrl, youTubeReferenceSummary } from "@/lib/youtube-url";
 import { truncateSourceImportText } from "@/lib/source-import-formats";
 import {
@@ -542,7 +546,7 @@ async function generateDayVocabularyDetailCore(
 
 Requirements:
 - Write specific, accurate content for the subject, grade, topic, and learning standard (when provided).
-- terms: prefer real subject-domain concepts students will be taught (e.g. Variable, Equation, Coefficient for Algebra). shortDefinition is the concise student-friendly meaning; definition is a fuller classroom explanation (2–4 sentences); example is a concrete italic-ready classroom example starting with "Example:".
+- terms: prefer real subject-domain concepts students will be taught (e.g. Variable, Equation, Coefficient for Algebra). shortDefinition is the concise student-friendly meaning; definition is a fuller classroom explanation (2–4 sentences); example is a concrete italic-ready classroom example with no "Example:" prefix.
 - If an assigned vocabulary line is the lesson topic/title or a generic meta-term (Process, Cause and effect, Evidence-as-filler, "main concept"), REPLACE it with authentic domain vocabulary for the topic instead of echoing it.
 - Keep roughly the same number of day terms as assigned (typically 1–6), but every term must be a teachable subject concept.
 ${fiveERequirement}
@@ -744,6 +748,15 @@ async function resolveLessonPlanDeckTarget(
     if (!access) {
       throw new Error("You do not have access to that deck.");
     }
+    const ownerDeck = await ensureOwnerLessonPlanDeckApartFromTeamAdminDeck({
+      viewerUserId: userId,
+      sourceDeck: deck,
+      subject: payload.input.subject,
+      topic: payload.input.topic,
+      gradeLevel: payload.input.gradeLevel,
+      difficultyLevel: payload.input.difficultyLevel,
+    });
+    if (ownerDeck) return ownerDeck;
     return { deckId: payload.deckId, sourceDeckName: deck.name };
   }
 
@@ -1174,6 +1187,49 @@ export async function extractLessonPlanReferenceAction(
       error,
       "Could not read that reference. Paste the page text with Plain text, try a public page such as Wikipedia, or upload a different file.",
       "extractLessonPlanReferenceAction",
+    );
+  }
+}
+
+const deckLessonPlanReferencesSchema = z.object({
+  deckId: z.number().int().positive(),
+  teamId: z.number().int().positive().optional(),
+});
+
+export async function getDeckLessonPlanReferencesAction(data: {
+  deckId: number;
+  teamId?: number;
+}): Promise<
+  | { ok: true; references: LessonPlanReferenceMaterial[] }
+  | { ok: false; error: string }
+> {
+  try {
+    const { userId } = await requireTeacherToolsAccess(
+      await getAccessContext(),
+      "Lesson Builder requires an education plan.",
+    );
+
+    const parsed = deckLessonPlanReferencesSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new Error("Invalid deck.");
+    }
+
+    const bundle = await getDeckWithViewerAccess(parsed.data.deckId, userId);
+    if (!bundle) {
+      return { ok: true, references: [] };
+    }
+
+    const references = await getLessonPlanReferenceMaterialsForDeckSource(
+      userId,
+      parsed.data.deckId,
+      parsed.data.teamId ?? bundle.deck.teamId,
+    );
+    return { ok: true, references };
+  } catch (error) {
+    return failLessonPlanAction(
+      error,
+      "Could not load reference material for that deck.",
+      "getDeckLessonPlanReferencesAction",
     );
   }
 }

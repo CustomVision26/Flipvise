@@ -1,5 +1,9 @@
 import type { LessonPlanResult } from "@/lib/teacher-generators";
 import type { LessonPlanDayVocabularyDetail } from "@/lib/lesson-plan-ai-schema";
+import {
+  collapseRepeatedExampleLabel,
+  formatVocabularyExampleLine,
+} from "@/lib/lesson-plan-vocabulary-detail";
 import { formatUnitPacingLabel } from "@/lib/lesson-plan-weekly-schedule";
 
 export type LessonPlanPdfUnitContext = {
@@ -45,7 +49,10 @@ function addSection(
   doc.setTextColor(50);
 
   for (const line of lines) {
-    const wrapped = doc.splitTextToSize(line, contentW);
+    const wrapped = doc.splitTextToSize(
+      collapseRepeatedExampleLabel(line),
+      contentW,
+    );
     checkPage(wrapped.length * 13 + 4);
     doc.text(wrapped, margin, yRef.y);
     yRef.y += wrapped.length * 13 + 4;
@@ -61,8 +68,9 @@ export function vocabularyDetailPdfLines(
 
   for (const term of detail.terms) {
     lines.push(`• ${term.term} — ${term.definition}`);
-    if (term.example) {
-      lines.push(`  Example: ${term.example}`);
+    const exampleLine = formatVocabularyExampleLine(term.example);
+    if (exampleLine) {
+      lines.push(`  ${exampleLine}`);
     }
   }
 
@@ -121,8 +129,9 @@ export function vocabularyDetailPdfLines(
     );
     for (const term of detail.additionalVocabulary) {
       lines.push(`• ${term.term} — ${term.definition}`);
-      if (term.example) {
-        lines.push(`  Example: ${term.example}`);
+      const exampleLine = formatVocabularyExampleLine(term.example);
+      if (exampleLine) {
+        lines.push(`  ${exampleLine}`);
       }
     }
   }

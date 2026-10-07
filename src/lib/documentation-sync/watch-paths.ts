@@ -70,6 +70,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/live-classroom-dashboard-entry.tsx",
     "src/app/dashboard/page.tsx",
     "src/app/dashboard/deck-grid.tsx",
+    "src/components/education-owner-workspace-decks.tsx",
+    "src/lib/education-owner-workspace-decks.ts",
     "src/components/docs-ui-guide-provider.tsx",
     "src/lib/flipvise-ui-guides.ts",
   ],
@@ -358,6 +360,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/education-plans.ts",
   ],
   "teacher-dashboard": [
+    "src/lib/flipvise-ui-guides.ts",
     "src/app/teacher/page.tsx",
     "src/components/teacher-dashboard-home.tsx",
     "src/components/teacher-dashboard-shell.tsx",
@@ -368,6 +371,7 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/components/teacher-top-dashboard-buttons.tsx",
   ],
   "teacher-ai-content-tools": [
+    "src/lib/flipvise-ui-guides.ts",
     "src/app/teacher/lesson-builder/page.tsx",
     "src/app/teacher/lesson-builder/teacher-lesson-builder-form.tsx",
     "src/hooks/use-dirty-route-leave-guard.ts",
@@ -379,6 +383,8 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/lib/lesson-plan-similarity.ts",
     "src/lib/deck-edit-lesson-plan-sync.ts",
     "src/lib/deck-subject-topic.ts",
+    "src/lib/lesson-plan-deck-marker.ts",
+    "src/db/queries/lesson-plan-deck-references.ts",
     "src/actions/teacher-lesson-plan.ts",
     "src/lib/server-action-client-error.ts",
     "src/lib/document-extract.ts",

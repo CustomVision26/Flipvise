@@ -33,6 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getFirstPreviewCardFrontByDeckIds, promoteCoverPlaceholderCardsForDeck } from "@/db/queries/cards";
 import { getPersonalDecksByUserWithCardCount } from "@/db/queries/decks";
+import { relocateOwnerLessonPlansOffTeamAdminDecks } from "@/db/queries/owner-lesson-plan-deck-placement";
 import {
   countTeamsForOwner,
   getAssignedDecksForMemberWithCardCount,
@@ -48,6 +49,7 @@ import { TeamInviteAcceptedBanner } from "@/components/team-invite-accepted-bann
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { AddDeckDialogLoader as AddDeckDialog } from "@/components/add-deck-dialog-loader";
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
+import { EducationOwnerWorkspaceDecks } from "@/components/education-owner-workspace-decks";
 import { DeckGrid } from "./deck-grid";
 import { AiDocumentStudioDashboardEntry } from "@/components/ai-document-studio-dashboard-entry";
 import { LiveClassroomDashboardEntry } from "@/components/live-classroom-dashboard-entry";
@@ -316,20 +318,30 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   if (teamWorkspaceUrl?.isTeamAdminWorkspaceViewer) {
     const tw = teamWorkspaceUrl;
-    const [workspaceHeadingRow, workspaceDecksRaw] = await Promise.all([
-      tryTeamQuery(() => getTeamById(tw.teamId), null),
-      tryTeamQuery(async () => {
-        const teamRow = await getTeamById(tw.teamId);
-        if (teamRow && isEducationTeamPlanId(teamRow.planSlug)) {
-          return getEducationTeamAdminWorkspaceDecksWithCardCount(
-            tw.teamId,
-            tw.ownerUserId,
-            userId,
-          );
-        }
-        return getAssignedDecksForMemberWithCardCount(tw.teamId, userId);
-      }, []),
-    ]);
+    const workspaceHeadingRow = await tryTeamQuery(
+      () => getTeamById(tw.teamId),
+      null,
+    );
+    if (
+      workspaceHeadingRow &&
+      isEducationTeamPlanId(workspaceHeadingRow.planSlug)
+    ) {
+      await relocateOwnerLessonPlansOffTeamAdminDecks(
+        workspaceHeadingRow.ownerUserId,
+        tw.teamId,
+      );
+    }
+    const workspaceDecksRaw = await tryTeamQuery(async () => {
+      const teamRow = workspaceHeadingRow ?? (await getTeamById(tw.teamId));
+      if (teamRow && isEducationTeamPlanId(teamRow.planSlug)) {
+        return getEducationTeamAdminWorkspaceDecksWithCardCount(
+          tw.teamId,
+          tw.ownerUserId,
+          userId,
+        );
+      }
+      return getAssignedDecksForMemberWithCardCount(tw.teamId, userId);
+    }, []);
     const isEducationTeamAdminViewer =
       workspaceHeadingRow != null &&
       isEducationTeamPlanId(workspaceHeadingRow.planSlug);
@@ -721,20 +733,52 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         [],
       )
     : [];
+  let educationDeckSource = decks;
+  if (showEducationWorkspaceSections && ownedEducationTeams.length > 0) {
+    const moved = (
+      await Promise.all(
+        ownedEducationTeams.map((team) =>
+          relocateOwnerLessonPlansOffTeamAdminDecks(userId, team.id),
+        ),
+      )
+    ).some((count) => count > 0);
+    if (moved) {
+      const refreshed = await getPersonalDecksByUserWithCardCount(userId);
+      educationDeckSource = ownSubscriberTeamTierExtras
+        ? await mergePreviewThumbsForDecks(refreshed)
+        : refreshed;
+    }
+  }
   const personalOnlyDecks = showEducationWorkspaceSections
     ? decks.filter((deck) => deck.teamId == null)
     : decks;
-  const workspaceDeckSections = showEducationWorkspaceSections
-    ? ownedEducationTeams
-        .map((team) => ({
-          team,
-          decks: decks.filter((deck) => deck.teamId === team.id),
-        }))
-        .filter((section) => section.decks.length > 0)
+  const educationWorkspaces = showEducationWorkspaceSections
+    ? ownedEducationTeams.map((team) => ({
+        id: team.id,
+        name: team.name,
+        decks: educationDeckSource.filter((deck) => deck.teamId === team.id),
+      }))
     : [];
+  const creatorIds = [
+    ...new Set(
+      educationWorkspaces.flatMap((workspace) =>
+        workspace.decks
+          .map((deck) => deck.createdByUserId?.trim() ?? "")
+          .filter((id) => id.length > 0 && id !== userId),
+      ),
+    ),
+  ];
+  const creatorNames = Object.fromEntries(
+    await Promise.all(
+      creatorIds.map(async (id) => {
+        const name = (await getClerkUserDisplayNameById(id)).trim();
+        return [id, name && name !== "Subscriber" ? name : "Team admin"] as const;
+      }),
+    ),
+  );
   const hasGroupedEducationDecks =
     showEducationWorkspaceSections &&
-    (personalOnlyDecks.length > 0 || workspaceDeckSections.length > 0);
+    (personalOnlyDecks.length > 0 || educationWorkspaces.length > 0);
   const showAiDocumentStudio = hasAnyAiDocumentStudioAddon(
     access.activeAddonKeys,
   );
@@ -931,21 +975,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               />
             </section>
           ) : null}
-          {workspaceDeckSections.map(({ team, decks: sectionDecks }) => (
-            <section key={team.id} className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {team.name}
-              </h2>
-              <DeckGrid
-                decks={sectionDecks}
-                initialView={initialView}
-                allowCoverUpload={ownSubscriberTeamTierExtras}
-                teamTierPreviewPromo={ownSubscriberTeamTierExtras}
-                hasAiReading={hasAiReading}
-                detailedDeleteWarning={detailedDeleteWarning}
-              />
-            </section>
-          ))}
+          {educationWorkspaces.length > 0 ? (
+            <EducationOwnerWorkspaceDecks
+              workspaces={educationWorkspaces}
+              ownerUserId={userId}
+              creatorNames={creatorNames}
+              initialView={initialView}
+              allowCoverUpload={ownSubscriberTeamTierExtras}
+              teamTierPreviewPromo={ownSubscriberTeamTierExtras}
+              hasAiReading={hasAiReading}
+              detailedDeleteWarning={detailedDeleteWarning}
+            />
+          ) : null}
         </div>
       ) : (
         <DeckGrid
