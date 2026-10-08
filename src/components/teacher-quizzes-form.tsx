@@ -276,12 +276,14 @@ export function TeacherQuizzesForm({
     if (!value || value === ADMIN_NONE) {
       setSelectedAdminUserId(ADMIN_NONE);
       setLessonPlanSearchQuery("");
+      setExistingDeckKey(EXISTING_DECK_NONE);
       handleSavedPlanChange(SAVED_PLAN_NONE, []);
       return;
     }
 
     setSelectedAdminUserId(value);
     setLessonPlanSearchQuery("");
+    setExistingDeckKey(EXISTING_DECK_NONE);
     handleSavedPlanChange(
       SAVED_PLAN_NONE,
       ownerPicker.lessonPlansByAdminUserId[value] ?? [],
@@ -652,9 +654,20 @@ export function TeacherQuizzesForm({
   const selectedCreatorIsWorkspaceOwner = selectedAdminLabel?.isWorkspaceOwner === true;
 
   const editableDecks = useMemo(() => {
-    if (isWorkspaceOwner) return decks;
-    return decks.filter((deck) => deck.createdByUserId === viewerUserId);
-  }, [decks, isWorkspaceOwner, viewerUserId]);
+    if (!isWorkspaceOwner) {
+      return decks.filter((deck) => deck.createdByUserId === viewerUserId);
+    }
+    if (!selectedAdminLabel) return [];
+    if (selectedAdminLabel.isWorkspaceOwner) {
+      return decks.filter(
+        (deck) =>
+          (deck.createdByUserId ?? deck.userId) === selectedAdminLabel.userId,
+      );
+    }
+    return decks.filter(
+      (deck) => deck.createdByUserId === selectedAdminLabel.userId,
+    );
+  }, [decks, isWorkspaceOwner, selectedAdminLabel, viewerUserId]);
 
   const selectedExistingDeck =
     deckTargetMode === "existing"
@@ -1070,14 +1083,18 @@ export function TeacherQuizzesForm({
               <TeacherFieldLabel
                 htmlFor="existingQuizDeck"
                 label="Deck"
-                help="Generated cards are added to this deck. A team admin sees decks they created. The workspace owner sees every deck in this workspace. The deck’s card limit still applies."
+                help="Generated cards are added to this deck. When a team admin is selected, only decks that admin created are listed. Select the workspace owner to use decks you created, including decks assigned to a team admin. The deck’s card limit still applies."
               />
               <Select
                 value={existingDeckKey}
                 onValueChange={(value) => {
                   if (value) setExistingDeckKey(value);
                 }}
-                disabled={isBusy || editableDecks.length === 0}
+                disabled={
+                  isBusy ||
+                  editableDecks.length === 0 ||
+                  (isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE)
+                }
               >
                 <SelectTrigger id="existingQuizDeck" className="h-10 w-full bg-background">
                   <SelectValue placeholder="Select a deck">
@@ -1095,9 +1112,13 @@ export function TeacherQuizzesForm({
               </Select>
               {editableDecks.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {isWorkspaceOwner
-                    ? "This workspace has no decks yet. Choose Lesson plan to create one."
-                    : "You have no decks you can add cards to yet. Choose Lesson plan to create one."}
+                  {isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE
+                    ? "Select the workspace owner or a team admin above to see their decks."
+                    : isWorkspaceOwner && !selectedCreatorIsWorkspaceOwner
+                      ? "This team admin has not created any decks yet. Decks assigned to them are listed when you select the workspace owner."
+                      : isWorkspaceOwner
+                        ? "You have no decks yet. Choose Lesson plan to create one."
+                        : "You have no decks you can add cards to yet. Choose Lesson plan to create one."}
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
