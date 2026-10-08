@@ -24,7 +24,8 @@ export type DocsUiGuideId =
   | "quiz-results-workspace"
   | "edu-teacher-dashboard"
   | "edu-teacher-lesson-plan-owner"
-  | "edu-teacher-lesson-plan-owner-new-deck";
+  | "edu-teacher-lesson-plan-owner-new-deck"
+  | "edu-teacher-quiz-owner-lesson-plan";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -103,6 +104,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-dashboard",
           "edu-teacher-lesson-plan-owner",
           "edu-teacher-lesson-plan-owner-new-deck",
+          "edu-teacher-quiz-owner-lesson-plan",
         ],
       },
     ],
@@ -1075,6 +1077,12 @@ export const QUIZ_FORMATS_WORKSPACE_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
       "When counts are valid and AI content is ready, Preview shows how each card will appear. Republish to quiz replaces the published mix so members see it on their next quiz.",
   },
   {
+    src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 06.png`),
+    title: "Preview multiple choice",
+    caption:
+      "In Quiz format preview, multiple choice shows What quiz takers see (for example Battle of Hastings with options A–D, and the correct option marked). The original card question and MCQ options stay preserved underneath. Close returns to Quiz formats.",
+  },
+  {
     src: uiSrc(`${QUIZ_FORMATS_WORKSPACE_FILE} - 07.png`),
     title: "Preview true/false",
     caption:
@@ -1486,6 +1494,79 @@ export const EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_GUIDE_STEPS: readonly DocsUi
     },
   ];
 
+const EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE =
+  "28 Flipvise - Team Tier Edu Plan - Teacher DB AI-Quiz_TestGenerate - owner_UI-LP";
+
+export const EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 01.png`),
+      title: "Open AI Quiz/Test Generator",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens AI Quiz/Test Generator. The page creates a quiz deck from a saved lesson plan. Decks shows the workspace count (for example 4 / 15) and the card cap (up to 52 cards per deck). Workspace owner or team admin is the first field — open it to choose whose lesson plans to use.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 02.png`),
+      title: "Choose the owner or a team admin",
+      caption:
+        "Open Workspace owner or team admin. The list shows the subscriber (owner), for example John Brown — Workspace owner, and the team admin, for example Teddy Watt. The plan owner can use their own records and each team admin’s records in this workspace. A team admin can use their own records and other team admins in the same workspace.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 03.png`),
+      title: "Select a saved lesson plan",
+      caption:
+        "After a team admin is selected (Teddy Watt), Quiz source shows Lesson plan and Existing deck. Lesson plan is the tab for a saved plan. Open the list and choose a plan (for example Air Pollution and Its Effects · Lesson Plan · 3 days · grade 7). Subject, grade, topic, and difficulty fill from that plan.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 04.png`),
+      title: "Review the filled lesson plan",
+      caption:
+        "The selected plan fills Subject (Science : Environmental Science), Grade Level (grade 7), Topic (Air pollution), and Difficulty Level (Intermediate). Saved reference materials lists references from the plan (for example the website scied.ucar.edu). Number of Cards starts at 10 (1–52 on Education Gold). Include reading passage is still off. Choose AI Generate when the form is ready, or turn on a reading passage first.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 05.png`),
+      title: "Set regular cards and a reading passage",
+      caption:
+        "Set Regular quiz cards (for example 2). Turn on Include reading passage, then set Number of passages (for example 1) and Questions for each passage (for example 1). Passage type and Passage style can stay on Auto, and Reading level on On Grade. Question types include Multiple Choice (on by default), Critical Thinking, Scenario-Based, and Practical/Application — keep at least one on. Passage options can include key vocabulary, explanations for correct answers, teacher notes, local or cultural context, and avoiding previous passages. The footnote shows the mix (for example 2 regular + (1) passage questions = 3 / 52 cards). Choose AI Generate.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 06.png`),
+      title: "Choose which part of the lesson plan",
+      caption:
+        "For a multi-day plan, Which part of the lesson plan? asks for a scope before generation. All Days uses vocabulary, focus, and outlines from every day. A single day (Day 1, Day 2, or Day 3) uses only that day’s vocabulary, daily focus, and class outline — for example Day 1 Understanding air pollution and its health impacts. Choose a scope, then Generate. Quiz cards are created only from that choice.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 07.png`),
+      title: "Preview the generated cards",
+      caption:
+        "Preview lists the cards before they are saved (for example Card 1 · Regular, under Science : Environmental Science — Air pollution LP All Days). The front is blue, the correct back is green, and the three wrong answers are red. Expand opens the review larger so the question and answers are easier to read. Check the cards you want, then Save selected stores them on the new quiz deck.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 08.png`),
+      title: "Review a regular card",
+      caption:
+        "With Expand open, Collapse returns to the page. A regular card has one question on the front and the correct answer on the back. Swap exchanges the front and the back. The front, the back, and each wrong answer stay editable. Wrong answers from original front can supply distractors taken from the source card when that option applies.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 09.png`),
+      title: "Review a passage card",
+      caption:
+        "A passage card (for example Card 2 · Passage) puts the reading on the front — passage title, passage text, and the question — and the correct answer on the back (for example Ground-level ozone and particulate matter). Three wrong answers sit below for quiz mode. Regenerate replaces only those wrong answers and keeps the question and the correct answer. Save selected stores the checked cards.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 10.png`),
+      title: "Workspace Decks for the workspace",
+      caption:
+        "Workspace Decks — UC-K26 lists decks in this workspace. Search & filters matches name, day label, or description, and Sort by can order the list (for example Deck A–Z). Each row shows a Creator badge: Owner for the plan owner’s decks (for example Math: Alegbra 1, Science : Environmental Science — Air pollution, and Social Studies: British History) and Team admin for a deck that team admin created (Science : Environmental Science — Air pollution, labeled LESSON PLAN DAY 1).",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_FILE} - 11.png`),
+      title: "Open a deck from the table",
+      caption:
+        "Double-click a row to open that deck’s summary. The team admin deck (Science : Environmental Science — Air pollution, LESSON PLAN DAY 1) shows its description (topic, subject, grade, difficulty, and that it is a teacher quiz deck). Open Deck from the summary goes to that deck.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1635,5 +1716,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Teacher Dashboard, choose New deck, generate a lesson plan, save it, then find that deck under Owner lesson plans and the plan in Teacher Resource Library.",
     steps: EDU_TEACHER_LESSON_PLAN_OWNER_NEW_DECK_GUIDE_STEPS,
+  },
+  "edu-teacher-quiz-owner-lesson-plan": {
+    title: "AI Quiz/Test Generator from a lesson plan",
+    summary:
+      "On Teacher Dashboard, the plan owner chooses a team admin and a saved lesson plan, sets regular cards and a reading passage, generates, reviews the cards, then opens a deck from Workspace Decks.",
+    steps: EDU_TEACHER_QUIZ_OWNER_LESSON_PLAN_GUIDE_STEPS,
   },
 };

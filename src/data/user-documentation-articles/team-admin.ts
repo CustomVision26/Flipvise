@@ -273,7 +273,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Quiz formats",
         bullets: [
           "Route: /dashboard/team-admin/quiz-results/quiz-formats",
-          "Open quiz formats for a workspace guide to follow workspace defaults, a per-deck override, questions per format, Generate AI quiz sentences, Preview, Republish to quiz, and the member’s Timed quiz lobby.",
+          "Open quiz formats for a workspace guide to follow workspace defaults, a per-deck override, questions per format, Generate AI quiz sentences, Preview (multiple choice, true/false, and fill-in-the-blank), Republish to quiz, and the member’s Timed quiz lobby.",
           "Workspace selector shows the workspace name — pick the workspace before editing defaults or per-deck overrides.",
           "Workspace defaults — enable multiple choice, true/false, and/or fill-in-the-blank for all linked decks that inherit defaults.",
           "Per-deck overrides — uncheck Use workspace defaults to set formats for one deck only.",

@@ -248,6 +248,9 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="edu-teacher-lesson-plan-owner-new-deck">
               Open AI Lesson Builder for a new deck guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-quiz-owner-lesson-plan">
+              Open AI Quiz/Test Generator from a lesson plan guide
+            </DocsUiGuideStartButton>
           </>
         ) : null}
       </div>
@@ -527,6 +530,14 @@ function articleSectionGuides(
       {
         id: "edu-teacher-lesson-plan-owner-new-deck",
         label: "Open AI Lesson Builder for a new deck guide",
+      },
+    ];
+  }
+  if (pageId === "teacher-ai-content-tools" && sectionId === "quizzes-homework") {
+    return [
+      {
+        id: "edu-teacher-quiz-owner-lesson-plan",
+        label: "Open AI Quiz/Test Generator from a lesson plan guide",
       },
     ];
   }
