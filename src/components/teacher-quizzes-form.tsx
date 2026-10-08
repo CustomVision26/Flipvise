@@ -1018,19 +1018,94 @@ export function TeacherQuizzesForm({
 
           <div className="space-y-2 sm:col-span-2">
             <TeacherFieldLabel
-              htmlFor="savedLessonPlan"
-              label="Saved Lesson Plan (optional)"
+              htmlFor="quizDeckTargetMode"
+              label="Quiz source"
               help={
                 <>
-                  <p className="mb-1 font-semibold">Example:</p>
-                  <p>
-                    Select a plan saved from the AI Lesson Builder. Subject, grade,
-                    topic, and difficulty will auto-fill for your quiz deck.
-                  </p>
+                  <p className="mb-2">Choose how this quiz is saved.</p>
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    <li>
+                      <strong>Lesson plan</strong> — use a saved lesson plan to create a
+                      new quiz deck. Subject, grade, topic, and difficulty fill from the plan.
+                    </li>
+                    <li>
+                      <strong>Existing deck</strong> — add the generated cards to a deck
+                      you can already edit. A new deck is not created.
+                    </li>
+                  </ul>
                 </>
               }
             />
-          {isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE ? (
+            <ToggleGroup
+              id="quizDeckTargetMode"
+              value={[deckTargetMode]}
+              onValueChange={(next) => {
+                const value = next[0] as QuizDeckTargetMode | undefined;
+                if (!value) return;
+                setDeckTargetMode(value);
+                if (value === "new") {
+                  setExistingDeckKey(EXISTING_DECK_NONE);
+                  return;
+                }
+                setSelectedPlanKey(SAVED_PLAN_NONE);
+                setForm((current) => ({
+                  ...current,
+                  savedLessonPlanId: undefined,
+                }));
+              }}
+              variant="outline"
+              spacing={0}
+              className="flex w-full"
+              disabled={isBusy}
+            >
+              <ToggleGroupItem value="new" className="h-10 flex-1 px-3">
+                Lesson plan
+              </ToggleGroupItem>
+              <ToggleGroupItem value="existing" className="h-10 flex-1 px-3">
+                Existing deck
+              </ToggleGroupItem>
+            </ToggleGroup>
+          {deckTargetMode === "existing" ? (
+            <div className="space-y-2 pt-1">
+              <TeacherFieldLabel
+                htmlFor="existingQuizDeck"
+                label="Deck"
+                help="Generated cards are added to this deck. A team admin sees decks they created. The workspace owner sees every deck in this workspace. The deck’s card limit still applies."
+              />
+              <Select
+                value={existingDeckKey}
+                onValueChange={(value) => {
+                  if (value) setExistingDeckKey(value);
+                }}
+                disabled={isBusy || editableDecks.length === 0}
+              >
+                <SelectTrigger id="existingQuizDeck" className="h-10 w-full bg-background">
+                  <SelectValue placeholder="Select a deck">
+                    {selectedExistingDeck?.name ?? "Select a deck"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EXISTING_DECK_NONE}>Select a deck</SelectItem>
+                  {editableDecks.map((deck) => (
+                    <SelectItem key={deck.id} value={String(deck.id)}>
+                      {deck.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {editableDecks.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {isWorkspaceOwner
+                    ? "This workspace has no decks yet. Choose Lesson plan to create one."
+                    : "You have no decks you can add cards to yet. Choose Lesson plan to create one."}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Cards are added to the selected deck. A new deck is not created.
+                </p>
+              )}
+            </div>
+          ) : isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE ? (
             <p className="text-sm text-muted-foreground">
               Select the workspace owner or a team admin above to browse their saved lesson
               plans.
@@ -1081,7 +1156,7 @@ export function TeacherQuizzesForm({
               ) : null}
             </>
           )}
-          {!isWorkspaceOwner && savedLessonPlans.length === 0 ? (
+          {deckTargetMode === "new" && !isWorkspaceOwner && savedLessonPlans.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No saved lesson plans yet. Save one in the{" "}
               <Link
@@ -1101,7 +1176,8 @@ export function TeacherQuizzesForm({
               first — input data and the PDF are stored for quiz generation.
             </p>
           ) : null}
-          {isWorkspaceOwner &&
+          {deckTargetMode === "new" &&
+          isWorkspaceOwner &&
           selectedAdminUserId !== ADMIN_NONE &&
           activeLessonPlans.length === 0 ? (
             <p className="text-xs text-muted-foreground">
@@ -1110,7 +1186,7 @@ export function TeacherQuizzesForm({
                 : "This team admin has no saved lesson plans yet."}
             </p>
           ) : null}
-          {selectedPlan?.pdfUrl ? (
+          {deckTargetMode === "new" && selectedPlan?.pdfUrl ? (
             <p className="text-xs text-muted-foreground">
               Lesson plan PDF:{" "}
               <a
@@ -1124,12 +1200,12 @@ export function TeacherQuizzesForm({
               </a>
             </p>
           ) : null}
-          {selectedPlan ? (
+          {deckTargetMode === "new" && selectedPlan ? (
             <LessonPlanSavedReferenceSummary
               references={getLessonPlanReferenceMaterials(selectedPlan.input)}
             />
           ) : null}
-          {lessonPlanFieldOverride ? (
+          {deckTargetMode === "new" && lessonPlanFieldOverride ? (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               Subject, grade, or topic differs from the selected lesson plan — your edits override
               the plan values for generation.
@@ -1226,92 +1302,6 @@ export function TeacherQuizzesForm({
               )}
             </SelectContent>
             </Select>
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <TeacherFieldLabel
-            htmlFor="quizDeckTargetMode"
-            label="Save to deck"
-            help={
-              <>
-                <p className="mb-2">
-                  Choose where the generated quiz cards are saved.
-                </p>
-                <ul className="list-disc space-y-0.5 pl-4">
-                  <li>
-                    <strong>Existing deck</strong> — add the new cards to a deck you
-                    can already edit. A team admin sees decks they created. The workspace
-                    owner sees every deck in this workspace.
-                  </li>
-                  <li>
-                    <strong>New deck</strong> — create a quiz deck from the subject and
-                    topic, or the lesson-plan day deck when a saved lesson plan is selected.
-                  </li>
-                </ul>
-              </>
-            }
-          />
-          <ToggleGroup
-            id="quizDeckTargetMode"
-            value={[deckTargetMode]}
-            onValueChange={(next) => {
-              const value = next[0] as QuizDeckTargetMode | undefined;
-              if (!value) return;
-              setDeckTargetMode(value);
-              if (value === "new") setExistingDeckKey(EXISTING_DECK_NONE);
-            }}
-            variant="outline"
-            spacing={0}
-            className="flex w-full"
-            disabled={isBusy}
-          >
-            <ToggleGroupItem value="existing" className="h-10 flex-1 px-3">
-              Existing deck
-            </ToggleGroupItem>
-            <ToggleGroupItem value="new" className="h-10 flex-1 px-3">
-              New deck
-            </ToggleGroupItem>
-          </ToggleGroup>
-          {deckTargetMode === "existing" ? (
-            <div className="space-y-2 pt-1">
-              <TeacherFieldLabel
-                htmlFor="existingQuizDeck"
-                label="Deck"
-                help="Generated cards are added to this deck. The deck’s card limit still applies."
-              />
-              <Select
-                value={existingDeckKey}
-                onValueChange={(value) => {
-                  if (value) setExistingDeckKey(value);
-                }}
-                disabled={isBusy || editableDecks.length === 0}
-              >
-                <SelectTrigger id="existingQuizDeck" className="h-10 w-full bg-background">
-                  <SelectValue placeholder="Select a deck">
-                    {selectedExistingDeck?.name ?? "Select a deck"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={EXISTING_DECK_NONE}>Select a deck</SelectItem>
-                  {editableDecks.map((deck) => (
-                    <SelectItem key={deck.id} value={String(deck.id)}>
-                      {deck.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {editableDecks.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {isWorkspaceOwner
-                    ? "This workspace has no decks yet. Choose New deck to create one."
-                    : "You have no decks you can add cards to yet. Choose New deck to create one."}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Cards are added to the selected deck. A new deck is not created.
-                </p>
-              )}
-            </div>
-          ) : null}
         </div>
         <div className="space-y-2 sm:col-span-2 sm:max-w-xs">
           <TeacherFieldLabel
