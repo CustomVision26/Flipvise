@@ -15,6 +15,7 @@ import {
   type TeacherQuizReviewRow,
 } from "@/lib/teacher-quiz-review";
 import type { TeacherQuizDeckSaveDestinationPreview } from "@/lib/teacher-quiz-deck-save-preview";
+import { useTeacherPreviewExpanded } from "@/components/teacher-tool-page-shell";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ArrowUpDown, Loader2, RefreshCw } from "lucide-react";
@@ -51,6 +52,7 @@ export function TeacherQuizReviewPanel({
   const hasRegularCards = rows.some((row) => !row.isReadingPassage);
   const mixedReview = hasPassageCards && hasRegularCards;
   const destinationPhrase = formatSaveDestinationPhrase(saveDestination);
+  const previewExpanded = useTeacherPreviewExpanded();
   async function fetchDistractorsForRow(row: TeacherQuizReviewRow) {
     const ctx = distractorContextForTeacherQuizRow(row);
     try {
@@ -176,7 +178,12 @@ export function TeacherQuizReviewPanel({
           />
         </div>
 
-        <div className="max-h-[min(65vh,32rem)] space-y-3 overflow-y-auto pr-1">
+        <div
+          className={cn(
+            "space-y-3 overflow-y-auto pr-1",
+            previewExpanded ? "max-h-none" : "max-h-[min(65vh,32rem)]",
+          )}
+        >
           {rows.map((row, index) => {
             const passageCard = row.isReadingPassage === true;
             return (
@@ -209,15 +216,21 @@ export function TeacherQuizReviewPanel({
                 <TeacherReviewFieldLabel
                   htmlFor={`teacher-quiz-front-${row.id}`}
                   label="Front"
+                  className="text-sky-300"
                   help="The question or prompt shown on the front of the flashcard — e.g. “What is a colony?”"
                 />
                 <Textarea
                   id={`teacher-quiz-front-${row.id}`}
                   value={row.front}
                   onChange={(event) => updateRow(row.id, { front: event.target.value })}
-                  rows={passageCard ? 10 : 2}
+                  rows={passageCard ? (previewExpanded ? 22 : 10) : 2}
                   disabled={disabled}
-                  className="min-h-[2.5rem] resize-y text-sm"
+                  className={cn(
+                    "resize-y border-sky-500/40 text-sm text-sky-200",
+                    previewExpanded && passageCard
+                      ? "min-h-[28rem]"
+                      : "min-h-[2.5rem]",
+                  )}
                 />
               </div>
               {!passageCard ? (
@@ -241,6 +254,7 @@ export function TeacherQuizReviewPanel({
                 <TeacherReviewFieldLabel
                   htmlFor={`teacher-quiz-back-${row.id}`}
                   label="Back"
+                  className="text-emerald-400"
                   help="The correct answer saved with this card. For math/problem-solving, use Step 1: … Answer: … so Standard Review study mode shows the breakdown; Quiz mode still shows only the final Answer: value."
                 />
                 <Textarea
@@ -249,7 +263,7 @@ export function TeacherQuizReviewPanel({
                   onChange={(event) => updateRow(row.id, { back: event.target.value })}
                   rows={row.back.includes("Step") ? 8 : 3}
                   disabled={disabled}
-                  className="min-h-[3rem] resize-y text-sm"
+                  className="min-h-[3rem] resize-y border-emerald-500/40 text-sm text-emerald-300"
                 />
               </div>
               {!passageCard ? (
@@ -293,10 +307,11 @@ export function TeacherQuizReviewPanel({
                   </div>
                 </div>
               ) : null}
-              <div className="space-y-2 rounded-md border border-border/60 bg-muted/5 px-2.5 py-2.5">
+              <div className="space-y-2 rounded-md border border-red-500/40 bg-red-500/5 px-2.5 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <TeacherReviewFieldLabel
                     label="Quiz wrong answers (preview)"
+                    className="text-red-400"
                     help="Three incorrect options stored with the correct answer for multiple-choice quiz mode. All three are required before saving."
                   />
                   <TeacherTooltipButton
@@ -327,6 +342,7 @@ export function TeacherQuizReviewPanel({
                     <TeacherReviewFieldLabel
                       htmlFor={`teacher-quiz-distractor-${row.id}-${distractorIndex}`}
                       label={`Wrong answer ${distractorIndex + 1}`}
+                      className="text-red-400"
                       help="A plausible but incorrect choice shown alongside the correct answer during quiz study."
                     />
                     <Textarea
@@ -337,7 +353,7 @@ export function TeacherQuizReviewPanel({
                       }
                       disabled={disabled || row.distractorsLoading}
                       rows={distractorIndex === 0 ? 2 : 1}
-                      className="min-h-[2rem] resize-y text-sm"
+                      className="min-h-[2rem] resize-y border-red-500/40 text-sm text-red-300"
                     />
                   </div>
                 ))}
