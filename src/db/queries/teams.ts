@@ -958,6 +958,16 @@ export async function deckHasAnyTeamAssignments(
   return row != null;
 }
 
+/** Deck ids assigned to any member of this workspace. */
+export async function getAssignedDeckIdsForTeam(teamId: number): Promise<number[]> {
+  const rows = await db
+    .select({ deckId: teamDeckAssignments.deckId })
+    .from(teamDeckAssignments)
+    .where(eq(teamDeckAssignments.teamId, teamId))
+    .groupBy(teamDeckAssignments.deckId);
+  return rows.map((row) => row.deckId);
+}
+
 export async function getAssignedDecksForMember(
   teamId: number,
   memberUserId: string,

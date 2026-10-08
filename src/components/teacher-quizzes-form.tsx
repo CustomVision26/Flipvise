@@ -175,6 +175,7 @@ export function TeacherQuizzesForm({
   ownerPicker,
   initialLessonPlanId,
   decks,
+  assignedDeckIds,
   deckQuota,
   viewerUserId,
   backHref = "/teacher",
@@ -184,6 +185,7 @@ export function TeacherQuizzesForm({
   ownerPicker: OwnerQuizLessonPlanPickerPayload;
   initialLessonPlanId?: number;
   decks: DeckRow[];
+  assignedDeckIds: number[];
   deckQuota: TeacherDeckQuota;
   viewerUserId: string;
   backHref?: string;
@@ -204,6 +206,7 @@ export function TeacherQuizzesForm({
   const [isSaving, setIsSaving] = useState(false);
   const [reviewRows, setReviewRows] = useState<TeacherQuizReviewRow[] | null>(null);
   const [decksExpanded, setDecksExpanded] = useState(true);
+  const [openWorkspaceDeckKey, setOpenWorkspaceDeckKey] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [readingPassageQuestions, setReadingPassageQuestions] = useState(false);
@@ -277,6 +280,7 @@ export function TeacherQuizzesForm({
       setSelectedAdminUserId(ADMIN_NONE);
       setLessonPlanSearchQuery("");
       setExistingDeckKey(EXISTING_DECK_NONE);
+      setDeckTargetMode("new");
       handleSavedPlanChange(SAVED_PLAN_NONE, []);
       return;
     }
@@ -659,15 +663,17 @@ export function TeacherQuizzesForm({
     }
     if (!selectedAdminLabel) return [];
     if (selectedAdminLabel.isWorkspaceOwner) {
+      const assigned = new Set(assignedDeckIds);
       return decks.filter(
         (deck) =>
+          assigned.has(deck.id) &&
           (deck.createdByUserId ?? deck.userId) === selectedAdminLabel.userId,
       );
     }
     return decks.filter(
       (deck) => deck.createdByUserId === selectedAdminLabel.userId,
     );
-  }, [decks, isWorkspaceOwner, selectedAdminLabel, viewerUserId]);
+  }, [assignedDeckIds, decks, isWorkspaceOwner, selectedAdminLabel, viewerUserId]);
 
   const selectedExistingDeck =
     deckTargetMode === "existing"
@@ -929,6 +935,14 @@ export function TeacherQuizzesForm({
                 <CardContent className="space-y-4 pt-4">
                   <TeamAdminRecordSlider
                     items={deckSliderItems}
+                    layout="table"
+                    tableActivateOn="dblclick"
+                    activeKey={openWorkspaceDeckKey}
+                    onActivate={(item) =>
+                      setOpenWorkspaceDeckKey((current) =>
+                        current === item.key ? null : item.key,
+                      )
+                    }
                     interactiveCard
                     defaultFiltersOpen
                     searchLabel="Search decks"
@@ -938,19 +952,61 @@ export function TeacherQuizzesForm({
                       member_az: "Deck (A–Z)",
                       member_za: "Deck (Z–A)",
                     }}
+                    tableRowNoun={{ singular: "deck", plural: "decks" }}
+                    tableColumns={[
+                      {
+                        id: "deck",
+                        header: "Deck",
+                        cell: (item) => (
+                          <div className="min-w-0 space-y-0.5">
+                            {item.lessonPlanDayLabel ? (
+                              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {item.lessonPlanDayLabel}
+                              </p>
+                            ) : null}
+                            <p className="font-medium text-foreground">{item.displayName}</p>
+                          </div>
+                        ),
+                      },
+                      {
+                        id: "creator",
+                        header: "Creator",
+                        className: "w-36",
+                        cell: (item) => {
+                          const creatorId =
+                            item.deck.createdByUserId ?? item.deck.userId;
+                          const owner = ownerPicker.teamAdmins.find(
+                            (admin) => admin.isWorkspaceOwner,
+                          );
+                          const isOwnerDeck = owner
+                            ? creatorId === owner.userId
+                            : isWorkspaceOwner
+                              ? creatorId === viewerUserId
+                              : creatorId !== viewerUserId;
+                          return (
+                            <Badge variant={isOwnerDeck ? "secondary" : "outline"}>
+                              {isOwnerDeck ? "Owner" : "Team admin"}
+                            </Badge>
+                          );
+                        },
+                      },
+                    ]}
                     getSearchHaystack={(item) =>
                       [
                         item.displayName,
                         item.deck.name,
                         item.deck.description,
                         item.lessonPlanDayLabel,
+                        item.deck.createdByUserId === viewerUserId
+                          ? "team admin"
+                          : "owner",
                       ]
                         .filter((part): part is string => Boolean(part?.trim()))
                         .join(" ")
                     }
                     emptyMessage="No decks yet. Select a saved lesson plan and click AI Generate to create one."
                     noResultsMessage="No decks match your search."
-                    renderCard={(item) => (
+                    renderBelowActive={(item) => (
                       <div className="flex min-h-[7.5rem] flex-col justify-between gap-4 sm:flex-row sm:items-center">
                         <div className="min-w-0 space-y-1.5">
                           {item.lessonPlanDayLabel ? (
@@ -1029,6 +1085,7 @@ export function TeacherQuizzesForm({
             </div>
           ) : null}
 
+          {!isWorkspaceOwner || selectedAdminUserId !== ADMIN_NONE ? (
           <div className="space-y-2 sm:col-span-2">
             <TeacherFieldLabel
               htmlFor="quizDeckTargetMode"
@@ -1083,7 +1140,7 @@ export function TeacherQuizzesForm({
               <TeacherFieldLabel
                 htmlFor="existingQuizDeck"
                 label="Deck"
-                help="Generated cards are added to this deck. When a team admin is selected, only decks that admin created are listed. Select the workspace owner to use decks you created, including decks assigned to a team admin. The deck’s card limit still applies."
+                help="Generated cards are added to this deck. When a team admin is selected, only decks that admin created are listed. Select the workspace owner to use decks assigned to workspace members. Unassigned decks are omitted. The deck’s card limit still applies."
               />
               <Select
                 value={existingDeckKey}
@@ -1115,9 +1172,9 @@ export function TeacherQuizzesForm({
                   {isWorkspaceOwner && selectedAdminUserId === ADMIN_NONE
                     ? "Select the workspace owner or a team admin above to see their decks."
                     : isWorkspaceOwner && !selectedCreatorIsWorkspaceOwner
-                      ? "This team admin has not created any decks yet. Decks assigned to them are listed when you select the workspace owner."
+                      ? "This team admin has not created any decks yet."
                       : isWorkspaceOwner
-                        ? "You have no decks yet. Choose Lesson plan to create one."
+                        ? "No assigned decks yet. Assign a deck in Team Admin, or choose Lesson plan to create one."
                         : "You have no decks you can add cards to yet. Choose Lesson plan to create one."}
                 </p>
               ) : (
@@ -1233,6 +1290,7 @@ export function TeacherQuizzesForm({
             </p>
           ) : null}
         </div>
+          ) : null}
         <div className="space-y-2">
           <TeacherFieldLabel
             htmlFor="subject"

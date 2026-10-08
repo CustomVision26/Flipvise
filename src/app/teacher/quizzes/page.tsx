@@ -4,6 +4,7 @@ import {
 } from "@/db/queries/saved-lesson-plans";
 import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
+import { getAssignedDeckIdsForTeam } from "@/db/queries/teams";
 import { TeacherQuizzesForm } from "@/components/teacher-quizzes-form";
 
 type TeacherQuizzesPageProps = {
@@ -27,10 +28,13 @@ export default async function TeacherQuizzesPage({
     ? Number.parseInt(params.lessonPlanId, 10)
     : undefined;
 
-  const [savedLessonPlans, ownerPicker, deckContext] = await Promise.all([
+  const [savedLessonPlans, ownerPicker, deckContext, assignedDeckIds] = await Promise.all([
     getSavedLessonPlansForQuizPicker(userId, workspace.teamId),
     loadOwnerQuizLessonPlanPicker(userId, workspace.teamId),
     loadTeacherDeckContext(userId, workspace.teamId),
+    workspace.teamId != null
+      ? getAssignedDeckIdsForTeam(workspace.teamId)
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -38,6 +42,7 @@ export default async function TeacherQuizzesPage({
       savedLessonPlans={savedLessonPlans}
       ownerPicker={ownerPicker}
       decks={deckContext.decks}
+      assignedDeckIds={assignedDeckIds}
       deckQuota={deckContext.quota}
       viewerUserId={userId}
       initialLessonPlanId={

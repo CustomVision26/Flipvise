@@ -161,6 +161,8 @@ export type TeamAdminRecordSliderProps<
   defaultFiltersOpen?: boolean;
   /** Card carousel (default) or scrollable table of all filtered rows. */
   layout?: "slider" | "table";
+  /** Table rows open on click (default) or double-click. */
+  tableActivateOn?: "click" | "dblclick";
   /** Table headers — required when `layout="table"`. */
   tableColumns?: Array<{
     id: string;
@@ -200,6 +202,7 @@ export function TeamAdminRecordSlider<
   filterPanelExtraActive = false,
   defaultFiltersOpen = false,
   layout = "slider",
+  tableActivateOn = "click",
   tableColumns,
   tableGroupByMember = false,
   tablePageSize = 10,
@@ -314,6 +317,17 @@ export function TeamAdminRecordSlider<
     const next = slideIndex + 1;
     setSlideIndex(next);
     scrollToIndex(next);
+  }
+
+  function activateTableRow(item: T) {
+    if (tableActivateOn === "dblclick") return;
+    onActivate?.(item);
+  }
+
+  function activateTableRowOnDoubleClick(item: T) {
+    if (tableActivateOn !== "dblclick") return;
+    onDoubleClick?.(item);
+    onActivate?.(item);
   }
 
   function expandedDetailRow(item: T) {
@@ -491,7 +505,13 @@ export function TeamAdminRecordSlider<
                           <React.Fragment key={item.key}>
                           <TableRow
                             className={cn("cursor-pointer", isActive && "bg-muted/40")}
-                            onClick={() => onActivate?.(item)}
+                            onClick={() => activateTableRow(item)}
+                            onDoubleClick={() => activateTableRowOnDoubleClick(item)}
+                            title={
+                              tableActivateOn === "dblclick"
+                                ? "Double-click to open this record"
+                                : undefined
+                            }
                             aria-selected={isActive}
                           >
                             {memberColumn ? (
@@ -524,7 +544,13 @@ export function TeamAdminRecordSlider<
                         <React.Fragment key={item.key}>
                         <TableRow
                           className={cn("cursor-pointer", isActive && "bg-muted/40")}
-                          onClick={() => onActivate?.(item)}
+                          onClick={() => activateTableRow(item)}
+                          onDoubleClick={() => activateTableRowOnDoubleClick(item)}
+                          title={
+                            tableActivateOn === "dblclick"
+                              ? "Double-click to open this record"
+                              : undefined
+                          }
                           aria-selected={isActive}
                         >
                           {tableColumns.map((col) => (
