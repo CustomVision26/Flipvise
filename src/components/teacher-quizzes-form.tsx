@@ -44,6 +44,10 @@ import { buildTeacherSubPath } from "@/lib/teacher-url";
 import type { TeacherWorkspaceContext } from "@/lib/teacher-url";
 import { LESSON_DIFFICULTY_LEVELS } from "@/lib/lesson-plan-difficulty";
 import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
+import {
+  parseTeacherDeckGradeAndDifficulty,
+  resolveDeckSubjectAndTopic,
+} from "@/lib/deck-subject-topic";
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
 import {
@@ -168,6 +172,34 @@ function clampCardCountInput(value: string, max: number, min = 0): string {
 
 function defaultNumberOfCards(maxCardsPerDeck: number): string {
   return String(Math.min(TEACHER_QUIZ_DEFAULT_QUESTION_COUNT, maxCardsPerDeck));
+}
+
+function lessonDifficultyForQuizSelect(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "All") return "";
+  if (
+    (LESSON_DIFFICULTY_LEVELS as readonly string[]).includes(trimmed)
+  ) {
+    return trimmed;
+  }
+  if (/^on-?level$/i.test(trimmed)) return "Intermediate";
+  return "";
+}
+
+function quizFormDefaultsFromDeck(deck: DeckRow): Pick<
+  QuizDeckFormState,
+  "subject" | "gradeLevel" | "topic" | "difficultyLevel"
+> {
+  const { subject, topic } = resolveDeckSubjectAndTopic(deck);
+  const fromDescription = parseTeacherDeckGradeAndDifficulty(deck.description);
+  return {
+    subject,
+    topic,
+    gradeLevel: deck.gradeLevel?.trim() || fromDescription.gradeLevel,
+    difficultyLevel: lessonDifficultyForQuizSelect(
+      deck.difficultyLevel?.trim() || fromDescription.difficultyLevel,
+    ),
+  };
 }
 
 export function TeacherQuizzesForm({
@@ -682,6 +714,31 @@ export function TeacherQuizzesForm({
 
   const existingDeckMissing = deckTargetMode === "existing" && selectedExistingDeck == null;
 
+  function handleExistingDeckChange(value: string | null) {
+    if (!value || value === EXISTING_DECK_NONE) {
+      setExistingDeckKey(EXISTING_DECK_NONE);
+      setForm((current) => ({
+        ...EMPTY_FORM,
+        numberOfCards: current.numberOfCards,
+      }));
+      return;
+    }
+
+    const deck = editableDecks.find((item) => String(item.id) === value);
+    if (!deck) return;
+
+    const defaults = quizFormDefaultsFromDeck(deck);
+    setExistingDeckKey(value);
+    setForm((current) => ({
+      ...current,
+      savedLessonPlanId: undefined,
+      subject: defaults.subject,
+      gradeLevel: defaults.gradeLevel,
+      topic: defaults.topic,
+      difficultyLevel: defaults.difficultyLevel,
+    }));
+  }
+
   const effectiveSaveDestination = selectedExistingDeck
     ? { mode: "append" as const, deckName: selectedExistingDeck.name }
     : saveDestination;
@@ -1100,7 +1157,8 @@ export function TeacherQuizzesForm({
                     </li>
                     <li>
                       <strong>Existing deck</strong> — add the generated cards to a deck
-                      you can already edit. A new deck is not created.
+                      you can already edit. A new deck is not created. Subject, grade,
+                      topic, and difficulty fill from the selected deck.
                     </li>
                   </ul>
                 </>
@@ -1140,13 +1198,11 @@ export function TeacherQuizzesForm({
               <TeacherFieldLabel
                 htmlFor="existingQuizDeck"
                 label="Deck"
-                help="Generated cards are added to this deck. When a team admin is selected, only decks that admin created are listed. Select the workspace owner to use decks assigned to workspace members. Unassigned decks are omitted. The deck’s card limit still applies."
+                help="Generated cards are added to this deck. Subject, grade, topic, and difficulty fill from the deck. When a team admin is selected, only decks that admin created are listed. Select the workspace owner to use decks assigned to workspace members. Unassigned decks are omitted. The deck’s card limit still applies."
               />
               <Select
                 value={existingDeckKey}
-                onValueChange={(value) => {
-                  if (value) setExistingDeckKey(value);
-                }}
+                onValueChange={handleExistingDeckChange}
                 disabled={
                   isBusy ||
                   editableDecks.length === 0 ||

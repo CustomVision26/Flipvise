@@ -42,6 +42,45 @@ function parseStructuredTeacherDeckDescription(
   return null;
 }
 
+function gradeFromDescriptionSegment(segment: string): string | null {
+  const match = segment.match(/^grade\s+(.+)$/i);
+  if (!match) return null;
+  const rest = match[1]?.trim() ?? "";
+  if (!rest) return null;
+  // Stored values already include "grade" (for example "grade 7"), and the
+  // description prefixes another "Grade ". Keep a bare "Grade 7" intact.
+  if (/^grade\b/i.test(rest)) return rest;
+  return segment.trim();
+}
+
+function difficultyFromDescriptionSegment(segment: string): string | null {
+  const match = segment.match(/^(.+?)\s+difficulty$/i);
+  const value = match?.[1]?.trim() ?? "";
+  return value || null;
+}
+
+/** Grade and difficulty written into teacher quiz and lesson-plan deck descriptions. */
+export function parseTeacherDeckGradeAndDifficulty(
+  description: string | null | undefined,
+): { gradeLevel: string; difficultyLevel: string } {
+  const raw = description?.trim();
+  if (!raw || !isTeacherToolDeckDescription(raw)) {
+    return { gradeLevel: "", difficultyLevel: "" };
+  }
+
+  let gradeLevel = "";
+  let difficultyLevel = "";
+  for (const segment of raw.split(DESCRIPTION_SEGMENT_SPLIT)) {
+    const part = segment.trim();
+    if (!part) continue;
+    if (!gradeLevel) gradeLevel = gradeFromDescriptionSegment(part) ?? "";
+    if (!difficultyLevel) {
+      difficultyLevel = difficultyFromDescriptionSegment(part) ?? "";
+    }
+  }
+  return { gradeLevel, difficultyLevel };
+}
+
 function parseSubjectTopicFromName(name: string): { subject: string; topic: string } {
   const stripped = stripLessonPlanScopedDeckSuffix(name.trim());
   if (!stripped) {

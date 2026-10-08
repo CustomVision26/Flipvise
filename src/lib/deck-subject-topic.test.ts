@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseDeckSubjectTopic, resolveDeckSubjectAndTopic } from "./deck-subject-topic";
+import {
+  parseDeckSubjectTopic,
+  parseTeacherDeckGradeAndDifficulty,
+  resolveDeckSubjectAndTopic,
+} from "./deck-subject-topic";
 
 describe("parseDeckSubjectTopic", () => {
   it("keeps Science : Environmental Science as subject and Air pollution as topic for quiz decks", () => {
@@ -40,6 +44,28 @@ describe("parseDeckSubjectTopic", () => {
     });
     assert.equal(parsed.subject, "Mathematics");
     assert.equal(parsed.topic, "Linear equations");
+  });
+
+  it("reads grade and difficulty from a teacher quiz deck description", () => {
+    const parsed = parseTeacherDeckGradeAndDifficulty(
+      "Air pollution · Science : Environmental Science · Grade grade 7 · Intermediate difficulty · Teacher quiz deck · Lesson scope: Day 1",
+    );
+    assert.equal(parsed.gradeLevel, "grade 7");
+    assert.equal(parsed.difficultyLevel, "Intermediate");
+  });
+
+  it("keeps a single Grade label when the description is not doubled", () => {
+    const parsed = parseTeacherDeckGradeAndDifficulty(
+      "Algebra · Mathematics · Grade 6 · Beginner difficulty · Teacher lesson plan deck",
+    );
+    assert.equal(parsed.gradeLevel, "Grade 6");
+    assert.equal(parsed.difficultyLevel, "Beginner");
+  });
+
+  it("ignores ordinary deck descriptions for grade and difficulty", () => {
+    const parsed = parseTeacherDeckGradeAndDifficulty("Linear equations");
+    assert.equal(parsed.gradeLevel, "");
+    assert.equal(parsed.difficultyLevel, "");
   });
 
   it("splits a Subject — Topic deck name when description is empty", () => {
