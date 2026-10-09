@@ -224,7 +224,7 @@ export function TeacherHomeworkForm({
         ? "lesson_plan"
         : initialDeck
           ? "deck"
-          : "topic"),
+          : "lesson_plan"),
   );
   const [selectedPlanKey, setSelectedPlanKey] = useState<string>(
     initialSavedHomework?.savedLessonPlanId != null
@@ -894,10 +894,6 @@ export function TeacherHomeworkForm({
                   </p>
                   <ul className="list-disc pl-4 space-y-0.5">
                     <li>
-                      <strong>Custom topic</strong> — use the subject, grade, and topic
-                      fields only.
-                    </li>
-                    <li>
                       <strong>Lesson plan</strong> — base homework on a plan from the AI
                       Lesson Builder.
                     </li>
@@ -927,9 +923,6 @@ export function TeacherHomeworkForm({
                 isEditingExistingHomework && "opacity-60",
               )}
             >
-              <ToggleGroupItem value="topic" className="h-10 flex-1 px-3">
-                Custom topic
-              </ToggleGroupItem>
               <ToggleGroupItem value="lesson_plan" className="h-10 flex-1 px-3">
                 Lesson plan
               </ToggleGroupItem>
