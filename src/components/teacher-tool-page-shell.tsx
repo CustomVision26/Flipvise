@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode, createContext, useContext } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+  createContext,
+  useContext,
+} from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Maximize2, Minimize2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -89,6 +98,28 @@ export function TeacherToolPageShell({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewExpanded]);
+
+  useLayoutEffect(() => {
+    if (!previewExpanded) return;
+    const header = document.querySelector<HTMLElement>("[data-app-header]");
+    const root = document.documentElement;
+    const apply = () => {
+      const headerBottom = header?.getBoundingClientRect().bottom ?? 0;
+      const top = Math.max(headerBottom, 0) + 12;
+      root.style.setProperty("--teacher-preview-top", `${top}px`);
+    };
+    apply();
+    const observer = header ? new ResizeObserver(apply) : null;
+    if (header && observer) observer.observe(header);
+    window.addEventListener("resize", apply);
+    window.addEventListener("scroll", apply, { passive: true });
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", apply);
+      window.removeEventListener("scroll", apply);
+      root.style.removeProperty("--teacher-preview-top");
+    };
   }, [previewExpanded]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -201,7 +232,8 @@ export function TeacherToolPageShell({
         <Button
           type="button"
           variant="ghost"
-          className="fixed inset-0 z-40 h-auto w-auto max-w-none rounded-none bg-background/80 p-0 hover:bg-background/80"
+          className="fixed inset-x-0 bottom-0 z-40 h-auto w-auto max-w-none rounded-none bg-background/80 p-0 hover:bg-background/80"
+          style={{ top: "var(--teacher-preview-top, 4.5rem)" }}
           aria-label="Collapse preview"
           onClick={() => setPreviewExpanded(false)}
         />
@@ -213,11 +245,16 @@ export function TeacherToolPageShell({
           "backdrop-blur-sm",
           !shouldShowPreview && "hidden",
           previewExpanded &&
-            "fixed inset-3 z-50 flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden shadow-2xl sm:inset-6",
+            "fixed inset-x-3 bottom-3 z-50 flex flex-col overflow-hidden shadow-2xl sm:inset-x-6 sm:bottom-6",
         )}
+        style={
+          previewExpanded
+            ? { top: "var(--teacher-preview-top, 4.5rem)" }
+            : undefined
+        }
         aria-hidden={!shouldShowPreview}
       >
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">Preview</CardTitle>
             {shouldShowPreview ? (
