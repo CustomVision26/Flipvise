@@ -28,7 +28,8 @@ export type DocsUiGuideId =
   | "edu-teacher-quiz-owner-lesson-plan"
   | "edu-teacher-quiz-owner-existing-deck"
   | "edu-teacher-homework-owner-deck"
-  | "edu-teacher-homework-owner-lesson-plan";
+  | "edu-teacher-homework-owner-lesson-plan"
+  | "edu-teacher-study-guide-owner-lesson-plan";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -111,6 +112,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-quiz-owner-existing-deck",
           "edu-teacher-homework-owner-deck",
           "edu-teacher-homework-owner-lesson-plan",
+          "edu-teacher-study-guide-owner-lesson-plan",
         ],
       },
     ],
@@ -1696,6 +1698,31 @@ export const EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly DocsUi
     },
   ];
 
+const EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_FILE =
+  "30 Flipvise - Team Tier Edu Plan - Teacher DB StudyGuideGenerate - owner_UI";
+
+export const EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_FILE} - 01.png`),
+      title: "Generate from a saved lesson plan",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Study Guide Generator. Choose the workspace owner or a team admin, then a saved lesson plan (for example Understanding Air Pollution · Lesson Plan · 5 days · grade 7). The plan fills Subject (Science : Environmental Science), Grade Level (grade 7), and Topic (Air pollution). Homework assignment is optional when one is already saved for that plan. Reference material is optional — Website URL, Plain text, PDF, Word, PowerPoint, or handwritten notes. Choose Generate. A multi-day plan uses the full plan (All Days) without a day picker.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_FILE} - 02.png`),
+      title: "Preview the study guide",
+      caption:
+        "Preview shows the guide (for example Understanding Air Pollution · Lesson Plan All Days) with the summary, Key Vocabulary, Important Points, Worked Examples, Sample Problems, Practice Questions, and Study Tips. Expand opens the review larger. Edit changes the guide before you save. Save stores it in Teacher Resource Library. Download PDF saves a copy for printing or sharing. Regenerate AI builds another version from the same lesson plan.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_FILE} - 03.png`),
+      title: "Expanded preview",
+      caption:
+        "Collapse returns to the page. The enlarged preview lists the same sections — summary, Key Vocabulary, Important Points, Worked Examples, Sample Problems, Practice Questions, and Study Tips. Edit, Save, Download PDF, and Regenerate AI stay on the preview.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1869,5 +1896,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Teacher Dashboard, the plan owner chooses a team admin and a saved lesson plan, picks All Days or one day, then previews, saves, or downloads the homework.",
     steps: EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_GUIDE_STEPS,
+  },
+  "edu-teacher-study-guide-owner-lesson-plan": {
+    title: "Study Guide Generator from a lesson plan",
+    summary:
+      "On Teacher Dashboard, the plan owner chooses a saved lesson plan, optionally adds reference material, then previews, saves, downloads, or regenerates the study guide.",
+    steps: EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_GUIDE_STEPS,
   },
 };
