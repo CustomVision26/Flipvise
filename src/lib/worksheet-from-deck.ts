@@ -13,8 +13,12 @@ import {
 
 type CardRow = typeof cards.$inferSelect;
 
-function normalizeImageUrl(url: string | null | undefined): string | null {
-  const trimmed = url?.trim();
+function asText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeImageUrl(url: unknown): string | null {
+  const trimmed = asText(url);
   return trimmed ? trimmed : null;
 }
 
@@ -23,20 +27,21 @@ function resolveCardAnswer(card: CardRow): {
   answerImageUrl: string | null;
   backImageUrl: string | null;
 } {
-  if (card.cardType === "multiple_choice" && card.choices?.length) {
+  const choices = Array.isArray(card.choices) ? card.choices : [];
+  if (card.cardType === "multiple_choice" && choices.length > 0) {
     const correctIdx = card.correctChoiceIndex ?? 0;
-    const correct = card.choices[correctIdx]?.trim() ?? "";
-    const choiceImages = card.choiceImageUrls ?? [];
+    const correct = asText(choices[correctIdx]);
+    const choiceImages = Array.isArray(card.choiceImageUrls) ? card.choiceImageUrls : [];
     const answerImageUrl = normalizeImageUrl(choiceImages[correctIdx]);
     return {
-      answer: correct || card.back?.trim() || "(see image)",
+      answer: correct || asText(card.back) || "(see image)",
       answerImageUrl,
       backImageUrl: normalizeImageUrl(card.backImageUrl) ?? answerImageUrl,
     };
   }
 
   return {
-    answer: card.back?.trim() || "(see image)",
+    answer: asText(card.back) || "(see image)",
     answerImageUrl: normalizeImageUrl(card.backImageUrl),
     backImageUrl: normalizeImageUrl(card.backImageUrl),
   };
@@ -49,7 +54,7 @@ export function buildWorksheetItemsFromCards(cardRows: CardRow[]): WorksheetItem
 
     return {
       questionNumber: index + 1,
-      prompt: card.front?.trim() || (frontImageUrl ? "Refer to the image." : "Complete this item."),
+      prompt: asText(card.front) || (frontImageUrl ? "Refer to the image." : "Complete this item."),
       promptImageUrl: frontImageUrl,
       answer,
       answerImageUrl,

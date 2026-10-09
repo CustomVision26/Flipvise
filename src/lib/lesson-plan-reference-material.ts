@@ -136,11 +136,19 @@ const REFERENCE_GROUNDING_BY_PURPOSE: Record<LessonPlanReferenceGeneratorPurpose
 export function getLessonPlanReferenceMaterials(
   input: { referenceMaterials?: LessonPlanReferenceMaterial[] } | null | undefined,
 ): LessonPlanReferenceMaterial[] {
-  return (
-    input?.referenceMaterials?.filter(
-      (reference) => reference.text.trim().length > 0,
-    ) ?? []
-  );
+  const materials = input?.referenceMaterials;
+  if (!Array.isArray(materials)) return [];
+
+  const references: LessonPlanReferenceMaterial[] = [];
+  for (const reference of materials) {
+    if (!reference || typeof reference !== "object") continue;
+    const text = typeof reference.text === "string" ? reference.text.trim() : "";
+    if (!text) continue;
+    const summary =
+      typeof reference.summary === "string" ? reference.summary.trim() : "";
+    references.push({ text, summary });
+  }
+  return references;
 }
 
 export function formatLessonPlanReferencesForGeneratorContext(

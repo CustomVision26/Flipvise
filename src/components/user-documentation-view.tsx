@@ -254,6 +254,12 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="edu-teacher-quiz-owner-existing-deck">
               Open AI Quiz/Test Generator for an existing deck guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-homework-owner-deck">
+              Open Homework Generator from a deck guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-homework-owner-lesson-plan">
+              Open Homework Generator from a lesson plan guide
+            </DocsUiGuideStartButton>
           </>
         ) : null}
       </div>
@@ -545,6 +551,14 @@ function articleSectionGuides(
       {
         id: "edu-teacher-quiz-owner-existing-deck",
         label: "Open AI Quiz/Test Generator for an existing deck guide",
+      },
+      {
+        id: "edu-teacher-homework-owner-deck",
+        label: "Open Homework Generator from a deck guide",
+      },
+      {
+        id: "edu-teacher-homework-owner-lesson-plan",
+        label: "Open Homework Generator from a lesson plan guide",
       },
     ];
   }

@@ -26,7 +26,9 @@ export type DocsUiGuideId =
   | "edu-teacher-lesson-plan-owner"
   | "edu-teacher-lesson-plan-owner-new-deck"
   | "edu-teacher-quiz-owner-lesson-plan"
-  | "edu-teacher-quiz-owner-existing-deck";
+  | "edu-teacher-quiz-owner-existing-deck"
+  | "edu-teacher-homework-owner-deck"
+  | "edu-teacher-homework-owner-lesson-plan";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -107,6 +109,8 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-lesson-plan-owner-new-deck",
           "edu-teacher-quiz-owner-lesson-plan",
           "edu-teacher-quiz-owner-existing-deck",
+          "edu-teacher-homework-owner-deck",
+          "edu-teacher-homework-owner-lesson-plan",
         ],
       },
     ],
@@ -1630,6 +1634,68 @@ export const EDU_TEACHER_QUIZ_OWNER_EXISTING_DECK_GUIDE_STEPS: readonly DocsUiGu
     },
   ];
 
+const EDU_TEACHER_HOMEWORK_OWNER_DECK_FILE =
+  "29 Flipvise - Team Tier Edu Plan - Teacher DB HomeworkGenerate - owner_UI-deck";
+
+export const EDU_TEACHER_HOMEWORK_OWNER_DECK_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_DECK_FILE} - 01.png`),
+      title: "Generate from a deck",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner opens Homework Generator and sets Generate from to Deck. Choose the team admin (Teddy Watt), then that admin’s deck (Science : Environmental Science — Air pollution LP Day 1). The deck fills Subject (Science : Environmental Science), Grade Level (grade 7), Topic (Air pollution), and Difficulty Level (Intermediate). Number of Questions stays at 8. Choose Generate.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_DECK_FILE} - 02.png`),
+      title: "Preview the homework",
+      caption:
+        "Preview shows the assignment (for example Understanding Air Pollution - Lesson Plan All Days), the instructions, numbered questions, and the Answer Key. Expand opens the review larger. Edit changes the homework before you save. Save Homework stores it in Teacher Resource Library. Download PDF saves a copy for printing or sharing.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_DECK_FILE} - 03.png`),
+      title: "Expanded preview",
+      caption:
+        "Collapse returns to the page. The enlarged preview lists the assignment title (for example Air Pollution and Health Effects), the instructions, each question, and the Answer Key. Edit, Save Homework, and Download PDF stay on the preview.",
+    },
+  ];
+
+const EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_FILE =
+  "29 Flipvise - Team Tier Edu Plan - Teacher DB HomeworkGenerate - owner_UI-LP";
+
+export const EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_FILE} - 01.png`),
+      title: "Open Homework Generator",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Homework Generator. Generate from is set to Lesson plan. Workspace owner or team admin is the next field — open it to choose whose saved lesson plans to use. Subject, grade, topic, and difficulty stay empty until a plan is selected. Number of Questions starts at 8 and Difficulty Level at On-level.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_FILE} - 02.png`),
+      title: "Select a saved lesson plan",
+      caption:
+        "Choose the team admin (Teddy Watt), then a saved plan (for example Air Pollution and Its Effects · Lesson Plan · 3 days · grade 7). The plan fills Subject (Science : Environmental Science), Grade Level (grade 7), Topic (Air pollution), and Difficulty Level (Intermediate). View saved PDF opens the plan. Choose Generate.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_FILE} - 03.png`),
+      title: "Choose which part of the lesson plan",
+      caption:
+        "For a multi-day plan, Which part of the lesson plan? asks for a scope before generation. All Days uses vocabulary, focus, and outlines from every day. A single day (Day 1, Day 2, or Day 3) uses only that day’s vocabulary, daily focus, and class outline — for example Day 1 Understanding air pollution and its health impacts. Choose a scope, then Generate.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_FILE} - 04.png`),
+      title: "Preview the homework",
+      caption:
+        "Preview shows the assignment (for example Air Pollution: Causes and Effects - Lesson Plan All Days), the instructions, numbered questions, and the Answer Key. Expand opens the review larger. Edit changes the homework before you save. Save Homework stores it in Teacher Resource Library. Download PDF saves a copy for printing or sharing.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_FILE} - 05.png`),
+      title: "Expanded preview",
+      caption:
+        "Collapse returns to the page. The enlarged preview lists the assignment title, the instructions, each question, and the Answer Key. Edit, Save Homework, and Download PDF stay on the preview.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1791,5 +1857,17 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Teacher Dashboard, the plan owner chooses a team admin and Existing deck, reviews the filled subject and grade, generates cards, then saves them onto that deck.",
     steps: EDU_TEACHER_QUIZ_OWNER_EXISTING_DECK_GUIDE_STEPS,
+  },
+  "edu-teacher-homework-owner-deck": {
+    title: "Homework Generator from a deck",
+    summary:
+      "On Teacher Dashboard, the plan owner chooses Deck, a team admin’s deck, then generates, previews, saves, or downloads the homework.",
+    steps: EDU_TEACHER_HOMEWORK_OWNER_DECK_GUIDE_STEPS,
+  },
+  "edu-teacher-homework-owner-lesson-plan": {
+    title: "Homework Generator from a lesson plan",
+    summary:
+      "On Teacher Dashboard, the plan owner chooses a team admin and a saved lesson plan, picks All Days or one day, then previews, saves, or downloads the homework.",
+    steps: EDU_TEACHER_HOMEWORK_OWNER_LESSON_PLAN_GUIDE_STEPS,
   },
 };

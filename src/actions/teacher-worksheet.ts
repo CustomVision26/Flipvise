@@ -25,71 +25,100 @@ import {
 import { buildDeckWorksheetResult } from "@/lib/worksheet-from-deck";
 import { resolveWorksheetItemsForCount } from "@/lib/worksheet-ai";
 import { getCardsForDeckViewer } from "@/db/queries/cards";
+import {
+  isNextControlFlowError,
+  userFacingServerActionError,
+} from "@/lib/server-action-client-error";
+
+export type GenerateWorksheetActionResult =
+  | { ok: true; worksheet: DeckWorksheetResult }
+  | { ok: false; error: string };
+
+function worksheetActionError(error: unknown, fallback: string): string {
+  console.error("[generateWorksheetFromDeckAction]", error);
+  return userFacingServerActionError(error, fallback);
+}
 
 export async function generateWorksheetFromDeckAction(
   data: TeacherWorksheetActionInput,
-): Promise<DeckWorksheetResult> {
-  const ctx = await getAccessContext();
-  const { userId } = await requireTeacherToolsAccess(
-    ctx,
-    "Worksheet Generator requires an education plan.",
-  );
+): Promise<GenerateWorksheetActionResult> {
+  try {
+    const ctx = await getAccessContext();
+    const { userId } = await requireTeacherToolsAccess(
+      ctx,
+      "Worksheet Generator requires an education plan.",
+    );
 
-  const parsed = teacherWorksheetInputSchema.safeParse(data);
-  if (!parsed.success) {
-    const first = parsed.error.issues[0];
-    throw new Error(first?.message ?? "Invalid input");
+    const parsed = teacherWorksheetInputSchema.safeParse(data);
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      return { ok: false, error: first?.message ?? "Invalid input" };
+    }
+
+    const input = parsed.data;
+    const access = await resolveDeckViewerAccess(input.deckId, userId);
+    if (!access) {
+      return { ok: false, error: "Deck not found or you do not have access to it." };
+    }
+
+    const deck = await getDeckRowById(input.deckId);
+    if (!deck) {
+      return { ok: false, error: "Deck not found." };
+    }
+
+    const cardRows = await getCardsForDeckViewer(input.deckId, userId);
+    if (cardRows.length === 0) {
+      return {
+        ok: false,
+        error: "The selected deck has no cards. Add cards first or choose another deck.",
+      };
+    }
+
+    const linkedLessonPlan = await getSavedLessonPlanByDeckIdForUser(userId, input.deckId);
+    const referenceMaterials = getLessonPlanReferenceMaterials(linkedLessonPlan?.input);
+
+    const worksheet = await runWithAiUsageContext(
+      {
+        userId,
+        feature: "worksheet",
+        teamId: deck.teamId ?? null,
+        subscriptionPlan: ctx.effectivePlanSlug,
+        isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
+      },
+      async () => {
+        const items = await resolveWorksheetItemsForCount({
+          cardRows,
+          numberOfQuestions: input.numberOfQuestions,
+          subject: input.subject,
+          gradeLevel: input.gradeLevel,
+          topic: input.topic,
+          worksheetType: input.worksheetType,
+          difficultyLevel: input.difficultyLevel,
+          deckName: deck.name,
+        });
+
+        if (items.length === 0) {
+          throw new Error("Could not build worksheet questions from this deck.");
+        }
+
+        return buildDeckWorksheetResult(deck, cardRows, input, {
+          referenceMaterials,
+          items,
+        });
+      },
+    );
+
+    return { ok: true, worksheet };
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    return {
+      ok: false,
+      error: worksheetActionError(
+        error,
+        "Worksheet generation failed. Please try again.",
+      ),
+    };
   }
-
-  const input = parsed.data;
-  const access = await resolveDeckViewerAccess(input.deckId, userId);
-  if (!access) {
-    throw new Error("Deck not found or you do not have access to it.");
-  }
-
-  const deck = await getDeckRowById(input.deckId);
-  if (!deck) {
-    throw new Error("Deck not found.");
-  }
-
-  const cardRows = await getCardsForDeckViewer(input.deckId, userId);
-  if (cardRows.length === 0) {
-    throw new Error("The selected deck has no cards. Add cards first or choose another deck.");
-  }
-
-  const linkedLessonPlan = await getSavedLessonPlanByDeckIdForUser(userId, input.deckId);
-  const referenceMaterials = getLessonPlanReferenceMaterials(linkedLessonPlan?.input);
-
-  return runWithAiUsageContext(
-    {
-      userId,
-      feature: "worksheet",
-      teamId: deck.teamId ?? null,
-      subscriptionPlan: ctx.effectivePlanSlug,
-      isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
-    },
-    async () => {
-      const items = await resolveWorksheetItemsForCount({
-        cardRows,
-        numberOfQuestions: input.numberOfQuestions,
-        subject: input.subject,
-        gradeLevel: input.gradeLevel,
-        topic: input.topic,
-        worksheetType: input.worksheetType,
-        difficultyLevel: input.difficultyLevel,
-        deckName: deck.name,
-      });
-
-      if (items.length === 0) {
-        throw new Error("Could not build worksheet questions from this deck.");
-      }
-
-      return buildDeckWorksheetResult(deck, cardRows, input, {
-        referenceMaterials,
-        items,
-      });
-    },
-  );
 }
 
 const saveWorksheetSchema = z.object({

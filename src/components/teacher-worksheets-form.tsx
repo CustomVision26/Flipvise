@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Download, Loader2, Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { generateWorksheetFromDeckAction, saveWorksheetAction, updateWorksheetAction } from "@/actions/teacher-worksheet";
+import { userFacingServerActionError } from "@/lib/server-action-client-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -248,7 +249,7 @@ export function TeacherWorksheetsForm({
         throw new Error("Select a deck.");
       }
 
-      const worksheet = await generateWorksheetFromDeckAction({
+      const generated = await generateWorksheetFromDeckAction({
         deckId,
         subject: form.subject,
         gradeLevel: form.gradeLevel,
@@ -258,16 +259,22 @@ export function TeacherWorksheetsForm({
         numberOfQuestions: parseNumberOfQuestions(form.numberOfQuestions),
       });
 
-      setResult(worksheet);
+      if (!generated.ok) {
+        setErrorMessage(generated.error);
+        return;
+      }
+
+      setResult(generated.worksheet);
       setShowResult(true);
       setSavedWorksheetId(null);
       setIsEditing(false);
       setEditDraft(null);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Worksheet generation failed. Please try again.",
+        userFacingServerActionError(
+          error,
+          "Worksheet generation failed. Please try again.",
+        ),
       );
     } finally {
       setIsGenerating(false);
@@ -415,7 +422,7 @@ export function TeacherWorksheetsForm({
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Could not save worksheet.",
+        userFacingServerActionError(error, "Could not save worksheet."),
       );
     } finally {
       setIsSaving(false);
