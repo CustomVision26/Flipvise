@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Download, Loader2, Pencil, Save, X } from "lucide-react";
+import { Download, ExternalLink, Loader2, Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { generateWorksheetFromDeckAction, saveWorksheetAction, updateWorksheetAction } from "@/actions/teacher-worksheet";
 import { userFacingServerActionError } from "@/lib/server-action-client-error";
@@ -32,16 +32,21 @@ import {
   OwnerTeamAdminResourcePicker,
   useOwnerScopedItems,
 } from "@/components/owner-team-admin-resource-picker";
-import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
+import type { OwnerTeamAdminLessonPlanPickerPayload } from "@/db/queries/teacher-owner-pickers";
 import { ADMIN_NONE } from "@/lib/owner-team-admin-picker";
 import { buildTeacherSubPath, type TeacherWorkspaceContext } from "@/lib/teacher-url";
-import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import { cn } from "@/lib/utils";
-import type { DeckRow } from "@/db/queries/decks";
 import type { SavedWorksheetEditItem } from "@/db/queries/saved-worksheets";
 import type { SavedLessonPlanPickerItem } from "@/db/queries/saved-lesson-plans";
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
 import { LessonPlanSavedReferenceSummary } from "@/components/lesson-plan-saved-reference-summary";
+import { LessonPlanDayScopeDialog } from "@/components/lesson-plan-day-scope-dialog";
+import {
+  getLessonPlanDayScopeOptions,
+  shouldPromptLessonPlanDayScope,
+  type LessonPlanDayScope,
+} from "@/lib/lesson-plan-day-scope";
+import { lessonPlanInputToQuizDefaults } from "@/lib/lesson-plan-quiz-context";
 import type { DeckWorksheetResult } from "@/lib/teacher-worksheet-schema";
 import {
   TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT,
@@ -53,7 +58,7 @@ import {
   cloneWorksheetResult,
 } from "@/components/worksheet-preview-editor";
 
-const DECK_NONE = "__none__";
+const PLAN_NONE = "__none__";
 
 type WorksheetFormState = {
   subject: string;
@@ -74,16 +79,14 @@ const EMPTY_FORM: WorksheetFormState = {
 };
 
 export function TeacherWorksheetsForm({
-  decks,
-  ownerDeckPicker,
+  ownerLessonPlanPicker,
   savedLessonPlans,
   backHref = "/teacher",
   teacherWorkspace,
   initialDeckId,
   initialSavedWorksheet,
 }: {
-  decks: DeckRow[];
-  ownerDeckPicker: OwnerTeamAdminDeckPickerPayload;
+  ownerLessonPlanPicker: OwnerTeamAdminLessonPlanPickerPayload;
   savedLessonPlans: SavedLessonPlanPickerItem[];
   backHref?: string;
   teacherWorkspace?: TeacherWorkspaceContext;
@@ -91,18 +94,17 @@ export function TeacherWorksheetsForm({
   initialSavedWorksheet?: SavedWorksheetEditItem;
 }) {
   const isEditingExistingWorksheet = initialSavedWorksheet != null;
-  const resolvedInitialDeckId = initialSavedWorksheet?.deckId ?? initialDeckId;
-  const initialDeck =
-    resolvedInitialDeckId != null
-      ? decks.find((deck) => deck.id === resolvedInitialDeckId) ?? null
-      : null;
+  const initialSavedPlanId = initialSavedWorksheet?.input.savedLessonPlanId;
 
-  const initialDeckDefaults = initialDeck ? deckToHomeworkDefaults(initialDeck) : null;
-
-  const [selectedDeckKey, setSelectedDeckKey] = useState<string>(
-    resolvedInitialDeckId != null ? String(resolvedInitialDeckId) : DECK_NONE,
+  const [selectedPlanKey, setSelectedPlanKey] = useState<string>(
+    initialSavedPlanId != null ? String(initialSavedPlanId) : PLAN_NONE,
   );
-  const [deckId, setDeckId] = useState<number | undefined>(resolvedInitialDeckId ?? undefined);
+  const [savedLessonPlanId, setSavedLessonPlanId] = useState<number | undefined>(
+    initialSavedPlanId ?? undefined,
+  );
+  const [generationDayScope, setGenerationDayScope] = useState<LessonPlanDayScope>(
+    initialSavedWorksheet?.input.dayScope ?? "all",
+  );
   const [form, setForm] = useState<WorksheetFormState>(
     initialSavedWorksheet
       ? {
@@ -117,16 +119,7 @@ export function TeacherWorksheetsForm({
               TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT,
           ),
         }
-      : initialDeckDefaults
-        ? {
-            subject: initialDeckDefaults.subject,
-            gradeLevel: initialDeckDefaults.gradeLevel,
-            topic: initialDeckDefaults.topic,
-            worksheetType: "Practice",
-            difficultyLevel: initialDeckDefaults.difficultyLevel,
-            numberOfQuestions: String(TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT),
-          }
-        : EMPTY_FORM,
+      : EMPTY_FORM,
   );
   const [result, setResult] = useState<DeckWorksheetResult | null>(
     initialSavedWorksheet?.result ?? null,
@@ -148,27 +141,60 @@ export function TeacherWorksheetsForm({
     isEditingExistingWorksheet ? initialSavedWorksheet.id : null,
   );
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [dayScopeDialogOpen, setDayScopeDialogOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState(initialSavedWorksheet?.label ?? "");
   const [selectedAdminUserId, setSelectedAdminUserId] = useState<string>(ADMIN_NONE);
 
-  const isWorkspaceOwner = ownerDeckPicker.isWorkspaceOwner;
-  const activeDecks = useOwnerScopedItems(
+  const isWorkspaceOwner = ownerLessonPlanPicker.isWorkspaceOwner;
+  const activeLessonPlans = useOwnerScopedItems(
     isWorkspaceOwner,
     selectedAdminUserId,
-    ownerDeckPicker.itemsByAdminUserId,
-    decks,
+    ownerLessonPlanPicker.lessonPlansByAdminUserId,
+    savedLessonPlans,
   );
 
-  const selectedDeck =
-    deckId != null ? activeDecks.find((deck) => deck.id === deckId) ?? null : null;
+  const allLessonPlans = useMemo(() => {
+    if (!isWorkspaceOwner) return savedLessonPlans;
+    const byId = new Map<number, SavedLessonPlanPickerItem>();
+    for (const plan of Object.values(
+      ownerLessonPlanPicker.lessonPlansByAdminUserId,
+    ).flat()) {
+      byId.set(plan.id, plan);
+    }
+    for (const plan of savedLessonPlans) {
+      byId.set(plan.id, plan);
+    }
+    return [...byId.values()];
+  }, [
+    isWorkspaceOwner,
+    savedLessonPlans,
+    ownerLessonPlanPicker.lessonPlansByAdminUserId,
+  ]);
 
-  const linkedLessonPlan =
-    deckId != null
-      ? savedLessonPlans.find((plan) => plan.deckId === deckId) ?? null
+  const selectedPlan =
+    savedLessonPlanId != null
+      ? allLessonPlans.find((plan) => plan.id === savedLessonPlanId) ??
+        activeLessonPlans.find((plan) => plan.id === savedLessonPlanId) ??
+        null
       : null;
+
+  const dayScopeOptions = useMemo(
+    () => getLessonPlanDayScopeOptions(selectedPlan?.result),
+    [selectedPlan],
+  );
+  const simpleDayScopeOptions = useMemo(
+    () =>
+      dayScopeOptions.map((option) => ({
+        value: option.value,
+        label: option.label,
+        scope: option.scope,
+      })),
+    [dayScopeOptions],
+  );
+
   const linkedLessonPlanReferences =
     initialSavedWorksheet?.input.referenceMaterials ??
-    getLessonPlanReferenceMaterials(linkedLessonPlan?.input);
+    getLessonPlanReferenceMaterials(selectedPlan?.input);
 
   const resourcesHref = teacherWorkspace
     ? buildTeacherSubPath(
@@ -177,48 +203,41 @@ export function TeacherWorksheetsForm({
         teacherWorkspace.teamMemberId,
       )
     : "/teacher/resources";
+  const lessonBuilderHref = teacherWorkspace
+    ? buildTeacherSubPath(
+        "/lesson-builder",
+        teacherWorkspace.teamId,
+        teacherWorkspace.teamMemberId,
+      )
+    : "/teacher/lesson-builder";
+  const didApplyInitialPlan = useRef(false);
 
   function handleAdminChange(adminUserId: string) {
     setSelectedAdminUserId(adminUserId);
-    setSelectedDeckKey(DECK_NONE);
-    setDeckId(undefined);
+    setSelectedPlanKey(PLAN_NONE);
+    setSavedLessonPlanId(undefined);
     setForm(EMPTY_FORM);
   }
 
-  function deckHaystack(deck: DeckRow): string {
-    return [deck.name, deck.description, deck.gradeLevel]
-      .filter((part): part is string => Boolean(part && part.trim()))
+  function lessonPlanHaystack(plan: SavedLessonPlanPickerItem): string {
+    return [
+      plan.optionLabel,
+      plan.lessonTitle,
+      plan.subject,
+      plan.gradeLevel,
+      plan.topic,
+      plan.sourceDeckName,
+    ]
+      .filter((part): part is string => Boolean(part?.trim()))
       .join(" ")
       .toLowerCase();
   }
 
-  useEffect(() => {
-    if (!initialDeckId || !isWorkspaceOwner) return;
-    const adminWithDeck = ownerDeckPicker.teamAdmins.find((admin) =>
-      (ownerDeckPicker.itemsByAdminUserId[admin.userId] ?? []).some(
-        (item) => item.id === initialDeckId,
-      ),
-    );
-    if (!adminWithDeck) return;
-    setSelectedAdminUserId(adminWithDeck.userId);
-    handleDeckChange(String(initialDeckId));
-  }, [initialDeckId, isWorkspaceOwner, ownerDeckPicker]);
-
-  function handleDeckChange(value: string | null) {
-    if (!value || value === DECK_NONE) {
-      setSelectedDeckKey(DECK_NONE);
-      setDeckId(undefined);
-      setForm(EMPTY_FORM);
-      return;
-    }
-
-    const id = Number(value);
-    const deck = activeDecks.find((item) => item.id === id);
-    if (!deck) return;
-
-    const defaults = deckToHomeworkDefaults(deck);
-    setSelectedDeckKey(value);
-    setDeckId(deck.id);
+  function applyLessonPlan(plan: SavedLessonPlanPickerItem) {
+    const defaults = lessonPlanInputToQuizDefaults(plan.input);
+    setSelectedPlanKey(String(plan.id));
+    setSavedLessonPlanId(plan.id);
+    setGenerationDayScope("all");
     setForm({
       subject: defaults.subject,
       gradeLevel: defaults.gradeLevel,
@@ -228,6 +247,53 @@ export function TeacherWorksheetsForm({
       numberOfQuestions: String(TEACHER_WORKSHEET_DEFAULT_QUESTION_COUNT),
     });
   }
+
+  function handleLessonPlanChange(value: string | null) {
+    if (!value || value === PLAN_NONE) {
+      setSelectedPlanKey(PLAN_NONE);
+      setSavedLessonPlanId(undefined);
+      setForm(EMPTY_FORM);
+      return;
+    }
+
+    const plan = activeLessonPlans.find((item) => item.id === Number(value));
+    if (!plan) return;
+    applyLessonPlan(plan);
+  }
+
+  useEffect(() => {
+    if (didApplyInitialPlan.current) return;
+    const planId =
+      initialSavedPlanId ??
+      (initialDeckId != null
+        ? allLessonPlans.find((plan) => plan.deckId === initialDeckId)?.id
+        : undefined);
+    if (planId == null) return;
+    const plan = allLessonPlans.find((item) => item.id === planId);
+    if (!plan) return;
+    didApplyInitialPlan.current = true;
+    if (isWorkspaceOwner) {
+      const adminWithPlan = ownerLessonPlanPicker.teamAdmins.find((admin) =>
+        (ownerLessonPlanPicker.lessonPlansByAdminUserId[admin.userId] ?? []).some(
+          (item) => item.id === plan.id,
+        ),
+      );
+      if (adminWithPlan) setSelectedAdminUserId(adminWithPlan.userId);
+    }
+    if (initialSavedWorksheet) {
+      setSelectedPlanKey(String(plan.id));
+      setSavedLessonPlanId(plan.id);
+      return;
+    }
+    applyLessonPlan(plan);
+  }, [
+    allLessonPlans,
+    initialDeckId,
+    initialSavedPlanId,
+    initialSavedWorksheet,
+    isWorkspaceOwner,
+    ownerLessonPlanPicker,
+  ]);
 
   function parseNumberOfQuestions(value: string): number {
     const parsed = Number.parseInt(value, 10);
@@ -240,17 +306,22 @@ export function TeacherWorksheetsForm({
     );
   }
 
-  async function handleGenerate() {
+  async function runGenerate(dayScope: LessonPlanDayScope = "all") {
     setIsGenerating(true);
     setErrorMessage(null);
+    setDayScopeDialogOpen(false);
 
     try {
-      if (deckId == null) {
-        throw new Error("Select a deck.");
+      if (savedLessonPlanId == null) {
+        throw new Error("Select a saved lesson plan.");
       }
 
+      setGenerationDayScope(dayScope);
       const generated = await generateWorksheetFromDeckAction({
-        deckId,
+        deckId: selectedPlan?.deckId ?? undefined,
+        savedLessonPlanId,
+        dayScope: dayScopeOptions.length > 0 ? dayScope : "all",
+        teamId: teacherWorkspace?.teamId ?? undefined,
         subject: form.subject,
         gradeLevel: form.gradeLevel,
         topic: form.topic,
@@ -279,6 +350,22 @@ export function TeacherWorksheetsForm({
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  function handleGenerate() {
+    if (savedLessonPlanId == null) {
+      setErrorMessage("Select a saved lesson plan.");
+      return;
+    }
+    if (shouldPromptLessonPlanDayScope(selectedPlan?.result)) {
+      setDayScopeDialogOpen(true);
+      return;
+    }
+    void runGenerate("all");
+  }
+
+  function handleDayScopeConfirm(scope: LessonPlanDayScope) {
+    void runGenerate(scope);
   }
 
   async function handleDownloadWorksheet() {
@@ -333,17 +420,21 @@ export function TeacherWorksheetsForm({
 
   function openSaveDialog() {
     if (!result) return;
+    if (saveDeckId == null) {
+      toast.error("This lesson plan is not linked to a deck, so the worksheet cannot be saved yet.");
+      return;
+    }
     setSaveLabel(result.worksheetTitle);
     setSaveDialogOpen(true);
   }
 
   async function handleSaveWorksheet() {
-    if (!result || !saveLabel.trim() || deckId == null) return;
+    if (!result || !saveLabel.trim() || saveDeckId == null) return;
     await persistWorksheet(saveLabel.trim());
   }
 
   async function handleSaveChanges() {
-    if (!result || editingWorksheetId == null || deckId == null) return;
+    if (!result || editingWorksheetId == null || saveDeckId == null) return;
     const label = saveLabel.trim() || initialSavedWorksheet?.label;
     if (!label) {
       toast.error("Worksheet label is missing.");
@@ -368,14 +459,19 @@ export function TeacherWorksheetsForm({
     await persistWorksheet(label, editingWorksheetId);
   }
 
+  const saveDeckId = selectedPlan?.deckId ?? initialSavedWorksheet?.deckId;
+
   async function persistWorksheet(label: string, worksheetId?: number) {
-    if (!result || deckId == null) return;
+    if (!result || saveDeckId == null) return;
     setIsSaving(true);
     try {
       const payload = {
         label,
         input: {
-          deckId,
+          deckId: saveDeckId,
+          savedLessonPlanId,
+          dayScope: generationDayScope,
+          teamId: teacherWorkspace?.teamId ?? undefined,
           subject: form.subject,
           gradeLevel: form.gradeLevel,
           topic: form.topic,
@@ -415,7 +511,7 @@ export function TeacherWorksheetsForm({
               : saved.worksheetPdfUrl || saved.answerKeyPdfUrl
                 ? " with PDF"
                 : ""}
-            . From deck: <strong>{saved.sourceDeckName}</strong>.
+            . From lesson plan: <strong>{selectedPlan?.lessonTitle ?? saved.sourceDeckName}</strong>.
           </span>
         ),
       },
@@ -436,16 +532,16 @@ export function TeacherWorksheetsForm({
       description={
         isEditingExistingWorksheet
           ? `Update ${initialSavedWorksheet.label} and save changes back to your Resource Library.`
-          : "Create worksheets with student sections and teacher answer keys from your flashcard decks."
+          : "Create worksheets with student sections and teacher answer keys from a saved lesson plan."
       }
       showResult={showResult && result != null}
       isGenerating={isGenerating}
       generateLabel="Generate"
       submittingLabel="Generating…"
-      generateTooltip="Build a student worksheet and answer key from the selected deck."
+      generateTooltip="Choose All Days or one day, then build the worksheet with AI from that part of the lesson plan."
       errorMessage={errorMessage}
       onGenerate={handleGenerate}
-      submitDisabled={deckId == null}
+      submitDisabled={savedLessonPlanId == null}
       backHref={backHref}
       previewActions={
         result ? (
@@ -537,65 +633,105 @@ export function TeacherWorksheetsForm({
         <div className="grid gap-4 sm:grid-cols-2">
           {isEditingExistingWorksheet ? (
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="worksheetDeckReadonly">Deck</Label>
+              <Label htmlFor="worksheetPlanReadonly">Saved lesson plan</Label>
               <Input
-                id="worksheetDeckReadonly"
+                id="worksheetPlanReadonly"
                 disabled
-                value={initialSavedWorksheet.sourceDeckName}
+                value={selectedPlan?.optionLabel ?? initialSavedWorksheet.sourceDeckName}
               />
             </div>
           ) : isWorkspaceOwner ? (
             <OwnerTeamAdminResourcePicker
-              ownerPicker={ownerDeckPicker}
-              itemsByAdminUserId={ownerDeckPicker.itemsByAdminUserId}
+              ownerPicker={ownerLessonPlanPicker}
+              itemsByAdminUserId={ownerLessonPlanPicker.lessonPlansByAdminUserId}
               selectedAdminUserId={selectedAdminUserId}
               onAdminChange={handleAdminChange}
-              selectedItemKey={selectedDeckKey}
-              onItemChange={handleDeckChange}
-              noneValue={DECK_NONE}
-              noneLabel="Select a deck"
-              placeholder="Select a deck"
-              resourceLabel="Deck"
-              resourceSelectId="worksheetDeck"
+              selectedItemKey={selectedPlanKey}
+              onItemChange={handleLessonPlanChange}
+              noneValue={PLAN_NONE}
+              noneLabel="Select a lesson plan"
+              placeholder="Select a lesson plan"
+              resourceLabel="Saved lesson plan"
+              resourceSelectId="worksheetLessonPlan"
               adminSelectId="worksheetTeamAdmin"
-              getItemKey={(deck) => String(deck.id)}
-              getItemLabel={(deck) => deck.name}
-              getItemHaystack={deckHaystack}
-              searchPlaceholder="Search decks by name, subject, or description…"
-              resourceHelp="Pick one of the team admin's decks. Subject, grade, topic, and difficulty will auto-fill from the deck."
+              getItemKey={(plan) => String(plan.id)}
+              getItemLabel={(plan) => plan.optionLabel}
+              getItemHaystack={lessonPlanHaystack}
+              searchPlaceholder="Search lesson plans by title, subject, grade, or topic…"
+              resourceHelp="Pick a lesson plan saved by the workspace owner or a team admin. Subject, grade, topic, and difficulty fill in from that plan."
+              resourceFooter={
+                <>
+                  {selectedPlan?.pdfUrl ? (
+                    <p className="text-xs text-muted-foreground">
+                      Lesson plan PDF:{" "}
+                      <a
+                        href={selectedPlan.pdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 underline underline-offset-2"
+                      >
+                        View saved PDF
+                        <ExternalLink className="size-3" aria-hidden />
+                      </a>
+                    </p>
+                  ) : null}
+                  <LessonPlanSavedReferenceSummary
+                    references={linkedLessonPlanReferences}
+                    description="Reference materials saved with this lesson plan are included in the worksheet instructions."
+                  />
+                </>
+              }
             />
           ) : (
           <div className="space-y-2 sm:col-span-2">
             <TeacherFieldLabel
-              htmlFor="worksheetDeck"
-              label="Deck"
-              help="Pick one of your decks. Subject, grade, topic, and difficulty will auto-fill from the deck."
+              htmlFor="worksheetLessonPlan"
+              label="Saved lesson plan"
+              help="Pick a plan saved from the AI Lesson Builder. Subject, grade, topic, and difficulty will auto-fill."
             />
-            <Select value={selectedDeckKey} onValueChange={handleDeckChange} disabled={isEditingExistingWorksheet}>
-              <SelectTrigger id="worksheetDeck" className={cn("h-10 w-full bg-background", isEditingExistingWorksheet && "opacity-60")}>
-                <SelectValue placeholder="Select a deck">
-                  {selectedDeck?.name ?? "Select a deck"}
+            <Select value={selectedPlanKey} onValueChange={handleLessonPlanChange}>
+              <SelectTrigger id="worksheetLessonPlan" className="h-10 w-full bg-background">
+                <SelectValue placeholder="Select a lesson plan">
+                  {selectedPlan?.optionLabel ?? "Select a lesson plan"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={DECK_NONE} disabled>
-                  Select a deck
+                <SelectItem value={PLAN_NONE} disabled>
+                  Select a lesson plan
                 </SelectItem>
-                {activeDecks.map((deck) => (
-                  <SelectItem key={deck.id} value={String(deck.id)}>
-                    {deck.name}
+                {activeLessonPlans.map((plan) => (
+                  <SelectItem key={plan.id} value={String(plan.id)}>
+                    {plan.optionLabel}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {activeDecks.length === 0 ? (
+            {activeLessonPlans.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No decks available. Create a deck first, then return here to generate a worksheet.
+                No saved lesson plans yet. Save one in the{" "}
+                <Link href={lessonBuilderHref} className="underline underline-offset-2">
+                  AI Lesson Builder
+                </Link>{" "}
+                first.
+              </p>
+            ) : null}
+            {selectedPlan?.pdfUrl ? (
+              <p className="text-xs text-muted-foreground">
+                Lesson plan PDF:{" "}
+                <a
+                  href={selectedPlan.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 underline underline-offset-2"
+                >
+                  View saved PDF
+                  <ExternalLink className="size-3" aria-hidden />
+                </a>
               </p>
             ) : null}
             <LessonPlanSavedReferenceSummary
               references={linkedLessonPlanReferences}
-              description="Reference materials saved with the lesson plan for this deck are included in the worksheet instructions."
+              description="Reference materials saved with this lesson plan are included in the worksheet instructions."
             />
           </div>
           )}
@@ -646,7 +782,7 @@ export function TeacherWorksheetsForm({
             <TeacherFieldLabel
               htmlFor="numberOfQuestions"
               label="Number of Questions"
-              help="How many practice questions to include (1–50). If you ask for more than the deck has cards, AI creates extra questions from the deck content."
+              help="How many practice questions to include (1–50). AI writes them from the part of the lesson plan you choose."
             />
             <Input
               id="numberOfQuestions"
@@ -697,9 +833,9 @@ export function TeacherWorksheetsForm({
             placeholder="e.g. Geography of Jamaica practice worksheet"
             maxLength={255}
           />
-          {selectedDeck ? (
+          {selectedPlan ? (
             <p className="text-xs text-muted-foreground">
-              From deck: <span className="text-foreground">{selectedDeck.name}</span>
+              From lesson plan: <span className="text-foreground">{selectedPlan.lessonTitle}</span>
             </p>
           ) : null}
         </div>
@@ -729,6 +865,17 @@ export function TeacherWorksheetsForm({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <LessonPlanDayScopeDialog
+      open={dayScopeDialogOpen}
+      onOpenChange={setDayScopeDialogOpen}
+      options={simpleDayScopeOptions}
+      onConfirm={handleDayScopeConfirm}
+      confirmLabel="Generate"
+      title="Which part of the lesson plan?"
+      description="Choose All Days or one day. The worksheet is generated only from that choice."
+      infoTooltip="All Days covers the whole plan. One day uses only that day's lesson."
+    />
     </>
   );
 }

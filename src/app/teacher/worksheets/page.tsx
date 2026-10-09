@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
-import { loadOwnerTeamAdminDeckPicker } from "@/db/queries/teacher-owner-pickers";
+import { loadOwnerTeamAdminLessonPlanPicker } from "@/db/queries/teacher-owner-pickers";
 import { getSavedLessonPlansForQuizPicker } from "@/db/queries/saved-lesson-plans";
 import {
   resolveSavedWorksheetForViewer,
@@ -48,16 +47,14 @@ export default async function TeacherWorksheetsPage({
     );
   }
 
-  const [deckContext, ownerDeckPicker, savedLessonPlans] = await Promise.all([
-    loadTeacherDeckContext(userId),
-    loadOwnerTeamAdminDeckPicker(userId, workspace.teamId),
+  const [ownerLessonPlanPicker, savedLessonPlans] = await Promise.all([
+    loadOwnerTeamAdminLessonPlanPicker(userId, workspace.teamId),
     getSavedLessonPlansForQuizPicker(userId, workspace.teamId),
   ]);
 
   return (
     <TeacherWorksheetsForm
-      decks={deckContext.decks}
-      ownerDeckPicker={ownerDeckPicker}
+      ownerLessonPlanPicker={ownerLessonPlanPicker}
       savedLessonPlans={savedLessonPlans}
       teacherWorkspace={workspace}
       backHref={backHref}

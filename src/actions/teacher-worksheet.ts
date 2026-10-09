@@ -7,9 +7,17 @@ import { requireTeacherToolsAccess } from "@/lib/teacher-access";
 import { runWithAiUsageContext } from "@/lib/ai-usage/track";
 import { getDeckRowById } from "@/db/queries/decks";
 import { saveWorksheet, updateSavedWorksheetById, resolveSavedWorksheetForViewer } from "@/db/queries/saved-worksheets";
-import { getSavedLessonPlanByDeckIdForUser } from "@/db/queries/saved-lesson-plans";
+import { resolveSavedLessonPlanForViewer } from "@/db/queries/saved-lesson-plans";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
 import { getLessonPlanReferenceMaterials } from "@/lib/lesson-plan-reference-material";
+import {
+  formatLessonPlanContextForPrompt,
+  normalizeLessonPlanContext,
+} from "@/lib/lesson-plan-context";
+import {
+  formatLessonPlanDayScopeLabel,
+  isLessonPlanDayScopeAll,
+} from "@/lib/lesson-plan-day-scope";
 import { uploadWorksheetPdfBufferToS3, deleteFromS3 } from "@/lib/s3";
 import { resolveReferenceMaterialsForWorksheetDeck } from "@/lib/resolve-saved-resource-references";
 import {
@@ -22,9 +30,8 @@ import {
   type DeckWorksheetResult,
   type TeacherWorksheetActionInput,
 } from "@/lib/teacher-worksheet-schema";
-import { buildDeckWorksheetResult } from "@/lib/worksheet-from-deck";
-import { resolveWorksheetItemsForCount } from "@/lib/worksheet-ai";
-import { getCardsForDeckViewer } from "@/db/queries/cards";
+import { buildLessonPlanWorksheetResult } from "@/lib/worksheet-from-deck";
+import { generateWorksheetItemsFromLessonPlan } from "@/lib/worksheet-ai";
 import {
   isNextControlFlowError,
   userFacingServerActionError,
@@ -56,55 +63,91 @@ export async function generateWorksheetFromDeckAction(
     }
 
     const input = parsed.data;
-    const access = await resolveDeckViewerAccess(input.deckId, userId);
-    if (!access) {
-      return { ok: false, error: "Deck not found or you do not have access to it." };
+    if (input.savedLessonPlanId == null) {
+      return { ok: false, error: "Select a saved lesson plan." };
     }
 
-    const deck = await getDeckRowById(input.deckId);
-    if (!deck) {
-      return { ok: false, error: "Deck not found." };
+    const savedPlan = await resolveSavedLessonPlanForViewer(
+      userId,
+      input.savedLessonPlanId,
+      input.teamId,
+    );
+    if (!savedPlan) {
+      return { ok: false, error: "Saved lesson plan not found." };
     }
 
-    const cardRows = await getCardsForDeckViewer(input.deckId, userId);
-    if (cardRows.length === 0) {
-      return {
-        ok: false,
-        error: "The selected deck has no cards. Add cards first or choose another deck.",
-      };
+    const dayScope = input.dayScope ?? "all";
+    if (!isLessonPlanDayScopeAll(dayScope)) {
+      const scheduleLength = savedPlan.result.weeklySchedule?.length ?? 0;
+      if (dayScope.dayIndex >= scheduleLength) {
+        return {
+          ok: false,
+          error:
+            "Selected lesson-plan day is not available on this plan. Choose All Days or another day.",
+        };
+      }
     }
 
-    const linkedLessonPlan = await getSavedLessonPlanByDeckIdForUser(userId, input.deckId);
-    const referenceMaterials = getLessonPlanReferenceMaterials(linkedLessonPlan?.input);
+    const referenceMaterials = getLessonPlanReferenceMaterials(savedPlan.input);
+    const curriculum = normalizeLessonPlanContext({
+      lessonPlanId: savedPlan.id,
+      input: savedPlan.input,
+      result: savedPlan.result,
+      dayScope,
+      overrides: {
+        subject: input.subject,
+        gradeLevel: input.gradeLevel,
+        topic: input.topic,
+      },
+    });
+    const scopedDayIndex = isLessonPlanDayScopeAll(dayScope) ? null : dayScope.dayIndex;
+    const scopedDay =
+      scopedDayIndex != null
+        ? savedPlan.result.weeklySchedule?.[scopedDayIndex] ?? null
+        : null;
+    const dayScopeLabel = scopedDay && scopedDayIndex != null
+      ? formatLessonPlanDayScopeLabel(scopedDay, scopedDayIndex)
+      : "All Days";
+
+    const linkedDeck =
+      savedPlan.deckId != null ? await getDeckRowById(savedPlan.deckId) : null;
 
     const worksheet = await runWithAiUsageContext(
       {
         userId,
         feature: "worksheet",
-        teamId: deck.teamId ?? null,
+        teamId: linkedDeck?.teamId ?? input.teamId ?? null,
         subscriptionPlan: ctx.effectivePlanSlug,
         isPlatformAdmin: ctx.isAdmin || ctx.isSuperadmin,
       },
       async () => {
-        const items = await resolveWorksheetItemsForCount({
-          cardRows,
+        const items = await generateWorksheetItemsFromLessonPlan({
+          curriculumContext: formatLessonPlanContextForPrompt(curriculum),
           numberOfQuestions: input.numberOfQuestions,
           subject: input.subject,
           gradeLevel: input.gradeLevel,
           topic: input.topic,
           worksheetType: input.worksheetType,
           difficultyLevel: input.difficultyLevel,
-          deckName: deck.name,
+          dayScopeLabel,
         });
 
         if (items.length === 0) {
-          throw new Error("Could not build worksheet questions from this deck.");
+          throw new Error("Could not build worksheet questions from this lesson plan.");
         }
 
-        return buildDeckWorksheetResult(deck, cardRows, input, {
-          referenceMaterials,
-          items,
-        });
+        return buildLessonPlanWorksheetResult(
+          {
+            subject: input.subject,
+            gradeLevel: input.gradeLevel,
+            topic: input.topic,
+            worksheetType: input.worksheetType,
+            difficultyLevel: input.difficultyLevel,
+            lessonTitle: savedPlan.lessonTitle,
+            dayScope,
+          },
+          { referenceMaterials, items },
+        );
       },
     );
 
@@ -201,19 +244,23 @@ export async function saveWorksheetAction(data: {
   }
 
   const payload = parsed.data;
-  const access = await resolveDeckViewerAccess(payload.input.deckId, userId);
+  const deckId = payload.input.deckId;
+  if (deckId == null) {
+    throw new Error("This lesson plan is not linked to a deck, so the worksheet cannot be saved yet.");
+  }
+  const access = await resolveDeckViewerAccess(deckId, userId);
   if (!access) {
     throw new Error("Deck not found or you do not have access to it.");
   }
 
-  const deck = await getDeckRowById(payload.input.deckId);
+  const deck = await getDeckRowById(deckId);
   if (!deck) {
     throw new Error("Deck not found.");
   }
 
   const referenceMaterials = await resolveReferenceMaterialsForWorksheetDeck(
     userId,
-    payload.input.deckId,
+    deckId,
   );
 
   const pdfs = await uploadWorksheetPdfs(userId, payload.result);
@@ -227,10 +274,12 @@ export async function saveWorksheetAction(data: {
     topic: payload.input.topic,
     worksheetType: payload.input.worksheetType,
     difficultyLevel: payload.input.difficultyLevel,
-    deckId: payload.input.deckId,
-    sourceDeckName: deck.name,
+    deckId,
+    sourceDeckName: payload.result.deckName || deck.name,
     input: {
-      deckId: payload.input.deckId,
+      deckId,
+      savedLessonPlanId: payload.input.savedLessonPlanId,
+      dayScope: payload.input.dayScope,
       subject: payload.input.subject,
       gradeLevel: payload.input.gradeLevel,
       topic: payload.input.topic,
@@ -337,6 +386,8 @@ export async function updateWorksheetAction(data: {
     sourceDeckName: deck.name,
     input: {
       deckId: existing.deckId,
+      savedLessonPlanId: payload.input.savedLessonPlanId,
+      dayScope: payload.input.dayScope,
       subject: payload.input.subject,
       gradeLevel: payload.input.gradeLevel,
       topic: payload.input.topic,

@@ -65,6 +65,8 @@ export type SavedStudyGuideGenerationInput = Pick<
 export type SavedWorksheetGenerationInput = Pick<
   TeacherWorksheetActionInput,
   | 'deckId'
+  | 'savedLessonPlanId'
+  | 'dayScope'
   | 'subject'
   | 'gradeLevel'
   | 'topic'

@@ -1707,7 +1707,7 @@ export const EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly Doc
       src: uiSrc(`${EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_FILE} - 01.png`),
       title: "Generate from a saved lesson plan",
       caption:
-        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Study Guide Generator. Choose the workspace owner or a team admin, then a saved lesson plan (for example Understanding Air Pollution · Lesson Plan · 5 days · grade 7). The plan fills Subject (Science : Environmental Science), Grade Level (grade 7), and Topic (Air pollution). Homework assignment is optional when one is already saved for that plan. Reference material is optional — Website URL, Plain text, PDF, Word, PowerPoint, or handwritten notes. Choose Generate. A multi-day plan uses the full plan (All Days) without a day picker.",
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Study Guide Generator. Choose the workspace owner or a team admin, then a saved lesson plan (for example Understanding Air Pollution · Lesson Plan · 5 days · grade 7). The plan fills Subject (Science : Environmental Science), Grade Level (grade 7), and Topic (Air pollution). Homework assignment is optional when one is already saved for that plan. Reference material is optional — Website URL, Plain text, PDF, Word, PowerPoint, or handwritten notes. Choose Generate. A multi-day plan asks which part to use — All Days or one day — and the study guide is written from that choice.",
     },
     {
       src: uiSrc(`${EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_FILE} - 02.png`),

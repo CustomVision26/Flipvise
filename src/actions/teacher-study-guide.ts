@@ -238,6 +238,13 @@ Requirements:
 - Write specific, in-depth content grounded in the provided source material — never generic placeholders like "definition 1", "key term A", or "core concept 1".
 - When reference material (websites, documents, captions, etc.) is provided, prioritize its facts, vocabulary, concepts, and examples. Do not contradict the references or invent unrelated content.
 - When a lesson plan is linked, draw vocabulary, important points, examples, and practice from its objectives, vocabulary list, teaching steps, and assessment items.
+${
+  input.savedLessonPlanId == null
+    ? ""
+    : input.dayScope != null && input.dayScope !== "all"
+      ? "- Use only the selected lesson-plan day: that day's vocabulary, daily focus, and class outline. Do not add content from the other days.\n"
+      : "- Cover the full multi-day lesson plan (All Days).\n"
+}
 - When homework is linked, align the study guide so students can prepare for those questions — cover the same skills and terminology without copying homework questions verbatim into practiceQuestions.
 - summary: 2–4 sentences overview of what students need to know for ${input.topic}.
 - keyVocabulary: 6–12 real subject-specific terms. Format each as "Term — concise student-friendly definition".

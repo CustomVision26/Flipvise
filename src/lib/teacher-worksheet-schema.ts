@@ -1,7 +1,11 @@
 import { z } from "zod";
+import { lessonPlanDayScopeSchema } from "@/lib/lesson-plan-day-scope";
 
 export const teacherWorksheetInputSchema = z.object({
-  deckId: z.number().int().positive(),
+  deckId: z.number().int().positive().optional(),
+  savedLessonPlanId: z.number().int().positive().optional(),
+  dayScope: lessonPlanDayScopeSchema.optional(),
+  teamId: z.number().int().positive().optional(),
   subject: z.string().min(1),
   gradeLevel: z.string().min(1),
   topic: z.string().min(1),

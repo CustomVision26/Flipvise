@@ -2,6 +2,7 @@ import type { cards } from "@/db/schema";
 import type { DeckRow } from "@/db/queries/decks";
 import { deckToHomeworkDefaults } from "@/lib/homework-source-context";
 import type { LessonPlanReferenceMaterial } from "@/lib/lesson-plan-reference-material";
+import type { LessonPlanDayScope } from "@/lib/lesson-plan-day-scope";
 import type { DeckWorksheetResult, WorksheetItem } from "@/lib/teacher-worksheet-schema";
 import {
   buildGenerationTitleSourceSuffix,
@@ -130,6 +131,54 @@ export function buildDeckWorksheetResult(
       titleSuffix,
     ),
     deckName: deck.name,
+    subject,
+    gradeLevel,
+    topic,
+    worksheetType,
+    difficultyLevel,
+    instructions: `Complete this ${worksheetType.toLowerCase()} worksheet on ${shortTopic || topic}. Use the questions below. Write your answers in the space provided.${referenceNote}`,
+    studentHeader: `Name: ____________________    Date: ____________________\n\n${shortTopic || topic} — ${worksheetType} (${difficultyLevel})`,
+    items,
+  };
+}
+
+export function buildLessonPlanWorksheetResult(
+  input: {
+    subject: string;
+    gradeLevel: string;
+    topic: string;
+    worksheetType: string;
+    difficultyLevel: string;
+    lessonTitle: string;
+    dayScope?: LessonPlanDayScope | null;
+  },
+  options: {
+    items: WorksheetItem[];
+    referenceMaterials?: LessonPlanReferenceMaterial[];
+  },
+): DeckWorksheetResult {
+  const items = renumberWorksheetItems(options.items);
+  const subject = input.subject.trim();
+  const topic = input.topic.trim();
+  const gradeLevel = input.gradeLevel.trim();
+  const worksheetType = input.worksheetType.trim() || "Practice";
+  const difficultyLevel = input.difficultyLevel.trim() || "On-level";
+  const lessonTitle = input.lessonTitle.trim() || topic;
+  const referenceNote = buildWorksheetReferenceInstructions(
+    options.referenceMaterials ?? [],
+  );
+  const shortTopic = shortenTeacherTitleSegment(topic, 48);
+  const titleSuffix = buildGenerationTitleSourceSuffix({
+    sourceType: "lesson_plan",
+    dayScope: input.dayScope ?? "all",
+  });
+
+  return {
+    worksheetTitle: withTitleSourceSuffix(
+      `${shortTopic} — ${worksheetType} Worksheet`,
+      titleSuffix,
+    ),
+    deckName: lessonTitle,
     subject,
     gradeLevel,
     topic,

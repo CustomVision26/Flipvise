@@ -213,7 +213,7 @@ export async function buildWorksheetPdfDocument(
   doc.setTextColor(70);
   addWrappedText(
     doc,
-    `Subject: ${worksheet.subject}  ·  Grade: ${worksheet.gradeLevel}  ·  Deck: ${worksheet.deckName}`,
+    `Subject: ${worksheet.subject}  ·  Grade: ${worksheet.gradeLevel}  ·  Source: ${worksheet.deckName}`,
     margin,
     yRef,
     contentW,

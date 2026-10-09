@@ -169,3 +169,78 @@ Requirements:
     return expandWorksheetItemsFromCards(cardRows, numberOfQuestions);
   }
 }
+
+/**
+ * Build the requested worksheet questions from a saved lesson plan scope.
+ * Questions come from the model, grounded in that plan's curriculum data.
+ */
+export async function generateWorksheetItemsFromLessonPlan(input: {
+  curriculumContext: string;
+  numberOfQuestions: number;
+  subject: string;
+  gradeLevel: string;
+  topic: string;
+  worksheetType: string;
+  difficultyLevel: string;
+  dayScopeLabel: string | null;
+}): Promise<WorksheetItem[]> {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    throw new Error("Worksheet generation needs an AI connection. Try again later.");
+  }
+
+  const scopeLine = input.dayScopeLabel
+    ? `Use only this part of the lesson plan: ${input.dayScopeLabel}.`
+    : "Use the full lesson plan (all days).";
+
+  const { output } = await trackedGenerateText({
+    model: openai("gpt-4o"),
+    output: Output.object({
+      schema: aiWorksheetQuestionsSchema,
+    }),
+    system: `You are an expert K–12 teacher writing a student worksheet and answer key from a saved lesson plan.
+
+Requirements:
+- Generate exactly ${input.numberOfQuestions} distinct worksheet questions.
+- ${scopeLine}
+- Ground every question in the curriculum data below. Do not switch to a different topic.
+- Match subject, grade, topic, worksheet type, and difficulty.
+- Vary the practice (identify, explain, apply, or solve) while staying on the same skills and vocabulary.
+- Do NOT prefix prompts or answers with numbers, bullets, or labels.
+- Each answer is one clear, classroom-ready correct answer.
+- Do not use markdown formatting.
+- Prefer plain text prompts.`,
+    prompt: [
+      `Subject: ${input.subject}`,
+      `Grade level: ${input.gradeLevel}`,
+      `Topic: ${input.topic}`,
+      `Worksheet type: ${input.worksheetType}`,
+      `Difficulty: ${input.difficultyLevel}`,
+      `Requested questions: ${input.numberOfQuestions}`,
+      "",
+      input.curriculumContext,
+    ].join("\n"),
+  });
+
+  if (!output?.questions?.length) {
+    throw new Error("AI worksheet generation returned no questions.");
+  }
+
+  const questions = output.questions.slice(0, input.numberOfQuestions);
+  if (questions.length < input.numberOfQuestions) {
+    throw new Error(
+      `AI worksheet generation returned ${questions.length} of ${input.numberOfQuestions} questions.`,
+    );
+  }
+
+  return renumberWorksheetItems(
+    questions.map((question) => ({
+      questionNumber: 1,
+      prompt: question.prompt.trim(),
+      promptImageUrl: null,
+      answer: question.answer.trim(),
+      answerImageUrl: null,
+      frontImageUrl: null,
+      backImageUrl: null,
+    })),
+  );
+}
