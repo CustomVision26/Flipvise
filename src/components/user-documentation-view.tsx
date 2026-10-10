@@ -240,6 +240,11 @@ function DocPagePanel({
             Open Teacher Dashboard guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "teacher-resources" ? (
+          <DocsUiGuideStartButton guideId="edu-teacher-resource-library-owner">
+            Open Teacher Resource Library for the plan owner guide
+          </DocsUiGuideStartButton>
+        ) : null}
         {page.id === "teacher-classroom" ? (
           <>
             <DocsUiGuideStartButton guideId="edu-teacher-classes-owner">
@@ -256,6 +261,9 @@ function DocPagePanel({
             </DocsUiGuideStartButton>
             <DocsUiGuideStartButton guideId="edu-teacher-student-progress-manual-grade-owner">
               Open Manual assignment grades for the plan owner guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-student-progress-quiz-grade-owner">
+              Open Quiz grades for the plan owner guide
             </DocsUiGuideStartButton>
           </>
         ) : null}
@@ -595,6 +603,14 @@ function articleSectionGuides(
       },
     ];
   }
+  if (pageId === "teacher-resources" && sectionId === "browse") {
+    return [
+      {
+        id: "edu-teacher-resource-library-owner",
+        label: "Open Teacher Resource Library for the plan owner guide",
+      },
+    ];
+  }
   if (pageId === "teacher-classroom" && sectionId === "classes") {
     return [
       {
@@ -620,6 +636,10 @@ function articleSectionGuides(
       {
         id: "edu-teacher-student-progress-manual-grade-owner",
         label: "Open Manual assignment grades for the plan owner guide",
+      },
+      {
+        id: "edu-teacher-student-progress-quiz-grade-owner",
+        label: "Open Quiz grades for the plan owner guide",
       },
     ];
   }

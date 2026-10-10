@@ -35,7 +35,9 @@ export type DocsUiGuideId =
   | "edu-teacher-student-progress-owner"
   | "edu-teacher-student-progress-add-student-owner"
   | "edu-teacher-student-progress-quiz-result-owner"
-  | "edu-teacher-student-progress-manual-grade-owner";
+  | "edu-teacher-student-progress-manual-grade-owner"
+  | "edu-teacher-student-progress-quiz-grade-owner"
+  | "edu-teacher-resource-library-owner";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -125,6 +127,8 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-student-progress-add-student-owner",
           "edu-teacher-student-progress-quiz-result-owner",
           "edu-teacher-student-progress-manual-grade-owner",
+          "edu-teacher-student-progress-quiz-grade-owner",
+          "edu-teacher-resource-library-owner",
         ],
       },
     ],
@@ -1938,6 +1942,80 @@ export const EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_GUIDE_STEPS: readon
     },
   ];
 
+const EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE =
+  "32 Flipvise - Team Tier Edu Plan - Teacher DB StudentProgress Report&Grade quizResult - owner_UI";
+
+export const EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE} - 01.png`),
+      title: "Open Add grade for a quiz result",
+      caption:
+        "On Student Progress, stay on Reports & Grades. The table can already list an assignment grade. Choose Add grade to record a quiz result.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE} - 02.png`),
+      title: "Enter the quiz score",
+      caption:
+        "Select the student (Bruce Williams), choose Quiz result, and confirm the class deck Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1. Under Score, Enter manually shows Score (%), for example 88.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE} - 03.png`),
+      title: "Use a saved member quiz result",
+      caption:
+        "Choose Member quiz result. The Quiz field stays on the class deck, and Saved result for this class deck lists the member’s attempt (Science : Environmental Science — Air pollution LP Day 1 — 50% · Oct 10, 2026, 12:52 PM). Score fills as 50%. Choose Save grade.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE} - 04.png`),
+      title: "Quiz grade saved",
+      caption:
+        "A confirmation says Manual grade saved. The Reports table now lists two selected rows for Bruce Williams: the quiz at 50% and Course work assignment 1 at 67/100. Choose Generate report.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE} - 05.png`),
+      title: "Preview both records",
+      caption:
+        "Generated report preview shows 2 total records, 1 quiz result, and 1 manual grade for Bruce Williams and the air-pollution class. Choose Download PDF or Save PDF.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_FILE} - 06.png`),
+      title: "Report with the quiz result",
+      caption:
+        "The Student Progress Report PDF lists both records: the quiz at 50% (Oct 10, 2026, 12:53 PM) and Course work assignment 1 at 67/100.",
+    },
+  ];
+
+const EDU_TEACHER_RESOURCE_LIBRARY_OWNER_FILE =
+  "33 Flipvise - Team Tier Edu Plan - Teacher DB Teacher Resource Library - owner_UI";
+
+export const EDU_TEACHER_RESOURCE_LIBRARY_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_RESOURCE_LIBRARY_OWNER_FILE} - 01.png`),
+      title: "Saved Lesson Plans",
+      caption:
+        "On Teacher Dashboard for UC-K26, the plan owner (John Brown) opens Teacher Resource Library and Saved Lesson Plans. Plans are grouped by person, then subject. The owner’s plan Understanding Air Pollution sits under John Brown (Owner). The team admin’s plan Air Pollution and its Effects sits under Teddy Watt (Admin). Each row offers PDF, Edit, Create Quiz, Rename, and Delete.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_RESOURCE_LIBRARY_OWNER_FILE} - 02.png`),
+      title: "Saved Homework",
+      caption:
+        "Saved Homework lists assignments the same way. John Brown (Owner) has Air Pollution Fundamentals · Lesson Plan All Days under Science : Environmental Science, with PDF, Edit, Rename, and Delete.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_RESOURCE_LIBRARY_OWNER_FILE} - 03.png`),
+      title: "Saved Worksheets",
+      caption:
+        "Saved Worksheets lists Air pollution — Practice Worksheet · Lesson Plan All Days under John Brown (Owner). The row offers Worksheet PDF, Answer Key PDF, Edit, Rename, and Delete.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_RESOURCE_LIBRARY_OWNER_FILE} - 04.png`),
+      title: "Saved Study Guides",
+      caption:
+        "Saved Study Guides lists Air pollution Study Guide · Lesson Plan All Days under John Brown (Owner), with PDF, Edit, Rename, and Delete.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -2153,5 +2231,17 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Reports & Grades, the plan owner records an assignment grade, generates a student progress report, and downloads the PDF.",
     steps: EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-student-progress-quiz-grade-owner": {
+    title: "Quiz grades for the plan owner",
+    summary:
+      "On Reports & Grades, the plan owner records a quiz score from a saved member result, then includes it in the student progress report.",
+    steps: EDU_TEACHER_STUDENT_PROGRESS_QUIZ_GRADE_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-resource-library-owner": {
+    title: "Teacher Resource Library for the plan owner",
+    summary:
+      "On Teacher Dashboard, the plan owner reviews saved lesson plans, homework, worksheets, and study guides grouped by owner and team admin.",
+    steps: EDU_TEACHER_RESOURCE_LIBRARY_OWNER_GUIDE_STEPS,
   },
 };

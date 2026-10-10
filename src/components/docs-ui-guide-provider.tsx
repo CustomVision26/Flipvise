@@ -12,7 +12,6 @@ import {
   GraduationCap,
   Images,
   Layers,
-  Lightbulb,
   Maximize2,
   Minimize2,
   MousePointerClick,
@@ -171,8 +170,10 @@ function DocsUiGuidePanel({
   const isLast = session.step === total - 1;
 
   const expanded = session.expanded;
+  const [direction, setDirection] = React.useState<1 | -1>(1);
 
   const goTo = (next: number) => {
+    setDirection(next >= session.step ? 1 : -1);
     onSessionChange((current) =>
       current
         ? { ...current, step: Math.min(Math.max(0, next), total - 1) }
@@ -196,7 +197,7 @@ function DocsUiGuidePanel({
         <Button
           type="button"
           variant="secondary"
-          className="pointer-events-auto h-10 gap-2 shadow-lg ring-1 ring-border/70"
+          className="pointer-events-auto h-10 gap-2 border border-cyan-400/40 bg-card/95 shadow-lg shadow-cyan-500/20 ring-1 ring-violet-400/30 backdrop-blur-md"
           onClick={() => setMinimized(false)}
         >
           <Maximize2 className="size-3.5" aria-hidden />
@@ -221,13 +222,19 @@ function DocsUiGuidePanel({
       <Card
         size="sm"
         className={cn(
-          "pointer-events-auto flex flex-col overflow-hidden border-border/70 bg-card/95 shadow-2xl ring-1 ring-primary/20 backdrop-blur-md animate-in fade-in-0 duration-300",
+          "pointer-events-auto flex flex-col overflow-hidden border-0 bg-card/95 p-0 shadow-2xl shadow-cyan-500/15 ring-1 ring-cyan-400/35 backdrop-blur-md animate-in fade-in-0 duration-500",
           expanded
             ? "h-full max-h-full w-full max-w-[min(92rem,100%)] slide-in-from-bottom-2"
-            : "max-h-[min(92vh,52rem)] w-full max-w-[32rem] slide-in-from-bottom-3",
+            : "max-h-[min(92vh,52rem)] w-full max-w-[34rem] slide-in-from-bottom-3",
         )}
       >
-        <CardHeader className="shrink-0 gap-2 border-b border-border/50 pb-3">
+        <div
+          aria-hidden
+          className="relative h-1.5 w-full shrink-0 overflow-hidden bg-muted"
+        >
+          <div className="absolute inset-0 animate-aurora bg-gradient-to-r from-cyan-400 via-teal-300 to-violet-500" />
+        </div>
+        <CardHeader className="shrink-0 gap-2 border-b border-border/50 px-4 pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 space-y-2">
               <Badge variant="secondary">{FLIPVISE_UI_GUIDE_LABEL}</Badge>
@@ -236,26 +243,19 @@ function DocsUiGuidePanel({
               </CardTitle>
               <Alert
                 className={cn(
-                  "border-primary/50 bg-primary/10 text-foreground shadow-lg shadow-primary/15",
+                  "border-cyan-400/40 bg-cyan-500/10 text-foreground shadow-md shadow-cyan-500/10",
                   "animate-in fade-in-0 slide-in-from-top-1 duration-500",
                   expanded && "py-1.5",
                 )}
               >
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-primary"
+                  className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-400 to-violet-500"
                 />
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute -left-1 top-3 size-2.5 rounded-full bg-primary shadow-[0_0_12px] shadow-primary animate-ping"
-                />
-                <MousePointerClick
-                  className="size-4 animate-bounce text-primary motion-reduce:animate-none"
-                  aria-hidden
-                />
-                <AlertTitle className="text-foreground">Keep this guide open</AlertTitle>
+                <MousePointerClick className="size-4 text-cyan-600 dark:text-cyan-300" aria-hidden />
+                <AlertTitle className="text-foreground">Walkthrough stays open</AlertTitle>
                 <AlertDescription className="text-foreground/90">
-                  Follow each step on screen. You may browse Flipvise while this guide stays open.
+                  Follow the numbered steps. You may continue working in Flipvise while this guide remains open.
                 </AlertDescription>
               </Alert>
             </div>
@@ -303,41 +303,52 @@ function DocsUiGuidePanel({
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pt-3">
           <div
             className={cn(
-              "min-h-0 overflow-auto rounded-lg bg-muted/40 ring-1 ring-border/60",
+              "relative min-h-0 overflow-hidden rounded-xl bg-muted/40 ring-1 ring-cyan-400/30",
               expanded ? "flex-1" : "max-h-[min(50vh,22rem)] shrink-0",
             )}
           >
-            <Image
-              key={step.src}
-              src={step.src}
-              alt={step.title}
-              width={1920}
-              height={1080}
-              sizes={expanded ? "92vw" : "(max-width: 640px) 100vw, 32rem"}
-              className="h-auto w-full animate-in fade-in-0 zoom-in-95 duration-300"
-              style={{ width: "100%", height: "auto", aspectRatio: "auto" }}
-              unoptimized
-              priority
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-cyan-400/20 to-transparent"
             />
+            <div className="h-full overflow-auto">
+              <Image
+                key={`${step.src}-${direction}`}
+                src={step.src}
+                alt={step.title}
+                width={1920}
+                height={1080}
+                sizes={expanded ? "92vw" : "(max-width: 640px) 100vw, 34rem"}
+                className={cn(
+                  "h-auto w-full animate-in fade-in-0 duration-500",
+                  direction === 1 ? "slide-in-from-right-8" : "slide-in-from-left-8",
+                )}
+                style={{ width: "100%", height: "auto", aspectRatio: "auto" }}
+                unoptimized
+                priority
+              />
+            </div>
           </div>
           <Alert
             key={session.step}
             className={cn(
-              "shrink-0 border-primary/55 bg-primary/12 text-foreground shadow-lg shadow-primary/20",
-              "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-500",
+              "shrink-0 border-violet-400/40 bg-violet-500/10 text-foreground shadow-md shadow-violet-500/10",
+              "animate-in fade-in-0 duration-500",
+              direction === 1 ? "slide-in-from-right-4" : "slide-in-from-left-4",
             )}
           >
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-primary"
+              className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-violet-400 to-cyan-400"
             />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-pulse"
-            />
-            <Sparkles className="relative size-4 text-primary" aria-hidden />
+            <Sparkles className="relative size-4 text-violet-600 dark:text-violet-300" aria-hidden />
             <AlertTitle className="relative flex items-center gap-2 text-foreground">
-              <Lightbulb className="size-3.5 text-primary" aria-hidden />
+              <Badge
+                variant="outline"
+                className="border-violet-400/40 bg-violet-500/15 font-normal text-violet-800 dark:text-violet-200"
+              >
+                {session.step + 1}
+              </Badge>
               {step.title}
             </AlertTitle>
             <AlertDescription
@@ -350,7 +361,25 @@ function DocsUiGuidePanel({
             </AlertDescription>
           </Alert>
         </CardContent>
-        <CardFooter className="shrink-0 justify-between gap-2">
+        <div className="flex shrink-0 gap-1 overflow-x-auto px-4 pt-1">
+          {guide.steps.map((item, index) => (
+            <Button
+              key={item.src}
+              type="button"
+              variant={index === session.step ? "default" : "outline"}
+              size="icon-xs"
+              aria-label={`Go to step ${index + 1}: ${item.title}`}
+              aria-current={index === session.step ? "step" : undefined}
+              className={cn(
+                "rounded-full transition-all duration-300",
+                index === session.step && "w-8 bg-cyan-600 text-white hover:bg-cyan-600 dark:bg-cyan-400",
+                index < session.step && "border-teal-400/50 bg-teal-500/30",
+              )}
+              onClick={() => goTo(index)}
+            />
+          ))}
+        </div>
+        <CardFooter className="shrink-0 justify-between gap-2 px-4">
           <Button
             type="button"
             variant="outline"
@@ -784,7 +813,7 @@ export function DocsUiGuideStartButton({
       type="button"
       variant="default"
       size="sm"
-      className="gap-1.5"
+      className="gap-1.5 border border-cyan-300/50 bg-gradient-to-r from-cyan-600 to-violet-600 text-white shadow-md shadow-cyan-500/25 transition-all duration-300 hover:-translate-y-0.5 hover:from-cyan-500 hover:to-violet-500 hover:text-white"
       onClick={() => guide.openGuide(guideId)}
     >
       <Eye className="size-3.5" aria-hidden />
