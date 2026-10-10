@@ -248,17 +248,11 @@ export function CreateTeacherClassDialog({
           </Button>
         }
       />
-      <DialogContent
-        className={
-          isPlanOwner
-            ? "flex max-h-[min(92vh,56rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
-            : "flex max-h-[min(90vh,48rem)] max-w-lg flex-col gap-0 overflow-hidden p-0"
-        }
-      >
+      <DialogContent className="flex max-h-[min(92vh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogHeader className="shrink-0 border-b border-border px-6 py-4 text-left">
-            <DialogTitle>Create class</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="shrink-0 gap-2 border-b border-border px-8 py-6 text-left">
+            <DialogTitle className="text-xl font-semibold tracking-tight">Create class</DialogTitle>
+            <DialogDescription className="max-w-2xl text-sm leading-6">
               Link a deck to a schedule slot. You can open lesson plans, homework, and other
               materials from the class card after saving.
             </DialogDescription>
@@ -291,10 +285,12 @@ export function CreateTeacherClassDialog({
             />
           </div>
 
-          <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none border-t border-border bg-background px-6 py-4">
+          <DialogFooter className="mx-0 mb-0 shrink-0 gap-3 rounded-none border-t border-border bg-muted/30 px-8 py-5 sm:justify-end">
             <Button
               type="button"
               variant="outline"
+              size="lg"
+              className="min-w-28"
               onClick={() => handleOpenChange(false)}
               disabled={isPending}
             >
@@ -302,6 +298,8 @@ export function CreateTeacherClassDialog({
             </Button>
             <Button
               type="submit"
+              size="lg"
+              className="min-w-36"
               disabled={isPending || isResolvingPlanPeriod || visibleDecks.length === 0}
             >
               {isPending ? (
