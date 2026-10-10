@@ -34,7 +34,8 @@ export type DocsUiGuideId =
   | "edu-teacher-classes-owner"
   | "edu-teacher-student-progress-owner"
   | "edu-teacher-student-progress-add-student-owner"
-  | "edu-teacher-student-progress-quiz-result-owner";
+  | "edu-teacher-student-progress-quiz-result-owner"
+  | "edu-teacher-student-progress-manual-grade-owner";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -123,6 +124,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-student-progress-owner",
           "edu-teacher-student-progress-add-student-owner",
           "edu-teacher-student-progress-quiz-result-owner",
+          "edu-teacher-student-progress-manual-grade-owner",
         ],
       },
     ],
@@ -1893,6 +1895,49 @@ export const EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_GUIDE_STEPS: readonl
     },
   ];
 
+const EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE =
+  "32 Flipvise - Team Tier Edu Plan - Teacher DB StudentProgress Report&Grade manualGrade - owner_UI";
+
+export const EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE} - 01.png`),
+      title: "Open Add grade",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26, the plan owner opens Student Progress under Classroom management, then Reports & Grades. Choose Add grade to record a grade for a registered student.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE} - 02.png`),
+      title: "Choose the student",
+      caption:
+        "Student name lists registered students. For example, Bruce Williams · williams.bruce2698@yahoo.com · Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1. Record type stays on Assignment grade until a student is selected.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE} - 03.png`),
+      title: "Enter the assignment grade",
+      caption:
+        "Assignment grade fills the email and subject from the class (Science : Environmental Science) and links the class deck. Enter the assignment (Course work assignment 1), grade 67, out of 100, academic year 2026, term Fall, week Week 2, and an optional note, then choose Save grade.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE} - 04.png`),
+      title: "Saved grade",
+      caption:
+        "The Reports table lists Bruce Williams, type Assignment, title Course work assignment 1, result 67/100, term Fall · Week 2. Select the row, then choose Generate report.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE} - 05.png`),
+      title: "Preview the report",
+      caption:
+        "Generated report preview shows 1 total record, 0 quiz results, and 1 manual grade for Bruce Williams — Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1. Choose Download PDF or Save PDF.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_FILE} - 06.png`),
+      title: "Student Progress Report PDF",
+      caption:
+        "The PDF (Student_Progress_Report) lists 1 total record, 0 quiz results, 1 manual grade, and 1 student. The record is Bruce Williams, Course work assignment 1, Assignment, 67/100, Fall · Week 2, 2026.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -2102,5 +2147,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Student Progress, the plan owner opens a member’s quiz result, the question sheet, the answer key, and the PDF, then records a quiz score by typing it or choosing a saved member result.",
     steps: EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-student-progress-manual-grade-owner": {
+    title: "Manual assignment grades for the plan owner",
+    summary:
+      "On Reports & Grades, the plan owner records an assignment grade, generates a student progress report, and downloads the PDF.",
+    steps: EDU_TEACHER_STUDENT_PROGRESS_MANUAL_GRADE_OWNER_GUIDE_STEPS,
   },
 };

@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createTeacherManualGradeAction,
@@ -235,7 +235,7 @@ function deckAssignmentNoticeForSelection(
 function UnassignedDeckNotice({ notice }: { notice: DeckAssignmentNotice }) {
   return (
     <div className="rounded-xl border border-border/70 bg-muted/10 px-4 py-3 text-sm sm:col-span-2">
-      <p>
+      <p className="text-destructive">
         {notice.deckTitle} is not assigned to {notice.studentName}.
       </p>
       {notice.canAssign && notice.href ? (
@@ -283,19 +283,25 @@ function quizOptionsForStudentId(
   const student = registeredStudents.find((item) => String(item.id) === studentId);
   if (!student) return [];
   if (isEducationTeamWorkspace) {
-    const assigned = assignedQuizOptionsForStudent(student, memberAssignedQuizOptions);
     const cls = resolveRegisteredStudentClass(student, personalClasses);
-    if (cls && !assigned.some((quiz) => quiz.deckId === cls.deckId)) {
-      return [
-        {
-          key: `deck-${cls.deckId}`,
-          title: quizTitleForTeacherClass(cls),
-          deckId: cls.deckId,
-        },
-        ...assigned,
-      ];
+    if (!cls) return [];
+    const assignedToClass = assignedQuizOptionsForStudent(
+      student,
+      memberAssignedQuizOptions,
+    ).filter((quiz) => quiz.deckId === cls.deckId);
+    if (assignedToClass.length > 0) {
+      return assignedToClass.map((quiz) => ({
+        ...quiz,
+        title: quizTitleForTeacherClass(cls, quiz.title),
+      }));
     }
-    return assigned;
+    return [
+      {
+        key: `deck-${cls.deckId}`,
+        title: quizTitleForTeacherClass(cls),
+        deckId: cls.deckId,
+      },
+    ];
   }
   if (student.classId == null && student.classDeckId == null) return [];
 
@@ -349,6 +355,55 @@ function quizOptionsForStudentId(
       deckId: cls.deckId,
     },
   ];
+}
+
+function studentMatchesSearch(
+  student: TeacherRegisteredStudentWithClass,
+  personalClasses: TeacherClassWithDeck[],
+  query: string,
+): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const label = formatRegisteredStudentWithClassLabel(student, personalClasses).toLowerCase();
+  return (
+    label.includes(needle) ||
+    student.fullName.toLowerCase().includes(needle) ||
+    student.email.toLowerCase().includes(needle)
+  );
+}
+
+function StudentSelectSearch({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div
+      className="border-b border-border p-2"
+      onPointerDown={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Search students"
+          className="h-8 bg-background pl-8"
+          autoComplete="off"
+          aria-label="Search students"
+        />
+      </div>
+    </div>
+  );
 }
 
 function memberQuizResultLabel(row: TeacherStudentProgressRow): string {
@@ -508,12 +563,14 @@ export const TeacherManualGradesPanel = forwardRef<
   const [form, setForm] = useState(EMPTY_FORM);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [selectedStudentId, setSelectedStudentId] = useState(STUDENT_NONE);
+  const [studentSearch, setStudentSearch] = useState("");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(ASSIGNMENT_NONE);
   const [selectedQuizKey, setSelectedQuizKey] = useState(QUIZ_NONE);
   const [gradeEntryType, setGradeEntryType] = useState<GradeEntryType>("assignment");
   const [quizScoreSource, setQuizScoreSource] = useState<QuizScoreSource>("manual");
   const [selectedMemberResultId, setSelectedMemberResultId] = useState(RESULT_NONE);
   const [editSelectedStudentId, setEditSelectedStudentId] = useState(STUDENT_NONE);
+  const [editStudentSearch, setEditStudentSearch] = useState("");
   const [editSelectedAssignmentId, setEditSelectedAssignmentId] = useState(ASSIGNMENT_NONE);
   const [editSelectedQuizKey, setEditSelectedQuizKey] = useState(QUIZ_NONE);
   const [editGradeEntryType, setEditGradeEntryType] = useState<GradeEntryType>("assignment");
@@ -748,8 +805,23 @@ export const TeacherManualGradesPanel = forwardRef<
     return buildTeacherHomeworkPath(teamId, teamMemberId, params);
   }
 
+  function classQuizKeyForStudent(studentId: string): string {
+    return (
+      quizOptionsForStudentId(
+        studentId,
+        registeredStudents,
+        personalClasses,
+        savedQuizOptions,
+        quizResultRows,
+        memberAssignedQuizOptions,
+        isEducationTeamWorkspace,
+      )[0]?.key ?? QUIZ_NONE
+    );
+  }
+
   function resetStudentSelection() {
     setSelectedStudentId(STUDENT_NONE);
+    setStudentSearch("");
     setSelectedAssignmentId(ASSIGNMENT_NONE);
     setSelectedQuizKey(QUIZ_NONE);
     setGradeEntryType("assignment");
@@ -763,8 +835,10 @@ export const TeacherManualGradesPanel = forwardRef<
 
     if (studentId === STUDENT_NONE) {
       setSelectedAssignmentId(ASSIGNMENT_NONE);
+      setSelectedQuizKey(QUIZ_NONE);
       setSelectedMemberResultId(RESULT_NONE);
       setQuizScoreSource("manual");
+      setStudentSearch("");
       setForm(EMPTY_FORM);
       return;
     }
@@ -774,10 +848,21 @@ export const TeacherManualGradesPanel = forwardRef<
 
     const cls = resolveRegisteredStudentClass(student, personalClasses);
 
+    const classQuiz = quizOptionsForStudentId(
+      studentId,
+      registeredStudents,
+      personalClasses,
+      savedQuizOptions,
+      quizResultRows,
+      memberAssignedQuizOptions,
+      isEducationTeamWorkspace,
+    )[0];
+
     setSelectedAssignmentId(ASSIGNMENT_NONE);
-    setSelectedQuizKey(QUIZ_NONE);
+    setSelectedQuizKey(classQuiz?.key ?? QUIZ_NONE);
     setSelectedMemberResultId(RESULT_NONE);
     setQuizScoreSource("manual");
+    setStudentSearch("");
     setForm((current) => ({
       ...current,
       studentName: student.fullName,
@@ -786,7 +871,7 @@ export const TeacherManualGradesPanel = forwardRef<
       academicYear: cls?.academicYear ?? student.classAcademicYear ?? "",
       termSemester: cls?.termSemester ?? student.classTermSemester ?? "",
       period: cls?.week ?? student.classWeek ?? "",
-      assignmentTitle: "",
+      assignmentTitle: classQuiz?.title ?? "",
     }));
   }
 
@@ -935,6 +1020,7 @@ export const TeacherManualGradesPanel = forwardRef<
     setEditGradeEntryType("assignment");
     setEditQuizScoreSource("manual");
     setEditSelectedMemberResultId(RESULT_NONE);
+    setEditStudentSearch("");
   }
 
   function openEditDialog(grade: TeacherManualGradeRow) {
@@ -976,7 +1062,8 @@ export const TeacherManualGradesPanel = forwardRef<
     });
     setEditSelectedStudentId(studentId);
     setEditSelectedAssignmentId(assignmentMatch ? String(assignmentMatch.id) : ASSIGNMENT_NONE);
-    setEditSelectedQuizKey(quizMatch?.key ?? QUIZ_NONE);
+    setEditSelectedQuizKey(quizMatch?.key ?? classQuizKeyForStudent(studentId));
+    setEditStudentSearch("");
   }
 
   function applyEditStudentSelection(studentId: string) {
@@ -984,6 +1071,8 @@ export const TeacherManualGradesPanel = forwardRef<
 
     if (studentId === STUDENT_NONE) {
       setEditSelectedAssignmentId(ASSIGNMENT_NONE);
+      setEditSelectedQuizKey(QUIZ_NONE);
+      setEditStudentSearch("");
       setEditForm((current) => ({
         ...current,
         studentName: "",
@@ -1002,10 +1091,21 @@ export const TeacherManualGradesPanel = forwardRef<
 
     const cls = resolveRegisteredStudentClass(student, personalClasses);
 
+    const classQuiz = quizOptionsForStudentId(
+      studentId,
+      registeredStudents,
+      personalClasses,
+      savedQuizOptions,
+      quizResultRows,
+      memberAssignedQuizOptions,
+      isEducationTeamWorkspace,
+    )[0];
+
     setEditSelectedAssignmentId(ASSIGNMENT_NONE);
-    setEditSelectedQuizKey(QUIZ_NONE);
+    setEditSelectedQuizKey(classQuiz?.key ?? QUIZ_NONE);
     setEditQuizScoreSource("manual");
     setEditSelectedMemberResultId(RESULT_NONE);
+    setEditStudentSearch("");
     setEditForm((current) => ({
       ...current,
       studentName: student.fullName,
@@ -1014,7 +1114,7 @@ export const TeacherManualGradesPanel = forwardRef<
       academicYear: cls?.academicYear ?? student.classAcademicYear ?? current.academicYear,
       termSemester: cls?.termSemester ?? student.classTermSemester ?? current.termSemester,
       period: cls?.week ?? student.classWeek ?? current.period,
-      assignmentTitle: "",
+      assignmentTitle: classQuiz?.title ?? "",
     }));
   }
 
@@ -1188,18 +1288,32 @@ export const TeacherManualGradesPanel = forwardRef<
                     <SelectValue placeholder="Select a registered student">
                       {selectedStudent
                         ? formatRegisteredStudentWithClassLabel(selectedStudent, personalClasses)
-                        : null}
+                        : "Select a registered student"}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={STUDENT_NONE} disabled>
-                      Select a registered student
-                    </SelectItem>
-                    {registeredStudents.map((student) => (
-                      <SelectItem key={student.id} value={String(student.id)}>
-                        {formatRegisteredStudentWithClassLabel(student, personalClasses)}
-                      </SelectItem>
-                    ))}
+                    <StudentSelectSearch
+                      id="manual-grade-student-search"
+                      value={studentSearch}
+                      onChange={setStudentSearch}
+                    />
+                    {registeredStudents.filter((student) =>
+                      studentMatchesSearch(student, personalClasses, studentSearch),
+                    ).length === 0 ? (
+                      <p className="px-2 py-3 text-sm text-muted-foreground">
+                        No students match that search.
+                      </p>
+                    ) : (
+                      registeredStudents
+                        .filter((student) =>
+                          studentMatchesSearch(student, personalClasses, studentSearch),
+                        )
+                        .map((student) => (
+                          <SelectItem key={student.id} value={String(student.id)}>
+                            {formatRegisteredStudentWithClassLabel(student, personalClasses)}
+                          </SelectItem>
+                        ))
+                    )}
                   </SelectContent>
                 </Select>
               ) : (
@@ -1610,18 +1724,32 @@ export const TeacherManualGradesPanel = forwardRef<
                     <SelectValue placeholder="Select a registered student">
                       {editSelectedStudent
                         ? formatRegisteredStudentWithClassLabel(editSelectedStudent, personalClasses)
-                        : editForm.studentName || null}
+                        : editForm.studentName || "Select a registered student"}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={STUDENT_NONE} disabled>
-                      Select a registered student
-                    </SelectItem>
-                    {registeredStudents.map((student) => (
-                      <SelectItem key={student.id} value={String(student.id)}>
-                        {formatRegisteredStudentWithClassLabel(student, personalClasses)}
-                      </SelectItem>
-                    ))}
+                  <SelectContent nestedInModal>
+                    <StudentSelectSearch
+                      id="edit-manual-grade-student-search"
+                      value={editStudentSearch}
+                      onChange={setEditStudentSearch}
+                    />
+                    {registeredStudents.filter((student) =>
+                      studentMatchesSearch(student, personalClasses, editStudentSearch),
+                    ).length === 0 ? (
+                      <p className="px-2 py-3 text-sm text-muted-foreground">
+                        No students match that search.
+                      </p>
+                    ) : (
+                      registeredStudents
+                        .filter((student) =>
+                          studentMatchesSearch(student, personalClasses, editStudentSearch),
+                        )
+                        .map((student) => (
+                          <SelectItem key={student.id} value={String(student.id)}>
+                            {formatRegisteredStudentWithClassLabel(student, personalClasses)}
+                          </SelectItem>
+                        ))
+                    )}
                   </SelectContent>
                 </Select>
               ) : (

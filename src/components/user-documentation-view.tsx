@@ -254,6 +254,9 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="edu-teacher-student-progress-quiz-result-owner">
               Open Student quiz results for the plan owner guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-student-progress-manual-grade-owner">
+              Open Manual assignment grades for the plan owner guide
+            </DocsUiGuideStartButton>
           </>
         ) : null}
         {page.id === "teacher-ai-content-tools" ? (
@@ -613,6 +616,10 @@ function articleSectionGuides(
       {
         id: "edu-teacher-student-progress-quiz-result-owner",
         label: "Open Student quiz results for the plan owner guide",
+      },
+      {
+        id: "edu-teacher-student-progress-manual-grade-owner",
+        label: "Open Manual assignment grades for the plan owner guide",
       },
     ];
   }
