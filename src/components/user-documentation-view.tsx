@@ -263,6 +263,9 @@ function DocPagePanel({
             <DocsUiGuideStartButton guideId="edu-teacher-study-guide-owner-lesson-plan">
               Open Study Guide Generator from a lesson plan guide
             </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-worksheet-owner-lesson-plan">
+              Open Worksheet Generator from a lesson plan guide
+            </DocsUiGuideStartButton>
           </>
         ) : null}
       </div>
@@ -566,6 +569,10 @@ function articleSectionGuides(
       {
         id: "edu-teacher-study-guide-owner-lesson-plan",
         label: "Open Study Guide Generator from a lesson plan guide",
+      },
+      {
+        id: "edu-teacher-worksheet-owner-lesson-plan",
+        label: "Open Worksheet Generator from a lesson plan guide",
       },
     ];
   }

@@ -2,7 +2,11 @@ import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
 import { loadTeacherClassesPagePayload } from "@/db/queries/teacher-classes";
 import { getTeacherClassDeckResources } from "@/db/queries/teacher-class-resources";
-import { getPlanPeriodDaysByDeckIdsForUser } from "@/db/queries/saved-lesson-plans";
+import {
+  getLinkedLessonPlanPeriodDaysByDeckIds,
+  getPlanPeriodDaysByDeckIdsForUser,
+} from "@/db/queries/saved-lesson-plans";
+import { loadOwnerTeamAdminDeckPicker } from "@/db/queries/teacher-owner-pickers";
 import type { ClassDeckResources } from "@/db/queries/teacher-class-resources";
 import { TeacherClassesView } from "@/components/teacher-classes-view";
 
@@ -22,15 +26,27 @@ export default async function TeacherClassesPage({
     params,
   );
 
-  const [classesPayload, deckContext] = await Promise.all([
+  const [classesPayload, deckContext, ownerDeckPicker] = await Promise.all([
     loadTeacherClassesPagePayload(userId, workspace.teamId),
-    loadTeacherDeckContext(userId),
+    loadTeacherDeckContext(userId, workspace.teamId),
+    loadOwnerTeamAdminDeckPicker(userId, workspace.teamId),
   ]);
 
-  const planPeriodDaysByDeckId = await getPlanPeriodDaysByDeckIdsForUser(
-    userId,
-    deckContext.decks,
-  );
+  const ownerPickerDecks = Object.values(ownerDeckPicker.itemsByAdminUserId).flat();
+  const [ownPlanPeriods, linkedPlanPeriods] = await Promise.all([
+    getPlanPeriodDaysByDeckIdsForUser(userId, deckContext.decks),
+    ownerDeckPicker.isWorkspaceOwner
+      ? getLinkedLessonPlanPeriodDaysByDeckIds(ownerPickerDecks.map((deck) => deck.id))
+      : Promise.resolve({} as Record<number, number>),
+  ]);
+  const planPeriodDaysByDeckId = { ...ownPlanPeriods, ...linkedPlanPeriods };
+  const lessonPlanDeckIds = [
+    ...new Set(
+      [...Object.keys(ownPlanPeriods), ...Object.keys(linkedPlanPeriods)].map((id) =>
+        Number(id),
+      ),
+    ),
+  ];
 
   const decksById = new Map(
     deckContext.decks.map((deck) => [
@@ -81,6 +97,8 @@ export default async function TeacherClassesPage({
       memberMetaByUserId={classesPayload.memberMetaByUserId}
       isWorkspaceOwner={classesPayload.isWorkspaceOwner}
       decks={deckContext.decks}
+      ownerDeckPicker={ownerDeckPicker.isWorkspaceOwner ? ownerDeckPicker : null}
+      lessonPlanDeckIds={lessonPlanDeckIds}
       planPeriodDaysByDeckId={planPeriodDaysByDeckId}
       deckResourcesByClassId={deckResourcesByClassId}
       workspace={workspace}

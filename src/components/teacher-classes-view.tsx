@@ -42,6 +42,7 @@ import type {
   TeacherClassWithDeck,
 } from "@/db/queries/teacher-classes";
 import type { DeckRow } from "@/db/queries/decks";
+import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
 import {
   teacherClassDisplayTitle,
   teacherClassSubjectLabel,
@@ -99,6 +100,8 @@ type TeacherClassesViewProps = {
   memberMetaByUserId: Record<string, WorkspaceMemberMeta>;
   isWorkspaceOwner: boolean;
   decks: DeckRow[];
+  ownerDeckPicker?: OwnerTeamAdminDeckPickerPayload | null;
+  lessonPlanDeckIds?: number[];
   planPeriodDaysByDeckId: Record<number, number>;
   deckResourcesByClassId: Record<number, ClassDeckResources>;
   workspace: TeacherWorkspaceContext;
@@ -659,6 +662,8 @@ export function TeacherClassesView({
   memberMetaByUserId,
   isWorkspaceOwner,
   decks,
+  ownerDeckPicker = null,
+  lessonPlanDeckIds = [],
   planPeriodDaysByDeckId,
   deckResourcesByClassId,
   workspace,
@@ -761,6 +766,8 @@ export function TeacherClassesView({
           decks={decks}
           teamId={workspace.teamId}
           planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+          ownerDeckPicker={ownerDeckPicker}
+          lessonPlanDeckIds={lessonPlanDeckIds}
         />
       </div>
 

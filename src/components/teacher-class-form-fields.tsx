@@ -40,9 +40,17 @@ const PLAN_PERIOD_CLASS_HELP = (
   </>
 );
 
+type TeacherClassMemberOption = {
+  userId: string;
+  label: string;
+};
+
 type TeacherClassFormFieldsProps = {
   idPrefix: string;
   decks: DeckRow[];
+  memberOptions?: TeacherClassMemberOption[];
+  selectedMemberUserId?: string;
+  onMemberChange?: (userId: string) => void;
   deckKey: string;
   onDeckChange: (value: string) => void;
   academicYear: string;
@@ -65,6 +73,9 @@ type TeacherClassFormFieldsProps = {
 export function TeacherClassFormFields({
   idPrefix,
   decks,
+  memberOptions,
+  selectedMemberUserId,
+  onMemberChange,
   deckKey,
   onDeckChange,
   academicYear,
@@ -92,6 +103,28 @@ export function TeacherClassFormFields({
 
   return (
     <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
+      {memberOptions && memberOptions.length > 0 && onMemberChange ? (
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor={`${idPrefix}-member`}>Workspace owner or team admin</Label>
+          <Select
+            value={selectedMemberUserId}
+            onValueChange={(value) => {
+              if (value) onMemberChange(value);
+            }}
+          >
+            <SelectTrigger id={`${idPrefix}-member`} className="h-10 w-full bg-background">
+              <SelectValue placeholder="Select a member" />
+            </SelectTrigger>
+            <SelectContent nestedInModal>
+              {memberOptions.map((member) => (
+                <SelectItem key={member.userId} value={member.userId}>
+                  {member.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
       <div className="space-y-2 sm:col-span-2">
         <Label htmlFor={`${idPrefix}-deck`}>Deck</Label>
         <Select
@@ -112,6 +145,11 @@ export function TeacherClassFormFields({
             ))}
           </SelectContent>
         </Select>
+        {memberOptions && decks.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No decks with a linked lesson plan for this member.
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2">

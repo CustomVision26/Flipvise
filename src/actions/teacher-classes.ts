@@ -9,7 +9,10 @@ import {
   getTeacherClassById,
   updateTeacherClassById,
 } from "@/db/queries/teacher-classes";
-import { getPlanPeriodDaysForDeckForUser } from "@/db/queries/saved-lesson-plans";
+import {
+  getLinkedLessonPlanPeriodDaysByDeckIds,
+  getPlanPeriodDaysForDeckForUser,
+} from "@/db/queries/saved-lesson-plans";
 import { getTeamById } from "@/db/queries/teams";
 import { loadTeacherDeckContext } from "@/lib/load-teacher-deck-quota";
 import {
@@ -96,7 +99,15 @@ export async function getTeacherClassDeckPlanPeriodAction(
     return null;
   }
 
-  return getPlanPeriodDaysForDeckForUser(userId, parsed.data.deckId, deckContext.decks);
+  const ownPlanPeriod = await getPlanPeriodDaysForDeckForUser(
+    userId,
+    parsed.data.deckId,
+    deckContext.decks,
+  );
+  if (ownPlanPeriod != null) return ownPlanPeriod;
+
+  const linked = await getLinkedLessonPlanPeriodDaysByDeckIds([parsed.data.deckId]);
+  return linked[parsed.data.deckId] ?? null;
 }
 
 export async function updateTeacherClassAction(input: UpdateTeacherClassInput) {

@@ -288,6 +288,34 @@ export async function getPlanPeriodDaysByDeckIdsForUser(
   return byDeckId;
 }
 
+/** Latest linked lesson plan's plan-period length for each deck, regardless of who saved it. */
+export async function getLinkedLessonPlanPeriodDaysByDeckIds(
+  deckIds: number[],
+): Promise<Record<number, number>> {
+  const unique = [...new Set(deckIds.filter((id) => id > 0))];
+  if (unique.length === 0) return {};
+
+  const rows = await db
+    .select({
+      deckId: savedLessonPlans.deckId,
+      input: savedLessonPlans.input,
+    })
+    .from(savedLessonPlans)
+    .where(
+      and(inArray(savedLessonPlans.deckId, unique), isNotNull(savedLessonPlans.deckId)),
+    )
+    .orderBy(desc(savedLessonPlans.createdAt));
+
+  const byDeckId: Record<number, number> = {};
+  for (const row of rows) {
+    if (row.deckId == null || byDeckId[row.deckId] != null) continue;
+    byDeckId[row.deckId] = clampPlanPeriodDays(
+      row.input.planPeriodDays ?? DEFAULT_PLAN_PERIOD_DAYS,
+    );
+  }
+  return byDeckId;
+}
+
 export async function getPlanPeriodDaysForDeckForUser(
   userId: string,
   deckId: number,

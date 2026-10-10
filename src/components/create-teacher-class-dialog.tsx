@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { TeacherClassFormFields } from "@/components/teacher-class-form-fields";
 import type { DeckRow } from "@/db/queries/decks";
+import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
+import { adminDisplayLabel } from "@/lib/owner-team-admin-picker";
 import {
   buildPeriodFieldsForPlanPeriod,
   formatStoredClassPeriods,
@@ -30,6 +32,8 @@ type CreateTeacherClassDialogProps = {
   decks: DeckRow[];
   teamId: number | null;
   planPeriodDaysByDeckId: Record<number, number>;
+  ownerDeckPicker?: OwnerTeamAdminDeckPickerPayload | null;
+  lessonPlanDeckIds?: number[];
 };
 
 async function resolvePlanPeriodDaysForDeck(
@@ -48,6 +52,8 @@ export function CreateTeacherClassDialog({
   decks,
   teamId,
   planPeriodDaysByDeckId,
+  ownerDeckPicker = null,
+  lessonPlanDeckIds = [],
 }: CreateTeacherClassDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -63,9 +69,41 @@ export function CreateTeacherClassDialog({
   const [deckKey, setDeckKey] = useState(TEACHER_CLASS_DECK_NONE);
   const [linkedPlanPeriodDays, setLinkedPlanPeriodDays] = useState<number | null>(null);
 
+  const isPlanOwner = ownerDeckPicker?.isWorkspaceOwner === true;
+  const memberOptions = useMemo(
+    () =>
+      isPlanOwner
+        ? (ownerDeckPicker?.teamAdmins ?? []).map((admin) => ({
+            userId: admin.userId,
+            label: adminDisplayLabel(admin),
+          }))
+        : [],
+    [isPlanOwner, ownerDeckPicker?.teamAdmins],
+  );
+  const defaultMemberUserId =
+    ownerDeckPicker?.teamAdmins.find((admin) => admin.isWorkspaceOwner)?.userId ??
+    memberOptions[0]?.userId ??
+    "";
+  const [selectedMemberUserId, setSelectedMemberUserId] = useState(defaultMemberUserId);
+  const lessonPlanDeckIdSet = useMemo(
+    () => new Set(lessonPlanDeckIds),
+    [lessonPlanDeckIds],
+  );
+  const visibleDecks = useMemo(() => {
+    if (!isPlanOwner) return decks;
+    const memberDecks = ownerDeckPicker?.itemsByAdminUserId[selectedMemberUserId] ?? [];
+    return memberDecks.filter((deck) => lessonPlanDeckIdSet.has(deck.id));
+  }, [
+    decks,
+    isPlanOwner,
+    lessonPlanDeckIdSet,
+    ownerDeckPicker?.itemsByAdminUserId,
+    selectedMemberUserId,
+  ]);
+
   const selectedDeck =
     deckKey !== TEACHER_CLASS_DECK_NONE
-      ? decks.find((deck) => String(deck.id) === deckKey) ?? null
+      ? visibleDecks.find((deck) => String(deck.id) === deckKey) ?? null
       : null;
 
   function resetForm() {
@@ -76,7 +114,18 @@ export function CreateTeacherClassDialog({
     setPeriod("");
     setPeriods([]);
     setDeckKey(TEACHER_CLASS_DECK_NONE);
+    setSelectedMemberUserId(defaultMemberUserId);
     setLinkedPlanPeriodDays(null);
+    setError(null);
+  }
+
+  function handleMemberChange(userId: string) {
+    setSelectedMemberUserId(userId);
+    setDeckKey(TEACHER_CLASS_DECK_NONE);
+    setLinkedPlanPeriodDays(null);
+    setDay("");
+    setPeriod("");
+    setPeriods([]);
     setError(null);
   }
 
@@ -184,12 +233,18 @@ export function CreateTeacherClassDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
-          <Button type="button" disabled={decks.length === 0}>
+          <Button type="button" disabled={!isPlanOwner && decks.length === 0}>
             Create class
           </Button>
         }
       />
-      <DialogContent className="flex max-h-[min(90vh,48rem)] max-w-lg flex-col gap-0 overflow-hidden p-0">
+      <DialogContent
+        className={
+          isPlanOwner
+            ? "flex max-h-[min(92vh,56rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+            : "flex max-h-[min(90vh,48rem)] max-w-lg flex-col gap-0 overflow-hidden p-0"
+        }
+      >
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DialogHeader className="shrink-0 border-b border-border px-6 py-4 text-left">
             <DialogTitle>Create class</DialogTitle>
@@ -202,7 +257,10 @@ export function CreateTeacherClassDialog({
           <div className="min-h-0 flex-1 overflow-y-auto">
             <TeacherClassFormFields
               idPrefix="create-class"
-              decks={decks}
+              decks={visibleDecks}
+              memberOptions={isPlanOwner ? memberOptions : undefined}
+              selectedMemberUserId={selectedMemberUserId}
+              onMemberChange={isPlanOwner ? handleMemberChange : undefined}
               deckKey={deckKey}
               onDeckChange={(value) => void handleDeckChange(value)}
               academicYear={academicYear}
@@ -234,7 +292,7 @@ export function CreateTeacherClassDialog({
             </Button>
             <Button
               type="submit"
-              disabled={isPending || isResolvingPlanPeriod || decks.length === 0}
+              disabled={isPending || isResolvingPlanPeriod || visibleDecks.length === 0}
             >
               {isPending ? (
                 <>

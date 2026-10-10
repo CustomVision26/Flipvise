@@ -29,7 +29,8 @@ export type DocsUiGuideId =
   | "edu-teacher-quiz-owner-existing-deck"
   | "edu-teacher-homework-owner-deck"
   | "edu-teacher-homework-owner-lesson-plan"
-  | "edu-teacher-study-guide-owner-lesson-plan";
+  | "edu-teacher-study-guide-owner-lesson-plan"
+  | "edu-teacher-worksheet-owner-lesson-plan";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -113,6 +114,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-homework-owner-deck",
           "edu-teacher-homework-owner-lesson-plan",
           "edu-teacher-study-guide-owner-lesson-plan",
+          "edu-teacher-worksheet-owner-lesson-plan",
         ],
       },
     ],
@@ -1723,6 +1725,25 @@ export const EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly Doc
     },
   ];
 
+const EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_FILE =
+  "31 Flipvise - Team Tier Edu Plan - Teacher DB WorksheetGenerate - owner_UI";
+
+export const EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_FILE} - 01.png`),
+      title: "Generate from a saved lesson plan",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Worksheet Generator. Choose the workspace owner or a team admin, then a saved lesson plan (for example Science : Environmental Science — Air pollution). The plan fills Subject (Science : Environmental Science), Grade Level (grade 7), and Topic (Air pollution). Worksheet Type is Practice, Number of Questions is 10, and Difficulty Level is Intermediate. Choose Generate. A multi-day plan asks which part to use — All Days or one day — and the worksheet is written from that choice.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_FILE} - 02.png`),
+      title: "Preview the worksheet",
+      caption:
+        "Preview shows the practice instructions, the questions (for example 10 items on air pollution), and an Answer key preview. Expand opens the review larger. Edit changes the worksheet before you save. Save stores it in Teacher Resource Library. Worksheet PDF and Answer Key PDF each save a copy for printing or sharing.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1902,5 +1923,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Teacher Dashboard, the plan owner chooses a saved lesson plan, optionally adds reference material, then previews, saves, downloads, or regenerates the study guide.",
     steps: EDU_TEACHER_STUDY_GUIDE_OWNER_LESSON_PLAN_GUIDE_STEPS,
+  },
+  "edu-teacher-worksheet-owner-lesson-plan": {
+    title: "Worksheet Generator from a lesson plan",
+    summary:
+      "On Teacher Dashboard, the plan owner chooses a saved lesson plan, then previews, edits, saves, or downloads the worksheet and answer key.",
+    steps: EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_GUIDE_STEPS,
   },
 };
