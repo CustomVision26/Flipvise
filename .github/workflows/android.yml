@@ -13,6 +13,7 @@ on:
         default: firebase
         options:
           - firebase
+          - play
           - create_group
       release_notes:
         description: "Firebase release notes (optional; defaults to the latest commit message)"
@@ -81,7 +82,22 @@ jobs:
       - name: Install fastlane plugins
         run: bundle exec fastlane install_plugins
 
+      - name: Write Play Console service account
+        if: github.event.inputs.lane == 'play'
+        env:
+          PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
+        run: |
+          set -euo pipefail
+          FILE="$RUNNER_TEMP/play-store-service-account.json"
+          printf '%s' "$PLAY_STORE_JSON_KEY" > "$FILE"
+          if ! grep -q "private_key" "$FILE"; then
+            echo "::error::PLAY_STORE_JSON_KEY secret is missing or not a valid service account JSON."
+            exit 1
+          fi
+          echo "PLAY_STORE_JSON_KEY_PATH=$FILE" >> "$GITHUB_ENV"
+
       - name: Write Firebase service account
+        if: github.event.inputs.lane != 'play'
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
@@ -157,10 +173,19 @@ jobs:
         run: bundle exec fastlane android ${{ github.event.inputs.lane || 'firebase' }}
 
       - name: Upload APK artifact
-        if: always()
+        if: always() && github.event.inputs.lane != 'play'
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
           path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload AAB artifact
+        if: always() && github.event.inputs.lane == 'play'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: ignore
           retention-days: 14

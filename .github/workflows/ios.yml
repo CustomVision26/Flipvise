@@ -12,6 +12,7 @@ on:
         default: beta
         options:
           - beta
+          - release
           - nuke_certs
       changelog:
         description: "TestFlight 'What to Test' notes (optional; defaults to the latest commit message)"

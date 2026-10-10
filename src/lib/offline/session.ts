@@ -123,7 +123,7 @@ export async function getStoredSyncToken(): Promise<string | null> {
   return value ?? null;
 }
 
-/** Live origin the bundled app syncs against (e.g. https://flipvise-sjgw.onrender.com). */
+/** Live origin the bundled app syncs against (e.g. https://learn.flipvisestudio.com). */
 export async function setStoredApiBaseUrl(url: string): Promise<void> {
   await Preferences.set({ key: API_BASE_URL_KEY, value: url });
 }

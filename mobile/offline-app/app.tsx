@@ -68,7 +68,7 @@ import {
 
 const LIVE_URL =
   (import.meta.env.VITE_LIVE_URL as string | undefined) ??
-  "https://flipvise-sjgw.onrender.com";
+  "https://learn.flipvisestudio.com";
 
 /**
  * Live origin from this native build — not a stale value from Preferences.

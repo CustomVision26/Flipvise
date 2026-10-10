@@ -132,6 +132,31 @@ platform :ios do
       skip_waiting_for_build_processing: false,
     )
   end
+
+  # Selects the newest uploaded build in App Store Connect. Listing text,
+  # screenshots, and the privacy questionnaire stay in App Store Connect.
+  # The build is not sent to review until you submit it there.
+  desc "Attach the latest build to the App Store version (does not submit for review)"
+  lane :release do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: ENV.fetch("ASC_KEY_PATH"),
+      in_house: false,
+    )
+
+    deliver(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      submit_for_review: false,
+      automatic_release: false,
+      skip_screenshots: true,
+      skip_metadata: true,
+      skip_binary_upload: true,
+      force: true,
+      precheck_include_in_app_purchases: false,
+    )
+  end
 end
 
 platform :android do
@@ -191,5 +216,32 @@ platform :android do
     options[:groups] = groups unless groups.empty?
 
     firebase_app_distribution(options)
+  end
+
+  # Play requires an Android App Bundle. The first bundle for a brand-new Play
+  # app must be uploaded once in Play Console; later runs can use this lane.
+  # The release is left as a draft on the internal track.
+  desc "Build a release AAB and upload a draft to the Play internal track"
+  lane :play do
+    gradle(
+      project_dir: "android",
+      task: "bundle",
+      build_type: "Release",
+    )
+
+    aab_path = lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH] ||
+               "android/app/build/outputs/bundle/release/app-release.aab"
+
+    upload_to_play_store(
+      json_key: ENV.fetch("PLAY_STORE_JSON_KEY_PATH"),
+      package_name: "com.flipvise.app",
+      aab: aab_path,
+      track: ENV.fetch("PLAY_TRACK", "internal"),
+      release_status: "draft",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true,
+    )
   end
 end

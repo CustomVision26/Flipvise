@@ -110,7 +110,7 @@ interface SyncResponse {
 export interface SyncOptions {
   /** Current Clerk user id — stamped onto pulled rows so local reads filter correctly. */
   userId: string;
-  /** Origin of the live app (e.g. https://flipvise-sjgw.onrender.com). Defaults to same-origin. */
+  /** Origin of the live app (e.g. https://learn.flipvisestudio.com). Defaults to same-origin. */
   apiBaseUrl?: string;
   /**
    * Device sync token. When set, sent as `Authorization: Bearer <token>` (used by the

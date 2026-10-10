@@ -17,7 +17,7 @@ export default defineConfig({
   define: {
     "import.meta.env.BASE_URL": JSON.stringify("./"),
     "import.meta.env.VITE_LIVE_URL": JSON.stringify(
-      process.env.VITE_LIVE_URL ?? "https://flipvise-sjgw.onrender.com",
+      process.env.VITE_LIVE_URL ?? "https://learn.flipvisestudio.com",
     ),
   },
   resolve: {

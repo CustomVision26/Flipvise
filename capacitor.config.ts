@@ -22,7 +22,7 @@ function parseLiveHost(raw: string): string {
   return raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 }
 
-const PROD_HOST = "flipvise-sjgw.onrender.com";
+const PROD_HOST = "learn.flipvisestudio.com";
 
 const LIVE_HOST = parseLiveHost(
   process.env.CAP_LIVE_HOST ??
@@ -41,6 +41,9 @@ const allowNavigation = new Set([
   "10.0.2.2",
   LIVE_HOST,
   PROD_HOST,
+  "learn.flipvisestudio.com",
+  "clerk.flipvisestudio.com",
+  "*.flipvisestudio.com",
   "*.onrender.com",
   "accounts.clerk.dev",
   "*.clerk.accounts.dev",

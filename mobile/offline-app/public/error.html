@@ -130,7 +130,8 @@
     </div>
     <script>
       (function () {
-        var PROD_HOST = "https://flipvise-sjgw.onrender.com";
+        var PROD_HOST = "https://learn.flipvisestudio.com";
+        var LEGACY_HOST = "flipvise-sjgw.onrender.com";
         var PREF_LAST_URL = "flipvise.offline.lastNavigationUrl";
         var PREF_API_BASE = "flipvise.offline.apiBaseUrl";
         var recoverAttempted = false;
@@ -178,10 +179,23 @@
             });
         }
 
-        function unwrapNativeSignInUrl(url) {
+        function rewriteLegacyHost(url) {
           try {
             var u = new URL(url);
-            if (u.pathname.indexOf("/native-signin") === -1) return url;
+            if (u.hostname !== LEGACY_HOST) return url;
+            var live = new URL(PROD_HOST);
+            u.protocol = live.protocol;
+            u.host = live.host;
+            return u.toString();
+          } catch (e) {
+            return url;
+          }
+        }
+
+        function unwrapNativeSignInUrl(url) {
+          try {
+            var u = new URL(rewriteLegacyHost(url));
+            if (u.pathname.indexOf("/native-signin") === -1) return u.toString();
             var redirect = u.searchParams.get("redirect");
             if (
               redirect &&
@@ -191,11 +205,11 @@
               return u.origin + redirect;
             }
           } catch (e) {}
-          return url;
+          return rewriteLegacyHost(url);
         }
 
         function buildDefaultRetryUrl(base) {
-          var origin = (base || PROD_HOST).replace(/\/$/, "");
+          var origin = rewriteLegacyHost(base || PROD_HOST).replace(/\/$/, "");
           return origin + "/dashboard";
         }
 
