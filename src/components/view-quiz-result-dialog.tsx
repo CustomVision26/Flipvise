@@ -38,7 +38,7 @@ export function ViewQuizResultDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[calc(100dvh-0.5rem)] w-[calc(100%-0.5rem)] max-w-3xl flex-col overflow-hidden p-0 sm:h-[min(92vh,56rem)] sm:max-h-[92vh] sm:w-full">
+        <DialogContent className="flex max-h-[min(92vh,56rem)] w-[calc(100%-1.5rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-h-[92vh] sm:max-w-5xl sm:w-full">
           <QuizResultDetailView
             variant="dialog"
             result={result}
