@@ -17,6 +17,7 @@ export type TeacherRegisteredStudentWithClass = TeacherRegisteredStudentRow & {
   classAcademicYear: string | null;
   classTermSemester: string | null;
   classWeek: string | null;
+  classMonth: string | null;
 };
 
 export async function listTeacherRegisteredStudentsForUser(
@@ -39,6 +40,7 @@ export async function listTeacherRegisteredStudentsForUser(
         classAcademicYear: teacherClasses.academicYear,
         classTermSemester: teacherClasses.termSemester,
         classWeek: teacherClasses.week,
+        classMonth: teacherClasses.month,
       })
       .from(teacherRegisteredStudents)
       .leftJoin(teacherClasses, eq(teacherRegisteredStudents.classId, teacherClasses.id))

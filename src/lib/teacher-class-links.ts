@@ -120,6 +120,7 @@ export function resolveRegisteredStudentClass(
     classDeckName?: string | null;
     classAcademicYear?: string | null;
     classPeriod?: string | null;
+    classMonth?: string | null;
     userId?: string;
   },
   personalClasses: TeacherClassWithDeck[],
@@ -143,6 +144,7 @@ export function resolveRegisteredStudentClass(
       academicYear: student.classAcademicYear ?? "",
       termSemester: student.classTermSemester,
       week: student.classWeek,
+      month: student.classMonth ?? null,
       day: "",
       period: student.classPeriod ?? "",
       createdAt: new Date(0),
@@ -165,6 +167,7 @@ export function resolveRegisteredStudentClassDeckId(
     classDeckName?: string | null;
     classAcademicYear?: string | null;
     classPeriod?: string | null;
+    classMonth?: string | null;
     userId?: string;
   },
   personalClasses: TeacherClassWithDeck[],

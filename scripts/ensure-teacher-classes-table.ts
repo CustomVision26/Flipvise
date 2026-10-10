@@ -41,6 +41,11 @@ async function main() {
     ON "teacher_classes" ("deckId")
   `;
 
+  await sql`
+    ALTER TABLE "teacher_classes"
+    ADD COLUMN IF NOT EXISTS "month" varchar(32)
+  `;
+
   console.log("teacher_classes table ready.");
 }
 
