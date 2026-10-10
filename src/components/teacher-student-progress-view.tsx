@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition, Fragment } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,14 @@ import {
   TeacherRecordsCountBar,
   type TeacherPageSize,
 } from "@/components/teacher-record-pagination";
+
+const STUDENT_PROGRESS_TABS = [
+  "register-student",
+  "quiz-results",
+  "reports-and-grades",
+] as const;
+
+type StudentProgressTab = (typeof STUDENT_PROGRESS_TABS)[number];
 
 const FILTER_ALL = "__all__";
 
@@ -742,13 +750,30 @@ export function TeacherStudentProgressView({
     onOpenSheets: openQuizSheets,
   };
 
-  const defaultTab = showRegisterStudentTab && isPersonalEducation
-    ? "register-student"
-    : showQuizResultsTab
-      ? "quiz-results"
-      : showGradesAndReportsTabs
-        ? "reports-and-grades"
-        : "quiz-results";
+  const searchParams = useSearchParams();
+  const availableTabs = [
+    showRegisterStudentTab ? "register-student" : null,
+    showQuizResultsTab ? "quiz-results" : null,
+    showGradesAndReportsTabs ? "reports-and-grades" : null,
+  ].filter((tab): tab is StudentProgressTab => tab != null);
+  const requestedTab = searchParams.get("tab");
+  const activeTab = availableTabs.includes(requestedTab as StudentProgressTab)
+    ? (requestedTab as StudentProgressTab)
+    : (availableTabs[0] ?? "quiz-results");
+
+  useEffect(() => {
+    if (searchParams.get("tab") === activeTab) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", activeTab);
+    router.replace(`/teacher/students?${params.toString()}`, { scroll: false });
+  }, [activeTab, router, searchParams]);
+
+  function selectProgressTab(next: string | null) {
+    if (!next || next === activeTab) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", next);
+    router.replace(`/teacher/students?${params.toString()}`, { scroll: false });
+  }
 
   const quizResultsCard = (
       <Card className={cn(teamAdminCardClass, "overflow-visible backdrop-blur-sm")}>
@@ -1107,7 +1132,13 @@ export function TeacherStudentProgressView({
         </div>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="w-full gap-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          if (typeof value === "string") selectProgressTab(value);
+        }}
+        className="w-full gap-4"
+      >
         <TabsList
           className={cn(
             "h-auto w-full gap-1.5 bg-muted/60 p-1.5",

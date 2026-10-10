@@ -31,7 +31,10 @@ export type DocsUiGuideId =
   | "edu-teacher-homework-owner-lesson-plan"
   | "edu-teacher-study-guide-owner-lesson-plan"
   | "edu-teacher-worksheet-owner-lesson-plan"
-  | "edu-teacher-classes-owner";
+  | "edu-teacher-classes-owner"
+  | "edu-teacher-student-progress-owner"
+  | "edu-teacher-student-progress-add-student-owner"
+  | "edu-teacher-student-progress-quiz-result-owner";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -117,6 +120,9 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-study-guide-owner-lesson-plan",
           "edu-teacher-worksheet-owner-lesson-plan",
           "edu-teacher-classes-owner",
+          "edu-teacher-student-progress-owner",
+          "edu-teacher-student-progress-add-student-owner",
+          "edu-teacher-student-progress-quiz-result-owner",
         ],
       },
     ],
@@ -1782,6 +1788,99 @@ export const EDU_TEACHER_CLASSES_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
   },
 ];
 
+const EDU_TEACHER_STUDENT_PROGRESS_OWNER_FILE =
+  "32 Flipvise - Team Tier Edu Plan - Teacher DB StudentProgress - owner_UI";
+
+export const EDU_TEACHER_STUDENT_PROGRESS_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_OWNER_FILE} - 01.png`),
+      title: "Open Student Progress",
+      caption:
+        "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Student Progress under Classroom management. AI Recall™ insights shows the workspace totals (for example 1% average score, 47s average time, 1 forced unlock, 1 session) and the lowest and highest decks (Social Studies: British History). Track each student lists saved sessions — open Bruce Williams to see that person’s accuracy (50%), average AI score (1%), time (7m 49s), and last session. Below that, Student Progress has Registering a student, Quiz results, and Reports & Grades.",
+    },
+  ];
+
+const EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_FILE =
+  "32 Flipvise - Team Tier Edu Plan - Teacher DB StudentProgress AddStudent - owner_UI";
+
+export const EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_FILE} - 01.png`),
+      title: "Open Register student",
+      caption:
+        "On Student Progress, stay on Registering a student. A class must already exist. Choose Register student to link an invited workspace member to that class.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_FILE} - 02.png`),
+      title: "Choose a class and a member",
+      caption:
+        "Class lists classes created under Classes. Workspace student lists invited members with the Member role (team admins are not listed). Choose Save student after both are selected.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_FILE} - 03.png`),
+      title: "Save the student",
+      caption:
+        "For example, Class is Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1, and Workspace student is Bruce Williams (williams.bruce2698@yahoo.com), invited by John Brown. Choose Save student.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_FILE} - 04.png`),
+      title: "Student registered",
+      caption:
+        "The roster shows Bruce Williams, williams.bruce2698@yahoo.com, and the class Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1. A confirmation says Bruce Williams was added to the roster.",
+    },
+  ];
+
+const EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE =
+  "32 Flipvise - Team Tier Edu Plan - Teacher DB StudentProgress QuizResult- owner_UI";
+
+export const EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] =
+  [
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 01.png`),
+      title: "Open Quiz results",
+      caption:
+        "On Student Progress, choose Quiz results. Workspace quiz results groups saved attempts by team admin, then by member. Under John Brown (Owner), Bruce Williams (Member) has Social Studies: British History, topic Learning British history, saved Oct 4, 2026, 11:38 PM, score 50%. Double-click the row to open the question sheet and answer key.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 02.png`),
+      title: "Question sheet",
+      caption:
+        "Quiz sheets opens on Question sheet for Social Studies: British History, Bruce Williams, 10 questions. Review the questions, download the question sheet, or choose Save to resources.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 03.png`),
+      title: "Answer key",
+      caption:
+        "Answer key shows the correct answers for that quiz (for example Q1 John Wycliffe). Download answer key saves a separate PDF. Close returns to the results table.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 04.png`),
+      title: "View quiz result",
+      caption:
+        "On the same Quiz results row, View quiz result opens the member’s completed attempt. Delete removes that saved result.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 05.png`),
+      title: "Score and question review",
+      caption:
+        "The result names the deck (Social Studies: British History), who took it (Bruce Williams, williams.bruce2698@yahoo.com), workspace UC-K26, role Member, and owner John Brown. Score is 50% (5/10) in 01:39, with 5 correct, 2 incorrect, and 3 unanswered. Question review filters All, Correct, Incorrect, and Unanswered, and expands each question beside the correct answer.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 06.png`),
+      title: "Unanswered questions and Download PDF",
+      caption:
+        "Unanswered questions show Your answer as Not answered and the correct answer beside it (for example Queen Elizabeth I reigned for 45 years, from 1558 to 1603). The footer repeats 5 correct, 2 incorrect, 3 unanswered, and 10 total questions. Choose Download PDF.",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 07.png`),
+      title: "Quiz result PDF",
+      caption:
+        "The PDF (quiz_result_social_studies_british_history.pdf) lists the deck, date, taker, workspace UC-K26, role, owner, 50% (5/10 correct), and the question review with each submitted answer marked Correct or Incorrect.",
+    },
+  ];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1973,5 +2072,23 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Teacher Dashboard, the plan owner creates a class from a member’s lesson-plan deck, sets the academic schedule, then opens the saved class record.",
     steps: EDU_TEACHER_CLASSES_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-student-progress-owner": {
+    title: "Student Progress for the plan owner",
+    summary:
+      "On Teacher Dashboard, the plan owner opens Student Progress, reviews AI Recall™ insights, and opens a student’s saved session.",
+    steps: EDU_TEACHER_STUDENT_PROGRESS_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-student-progress-add-student-owner": {
+    title: "Register a student for the plan owner",
+    summary:
+      "On Student Progress, the plan owner registers an invited member onto an existing class.",
+    steps: EDU_TEACHER_STUDENT_PROGRESS_ADD_STUDENT_OWNER_GUIDE_STEPS,
+  },
+  "edu-teacher-student-progress-quiz-result-owner": {
+    title: "Student quiz results for the plan owner",
+    summary:
+      "On Student Progress, the plan owner opens a member’s quiz result, the question sheet, the answer key, and the PDF.",
+    steps: EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_GUIDE_STEPS,
   },
 };

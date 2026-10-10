@@ -59,8 +59,10 @@ import { cn } from "@/lib/utils";
 const STUDENT_NONE = "__none__";
 const ASSIGNMENT_NONE = "__none__";
 const QUIZ_NONE = "__none__";
+const RESULT_NONE = "__none__";
 
 type GradeEntryType = "assignment" | "quiz";
+type QuizScoreSource = "manual" | "member-result";
 
 type TeacherManualGradesPanelProps = {
   grades: TeacherManualGradeRow[];
@@ -223,6 +225,112 @@ function quizOptionsForStudentId(
   ];
 }
 
+function memberQuizResultLabel(row: TeacherStudentProgressRow): string {
+  const when = row.savedAt.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${row.summary.deckName} — ${row.percent}% · ${when}`;
+}
+
+function QuizResultScoreFields({
+  idPrefix,
+  source,
+  onSourceChange,
+  grade,
+  onGradeChange,
+  results,
+  selectedResultId,
+  onResultChange,
+  studentSelected,
+}: {
+  idPrefix: string;
+  source: QuizScoreSource;
+  onSourceChange: (source: QuizScoreSource) => void;
+  grade: string;
+  onGradeChange: (grade: string) => void;
+  results: TeacherStudentProgressRow[];
+  selectedResultId: string;
+  onResultChange: (resultId: string) => void;
+  studentSelected: boolean;
+}) {
+  const selected = results.find((row) => String(row.resultId) === selectedResultId);
+
+  return (
+    <div className="space-y-3 sm:col-span-2">
+      <div className="space-y-2">
+        <Label>Score</Label>
+        <ToggleGroup
+          value={[source]}
+          onValueChange={(value) => {
+            onSourceChange((value[0] as QuizScoreSource | undefined) ?? "manual");
+          }}
+          className="grid w-full grid-cols-2 gap-2"
+        >
+          <ToggleGroupItem value="manual" className="h-10 px-3">
+            Enter manually
+          </ToggleGroupItem>
+          <ToggleGroupItem value="member-result" className="h-10 px-3">
+            Member quiz result
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      {source === "member-result" ? (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-member-result`}>Saved result for this class deck</Label>
+          {!studentSelected ? (
+            <p className="text-sm text-muted-foreground">
+              Select a student first to load quiz results for their class deck.
+            </p>
+          ) : results.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No saved quiz results for this class deck.
+            </p>
+          ) : (
+            <Select
+              value={selectedResultId}
+              onValueChange={(value) => onResultChange(value ?? RESULT_NONE)}
+            >
+              <SelectTrigger id={`${idPrefix}-member-result`} className="w-full">
+                <SelectValue placeholder="Select a quiz result">
+                  {selected ? memberQuizResultLabel(selected) : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={RESULT_NONE} disabled>
+                  Select a quiz result
+                </SelectItem>
+                {results.map((row) => (
+                  <SelectItem key={row.resultId} value={String(row.resultId)}>
+                    {memberQuizResultLabel(row)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <p className="text-sm text-muted-foreground">
+            Score: {selected ? `${selected.percent}%` : "—"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-score`}>Score (%)</Label>
+          <Input
+            id={`${idPrefix}-score`}
+            value={grade}
+            onChange={(event) => onGradeChange(event.target.value)}
+            placeholder="e.g. 88"
+            required
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function findRegisteredStudentIdForGrade(
   grade: TeacherManualGradeRow,
   registeredStudents: TeacherRegisteredStudentWithClass[],
@@ -273,10 +381,14 @@ export const TeacherManualGradesPanel = forwardRef<
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(ASSIGNMENT_NONE);
   const [selectedQuizKey, setSelectedQuizKey] = useState(QUIZ_NONE);
   const [gradeEntryType, setGradeEntryType] = useState<GradeEntryType>("assignment");
+  const [quizScoreSource, setQuizScoreSource] = useState<QuizScoreSource>("manual");
+  const [selectedMemberResultId, setSelectedMemberResultId] = useState(RESULT_NONE);
   const [editSelectedStudentId, setEditSelectedStudentId] = useState(STUDENT_NONE);
   const [editSelectedAssignmentId, setEditSelectedAssignmentId] = useState(ASSIGNMENT_NONE);
   const [editSelectedQuizKey, setEditSelectedQuizKey] = useState(QUIZ_NONE);
   const [editGradeEntryType, setEditGradeEntryType] = useState<GradeEntryType>("assignment");
+  const [editQuizScoreSource, setEditQuizScoreSource] = useState<QuizScoreSource>("manual");
+  const [editSelectedMemberResultId, setEditSelectedMemberResultId] = useState(RESULT_NONE);
 
   const useRegisteredStudentFlow =
     registeredStudents.length > 0 && (isPersonalEducation || isEducationTeamWorkspace);
@@ -358,6 +470,14 @@ export const TeacherManualGradesPanel = forwardRef<
     return resolveRegisteredStudentClass(selectedStudent, personalClasses);
   }, [personalClasses, selectedStudent]);
 
+  const memberQuizResults = useMemo(() => {
+    if (!selectedStudent) return [];
+    const deckId =
+      selectedClass?.deckId ??
+      resolveRegisteredStudentClassDeckId(selectedStudent, personalClasses);
+    return quizResultsForRegisteredStudent(selectedStudent, deckId, quizResultRows);
+  }, [personalClasses, quizResultRows, selectedClass, selectedStudent]);
+
   const selectedQuiz = useMemo(
     () => quizOptions.find((item) => item.key === selectedQuizKey),
     [quizOptions, selectedQuizKey],
@@ -372,6 +492,14 @@ export const TeacherManualGradesPanel = forwardRef<
     if (!editSelectedStudent) return null;
     return resolveRegisteredStudentClass(editSelectedStudent, personalClasses);
   }, [personalClasses, editSelectedStudent]);
+
+  const editMemberQuizResults = useMemo(() => {
+    if (!editSelectedStudent) return [];
+    const deckId =
+      editSelectedClass?.deckId ??
+      resolveRegisteredStudentClassDeckId(editSelectedStudent, personalClasses);
+    return quizResultsForRegisteredStudent(editSelectedStudent, deckId, quizResultRows);
+  }, [editSelectedClass, editSelectedStudent, personalClasses, quizResultRows]);
 
   const editSelectedAssignment = useMemo(
     () => editAssignmentOptions.find((item) => String(item.id) === editSelectedAssignmentId),
@@ -431,6 +559,8 @@ export const TeacherManualGradesPanel = forwardRef<
     setSelectedAssignmentId(ASSIGNMENT_NONE);
     setSelectedQuizKey(QUIZ_NONE);
     setGradeEntryType("assignment");
+    setQuizScoreSource("manual");
+    setSelectedMemberResultId(RESULT_NONE);
     setForm(EMPTY_FORM);
   }
 
@@ -439,6 +569,8 @@ export const TeacherManualGradesPanel = forwardRef<
 
     if (studentId === STUDENT_NONE) {
       setSelectedAssignmentId(ASSIGNMENT_NONE);
+      setSelectedMemberResultId(RESULT_NONE);
+      setQuizScoreSource("manual");
       setForm(EMPTY_FORM);
       return;
     }
@@ -450,6 +582,8 @@ export const TeacherManualGradesPanel = forwardRef<
 
     setSelectedAssignmentId(ASSIGNMENT_NONE);
     setSelectedQuizKey(QUIZ_NONE);
+    setSelectedMemberResultId(RESULT_NONE);
+    setQuizScoreSource("manual");
     setForm((current) => ({
       ...current,
       studentName: student.fullName,
@@ -499,6 +633,22 @@ export const TeacherManualGradesPanel = forwardRef<
     }));
   }
 
+  function applyMemberQuizResult(resultId: string) {
+    setSelectedMemberResultId(resultId);
+    if (resultId === RESULT_NONE) {
+      setForm((current) => ({ ...current, grade: "" }));
+      return;
+    }
+    const row = memberQuizResults.find((item) => String(item.resultId) === resultId);
+    if (!row) return;
+    setForm((current) => ({
+      ...current,
+      grade: String(row.percent),
+      assignmentTitle: memberQuizResultLabel(row),
+      maxGrade: "",
+    }));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!isPersonalEducation && teamId == null) {
@@ -520,11 +670,21 @@ export const TeacherManualGradesPanel = forwardRef<
         toast.error("Enter an assignment title.");
         return;
       }
+    } else if (useRegisteredStudentFlow && quizScoreSource === "member-result") {
+      if (selectedMemberResultId === RESULT_NONE) {
+        toast.error("Select a saved quiz result for this class deck.");
+        return;
+      }
     } else if (useQuizPicker && selectedQuizKey === QUIZ_NONE) {
       toast.error("Select a quiz for this student.");
       return;
     } else if (!form.assignmentTitle.trim()) {
       toast.error("Enter a quiz title.");
+      return;
+    }
+
+    if (gradeEntryType === "quiz" && !form.grade.trim()) {
+      toast.error("Enter a score.");
       return;
     }
 
@@ -571,6 +731,8 @@ export const TeacherManualGradesPanel = forwardRef<
     setEditSelectedAssignmentId(ASSIGNMENT_NONE);
     setEditSelectedQuizKey(QUIZ_NONE);
     setEditGradeEntryType("assignment");
+    setEditQuizScoreSource("manual");
+    setEditSelectedMemberResultId(RESULT_NONE);
   }
 
   function openEditDialog(grade: TeacherManualGradeRow) {
@@ -638,6 +800,8 @@ export const TeacherManualGradesPanel = forwardRef<
 
     setEditSelectedAssignmentId(ASSIGNMENT_NONE);
     setEditSelectedQuizKey(QUIZ_NONE);
+    setEditQuizScoreSource("manual");
+    setEditSelectedMemberResultId(RESULT_NONE);
     setEditForm((current) => ({
       ...current,
       studentName: student.fullName,
@@ -687,6 +851,22 @@ export const TeacherManualGradesPanel = forwardRef<
     }));
   }
 
+  function applyEditMemberQuizResult(resultId: string) {
+    setEditSelectedMemberResultId(resultId);
+    if (resultId === RESULT_NONE) {
+      setEditForm((current) => ({ ...current, grade: "" }));
+      return;
+    }
+    const row = editMemberQuizResults.find((item) => String(item.resultId) === resultId);
+    if (!row) return;
+    setEditForm((current) => ({
+      ...current,
+      grade: String(row.percent),
+      assignmentTitle: memberQuizResultLabel(row),
+      maxGrade: "",
+    }));
+  }
+
   async function handleEditSubmit(event: React.FormEvent) {
     event.preventDefault();
 
@@ -706,11 +886,21 @@ export const TeacherManualGradesPanel = forwardRef<
         toast.error("Enter an assignment title.");
         return;
       }
+    } else if (useRegisteredStudentFlow && editQuizScoreSource === "member-result") {
+      if (editSelectedMemberResultId === RESULT_NONE) {
+        toast.error("Select a saved quiz result for this class deck.");
+        return;
+      }
     } else if (useEditQuizPicker && editSelectedQuizKey === QUIZ_NONE) {
       toast.error("Select a quiz for this student.");
       return;
     } else if (!editForm.assignmentTitle.trim()) {
       toast.error("Enter a quiz title.");
+      return;
+    }
+
+    if (editGradeEntryType === "quiz" && !editForm.grade.trim()) {
+      toast.error("Enter a score.");
       return;
     }
 
@@ -851,6 +1041,8 @@ export const TeacherManualGradesPanel = forwardRef<
                   onValueChange={(value) => {
                     const next = (value[0] as GradeEntryType | undefined) ?? "assignment";
                     setGradeEntryType(next);
+                    setQuizScoreSource("manual");
+                    setSelectedMemberResultId(RESULT_NONE);
                     setSelectedAssignmentId(ASSIGNMENT_NONE);
                     setSelectedQuizKey(QUIZ_NONE);
                     setForm((current) => ({
@@ -1071,16 +1263,33 @@ export const TeacherManualGradesPanel = forwardRef<
                       />
                     )}
                   </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="manual-grade-quiz-score">Score (%)</Label>
-                    <Input
-                      id="manual-grade-quiz-score"
-                      value={form.grade}
-                      onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}
-                      placeholder="e.g. 88"
-                      required
+                  {useRegisteredStudentFlow ? (
+                    <QuizResultScoreFields
+                      idPrefix="manual-grade-quiz"
+                      source={quizScoreSource}
+                      onSourceChange={(next) => {
+                        setQuizScoreSource(next);
+                        if (next === "manual") setSelectedMemberResultId(RESULT_NONE);
+                      }}
+                      grade={form.grade}
+                      onGradeChange={(grade) => setForm((current) => ({ ...current, grade }))}
+                      results={memberQuizResults}
+                      selectedResultId={selectedMemberResultId}
+                      onResultChange={applyMemberQuizResult}
+                      studentSelected={selectedStudentId !== STUDENT_NONE}
                     />
-                  </div>
+                  ) : (
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="manual-grade-quiz-score">Score (%)</Label>
+                      <Input
+                        id="manual-grade-quiz-score"
+                        value={form.grade}
+                        onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}
+                        placeholder="e.g. 88"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1242,6 +1451,8 @@ export const TeacherManualGradesPanel = forwardRef<
                   onValueChange={(value) => {
                     const next = (value[0] as GradeEntryType | undefined) ?? "assignment";
                     setEditGradeEntryType(next);
+                    setEditQuizScoreSource("manual");
+                    setEditSelectedMemberResultId(RESULT_NONE);
                     setEditSelectedAssignmentId(ASSIGNMENT_NONE);
                     setEditSelectedQuizKey(QUIZ_NONE);
                     setEditForm((current) => ({
@@ -1412,17 +1623,36 @@ export const TeacherManualGradesPanel = forwardRef<
                       />
                     )}
                   </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="edit-manual-grade-quiz-score">Score (%)</Label>
-                    <Input
-                      id="edit-manual-grade-quiz-score"
-                      value={editForm.grade}
-                      onChange={(e) =>
-                        setEditForm((current) => ({ ...current, grade: e.target.value }))
+                  {useRegisteredStudentFlow ? (
+                    <QuizResultScoreFields
+                      idPrefix="edit-manual-grade-quiz"
+                      source={editQuizScoreSource}
+                      onSourceChange={(next) => {
+                        setEditQuizScoreSource(next);
+                        if (next === "manual") setEditSelectedMemberResultId(RESULT_NONE);
+                      }}
+                      grade={editForm.grade}
+                      onGradeChange={(grade) =>
+                        setEditForm((current) => ({ ...current, grade }))
                       }
-                      required
+                      results={editMemberQuizResults}
+                      selectedResultId={editSelectedMemberResultId}
+                      onResultChange={applyEditMemberQuizResult}
+                      studentSelected={editSelectedStudentId !== STUDENT_NONE}
                     />
-                  </div>
+                  ) : (
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="edit-manual-grade-quiz-score">Score (%)</Label>
+                      <Input
+                        id="edit-manual-grade-quiz-score"
+                        value={editForm.grade}
+                        onChange={(e) =>
+                          setEditForm((current) => ({ ...current, grade: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

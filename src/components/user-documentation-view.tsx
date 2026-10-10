@@ -241,9 +241,20 @@ function DocPagePanel({
           </DocsUiGuideStartButton>
         ) : null}
         {page.id === "teacher-classroom" ? (
-          <DocsUiGuideStartButton guideId="edu-teacher-classes-owner">
-            Open Classes for the plan owner guide
-          </DocsUiGuideStartButton>
+          <>
+            <DocsUiGuideStartButton guideId="edu-teacher-classes-owner">
+              Open Classes for the plan owner guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-student-progress-owner">
+              Open Student Progress for the plan owner guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-student-progress-add-student-owner">
+              Open Register a student for the plan owner guide
+            </DocsUiGuideStartButton>
+            <DocsUiGuideStartButton guideId="edu-teacher-student-progress-quiz-result-owner">
+              Open Student quiz results for the plan owner guide
+            </DocsUiGuideStartButton>
+          </>
         ) : null}
         {page.id === "teacher-ai-content-tools" ? (
           <>
@@ -586,6 +597,22 @@ function articleSectionGuides(
       {
         id: "edu-teacher-classes-owner",
         label: "Open Classes for the plan owner guide",
+      },
+    ];
+  }
+  if (pageId === "teacher-classroom" && sectionId === "students") {
+    return [
+      {
+        id: "edu-teacher-student-progress-owner",
+        label: "Open Student Progress for the plan owner guide",
+      },
+      {
+        id: "edu-teacher-student-progress-add-student-owner",
+        label: "Open Register a student for the plan owner guide",
+      },
+      {
+        id: "edu-teacher-student-progress-quiz-result-owner",
+        label: "Open Student quiz results for the plan owner guide",
       },
     ];
   }

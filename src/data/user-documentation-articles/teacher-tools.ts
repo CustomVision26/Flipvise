@@ -127,7 +127,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         id: "students",
         title: "Student Progress (/teacher/students)",
         bullets: [
-          "Review student quiz performance and study activity. AI Recall™ insights lists each member or registered student with a saved session. Open the row to see that person’s accuracy, AI score, time, cards, and misses.",
+          "Open Student Progress for the plan owner guide to follow AI Recall™ insights and a saved session. Open Register a student for the plan owner guide to follow Register student, an existing class, an invited member, and the roster row. Open Student quiz results for the plan owner guide to follow Quiz results, the question sheet, the answer key, View quiz result, and Download PDF. AI Recall™ insights lists each member or registered student with a saved session. Open the row to see that person’s accuracy, AI score, time, cards, and misses. Registering a student, Quiz results, and Reports & Grades each keep their own address (?tab=register-student, ?tab=quiz-results, ?tab=reports-and-grades). On Reports & Grades, a quiz score can be typed or taken from a saved member quiz result for that class deck.",
           "Education Gold adds a student progress dashboard and teacher analytics.",
           "Education Enterprise adds school-wide learning analytics and teacher performance reports.",
         ],

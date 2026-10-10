@@ -31,6 +31,16 @@ function preservedExtraParams(
   searchParams: Record<string, string | string[] | undefined>,
 ): URLSearchParams {
   const extra = new URLSearchParams();
+  if (pathname === "/teacher/students" || pathname.startsWith("/teacher/students/")) {
+    const tab = firstParam(searchParams, "tab");
+    if (
+      tab === "register-student" ||
+      tab === "quiz-results" ||
+      tab === "reports-and-grades"
+    ) {
+      extra.set("tab", tab);
+    }
+  }
   if (
     pathname === "/teacher/quizzes" ||
     pathname.startsWith("/teacher/quizzes/") ||
