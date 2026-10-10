@@ -17,6 +17,7 @@ import {
   periodPlaceholder,
   TEACHER_CLASS_DAY_OPTIONS,
   TEACHER_CLASS_DECK_NONE,
+  TEACHER_CLASS_MONTH_OPTIONS,
   TEACHER_CLASS_TERM_OPTIONS,
 } from "@/lib/teacher-class-form";
 
@@ -61,6 +62,8 @@ type TeacherClassFormFieldsProps = {
   onTermSemesterChange: (value: string) => void;
   week: string;
   onWeekChange: (value: string) => void;
+  month: string;
+  onMonthChange: (value: string) => void;
   day: string;
   onDayChange: (value: string) => void;
   period: string;
@@ -86,6 +89,8 @@ export function TeacherClassFormFields({
   onTermSemesterChange,
   week,
   onWeekChange,
+  month,
+  onMonthChange,
   day,
   onDayChange,
   period,
@@ -215,6 +220,24 @@ export function TeacherClassFormFields({
             className={fieldControlClassName}
             required
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-month`} className="text-sm font-medium">
+            Month
+          </Label>
+          <Select value={month} onValueChange={(value) => onMonthChange(value ?? "")}>
+            <SelectTrigger id={`${idPrefix}-month`} className={fieldControlClassName}>
+              <SelectValue placeholder="Select month" />
+            </SelectTrigger>
+            <SelectContent nestedInModal>
+              {TEACHER_CLASS_MONTH_OPTIONS.map((monthName) => (
+                <SelectItem key={monthName} value={monthName}>
+                  {monthName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">

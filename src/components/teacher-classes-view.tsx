@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
@@ -134,6 +142,7 @@ function classHaystack(
     cls.academicYear,
     cls.termSemester,
     cls.week,
+    cls.month,
     cls.day,
     cls.period,
     creatorLabel,
@@ -376,6 +385,7 @@ function ClassCard({
         <p>Academic year: {cls.academicYear}</p>
         <p>Term: {cls.termSemester}</p>
         <p>Week: {teacherClassWeekDisplay(cls, planPeriodDaysByDeckId)}</p>
+        <p>Month: {cls.month?.trim() || "—"}</p>
       </CardContent>
       <CardFooter className="mt-auto flex flex-wrap gap-2 border-t border-border/60 pt-4">
         <TeacherClassResourceButton
@@ -436,6 +446,96 @@ function fallbackResources(cls: TeacherClassWithDeck): ClassDeckResources {
       cards: buildTeacherClassDeckHref(cls.deckId),
     },
   };
+}
+
+function ClassRecordsTable({
+  classes,
+  creatorLabel,
+  deckResourcesByClassId,
+  canManageClass,
+  decks,
+  planPeriodDaysByDeckId,
+  teamId,
+  onClassDeleted,
+}: {
+  classes: TeacherClassWithDeck[];
+  creatorLabel?: string | null;
+  deckResourcesByClassId: Record<number, ClassDeckResources>;
+  canManageClass: (cls: TeacherClassWithDeck) => boolean;
+  decks: DeckRow[];
+  planPeriodDaysByDeckId: Record<number, number>;
+  teamId: number | null;
+  onClassDeleted: (classId: number) => void;
+}) {
+  const [openClassId, setOpenClassId] = useState<number | null>(null);
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-10">
+            <span className="sr-only">Open</span>
+          </TableHead>
+          <TableHead>Class</TableHead>
+          <TableHead>Subject</TableHead>
+          <TableHead>Grade level</TableHead>
+          <TableHead>Academic year</TableHead>
+          <TableHead>Term</TableHead>
+          <TableHead>Week</TableHead>
+          <TableHead>Month</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {classes.map((cls) => {
+          const isOpen = openClassId === cls.id;
+          return (
+            <Fragment key={cls.id}>
+              <TableRow
+                className="cursor-pointer"
+                aria-expanded={isOpen}
+                onClick={() => setOpenClassId(isOpen ? null : cls.id)}
+              >
+                <TableCell>
+                  <ChevronDown
+                    className={cn(
+                      "size-4 text-muted-foreground transition-transform",
+                      !isOpen && "-rotate-90",
+                    )}
+                    aria-hidden
+                  />
+                </TableCell>
+                <TableCell className="max-w-sm font-medium whitespace-normal">
+                  {teacherClassDisplayTitle(cls)}
+                </TableCell>
+                <TableCell>{teacherClassSubjectLabel(cls)}</TableCell>
+                <TableCell>{cls.deckGradeLevel?.trim() || "—"}</TableCell>
+                <TableCell>{cls.academicYear}</TableCell>
+                <TableCell>{cls.termSemester}</TableCell>
+                <TableCell>{teacherClassWeekDisplay(cls, planPeriodDaysByDeckId)}</TableCell>
+                <TableCell>{cls.month?.trim() || "—"}</TableCell>
+              </TableRow>
+              {isOpen ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={8} className="bg-muted/15 p-4">
+                    <ClassCard
+                      cls={cls}
+                      resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
+                      creatorLabel={creatorLabel}
+                      canManage={canManageClass(cls)}
+                      decks={decks}
+                      planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+                      teamId={teamId}
+                      onDeleted={() => onClassDeleted(cls.id)}
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </Fragment>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
 }
 
 function GroupedClassesList({
@@ -565,20 +665,15 @@ function GroupedClassesList({
             {!isAdminCollapsed ? (
               <div className="space-y-4 border-t border-border/60 p-4">
                 {adminGroup.leaderItems.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {adminGroup.leaderItems.map((cls) => (
-                      <ClassCard
-                        key={cls.id}
-                        cls={cls}
-                        resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
-                        canManage={canManageClass(cls)}
-                        decks={decks}
-                        planPeriodDaysByDeckId={planPeriodDaysByDeckId}
-                        teamId={teamId}
-                        onDeleted={() => onClassDeleted(cls.id)}
-                      />
-                    ))}
-                  </div>
+                  <ClassRecordsTable
+                    classes={adminGroup.leaderItems}
+                    deckResourcesByClassId={deckResourcesByClassId}
+                    canManageClass={canManageClass}
+                    decks={decks}
+                    planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+                    teamId={teamId}
+                    onClassDeleted={onClassDeleted}
+                  />
                 ) : null}
 
                 {adminGroup.memberGroups.map((memberGroup) => {
@@ -624,20 +719,17 @@ function GroupedClassesList({
                         </span>
                       </Button>
                       {!isMemberCollapsed ? (
-                        <div className="grid gap-4 border-t border-border/50 p-4 sm:grid-cols-2">
-                          {memberGroup.items.map((cls) => (
-                            <ClassCard
-                              key={cls.id}
-                              cls={cls}
-                              resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
-                              creatorLabel={memberGroup.memberLabel}
-                              canManage={canManageClass(cls)}
-                              decks={decks}
-                              planPeriodDaysByDeckId={planPeriodDaysByDeckId}
-                              teamId={teamId}
-                              onDeleted={() => onClassDeleted(cls.id)}
-                            />
-                          ))}
+                        <div className="border-t border-border/50 p-4">
+                          <ClassRecordsTable
+                            classes={memberGroup.items}
+                            creatorLabel={memberGroup.memberLabel}
+                            deckResourcesByClassId={deckResourcesByClassId}
+                            canManageClass={canManageClass}
+                            decks={decks}
+                            planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+                            teamId={teamId}
+                            onClassDeleted={onClassDeleted}
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -955,19 +1047,16 @@ export function TeacherClassesView({
             </>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {paginatedClasses.map((cls) => (
-                  <ClassCard
-                    key={cls.id}
-                    cls={cls}
-                    resources={deckResourcesByClassId[cls.id] ?? fallbackResources(cls)}
-                    canManage={canManageClass(cls)}
-                    decks={decks}
-                    planPeriodDaysByDeckId={planPeriodDaysByDeckId}
-                    teamId={workspace.teamId}
-                    onDeleted={() => handleClassDeleted(cls.id)}
-                  />
-                ))}
+              <div className="overflow-hidden rounded-xl border border-border/80 bg-card/40">
+                <ClassRecordsTable
+                  classes={paginatedClasses}
+                  deckResourcesByClassId={deckResourcesByClassId}
+                  canManageClass={canManageClass}
+                  decks={decks}
+                  planPeriodDaysByDeckId={planPeriodDaysByDeckId}
+                  teamId={workspace.teamId}
+                  onClassDeleted={handleClassDeleted}
+                />
               </div>
               <TeacherRecordPagination
                 page={safePage}

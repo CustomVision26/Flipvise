@@ -21,6 +21,7 @@ const teacherClassSelect = {
   academicYear: teacherClasses.academicYear,
   termSemester: teacherClasses.termSemester,
   week: teacherClasses.week,
+  month: teacherClasses.month,
   day: teacherClasses.day,
   period: teacherClasses.period,
   createdAt: teacherClasses.createdAt,
@@ -154,6 +155,7 @@ export async function createTeacherClass(
     academicYear: string;
     termSemester: string;
     week: string;
+    month: string;
     day: string;
     period: string;
   },
@@ -167,6 +169,7 @@ export async function createTeacherClass(
       academicYear: input.academicYear,
       termSemester: input.termSemester,
       week: input.week,
+      month: input.month,
       day: input.day,
       period: input.period,
     })
@@ -198,6 +201,7 @@ export async function updateTeacherClassById(
     academicYear: string;
     termSemester: string;
     week: string;
+    month: string;
     day: string;
     period: string;
   },
@@ -209,6 +213,7 @@ export async function updateTeacherClassById(
       academicYear: input.academicYear,
       termSemester: input.termSemester,
       week: input.week,
+      month: input.month,
       day: input.day,
       period: input.period,
       updatedAt: new Date(),

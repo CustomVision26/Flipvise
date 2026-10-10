@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TEACHER_CLASS_MONTH_OPTIONS } from "@/lib/teacher-class-form";
 
 export const TEACHER_CLASS_PERIOD_MAX_LENGTH = 512;
 
@@ -6,6 +7,7 @@ export const createTeacherClassSchema = z.object({
   academicYear: z.string().trim().min(1, "Academic year is required.").max(64),
   termSemester: z.string().trim().min(1, "Term / semester is required.").max(128),
   week: z.string().trim().min(1, "Week is required.").max(64),
+  month: z.enum(TEACHER_CLASS_MONTH_OPTIONS, { message: "Month is required." }),
   day: z.string().trim().min(1, "Day is required.").max(64),
   period: z
     .string()

@@ -8,6 +8,21 @@ export const TEACHER_CLASS_DAY_OPTIONS = [
   "Sunday",
 ] as const;
 
+export const TEACHER_CLASS_MONTH_OPTIONS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 export const TEACHER_CLASS_TERM_OPTIONS = [
   "Fall",
   "Spring",

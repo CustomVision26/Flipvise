@@ -1336,6 +1336,7 @@ export const teacherClasses = pgTable(
     academicYear: varchar({ length: 64 }).notNull(),
     termSemester: varchar({ length: 128 }).notNull(),
     week: varchar({ length: 64 }).notNull(),
+    month: varchar({ length: 32 }),
     day: varchar({ length: 64 }).notNull(),
     period: varchar({ length: 512 }).notNull(),
     createdAt: timestamp().notNull().defaultNow(),

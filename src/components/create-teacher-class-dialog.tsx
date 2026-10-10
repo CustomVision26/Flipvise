@@ -28,6 +28,7 @@ import {
   buildPeriodFieldsForPlanPeriod,
   formatStoredClassPeriods,
   TEACHER_CLASS_DECK_NONE,
+  TEACHER_CLASS_MONTH_OPTIONS,
 } from "@/lib/teacher-class-form";
 
 type CreateTeacherClassDialogProps = {
@@ -73,6 +74,7 @@ export function CreateTeacherClassDialog({
   const [academicYear, setAcademicYear] = useState("");
   const [termSemester, setTermSemester] = useState("");
   const [week, setWeek] = useState("");
+  const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
   const [period, setPeriod] = useState("");
   const [periods, setPeriods] = useState<string[]>([]);
@@ -120,6 +122,7 @@ export function CreateTeacherClassDialog({
     setAcademicYear("");
     setTermSemester("");
     setWeek("");
+    setMonth("");
     setDay("");
     setPeriod("");
     setPeriods([]);
@@ -197,6 +200,14 @@ export function CreateTeacherClassDialog({
       return;
     }
 
+    const selectedMonth = TEACHER_CLASS_MONTH_OPTIONS.find((name) => name === month);
+    if (!selectedMonth) {
+      const message = "Select a month.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     let submitDay = day;
     let submitPeriod = period;
 
@@ -219,6 +230,7 @@ export function CreateTeacherClassDialog({
         academicYear,
         termSemester,
         week,
+        month: selectedMonth,
         day: submitDay,
         period: submitPeriod,
         deckId: selectedDeck.id,
@@ -273,6 +285,8 @@ export function CreateTeacherClassDialog({
               onTermSemesterChange={setTermSemester}
               week={week}
               onWeekChange={setWeek}
+              month={month}
+              onMonthChange={setMonth}
               day={day}
               onDayChange={setDay}
               period={period}

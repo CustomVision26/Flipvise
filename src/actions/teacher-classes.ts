@@ -68,6 +68,7 @@ export async function createTeacherClassAction(input: CreateTeacherClassInput) {
     academicYear: parsed.data.academicYear,
     termSemester: parsed.data.termSemester,
     week: parsed.data.week,
+    month: parsed.data.month,
     day: parsed.data.day,
     period: parsed.data.period,
   });
@@ -145,6 +146,7 @@ export async function updateTeacherClassAction(input: UpdateTeacherClassInput) {
     academicYear: parsed.data.academicYear,
     termSemester: parsed.data.termSemester,
     week: parsed.data.week,
+    month: parsed.data.month,
     day: parsed.data.day,
     period: parsed.data.period,
   });

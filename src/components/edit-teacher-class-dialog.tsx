@@ -25,6 +25,7 @@ import {
   formatStoredClassPeriods,
   TEACHER_CLASS_DAY_OPTIONS,
   TEACHER_CLASS_DECK_NONE,
+  TEACHER_CLASS_MONTH_OPTIONS,
 } from "@/lib/teacher-class-form";
 import { teacherClassDisplayTitle } from "@/lib/teacher-class-links";
 
@@ -81,6 +82,7 @@ export function EditTeacherClassDialog({
   const [academicYear, setAcademicYear] = useState(cls.academicYear);
   const [termSemester, setTermSemester] = useState(cls.termSemester);
   const [week, setWeek] = useState(cls.week);
+  const [month, setMonth] = useState(cls.month ?? "");
   const [day, setDay] = useState(
     initialPlanPeriod != null ? initialPeriodState.day : buildInitialDay(cls, initialPlanPeriod),
   );
@@ -108,6 +110,7 @@ export function EditTeacherClassDialog({
     setAcademicYear(cls.academicYear);
     setTermSemester(cls.termSemester);
     setWeek(cls.week);
+    setMonth(cls.month ?? "");
     setDay(planPeriod != null ? nextPeriodState.day : buildInitialDay(cls, planPeriod));
     setPeriod(planPeriod != null ? "" : cls.period);
     setPeriods(nextPeriodState.periods);
@@ -176,6 +179,14 @@ export function EditTeacherClassDialog({
       return;
     }
 
+    const selectedMonth = TEACHER_CLASS_MONTH_OPTIONS.find((name) => name === month);
+    if (!selectedMonth) {
+      const message = "Select a month.";
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     let submitDay = day;
     let submitPeriod = period;
 
@@ -199,6 +210,7 @@ export function EditTeacherClassDialog({
         academicYear,
         termSemester,
         week,
+        month: selectedMonth,
         day: submitDay,
         period: submitPeriod,
         deckId: selectedDeck.id,
@@ -261,6 +273,8 @@ export function EditTeacherClassDialog({
                 onTermSemesterChange={setTermSemester}
                 week={week}
                 onWeekChange={setWeek}
+                month={month}
+                onMonthChange={setMonth}
                 day={day}
                 onDayChange={setDay}
                 period={period}
