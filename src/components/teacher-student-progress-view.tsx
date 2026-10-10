@@ -39,7 +39,11 @@ import type { TeacherClassWithDeck } from "@/db/queries/teacher-classes";
 import type { TeacherRegisteredStudentWithClass } from "@/db/queries/teacher-registered-students";
 import type { WorkspaceStudentInvitee } from "@/db/queries/teacher-workspace-student-invitees";
 import type { SavedHomeworkAssignmentOption } from "@/db/queries/saved-homework";
-import type { TeacherManualGradeQuizOption } from "@/db/queries/teacher-manual-grades";
+import type { DeckAssignmentPrompt } from "@/components/teacher-manual-grades-panel";
+import type {
+  MemberAssignedQuizOption,
+  TeacherManualGradeQuizOption,
+} from "@/db/queries/teacher-manual-grades";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import {
   AlertDialog,
@@ -555,6 +559,8 @@ type TeacherStudentProgressViewProps = {
   personalClasses: TeacherClassWithDeck[];
   savedHomeworkAssignments: SavedHomeworkAssignmentOption[];
   savedQuizOptions: TeacherManualGradeQuizOption[];
+  memberAssignedQuizOptions: MemberAssignedQuizOption[];
+  deckAssignmentPrompt: DeckAssignmentPrompt | null;
   manualGrades: TeacherManualGradeRow[];
 };
 
@@ -581,6 +587,8 @@ export function TeacherStudentProgressView({
   personalClasses,
   savedHomeworkAssignments,
   savedQuizOptions,
+  memberAssignedQuizOptions,
+  deckAssignmentPrompt,
   manualGrades,
 }: TeacherStudentProgressViewProps) {
   const router = useRouter();
@@ -1203,6 +1211,8 @@ export function TeacherStudentProgressView({
               personalClasses={personalClasses}
               savedHomeworkAssignments={savedHomeworkAssignments}
               savedQuizOptions={savedQuizOptions}
+              memberAssignedQuizOptions={memberAssignedQuizOptions}
+              deckAssignmentPrompt={deckAssignmentPrompt}
               quizResultRows={rows}
             />
           </TabsContent>

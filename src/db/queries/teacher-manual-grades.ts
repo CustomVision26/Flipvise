@@ -1,8 +1,13 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { decks, teacherManualGrades, type TeacherManualGradeRow } from "@/db/schema";
+import {
+  decks,
+  teacherManualGrades,
+  teamDeckAssignments,
+  type TeacherManualGradeRow,
+} from "@/db/schema";
 import { getSavedLessonPlansByUser } from "@/db/queries/saved-lesson-plans";
 import { withTeacherManualGradesTable } from "@/lib/ensure-teacher-student-tracking-tables";
 
@@ -16,6 +21,25 @@ export type TeacherManualGradeQuizOption = {
   percent?: number;
   savedAt?: Date;
 };
+
+export type MemberAssignedQuizOption = TeacherManualGradeQuizOption & {
+  memberEmail: string;
+};
+
+export async function listTeamMemberAssignedDecksForQuiz(teamId: number): Promise<
+  Array<{ memberUserId: string; deckId: number; deckName: string }>
+> {
+  return db
+    .select({
+      memberUserId: teamDeckAssignments.memberUserId,
+      deckId: decks.id,
+      deckName: decks.name,
+    })
+    .from(teamDeckAssignments)
+    .innerJoin(decks, eq(teamDeckAssignments.deckId, decks.id))
+    .where(eq(teamDeckAssignments.teamId, teamId))
+    .orderBy(asc(decks.name));
+}
 
 export async function listTeacherManualGradeQuizOptionsForUser(
   userId: string,

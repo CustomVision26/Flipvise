@@ -35,7 +35,10 @@ import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import type { TeacherClassWithDeck } from "@/db/queries/teacher-classes";
 import type { TeacherRegisteredStudentWithClass } from "@/db/queries/teacher-registered-students";
 import type { SavedHomeworkAssignmentOption } from "@/db/queries/saved-homework";
-import type { TeacherManualGradeQuizOption } from "@/db/queries/teacher-manual-grades";
+import type {
+  MemberAssignedQuizOption,
+  TeacherManualGradeQuizOption,
+} from "@/db/queries/teacher-manual-grades";
 import type { TeacherManualGradeRow } from "@/db/schema";
 import type { TeacherStudentProgressRow } from "@/db/queries/teacher-student-progress";
 import {
@@ -54,6 +57,7 @@ import {
   buildTeacherPageCanonicalPath,
   buildTeacherQuizzesPath,
 } from "@/lib/teacher-url";
+import { canManageMemberAsOwnerOrInviter } from "@/lib/team-member-inviter-access";
 import { cn } from "@/lib/utils";
 
 const STUDENT_NONE = "__none__";
@@ -74,6 +78,8 @@ type TeacherManualGradesPanelProps = {
   personalClasses?: TeacherClassWithDeck[];
   savedHomeworkAssignments?: SavedHomeworkAssignmentOption[];
   savedQuizOptions?: TeacherManualGradeQuizOption[];
+  memberAssignedQuizOptions?: MemberAssignedQuizOption[];
+  deckAssignmentPrompt?: DeckAssignmentPrompt | null;
   quizResultRows?: TeacherStudentProgressRow[];
   variant?: "full" | "embedded";
   showForm?: boolean;
@@ -160,17 +166,137 @@ function quizResultsForRegisteredStudent(
     .sort((a, b) => b.savedAt.getTime() - a.savedAt.getTime());
 }
 
+export type DeckAssignmentPrompt = {
+  viewerUserId: string;
+  ownerUserId: string;
+  viewerIsTeamAdmin: boolean;
+  assignDecksHref: string | null;
+  members: Array<{
+    email: string;
+    memberUserId: string;
+    addedByUserId: string | null;
+  }>;
+};
+
+type DeckAssignmentNotice = {
+  deckTitle: string;
+  studentName: string;
+  canAssign: boolean;
+  viewerIsTeamAdmin: boolean;
+  href: string | null;
+};
+
+function assignedDeckIdsForStudent(
+  student: TeacherRegisteredStudentWithClass,
+  memberAssignedQuizOptions: MemberAssignedQuizOption[],
+): Set<number> {
+  const email = student.email.trim().toLowerCase();
+  if (!email) return new Set();
+  return new Set(
+    memberAssignedQuizOptions
+      .filter((quiz) => quiz.memberEmail === email)
+      .map((quiz) => quiz.deckId),
+  );
+}
+
+function deckAssignmentNoticeForSelection(
+  student: TeacherRegisteredStudentWithClass | undefined,
+  deck: { deckId: number; title: string } | null,
+  memberAssignedQuizOptions: MemberAssignedQuizOption[],
+  prompt: DeckAssignmentPrompt | null | undefined,
+  isEducationTeamWorkspace: boolean,
+): DeckAssignmentNotice | null {
+  if (!isEducationTeamWorkspace || !student || !deck || !prompt) return null;
+  if (assignedDeckIdsForStudent(student, memberAssignedQuizOptions).has(deck.deckId)) {
+    return null;
+  }
+
+  const email = student.email.trim().toLowerCase();
+  const member = prompt.members.find((item) => item.email === email);
+  const canAssign =
+    member != null &&
+    prompt.assignDecksHref != null &&
+    canManageMemberAsOwnerOrInviter({
+      viewerUserId: prompt.viewerUserId,
+      ownerUserId: prompt.ownerUserId,
+      memberUserId: member.memberUserId,
+      addedByUserId: member.addedByUserId,
+    });
+
+  return {
+    deckTitle: deck.title,
+    studentName: student.fullName,
+    canAssign,
+    viewerIsTeamAdmin: prompt.viewerIsTeamAdmin,
+    href: canAssign ? prompt.assignDecksHref : null,
+  };
+}
+
+function UnassignedDeckNotice({ notice }: { notice: DeckAssignmentNotice }) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-muted/10 px-4 py-3 text-sm sm:col-span-2">
+      <p>
+        {notice.deckTitle} is not assigned to {notice.studentName}.
+      </p>
+      {notice.canAssign && notice.href ? (
+        <Link
+          href={notice.href}
+          className="mt-2 inline-flex items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+        >
+          <ExternalLink className="size-3.5" aria-hidden />
+          Assign decks
+        </Link>
+      ) : (
+        <p className="mt-2 text-muted-foreground">
+          {notice.viewerIsTeamAdmin
+            ? "You can assign decks only to members you invited. Ask the workspace owner to assign this deck."
+            : "Ask a workspace owner or team admin to assign this deck."}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function assignedQuizOptionsForStudent(
+  student: TeacherRegisteredStudentWithClass,
+  memberAssignedQuizOptions: MemberAssignedQuizOption[],
+): TeacherManualGradeQuizOption[] {
+  const email = student.email.trim().toLowerCase();
+  if (!email) return [];
+
+  return memberAssignedQuizOptions
+    .filter((quiz) => quiz.memberEmail === email)
+    .map(({ memberEmail: _memberEmail, ...quiz }) => quiz);
+}
+
 function quizOptionsForStudentId(
   studentId: string,
   registeredStudents: TeacherRegisteredStudentWithClass[],
   personalClasses: TeacherClassWithDeck[],
   savedQuizOptions: TeacherManualGradeQuizOption[],
   quizResultRows: TeacherStudentProgressRow[],
+  memberAssignedQuizOptions: MemberAssignedQuizOption[] = [],
+  isEducationTeamWorkspace = false,
 ): TeacherManualGradeQuizOption[] {
   if (studentId === STUDENT_NONE) return [];
 
   const student = registeredStudents.find((item) => String(item.id) === studentId);
   if (!student) return [];
+  if (isEducationTeamWorkspace) {
+    const assigned = assignedQuizOptionsForStudent(student, memberAssignedQuizOptions);
+    const cls = resolveRegisteredStudentClass(student, personalClasses);
+    if (cls && !assigned.some((quiz) => quiz.deckId === cls.deckId)) {
+      return [
+        {
+          key: `deck-${cls.deckId}`,
+          title: quizTitleForTeacherClass(cls),
+          deckId: cls.deckId,
+        },
+        ...assigned,
+      ];
+    }
+    return assigned;
+  }
   if (student.classId == null && student.classDeckId == null) return [];
 
   const cls = resolveRegisteredStudentClass(student, personalClasses);
@@ -246,6 +372,7 @@ function QuizResultScoreFields({
   selectedResultId,
   onResultChange,
   studentSelected,
+  hideSavedResults,
 }: {
   idPrefix: string;
   source: QuizScoreSource;
@@ -256,6 +383,7 @@ function QuizResultScoreFields({
   selectedResultId: string;
   onResultChange: (resultId: string) => void;
   studentSelected: boolean;
+  hideSavedResults: boolean;
 }) {
   const selected = results.find((row) => String(row.resultId) === selectedResultId);
 
@@ -278,7 +406,7 @@ function QuizResultScoreFields({
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {source === "member-result" ? (
+      {source === "member-result" && hideSavedResults ? null : source === "member-result" ? (
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-member-result`}>Saved result for this class deck</Label>
           {!studentSelected ? (
@@ -358,6 +486,8 @@ export const TeacherManualGradesPanel = forwardRef<
     personalClasses = [],
     savedHomeworkAssignments = [],
     savedQuizOptions = [],
+    memberAssignedQuizOptions = [],
+    deckAssignmentPrompt = null,
     quizResultRows = [],
     variant = "full",
     showForm: controlledShowForm,
@@ -421,8 +551,18 @@ export const TeacherManualGradesPanel = forwardRef<
         personalClasses,
         savedQuizOptions,
         quizResultRows,
+        memberAssignedQuizOptions,
+        isEducationTeamWorkspace,
       ),
-    [selectedStudentId, registeredStudents, personalClasses, savedQuizOptions, quizResultRows],
+    [
+      selectedStudentId,
+      registeredStudents,
+      personalClasses,
+      savedQuizOptions,
+      quizResultRows,
+      memberAssignedQuizOptions,
+      isEducationTeamWorkspace,
+    ],
   );
 
   const editAssignmentOptions = useMemo(
@@ -444,8 +584,18 @@ export const TeacherManualGradesPanel = forwardRef<
         personalClasses,
         savedQuizOptions,
         quizResultRows,
+        memberAssignedQuizOptions,
+        isEducationTeamWorkspace,
       ),
-    [editSelectedStudentId, registeredStudents, personalClasses, savedQuizOptions, quizResultRows],
+    [
+      editSelectedStudentId,
+      registeredStudents,
+      personalClasses,
+      savedQuizOptions,
+      quizResultRows,
+      memberAssignedQuizOptions,
+      isEducationTeamWorkspace,
+    ],
   );
 
   const useAssignmentPicker =
@@ -510,6 +660,50 @@ export const TeacherManualGradesPanel = forwardRef<
     () => editQuizOptions.find((item) => item.key === editSelectedQuizKey),
     [editQuizOptions, editSelectedQuizKey],
   );
+
+  const deckAssignmentNotice = useMemo(() => {
+    const deck = selectedQuiz
+      ? { deckId: selectedQuiz.deckId, title: selectedQuiz.title }
+      : selectedClass
+        ? { deckId: selectedClass.deckId, title: quizTitleForTeacherClass(selectedClass) }
+        : null;
+    return deckAssignmentNoticeForSelection(
+      selectedStudent,
+      deck,
+      memberAssignedQuizOptions,
+      deckAssignmentPrompt,
+      isEducationTeamWorkspace,
+    );
+  }, [
+    deckAssignmentPrompt,
+    isEducationTeamWorkspace,
+    memberAssignedQuizOptions,
+    selectedClass,
+    selectedQuiz,
+    selectedStudent,
+  ]);
+
+  const editDeckAssignmentNotice = useMemo(() => {
+    const deck = editSelectedQuiz
+      ? { deckId: editSelectedQuiz.deckId, title: editSelectedQuiz.title }
+      : editSelectedClass
+        ? { deckId: editSelectedClass.deckId, title: quizTitleForTeacherClass(editSelectedClass) }
+        : null;
+    return deckAssignmentNoticeForSelection(
+      editSelectedStudent,
+      deck,
+      memberAssignedQuizOptions,
+      deckAssignmentPrompt,
+      isEducationTeamWorkspace,
+    );
+  }, [
+    deckAssignmentPrompt,
+    editSelectedClass,
+    editSelectedQuiz,
+    editSelectedStudent,
+    isEducationTeamWorkspace,
+    memberAssignedQuizOptions,
+  ]);
 
   const resourcesHomeworkHref = buildTeacherPageCanonicalPath(
     "/teacher/resources",
@@ -670,13 +864,21 @@ export const TeacherManualGradesPanel = forwardRef<
         toast.error("Enter an assignment title.");
         return;
       }
+    } else if (deckAssignmentNotice) {
+      toast.error(
+        `${deckAssignmentNotice.deckTitle} is not assigned to ${deckAssignmentNotice.studentName}.`,
+      );
+      return;
     } else if (useRegisteredStudentFlow && quizScoreSource === "member-result") {
       if (selectedMemberResultId === RESULT_NONE) {
         toast.error("Select a saved quiz result for this class deck.");
         return;
       }
+    } else if (isEducationTeamWorkspace && !useQuizPicker) {
+      toast.error("No decks are assigned to this member.");
+      return;
     } else if (useQuizPicker && selectedQuizKey === QUIZ_NONE) {
-      toast.error("Select a quiz for this student.");
+      toast.error("Select a deck assigned to this member.");
       return;
     } else if (!form.assignmentTitle.trim()) {
       toast.error("Enter a quiz title.");
@@ -749,6 +951,8 @@ export const TeacherManualGradesPanel = forwardRef<
       personalClasses,
       savedQuizOptions,
       quizResultRows,
+      memberAssignedQuizOptions,
+      isEducationTeamWorkspace,
     );
     const assignmentMatch = assignmentOptionsForEdit.find(
       (item) => assignmentDisplayName(item) === grade.assignmentTitle,
@@ -886,13 +1090,21 @@ export const TeacherManualGradesPanel = forwardRef<
         toast.error("Enter an assignment title.");
         return;
       }
+    } else if (editDeckAssignmentNotice) {
+      toast.error(
+        `${editDeckAssignmentNotice.deckTitle} is not assigned to ${editDeckAssignmentNotice.studentName}.`,
+      );
+      return;
     } else if (useRegisteredStudentFlow && editQuizScoreSource === "member-result") {
       if (editSelectedMemberResultId === RESULT_NONE) {
         toast.error("Select a saved quiz result for this class deck.");
         return;
       }
+    } else if (isEducationTeamWorkspace && !useEditQuizPicker) {
+      toast.error("No decks are assigned to this member.");
+      return;
     } else if (useEditQuizPicker && editSelectedQuizKey === QUIZ_NONE) {
-      toast.error("Select a quiz for this student.");
+      toast.error("Select a deck assigned to this member.");
       return;
     } else if (!editForm.assignmentTitle.trim()) {
       toast.error("Enter a quiz title.");
@@ -1181,7 +1393,9 @@ export const TeacherManualGradesPanel = forwardRef<
                       <>
                         {selectedStudentId === STUDENT_NONE ? (
                           <p className="text-sm text-muted-foreground">
-                            Select a student first to load quizzes from their class.
+                            {isEducationTeamWorkspace
+                              ? "Select a student first to load decks assigned to that member."
+                              : "Select a student first to load quizzes from their class."}
                           </p>
                         ) : useQuizPicker ? (
                           <Select
@@ -1189,13 +1403,21 @@ export const TeacherManualGradesPanel = forwardRef<
                             onValueChange={(value) => applyQuizSelection(value ?? QUIZ_NONE)}
                           >
                             <SelectTrigger id="manual-grade-quiz" className="w-full">
-                              <SelectValue placeholder="Select a quiz">
+                              <SelectValue
+                                placeholder={
+                                  isEducationTeamWorkspace
+                                    ? "Select an assigned deck"
+                                    : "Select a quiz"
+                                }
+                              >
                                 {selectedQuiz ? selectedQuiz.title : null}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value={QUIZ_NONE} disabled>
-                                Select a quiz
+                                {isEducationTeamWorkspace
+                                  ? "Select an assigned deck"
+                                  : "Select a quiz"}
                               </SelectItem>
                               {quizOptions.map((quiz) => (
                                 <SelectItem key={quiz.key} value={quiz.key}>
@@ -1204,6 +1426,10 @@ export const TeacherManualGradesPanel = forwardRef<
                               ))}
                             </SelectContent>
                           </Select>
+                        ) : isEducationTeamWorkspace ? (
+                          <p className="text-sm text-muted-foreground">
+                            No decks are assigned to this member.
+                          </p>
                         ) : (
                           <Input
                             id="manual-grade-quiz"
@@ -1238,6 +1464,9 @@ export const TeacherManualGradesPanel = forwardRef<
                               </Link>
                             </div>
                           </div>
+                        ) : null}
+                        {deckAssignmentNotice ? (
+                          <UnassignedDeckNotice notice={deckAssignmentNotice} />
                         ) : null}
                         {selectedQuiz ? (
                           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -1277,6 +1506,7 @@ export const TeacherManualGradesPanel = forwardRef<
                       selectedResultId={selectedMemberResultId}
                       onResultChange={applyMemberQuizResult}
                       studentSelected={selectedStudentId !== STUDENT_NONE}
+                      hideSavedResults={deckAssignmentNotice != null}
                     />
                   ) : (
                     <div className="space-y-2 sm:col-span-2">
@@ -1567,7 +1797,9 @@ export const TeacherManualGradesPanel = forwardRef<
                       <>
                         {editSelectedStudentId === STUDENT_NONE ? (
                           <p className="text-sm text-muted-foreground">
-                            Select a student first to load quizzes from their class.
+                            {isEducationTeamWorkspace
+                              ? "Select a student first to load decks assigned to that member."
+                              : "Select a student first to load quizzes from their class."}
                           </p>
                         ) : useEditQuizPicker ? (
                           <Select
@@ -1577,7 +1809,13 @@ export const TeacherManualGradesPanel = forwardRef<
                             }
                           >
                             <SelectTrigger id="edit-manual-grade-quiz" className="w-full">
-                              <SelectValue placeholder="Select a quiz">
+                              <SelectValue
+                                placeholder={
+                                  isEducationTeamWorkspace
+                                    ? "Select an assigned deck"
+                                    : "Select a quiz"
+                                }
+                              >
                                 {editSelectedQuiz
                                   ? editSelectedQuiz.title
                                   : editForm.assignmentTitle || null}
@@ -1585,7 +1823,9 @@ export const TeacherManualGradesPanel = forwardRef<
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value={QUIZ_NONE} disabled>
-                                Select a quiz
+                                {isEducationTeamWorkspace
+                                  ? "Select an assigned deck"
+                                  : "Select a quiz"}
                               </SelectItem>
                               {editQuizOptions.map((quiz) => (
                                 <SelectItem key={quiz.key} value={quiz.key}>
@@ -1594,6 +1834,10 @@ export const TeacherManualGradesPanel = forwardRef<
                               ))}
                             </SelectContent>
                           </Select>
+                        ) : isEducationTeamWorkspace ? (
+                          <p className="text-sm text-muted-foreground">
+                            No decks are assigned to this member.
+                          </p>
                         ) : (
                           <Input
                             id="edit-manual-grade-quiz"
@@ -1608,6 +1852,9 @@ export const TeacherManualGradesPanel = forwardRef<
                             required
                           />
                         )}
+                        {editDeckAssignmentNotice ? (
+                          <UnassignedDeckNotice notice={editDeckAssignmentNotice} />
+                        ) : null}
                       </>
                     ) : (
                       <Input
@@ -1639,6 +1886,7 @@ export const TeacherManualGradesPanel = forwardRef<
                       selectedResultId={editSelectedMemberResultId}
                       onResultChange={applyEditMemberQuizResult}
                       studentSelected={editSelectedStudentId !== STUDENT_NONE}
+                      hideSavedResults={editDeckAssignmentNotice != null}
                     />
                   ) : (
                     <div className="space-y-2 sm:col-span-2">

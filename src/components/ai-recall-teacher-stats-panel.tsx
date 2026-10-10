@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { AiRecallTeamMonitor } from "@/components/ai-recall-team-monitor";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TeacherAiRecallDashboardStats } from "@/db/queries/ai-recall";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
@@ -20,15 +25,38 @@ export function AiRecallTeacherStatsPanel({
   stats: TeacherAiRecallDashboardStats;
   className?: string;
 }) {
+  const [open, setOpen] = useState(true);
+
   return (
     <Card className={cn(teamAdminCardClass, className)}>
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-base">AI Recall™ insights</CardTitle>
-        <CardDescription>
-          Active Recall session analytics for your students and classes.
-        </CardDescription>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <CardTitle className="text-base">AI Recall™ insights</CardTitle>
+            <CardDescription>
+              Active Recall session analytics for your students and classes.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground"
+            aria-expanded={open}
+            aria-controls="ai-recall-insights-body"
+            aria-label={open ? "Hide AI Recall insights" : "Show AI Recall insights"}
+            onClick={() => setOpen((current) => !current)}
+          >
+            {open ? (
+              <ChevronUp className="size-4" aria-hidden />
+            ) : (
+              <ChevronDown className="size-4" aria-hidden />
+            )}
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      {open ? (
+      <CardContent id="ai-recall-insights-body" className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
           label="Average AI Recall Score"
@@ -77,6 +105,7 @@ export function AiRecallTeacherStatsPanel({
         </div>
         <AiRecallTeamMonitor stats={stats.monitor} audience="students" embedded />
       </CardContent>
+      ) : null}
     </Card>
   );
 }

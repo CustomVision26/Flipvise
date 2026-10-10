@@ -3,10 +3,16 @@ import { getTeamById } from "@/db/queries/teams";
 import { listTeacherStudentProgressForWorkspace } from "@/db/queries/teacher-student-progress";
 import { listTeacherRegisteredStudentsForUser } from "@/db/queries/teacher-registered-students";
 import { listWorkspaceStudentInviteesForTeam } from "@/db/queries/teacher-workspace-student-invitees";
-import { listTeacherManualGradesForWorkspace, listTeacherManualGradeQuizOptionsForUser } from "@/db/queries/teacher-manual-grades";
+import {
+  listTeacherManualGradesForWorkspace,
+  listTeacherManualGradeQuizOptionsForUser,
+  listTeamMemberAssignedDecksForQuiz,
+  type MemberAssignedQuizOption,
+} from "@/db/queries/teacher-manual-grades";
 import { listTeacherClassesForUser } from "@/db/queries/teacher-classes";
 import { listSavedHomeworkAssignmentOptionsForUser, listSavedHomeworkAssignmentOptionsForWorkspace } from "@/db/queries/saved-homework";
 import { loadTeacherPageContext } from "@/lib/resolve-teacher-workspace-url";
+import { buildTeamAdminAssignDecksToMembersPath } from "@/lib/team-admin-url";
 import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { TeacherStudentProgressView } from "@/components/teacher-student-progress-view";
 import { AiRecallTeacherStatsPanel } from "@/components/ai-recall-teacher-stats-panel";
@@ -44,7 +50,7 @@ export default async function TeacherStudentsPage({
   const showQuizResultsTab = isEducationTeamWorkspace;
   const showGradesAndReportsTabs = isEducationPlus || showQuizResultsTab;
 
-  const [progress, registeredStudents, workspaceInvitees, manualGrades, personalClasses, savedHomeworkAssignments, savedQuizOptions, aiRecallStats] =
+  const [progress, registeredStudents, workspaceInvitees, manualGrades, personalClasses, savedHomeworkAssignments, savedQuizOptions, assignedMemberDecks, aiRecallStats] =
     await Promise.all([
     listTeacherStudentProgressForWorkspace(userId, workspace.teamId),
     showRegisterStudentTab
@@ -69,6 +75,9 @@ export default async function TeacherStudentsPage({
         : Promise.resolve([]),
     showRegisterStudentTab && isEducationPlus
       ? listTeacherManualGradeQuizOptionsForUser(userId)
+      : Promise.resolve([]),
+    isEducationTeamWorkspace && workspace.teamId != null
+      ? listTeamMemberAssignedDecksForQuiz(workspace.teamId)
       : Promise.resolve([]),
     getTeacherAiRecallStatsForWorkspace(userId, workspace.teamId),
   ]);
@@ -124,6 +133,27 @@ export default async function TeacherStudentsPage({
     },
   };
 
+  const emailByMemberUserId = new Map(
+    workspaceInvitees
+      .map((invitee) => [invitee.memberUserId, invitee.email.trim().toLowerCase()] as const)
+      .filter(([, email]) => email !== ""),
+  );
+  const memberAssignedQuizOptions: MemberAssignedQuizOption[] = [];
+  const seenAssignedDecks = new Set<string>();
+  for (const deck of assignedMemberDecks) {
+    const memberEmail = emailByMemberUserId.get(deck.memberUserId);
+    if (!memberEmail) continue;
+    const seenKey = `${memberEmail}:${deck.deckId}`;
+    if (seenAssignedDecks.has(seenKey)) continue;
+    seenAssignedDecks.add(seenKey);
+    memberAssignedQuizOptions.push({
+      key: `assigned-${deck.deckId}`,
+      title: deck.deckName,
+      deckId: deck.deckId,
+      memberEmail,
+    });
+  }
+
   const isWorkspaceOwner = team != null && team.ownerUserId === userId;
   const canDeleteResults =
     workspace.teamId != null &&
@@ -156,6 +186,27 @@ export default async function TeacherStudentsPage({
         personalClasses={personalClasses}
         savedHomeworkAssignments={savedHomeworkAssignments}
         savedQuizOptions={savedQuizOptions}
+        memberAssignedQuizOptions={memberAssignedQuizOptions}
+        deckAssignmentPrompt={
+          isEducationTeamWorkspace && workspace.teamId != null
+            ? {
+                viewerUserId: userId,
+                ownerUserId: progress.ownerUserId,
+                viewerIsTeamAdmin:
+                  isWorkspaceOwner ||
+                  progress.memberMetaByUserId[userId]?.role === "team_admin",
+                assignDecksHref: buildTeamAdminAssignDecksToMembersPath(
+                  workspace.teamId,
+                  workspace.teamMemberId,
+                ),
+                members: workspaceInvitees.map((invitee) => ({
+                  email: invitee.email.trim().toLowerCase(),
+                  memberUserId: invitee.memberUserId,
+                  addedByUserId: invitee.invitedByUserId,
+                })),
+              }
+            : null
+        }
         manualGrades={manualGrades}
       />
     </div>

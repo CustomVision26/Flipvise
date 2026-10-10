@@ -1879,6 +1879,18 @@ export const EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_GUIDE_STEPS: readonl
       caption:
         "The PDF (quiz_result_social_studies_british_history.pdf) lists the deck, date, taker, workspace UC-K26, role, owner, 50% (5/10 correct), and the question review with each submitted answer marked Correct or Incorrect.",
     },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 08.png`),
+      title: "Enter a quiz score manually",
+      caption:
+        "On Reports & Grades, open the grade form and choose Quiz result. Bruce Williams is selected, with email williams.bruce2698@yahoo.com and subject Science : Environmental Science. The class deck is Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1. Under Score, Enter manually shows a Score (%) field (for example 88).",
+    },
+    {
+      src: uiSrc(`${EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_FILE} - 09.png`),
+      title: "Use a member quiz result",
+      caption:
+        "Choose Member quiz result instead of typing a score. The Quiz list shows decks assigned to the selected member. Saved result for this class deck lists that member’s saved attempts; if none are saved, the score stays blank until a result is chosen.",
+    },
   ];
 
 export const DOCS_UI_GUIDES: Record<
@@ -2088,7 +2100,7 @@ export const DOCS_UI_GUIDES: Record<
   "edu-teacher-student-progress-quiz-result-owner": {
     title: "Student quiz results for the plan owner",
     summary:
-      "On Student Progress, the plan owner opens a member’s quiz result, the question sheet, the answer key, and the PDF.",
+      "On Student Progress, the plan owner opens a member’s quiz result, the question sheet, the answer key, and the PDF, then records a quiz score by typing it or choosing a saved member result.",
     steps: EDU_TEACHER_STUDENT_PROGRESS_QUIZ_RESULT_OWNER_GUIDE_STEPS,
   },
 };
