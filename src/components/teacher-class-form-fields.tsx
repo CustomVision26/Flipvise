@@ -100,6 +100,8 @@ export function TeacherClassFormFields({
       : null;
 
   const hasLinkedLessonPlan = linkedPlanPeriodDays != null;
+  const selectedMember =
+    memberOptions?.find((member) => member.userId === selectedMemberUserId) ?? null;
 
   return (
     <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
@@ -113,7 +115,9 @@ export function TeacherClassFormFields({
             }}
           >
             <SelectTrigger id={`${idPrefix}-member`} className="h-10 w-full bg-background">
-              <SelectValue placeholder="Select a member" />
+              <SelectValue placeholder="Select a member">
+                {selectedMember?.label ?? "Select a member"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent nestedInModal>
               {memberOptions.map((member) => (

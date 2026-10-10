@@ -21,7 +21,9 @@ import {
 import { TeacherClassFormFields } from "@/components/teacher-class-form-fields";
 import type { DeckRow } from "@/db/queries/decks";
 import type { OwnerTeamAdminDeckPickerPayload } from "@/db/queries/teacher-owner-pickers";
+import { looksLikeClerkUserId } from "@/lib/clerk-user-display";
 import { adminDisplayLabel } from "@/lib/owner-team-admin-picker";
+import type { TeamAdminQuizPickerOption } from "@/db/queries/saved-lesson-plans";
 import {
   buildPeriodFieldsForPlanPeriod,
   formatStoredClassPeriods,
@@ -35,6 +37,14 @@ type CreateTeacherClassDialogProps = {
   ownerDeckPicker?: OwnerTeamAdminDeckPickerPayload | null;
   lessonPlanDeckIds?: number[];
 };
+
+function classMemberFieldLabel(admin: TeamAdminQuizPickerOption): string {
+  const name = admin.name?.trim() ?? "";
+  return adminDisplayLabel({
+    ...admin,
+    name: name && !looksLikeClerkUserId(name) ? name : null,
+  });
+}
 
 async function resolvePlanPeriodDaysForDeck(
   deckId: number,
@@ -75,7 +85,7 @@ export function CreateTeacherClassDialog({
       isPlanOwner
         ? (ownerDeckPicker?.teamAdmins ?? []).map((admin) => ({
             userId: admin.userId,
-            label: adminDisplayLabel(admin),
+            label: classMemberFieldLabel(admin),
           }))
         : [],
     [isPlanOwner, ownerDeckPicker?.teamAdmins],
