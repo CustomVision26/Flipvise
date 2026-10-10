@@ -11,6 +11,10 @@ import { isEducationTeamPlanId } from "@/lib/education-plans";
 import { TeacherStudentProgressView } from "@/components/teacher-student-progress-view";
 import { AiRecallTeacherStatsPanel } from "@/components/ai-recall-teacher-stats-panel";
 import { getTeacherAiRecallStatsForWorkspace } from "@/db/queries/ai-recall";
+import {
+  getClerkUserFieldDisplaysByIds,
+  looksLikeClerkUserId,
+} from "@/lib/clerk-user-display";
 
 type TeacherStudentsPageProps = {
   searchParams: Promise<{
@@ -69,6 +73,57 @@ export default async function TeacherStudentsPage({
     getTeacherAiRecallStatsForWorkspace(userId, workspace.teamId),
   ]);
 
+  const learnerIds = [
+    ...new Set(aiRecallStats.monitor.members.map((member) => member.userId)),
+  ];
+  const recallDisplays =
+    learnerIds.length > 0
+      ? await getClerkUserFieldDisplaysByIds(learnerIds)
+      : {};
+  const registeredNameByEmail = new Map(
+    registeredStudents
+      .map((student) => [student.email.trim().toLowerCase(), student.fullName.trim()] as const)
+      .filter(([email, name]) => email !== "" && name !== ""),
+  );
+  const inviteeByUserId = new Map(
+    workspaceInvitees.map((invitee) => [invitee.memberUserId, invitee]),
+  );
+
+  function recallPersonLabel(userId: string): string {
+    const display = recallDisplays[userId];
+    const invitee = inviteeByUserId.get(userId);
+    const email = (display?.primaryEmail ?? invitee?.email ?? "").trim();
+    const registeredName = email
+      ? registeredNameByEmail.get(email.toLowerCase())
+      : undefined;
+    if (registeredName) return registeredName;
+    const inviteeLabel = invitee?.label?.trim() ?? "";
+    if (inviteeLabel && !looksLikeClerkUserId(inviteeLabel)) return inviteeLabel;
+    const line = display?.primaryLine?.trim() ?? "";
+    if (line && !looksLikeClerkUserId(line)) return line;
+    if (email) return email;
+    return "Student";
+  }
+
+  const labeledAiRecallStats = {
+    ...aiRecallStats,
+    monitor: {
+      ...aiRecallStats.monitor,
+      members: aiRecallStats.monitor.members.map((member) => ({
+        ...member,
+        memberLabel: recallPersonLabel(member.userId),
+      })),
+      sessions: aiRecallStats.monitor.sessions.map((session) => ({
+        ...session,
+        memberLabel: recallPersonLabel(session.userId),
+      })),
+      topLearners: aiRecallStats.monitor.topLearners.map((learner) => ({
+        ...learner,
+        memberLabel: recallPersonLabel(learner.userId),
+      })),
+    },
+  };
+
   const isWorkspaceOwner = team != null && team.ownerUserId === userId;
   const canDeleteResults =
     workspace.teamId != null &&
@@ -77,7 +132,7 @@ export default async function TeacherStudentsPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <AiRecallTeacherStatsPanel stats={aiRecallStats} />
+      <AiRecallTeacherStatsPanel stats={labeledAiRecallStats} />
       <TeacherStudentProgressView
         rows={progress.rows}
         teamId={workspace.teamId}

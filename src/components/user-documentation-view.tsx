@@ -240,6 +240,11 @@ function DocPagePanel({
             Open Teacher Dashboard guide
           </DocsUiGuideStartButton>
         ) : null}
+        {page.id === "teacher-classroom" ? (
+          <DocsUiGuideStartButton guideId="edu-teacher-classes-owner">
+            Open Classes for the plan owner guide
+          </DocsUiGuideStartButton>
+        ) : null}
         {page.id === "teacher-ai-content-tools" ? (
           <>
             <DocsUiGuideStartButton guideId="edu-teacher-lesson-plan-owner">
@@ -573,6 +578,14 @@ function articleSectionGuides(
       {
         id: "edu-teacher-worksheet-owner-lesson-plan",
         label: "Open Worksheet Generator from a lesson plan guide",
+      },
+    ];
+  }
+  if (pageId === "teacher-classroom" && sectionId === "classes") {
+    return [
+      {
+        id: "edu-teacher-classes-owner",
+        label: "Open Classes for the plan owner guide",
       },
     ];
   }

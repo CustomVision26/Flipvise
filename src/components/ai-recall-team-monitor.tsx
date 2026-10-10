@@ -54,8 +54,14 @@ function formatSavedAt(iso: string | null): string {
 
 export function AiRecallTeamMonitor({
   stats,
+  audience = "members",
+  embedded = false,
 }: {
   stats: TeamAiRecallDashboardStats;
+  /** Teacher Student Progress uses student wording for the same session rows. */
+  audience?: "members" | "students";
+  /** Render inside an existing card instead of a second panel. */
+  embedded?: boolean;
 }) {
   const [tab, setTab] = React.useState("members");
   const [query, setQuery] = React.useState("");
@@ -66,46 +72,53 @@ export function AiRecallTeamMonitor({
     setQuery("");
   }, [tab]);
 
+  const personNoun = audience === "students" ? "student" : "member";
+  const personNounPlural = audience === "students" ? "Students" : "Members";
   const q = query.trim().toLowerCase();
   const members = stats.members.filter((member) => {
     if (!q) return true;
-    return (
-      member.memberLabel.toLowerCase().includes(q) ||
-      member.userId.toLowerCase().includes(q)
-    );
+    const label = member.memberLabel.toLowerCase().includes(q);
+    if (audience === "students") return label;
+    return label || member.userId.toLowerCase().includes(q);
   });
   const decks = stats.decks.filter((deck) => {
     if (!q) return true;
     return deck.deckName.toLowerCase().includes(q);
   });
 
-  return (
-    <section className="space-y-3" aria-labelledby="active-recall-monitor">
+  const monitor = (
+    <section
+      className={cn("space-y-3", embedded && "space-y-2")}
+      aria-labelledby="active-recall-monitor"
+    >
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Session results
+          {audience === "students" ? "Individual results" : "Session results"}
         </p>
         <h2
           id="active-recall-monitor"
           className="text-base font-semibold tracking-tight text-foreground"
         >
-          Track members and decks
+          {audience === "students"
+            ? "Track each student"
+            : "Track members and decks"}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Open a member to see every saved AI Recall™ session for that person.
-          Open a deck to see how the workspace performed on that material.
+          {audience === "students"
+            ? "Open a student to see every saved AI Recall™ session for that person. Open a deck to see how students performed on that material."
+            : "Open a member to see every saved AI Recall™ session for that person. Open a deck to see how the workspace performed on that material."}
         </p>
       </div>
 
-      <Card className={cn(teamAdminCardClass)}>
+      <Card className={cn(teamAdminCardClass, embedded && "border-border/60 bg-background/30 shadow-none")}>
         <CardHeader className="space-y-1.5 border-b border-border/40 pb-4">
           <CardTitle className="text-sm font-semibold tracking-tight">
             Saved session monitor
           </CardTitle>
           <CardDescription className="text-xs leading-relaxed">
-            Click a row to expand session details. Metrics come from completed
-            sessions members saved — on-screen results that were not saved are
-            not included.
+            {audience === "students"
+              ? "Click a student to expand that person’s saved AI Recall™ sessions. Results appear after the student saves a completed session."
+              : "Click a row to expand session details. Metrics come from completed sessions members saved — on-screen results that were not saved are not included."}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -120,7 +133,7 @@ export function AiRecallTeamMonitor({
               <TabsList className="h-9">
                 <TabsTrigger value="members">
                   <Users className="size-3.5" aria-hidden />
-                  Members
+                  {personNounPlural}
                   <Badge variant="secondary" className="ml-1 tabular-nums">
                     {stats.members.length}
                   </Badge>
@@ -143,11 +156,15 @@ export function AiRecallTeamMonitor({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={
-                    tab === "members" ? "Search members" : "Search decks"
+                    tab === "members"
+                      ? `Search ${personNounPlural.toLowerCase()}`
+                      : "Search decks"
                   }
                   className="h-9 bg-background pl-8"
                   aria-label={
-                    tab === "members" ? "Search members" : "Search decks"
+                    tab === "members"
+                      ? `Search ${personNounPlural.toLowerCase()}`
+                      : "Search decks"
                   }
                 />
               </div>
@@ -155,9 +172,9 @@ export function AiRecallTeamMonitor({
 
             <TabsContent value="members" className="mt-0 rounded-none border-0 p-0 shadow-none ring-0">
               <MonitorTable
-                empty="No saved member sessions match this search."
+                empty={`No saved ${personNoun} sessions match this search.`}
                 columns={[
-                  "Member",
+                  audience === "students" ? "Student" : "Member",
                   "Sessions",
                   "Accuracy",
                   "Avg. AI score",
@@ -197,7 +214,7 @@ export function AiRecallTeamMonitor({
                 columns={[
                   "Deck",
                   "Sessions",
-                  "Members",
+                  personNounPlural,
                   "Accuracy",
                   "Avg. AI score",
                   "Misses",
@@ -225,9 +242,10 @@ export function AiRecallTeamMonitor({
                               session.deckId == null,
                         )}
                         variant="deck"
+                        personLabel={audience === "students" ? "Student" : "Member"}
                       />
                     ),
-                    summary: deckSummary(deck),
+                    summary: deckSummary(deck, personNoun),
                   };
                 })}
                 activeKey={activeKey}
@@ -239,14 +257,16 @@ export function AiRecallTeamMonitor({
       </Card>
     </section>
   );
+
+  return monitor;
 }
 
 function memberSummary(member: TeamAiRecallMemberRollup): string {
   return `${member.sessions} saved session${member.sessions === 1 ? "" : "s"} · ${member.cardsReviewed} cards reviewed · ${member.misses} misses`;
 }
 
-function deckSummary(deck: TeamAiRecallDeckRollup): string {
-  return `${deck.sessions} saved session${deck.sessions === 1 ? "" : "s"} · ${deck.memberCount} member${deck.memberCount === 1 ? "" : "s"} · ${deck.cardsReviewed} cards reviewed`;
+function deckSummary(deck: TeamAiRecallDeckRollup, personNoun: string): string {
+  return `${deck.sessions} saved session${deck.sessions === 1 ? "" : "s"} · ${deck.memberCount} ${personNoun}${deck.memberCount === 1 ? "" : "s"} · ${deck.cardsReviewed} cards reviewed`;
 }
 
 function MonitorTable({
@@ -359,9 +379,11 @@ function MonitorTable({
 function SessionDetailTable({
   sessions,
   variant,
+  personLabel = "Member",
 }: {
   sessions: TeamAiRecallSessionSummary[];
   variant: "member" | "deck";
+  personLabel?: string;
 }) {
   if (sessions.length === 0) {
     return (
@@ -371,7 +393,7 @@ function SessionDetailTable({
     );
   }
 
-  const subjectHeader = variant === "member" ? "Deck" : "Member";
+  const subjectHeader = variant === "member" ? "Deck" : personLabel;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border/60 bg-background/40">

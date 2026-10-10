@@ -183,7 +183,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "members",
         title: "Track members",
         bullets: [
-          "The Members tab lists each learner with at least one saved session: session count, accuracy, average AI score, average time, and last session.",
+          "The Members tab lists each learner with at least one saved session: session count, accuracy, average AI score, average time, and last session. The row name is the member’s display name or email.",
           "Click a member row to open that person’s saved sessions (deck, accuracy, AI score, duration, cards, correct answers, and misses).",
           "Search filters the member list by name.",
         ],

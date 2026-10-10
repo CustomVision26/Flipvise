@@ -118,7 +118,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         id: "classes",
         title: "Classes (/teacher/classes)",
         bullets: [
-          "Create and manage classroom groups. For the workspace owner, Create class is a wider dialog with a Workspace owner or team admin menu. Choosing the owner lists that owner’s workspace decks that have a linked lesson plan. Choosing a team admin lists that admin’s workspace decks that have a linked lesson plan.",
+          "Open Classes for the plan owner guide to follow Create class, the member and lesson-plan deck, the academic schedule, and the saved class row. For the workspace owner, Create class starts with a Workspace owner or team admin menu. Choosing the owner lists that owner’s workspace decks that have a linked lesson plan. Choosing a team admin lists that admin’s workspace decks that have a linked lesson plan. Academic schedule includes academic year, term / semester, week, month (January–December), and plan period, then a period of the day for each teaching day.",
           "Associate students and assignments with each class.",
           "Education Gold/Enterprise teams can collaborate via shared department workspaces.",
         ],
@@ -127,7 +127,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         id: "students",
         title: "Student Progress (/teacher/students)",
         bullets: [
-          "Review student quiz performance and study activity.",
+          "Review student quiz performance and study activity. AI Recall™ insights lists each member or registered student with a saved session. Open the row to see that person’s accuracy, AI score, time, cards, and misses.",
           "Education Gold adds a student progress dashboard and teacher analytics.",
           "Education Enterprise adds school-wide learning analytics and teacher performance reports.",
         ],

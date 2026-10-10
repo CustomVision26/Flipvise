@@ -30,7 +30,8 @@ export type DocsUiGuideId =
   | "edu-teacher-homework-owner-deck"
   | "edu-teacher-homework-owner-lesson-plan"
   | "edu-teacher-study-guide-owner-lesson-plan"
-  | "edu-teacher-worksheet-owner-lesson-plan";
+  | "edu-teacher-worksheet-owner-lesson-plan"
+  | "edu-teacher-classes-owner";
 
 export const FLIPVISE_UI_GUIDE_LABEL = "Flipvise UI guide";
 
@@ -115,6 +116,7 @@ export const DOCS_UI_GUIDE_CATEGORIES: readonly DocsUiGuideCategory[] = [
           "edu-teacher-homework-owner-lesson-plan",
           "edu-teacher-study-guide-owner-lesson-plan",
           "edu-teacher-worksheet-owner-lesson-plan",
+          "edu-teacher-classes-owner",
         ],
       },
     ],
@@ -1744,6 +1746,42 @@ export const EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_GUIDE_STEPS: readonly DocsU
     },
   ];
 
+const EDU_TEACHER_CLASSES_OWNER_FILE =
+  "32 Flipvise - Team Tier Edu Plan - Teacher DB Classes - owner_UI";
+
+export const EDU_TEACHER_CLASSES_OWNER_GUIDE_STEPS: readonly DocsUiGuideStep[] = [
+  {
+    src: uiSrc(`${EDU_TEACHER_CLASSES_OWNER_FILE} - 01.png`),
+    title: "Open Classes",
+    caption:
+      "On Teacher Dashboard for workspace UC-K26 (Education Gold), the plan owner (John Brown) opens Classes under Classroom management. The page lists decks linked to classes for lesson plan generation, grouped by team admin. Choose Create class. Each class record holds that week’s lesson plan together with homework, cards, the study guide, and the worksheet.",
+  },
+  {
+    src: uiSrc(`${EDU_TEACHER_CLASSES_OWNER_FILE} - 02.png`),
+    title: "Choose the member and deck",
+    caption:
+      "Create class starts with Workspace owner or team admin. Choose the workspace owner (John Brown · Workspace owner) or a team admin (Teddy Watt). Deck then lists only that person’s decks that already have a linked lesson plan.",
+  },
+  {
+    src: uiSrc(`${EDU_TEACHER_CLASSES_OWNER_FILE} - 03.png`),
+    title: "Fill the academic schedule",
+    caption:
+      "After the member and deck (for example Teddy Watt and Science : Environmental Science — Air pollution LP Day 1), complete Academic schedule and Timetable. Academic year is the school year (2025–2026). Term / semester lists Fall, Spring, Summer, Semester 1, Semester 2, Trimester 1, Trimester 2, and Trimester 3. Month lists January through December. Week is the week within that month (Week 1). Plan period shows the lesson length (3 days). Period of the day 1, 2, and 3 are the class periods for those teaching days.",
+  },
+  {
+    src: uiSrc(`${EDU_TEACHER_CLASSES_OWNER_FILE} - 04.png`),
+    title: "Create the class",
+    caption:
+      "With Teddy Watt, the deck Science : Environmental Science — Air pollution LP Day 1, academic year 2026, Fall, Week 2, October, a 3-day plan period, and periods Period 2, Period 1, and Period 4, choose Create class.",
+  },
+  {
+    src: uiSrc(`${EDU_TEACHER_CLASSES_OWNER_FILE} - 05.png`),
+    title: "Open the class record",
+    caption:
+      "The new row appears under John Brown (Owner): Fall · Week 2 — Science : Environmental Science — Air pollution LP Day 1, subject Science : Environmental Science, grade 7, academic year 2026, term Fall, week Week 2 · No of Class : 3, month October. Open the row to see Edit, Delete, and Lesson plan, Homework, Cards, Study guide, and Worksheet.",
+  },
+];
+
 export const DOCS_UI_GUIDES: Record<
   DocsUiGuideId,
   { title: string; summary: string; steps: readonly DocsUiGuideStep[] }
@@ -1929,5 +1967,11 @@ export const DOCS_UI_GUIDES: Record<
     summary:
       "On Teacher Dashboard, the plan owner chooses a saved lesson plan, then previews, edits, saves, or downloads the worksheet and answer key.",
     steps: EDU_TEACHER_WORKSHEET_OWNER_LESSON_PLAN_GUIDE_STEPS,
+  },
+  "edu-teacher-classes-owner": {
+    title: "Classes for the plan owner",
+    summary:
+      "On Teacher Dashboard, the plan owner creates a class from a member’s lesson-plan deck, sets the academic schedule, then opens the saved class record.",
+    steps: EDU_TEACHER_CLASSES_OWNER_GUIDE_STEPS,
   },
 };

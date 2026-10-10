@@ -1,3 +1,4 @@
+import { AiRecallTeamMonitor } from "@/components/ai-recall-team-monitor";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TeacherAiRecallDashboardStats } from "@/db/queries/ai-recall";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
@@ -27,7 +28,8 @@ export function AiRecallTeacherStatsPanel({
           Active Recall session analytics for your students and classes.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
           label="Average AI Recall Score"
           value={stats.averageAiScore != null ? `${stats.averageAiScore}%` : "—"}
@@ -72,6 +74,8 @@ export function AiRecallTeacherStatsPanel({
             </ul>
           )}
         </div>
+        </div>
+        <AiRecallTeamMonitor stats={stats.monitor} audience="students" embedded />
       </CardContent>
     </Card>
   );

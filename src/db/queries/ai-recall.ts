@@ -157,6 +157,7 @@ export type TeacherAiRecallDashboardStats = {
   sessionCount: number;
   lowestPerformingDecks: { deckName: string; averageScore: number }[];
   highestPerformingDecks: { deckName: string; averageScore: number }[];
+  monitor: TeamAiRecallDashboardStats;
 };
 
 export async function getTeacherAiRecallStatsForWorkspace(
@@ -178,6 +179,24 @@ export async function getTeacherAiRecallStatsForWorkspace(
           .orderBy(desc(aiRecallSessions.savedAt))
           .limit(500);
 
+  const monitor = buildTeamAiRecallDashboardStats(
+    sessions.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      deckId: row.deckId,
+      deckName: row.deckName,
+      cardsReviewed: row.cardsReviewed,
+      correct: row.correct,
+      incorrect: row.incorrect,
+      forcedUnlocks: row.forcedUnlocks,
+      averageAiScore: row.averageAiScore,
+      sessionDurationMs: row.sessionDurationMs,
+      savedAt:
+        row.savedAt instanceof Date ? row.savedAt : new Date(row.savedAt),
+      perCard: row.perCard ?? null,
+    })),
+  );
+
   if (sessions.length === 0) {
     return {
       averageAiScore: null,
@@ -186,6 +205,7 @@ export async function getTeacherAiRecallStatsForWorkspace(
       sessionCount: 0,
       lowestPerformingDecks: [],
       highestPerformingDecks: [],
+      monitor,
     };
   }
 
@@ -230,6 +250,7 @@ export async function getTeacherAiRecallStatsForWorkspace(
     sessionCount: sessions.length,
     lowestPerformingDecks: deckAvgs.slice(0, 5),
     highestPerformingDecks: [...deckAvgs].reverse().slice(0, 5),
+    monitor,
   };
 }
 
