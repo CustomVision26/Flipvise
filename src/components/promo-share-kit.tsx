@@ -2,13 +2,44 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Check, Copy, Link2 } from "lucide-react";
+import { Check, Copy, Link2, Mail, MessageSquare, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function pricingPromoUrl(code: string): string {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
   return `${origin}/pricing?promo=${encodeURIComponent(code)}`;
+}
+
+function shareMessage(code: string, link: string): string {
+  return `Use promo code ${code} on Flipvise: ${link}`;
+}
+
+function dataUrlToFile(dataUrl: string, filename: string): File | null {
+  const [header, data] = dataUrl.split(",");
+  if (!header || !data) return null;
+  const mime = /:(.*?);/.exec(header)?.[1] ?? "image/png";
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
+
+function openShareTarget(href: string) {
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  if (href.startsWith("http")) {
+    anchor.target = "_blank";
+    anchor.rel = "noreferrer";
+  }
+  anchor.click();
 }
 
 export function PromoShareKit({
@@ -20,7 +51,13 @@ export function PromoShareKit({
 }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  const [canNativeShare, setCanNativeShare] = useState(false);
   const link = pricingPromoUrl(code);
+  const message = shareMessage(code, link);
+
+  useEffect(() => {
+    setCanNativeShare(typeof navigator.share === "function");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +76,28 @@ export function PromoShareKit({
       cancelled = true;
     };
   }, [link]);
+
+  async function shareNative() {
+    const file = qr ? dataUrlToFile(qr, `${code}-qr.png`) : null;
+    const withFile: ShareData = {
+      title: `Flipvise promo ${code}`,
+      text: message,
+      files: file ? [file] : undefined,
+    };
+    try {
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share(withFile);
+        return;
+      }
+      await navigator.share({
+        title: `Flipvise promo ${code}`,
+        text: `Use promo code ${code}`,
+        url: link,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  }
 
   async function copy(value: string, kind: "code" | "link") {
     try {
@@ -90,6 +149,83 @@ export function PromoShareKit({
             {copied === "link" ? <Check className="size-3.5" /> : <Link2 className="size-3.5" />}
             Copy link
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={(menuProps) => (
+                <Button {...menuProps} type="button" size="sm" variant="outline">
+                  <Share2 className="size-3.5" />
+                  Share
+                </Button>
+              )}
+            />
+            <DropdownMenuContent align="start" className="w-56">
+              {canNativeShare ? (
+                <>
+                  <DropdownMenuItem onClick={() => void shareNative()}>
+                    <Share2 />
+                    Share QR and link
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+              <DropdownMenuItem
+                onClick={() =>
+                  openShareTarget(`sms:?&body=${encodeURIComponent(message)}`)
+                }
+              >
+                <MessageSquare />
+                Messages
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  openShareTarget(`https://wa.me/?text=${encodeURIComponent(message)}`)
+                }
+              >
+                <Share2 />
+                WhatsApp
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  openShareTarget(
+                    `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Use promo code ${code} on Flipvise`)}&url=${encodeURIComponent(link)}`,
+                  )
+                }
+              >
+                <Share2 />
+                X
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  openShareTarget(
+                    `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`,
+                  )
+                }
+              >
+                <Share2 />
+                Facebook
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  openShareTarget(
+                    `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`,
+                  )
+                }
+              >
+                <Share2 />
+                LinkedIn
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  openShareTarget(
+                    `mailto:?subject=${encodeURIComponent(`Flipvise promo ${code}`)}&body=${encodeURIComponent(message)}`,
+                  )
+                }
+              >
+                <Mail />
+                Email
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

@@ -344,6 +344,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Invite, edit, revoke, and quota-manage marketing affiliate arrangements.",
         howItWorks: [
           "Invite affiliate by email with plan grant (including education tiers), end date, and accept-link expiry. The invite dialog also has a Special feature promo tab for expo, TV, and social media codes linked to Stripe.",
+          "Special feature promos tab lists those codes. Double-click a row to open the code, link, and QR code, then share them to messages, WhatsApp, email, or social apps.",
           "Edit pending invites or active arrangements (arrangement changes require affiliate confirmation).",
           "Referral quota toggles auto-renewal targets for complimentary plan periods.",
           "Copy invite link for manual delivery when Loops email is skipped.",

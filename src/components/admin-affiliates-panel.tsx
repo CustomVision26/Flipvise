@@ -68,7 +68,10 @@ import { resolveAffiliateInviteEmailConflict } from "@/lib/affiliate-invite-emai
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { adminSectionCardClass } from "@/components/admin-panel-styles";
-import { AdminSpecialFeaturePromoPanel } from "@/components/admin-special-feature-promo-panel";
+import {
+  AdminSpecialFeaturePromoPanel,
+  AdminSpecialFeaturePromoRecords,
+} from "@/components/admin-special-feature-promo-panel";
 import { PromoShareKit } from "@/components/promo-share-kit";
 import plansConfigData from "@/data/plans-config.json";
 import type { PlanConfig } from "@/lib/plan-config-types";
@@ -575,6 +578,10 @@ export function AdminAffiliatesPanel({
                   </Badge>
                 ) : null}
               </TabsTrigger>
+              <TabsTrigger value="special-promos" className="gap-1.5">
+                <TicketPercent className="h-4 w-4 shrink-0" />
+                Special feature promos
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="directory" className="mt-0 space-y-3">
@@ -879,6 +886,10 @@ export function AdminAffiliatesPanel({
             </TableBody>
           </Table>
               </div>
+            </TabsContent>
+
+            <TabsContent value="special-promos" className="mt-0">
+              <AdminSpecialFeaturePromoRecords />
             </TabsContent>
 
             <TabsContent value="quotas" className="mt-0">

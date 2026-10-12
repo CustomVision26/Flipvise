@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -13,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Search } from "lucide-react";
 import { PromoShareKit } from "@/components/promo-share-kit";
 import {
   createSpecialFeaturePromoAction,
@@ -31,6 +40,19 @@ const CHANNELS = [
   { id: "tv", label: "TV promo" },
   { id: "social", label: "Social media promo" },
 ] as const;
+
+function channelLabel(channel: string): string {
+  return CHANNELS.find((item) => item.id === channel)?.label ?? channel;
+}
+
+function formatPromoDate(value: string | null): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function suggestCode(channel: string): string {
   const prefix = channel === "tv" ? "TV" : channel === "social" ? "SOCIAL" : "EXPO";
@@ -223,6 +245,147 @@ export function AdminSpecialFeaturePromoPanel() {
             />
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+export function AdminSpecialFeaturePromoRecords() {
+  const [promos, setPromos] = useState<SpecialFeaturePromoView[]>([]);
+  const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listSpecialFeaturePromosAction()
+      .then((rows) => {
+        if (!cancelled) setPromos(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load promos.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return promos;
+    return promos.filter((promo) => {
+      const plans = promo.planIds
+        .map((id) => labelForAdminPlanAssignment(id as AdminPlanAssignment))
+        .join(" ");
+      return [channelLabel(promo.channel), promo.label, promo.code, plans]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [promos, search]);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Double-click a row to open the code, link, and QR code.
+      </p>
+      <div className="relative w-full sm:max-w-sm">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          placeholder="Search by label, code, or plan…"
+          className="pl-8"
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </div>
+      {error ? (
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+      ) : null}
+      <div className="overflow-x-auto rounded-lg border-2 border-border/70">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Channel</TableHead>
+              <TableHead>Label</TableHead>
+              <TableHead>Code</TableHead>
+              <TableHead>Percent</TableHead>
+              <TableHead>Plans</TableHead>
+              <TableHead>Dates</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  {promos.length === 0
+                    ? "No special feature promos yet. Use Invite Affiliate → Special feature promo to create one."
+                    : "No promos match the current search."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((promo) => {
+                const isExpanded = expandedId === promo.id;
+                const planNames = promo.planIds
+                  .map((id) => labelForAdminPlanAssignment(id as AdminPlanAssignment))
+                  .join(", ");
+                return (
+                  <Fragment key={promo.id}>
+                    <TableRow
+                      onDoubleClick={() =>
+                        setExpandedId((current) => (current === promo.id ? null : promo.id))
+                      }
+                      className={[
+                        "cursor-pointer select-none",
+                        isExpanded ? "bg-accent/30" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <TableCell>
+                        <Badge variant="secondary" className="text-xs">
+                          {channelLabel(promo.channel)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{promo.label}</TableCell>
+                      <TableCell>
+                        <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-xs">
+                          {promo.code}
+                        </code>
+                      </TableCell>
+                      <TableCell className="tabular-nums">{promo.percentOff}%</TableCell>
+                      <TableCell className="max-w-[16rem] text-xs text-muted-foreground">
+                        {planNames}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {promo.startsAt || promo.endsAt
+                          ? `${formatPromoDate(promo.startsAt)} – ${formatPromoDate(promo.endsAt)}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={promo.active ? "default" : "outline"}>
+                          {promo.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded ? (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={7} className="px-4 py-3">
+                          <PromoShareKit
+                            code={promo.code}
+                            caption="Open the link or scan the QR code. Pricing fills this code and highlights the plans it can be used with."
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
