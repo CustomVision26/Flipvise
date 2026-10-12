@@ -23,6 +23,7 @@ import {
 } from "@/lib/stripe-pricing-display";
 import type { PlanConfig } from "@/components/pricing-content";
 import { getAddonCatalogSettings } from "@/db/queries/addons";
+import { listPromoHighlightPlanIds } from "@/lib/promo-pricing-highlight";
 
 /** Stripe price snapshots must run at request time (env + live amounts). */
 export const dynamic = "force-dynamic";
@@ -112,7 +113,12 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
   const plansForUi = await loadPlansForPricingUi();
   const promoNowMs = Date.now();
-  const showPromotionCodeUi = pricingHasActivePromoUi(plansForUi, promoNowMs);
+  const promoHighlightPlanIds = promoFromUrl?.trim()
+    ? await listPromoHighlightPlanIds(promoFromUrl, plansForUi)
+    : [];
+  const showPromotionCodeUi =
+    pricingHasActivePromoUi(plansForUi, promoNowMs) ||
+    Boolean(promoFromUrl?.trim());
   const publicPromoCodes = activePublicPromoCodes(plansForUi, promoNowMs);
   const activeDiscountPlanIds = activeGeneralDiscountPlanIds(
     plansForUi,
@@ -182,6 +188,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           showPromotionCodeUi={showPromotionCodeUi}
           publicPromoCodes={publicPromoCodes}
           activeDiscountPlanIds={activeDiscountPlanIds}
+          promoHighlightPlanIds={promoHighlightPlanIds}
         />
       </div>
     </div>

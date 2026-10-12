@@ -1,5 +1,6 @@
 import type { PlanConfig } from "@/components/pricing-content";
 import { getAffiliateByPromotionalCode } from "@/db/queries/affiliates";
+import { getSpecialFeaturePromoByCode } from "@/db/queries/special-feature-promos";
 import {
   affiliateStripeCouponId,
   buildAffiliatePlanCouponName,
@@ -28,7 +29,7 @@ export type ResolvedCheckoutDiscount = {
   affiliateId: number | null;
   /** Code the customer entered (or the tier’s general code when auto-applied). */
   customerPromoCode: string | null;
-  promoKind: "general" | "affiliate" | null;
+  promoKind: "general" | "affiliate" | "special" | null;
   percentOff: number | null;
 };
 
@@ -48,7 +49,7 @@ export function noPromoCheckoutDiscount(): ResolvedCheckoutDiscount {
 export async function stampStripeCouponInvoiceLabel(opts: {
   couponId: string;
   customerPromoCode: string;
-  kind: "general" | "affiliate";
+  kind: "general" | "affiliate" | "special";
   percentOff: number;
 }): Promise<void> {
   let percentOff = Math.round(opts.percentOff);
@@ -394,6 +395,31 @@ export async function resolveCheckoutDiscount(opts: {
       promoKind: null,
       percentOff: null,
     };
+  }
+
+  const special = await getSpecialFeaturePromoByCode(trimmed);
+  if (special) {
+    if (!special.active) {
+      throw new Error("This promotion is no longer active.");
+    }
+    const now = Date.now();
+    if (special.startsAt && special.startsAt.getTime() > now) {
+      throw new Error("This promotion is not active yet.");
+    }
+    if (special.endsAt && special.endsAt.getTime() < now) {
+      throw new Error("This promotion has expired and is no longer accepted at checkout.");
+    }
+    if (!special.planIds.includes(planId)) {
+      throw new Error("This promotion does not apply to the selected plan.");
+    }
+    return finalize({
+      couponId: special.stripeCouponId,
+      allowPromotionCodes: false,
+      affiliateId: null,
+      customerPromoCode: special.code,
+      promoKind: "special",
+      percentOff: special.percentOff,
+    });
   }
 
   if (!baseCoupon) {

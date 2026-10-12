@@ -43,6 +43,7 @@ import {
   Check,
   AlertCircle,
   Target,
+  TicketPercent,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminAffiliateQuotaPanel } from "@/components/admin-affiliate-quota-panel";
@@ -67,6 +68,10 @@ import { resolveAffiliateInviteEmailConflict } from "@/lib/affiliate-invite-emai
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { adminSectionCardClass } from "@/components/admin-panel-styles";
+import { AdminSpecialFeaturePromoPanel } from "@/components/admin-special-feature-promo-panel";
+import { PromoShareKit } from "@/components/promo-share-kit";
+import plansConfigData from "@/data/plans-config.json";
+import type { PlanConfig } from "@/lib/plan-config-types";
 
 interface AdminAffiliatesPanelProps {
   affiliates: SerializedAffiliate[];
@@ -75,6 +80,17 @@ interface AdminAffiliatesPanelProps {
 }
 
 type StatusFilter = "all" | "pending" | "active" | "revoked";
+
+function affiliateCheckoutCodes(suffix: string): Array<{ planName: string; code: string }> {
+  const rows: Array<{ planName: string; code: string }> = [];
+  for (const plan of plansConfigData as PlanConfig[]) {
+    if (plan.id === "free") continue;
+    const base = plan.discount?.stripeCouponId?.trim();
+    if (!base) continue;
+    rows.push({ planName: plan.name, code: `${base}${suffix}` });
+  }
+  return rows;
+}
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
@@ -177,6 +193,7 @@ export function AdminAffiliatesPanel({
 
   // Invite dialog
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteDialogTab, setInviteDialogTab] = useState<"invite" | "special">("invite");
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePlan, setInvitePlan] = useState<AffiliatePlanValue>("pro");
@@ -486,7 +503,7 @@ export function AdminAffiliatesPanel({
   }
 
   const affiliateDialogContentClass =
-    "flex max-h-[min(92dvh,44rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:w-full sm:max-w-md";
+    "flex max-h-[min(94dvh,58rem)] w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden p-0 sm:w-full sm:max-w-4xl";
   const affiliateDialogHeaderClass =
     "shrink-0 min-w-0 space-y-2 px-3 pt-4 pr-10 sm:px-4 sm:pr-12";
   const affiliateDialogBodyClass =
@@ -840,6 +857,17 @@ export function AdminAffiliatesPanel({
                               >
                                 Collapse
                               </Button>
+                              {a.status !== "revoked" ? (
+                                <div className="basis-full space-y-2 pt-2">
+                                  {affiliateCheckoutCodes(a.promotionalCode).map((share) => (
+                                    <PromoShareKit
+                                      key={share.code}
+                                      code={share.code}
+                                      caption={`${share.planName} affiliation code. The link opens pricing with this code filled in.`}
+                                    />
+                                  ))}
+                                </div>
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -865,23 +893,53 @@ export function AdminAffiliatesPanel({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         onOpenChangeComplete={(open) => {
-          if (!open) resetInviteForm();
+          if (!open) {
+            resetInviteForm();
+            setInviteDialogTab("invite");
+          }
         }}
       >
         <DialogContent className={affiliateDialogContentClass}>
           <DialogHeader className={affiliateDialogHeaderClass}>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 shrink-0" />
-              Invite Affiliate
+              {inviteDialogTab === "special" ? (
+                <TicketPercent className="h-5 w-5 shrink-0" />
+              ) : (
+                <UserPlus className="h-5 w-5 shrink-0" />
+              )}
+              {inviteDialogTab === "special" ? "Special feature promo" : "Invite Affiliate"}
             </DialogTitle>
-            <DialogDescription className="text-pretty break-words">
-              The affiliate plan activates only after the invitee accepts. If they already have a
-              Flipvise account (email matches Clerk), only their app inbox receives the invite — no outgoing
-              email. If no account exists yet, Loops sends an invitation email to their address (when configured).
-              They accept from inbox or via the emailed link once they join.
-            </DialogDescription>
+            <Tabs
+              value={inviteDialogTab}
+              onValueChange={(value) =>
+                setInviteDialogTab(value === "special" ? "special" : "invite")
+              }
+            >
+              <TabsList className="h-auto w-full flex-wrap justify-start">
+                <TabsTrigger value="invite">Invite affiliate</TabsTrigger>
+                <TabsTrigger value="special">Special feature promo</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {inviteDialogTab === "invite" ? (
+              <DialogDescription className="text-pretty break-words">
+                The affiliate plan activates only after the invitee accepts. If they already have a
+                Flipvise account (email matches Clerk), only their app inbox receives the invite — no outgoing
+                email. If no account exists yet, Loops sends an invitation email to their address (when configured).
+                They accept from inbox or via the emailed link once they join.
+              </DialogDescription>
+            ) : (
+              <DialogDescription className="text-pretty break-words">
+                Expo, TV, and social media codes are created in Stripe and granted on the plans you select.
+              </DialogDescription>
+            )}
           </DialogHeader>
 
+          {inviteDialogTab === "special" ? (
+            <div className={affiliateDialogBodyClass}>
+              <AdminSpecialFeaturePromoPanel />
+            </div>
+          ) : (
+          <>
           <div className={affiliateDialogBodyClass}>
           <div className="min-w-0 space-y-4 pb-4">
             <div className="space-y-1.5">
@@ -1057,6 +1115,8 @@ export function AdminAffiliatesPanel({
               {isPending ? "Sending…" : "Send Invite"}
             </Button>
           </div>
+          </>
+          )}
         </DialogContent>
       </Dialog>
 

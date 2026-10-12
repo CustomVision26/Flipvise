@@ -615,7 +615,7 @@ const ALL_ARTICLES: DocArticle[] = [
         bullets: [
           "Edit display names, descriptions, feature bullet lists, and sort order for /pricing cards.",
           "Stripe price references use env var keys (STRIPE_PRO_PRICE_ID, STRIPE_PRO_PLUS_YEARLY_PRICE_ID, team-tier keys, etc.) — never hardcode price_* IDs in the editor.",
-          "Affiliate discount blocks configure per-tier combined promo codes.",
+          "Affiliate discount blocks configure per-tier combined promo codes. Each general code shows a pricing link and QR code.",
           "Save writes plans-config.json — changes affect checkout validation and pricing page rendering.",
           "Stripe cannot edit a Price amount in place. After a price change, checkout looks up the Pro Plus (etc.) product and uses a matching Price even if Render still has a deleted STRIPE_*_PRICE_ID. Still update Render env to the current Price ids from .env.old / the sync script so webhooks and the Dashboard stay aligned.",
           "Checkout sessions omit payment_method_types. Extra methods such as Cash App Pay, Amazon Pay, and Klarna are excluded. Enable Cards, Apple Pay, Google Pay, Link, and ACH Direct Debit in the live Stripe Dashboard (Settings → Payment methods). Register the public app domain under Payment method domains so wallets appear.",

@@ -619,7 +619,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Education tiers: Education Plus (individual teachers), Education Gold (teaching teams), and Education Enterprise (schools).",
           "Each card lists features, price, and — during a sale — a promo badge and code for that tier only.",
           "Published free trials (monthly checkout only) show Start free trial on eligible plans — one trial per account.",
-          "Enter a promotion code in the field above the plan cards (optional). Codes can also pre-fill from ?promo= in the URL.",
+          "Enter a promotion code in the field above the plan cards (optional). A promo link or QR code opens this page with ?promo= filled in and highlights the plans that code can be used with.",
           "Active public codes appear as quick-fill chips under the promo field when a tier’s general sale is running.",
           "Signed-in users see a Current plan badge; active subscribers also get Manage subscription.",
           "When the Add-on Catalog is published, it lists optional features (such as AI Essay) that stack on your current plan — monthly or yearly where configured.",
@@ -773,7 +773,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Seasonal or campaign discounts configured per plan tier (e.g. SUMMER26 on Pro).",
         howItWorks: [
           "Each paid tier can have its own general promo in admin/plans config: discount %, label, Stripe coupon id, and a start/end schedule (promo window).",
-          "When a tier’s general sale is active, its plan card shows the promo label and code; the code also appears under Active codes on the pricing page.",
+          "When a tier’s general sale is active, its plan card shows the promo label and code; the code also appears under Active codes on the pricing page. Admin share kits include that code, a pricing link, and a QR code.",
           "Enter the exact code (case-insensitive) in Promotion code, or leave blank — if the tier has an active general sale, checkout may auto-apply that tier’s coupon for new subscriptions.",
           "General codes apply only to the matching tier. Using SUMMER26 on Pro Plus when that code belongs to Pro will fail.",
           "Each customer can redeem a given promo campaign once per account (tracked across checkout and invoices).",
@@ -846,7 +846,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Education Enterprise — everything in Enterprise plus Education Gold, school administration dashboard, multi-campus support, curriculum management, and school branding (30 workspaces, 45 members).",
           "Education Plus teachers create decks on the personal dashboard and link them in teacher tools.",
           "Education Gold/Enterprise team admins can create decks for assigned workspaces. On the plan owner's Personal Dashboard those decks sit below Personal: choose the workspace, then Created by team admin stays separate from Owner lesson plans. A lesson-plan deck the owner saves from a team-admin deck stays in Owner lesson plans and is not copied onto the team admin Team Dashboard.",
-          "Teacher Dashboard link appears in the header when you have an education plan or education team membership.",
+          "Teacher Dashboard link appears in the header when you have an education plan or education team membership. A promo link highlights an education plan on pricing when that code applies to it.",
         ],
         requirements: [
           "Education Plus personal subscription, or membership in an Education Gold / Education Enterprise workspace.",

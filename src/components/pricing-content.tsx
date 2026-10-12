@@ -62,6 +62,7 @@ function PlanCard({
   onCheckout,
   onTrialCheckout,
   hasActiveDiscount,
+  promoApplies,
 }: {
   plan: PlanConfig;
   period: BillingPeriod;
@@ -74,6 +75,8 @@ function PlanCard({
   onTrialCheckout: (planId: PaidPlanId) => void;
   /** Server-computed — avoids promo-window TZ mismatch on hydrate. */
   hasActiveDiscount: boolean;
+  /** The code in the promo field can be used on this plan. */
+  promoApplies: boolean;
 }) {
   const periodPricing = computePlanPeriodPricing(plan, period, {
     hasActiveDiscount,
@@ -157,7 +160,8 @@ function PlanCard({
     <Card
       className={cn(
         "flex flex-col border-border/80 bg-card/60 shadow-sm",
-        plan.highlighted && "border-primary/40 ring-1 ring-primary/20",
+        plan.highlighted && !promoApplies && "border-primary/40 ring-1 ring-primary/20",
+        promoApplies && "border-cyan-400 ring-2 ring-cyan-400/80 shadow-lg shadow-cyan-500/25",
       )}
     >
       <CardHeader className="pb-4">
@@ -166,6 +170,11 @@ function PlanCard({
             {plan.name}
           </span>
           <div className="flex shrink-0 gap-1.5">
+            {promoApplies ? (
+              <Badge className="border-cyan-400/40 bg-cyan-500/20 text-xs text-cyan-800 dark:text-cyan-100">
+                Code applies
+              </Badge>
+            ) : null}
             {isCurrent && (
               <Badge variant="secondary" className="text-xs">
                 Current plan
@@ -299,6 +308,7 @@ export function PricingContent({
   showPromotionCodeUi,
   publicPromoCodes,
   activeDiscountPlanIds,
+  promoHighlightPlanIds = [],
 }: {
   userId: string | null;
   /**
@@ -318,6 +328,8 @@ export function PricingContent({
   publicPromoCodes: Array<{ planName: string; code: string }>;
   /** Server-computed plan ids with an effectively active general discount. */
   activeDiscountPlanIds: string[];
+  /** Plans the current URL promo code can be used with. */
+  promoHighlightPlanIds?: string[];
 }) {
   const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -442,8 +454,17 @@ export function PricingContent({
               placeholder="e.g. SUMMER26 or SummerLaunchusera1276"
               value={promotionCode}
               onChange={(e) => setPromotionCode(e.target.value)}
-              className="h-10 max-w-md bg-background/80 text-sm font-mono"
+              className={cn(
+                "h-10 max-w-md bg-background/80 text-sm font-mono",
+                promoHighlightPlanIds.length > 0 &&
+                  "border-cyan-400 ring-2 ring-cyan-400/70",
+              )}
             />
+            {promoHighlightPlanIds.length > 0 ? (
+              <p className="text-sm text-cyan-700 dark:text-cyan-300">
+                Highlighted plans accept this code.
+              </p>
+            ) : null}
             {publicPromoCodes.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="shrink-0">Active codes:</span>
@@ -494,6 +515,7 @@ export function PricingContent({
             onCheckout={(planId) => handleCheckout(planId, false)}
             onTrialCheckout={(planId) => handleCheckout(planId, true)}
             hasActiveDiscount={activeDiscountPlanIds.includes(plan.id)}
+            promoApplies={promoHighlightPlanIds.includes(plan.id)}
           />
         ))}
       </div>

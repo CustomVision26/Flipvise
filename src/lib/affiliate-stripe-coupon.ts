@@ -63,13 +63,15 @@ export function buildGeneralCheckoutDiscountSuffix(percentOff: number): string {
 /** Customer-facing label on Stripe invoices/receipts (coupon `name` field, max 40 chars). */
 export function buildCheckoutInvoiceCouponName(opts: {
   customerPromoCode: string;
-  kind: "general" | "affiliate";
+  kind: "general" | "affiliate" | "special";
   percentOff: number;
 }): string {
   const suffix =
     opts.kind === "affiliate"
       ? ` (affiliate ${opts.percentOff}% off)`
-      : buildGeneralCheckoutDiscountSuffix(opts.percentOff);
+      : opts.kind === "special"
+        ? ` (${opts.percentOff}% promo)`
+        : buildGeneralCheckoutDiscountSuffix(opts.percentOff);
   const maxCodeLen = STRIPE_COUPON_NAME_MAX_LEN - suffix.length;
   let code = opts.customerPromoCode.trim();
   if (maxCodeLen < 1) return suffix.trim();

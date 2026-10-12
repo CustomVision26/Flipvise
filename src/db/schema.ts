@@ -730,6 +730,24 @@ export const billingProrationLines = pgTable(
 
 export const affiliateStatusEnum = pgEnum('affiliate_status', ['pending', 'active', 'revoked']);
 
+/** Expo, TV, and social promo codes. Checkout applies the linked Stripe coupon on the selected plans. */
+export const specialFeaturePromos = pgTable('special_feature_promos', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  /** expo | tv | social */
+  channel: varchar({ length: 16 }).notNull(),
+  code: varchar({ length: 64 }).notNull().unique(),
+  label: varchar({ length: 120 }).notNull(),
+  percentOff: integer().notNull(),
+  planIds: json().$type<string[]>().notNull(),
+  stripeCouponId: varchar({ length: 80 }).notNull(),
+  stripePromotionCodeId: varchar({ length: 80 }),
+  active: boolean().notNull().default(true),
+  startsAt: timestamp(),
+  endsAt: timestamp(),
+  createdByUserId: varchar({ length: 255 }).notNull(),
+  createdAt: timestamp().notNull().defaultNow(),
+});
+
 /** Marketing affiliates invited by an admin to promote the platform. */
 export const affiliates = pgTable('affiliates', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),

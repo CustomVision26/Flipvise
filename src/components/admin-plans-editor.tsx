@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import type { PlanConfig, PlanDiscount, PlanAffiliateDiscount } from "@/components/pricing-content";
 import { updatePlanAction } from "@/actions/admin-plans";
+import { PromoShareKit } from "@/components/promo-share-kit";
 import { affiliateStripeCouponId } from "@/lib/affiliate-stripe-coupon";
 import { isStripePaidPlanId } from "@/lib/billing-plan-ids";
 import {
@@ -547,8 +548,15 @@ function PlanEditor({
               <span className="text-foreground">Promotion code</span> on that coupon when customers
               should type a public code. Checkout accepts either the coupon id or that code. Match{" "}
               <span className="text-foreground/90">Redeem by</span> on the coupon or code to the plan
-              end date below if you use one.
+              end date below if you use one. The code, link, and QR below open pricing with this
+              code filled in and this plan highlighted.
             </p>
+            {draft.discount?.stripeCouponId?.trim() ? (
+              <PromoShareKit
+                code={draft.discount.stripeCouponId.trim()}
+                caption={`${plan.name} discount code`}
+              />
+            ) : null}
 
             {draft.discount?.active && draft.discount.value > 0 && (
               <div className="text-xs text-amber-400 bg-amber-500/10 rounded-md px-3 py-2 border border-amber-500/20">

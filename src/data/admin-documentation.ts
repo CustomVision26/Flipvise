@@ -250,7 +250,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Changes affect /pricing cards and checkout validation.",
           "Checkout recovers if Render still has a deleted STRIPE_*_PRICE_ID by finding the tagged/named Stripe product and a matching catalog Price. Update Render env to the current ids after a price change.",
           "Checkout omits payment_method_types so Stripe can show cards, Apple Pay, Google Pay, Link, and ACH. Extra Dashboard methods (Cash App Pay, Amazon Pay, Klarna, PayPal, and similar) are excluded. Enable the remaining methods in the live Stripe Dashboard (Settings → Payment methods) and register the public domain under Payment method domains for wallets.",
-          "Affiliate discount blocks are configured per tier for combined codes.",
+          "Affiliate discount blocks are configured per tier for combined codes. Each general code shows a pricing link and QR code.",
           "AI Recall™ (Active Recall study mode) is an entitlement of Pro Plus, Education Plus, team-tier, and education team plans — not Free or standard Pro. Keep feature lists on /pricing aligned with that gate.",
         ],
         requirements: ["Platform admin access.", "Matching Stripe price IDs in environment."],
@@ -343,7 +343,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/admin/marketing-affiliates",
         purpose: "Invite, edit, revoke, and quota-manage marketing affiliate arrangements.",
         howItWorks: [
-          "Invite affiliate by email with plan grant (including education tiers), end date, and accept-link expiry.",
+          "Invite affiliate by email with plan grant (including education tiers), end date, and accept-link expiry. The invite dialog also has a Special feature promo tab for expo, TV, and social media codes linked to Stripe.",
           "Edit pending invites or active arrangements (arrangement changes require affiliate confirmation).",
           "Referral quota toggles auto-renewal targets for complimentary plan periods.",
           "Copy invite link for manual delivery when Loops email is skipped.",
