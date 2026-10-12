@@ -19,10 +19,29 @@ const clerkClient = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
 });
 
-const CHANNELS = ["expo", "tv", "social"] as const;
+const KNOWN_CHANNELS = [
+  { id: "expo", label: "Expo promo" },
+  { id: "tv", label: "TV promo" },
+  { id: "social", label: "Social media promo" },
+] as const;
+
+function normalizeChannel(value: string): string {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  const lower = normalized.toLowerCase();
+  const known = KNOWN_CHANNELS.find(
+    (item) => item.id === lower || item.label.toLowerCase() === lower,
+  );
+  return known?.id ?? normalized;
+}
 
 const createSchema = z.object({
-  channel: z.enum(CHANNELS),
+  channel: z
+    .string()
+    .trim()
+    .min(1, "Enter a channel name.")
+    .max(40, "Channel names can be up to 40 characters.")
+    .regex(/^[A-Za-z0-9][A-Za-z0-9 '&._-]*$/, "Use letters and numbers for the channel name.")
+    .transform(normalizeChannel),
   label: z.string().trim().min(1).max(120),
   code: z
     .string()

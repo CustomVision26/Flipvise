@@ -940,7 +940,7 @@ export function AdminAffiliatesPanel({
               </DialogDescription>
             ) : (
               <DialogDescription className="text-pretty break-words">
-                Expo, TV, and social media codes are created in Stripe and granted on the plans you select.
+                Expo, TV, and social media codes are created in Stripe and granted on the plans you select. Choose Add a channel to type a different name.
               </DialogDescription>
             )}
           </DialogHeader>

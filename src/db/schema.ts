@@ -733,8 +733,8 @@ export const affiliateStatusEnum = pgEnum('affiliate_status', ['pending', 'activ
 /** Expo, TV, and social promo codes. Checkout applies the linked Stripe coupon on the selected plans. */
 export const specialFeaturePromos = pgTable('special_feature_promos', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  /** expo | tv | social */
-  channel: varchar({ length: 16 }).notNull(),
+  /** Built-in ids (expo, tv, social) or a channel name typed by an admin. */
+  channel: varchar({ length: 40 }).notNull(),
   code: varchar({ length: 64 }).notNull().unique(),
   label: varchar({ length: 120 }).notNull(),
   percentOff: integer().notNull(),

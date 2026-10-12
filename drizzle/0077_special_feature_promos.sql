@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "special_feature_promos" (
   "id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  "channel" varchar(16) NOT NULL,
+  "channel" varchar(40) NOT NULL,
   "code" varchar(64) NOT NULL,
   "label" varchar(120) NOT NULL,
   "percentOff" integer NOT NULL,
@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS "special_feature_promos" (
   "createdAt" timestamp DEFAULT now() NOT NULL,
   CONSTRAINT "special_feature_promos_code_unique" UNIQUE("code")
 );
+
+ALTER TABLE "special_feature_promos" ALTER COLUMN "channel" TYPE varchar(40);
 
 -- Earlier drafts of this table used snake_case. App queries expect camelCase.
 DO $$

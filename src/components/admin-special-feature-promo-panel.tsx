@@ -41,6 +41,20 @@ const CHANNELS = [
   { id: "social", label: "Social media promo" },
 ] as const;
 
+const CUSTOM_CHANNEL = "__custom__";
+
+function planNamesFor(planIds: string[]): string[] {
+  return planIds.map((id) => labelForAdminPlanAssignment(id as AdminPlanAssignment));
+}
+
+function shortPlanLabel(planIds: string[]): string {
+  const names = planNamesFor(planIds);
+  if (names.length === 0) return "—";
+  if (names.length === 1) return names[0] ?? "—";
+  if (planIds.length >= STRIPE_PAID_PLAN_IDS.length) return "All plans";
+  return `${names.length} plans`;
+}
+
 function channelLabel(channel: string): string {
   return CHANNELS.find((item) => item.id === channel)?.label ?? channel;
 }
@@ -55,14 +69,18 @@ function formatPromoDate(value: string | null): string {
 }
 
 function suggestCode(channel: string): string {
-  const prefix = channel === "tv" ? "TV" : channel === "social" ? "SOCIAL" : "EXPO";
+  const known =
+    channel === "tv" ? "TV" : channel === "social" ? "SOCIAL" : channel === "expo" ? "EXPO" : "";
+  const fromName = channel.replace(/[^A-Za-z0-9]/g, "").slice(0, 8).toUpperCase();
+  const prefix = known || fromName || "PROMO";
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `${prefix}${suffix}`;
 }
 
 export function AdminSpecialFeaturePromoPanel() {
   const [promos, setPromos] = useState<SpecialFeaturePromoView[]>([]);
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]["id"]>("expo");
+  const [channel, setChannel] = useState("expo");
+  const [customChannel, setCustomChannel] = useState("");
   const [label, setLabel] = useState("");
   const [code, setCode] = useState(() => suggestCode("expo"));
   const [percentOff, setPercentOff] = useState("10");
@@ -88,6 +106,20 @@ export function AdminSpecialFeaturePromoPanel() {
     };
   }, []);
 
+  const savedChannels = useMemo(() => {
+    const known = new Set<string>(CHANNELS.map((item) => item.id));
+    const extra: string[] = [];
+    for (const promo of promos) {
+      if (!known.has(promo.channel) && !extra.includes(promo.channel)) extra.push(promo.channel);
+    }
+    return extra;
+  }, [promos]);
+
+  function resolvedChannel(): string {
+    if (channel !== CUSTOM_CHANNEL) return channel;
+    return customChannel.trim().replace(/\s+/g, " ");
+  }
+
   function togglePlan(id: string, checked: boolean) {
     setPlanIds((current) =>
       checked ? [...new Set([...current, id])] : current.filter((planId) => planId !== id),
@@ -96,10 +128,15 @@ export function AdminSpecialFeaturePromoPanel() {
 
   function createPromo() {
     setError(null);
+    const channelName = resolvedChannel();
+    if (!channelName) {
+      setError("Enter a channel name.");
+      return;
+    }
     startTransition(async () => {
       try {
         const created = await createSpecialFeaturePromoAction({
-          channel,
+          channel: channelName,
           label,
           code,
           percentOff: Number(percentOff),
@@ -109,7 +146,9 @@ export function AdminSpecialFeaturePromoPanel() {
         });
         setPromos((current) => [created, ...current]);
         setLabel("");
-        setCode(suggestCode(channel));
+        setCustomChannel("");
+        setChannel(created.channel);
+        setCode(suggestCode(created.channel));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not create the promo.");
       }
@@ -119,8 +158,8 @@ export function AdminSpecialFeaturePromoPanel() {
   return (
     <div className="space-y-5">
       <p className="text-sm leading-relaxed text-muted-foreground">
-        Create an expo, TV, or social media code. Flipvise creates the matching Stripe coupon so
-        checkout applies the percent to the plans you select.
+        Create an expo, TV, social media, or other channel code. Flipvise creates the matching
+        Stripe coupon so checkout applies the percent to the plans you select.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -128,9 +167,9 @@ export function AdminSpecialFeaturePromoPanel() {
           <Select
             value={channel}
             onValueChange={(value) => {
-              const next = (value ?? "expo") as (typeof CHANNELS)[number]["id"];
+              const next = value || "expo";
               setChannel(next);
-              setCode(suggestCode(next));
+              if (next !== CUSTOM_CHANNEL) setCode(suggestCode(next));
             }}
           >
             <SelectTrigger className="w-full">
@@ -142,8 +181,26 @@ export function AdminSpecialFeaturePromoPanel() {
                   {item.label}
                 </SelectItem>
               ))}
+              {savedChannels.map((name) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+              <SelectItem value={CUSTOM_CHANNEL}>Add a channel</SelectItem>
             </SelectContent>
           </Select>
+          {channel === CUSTOM_CHANNEL ? (
+            <Input
+              value={customChannel}
+              placeholder="e.g. Radio promo"
+              maxLength={40}
+              onChange={(event) => setCustomChannel(event.target.value)}
+              onBlur={(event) => {
+                const trimmed = event.target.value.trim();
+                if (trimmed) setCode(suggestCode(trimmed));
+              }}
+            />
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label>Percent off</Label>
@@ -328,9 +385,7 @@ export function AdminSpecialFeaturePromoRecords() {
             ) : (
               filtered.map((promo) => {
                 const isExpanded = expandedId === promo.id;
-                const planNames = promo.planIds
-                  .map((id) => labelForAdminPlanAssignment(id as AdminPlanAssignment))
-                  .join(", ");
+                const planNames = planNamesFor(promo.planIds).join(", ");
                 return (
                   <Fragment key={promo.id}>
                     <TableRow
@@ -356,8 +411,11 @@ export function AdminSpecialFeaturePromoRecords() {
                         </code>
                       </TableCell>
                       <TableCell className="tabular-nums">{promo.percentOff}%</TableCell>
-                      <TableCell className="max-w-[16rem] text-xs text-muted-foreground">
-                        {planNames}
+                      <TableCell
+                        className="max-w-[6.5rem] text-xs text-muted-foreground"
+                        title={planNames}
+                      >
+                        {shortPlanLabel(promo.planIds)}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
                         {promo.startsAt || promo.endsAt
@@ -373,6 +431,7 @@ export function AdminSpecialFeaturePromoRecords() {
                     {isExpanded ? (
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
                         <TableCell colSpan={7} className="px-4 py-3">
+                          <p className="mb-2 text-xs text-muted-foreground">{planNames}</p>
                           <PromoShareKit
                             code={promo.code}
                             caption="Open the link or scan the QR code. Pricing fills this code and highlights the plans it can be used with."

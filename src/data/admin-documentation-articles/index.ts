@@ -764,7 +764,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "special-promos",
         title: "Special feature promos",
         bullets: [
-          "Special feature promos tab on Marketing Affiliates lists expo, TV, and social media codes created from Invite Affiliate → Special feature promo.",
+          "Special feature promos tab on Marketing Affiliates lists expo, TV, social media, and manually added channel codes created from Invite Affiliate → Special feature promo.",
           "Double-click a row to open the code, pricing link, and QR code.",
           "Share sends the QR image and link through the device share sheet when available, or opens Messages, WhatsApp, X, Facebook, LinkedIn, or email.",
         ],
