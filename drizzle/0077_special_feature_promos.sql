@@ -3,14 +3,34 @@ CREATE TABLE IF NOT EXISTS "special_feature_promos" (
   "channel" varchar(16) NOT NULL,
   "code" varchar(64) NOT NULL,
   "label" varchar(120) NOT NULL,
-  "percent_off" integer NOT NULL,
-  "plan_ids" json NOT NULL,
-  "stripe_coupon_id" varchar(80) NOT NULL,
-  "stripe_promotion_code_id" varchar(80),
+  "percentOff" integer NOT NULL,
+  "planIds" json NOT NULL,
+  "stripeCouponId" varchar(80) NOT NULL,
+  "stripePromotionCodeId" varchar(80),
   "active" boolean DEFAULT true NOT NULL,
-  "starts_at" timestamp,
-  "ends_at" timestamp,
-  "created_by_user_id" varchar(255) NOT NULL,
-  "created_at" timestamp DEFAULT now() NOT NULL,
+  "startsAt" timestamp,
+  "endsAt" timestamp,
+  "createdByUserId" varchar(255) NOT NULL,
+  "createdAt" timestamp DEFAULT now() NOT NULL,
   CONSTRAINT "special_feature_promos_code_unique" UNIQUE("code")
 );
+
+-- Earlier drafts of this table used snake_case. App queries expect camelCase.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'special_feature_promos'
+      AND column_name = 'percent_off'
+  ) THEN
+    ALTER TABLE special_feature_promos RENAME COLUMN percent_off TO "percentOff";
+    ALTER TABLE special_feature_promos RENAME COLUMN plan_ids TO "planIds";
+    ALTER TABLE special_feature_promos RENAME COLUMN stripe_coupon_id TO "stripeCouponId";
+    ALTER TABLE special_feature_promos RENAME COLUMN stripe_promotion_code_id TO "stripePromotionCodeId";
+    ALTER TABLE special_feature_promos RENAME COLUMN starts_at TO "startsAt";
+    ALTER TABLE special_feature_promos RENAME COLUMN ends_at TO "endsAt";
+    ALTER TABLE special_feature_promos RENAME COLUMN created_by_user_id TO "createdByUserId";
+    ALTER TABLE special_feature_promos RENAME COLUMN created_at TO "createdAt";
+  END IF;
+END $$;
