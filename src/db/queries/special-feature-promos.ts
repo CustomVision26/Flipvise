@@ -56,6 +56,47 @@ export async function insertSpecialFeaturePromo(values: {
   return row;
 }
 
+export async function getSpecialFeaturePromoById(
+  id: number,
+): Promise<SpecialFeaturePromoRow | null> {
+  const rows = await db
+    .select()
+    .from(specialFeaturePromos)
+    .where(eq(specialFeaturePromos.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateSpecialFeaturePromo(
+  id: number,
+  values: {
+    channel: string;
+    label: string;
+    percentOff: number;
+    planIds: string[];
+    stripeCouponId: string;
+    startsAt: Date | null;
+    endsAt: Date | null;
+  },
+): Promise<SpecialFeaturePromoRow> {
+  const rows = await db
+    .update(specialFeaturePromos)
+    .set({
+      channel: values.channel,
+      label: values.label.trim(),
+      percentOff: values.percentOff,
+      planIds: values.planIds,
+      stripeCouponId: values.stripeCouponId,
+      startsAt: values.startsAt,
+      endsAt: values.endsAt,
+    })
+    .where(eq(specialFeaturePromos.id, id))
+    .returning();
+  const row = rows[0];
+  if (!row) throw new Error("Could not update the special feature promo.");
+  return row;
+}
+
 export async function setSpecialFeaturePromoActive(
   id: number,
   active: boolean,

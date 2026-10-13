@@ -765,7 +765,8 @@ const ALL_ARTICLES: DocArticle[] = [
         title: "Special feature promos",
         bullets: [
           "Special feature promos tab on Marketing Affiliates lists expo, TV, social media, and manually added channel codes created from Invite Affiliate → Special feature promo.",
-          "Double-click a row to open the code, pricing link, and QR code.",
+          "Double-click a row to open the code, pricing link, and QR code. Edit on that row updates the channel, label, percent, plans, and dates. The promo code stays the same.",
+          "The Status column switch turns a special feature promo on or off.",
           "Share sends the QR image and link through the device share sheet when available, or opens Messages, WhatsApp, X, Facebook, LinkedIn, or email.",
         ],
       },
