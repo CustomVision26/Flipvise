@@ -295,7 +295,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Page header summarizes registered, active, and Pricing-listed add-ons.",
           "Master toggle shows or hides the public Add-on Catalog page.",
           "Per-add-on Active, Published (header banner), and On pricing switches control purchase, banner chips, and catalog listing.",
-          "Complimentary assignment searches registered users by name or email, shows a selection summary, then assign or revoke.",
+          "Complimentary assignment lists every registered user from All Users, searches by name or email, shows a selection summary, then assign or revoke. The list is not limited to plans eligible for the selected add-on.",
           "AI Essay usage section shows entitlement, activity, and token metric cards plus an event breakdown list.",
           "Team Admins assign the same catalog keys from /dashboard/team-admin/add-ons without a separate admin product. Self-serve checkout stores the Stripe session in an httpOnly cookie instead of the URL.",
         ],

@@ -557,7 +557,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Header summary shows registered, active, and Pricing-listed counts.",
           "Master toggle shows or hides /pricing/add-ons for everyone.",
           "Per-add-on Active controls purchase/team assign; Published shows or hides the add-on in the top header banner; On pricing lists it on /pricing/add-ons.",
-          "Complimentary assignment searches by name or email, shows a selection summary, then assign or revoke.",
+          "Complimentary assignment lists every registered user from All Users and searches by name or email. The list is not limited to plans eligible for the selected add-on. A selection summary appears before assign or revoke.",
           "AI Essay usage section uses metric cards plus an event breakdown list.",
         ],
       },

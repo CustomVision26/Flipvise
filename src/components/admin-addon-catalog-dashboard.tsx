@@ -60,7 +60,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { isPlanEligibleForAddon } from "@/lib/addon-plan-eligibility";
 import { cn } from "@/lib/utils";
 import { displayNameForBillingPlanSlug } from "@/lib/plan-slug-display";
 import {
@@ -162,36 +161,23 @@ export function AdminAddonCatalogDashboard({
     [items, assignAddonKey],
   );
 
-  const planEligibleUsers = React.useMemo(() => {
-    if (!selectedAddon) return users;
-    return users.filter((user) =>
-      isPlanEligibleForAddon(selectedAddon.eligiblePlanIds, user.planSlug),
-    );
-  }, [users, selectedAddon]);
-
   const selectedUser = React.useMemo(
-    () =>
-      planEligibleUsers.find((user) => user.userId === assignUserId) ?? null,
-    [planEligibleUsers, assignUserId],
+    () => users.find((user) => user.userId === assignUserId) ?? null,
+    [users, assignUserId],
   );
-
-  React.useEffect(() => {
-    if (!assignUserId) return;
-    const stillEligible = planEligibleUsers.some(
-      (user) => user.userId === assignUserId,
-    );
-    if (!stillEligible) setAssignUserId("");
-  }, [assignUserId, planEligibleUsers]);
 
   const filteredUsers = React.useMemo(() => {
     const query = userSearch.trim().toLowerCase();
-    if (!query) return planEligibleUsers;
-    return planEligibleUsers.filter((user) => {
+    const sorted = [...users].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
+    if (!query) return sorted;
+    return sorted.filter((user) => {
       const haystack =
         `${user.name} ${user.email ?? ""} ${user.planLabel}`.toLowerCase();
       return haystack.includes(query);
     });
-  }, [planEligibleUsers, userSearch]);
+  }, [users, userSearch]);
 
   const assignDisabled =
     Boolean(pending) || !assignUserId.trim() || !assignAddonKey.trim();
@@ -657,11 +643,9 @@ export function AdminAddonCatalogDashboard({
               Complimentary assignment
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Grant or revoke an add-on for a registered user without Stripe
-              billing. The user list filters to plans eligible for the selected
-              add-on (for example, Live Classroom™ shows Team / Education tiers
-              only). Team Admins can also assign member add-ons from Team Admin →
-              Add-ons.
+              Grant or revoke an add-on for any registered user without Stripe
+              billing. The user list matches All Users. Team Admins can also
+              assign member add-ons from Team Admin → Add-ons.
             </p>
           </div>
 
@@ -675,7 +659,7 @@ export function AdminAddonCatalogDashboard({
                   Assign or revoke access
                 </CardTitle>
                 <CardDescription className="leading-relaxed">
-                  Choose an add-on first, then search eligible users by name or
+                  Choose an add-on, then search any registered user by name or
                   email and confirm the action below.
                 </CardDescription>
               </div>
@@ -718,9 +702,7 @@ export function AdminAddonCatalogDashboard({
                               ? selectedUser.email
                                 ? `${selectedUser.name} · ${selectedUser.email}`
                                 : selectedUser.name
-                              : selectedAddon
-                                ? "Search eligible users…"
-                                : "Search registered users…"}
+                              : "Search registered users…"}
                           </span>
                           <ChevronsUpDown
                             className="size-4 shrink-0 text-muted-foreground"
@@ -754,8 +736,8 @@ export function AdminAddonCatalogDashboard({
                       >
                         {filteredUsers.length === 0 ? (
                           <p className="px-2 py-3 text-sm text-muted-foreground">
-                            {planEligibleUsers.length === 0
-                              ? "No users on an eligible plan for this add-on."
+                            {users.length === 0
+                              ? "No registered users yet."
                               : "No users match that search."}
                           </p>
                         ) : (

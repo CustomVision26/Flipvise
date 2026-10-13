@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-12T23:59:37.361Z",
+  "updatedAt": "2026-10-13T00:47:44.882Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "a5cebdf51784c53f47e75af656adb43338e234d38e7b0cd07a22e530220052e7",
@@ -279,8 +279,8 @@
       "docFingerprint": "73a209e35eaf1fbbf8e15bf0a3c6ce039d73748af634e7eef39da2b91dd4576e"
     },
     "admin-add-ons": {
-      "watchFingerprint": "7b3ce0e9e1931d86cfb7ea0c0afb40f0c3376f513c33178f873e023701bfb4c9",
-      "docFingerprint": "05e45db08fb09f24a16a2beec87c088e95d0ec9a202e52a93c12deec85201628"
+      "watchFingerprint": "00ec16f02a5bc50d8fb48fce317611591de5c398d6c4b7a5318734b2dd666513",
+      "docFingerprint": "fa74e664fed61a885486e49c076ec7029f8806c72e7d4c21574299f13e3344be"
     },
     "plan-history": {
       "watchFingerprint": "2853840c9e2bb609f4f52292a00cbdfd1787b1efee3a9586fd516de5ced82cc0",
