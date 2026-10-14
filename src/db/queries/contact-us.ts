@@ -13,8 +13,10 @@ import {
   isContactUsSchemaUnavailableError,
   isMissingContactUsReplyImageUrlColumnError,
   isMissingPlatformCompanyAddressColumnError,
+  isMissingPlatformWhatsappColumnError,
   warnMissingContactUsReplyImageUrlColumnOnce,
   warnMissingPlatformCompanyAddressColumnOnce,
+  warnMissingPlatformWhatsappColumnOnce,
   withContactUsReadFallback,
 } from "@/lib/contact-us-db-fallback";
 import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
@@ -87,6 +89,7 @@ export async function getPlatformContactSettings() {
           id: SETTINGS_ID,
           email: SUPPORT_EMAIL,
           phone: null,
+          whatsapp: null,
           socialLinks: [],
           companyAddress: DEFAULT_PLATFORM_COMPANY_ADDRESS,
         })
@@ -102,6 +105,25 @@ export async function getPlatformContactSettings() {
         ? persistClearedLegacyCompanyApartment(seeded[0])
         : defaultPlatformContactSettingsRow();
     } catch (error) {
+      if (isMissingPlatformWhatsappColumnError(error)) {
+        warnMissingPlatformWhatsappColumnOnce();
+        const rows = await db
+          .select({
+            id: platformContactSettings.id,
+            email: platformContactSettings.email,
+            phone: platformContactSettings.phone,
+            socialLinks: platformContactSettings.socialLinks,
+            companyAddress: platformContactSettings.companyAddress,
+            updatedAt: platformContactSettings.updatedAt,
+            updatedByUserId: platformContactSettings.updatedByUserId,
+          })
+          .from(platformContactSettings)
+          .where(eq(platformContactSettings.id, SETTINGS_ID))
+          .limit(1);
+        const row = rows[0];
+        if (!row) return defaultPlatformContactSettingsRow();
+        return persistClearedLegacyCompanyApartment({ ...row, whatsapp: null });
+      }
       if (!isMissingPlatformCompanyAddressColumnError(error)) throw error;
       warnMissingPlatformCompanyAddressColumnOnce();
       const rows = await db
@@ -120,6 +142,7 @@ export async function getPlatformContactSettings() {
       if (!row) return defaultPlatformContactSettingsRow();
       return {
         ...row,
+        whatsapp: null,
         companyAddress: { ...DEFAULT_PLATFORM_COMPANY_ADDRESS },
       };
     }
@@ -129,6 +152,7 @@ export async function getPlatformContactSettings() {
 export async function upsertPlatformContactSettings(input: {
   email: string;
   phone: string | null;
+  whatsapp: string | null;
   socialLinks: ContactSocialLink[];
   companyAddress: PlatformCompanyAddress;
   updatedByUserId: string;
@@ -141,6 +165,7 @@ export async function upsertPlatformContactSettings(input: {
       id: SETTINGS_ID,
       email: input.email,
       phone: input.phone,
+      whatsapp: input.whatsapp,
       socialLinks: input.socialLinks,
       companyAddress,
       updatedByUserId: input.updatedByUserId,
@@ -151,6 +176,7 @@ export async function upsertPlatformContactSettings(input: {
       set: {
         email: input.email,
         phone: input.phone,
+        whatsapp: input.whatsapp,
         socialLinks: input.socialLinks,
         companyAddress,
         updatedByUserId: input.updatedByUserId,

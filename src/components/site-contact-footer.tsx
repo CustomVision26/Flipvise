@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, Mail, MapPin, Phone } from "lucide-react";
+import { ExternalLink, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { LegalLinks } from "@/components/legal-links";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import {
   formatPlatformCompanyAddressLines,
   type PlatformCompanyAddress,
 } from "@/lib/platform-company-address";
-import { supportMailtoHref } from "@/lib/support-contact";
+import { supportMailtoHref, whatsappChatHref } from "@/lib/support-contact";
 import { cn } from "@/lib/utils";
 
 function ContactMark({
@@ -34,11 +34,13 @@ function ContactMark({
 function FooterContactDetails({
   email,
   phone,
+  whatsapp,
   companyAddress,
   socialLinks,
 }: {
   email: string;
   phone: string | null;
+  whatsapp: string | null;
   companyAddress: PlatformCompanyAddress;
   socialLinks: ContactSocialLink[];
 }) {
@@ -47,6 +49,7 @@ function FooterContactDetails({
   const addressLine = addressLines.slice(1).join(", ");
   const year = new Date().getFullYear();
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null;
+  const whatsappHref = whatsappChatHref(whatsapp);
   const mapHref = `https://maps.google.com/?q=${encodeURIComponent(addressLines.join(", "))}`;
 
   return (
@@ -104,6 +107,17 @@ function FooterContactDetails({
                     {phone}
                   </a>
                 ) : null}
+                {whatsapp && whatsappHref ? (
+                  <a
+                    href={whatsappHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1.5 text-xs text-foreground hover:underline"
+                  >
+                    <MessageCircle className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                    {whatsapp}
+                  </a>
+                ) : null}
                 {socialLinks.map((link) => (
                   <a
                     key={`${link.platform}-${link.url}`}
@@ -143,6 +157,7 @@ export async function SiteContactFooter() {
       <FooterContactDetails
         email={settings.email}
         phone={settings.phone ?? null}
+        whatsapp={settings.whatsapp ?? null}
         companyAddress={settings.companyAddress}
         socialLinks={Array.isArray(settings.socialLinks) ? settings.socialLinks : []}
       />

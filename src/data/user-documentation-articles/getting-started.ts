@@ -49,7 +49,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           "Plans — compare tiers and start checkout after sign-in (header link to Plans & Pricing).",
           "Documentation — opens this user guide.",
           "Contact Us — public live chat for guests (also linked from the nav on guest pages).",
-          "The page footer shows the Flipvise Studio support email, phone, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
+          "The page footer shows the Flipvise Studio support email, phone, WhatsApp number, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
         ],
       },
       {

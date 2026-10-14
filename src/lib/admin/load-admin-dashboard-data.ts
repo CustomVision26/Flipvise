@@ -198,6 +198,7 @@ export type AdminTabsData = {
 const EMPTY_CONTACT_SETTINGS: SerializedContactSettings = {
   email: "customvision26@gmail.com",
   phone: null,
+  whatsapp: null,
   socialLinks: [],
   companyAddress: { ...DEFAULT_PLATFORM_COMPANY_ADDRESS },
   updatedAt: null,

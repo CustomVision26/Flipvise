@@ -74,6 +74,7 @@ export function defaultPlatformContactSettingsRow(): PlatformContactSettingsRow 
     id: 1,
     email: SUPPORT_EMAIL,
     phone: null,
+    whatsapp: null,
     socialLinks: [] as ContactSocialLink[],
     companyAddress: { ...DEFAULT_PLATFORM_COMPANY_ADDRESS },
     updatedAt: new Date(),
@@ -100,6 +101,37 @@ export function isMissingPlatformCompanyAddressColumnError(error: unknown): bool
     /platform_contact_settings/i.test(flat) &&
     /companyAddress/i.test(flat) &&
     (/Failed query/i.test(flat) || /does not exist/i.test(flat) || /42703/i.test(flat))
+  );
+}
+
+export function isMissingPlatformWhatsappColumnError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current && typeof current === "object"; depth++) {
+    const obj = current as Record<string, unknown>;
+    const message = typeof obj.message === "string" ? obj.message : "";
+    if (
+      /platform_contact_settings/i.test(message) &&
+      /whatsapp/i.test(message) &&
+      /(does not exist|Failed query|42703)/i.test(message)
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  const flat = String(error);
+  return (
+    /platform_contact_settings/i.test(flat) &&
+    /whatsapp/i.test(flat) &&
+    (/Failed query/i.test(flat) || /does not exist/i.test(flat) || /42703/i.test(flat))
+  );
+}
+
+let warnedMissingWhatsappColumn = false;
+export function warnMissingPlatformWhatsappColumnOnce() {
+  if (warnedMissingWhatsappColumn) return;
+  warnedMissingWhatsappColumn = true;
+  console.warn(
+    "[db] `platform_contact_settings` is missing `whatsapp` — run drizzle/0078_contact_whatsapp.sql",
   );
 }
 

@@ -593,6 +593,8 @@ export const platformContactSettings = pgTable('platform_contact_settings', {
   id: integer().primaryKey().default(1),
   email: varchar({ length: 255 }).notNull(),
   phone: varchar({ length: 64 }),
+  /** Public WhatsApp number. Opens a chat from Contact Us and the page footer. */
+  whatsapp: varchar({ length: 64 }),
   socialLinks: json().$type<
     { platform: string; label: string; url: string }[]
   >().notNull().default([]),

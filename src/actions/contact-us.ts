@@ -108,6 +108,7 @@ const submitContactMessageSchema = z.object({
 const updateContactSettingsSchema = z.object({
   email: z.string().trim().email().max(255),
   phone: z.string().trim().max(64).nullable(),
+  whatsapp: z.string().trim().max(64).nullable().optional(),
   socialLinks: z.array(socialLinkSchema).max(12),
   companyAddress: platformCompanyAddressSchema,
 });
@@ -402,6 +403,7 @@ export async function updatePlatformContactSettingsAction(
     await upsertPlatformContactSettings({
       email: parsed.data.email,
       phone: parsed.data.phone?.trim() ? parsed.data.phone.trim() : null,
+      whatsapp: parsed.data.whatsapp?.trim() ? parsed.data.whatsapp.trim() : null,
       socialLinks: parsed.data.socialLinks as ContactSocialLink[],
       companyAddress: parsed.data.companyAddress,
       updatedByUserId: userId,

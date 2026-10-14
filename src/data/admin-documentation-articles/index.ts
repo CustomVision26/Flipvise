@@ -49,6 +49,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Overview → Dashboard opens All Users; other groups cover Billing, AI & analytics, Access & support, Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
           "Support notifications bell in the page header surfaces unread Help Center tickets and Contact Us thread alerts.",
+          "The admin shell loads public contact settings, including the WhatsApp number shown on Contact Us and in the page footer.",
           "Section routes map to dedicated URLs (e.g. /admin/all-users, /admin/plans) for deep linking.",
         ],
       },
@@ -528,7 +529,7 @@ const ALL_ARTICLES: DocArticle[] = [
         id: "settings",
         title: "Platform contact settings",
         bullets: [
-          "Edit support email, phone, company address (state / province / parish), and social links displayed on the public /contact page.",
+          "Edit support email, phone, WhatsApp number, company address (state / province / parish), and social links displayed on the public /contact page and in the page footer.",
           "Saving contact details stores the company address for /contact and as the seller block on Flipvise receipts. New Stripe invoices also get this address in the footer and Company/Address fields. Incomplete social links are skipped; invalid fields show an on-page error instead of crashing the screen.",
           "Stripe-hosted invoice PDF headers still come from Stripe Dashboard → Settings → Public details and Business details (test and live). Stripe does not allow apps to change the platform account seller header.",
           "The Stripe webhook must include invoice.created so new invoices receive the footer stamp.",

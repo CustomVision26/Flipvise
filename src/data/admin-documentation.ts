@@ -19,6 +19,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, AI & analytics, Access & support, Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
           "Support notifications bell in the header surfaces unread ticket and contact alerts.",
+          "The admin shell loads public contact settings, including the WhatsApp number shown on Contact Us and in the page footer.",
         ],
         requirements: [
           "Clerk publicMetadata role admin or superadmin, or PLATFORM_SUPERADMIN_USER_IDS allow-list.",
@@ -225,7 +226,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Reply to guest and signed-in Contact Us messages.",
           "Archive or mark threads read; stats show open and weekly volume.",
-          "Edit support email, phone, company address (state / province / parish), and social links shown on /contact.",
+          "Edit support email, phone, WhatsApp number, company address (state / province / parish), and social links shown on /contact and in the page footer.",
           "Company address is the seller block on Flipvise receipts. New Stripe invoices also get this address in the footer. Stripe-hosted PDF headers still use Stripe Dashboard Public details and Business details.",
         ],
         requirements: ["Platform admin access."],

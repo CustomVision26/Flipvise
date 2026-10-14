@@ -29,6 +29,7 @@ export default async function ContactPage() {
       <ContactSupportView
         email={settings.email}
         phone={settings.phone ?? null}
+        whatsapp={settings.whatsapp ?? null}
         socialLinks={settings.socialLinks ?? []}
         companyAddress={settings.companyAddress ?? null}
         defaultName={defaultName}

@@ -9,6 +9,7 @@ import {
 export type SerializedContactSettings = {
   email: string;
   phone: string | null;
+  whatsapp: string | null;
   socialLinks: ContactSocialLink[];
   companyAddress: PlatformCompanyAddress;
   updatedAt: string | null;
@@ -41,6 +42,7 @@ export function serializeContactSettings(
   return {
     email: row.email,
     phone: row.phone ?? null,
+    whatsapp: row.whatsapp ?? null,
     socialLinks: (row.socialLinks ?? []) as ContactSocialLink[],
     companyAddress: parsePlatformCompanyAddress(row.companyAddress),
     updatedAt: row.updatedAt?.toISOString() ?? null,

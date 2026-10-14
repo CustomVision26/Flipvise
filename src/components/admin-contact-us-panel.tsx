@@ -145,6 +145,7 @@ export function AdminContactUsPanel({
 
   const [email, setEmail] = useState(settings.email);
   const [phone, setPhone] = useState(settings.phone ?? "");
+  const [whatsapp, setWhatsapp] = useState(settings.whatsapp ?? "");
   const [companyAddress, setCompanyAddress] = useState<PlatformCompanyAddress>(
     settings.companyAddress ?? DEFAULT_PLATFORM_COMPANY_ADDRESS,
   );
@@ -239,6 +240,7 @@ export function AdminContactUsPanel({
         const result = await updatePlatformContactSettingsAction({
           email: email.trim(),
           phone: phone.trim() || null,
+          whatsapp: whatsapp.trim() || null,
           companyAddress: parsePlatformCompanyAddress(companyAddress),
           socialLinks: socialLinks.filter(
             (link) => link.label.trim() && link.url.trim() && link.platform.trim(),
@@ -335,8 +337,9 @@ export function AdminContactUsPanel({
         <CardHeader className="gap-1 border-b border-border/40 pb-4">
           <CardTitle className="text-base">Public contact details</CardTitle>
           <CardDescription>
-            Email, phone, company address, and social links shown on the user Contact Us
-            page. Flipvise receipts use this company address as the seller block.
+            Email, phone, WhatsApp number, company address, and social links shown on
+            the user Contact Us page and in the page footer. Flipvise receipts use this
+            company address as the seller block.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pt-5">
@@ -361,6 +364,20 @@ export function AdminContactUsPanel({
                 placeholder="+1 (555) 000-0000"
                 className={adminFilterInputClass}
               />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="contact-whatsapp">WhatsApp number</Label>
+              <Input
+                id="contact-whatsapp"
+                type="tel"
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="+1 (555) 000-0000"
+                className={adminFilterInputClass}
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown on Contact Us and the page footer. The number opens a WhatsApp chat.
+              </p>
             </div>
           </div>
 

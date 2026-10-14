@@ -5,12 +5,13 @@ import {
   HelpCircle,
   Mail,
   MapPin,
+  MessageCircle,
   MessageSquare,
   Phone,
 } from "lucide-react";
 import { ContactSupportForm } from "@/components/contact-support-form";
 import { PublicPageIntro } from "@/components/public-page-intro";
-import { supportMailtoHref } from "@/lib/support-contact";
+import { supportMailtoHref, whatsappChatHref } from "@/lib/support-contact";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
@@ -58,6 +59,7 @@ function SupportBullet({ children }: { children: React.ReactNode }) {
 type ContactSupportViewProps = {
   email: string;
   phone: string | null;
+  whatsapp: string | null;
   socialLinks: ContactSocialLink[];
   companyAddress: PlatformCompanyAddress | null;
   defaultName?: string;
@@ -67,6 +69,7 @@ type ContactSupportViewProps = {
 export function ContactSupportView({
   email,
   phone,
+  whatsapp,
   socialLinks,
   companyAddress,
   defaultName,
@@ -154,6 +157,23 @@ export function ContactSupportView({
                   <p className="text-xs font-medium text-muted-foreground">Phone</p>
                   <a href={`tel:${phone.replace(/\s/g, "")}`} className="text-sm font-medium hover:underline">
                     {phone}
+                  </a>
+                </div>
+              </div>
+            ) : null}
+
+            {whatsapp && whatsappChatHref(whatsapp) ? (
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-4">
+                <MessageCircle className="size-4 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">WhatsApp</p>
+                  <a
+                    href={whatsappChatHref(whatsapp) ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium hover:underline"
+                  >
+                    {whatsapp}
                   </a>
                 </div>
               </div>
