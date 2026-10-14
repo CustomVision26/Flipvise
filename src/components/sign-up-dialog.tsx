@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth, useSignUp } from "@clerk/nextjs";
 import { ChevronRight, Eye, EyeOff, Loader2, Pencil, ShieldAlert } from "lucide-react";
 import { ensureWelcomeInboxMessageAction } from "@/actions/welcome-inbox";
@@ -438,6 +439,17 @@ export function SignUpDialog({
                 "Continue"
               )}
             </Button>
+            <p className="text-center text-xs leading-relaxed text-muted-foreground">
+              Creating an account means you agree to the{" "}
+              <Link href="/terms" className="text-primary underline-offset-4 hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-primary underline-offset-4 hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </form>
         ) : (
           <form

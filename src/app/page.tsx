@@ -8,6 +8,7 @@ import { BookOpen } from "lucide-react";
 import { HomeAuthActions } from "@/components/home-auth-actions";
 import { HomeBackground } from "@/components/home-background";
 import { AppTopNav } from "@/components/app-top-nav";
+import { LegalLinks } from "@/components/legal-links";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { LOGO_PUBLIC_URL } from "@/lib/branding";
 import {
@@ -155,6 +156,7 @@ export default async function Home({ searchParams }: HomePageProps) {
               </Card>
             ))}
           </div>
+          <LegalLinks className="text-white/70" />
         </div>
         </div>
       </div>

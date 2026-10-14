@@ -37,7 +37,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
         id: "sign-up",
         title: "Signing up",
         bullets: [
-          "Sign Up opens the Flipvise account form: name, email, password, and password confirmation.",
+          "Sign Up opens the Flipvise account form: name, email, password, and password confirmation. The form states that creating an account agrees to the Terms of Service and Privacy Policy.",
           "After email verification, complete contact details, account type, and security questions. The dashboard unlocks when those steps are saved.",
           "Open sign-up guide to walk through every screenshot in order, like a Flipvise UI guide. You may navigate anywhere in Flipvise while it remains open. UI Guides in the header also includes Create a deck, deck editor card walkthroughs, AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner.",
         ],
@@ -49,6 +49,7 @@ export const GETTING_STARTED_ARTICLES: DocArticle[] = [
           "Plans — compare tiers and start checkout after sign-in (header link to Plans & Pricing).",
           "Documentation — opens this user guide.",
           "Contact Us — public live chat for guests (also linked from the nav on guest pages).",
+          "The homepage footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
         ],
       },
       {

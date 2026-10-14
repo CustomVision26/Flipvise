@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalLinks } from "@/components/legal-links";
 import { PublicMarketingPageChrome } from "@/components/public-marketing-page-chrome";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { resolvePublicPageHomeContext } from "@/lib/public-page-home-context";
@@ -59,6 +60,18 @@ export default async function PrivacyPage() {
             </p>
           </section>
           <section className="space-y-2">
+            <h2 className="font-heading text-base font-semibold">AI features</h2>
+            <p>
+              When you generate study material, the topic or source text you submit is sent to
+              OpenAI to produce the result. The result is saved in your account. Usage records
+              store the feature, model, and token counts, not the prompt. Details are on the{" "}
+              <Link href="/ai" className="text-primary underline-offset-4 hover:underline">
+                AI data handling
+              </Link>{" "}
+              page.
+            </p>
+          </section>
+          <section className="space-y-2">
             <h2 className="font-heading text-base font-semibold">Support messages</h2>
             <p>
               Messages you send from Contact Us or the Help Center, including images you attach,
@@ -84,6 +97,7 @@ export default async function PrivacyPage() {
               .
             </p>
           </section>
+          <LegalLinks className="justify-start border-t border-border/60 pt-4" />
         </CardContent>
       </Card>
     </PublicMarketingPageChrome>

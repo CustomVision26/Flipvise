@@ -37,6 +37,7 @@ import {
   ESSAY_CATALOG_SUBJECTS,
   ESSAY_SUBJECT_GROUPS,
 } from "@/lib/essay-subjects";
+import { AiDataNotice } from "@/components/legal-links";
 import { TeacherFieldLabel } from "@/components/teacher-field-label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1012,6 +1013,7 @@ export function EssayGeneratorForm({
             <p className="text-xs text-muted-foreground">
               Creates a prompt, outline, vocabulary, and rubric for this setup.
             </p>
+            <AiDataNotice />
           </div>
         </form>
       </CardContent>

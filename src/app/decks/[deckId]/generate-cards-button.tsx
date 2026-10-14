@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
+import { AiDataNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -214,6 +215,7 @@ export function GenerateCardsButton({
             Generate cards in batches. AI matches your deck&apos;s style and avoids
             duplicates.
           </p>
+          <AiDataNotice className={mutedClass} />
         </div>
       </div>
 

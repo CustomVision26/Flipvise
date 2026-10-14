@@ -29,6 +29,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Active public codes appear as quick-fill chips during sales.",
           "Signed-in users see Current plan badge and Manage subscription when applicable.",
           "When published, an Add-on Catalog link leads to optional features such as AI Essay.",
+          "The page footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
         ],
       },
       {
@@ -83,7 +84,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Open it from the add-ons banner on your dashboard (or from Teacher Dashboard tools when the add-on is unlocked).",
           "How it work? in the header opens a short workflow dialog with a link to this Add-on Catalog guide.",
           "Overview shows recent essays and recent AI feedback with counts and date/time stamps, plus continue draft, generate, and assignments.",
-          "Generate Essay: subject, grade, type, difficulty, topic, optional learning standard, word count, timer, and include flags.",
+          "Generate Essay: subject, grade, type, difficulty, topic, optional learning standard, word count, timer, and include flags. The form notes that the topic is sent to OpenAI and links to AI data handling.",
           "My Essays, Drafts, and Assignments keep generated activities, open drafts, and Team Admin assignments.",
           "Writing workspace: prompt, instructions, word counter, optional timer, save, submit, and AI feedback. The model essay stays hidden until you reveal it.",
         ],

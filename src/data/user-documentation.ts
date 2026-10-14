@@ -16,7 +16,8 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Landing page for guests. Sign in or create an account to reach your dashboard.",
         howItWorks: [
           "Use Sign In to open the Clerk authentication modal. Sign up from that modal uses the Flipvise account form (not Clerk’s hosted Sign Up).",
-          "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation).",
+          "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation). Creating an account agrees to the Terms of Service and Privacy Policy, linked under the button.",
+          "The homepage footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them before the dashboard becomes available.",
           "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck, deck editor card walkthroughs, and Education Teacher guides under Team Tier Plan (AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner).",
@@ -153,7 +154,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "View and edit deck metadata and individual flashcards.",
         howItWorks: [
           "Deck header shows card count vs plan cap, a Free plan, Paid plan, or Complimentary badge (hover Paid plan or Complimentary for your tier and cards-per-deck limit; Complimentary means grant access, not a Stripe subscription), and last updated date. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
-          "Generate cards with AI on eligible plans.",
+          "Generate cards with AI on eligible plans. The panel notes that the topic you submit is sent to OpenAI and links to AI data handling.",
           "AI reads your deck name, description, and existing cards to match topic, tone, and format — add a few representative cards first for the most consistent results.",
           "Empty decks have only the name and description to guide AI, so the first generated batch may be less predictable until you refine cards or add manual examples.",
           "Batch generate, From source import, and Generate answer all use the same deck context and avoid duplicating cards already in the deck.",
@@ -612,7 +613,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
-          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. The page footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",
@@ -652,7 +653,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "AI Essay unlocks generation, drafts, submissions, and AI feedback. Open it from the add-ons banner on your dashboard after purchase or grant.",
           "How it work? in the AI Essay header explains the Essay Generator workflow and links to this Add-on Catalog guide.",
           "Overview shows recent essays and recent AI feedback, continue draft, generate, and assigned essays.",
-          "Generate Essay creates a prompt, objectives, optional outline, vocabulary, rubric, and an optional hidden model essay.",
+          "Generate Essay creates a prompt, objectives, optional outline, vocabulary, rubric, and an optional hidden model essay. The form notes that the topic you submit is sent to OpenAI and links to AI data handling.",
           "The writing workspace includes word count, an optional timer, save draft (including offline cache), submit, and AI feedback.",
           "AI generation and AI feedback need internet; reading prompts and drafting can continue offline.",
           "Live Classroom™ is an organization add-on for Team and Enterprise plans — purchased by the subscription owner; participant limits follow licensed seats.",

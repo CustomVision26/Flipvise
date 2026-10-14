@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AiDataNotice } from "@/components/legal-links";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import { dismissOpenOverlays } from "@/lib/dismiss-open-overlays";
 import { cn } from "@/lib/utils";
@@ -134,26 +135,29 @@ export function TeacherToolPageShell({
   }
 
   const submitButton = (
-    <Button
-      type="submit"
-      size="lg"
-      className="gap-2"
-      disabled={isGenerating || submitDisabled}
-    >
-      {isGenerating ? (
-        <>
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          {submittingLabel}
-        </>
-      ) : (
-        <>
-          {generateWithAiIcon ? (
-            <Sparkles className="size-4 shrink-0" aria-hidden />
-          ) : null}
-          {generateLabel}
-        </>
-      )}
-    </Button>
+    <div className="flex flex-col items-start gap-2">
+      <Button
+        type="submit"
+        size="lg"
+        className="gap-2"
+        disabled={isGenerating || submitDisabled}
+      >
+        {isGenerating ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            {submittingLabel}
+          </>
+        ) : (
+          <>
+            {generateWithAiIcon ? (
+              <Sparkles className="size-4 shrink-0" aria-hidden />
+            ) : null}
+            {generateLabel}
+          </>
+        )}
+      </Button>
+      <AiDataNotice />
+    </div>
   );
 
   return (
