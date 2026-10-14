@@ -17,7 +17,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         howItWorks: [
           "Use Sign In to open the Clerk authentication modal. Sign up from that modal uses the Flipvise account form (not Clerk’s hosted Sign Up).",
           "Use Sign Up to open the Flipvise account form (name, email, password, and password confirmation). Creating an account agrees to the Terms of Service and Privacy Policy, linked under the button.",
-          "The homepage footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
+          "The page footer shows the Flipvise Studio support email, phone, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
           "If you arrived from a team invite, the page may pre-fill your invited email.",
           "After you sign in, you are redirected to your personal dashboard. If required account details are incomplete, you complete them before the dashboard becomes available.",
           "Use View beside the page location to see the homepage screenshot. Open UI Guides (or the in-depth Sign In / Sign Up buttons) for Flipvise UI guides that stay open while you browse — including Create a deck, deck editor card walkthroughs, and Education Teacher guides under Team Tier Plan (AI Lesson Builder for the plan owner, AI Lesson Builder for a new deck, AI Quiz/Test Generator from a lesson plan, and AI Quiz/Test Generator for an existing deck, Homework Generator from a deck, Homework Generator from a lesson plan, Study Guide Generator from a lesson plan, Worksheet Generator from a lesson plan, Classes for the plan owner, Student Progress for the plan owner, Register a student for the plan owner, Student quiz results for the plan owner, Manual assignment grades for the plan owner, Quiz grades for the plan owner, and Teacher Resource Library for the plan owner).",
@@ -613,7 +613,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Compare tiers, choose monthly or yearly billing, and start checkout.",
         howItWorks: [
-          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. The page footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
+          "Open pricing guide to walk through opening Plans & Pricing and comparing every tier. The guide stays open while you browse. UI Guides in the header also lists Create a deck, Subscribe, deck editor card walkthroughs, and AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. The page footer shows the Flipvise Studio support email, phone, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
           "Toggle Billing period between monthly and yearly (yearly shows an effective monthly rate).",
           "Filter plans with the View plans dropdown, or show all tiers in the grid.",
           "Consumer tiers: Free, Pro, Pro Plus, Team Basic, Team Gold, Platinum, and Enterprise.",

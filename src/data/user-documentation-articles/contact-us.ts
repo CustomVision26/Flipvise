@@ -29,6 +29,7 @@ export const CONTACT_US_ARTICLES: DocArticle[] = [
         title: "Page sections",
         bullets: [
           "Contact details — support inbox, optional phone, company address, social links.",
+          "The same support email, phone, and company address appear in the footer on every page.",
           "In-app Help Center card — links to categorized tickets for signed-in users.",
           "Documentation card — links to this user guide.",
         ],

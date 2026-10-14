@@ -7,6 +7,7 @@ import { AppProviders } from "@/components/app-providers";
 import { HeaderLogo } from "@/components/header-logo";
 import { AppTopNav } from "@/components/app-top-nav";
 import { AuthenticatedShellChrome } from "@/components/authenticated-shell-chrome";
+import { SiteContactFooter } from "@/components/site-contact-footer";
 import { HeaderUserSection } from "@/components/header-user-section";
 import { HelpCenter } from "@/components/help-center";
 import { DashboardAddonsBanner } from "@/components/dashboard-addons-banner";
@@ -401,6 +402,7 @@ export default async function RootLayout({
               ) : null}
               <TooltipProvider>{children}</TooltipProvider>
             </div>
+            <SiteContactFooter />
         </AppProviders>
       </body>
     </html>

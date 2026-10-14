@@ -4,7 +4,6 @@ import Link from "next/link";
 import { StripeCheckoutToast } from "@/components/stripe-checkout-toast";
 import { getAccessContext, guestAccessContext } from "@/lib/access";
 import { resolvePricingBackToDashboardHref } from "@/lib/pricing-back-dashboard-href";
-import { LegalLinks } from "@/components/legal-links";
 import { PricingContent } from "@/components/pricing-content";
 import {
   activeGeneralDiscountPlanIds,
@@ -191,7 +190,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           activeDiscountPlanIds={activeDiscountPlanIds}
           promoHighlightPlanIds={promoHighlightPlanIds}
         />
-        <LegalLinks />
       </div>
     </div>
   );

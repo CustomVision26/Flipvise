@@ -29,7 +29,7 @@ export const PRICING_BILLING_ARTICLES: DocArticle[] = [
           "Active public codes appear as quick-fill chips during sales.",
           "Signed-in users see Current plan badge and Manage subscription when applicable.",
           "When published, an Add-on Catalog link leads to optional features such as AI Essay.",
-          "The page footer links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
+          "The page footer shows the Flipvise Studio support email, phone, and company address, and links to the Privacy Policy, Terms of Service, AI data handling, Documentation, and Contact Us.",
         ],
       },
       {

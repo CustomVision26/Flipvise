@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AppTopNav } from "@/components/app-top-nav";
-import { LegalLinks } from "@/components/legal-links";
 import { PublicPageAtmosphere } from "@/components/public-page-atmosphere";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
@@ -53,9 +52,6 @@ export function PublicMarketingPageChrome({
         <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
           {children}
         </main>
-        <footer className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-10 sm:px-6">
-          <LegalLinks />
-        </footer>
       </div>
     </div>
   );
