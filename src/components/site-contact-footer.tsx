@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Mail, MapPin, Phone } from "lucide-react";
 import { LegalLinks } from "@/components/legal-links";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -23,7 +22,7 @@ function ContactMark({
   return (
     <span
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center rounded-xl border shadow-[0_0_18px]",
+        "flex size-7 shrink-0 items-center justify-center rounded-lg border",
         className,
       )}
     >
@@ -45,42 +44,34 @@ function FooterContactDetails({
 }) {
   const addressLines = formatPlatformCompanyAddressLines(companyAddress);
   const companyName = companyAddress.name.trim() || "Flipvise Studio LLC";
+  const addressLine = addressLines.slice(1).join(", ");
   const year = new Date().getFullYear();
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null;
   const mapHref = `https://maps.google.com/?q=${encodeURIComponent(addressLines.join(", "))}`;
 
   return (
-    <footer className="dark relative z-10 mt-auto border-t border-cyan-400/25 bg-gradient-to-b from-cyan-950/40 via-background to-background text-foreground">
+    <footer className="dark relative z-10 mt-auto border-t border-cyan-400/20 bg-background text-foreground">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px overflow-hidden" aria-hidden>
-        <div className="animate-aurora h-full w-full bg-gradient-to-r from-cyan-400/0 via-cyan-300 to-teal-300/0" />
+        <div className="animate-aurora h-full w-full bg-gradient-to-r from-cyan-400/0 via-cyan-300/80 to-teal-300/0" />
       </div>
-      <div
-        className="pointer-events-none absolute -left-16 top-6 size-40 rounded-full bg-cyan-500/15 blur-3xl motion-safe:animate-float-gentle"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -right-10 bottom-0 size-36 rounded-full bg-teal-500/15 blur-3xl motion-safe:animate-float-gentle"
-        aria-hidden
-      />
 
-      <div className="relative mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        <Card className="animate-in fade-in-0 slide-in-from-bottom-3 overflow-hidden border-cyan-400/30 bg-card/75 shadow-none ring-1 ring-cyan-400/25 duration-700">
-          <CardContent className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            <div className="flex min-w-0 items-start gap-3">
-              <ContactMark className="border-teal-400/45 bg-teal-500/15 text-teal-800 shadow-teal-400/25 dark:text-teal-200">
-                <MapPin className="size-4" aria-hidden />
-              </ContactMark>
-              <div className="min-w-0 space-y-2">
-                <Badge variant="outline" className="border-teal-400/40 text-teal-800 dark:text-teal-200">
-                  {companyName}
-                </Badge>
-                <address className="text-sm leading-relaxed font-medium text-foreground not-italic">
-                  {addressLines.slice(1).map((line) => (
-                    <span key={line} className="block">
-                      {line}
-                    </span>
-                  ))}
-                </address>
+      <div className="relative mx-auto w-full max-w-6xl px-4 py-3 sm:px-6">
+        <Card
+          size="sm"
+          className="animate-in fade-in-0 slide-in-from-bottom-2 gap-0 overflow-hidden border-cyan-400/25 bg-card/80 py-0 shadow-none ring-1 ring-cyan-400/20 duration-500"
+        >
+          <CardContent className="flex flex-col gap-2 px-3 py-2.5 sm:px-4">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-5">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <ContactMark className="border-teal-400/40 bg-teal-500/15 text-teal-800 dark:text-teal-200">
+                  <MapPin className="size-3.5" aria-hidden />
+                </ContactMark>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-foreground">{companyName}</p>
+                  <address className="truncate text-[11px] leading-4 text-muted-foreground not-italic">
+                    {addressLine}
+                  </address>
+                </div>
                 <a
                   href={mapHref}
                   target="_blank"
@@ -88,74 +79,57 @@ function FooterContactDetails({
                   className={buttonVariants({
                     variant: "link",
                     size: "sm",
-                    className: "h-auto px-0 text-teal-800 dark:text-teal-200",
+                    className: "h-7 shrink-0 px-1 text-[11px] text-teal-800 dark:text-teal-200",
                   })}
                 >
-                  Open map
-                  <ExternalLink className="size-3.5" aria-hidden />
+                  Map
+                  <ExternalLink className="size-3" aria-hidden />
                 </a>
+              </div>
+
+              <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
+                <a
+                  href={supportMailtoHref(undefined, email)}
+                  className="inline-flex items-center gap-1.5 text-xs whitespace-nowrap text-foreground hover:underline"
+                >
+                  <Mail className="size-3.5 shrink-0 text-cyan-700 dark:text-cyan-300" aria-hidden />
+                  {email}
+                </a>
+                {phone && telHref ? (
+                  <a
+                    href={telHref}
+                    className="inline-flex shrink-0 items-center gap-1.5 text-xs text-foreground hover:underline"
+                  >
+                    <Phone className="size-3.5 shrink-0 text-violet-700 dark:text-violet-300" aria-hidden />
+                    {phone}
+                  </a>
+                ) : null}
+                {socialLinks.map((link) => (
+                  <a
+                    key={`${link.platform}-${link.url}`}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-foreground hover:underline"
+                  >
+                    {link.label}
+                    <ExternalLink className="size-3 shrink-0" aria-hidden />
+                  </a>
+                ))}
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <div className="flex min-w-0 items-start gap-3 rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-3">
-                <ContactMark className="border-cyan-400/45 bg-cyan-500/15 text-cyan-800 shadow-cyan-400/25 dark:text-cyan-200">
-                  <Mail className="size-4" aria-hidden />
-                </ContactMark>
-                <div className="min-w-0 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Support email</p>
-                  <a
-                    href={supportMailtoHref(undefined, email)}
-                    className="block truncate text-sm font-medium text-foreground hover:underline"
-                  >
-                    {email}
-                  </a>
-                </div>
-              </div>
-
-              {phone && telHref ? (
-                <div className="flex min-w-0 items-start gap-3 rounded-xl border border-violet-400/25 bg-violet-500/5 p-3">
-                  <ContactMark className="border-violet-400/45 bg-violet-500/15 text-violet-800 shadow-violet-400/25 dark:text-violet-200">
-                    <Phone className="size-4" aria-hidden />
-                  </ContactMark>
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Phone</p>
-                    <a href={telHref} className="block text-sm font-medium text-foreground hover:underline">
-                      {phone}
-                    </a>
-                  </div>
-                </div>
-              ) : null}
+            <Separator className="bg-cyan-400/15" />
+            <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-between">
+              <LegalLinks className="justify-center gap-x-3 text-[11px] sm:justify-start" />
+              <p className="text-[11px] text-muted-foreground">
+                © {year} {companyName}.{" "}
+                <Link href="/contact" className="underline-offset-4 hover:text-foreground hover:underline">
+                  Contact support
+                </Link>
+              </p>
             </div>
           </CardContent>
-
-          {socialLinks.length > 0 ? (
-            <div className="flex flex-wrap gap-2 px-5 pb-2 sm:px-6">
-              {socialLinks.map((link) => (
-                <a
-                  key={`${link.platform}-${link.url}`}
-                  href={link.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  {link.label}
-                  <ExternalLink className="size-3.5" aria-hidden />
-                </a>
-              ))}
-            </div>
-          ) : null}
-
-          <Separator className="bg-cyan-400/20" />
-          <div className="space-y-3 px-5 py-4 sm:px-6">
-            <LegalLinks />
-            <p className="text-center text-xs text-muted-foreground">
-              © {year} {companyName}.{" "}
-              <Link href="/contact" className="underline-offset-4 hover:text-foreground hover:underline">
-                Contact support
-              </Link>
-            </p>
-          </div>
         </Card>
       </div>
     </footer>
