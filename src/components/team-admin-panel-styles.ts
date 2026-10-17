@@ -26,7 +26,6 @@ export function teamAdminTabClass(isActive: boolean) {
     isActive
       ? "border-sky-300/55 bg-primary font-bold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_18px_-12px_rgba(56,189,248,0.85)] sm:border-sky-300 sm:bg-transparent sm:font-semibold sm:text-foreground sm:shadow-[inset_0_-2px_0_0_rgba(56,189,248,0.95)]"
       : "border-transparent bg-muted/70 font-medium text-muted-foreground hover:-translate-y-0.5 hover:bg-muted hover:text-foreground sm:bg-transparent sm:shadow-none sm:hover:translate-y-0 sm:hover:bg-transparent sm:hover:text-foreground",
-      : "border-transparent bg-muted/70 font-medium text-muted-foreground hover:-translate-y-0.5 hover:bg-muted hover:text-foreground sm:bg-transparent sm:shadow-none sm:hover:translate-y-0 sm:hover:bg-transparent sm:hover:text-foreground",
   );
 }
 
