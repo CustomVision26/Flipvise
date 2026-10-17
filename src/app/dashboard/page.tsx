@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -210,6 +210,40 @@ function DashboardTeamWorkspaceSubline({
   );
 }
 
+function DashboardAtmosphere({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute -right-24 -top-28 size-[22rem] rounded-full bg-cyan-500/15 blur-3xl animate-float-gentle" />
+        <div className="absolute -left-16 top-1/3 size-[18rem] rounded-full bg-violet-500/15 blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-[-5rem] right-1/4 size-[16rem] rounded-full bg-fuchsia-500/12 blur-3xl animate-drift" />
+        <div className="absolute left-1/3 top-10 size-[12rem] rounded-full bg-emerald-400/10 blur-3xl animate-float-gentle" />
+      </div>
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const dashboardHeaderCardClass =
+  "relative overflow-hidden rounded-2xl border border-white/10 bg-card/60 p-5 shadow-lg shadow-black/20 backdrop-blur-md animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both sm:p-7";
+
+const dashboardDeckPanelClass =
+  "flex flex-1 flex-col gap-5 rounded-2xl border border-white/10 bg-card/45 p-4 shadow-xl shadow-black/20 backdrop-blur-xl animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both sm:p-6";
+
+function DashboardHeaderCard({ children }: { children: ReactNode }) {
+  return (
+    <section className={dashboardHeaderCardClass}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400"
+      />
+      {children}
+    </section>
+  );
+}
+
 async function mergePreviewThumbsForDecks<T extends { id: number }>(
   list: T[],
 ): Promise<(T & { firstPreviewCardFrontImageUrl: string | null })[]> {
@@ -381,12 +415,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       (await teamOwnsLiveClassroom(tw.teamId)).owns;
 
     return (
-      <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+      <DashboardAtmosphere>
         {showLiveClassroom ? (
           <div className="flex flex-wrap items-center gap-2">
             <LiveClassroomDashboardEntry />
           </div>
         ) : null}
+        <DashboardHeaderCard>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -417,6 +452,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
           </div>
         </div>
+        </DashboardHeaderCard>
+        <section className={dashboardDeckPanelClass}>
         {workspaceDecks.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
@@ -454,7 +491,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             groupOwnerAssignedFromCreated={isEducationTeamAdminViewer}
           />
         )}
-      </div>
+        </section>
+      </DashboardAtmosphere>
     );
   }
 
@@ -485,7 +523,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const initialView = resolveViewMode(cookieStore.get(DECKS_VIEW_COOKIE)?.value);
     const assignedHeadingGroupName = assignedHeadingRow?.name ?? null;
     return (
-      <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+      <DashboardAtmosphere>
+        <DashboardHeaderCard>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -510,6 +549,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
           </div>
         </div>
+        </DashboardHeaderCard>
+        <section className={dashboardDeckPanelClass}>
         {assigned.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
@@ -532,7 +573,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             detailedDeleteWarning={detailedDeleteWarning}
           />
         )}
-      </div>
+        </section>
+      </DashboardAtmosphere>
     );
   }
 
@@ -618,7 +660,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     const cookieTeamHeadingGroupName = cookieTeamHeadingRow?.name ?? null;
 
     return (
-      <div className="flex flex-1 flex-col gap-4 sm:gap-6 p-4 sm:p-8">
+      <DashboardAtmosphere>
+        <DashboardHeaderCard>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             {teamWorkspaceTierExtras ? (
@@ -643,10 +686,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             )}
           </div>
         </div>
+        </DashboardHeaderCard>
+        <section className={dashboardDeckPanelClass}>
         {assigned.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-12 sm:py-20 text-center px-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
-              <BookOpen className="h-6 w-6 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 py-12 text-center px-4 sm:py-20">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/15 ring-1 ring-violet-400/30">
+              <BookOpen className="h-6 w-6 text-violet-200" />
             </div>
             <div className="space-y-1">
               <p className="font-medium text-foreground text-sm">No decks assigned yet</p>
@@ -655,14 +700,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {assigned.map((d) => (
-              <li key={d.id}>
-                <Card>
+            {assigned.map((d, index) => (
+              <li
+                key={d.id}
+                className="animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500"
+                style={{ animationDelay: `${Math.min(index, 8) * 55}ms` }}
+              >
+                <Card className="h-full border-violet-400/25 bg-gradient-to-br from-violet-500/15 via-card to-cyan-500/10 shadow-lg shadow-violet-950/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl">
                   <CardHeader>
                     <CardTitle className="text-base">{d.name}</CardTitle>
                   </CardHeader>
-                  <CardContent className="flex flex-wrap justify-between items-center gap-2">
-                    <span className="text-xs text-muted-foreground tabular-nums">
+                  <CardContent className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs tabular-nums text-muted-foreground">
                       {d.cardCount} cards
                     </span>
                     <TeamMemberDeckActions
@@ -678,7 +727,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             ))}
           </ul>
         )}
-      </div>
+        </section>
+      </DashboardAtmosphere>
     );
     }
   }
@@ -785,14 +835,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showLiveClassroom = accessHasAddon(access, LIVE_CLASSROOM_ADDON_KEY);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute -right-24 -top-28 size-[22rem] rounded-full bg-primary/10 blur-3xl animate-float-gentle" />
-        <div className="absolute -left-20 top-1/3 size-[18rem] rounded-full bg-violet-500/10 blur-3xl animate-pulse-slow" />
-        <div className="absolute bottom-[-5rem] right-1/3 size-[14rem] rounded-full bg-fuchsia-500/8 blur-3xl animate-drift" />
-      </div>
-
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
+    <DashboardAtmosphere>
       {showAiDocumentStudio || showLiveClassroom ? (
         <div className="flex flex-wrap items-center gap-2">
           {showAiDocumentStudio ? <AiDocumentStudioDashboardEntry /> : null}
@@ -819,7 +862,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Page header */}
-      <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-border/70 bg-card/55 p-5 shadow-lg shadow-black/10 backdrop-blur-md sm:p-7">
+      <DashboardHeaderCard>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
           <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -840,7 +883,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           />
         </div>
       </div>
-      </section>
+      </DashboardHeaderCard>
 
       {/* Free plan usage banner */}
       {isFreePlan && (
@@ -935,7 +978,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Deck grid */}
-      <section className="animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both flex flex-1 flex-col gap-5 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-xl shadow-black/15 backdrop-blur-xl sm:p-6">
+      <section className={dashboardDeckPanelClass}>
       {decks.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-14 text-center sm:py-24">
           <div className="relative flex h-16 w-16 items-center justify-center">
@@ -962,7 +1005,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <div className="space-y-8">
           {personalOnlyDecks.length > 0 ? (
             <section className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-foreground">
+                <span className="size-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.85)]" aria-hidden />
                 Personal
               </h2>
               <DeckGrid
@@ -1011,7 +1055,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </p>
       )}
       </section>
-      </div>
-    </div>
+    </DashboardAtmosphere>
   );
 }

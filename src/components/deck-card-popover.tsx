@@ -53,6 +53,49 @@ import {
   type ItemWatermarkView,
 } from "./item-watermark";
 
+const DECK_ACCENTS = [
+  {
+    rail: "from-cyan-300 via-sky-400 to-teal-300",
+    wash: "bg-[radial-gradient(120%_90%_at_0%_0%,rgba(34,211,238,0.22),transparent_58%)]",
+    glow: "hover:shadow-cyan-500/25 hover:ring-cyan-300/40",
+    chip: "bg-cyan-500/20 text-cyan-100 ring-cyan-300/40",
+  },
+  {
+    rail: "from-violet-300 via-fuchsia-400 to-purple-400",
+    wash: "bg-[radial-gradient(120%_90%_at_0%_0%,rgba(167,139,250,0.24),transparent_58%)]",
+    glow: "hover:shadow-violet-500/25 hover:ring-violet-300/40",
+    chip: "bg-violet-500/20 text-violet-100 ring-violet-300/40",
+  },
+  {
+    rail: "from-emerald-300 via-green-400 to-teal-300",
+    wash: "bg-[radial-gradient(120%_90%_at_0%_0%,rgba(52,211,153,0.22),transparent_58%)]",
+    glow: "hover:shadow-emerald-500/25 hover:ring-emerald-300/40",
+    chip: "bg-emerald-500/20 text-emerald-100 ring-emerald-300/40",
+  },
+  {
+    rail: "from-amber-200 via-orange-400 to-rose-400",
+    wash: "bg-[radial-gradient(120%_90%_at_0%_0%,rgba(251,191,36,0.2),transparent_58%)]",
+    glow: "hover:shadow-amber-500/25 hover:ring-amber-300/40",
+    chip: "bg-amber-500/20 text-amber-50 ring-amber-300/40",
+  },
+  {
+    rail: "from-rose-300 via-pink-400 to-fuchsia-400",
+    wash: "bg-[radial-gradient(120%_90%_at_0%_0%,rgba(251,113,133,0.22),transparent_58%)]",
+    glow: "hover:shadow-rose-500/25 hover:ring-rose-300/40",
+    chip: "bg-rose-500/20 text-rose-50 ring-rose-300/40",
+  },
+  {
+    rail: "from-sky-300 via-indigo-400 to-blue-400",
+    wash: "bg-[radial-gradient(120%_90%_at_0%_0%,rgba(96,165,250,0.24),transparent_58%)]",
+    glow: "hover:shadow-sky-500/25 hover:ring-sky-300/40",
+    chip: "bg-sky-500/20 text-sky-50 ring-sky-300/40",
+  },
+] as const;
+
+function deckAccentFor(id: number) {
+  return DECK_ACCENTS[Math.abs(id) % DECK_ACCENTS.length]!;
+}
+
 type PreviewCard = {
   id: number;
   front: string | null;
@@ -154,6 +197,8 @@ interface DeckCardPopoverProps {
    * warning (linked lesson plans, assignments, classes, etc.).
    */
   detailedDeleteWarning?: boolean;
+  /** Staggers the entrance animation when decks render in a list. */
+  enterIndex?: number;
 }
 
 export function DeckCardPopover({
@@ -166,6 +211,7 @@ export function DeckCardPopover({
   teamTierPreviewPromo = false,
   hasAiReading = false,
   detailedDeleteWarning = false,
+  enterIndex = 0,
 }: DeckCardPopoverProps) {
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -261,12 +307,14 @@ export function DeckCardPopover({
     minute: "2-digit",
   });
 
-  const wrapperClass =
+  const wrapperClass = cn(
+    "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500",
     view === "compact"
       ? "relative h-full min-h-[140px] sm:min-h-[160px]"
       : view === "list"
         ? "relative"
-        : "relative min-h-[4.75rem]";
+        : "relative min-h-[4.75rem]",
+  );
 
   const triggerClassName = cn(
     "block w-full min-h-0 text-left cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -413,6 +461,19 @@ export function DeckCardPopover({
   const showDeckEdit = variant === "full" || canEditContent === true;
   const deckGradient = getGradientBySlug(deck.gradient);
   const hasGradient = deckGradient.slug !== "none";
+  const deckAccentStyle = deckAccentFor(deck.id);
+  const deckMark = (
+    <span
+      className={cn(
+        "flex size-10 shrink-0 items-center justify-center rounded-xl ring-1 shadow-inner transition-transform duration-300 group-hover/card:scale-105",
+        hasGradient
+          ? "bg-white/15 text-white ring-white/35"
+          : deckAccentStyle.chip,
+      )}
+    >
+      <BookOpen className="size-4" aria-hidden />
+    </span>
+  );
 
   function deckEditMenuButton(
     compact: boolean,
@@ -488,27 +549,55 @@ export function DeckCardPopover({
     <Card
       className={cn(
         itemCardContainerClass,
-        "h-full transition-all duration-200 cursor-pointer select-none",
-        "border shadow-lg shadow-black/30 active:scale-[0.99]",
+        "h-full cursor-pointer select-none border shadow-lg shadow-black/30 transition-all duration-300 active:scale-[0.99] hover:-translate-y-0.5 hover:shadow-xl",
         hasGradient
           ? cn(
               deckGradient.classes,
-              "border-white/20 ring-1 ring-inset ring-white/15 hover:shadow-xl hover:ring-white/25",
+              "border-white/25 ring-1 ring-inset ring-white/20 hover:shadow-xl hover:ring-white/40",
             )
-          : "border-border/80 bg-card/95 ring-1 ring-foreground/20 backdrop-blur-md hover:border-foreground/30 hover:bg-card hover:shadow-xl",
+          : cn(
+              "border-border/80 bg-card/95 ring-1 ring-foreground/15 backdrop-blur-md hover:bg-card",
+              deckAccentStyle.glow,
+            ),
         view === "compact"
-          ? cn("flex h-full min-h-0 flex-col hover:-translate-y-0.5", hasCover && "p-0")
+          ? cn("flex h-full min-h-0 flex-col", hasCover && "p-0")
           : view === "list"
             ? cn(
                 "flex flex-row items-center py-2.5 sm:gap-3",
                 hasCover
-                  ? "gap-2.5 pl-2 pr-3 sm:pl-2.5 sm:pr-3"
-                  : "gap-3 px-3",
+                  ? "gap-2.5 pl-3.5 pr-3 sm:pl-4 sm:pr-3"
+                  : "gap-3 pl-4 pr-3",
               )
-            : "flex min-h-[4.75rem] flex-row items-center gap-3 px-4 py-3.5 sm:gap-4",
+            : "flex min-h-[4.75rem] flex-row items-center gap-3 py-3.5 pl-5 pr-4 sm:gap-4",
       )}
     >
       <ItemWatermark label="DECK" view={view} onGradient={hasGradient} />
+      <span
+        data-deck-accent
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-y-0 left-0 z-[3] w-1.5 bg-gradient-to-b",
+          hasGradient ? "from-white/90 via-white/40 to-white/10" : deckAccentStyle.rail,
+        )}
+      />
+      {hasGradient ? (
+        <span
+          data-deck-accent
+          aria-hidden
+          className="pointer-events-none absolute -right-8 -top-10 z-0 size-32 rounded-full bg-white/20 blur-2xl"
+        />
+      ) : (
+        <span
+          data-deck-accent
+          aria-hidden
+          className={cn("pointer-events-none absolute inset-0 z-0", deckAccentStyle.wash)}
+        />
+      )}
+      <span
+        data-deck-accent
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 z-[3] w-1/4 -translate-x-full -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 transition-all duration-700 ease-out group-hover/card:translate-x-[420%] group-hover/card:opacity-100"
+      />
       {view === "compact" && coverBanner}
       {view === "compact" ? (
         <>
@@ -558,7 +647,7 @@ export function DeckCardPopover({
         </>
       ) : view === "list" ? (
         <>
-          {coverThumbList}
+          {coverThumbList ?? deckMark}
           <div className="flex-1 min-w-0">
             {lessonPlanDayLabel ? (
               <p
@@ -590,6 +679,7 @@ export function DeckCardPopover({
         </>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
+          {hasCover ? null : deckMark}
           <div className="min-w-0 flex-1 flex flex-col gap-1">
             {lessonPlanDayLabel ? (
               <Badge
@@ -646,6 +736,7 @@ export function DeckCardPopover({
   return (
     <div
       className={wrapperClass}
+      style={{ animationDelay: `${Math.min(enterIndex, 12) * 55}ms` }}
       onPointerEnter={(event) => {
         if (!deck.coverImageUrl || menuLocked) return;
         setCoverAnchor(event.currentTarget.getBoundingClientRect());

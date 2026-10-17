@@ -3,17 +3,19 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TeacherPreviewSection } from "@/components/teacher-tool-page-shell";
 import type { DeckWorksheetResult, WorksheetItem } from "@/lib/teacher-worksheet-schema";
 
 function WorksheetReadOnly({ result }: { result: DeckWorksheetResult }) {
   return (
-    <div className="space-y-4 whitespace-pre-wrap text-foreground">
-      <p className="text-sm text-muted-foreground">{result.instructions}</p>
-      <div>
-        <p className="font-medium text-foreground">Questions ({result.items.length})</p>
-        <ol className="list-decimal space-y-2 pl-5">
+    <div className="space-y-3 text-foreground">
+      <TeacherPreviewSection title="Instructions" accent="sky">
+        <p className="whitespace-pre-wrap">{result.instructions}</p>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title={`Questions (${result.items.length})`} accent="violet">
+        <ol className="list-decimal space-y-2 pl-5 marker:text-violet-300">
           {result.items.map((item) => (
-            <li key={item.questionNumber}>
+            <li key={item.questionNumber} className="whitespace-pre-wrap">
               <span>{item.prompt}</span>
               {item.frontImageUrl ? (
                 <p className="text-xs text-muted-foreground">Includes card front image</p>
@@ -21,12 +23,11 @@ function WorksheetReadOnly({ result }: { result: DeckWorksheetResult }) {
             </li>
           ))}
         </ol>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Answer key preview</p>
-        <ol className="list-decimal space-y-2 pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Answer key preview" accent="emerald">
+        <ol className="list-decimal space-y-2 pl-5 marker:text-emerald-300">
           {result.items.map((item) => (
-            <li key={item.questionNumber}>
+            <li key={item.questionNumber} className="whitespace-pre-wrap">
               <span>{item.answer}</span>
               {item.backImageUrl || item.answerImageUrl ? (
                 <p className="text-xs text-muted-foreground">Includes card back image</p>
@@ -34,7 +35,7 @@ function WorksheetReadOnly({ result }: { result: DeckWorksheetResult }) {
             </li>
           ))}
         </ol>
-      </div>
+      </TeacherPreviewSection>
     </div>
   );
 }
@@ -83,7 +84,7 @@ function WorksheetEditable({
         {draft.items.map((item, index) => (
           <div
             key={item.questionNumber}
-            className="space-y-3 rounded-md border border-border p-4"
+            className="space-y-3 rounded-xl border border-violet-400/30 bg-gradient-to-br from-violet-500/10 via-card to-card p-4"
           >
             <p className="text-sm font-medium text-foreground">Question {item.questionNumber}</p>
             <div className="space-y-2">

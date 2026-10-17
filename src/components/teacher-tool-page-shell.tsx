@@ -32,6 +32,63 @@ export function useTeacherPreviewExpanded() {
   return useContext(TeacherPreviewExpandedContext);
 }
 
+const PREVIEW_SECTION_ACCENTS = {
+  emerald:
+    "border-emerald-400/30 bg-gradient-to-br from-emerald-500/15 via-card to-card shadow-emerald-950/10",
+  sky: "border-sky-400/30 bg-gradient-to-br from-sky-500/15 via-card to-card shadow-sky-950/10",
+  violet:
+    "border-violet-400/30 bg-gradient-to-br from-violet-500/15 via-card to-card shadow-violet-950/10",
+  amber:
+    "border-amber-400/30 bg-gradient-to-br from-amber-500/14 via-card to-card shadow-amber-950/10",
+  rose: "border-rose-400/30 bg-gradient-to-br from-rose-500/14 via-card to-card shadow-rose-950/10",
+  cyan: "border-cyan-400/30 bg-gradient-to-br from-cyan-500/15 via-card to-card shadow-cyan-950/10",
+} as const;
+
+const PREVIEW_SECTION_RAILS = {
+  emerald: "from-emerald-300 via-teal-400 to-cyan-300",
+  sky: "from-sky-300 via-blue-400 to-indigo-300",
+  violet: "from-violet-300 via-fuchsia-400 to-purple-300",
+  amber: "from-amber-200 via-orange-400 to-rose-300",
+  rose: "from-rose-300 via-pink-400 to-fuchsia-300",
+  cyan: "from-cyan-300 via-sky-400 to-blue-300",
+} as const;
+
+export type TeacherPreviewAccent = keyof typeof PREVIEW_SECTION_ACCENTS;
+
+/** Colored block inside a teacher-tool preview. Built from the shadcn Card. */
+export function TeacherPreviewSection({
+  title,
+  accent = "sky",
+  children,
+}: {
+  title: string;
+  accent?: TeacherPreviewAccent;
+  children: ReactNode;
+}) {
+  return (
+    <Card
+      size="sm"
+      className={cn(
+        "gap-2 overflow-hidden border py-0 shadow-sm transition-shadow duration-300 hover:shadow-md",
+        PREVIEW_SECTION_ACCENTS[accent],
+      )}
+    >
+      <div
+        aria-hidden
+        className={cn("h-1 w-full bg-gradient-to-r", PREVIEW_SECTION_RAILS[accent])}
+      />
+      <CardHeader className="px-4 pt-3 pb-0">
+        <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 text-sm leading-relaxed text-foreground">
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TeacherToolPageShell({
   title,
   description,
@@ -162,7 +219,11 @@ export function TeacherToolPageShell({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-      <Card className={cn(teamAdminCardClass, "backdrop-blur-md")}>
+      <Card className={cn(teamAdminCardClass, "relative overflow-hidden border-white/10 bg-card/70 shadow-lg shadow-black/15 backdrop-blur-md")}>
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-violet-400 to-rose-400"
+        />
         <CardHeader className="gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
@@ -179,7 +240,7 @@ export function TeacherToolPageShell({
                 Back
               </Link>
               <div className="min-w-0 space-y-1">
-                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-violet-200/90">
                   Teacher tool
                 </p>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
@@ -246,7 +307,8 @@ export function TeacherToolPageShell({
       <Card
         className={cn(
           teamAdminCardClass,
-          "backdrop-blur-sm",
+          "relative overflow-hidden border-violet-400/25 bg-gradient-to-b from-violet-500/12 via-card/85 to-card/70 shadow-xl shadow-violet-950/25 backdrop-blur-sm",
+          shouldShowPreview && "animate-in fade-in-0 slide-in-from-bottom-3 duration-500",
           !shouldShowPreview && "hidden",
           previewExpanded &&
             "fixed inset-x-3 bottom-3 z-50 flex flex-col overflow-hidden shadow-2xl sm:inset-x-6 sm:bottom-6",
@@ -258,9 +320,13 @@ export function TeacherToolPageShell({
         }
         aria-hidden={!shouldShowPreview}
       >
+        <div
+          aria-hidden
+          className="h-1 shrink-0 bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400"
+        />
         <CardHeader className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Preview</CardTitle>
+            <CardTitle className="text-base text-foreground">Preview</CardTitle>
             {shouldShowPreview ? (
               <Button
                 type="button"

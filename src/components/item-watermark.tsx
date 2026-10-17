@@ -33,7 +33,7 @@ export function ItemWatermark({
 }
 
 export const itemCardContainerClass =
-  "@container/item-card [container-type:inline-size] relative overflow-hidden [&>*:not([data-item-watermark])]:relative [&>*:not([data-item-watermark])]:z-[1]";
+  "@container/item-card [container-type:inline-size] relative overflow-hidden [&>*:not([data-item-watermark]):not([data-deck-accent])]:relative [&>*:not([data-item-watermark]):not([data-deck-accent])]:z-[1]";
 
 export function itemPrimaryTextClass(onGradient = false) {
   return cn(

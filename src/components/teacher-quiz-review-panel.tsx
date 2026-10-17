@@ -189,9 +189,12 @@ export function TeacherQuizReviewPanel({
             return (
             <div
               key={row.id}
+              style={{ animationDelay: `${Math.min(index, 8) * 45}ms` }}
               className={cn(
-                "space-y-2 rounded-lg border p-3",
-                row.selected ? "border-primary/40 bg-primary/5" : "border-border opacity-80",
+                "animate-in fade-in-0 slide-in-from-bottom-2 space-y-2 overflow-hidden rounded-xl border p-3 shadow-sm transition-all duration-200 fill-mode-both",
+                row.selected
+                  ? "border-violet-400/40 bg-gradient-to-br from-violet-500/15 via-card to-sky-500/10 shadow-violet-950/20"
+                  : "border-border/70 bg-muted/15 opacity-80",
               )}
             >
               <div className="flex items-center gap-2">
@@ -202,7 +205,7 @@ export function TeacherQuizReviewPanel({
                   }
                   aria-label={`Include card ${index + 1}`}
                 />
-                <span className="text-xs font-medium text-muted-foreground">
+                <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-xs font-medium text-violet-100 ring-1 ring-violet-300/30">
                   Card {index + 1}
                   {passageCard ? " · Passage" : mixedReview ? " · Regular" : ""}
                 </span>

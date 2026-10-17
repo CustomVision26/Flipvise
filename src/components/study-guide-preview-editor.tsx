@@ -2,6 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TeacherPreviewSection } from "@/components/teacher-tool-page-shell";
 import type { StudyGuideResult } from "@/lib/teacher-generators";
 
 function linesToArray(text: string): string[] {
@@ -23,61 +24,57 @@ function StudyGuideReadOnly({
   sourceTitle?: string | null;
 }) {
   return (
-    <div className="space-y-4 text-foreground">
+    <div className="space-y-3 text-foreground">
       {sourceTitle?.trim() ? (
-        <p className="text-sm font-semibold leading-snug text-foreground">
-          {sourceTitle.trim()}
-        </p>
+        <TeacherPreviewSection title="Source" accent="cyan">
+          <p className="font-medium">{sourceTitle.trim()}</p>
+        </TeacherPreviewSection>
       ) : null}
-      <p>{result.summary}</p>
-      <div>
-        <p className="font-medium text-foreground">Key Vocabulary</p>
-        <ul className="list-disc pl-5">
+      <TeacherPreviewSection title="Summary" accent="sky">
+        <p>{result.summary}</p>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Key Vocabulary" accent="violet">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-violet-300">
           {result.keyVocabulary.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Important Points</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Important Points" accent="emerald">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-emerald-300">
           {result.importantPoints.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Worked Examples</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Worked Examples" accent="amber">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-amber-300">
           {result.workedExamples.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Sample Problems</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Sample Problems" accent="rose">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-rose-300">
           {result.sampleProblems.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Practice Questions</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Practice Questions" accent="cyan">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-cyan-300">
           {result.practiceQuestions.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Study Tips</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Study Tips" accent="sky">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-sky-300">
           {result.studyTips.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
+      </TeacherPreviewSection>
     </div>
   );
 }

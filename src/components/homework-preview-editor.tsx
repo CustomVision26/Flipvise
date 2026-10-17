@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TeacherPreviewSection } from "@/components/teacher-tool-page-shell";
 import {
   getHomeworkPassageSections,
   stripOrderedListPrefix,
@@ -59,7 +60,7 @@ function HomeworkPassageBlock({
       : "Reading Passage";
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-3">
+    <div className="space-y-2 rounded-xl border border-sky-400/30 bg-gradient-to-br from-sky-500/15 via-card to-card px-3 py-3 shadow-sm">
       <p className="text-sm font-medium text-foreground">{heading}</p>
       <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
         {passage}
@@ -73,9 +74,10 @@ function HomeworkReadOnly({ result }: { result: HomeworkResult }) {
   const hasPassageBodies = sections.some((section) => section.body.trim());
 
   return (
-    <div className="space-y-4 text-foreground">
-      <p className="font-medium">{result.assignmentTitle}</p>
-      <p>{result.instructions}</p>
+    <div className="space-y-3 text-foreground">
+      <TeacherPreviewSection title={result.assignmentTitle} accent="amber">
+        <p>{result.instructions}</p>
+      </TeacherPreviewSection>
 
       {hasPassageBodies ? (
         sections.map((section, index) => (
@@ -89,27 +91,30 @@ function HomeworkReadOnly({ result }: { result: HomeworkResult }) {
               />
             ) : null}
             {section.questions.length > 0 ? (
-              <ol className="list-decimal space-y-1 pl-5" start={section.questionNumbers[0]}>
-                {section.questions.map((question, qIndex) => (
-                  <li key={`${section.questionNumbers[qIndex]}-${question}`}>
-                    {question}
-                  </li>
-                ))}
-              </ol>
+              <TeacherPreviewSection title="Questions" accent="violet">
+                <ol className="list-decimal space-y-1.5 pl-5 marker:text-violet-300" start={section.questionNumbers[0]}>
+                  {section.questions.map((question, qIndex) => (
+                    <li key={`${section.questionNumbers[qIndex]}-${question}`}>
+                      {question}
+                    </li>
+                  ))}
+                </ol>
+              </TeacherPreviewSection>
             ) : null}
           </div>
         ))
       ) : (
-        <ol className="list-decimal space-y-1 pl-5">
-          {result.questions.map((question, index) => (
-            <li key={`${index}-${question}`}>{question}</li>
-          ))}
-        </ol>
+        <TeacherPreviewSection title="Questions" accent="violet">
+          <ol className="list-decimal space-y-1.5 pl-5 marker:text-violet-300">
+            {result.questions.map((question, index) => (
+              <li key={`${index}-${question}`}>{question}</li>
+            ))}
+          </ol>
+        </TeacherPreviewSection>
       )}
 
-      <div>
-        <p className="font-medium text-foreground">Answer Key</p>
-        <ol className="list-decimal space-y-3 pl-5">
+      <TeacherPreviewSection title="Answer Key" accent="emerald">
+        <ol className="list-decimal space-y-3 pl-5 marker:text-emerald-300">
           {result.answerKey.map((answer, index) => (
             <li key={`${index}-${answer}`}>
               <p>{answer}</p>
@@ -117,7 +122,7 @@ function HomeworkReadOnly({ result }: { result: HomeworkResult }) {
             </li>
           ))}
         </ol>
-      </div>
+      </TeacherPreviewSection>
     </div>
   );
 }

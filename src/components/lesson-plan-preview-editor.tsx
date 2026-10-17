@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TeacherPreviewSection } from "@/components/teacher-tool-page-shell";
 import type { LessonPlanResult } from "@/lib/teacher-generators";
 import type { LessonPlanDaySchedule } from "@/lib/lesson-plan-ai-schema";
 import { formatUnitPacingLabel } from "@/lib/lesson-plan-weekly-schedule";
@@ -103,31 +104,30 @@ function LessonPlanReadOnly({
       : undefined;
 
   return (
-    <div className="space-y-4 text-foreground">
-      <div className="space-y-2">
-        <p className="font-medium">{result.lessonTitle}</p>
+    <div className="space-y-3 text-foreground">
+      <TeacherPreviewSection title={result.lessonTitle} accent="violet">
         {unitLabel ? (
-          <Badge variant="outline" className="text-foreground">
+          <Badge variant="outline" className="border-violet-300/40 bg-violet-500/10 text-foreground">
             {unitLabel}
           </Badge>
-        ) : null}
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Learning Objectives</p>
-        <ul className="list-disc pl-5">
+        ) : (
+          <p className="text-muted-foreground">Lesson plan</p>
+        )}
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Learning Objectives" accent="emerald">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-emerald-300">
           {result.learningObjectives.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <div>
-        <p className="font-medium text-foreground">Materials Needed</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Materials Needed" accent="amber">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-amber-300">
           {result.materialsNeeded.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
+      </TeacherPreviewSection>
       {hasWeeklySchedule ? (
         <LessonPlanWeeklySchedulePanel
           schedule={result.weeklySchedule!}
@@ -138,75 +138,59 @@ function LessonPlanReadOnly({
           useFiveEModel={Boolean(result.jamaicaNscGuidelinesApplied)}
         />
       ) : null}
-      <div>
-        <p className="font-medium text-foreground">
-          {hasWeeklySchedule ? "Vocabulary (full unit)" : "Vocabulary"}
-        </p>
-        <ul className="list-disc pl-5">
+      <TeacherPreviewSection
+        title={hasWeeklySchedule ? "Vocabulary (full unit)" : "Vocabulary"}
+        accent="sky"
+      >
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-sky-300">
           {result.vocabulary.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      {hasWeeklySchedule ? (
-        <div>
-          <p className="font-medium text-foreground">Unit pacing overview</p>
-          <ul className="list-disc pl-5">
-            {result.lessonTimeline.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <div>
-          <p className="font-medium text-foreground">Lesson Timeline</p>
-          <ul className="list-disc pl-5">
-            {result.lessonTimeline.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <p>
-        <span className="font-medium text-foreground">Warm-Up: </span>
-        {result.warmUpActivity}
-      </p>
-      <div>
-        <p className="font-medium text-foreground">Main Teaching Steps</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection
+        title={hasWeeklySchedule ? "Unit pacing overview" : "Lesson Timeline"}
+        accent="cyan"
+      >
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-cyan-300">
+          {result.lessonTimeline.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Warm-Up" accent="rose">
+        <p>{result.warmUpActivity}</p>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Main Teaching Steps" accent="violet">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-violet-300">
           {result.mainTeachingSteps.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <p>
-        <span className="font-medium text-foreground">Classroom Activity: </span>
-        {result.classroomActivity}
-      </p>
-      <div>
-        <p className="font-medium text-foreground">Assessment Questions</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Classroom Activity" accent="emerald">
+        <p>{result.classroomActivity}</p>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Assessment Questions" accent="amber">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-amber-300">
           {result.assessmentQuestions.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <p>
-        <span className="font-medium text-foreground">Homework: </span>
-        {result.homework}
-      </p>
-      <div>
-        <p className="font-medium text-foreground">Differentiated Instruction</p>
-        <ul className="list-disc pl-5">
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Homework" accent="sky">
+        <p>{result.homework}</p>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Differentiated Instruction" accent="rose">
+        <ul className="list-disc space-y-1.5 pl-5 marker:text-rose-300">
           {result.differentiatedInstruction.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <p>
-        <span className="font-medium text-foreground">Teacher Notes: </span>
-        {result.teacherNotes}
-      </p>
+      </TeacherPreviewSection>
+      <TeacherPreviewSection title="Teacher Notes" accent="cyan">
+        <p>{result.teacherNotes}</p>
+      </TeacherPreviewSection>
     </div>
   );
 }

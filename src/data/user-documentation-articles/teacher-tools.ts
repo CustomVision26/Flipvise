@@ -37,7 +37,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
         bullets: [
           "Header Teacher link appears when you qualify for education features.",
           "Welcome card shows your plan badge and workspace guidance.",
-          "Left sidebar lists AI content tools, Add-ons, Classroom management, and Resources. Open Teacher Dashboard guide for the Education Gold screenshots: Teacher Dash from Personal Dashboard, then the workspace sidebar.",
+          "Left sidebar lists AI content tools, Add-ons, Classroom management, and Resources. Each tool uses a colored icon tile, and the open tool stays highlighted. Open Teacher Dashboard guide for the Education Gold screenshots: Teacher Dash from Personal Dashboard, then the workspace sidebar.",
           "Workspace selector scopes deck pickers to personal or team context on Education Gold/Enterprise.",
           "Team Admin Dashboard shortcut appears when you can manage an education team workspace. Owners do not get a Team Dashboard shortcut — that surface is for invited members; owners use Personal Dashboard.",
         ],
@@ -65,7 +65,7 @@ export const TEACHER_TOOLS_ARTICLES: DocArticle[] = [
           "Open a tool from the Teacher Dashboard sidebar.",
           "Link one or more decks as source material (personal or team-scoped).",
           "Set topic, grade level, difficulty, and tool-specific options.",
-          "Generate → preview → edit sections → save to Teacher Resource Library.",
+          "Generate → preview → edit sections → save to Teacher Resource Library. Preview lays each generated section in a colored card. Quiz preview cards use a violet wash; the front stays blue, the correct back stays green, and wrong answers stay red.",
           "Regenerate individual sections or the full output when results need refinement.",
           "Export PDF where supported (lesson plans, study guides, worksheets).",
         ],

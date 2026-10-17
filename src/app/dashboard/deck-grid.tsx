@@ -371,6 +371,7 @@ export function DeckGrid({
               <DeckCardPopover
                 deck={deck}
                 view={view}
+                enterIndex={index}
                 workspaceQueryString={workspaceQueryString}
                 variant={resolveDeckPopoverVariant(deck, deckPopoverVariant)}
                 canEditContent={deck.canEditContent}

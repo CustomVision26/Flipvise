@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-14T15:45:40.138Z",
+  "updatedAt": "2026-10-17T15:22:32.004Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "7c4abd2c7b6eb840804a1124ab908b78d68364653a0580977b9b1336b315ed1d",
@@ -11,12 +11,12 @@
       "docFingerprint": "d12b8cf8788fd612248c51cbcf315866eb486ec359e5743195623a35e8b5c1d1"
     },
     "personal-dashboard": {
-      "watchFingerprint": "350c6d1d1310569266ab3aad87eeb6a45325d2f0b16fefb58c4665df648c7574",
-      "docFingerprint": "39743bd45c3dc503a394526472adc4c2a3392e9b88d35c5bb6361333d32f554b"
+      "watchFingerprint": "552132784a8f4f124623ddc7194245cbf222a1f776d80a5a03aadf156f55764d",
+      "docFingerprint": "e48fa5a2dac7086d67623d5c0c5581350148249289d13addbb02f6fbc07b657d"
     },
     "team-workspace-dashboard": {
-      "watchFingerprint": "91fcb1a6548c8542fae91327fdfa737a8966d188839d9d8fad120357f7ed6cf8",
-      "docFingerprint": "5aee225f87a500c49421268676db6cb1515747a7750062bda5da734dc1ed15cd"
+      "watchFingerprint": "79a041affc63b37930ebdfdfc5ade3ef8f3fd35a85b0942eeb46d327f6efd07f",
+      "docFingerprint": "4894dd09e954486d74af6946558071f55088e86f24594baebf37d90d1b7f8e4c"
     },
     "manage-workspaces": {
       "watchFingerprint": "8aecab13387cf2fd5049deea77332c44fccb702e87b50b27c54a15d6f2013d3c",
@@ -204,11 +204,11 @@
     },
     "teacher-dashboard": {
       "watchFingerprint": "f2fd3a83ddfc559247f4d784101e713b19b08363a84398549ba4b0371cfa8e82",
-      "docFingerprint": "d84651c3a163340a23b9821c4f568894ca194beb76e3d81ca30adabb20d3328f"
+      "docFingerprint": "0be6e42d90fe52652c10a46f5b597d69e4f47dd1bb67c29b6811193f0c242200"
     },
     "teacher-ai-content-tools": {
-      "watchFingerprint": "4a7d08baac446b4b2d49fce39275024a996d6a35f6d09dc4aaa90bb4383ee69a",
-      "docFingerprint": "880b2db4cda132c5d0d8cf8255303c69205c9a1fbce0fcbdde2b6286e4d105ce"
+      "watchFingerprint": "b608a4c7a81f3c9f10aa0ddf61248fead4a5d0c24c8d883b2123beb8c5a5aacc",
+      "docFingerprint": "0985c98cbc76d575e6a83add7c9217a7ecffe80b1b00cd6017b3061f28a630ba"
     },
     "teacher-classroom": {
       "watchFingerprint": "94696a981c9511be4c3fc2107e03fe3883d2d7e033f75b771a8694071059776c",
