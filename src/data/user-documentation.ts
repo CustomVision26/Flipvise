@@ -985,6 +985,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace. Open create workspace guide for the screenshot walkthrough.",
           "The Add-ons sidebar appears only when this workspace has a paid or assigned add-on that is compatible with its plan (for example Live Classroom™ on Education Gold).",
           "Live Classroom™ opens from Team Admin → Add-ons when that add-on is active, or from /dashboard/live-classroom.",
+          "The sidebar and section tabs use raised, color-accented controls so the open section stays easy to see.",
         ],
         requirements: [
           "Team owner or invited team_admin role.",
@@ -1259,7 +1260,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Open Worksheet Generator from a lesson plan guide to follow a saved plan, preview, Edit, Save, Worksheet PDF, and Answer Key PDF. Open Worksheet Generator, choose a saved lesson plan from the workspace owner or a team admin, then Generate. A multi-day plan asks which part to use: All Days or one day, listed by day only. The worksheet is then written with AI from that choice. Worksheet Generator (/teacher/worksheets) — printable practice sheets with answer keys.",
           "Generate AI Essay — premium add-on under the sidebar Add-ons category (AI Document Studio); requires the AI Essay add-on (purchase or complimentary grant). Workspace member assignment is coming soon.",
           "Each tool links one or more decks as source material — pick decks from your personal library or team workspaces you manage. Essay uses its own topic form in the AI Essay workspace.",
-          "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library.",
+          "Preview, edit, regenerate sections, and save outputs to your Teacher Resource Library. Daily Schedule days, vocabulary entries, class timelines, and the day-detail preview use raised color-accented panels so each day, term, and class phase stays visually separate while you edit.",
         ],
         requirements: [
           "Education plan access.",

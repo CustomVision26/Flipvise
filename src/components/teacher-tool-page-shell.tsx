@@ -68,6 +68,7 @@ export function TeacherPreviewSection({
   return (
     <Card
       size="sm"
+      data-studio-section=""
       className={cn(
         "gap-2 overflow-hidden border py-0 shadow-sm transition-shadow duration-300 hover:shadow-md",
         PREVIEW_SECTION_ACCENTS[accent],
@@ -252,7 +253,7 @@ export function TeacherToolPageShell({
         </CardHeader>
       </Card>
 
-      <Card className={cn(teamAdminCardClass, "backdrop-blur-sm")}>
+      <Card data-studio-form="" className={cn(teamAdminCardClass, "backdrop-blur-sm")}>
         <CardHeader>
           <CardTitle className="text-base">Input</CardTitle>
         </CardHeader>
@@ -305,6 +306,7 @@ export function TeacherToolPageShell({
       ) : null}
 
       <Card
+        data-studio-preview=""
         className={cn(
           teamAdminCardClass,
           "relative overflow-hidden border-violet-400/25 bg-gradient-to-b from-violet-500/12 via-card/85 to-card/70 shadow-xl shadow-violet-950/25 backdrop-blur-sm",

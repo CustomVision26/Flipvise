@@ -36,6 +36,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Direct URL: /dashboard/team-admin?team=<id>&teamMemberId=<id>. The member Team Dashboard is /dashboard?team=<id> only.",
           "Default landing redirects to Deck Manager → Assign decks to members.",
           "teamMemberId=0 means you are the subscriber owner.",
+          "The sidebar uses a raised panel with a color rail, and section tabs use raised color-accented controls.",
         ],
       },
       {

@@ -215,6 +215,11 @@ export default async function RootLayout({
   const hideAuthenticatedAccountChrome =
     isMinimalHeaderRoute || isNativeSignInRoute;
   const isTeamAdminRoute = shell.profile === "team-admin";
+  const studioCanvas =
+    (pathnameHeader.startsWith("/dashboard") ||
+      pathnameHeader.startsWith("/decks") ||
+      pathnameHeader.startsWith("/teacher")) &&
+    !pathnameHeader.includes("/projector");
   const aiEssayComingSoonForUser =
     userId != null
       ? await isAiEssayComingSoonForTeamMember(userId, {
@@ -390,17 +395,27 @@ export default async function RootLayout({
               </AuthenticatedShellChrome>
             )}
             <div
-              className="relative flex-1 flex flex-col"
+              className="relative flex min-h-0 flex-1 flex-col"
               data-shell={isTeamAdminRoute ? "team-admin" : undefined}
+              data-studio-canvas={studioCanvas ? "" : undefined}
               suppressHydrationWarning
             >
-              {billingReminder &&
-              userId &&
-              !isTeamInviteRoute &&
-              !isNativeSignInRoute ? (
-                <BillingReminderBanner reminder={billingReminder} />
+              {studioCanvas ? (
+                <div className="studio-canvas-orbs" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </div>
               ) : null}
-              <TooltipProvider>{children}</TooltipProvider>
+              <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+                {billingReminder &&
+                userId &&
+                !isTeamInviteRoute &&
+                !isNativeSignInRoute ? (
+                  <BillingReminderBanner reminder={billingReminder} />
+                ) : null}
+                <TooltipProvider>{children}</TooltipProvider>
+              </div>
             </div>
             <SiteContactFooter />
         </AppProviders>

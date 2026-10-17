@@ -233,10 +233,14 @@ export function TeamAdminDashboardNavPanel({
     <div
       className={cn(
         teamAdminCardClass,
-        "rounded-xl border border-border/80 bg-card/80 p-3 backdrop-blur-sm",
+        "rounded-2xl border border-white/10 bg-gradient-to-b from-card/90 via-card/80 to-card/65 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_18px_36px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md",
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="mb-3 h-1 rounded-full bg-gradient-to-r from-sky-400 via-amber-300 to-emerald-400"
+      />
       <TeamAdminDashboardNav onNavigate={onNavigate} addonNav={addonNav} />
     </div>
   );

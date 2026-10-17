@@ -121,7 +121,7 @@ function DayListTextarea({
 
 function VocabularySummaryBox({ terms }: { terms: LessonPlanVocabularyTermDetail[] }) {
   return (
-    <div className="rounded-md border border-border bg-muted/40 p-3">
+    <div data-studio-vocab className="rounded-md border border-border bg-muted/40 p-3">
       <p className="text-sm font-medium text-foreground">Vocabulary</p>
       <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
         {terms.map((term) => (
@@ -251,7 +251,7 @@ function EditableVocabularySummaryBox({
   }
 
   return (
-    <div className="space-y-3 rounded-md border border-border bg-muted/40 p-3">
+    <div data-studio-vocab className="space-y-3 rounded-md border border-border bg-muted/40 p-3">
       <p className="text-sm font-medium text-foreground">Vocabulary</p>
       <p className="text-xs text-muted-foreground">
         Press Enter for a new line. Use <span className="font-medium">Term — definition</span>{" "}
@@ -306,6 +306,7 @@ function FiveEBreakdownSection({
         {breakdown.phases.map((phase) => (
           <li
             key={phase.phase}
+            data-studio-phase={phase.phase}
             className="space-y-2 rounded-md border border-border bg-muted/30 p-3"
           >
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -808,6 +809,7 @@ export function LessonPlanWeeklySchedulePanel({
           return (
             <div
               key={`schedule-day-${dayIndex}`}
+              data-studio-day=""
               className="space-y-3 rounded-md border border-border p-3"
             >
               <div className="flex items-start justify-between gap-2">
@@ -971,7 +973,7 @@ export function LessonPlanWeeklySchedulePanel({
           if (!open) setDetailDayIndex(null);
         }}
       >
-        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl">
+        <SheetContent side="right" data-studio-detail="" className="w-full gap-0 p-0 sm:max-w-xl">
           {detailDay?.vocabularyDetail ? (
             <>
               <SheetHeader className="border-b border-border px-6 py-4 text-left">

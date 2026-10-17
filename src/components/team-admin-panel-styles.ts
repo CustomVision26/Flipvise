@@ -20,26 +20,28 @@ export function teamAdminPanelHref(href: string, panelId: string): string {
 /** Primary team-admin section tabs (Members, Deck Manager, …). */
 export function teamAdminTabClass(isActive: boolean) {
   return cn(
-    "inline-flex shrink-0 items-center justify-center whitespace-nowrap border-2 px-3.5 py-2 text-xs transition-all duration-200 sm:px-4 sm:py-2.5 sm:text-sm",
+    "inline-flex shrink-0 items-center justify-center whitespace-nowrap border px-3.5 py-2 text-xs transition-all duration-200 sm:px-4 sm:py-2.5 sm:text-sm",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    "rounded-full sm:rounded-none sm:border-b-2",
+    "rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_16px_-12px_rgba(0,0,0,0.65)] sm:rounded-none sm:rounded-t-xl sm:border-b-2",
     isActive
-      ? "border-primary bg-primary font-bold text-primary-foreground shadow-sm sm:border-primary sm:bg-transparent sm:font-semibold sm:text-foreground"
-      : "border-transparent bg-muted/60 font-medium text-muted-foreground hover:bg-muted hover:text-foreground sm:bg-transparent sm:hover:bg-transparent sm:hover:text-foreground",
+      ? "border-sky-300/55 bg-primary font-bold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_18px_-12px_rgba(56,189,248,0.85)] sm:border-sky-300 sm:bg-transparent sm:font-semibold sm:text-foreground sm:shadow-[inset_0_-2px_0_0_rgba(56,189,248,0.95)]"
+      : "border-transparent bg-muted/70 font-medium text-muted-foreground hover:-translate-y-0.5 hover:bg-muted hover:text-foreground sm:bg-transparent sm:shadow-none sm:hover:translate-y-0 sm:hover:bg-transparent sm:hover:text-foreground",
+      : "border-transparent bg-muted/70 font-medium text-muted-foreground hover:-translate-y-0.5 hover:bg-muted hover:text-foreground sm:bg-transparent sm:shadow-none sm:hover:translate-y-0 sm:hover:bg-transparent sm:hover:text-foreground",
   );
 }
 
 /** Nested pill tabs (Send invite, Pending, …). */
 export function teamAdminSubTabClass(isActive: boolean) {
   return cn(
-    "inline-flex h-9 shrink-0 items-center justify-center rounded-md border-2 px-3 text-xs font-medium transition-colors sm:text-sm",
+    "inline-flex h-9 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-medium transition-all duration-200 sm:text-sm",
     isActive
-      ? "border-primary bg-background font-semibold text-foreground shadow-sm"
-      : "border-transparent text-muted-foreground hover:text-foreground",
+      ? "border-emerald-300/45 bg-background font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_8px_16px_-12px_rgba(16,185,129,0.8)]"
+      : "border-transparent text-muted-foreground hover:-translate-y-0.5 hover:bg-muted/70 hover:text-foreground",
   );
 }
 
-export const teamAdminCardClass = "border-border/80 bg-card/60 shadow-sm";
+export const teamAdminCardClass =
+  "border-border/80 bg-card/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_16px_32px_-22px_rgba(0,0,0,0.65)]";
 
 /** Open tab panel — primary border, bold presence, entrance motion. */
 export const teamAdminActivePanelClass = cn(
