@@ -177,7 +177,7 @@ export function TeamAdminDashboardNav({
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               {section.title}
             </p>
-            <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               {section.description}
             </p>
           </div>

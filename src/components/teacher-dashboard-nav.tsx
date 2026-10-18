@@ -132,7 +132,7 @@ export function TeacherDashboardNav({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate">Dashboard</span>
-            <span className="block truncate text-[10px] font-normal text-muted-foreground/80">
+            <span className="block truncate text-[10px] font-normal text-muted-foreground">
               /teacher
             </span>
           </span>
@@ -146,7 +146,7 @@ export function TeacherDashboardNav({
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               {section.title}
             </p>
-            <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
               {section.description}
             </p>
           </div>
@@ -183,7 +183,7 @@ export function TeacherDashboardNav({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{item.title}</span>
-                      <span className="block truncate text-[10px] font-normal text-muted-foreground/80">
+                      <span className="block truncate text-[10px] font-normal text-muted-foreground">
                         {path}
                       </span>
                     </span>
