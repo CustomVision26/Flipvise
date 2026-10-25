@@ -35,7 +35,12 @@ export type IllustratedAsset = {
   varietyPool?: boolean;
 };
 
-export type IllustratedProp = "ai-recall-intro" | "quiz-stopwatch" | "quiz-pencil";
+export type IllustratedProp =
+  | "ai-recall-intro"
+  | "quiz-stopwatch"
+  | "quiz-pencil"
+  | "quiz-stars"
+  | "quiz-spark";
 
 const SCENE_TILE_WIDTH = 251;
 const SCENE_TILE_HEIGHT = 119;
@@ -613,6 +618,34 @@ export const ILLUSTRATED_ASSET_MANIFEST: IllustratedAsset[] = [
     height: 1024,
     transparent: true,
     suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "quiz-stars",
+    subject: "general",
+    topic: "quiz-stars",
+    role: "prop",
+    path: "/illustrated/props/quiz-stars.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "quiz-spark",
+    subject: "general",
+    topic: "quiz-spark",
+    role: "prop",
+    path: "/illustrated/props/quiz-spark.png",
+    width: 1280,
+    height: 720,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1280, 720),
     reviewStatus: "limited",
     fit: "contain",
     keywords: [],

@@ -2605,6 +2605,7 @@ html[data-illustrated="on"] .illustrated-layer-b {
 }
 
 html[data-illustrated="on"] .illustrated-quiz-prep [data-slot="card"] {
+  margin-inline: auto;
   border-color: #eadfce;
   background: #fff8ee;
   color: #0f172a;

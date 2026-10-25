@@ -342,7 +342,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
         <div className="absolute bottom-[-4rem] right-1/4 size-[14rem] rounded-full bg-fuchsia-500/8 blur-3xl animate-drift" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
+      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-5 overflow-y-auto p-4 sm:gap-7 sm:p-8">
         <IllustratedDeckHero
           name={deck.name}
           description={deck.description}

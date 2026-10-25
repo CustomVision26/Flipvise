@@ -260,11 +260,40 @@ export function IllustratedQuizPrepFrame({
     return <div className="illustrated-quiz-live illustrated-readable">{children}</div>;
   }
   return (
-    <div className="illustrated-quiz-prep relative mx-auto w-full max-w-3xl overflow-visible">
+    <div className="illustrated-quiz-prep relative mx-auto w-full max-w-3xl overflow-visible pt-8 pb-28 sm:pt-10 sm:pb-36">
       <div className="relative overflow-visible">
         <div
           className={cn(
-            "pointer-events-none absolute -left-6 bottom-4 z-20 hidden sm:block md:-left-16",
+            "pointer-events-none absolute left-0 top-0 z-20 hidden -translate-x-6 sm:block md:-translate-x-10",
+            !effectiveReducedMotion && "illustrated-quiz-props",
+          )}
+          aria-hidden
+        >
+          <span className="relative block h-28 w-28 md:h-40 md:w-40">
+            <IllustratedScene
+              prop="quiz-stars"
+              fit="contain"
+              displayWidth={160}
+              displayHeight={160}
+            />
+          </span>
+        </div>
+        <div
+          className="pointer-events-none absolute right-0 top-0 z-20 hidden translate-x-4 sm:block md:translate-x-8"
+          aria-hidden
+        >
+          <span className="relative block h-24 w-24 md:h-32 md:w-32">
+            <IllustratedScene
+              prop="quiz-stars"
+              fit="contain"
+              displayWidth={128}
+              displayHeight={128}
+            />
+          </span>
+        </div>
+        <div
+          className={cn(
+            "pointer-events-none absolute -left-6 bottom-10 z-20 hidden sm:block md:-left-16",
             !effectiveReducedMotion && "illustrated-quiz-props",
           )}
           aria-hidden
@@ -279,7 +308,7 @@ export function IllustratedQuizPrepFrame({
           </span>
         </div>
         <div
-          className="pointer-events-none absolute -right-4 top-2 z-20 hidden sm:block md:-right-12"
+          className="pointer-events-none absolute -right-4 top-16 z-20 hidden sm:block md:-right-12"
           aria-hidden
         >
           <span className="relative block h-56 w-48 md:h-72 md:w-60">
@@ -291,7 +320,25 @@ export function IllustratedQuizPrepFrame({
             />
           </span>
         </div>
-        <IllustratedCardStack seed={`${deckName}-quiz`}>{children}</IllustratedCardStack>
+        <div
+          className="pointer-events-none absolute left-1/2 top-full z-0 mt-4 hidden w-56 -translate-x-1/2 sm:block md:w-72"
+          aria-hidden
+        >
+          <span className="relative block h-20 w-full md:h-28">
+            <IllustratedScene
+              prop="quiz-spark"
+              fit="contain"
+              displayWidth={288}
+              displayHeight={112}
+            />
+          </span>
+        </div>
+        <IllustratedCardStack
+          className="illustrated-stack-plain relative z-10"
+          seed={`${deckName}-quiz`}
+        >
+          {children}
+        </IllustratedCardStack>
       </div>
     </div>
   );
