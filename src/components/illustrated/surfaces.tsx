@@ -10,6 +10,9 @@ import { useIllustratedAppearance } from "@/components/illustrated-appearance-pr
 import { IllustratedDeckHero, IllustratedQuizPrepFrame } from "@/components/illustrated/shell";
 import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
 import type { IllustratedAssetRole } from "@/lib/illustrated-asset-manifest";
+import { peekLayerColors } from "@/lib/illustrated-peek-colors";
+
+export { peekLayerColors };
 
 export function DeckArtwork({
   subject,
@@ -81,6 +84,8 @@ export function IllustratedStack({
   children,
   className,
   artClassName,
+  layerA,
+  layerB,
 }: {
   subject: SubjectKey;
   coverImageUrl?: string | null;
@@ -95,6 +100,9 @@ export function IllustratedStack({
   children: ReactNode;
   className?: string;
   artClassName?: string;
+  /** Peeking card behind the face. Inline so it is not lost to the shared layer color. */
+  layerA?: string;
+  layerB?: string;
 }) {
   const { effectiveReducedMotion } = useIllustratedAppearance();
   return (
@@ -105,8 +113,16 @@ export function IllustratedStack({
         className,
       )}
     >
-      <span className="illustrated-layer illustrated-layer-a" aria-hidden />
-      <span className="illustrated-layer illustrated-layer-b" aria-hidden />
+      <span
+        className="illustrated-layer illustrated-layer-a"
+        style={layerA ? { background: layerA } : undefined}
+        aria-hidden
+      />
+      <span
+        className="illustrated-layer illustrated-layer-b"
+        style={layerB ? { background: layerB } : undefined}
+        aria-hidden
+      />
       <div className="illustrated-face relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[#eadfce] bg-[#fff8ee] text-slate-900 shadow-lg">
         <div
           className={cn(
@@ -168,13 +184,15 @@ export function IllustratedDeckTile({
     <IllustratedStack
       subject={art.subject}
       referenceImageUrl={art.referenceImageUrl}
-      className={cn("illustrated-readable h-full", className)}
+      className={cn("illustrated-deck-tile illustrated-readable h-full", className)}
       topicText={`${name} ${description ?? ""}`}
       role="hero"
       displayWidth={360}
       displayHeight={240}
+      artClassName="illustrated-deck-art"
+      {...peekLayerColors(name)}
     >
-      <div className="flex flex-col gap-2 p-3 sm:p-4">
+      <div className="illustrated-deck-copy flex flex-col gap-2 px-3 pt-3 pb-3 sm:px-4">
         <p className="line-clamp-3 text-base font-semibold leading-snug tracking-tight text-slate-900 [overflow-wrap:anywhere]">
           {name}
         </p>
@@ -222,11 +240,12 @@ export function IllustratedCardTile({
       displayWidth={360}
       displayHeight={160}
       art={art}
-      artClassName="h-40 shrink-0 aspect-auto bg-[#f6f1e8]"
+      artClassName="illustrated-card-art h-32 shrink-0 aspect-auto bg-[#f6f1e8]"
       className="illustrated-card-tile illustrated-readable h-[18.5rem]"
+      {...peekLayerColors(variantIndex ?? topicText ?? subject)}
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
-        <div className="min-h-0 flex-1 overflow-hidden text-sm leading-snug text-slate-900 [overflow-wrap:anywhere]">
+      <div className="illustrated-card-copy flex shrink-0 flex-col gap-1.5 px-3 pt-2.5 pb-3">
+        <div className="text-sm leading-snug text-[#1e1b4b] [overflow-wrap:anywhere]">
           {children}
         </div>
         {footer ? <div className="shrink-0">{footer}</div> : null}

@@ -2726,36 +2726,7 @@ html[data-illustrated="on"] .illustrated-standard-wash {
   max-width: none;
   max-height: none;
   object-fit: contain;
-  filter: saturate(1.12) contrast(1.06) brightness(1.04);
-}
-
-.illustrated-page-bg-gloss {
-  position: absolute;
-  top: var(--bg-art-top, 11%);
-  height: var(--bg-art-height, 78%);
-  width: var(--bg-art-width, auto);
-  max-width: var(--bg-art-max-width, none);
-  max-height: var(--bg-art-max-height, none);
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.08) 22%, transparent 40%),
-    linear-gradient(128deg, transparent 24%, rgba(255, 255, 255, 0.5) 42%, rgba(255, 255, 255, 0.05) 50%, transparent 64%);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.illustrated-page-bg-gloss-left {
-  left: 0;
-  -webkit-mask-position: left center;
-  mask-position: left center;
-}
-
-.illustrated-page-bg-gloss-right {
-  right: 0;
-  -webkit-mask-position: right center;
-  mask-position: right center;
+  filter: none;
 }
 
 .illustrated-page-bg-art-left {
@@ -2903,6 +2874,86 @@ html[data-illustrated="on"] .illustrated-cards-decor[data-pattern="math"] {
   opacity: 0.35;
 }
 
+.illustrated-cards-mark {
+  display: none;
+}
+
+html[data-illustrated="on"] .illustrated-cards-mark {
+  display: block;
+  color: #7dd3fc;
+}
+
+html[data-illustrated="on"] .illustrated-card-delete,
+html[data-illustrated="on"] .illustrated-card-delete:hover,
+html[data-illustrated="on"] .illustrated-card-delete:active,
+html[data-illustrated="on"] .illustrated-card-delete:focus-visible {
+  background: #e11d48 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+html[data-illustrated="on"] .illustrated-card-delete:hover {
+  background: #be123c !important;
+}
+
+html[data-illustrated="on"] .illustrated-card-tile .illustrated-card-art {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 6.5rem;
+  aspect-ratio: auto !important;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+html[data-illustrated="on"] .illustrated-card-tile .illustrated-card-copy,
+html[data-illustrated="on"] .illustrated-deck-tile .illustrated-deck-copy {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  margin-top: -1.35rem;
+  background: #fff8ee;
+  border-top-left-radius: 1.85rem;
+  border-top-right-radius: 1.85rem;
+}
+
+html[data-illustrated="on"] .illustrated-deck-tile .illustrated-deck-art {
+  flex: 0 0 auto !important;
+  height: 11rem !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+html[data-illustrated="on"] .illustrated-deck-tile .illustrated-deck-art img {
+  object-position: center bottom !important;
+}
+
+html[data-illustrated="on"] .illustrated-deck-tile .illustrated-deck-copy {
+  margin-top: -4.25rem !important;
+  border-top-left-radius: 2.6rem !important;
+  border-top-right-radius: 2.6rem !important;
+  background: #fff8ee !important;
+}
+
+
+html[data-illustrated="on"] .illustrated-card-tile .illustrated-card-question {
+  display: -webkit-box;
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  opacity: 1 !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  min-height: 2.6rem;
+  letter-spacing: -0.011em;
+  text-shadow: none !important;
+  filter: none !important;
+  background: transparent !important;
+}
+
 html[data-illustrated="on"] .illustrated-cards-toolbar,
 html[data-illustrated="on"] .illustrated-cards-toolbar .text-muted-foreground,
 html[data-illustrated="on"] .illustrated-cards-meta,
@@ -2984,7 +3035,7 @@ html[data-illustrated="on"] .illustrated-page:has(.illustrated-quiz-live) .illus
     display: none;
   }
 
-  /* Phone app keeps the cartoon side art, gloss, and cream-card pictures. */
+  /* Phone app keeps the cartoon side art and cream-card pictures. */
   html[data-flipvise-native-shell] .illustrated-page-bg-slot {
     --bg-art-top: 14%;
     --bg-art-height: auto;

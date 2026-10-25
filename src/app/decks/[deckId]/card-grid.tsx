@@ -193,11 +193,15 @@ function CardFaceText({
         ) : null}
         <p
           className={cn(
-            "min-w-0 flex-1 font-semibold leading-snug text-card-foreground [overflow-wrap:anywhere]",
-            variant === "compact"
-              ? "line-clamp-4 text-[11px]"
-              : "line-clamp-2 text-xs sm:text-sm",
-            cardTextClass,
+            "min-w-0 flex-1 leading-snug [overflow-wrap:anywhere]",
+            cardTextClass.includes("illustrated-card-question")
+              ? "illustrated-card-question line-clamp-3"
+              : "font-semibold text-card-foreground",
+            !cardTextClass.includes("illustrated-card-question") &&
+              (variant === "compact"
+                ? "line-clamp-4 text-[11px]"
+                : "line-clamp-2 text-xs sm:text-sm"),
+            !cardTextClass.includes("illustrated-card-question") && cardTextClass,
             !front && "italic text-muted-foreground",
           )}
         >
@@ -525,7 +529,7 @@ export function CardGrid({
                   isMC={isMC}
                   frontImageUrl={null}
                   backImageUrl={card.backImageUrl}
-                  cardTextClass={cn(cardTextClass, "text-slate-900 drop-shadow-none")}
+                  cardTextClass="illustrated-card-question"
                   variant="compact"
                 />
               </IllustratedCardTile>

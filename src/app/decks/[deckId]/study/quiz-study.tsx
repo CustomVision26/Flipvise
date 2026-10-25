@@ -136,6 +136,7 @@ type SubmitQuizOptions = {
 
 import { cn } from "@/lib/utils";
 import { IllustratedQuizFrame } from "@/components/illustrated/surfaces";
+import { IllustratedPeekFrame } from "@/components/illustrated/shell";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
 import type { DeckQuizFormatAssignments } from "@/lib/quiz-format-assignments";
@@ -1770,12 +1771,15 @@ export function QuizStudy({
         </div>
       </div>
 
+      <IllustratedPeekFrame seed={current.cardId} className="w-full max-w-2xl">
       <div
         className={cn(
-          "w-full max-w-2xl rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
-          deckAccent.hasDeckAccent
-            ? cn(deckAccent.gradient.classes, "border-white/20")
-            : "bg-card border-border",
+          "w-full rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
+          effectiveIllustratedDesign
+            ? "border-[#eadfce] bg-[#fff8ee] text-slate-900"
+            : deckAccent.hasDeckAccent
+              ? cn(deckAccent.gradient.classes, "border-white/20")
+              : "bg-card border-border",
         )}
       >
         <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2">
@@ -1881,6 +1885,7 @@ export function QuizStudy({
           )}
         </div>
       </div>
+      </IllustratedPeekFrame>
 
       {current.type !== "fill_in_blank" ? (
       <div
@@ -2175,8 +2180,9 @@ function QuizResultCard({
       className="flex flex-1 flex-col items-center gap-6 px-2 sm:px-4 py-2 sm:py-4 w-full min-w-0"
       style={resultAccentCss}
     >
+      <IllustratedPeekFrame seed={`${deckName}-quiz-result`} className="w-full max-w-xl">
       <div
-        className={`w-full max-w-xl flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-gradient-to-b ${style.accent} bg-card p-6 sm:p-10 shadow-md text-center`}
+        className={`w-full flex flex-col items-center gap-4 sm:gap-6 rounded-xl sm:rounded-2xl border bg-gradient-to-b ${style.accent} bg-card p-6 sm:p-10 shadow-md text-center`}
       >
         <div className="flex flex-col items-center gap-2">
           <Icon className={`h-10 w-10 sm:h-12 sm:w-12 ${style.color}`} />
@@ -2351,6 +2357,7 @@ function QuizResultCard({
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      </IllustratedPeekFrame>
 
       <div className="w-full max-w-xl flex flex-col gap-2">
         <h3 className="text-sm font-semibold text-muted-foreground px-1">Review</h3>

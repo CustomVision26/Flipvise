@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
+import { peekLayerColors } from "@/lib/illustrated-peek-colors";
 
 export function IllustratedStudyShell({
   children,
@@ -26,11 +27,14 @@ export function IllustratedStudyShell({
 export function IllustratedCardStack({
   children,
   className,
+  seed = "stack",
 }: {
   children: ReactNode;
   className?: string;
+  seed?: number | string;
 }) {
   const { effectiveReducedMotion } = useIllustratedAppearance();
+  const peek = peekLayerColors(seed);
   return (
     <div
       className={cn(
@@ -39,8 +43,16 @@ export function IllustratedCardStack({
         className,
       )}
     >
-      <span className="illustrated-layer illustrated-layer-a" aria-hidden />
-      <span className="illustrated-layer illustrated-layer-b" aria-hidden />
+      <span
+        className="illustrated-layer illustrated-layer-a"
+        style={{ background: peek.layerA }}
+        aria-hidden
+      />
+      <span
+        className="illustrated-layer illustrated-layer-b"
+        style={{ background: peek.layerB }}
+        aria-hidden
+      />
       <div className="illustrated-face relative z-[1]">{children}</div>
     </div>
   );
@@ -101,7 +113,7 @@ export function IllustratedQuestionSurface({
     description: deckDescription,
   });
   return (
-    <IllustratedCardStack className={className}>
+    <IllustratedCardStack className={className} seed={deckName ?? "question"}>
       <div className="overflow-hidden rounded-2xl border border-[#eadfce] bg-[#fff8ee] text-slate-900 shadow-md">
         {showArt ? (
           <div className="relative h-28 w-full sm:h-36" aria-hidden>
@@ -122,6 +134,7 @@ export function IllustratedQuestionSurface({
 }
 
 export function IllustratedInfoPanel({
+  deckName,
   children,
   className,
 }: {
@@ -135,7 +148,7 @@ export function IllustratedInfoPanel({
     return <div className={className}>{children}</div>;
   }
   return (
-    <IllustratedCardStack className={cn("mx-auto w-full max-w-lg", className)}>
+    <IllustratedCardStack className={cn("mx-auto w-full max-w-lg", className)} seed={deckName}>
       <div className="illustrated-readable rounded-2xl border border-[#eadfce] bg-[#fff8ee] p-6 text-center text-slate-900 sm:p-8">
         <div className="relative mx-auto mb-4 h-36 w-36" aria-hidden>
           <IllustratedScene prop="ai-recall-intro" displayWidth={144} displayHeight={144} />
@@ -183,6 +196,41 @@ export function IllustratedAnswerOption({
   );
 }
 
+export function IllustratedPeekFrame({
+  seed,
+  className,
+  children,
+}: {
+  seed: number | string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { effectiveIllustratedDesign, effectiveReducedMotion } = useIllustratedAppearance();
+  if (!effectiveIllustratedDesign) return <div className={className}>{children}</div>;
+  const peek = peekLayerColors(seed);
+  return (
+    <div
+      className={cn(
+        "illustrated-stack relative",
+        effectiveReducedMotion && "illustrated-stack-still",
+        className,
+      )}
+    >
+      <span
+        className="illustrated-layer illustrated-layer-a"
+        style={{ background: peek.layerA }}
+        aria-hidden
+      />
+      <span
+        className="illustrated-layer illustrated-layer-b"
+        style={{ background: peek.layerB }}
+        aria-hidden
+      />
+      <div className="illustrated-face relative z-[1]">{children}</div>
+    </div>
+  );
+}
+
 export function IllustratedActionButton({
   children,
   className,
@@ -198,7 +246,6 @@ export function IllustratedActionButton({
 export function IllustratedQuizPrepFrame({
   active,
   deckName,
-  deckDescription,
   children,
 }: {
   active: boolean;
@@ -212,48 +259,39 @@ export function IllustratedQuizPrepFrame({
   if (active) {
     return <div className="illustrated-quiz-live illustrated-readable">{children}</div>;
   }
-  const art = resolveIllustratedArtwork({
-    name: deckName,
-    description: deckDescription,
-  });
   return (
-    <div className="illustrated-quiz-prep relative mx-auto w-full max-w-3xl">
-      <div className="mb-3 overflow-hidden rounded-2xl" aria-hidden>
-        <div className="relative h-32 sm:h-40">
-          <IllustratedScene
-            subject={art.subject}
-            text={`${deckName} ${deckDescription ?? ""}`}
-            role="hero"
-            fit="contain"
-            displayWidth={720}
-            displayHeight={160}
-          />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#1e1b4b]/80 to-transparent p-4">
-            <p className="text-lg font-semibold text-white [overflow-wrap:anywhere]">{deckName}</p>
-          </div>
-        </div>
-      </div>
-      <div className="relative">
+    <div className="illustrated-quiz-prep relative mx-auto w-full max-w-3xl overflow-visible">
+      <div className="relative overflow-visible">
         <div
           className={cn(
-            "pointer-events-none absolute -left-2 bottom-6 z-10 hidden sm:block",
+            "pointer-events-none absolute -left-6 bottom-4 z-20 hidden sm:block md:-left-16",
             !effectiveReducedMotion && "illustrated-quiz-props",
           )}
           aria-hidden
         >
-          <span className="relative block h-24 w-20">
-            <IllustratedScene prop="quiz-stopwatch" displayWidth={80} displayHeight={96} />
+          <span className="relative block h-52 w-44 md:h-64 md:w-56">
+            <IllustratedScene
+              prop="quiz-stopwatch"
+              fit="contain"
+              displayWidth={224}
+              displayHeight={256}
+            />
           </span>
         </div>
         <div
-          className="pointer-events-none absolute -right-1 top-4 z-10 hidden sm:block"
+          className="pointer-events-none absolute -right-4 top-2 z-20 hidden sm:block md:-right-12"
           aria-hidden
         >
-          <span className="relative block h-24 w-20">
-            <IllustratedScene prop="quiz-pencil" displayWidth={80} displayHeight={96} />
+          <span className="relative block h-56 w-48 md:h-72 md:w-60">
+            <IllustratedScene
+              prop="quiz-pencil"
+              fit="contain"
+              displayWidth={240}
+              displayHeight={288}
+            />
           </span>
         </div>
-        <IllustratedCardStack>{children}</IllustratedCardStack>
+        <IllustratedCardStack seed={`${deckName}-quiz`}>{children}</IllustratedCardStack>
       </div>
     </div>
   );

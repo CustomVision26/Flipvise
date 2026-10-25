@@ -34,7 +34,7 @@ import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
-import { IllustratedInfoPanel } from "@/components/illustrated/shell";
+import { IllustratedInfoPanel, IllustratedPeekFrame } from "@/components/illustrated/shell";
 import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
 import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { cn } from "@/lib/utils";
@@ -689,7 +689,8 @@ export function AiRecallStudy({
     const isExcellence = displayMotivation.tier === "excellence";
 
     return (
-      <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-4 rounded-2xl border border-border bg-card/60 p-6 text-center sm:p-8">
+      <IllustratedPeekFrame seed={`${deckName}-recall-done`} className="mx-auto w-full max-w-lg">
+      <div className="flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card/60 p-6 text-center sm:p-8">
         {isExcellence ? (
           <Flower2 className="h-8 w-8 text-rose-400" aria-hidden />
         ) : (
@@ -767,6 +768,7 @@ export function AiRecallStudy({
           </Tooltip>
         </TooltipProvider>
       </div>
+      </IllustratedPeekFrame>
     );
   }
 
@@ -835,9 +837,10 @@ export function AiRecallStudy({
         ) : null}
       </div>
 
+      <IllustratedPeekFrame seed={current.id} className="w-full">
       <div
         className={cn(
-          "relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border shadow-sm sm:min-h-[280px]",
+          "relative z-[1] flex min-h-[220px] flex-col overflow-hidden rounded-2xl border shadow-sm sm:min-h-[280px]",
           effectiveIllustratedDesign
             ? "illustrated-readable border-[#eadfce] bg-[#fff8ee] text-slate-900"
             : hasGradient
@@ -957,6 +960,7 @@ export function AiRecallStudy({
           )}
         </div>
       </div>
+      </IllustratedPeekFrame>
 
       {phase === "prompt" ? (
         <div className="flex flex-col gap-3">

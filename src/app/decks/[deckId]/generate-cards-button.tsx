@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Bot, Sparkles } from "lucide-react";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { AiDataNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import {
@@ -130,6 +131,7 @@ export function GenerateCardsButton({
     });
   }
 
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
   const titleClass = onGradient ? "text-white" : "text-foreground";
   const mutedClass = onGradient ? "text-white/70" : "text-muted-foreground";
   const softClass = onGradient ? "text-white/55" : "text-muted-foreground/80";
@@ -191,21 +193,30 @@ export function GenerateCardsButton({
       <div className="flex items-start gap-3">
         <div
           className={cn(
-            "relative flex size-9 shrink-0 items-center justify-center rounded-lg border",
-            onGradient
-              ? "border-white/20 bg-white/10 text-white"
-              : "border-primary/25 bg-primary/10 text-primary",
+            "relative flex size-9 shrink-0 items-center justify-center border",
+            effectiveIllustratedDesign
+              ? "size-10 rounded-full border-sky-200/50 bg-sky-400/25 text-sky-100 shadow-[0_0_16px_rgba(56,189,248,0.45)]"
+              : "rounded-lg",
+            !effectiveIllustratedDesign &&
+              (onGradient
+                ? "border-white/20 bg-white/10 text-white"
+                : "border-primary/25 bg-primary/10 text-primary"),
           )}
         >
           <span
             className={cn(
-              "absolute inset-0 rounded-lg opacity-40 blur-[6px]",
-              onGradient ? "bg-white/30" : "bg-primary/30",
+              "absolute inset-0 opacity-40 blur-[6px]",
+              effectiveIllustratedDesign ? "rounded-full bg-sky-300/40" : "rounded-lg",
+              !effectiveIllustratedDesign && (onGradient ? "bg-white/30" : "bg-primary/30"),
               isPending && "animate-pulse",
             )}
             aria-hidden
           />
-          <Sparkles className={cn("relative size-4", isPending && "animate-spin")} />
+          {effectiveIllustratedDesign ? (
+            <Bot className={cn("relative size-5", isPending && "animate-pulse")} />
+          ) : (
+            <Sparkles className={cn("relative size-4", isPending && "animate-spin")} />
+          )}
         </div>
         <div className="min-w-0 space-y-1">
           <p className={cn("text-sm font-semibold tracking-tight", titleClass)}>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { peekLayerColors } from "@/components/illustrated/surfaces";
 import { FormattedCardAnswer } from "@/components/formatted-card-answer";
 import { FormattedCardFront } from "@/components/formatted-card-front";
 import { Button } from "@/components/ui/button";
@@ -141,6 +142,7 @@ export function FlashcardStudy({
 
   const total = deck.length;
   const currentCard = deck[visibleIndex];
+  const peek = peekLayerColors(currentCard?.id ?? visibleIndex);
   const progressPercent = ((currentIndex + 1) / total) * 100;
 
   function navigateTo(newIndex: number, direction: "left" | "right") {
@@ -485,8 +487,16 @@ export function FlashcardStudy({
       >
       {effectiveIllustratedDesign ? (
         <>
-          <span className="illustrated-layer illustrated-layer-a" aria-hidden />
-          <span className="illustrated-layer illustrated-layer-b" aria-hidden />
+          <span
+            className="illustrated-layer illustrated-layer-a"
+            style={{ background: peek.layerA }}
+            aria-hidden
+          />
+          <span
+            className="illustrated-layer illustrated-layer-b"
+            style={{ background: peek.layerB }}
+            aria-hidden
+          />
         </>
       ) : null}
       <div

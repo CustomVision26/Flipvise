@@ -1,7 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +31,7 @@ interface DeleteCardDialogProps {
 
 export function DeleteCardDialog({ cardId, deckId }: DeleteCardDialogProps) {
   const [isPending, startTransition] = useTransition();
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
 
   function handleDelete() {
     startTransition(async () => {
@@ -45,10 +49,14 @@ export function DeleteCardDialog({ cardId, deckId }: DeleteCardDialogProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-destructive hover:text-destructive"
+                  className={cn(
+                    "text-destructive hover:text-destructive",
+                    effectiveIllustratedDesign && "illustrated-card-delete gap-1.5 rounded-full px-3",
+                  )}
                 />
               }
             >
+              {effectiveIllustratedDesign ? <Trash2 className="size-3.5" /> : null}
               Delete
             </AlertDialogTrigger>
           </TooltipTrigger>

@@ -38,10 +38,12 @@ import {
   ImagePlus,
   Mic,
   MicOff,
+  Pencil,
   RefreshCw,
   Sparkles,
   X,
 } from "lucide-react";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { cn } from "@/lib/utils";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { buildMathDiagramPngFile } from "@/lib/math-diagrams/build-diagram-file";
@@ -1453,6 +1455,7 @@ function MultipleChoiceEditForm({
 export function EditCardDialog({ card, deckId, hasAI = false }: EditCardDialogProps) {
   const [open, setOpen] = useState(false);
   const isMC = card.cardType === "multiple_choice";
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -1464,10 +1467,15 @@ export function EditCardDialog({ card, deckId, hasAI = false }: EditCardDialogPr
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
+                  className={cn(
+                    "h-8 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm",
+                    effectiveIllustratedDesign &&
+                      "gap-1.5 rounded-full bg-[#7c3aed] px-3 text-white hover:bg-[#6d28d9] hover:text-white",
+                  )}
                 />
               }
             >
+              {effectiveIllustratedDesign ? <Pencil className="size-3.5" /> : null}
               Edit
             </DialogTrigger>
           </TooltipTrigger>

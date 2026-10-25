@@ -532,7 +532,8 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
           <CardsPanelPattern pattern={pageTheme.pattern} />
           <div className="illustrated-cards-toolbar flex items-center justify-between gap-3 border-b border-border/60 pb-4">
             <div className="space-y-0.5">
-              <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+              <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight sm:text-lg">
+                <Layers3 className="illustrated-cards-mark size-5 shrink-0" aria-hidden />
                 Cards
               </h2>
               {cards.length > 0 ? (
