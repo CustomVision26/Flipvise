@@ -36,7 +36,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
           "Direct URL: /dashboard/team-admin?team=<id>&teamMemberId=<id>. The member Team Dashboard is /dashboard?team=<id> only.",
           "Default landing redirects to Deck Manager → Assign decks to members.",
           "teamMemberId=0 means you are the subscriber owner.",
-          "The sidebar uses a raised panel with a color rail, and section tabs use raised color-accented controls.",
+          "The sidebar, overview cards, menu, and members table stay solid and readable in light and dark mode. The open page uses a violet pill with a violet bar, and Workspace overview shows usage bars for workspaces, members, decks, and cards. Send invite uses the form under the page header.",
         ],
       },
       {
@@ -44,9 +44,9 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Dashboard structure",
         bullets: [
           "Dashboards bar — owners see Personal Dashboard only. Team Dashboard is omitted because owners already use Personal Dash for workspace decks; Team Admin is omitted because they are already on that dashboard. Invited co-admins still get Team Dashboard (and Team Admin).",
-          "Info opens workspace details (name, plan, owner, created date, and setup fields saved when the workspace was created).",
+          "Info shows an info icon and the word Info. It opens workspace details (name, plan, owner, created date, and setup fields saved when the workspace was created) and stays readable in light and dark mode.",
           "Workspace overview stats — workspaces, members, decks, cards vs plan limits.",
-          "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace. Open create workspace guide for the screenshot walkthrough.",
+          "Add Workspace is a purple button. Owners use it to open Manage Workspaces (/dashboard/workspaces) and create another workspace. Open create workspace guide for the screenshot walkthrough.",
           "Main tabs: Members, Deck Manager, Add-ons (only when a paid or assigned add-on matches this workspace plan), Workspace history, Invite members, Quiz results.",
         ],
       },
@@ -88,7 +88,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         title: "Member table",
         bullets: [
           "Owner row always shown with Owner (subscriber) role — cannot be removed.",
-          "Columns: User, Created, Updated, Added by (inviter), Role, Actions.",
+          "Columns: User, Created, Updated, Added by (inviter), Role, Actions. Search members filters the roster by name or email. Remove is in the row actions menu.",
           "Inviter shows workspace owner vs team admin who sent the invite.",
           "Double-click any member row to open a details dialog with name, email, acceptance date, role, workspace, and assigned deck names.",
         ],
@@ -227,7 +227,7 @@ export const TEAM_ADMIN_ARTICLES: DocArticle[] = [
         id: "send",
         title: "Send invite",
         bullets: [
-          "Choose workspace, email, invitee name (required), and role (Member or Team admin). Open invite unregistered member to a workspace guide to follow the screenshots from Send invite through the new member on the roster.",
+          "Choose workspace, email, invitee name (required), and role (team_member or team_admin), then Send invitation. Open invite unregistered member to a workspace guide to follow the screenshots from Send invite through the new member on the roster.",
           "Email must match the address they will sign in with.",
           "Invitee name auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account (you can still edit it).",
           "Invites expire in 3 days — expired invites must be resent.",

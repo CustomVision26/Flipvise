@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
+import { MoreHorizontal, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -60,6 +69,7 @@ interface TeamMemberTableProps {
   currentUserId: string;
   isOwner: boolean;
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>;
+  showRosterHeader?: boolean;
 }
 
 function formatMemberTimestamp(d: Date) {
@@ -162,6 +172,25 @@ function DeckList({ names }: { names: string[] }) {
   );
 }
 
+const AVATAR_TONES = [
+  "bg-violet-100 text-violet-700",
+  "bg-sky-100 text-sky-700",
+  "bg-amber-100 text-amber-800",
+  "bg-emerald-100 text-emerald-700",
+];
+
+function initialsFor(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  const letters = parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+  return letters || "?";
+}
+
+function avatarTone(name: string) {
+  let total = 0;
+  for (const char of name) total += char.charCodeAt(0);
+  return AVATAR_TONES[total % AVATAR_TONES.length];
+}
+
 function UserCell({
   userId,
   display,
@@ -173,25 +202,24 @@ function UserCell({
   const secondary = display?.secondaryLine;
   const showUserIdSubline = !secondary && primary !== userId;
   return (
-    <div className="min-w-0 max-w-[min(100%,280px)]">
-      <div className="truncate font-medium text-foreground" title={primary}>
-        {primary}
+    <div className="flex min-w-0 max-w-[min(100%,280px)] items-center gap-3">
+      <Avatar>
+        <AvatarFallback className={avatarTone(primary)}>{initialsFor(primary)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="truncate font-medium text-slate-900" title={primary}>
+          {primary}
+        </div>
+        {secondary ? (
+          <div className="truncate text-xs text-slate-500" title={secondary}>
+            {secondary}
+          </div>
+        ) : showUserIdSubline ? (
+          <div className="truncate font-mono text-[11px] text-slate-500" title={userId}>
+            {userId}
+          </div>
+        ) : null}
       </div>
-      {secondary ? (
-        <div
-          className="truncate text-xs text-muted-foreground"
-          title={secondary}
-        >
-          {secondary}
-        </div>
-      ) : showUserIdSubline ? (
-        <div
-          className="truncate font-mono text-[11px] text-muted-foreground/80"
-          title={userId}
-        >
-          {userId}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -207,12 +235,14 @@ export function TeamMemberTable({
   currentUserId,
   isOwner,
   userFieldDisplayById,
+  showRosterHeader = false,
 }: TeamMemberTableProps) {
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [removeDialogUserId, setRemoveDialogUserId] = React.useState<string | null>(null);
   const [removeSaving, setRemoveSaving] = React.useState(false);
   const [detailTarget, setDetailTarget] = React.useState<MemberDetailTarget | null>(null);
+  const [query, setQuery] = React.useState("");
   /** Stable id for confirm action — dialog close can clear state before the server call finishes. */
   const removeTargetUserIdRef = React.useRef<string | null>(null);
 
@@ -292,8 +322,42 @@ export function TeamMemberTable({
       ? (userFieldDisplayById[removeDialogUserId]?.primaryLine ?? removeDialogUserId)
       : null;
 
+  const needle = query.trim().toLowerCase();
+  function rowMatches(userId: string) {
+    if (!needle) return true;
+    const display = userFieldDisplayById[userId];
+    const haystack = [display?.primaryLine, display?.secondaryLine, display?.primaryEmail, userId]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(needle);
+  }
+  const ownerVisible = rowMatches(ownerUserId);
+  const visibleMembers = members.filter((member) => rowMatches(member.userId));
+
   return (
     <div className="space-y-3">
+      {showRosterHeader ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+            <Users className="size-5 text-violet-600" aria-hidden />
+            Members roster
+          </h2>
+          <div className="relative w-full sm:max-w-xs">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search members..."
+              aria-label="Search members"
+              className="bg-white pl-8 text-slate-900"
+            />
+          </div>
+        </div>
+      ) : null}
       {error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
@@ -312,6 +376,7 @@ export function TeamMemberTable({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {ownerVisible ? (
             <TableRow
               className="cursor-pointer"
               onDoubleClick={(e) => openDetailFromRow({ kind: "owner" }, e)}
@@ -331,7 +396,15 @@ export function TeamMemberTable({
               <TableCell>Owner (subscriber)</TableCell>
               <TableCell className="text-end text-muted-foreground text-xs">—</TableCell>
             </TableRow>
-            {members.map((m) => {
+            ) : null}
+            {!ownerVisible && visibleMembers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-sm text-slate-500">
+                  No members match that search.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {visibleMembers.map((m) => {
               const canManageThisMember = canManageMemberAsOwnerOrInviter({
                 viewerUserId: currentUserId,
                 ownerUserId,
@@ -384,7 +457,7 @@ export function TeamMemberTable({
                       }
                       disabled={busy === m.userId || !canManageThisMember}
                     >
-                      <SelectTrigger className="w-[160px]" title={manageHint}>
+                      <SelectTrigger className="h-8 w-[160px] rounded-lg border-stone-200 bg-white text-slate-900" title={manageHint}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -394,20 +467,37 @@ export function TeamMemberTable({
                     </Select>
                   </TableCell>
                   <TableCell className="text-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={busy === m.userId || !canManageThisMember}
-                      title={manageHint}
-                      onClick={() => {
-                        setError(null);
-                        removeTargetUserIdRef.current = m.userId;
-                        setRemoveDialogUserId(m.userId);
-                      }}
-                    >
-                      Remove
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={(menuProps) => (
+                          <Button
+                            {...menuProps}
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="border-stone-200 bg-white text-slate-700"
+                            disabled={busy === m.userId || !canManageThisMember}
+                            title={manageHint ?? "Member actions"}
+                            aria-label={`Actions for ${userFieldDisplayById[m.userId]?.primaryLine ?? "member"}`}
+                          >
+                            <MoreHorizontal className="size-4" aria-hidden />
+                          </Button>
+                        )}
+                      />
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={busy === m.userId || !canManageThisMember}
+                          onClick={() => {
+                            setError(null);
+                            removeTargetUserIdRef.current = m.userId;
+                            setRemoveDialogUserId(m.userId);
+                          }}
+                        >
+                          Remove
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );

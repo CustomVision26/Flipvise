@@ -334,6 +334,7 @@ export function TeamAdminManageTabs({
               currentUserId={currentUserId}
               isOwner={isOwner}
               userFieldDisplayById={userFieldDisplayById}
+              showRosterHeader={contentOnly}
             />
           )}
         </TeamAdminPanelCard>
@@ -391,11 +392,13 @@ export function TeamAdminManageTabs({
             ) : null}
 
             {isTeamAdminInviteSendPath(pathname) ? (
-              <div className={cn(teamAdminSubTabPanelClass, "space-y-4")}>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Choose a workspace, then enter an email and role. Subscribers see every workspace
-                  they own; co-admins only see workspaces they were invited to manage.
-                </p>
+              <div className="space-y-4 rounded-2xl border border-violet-200 bg-white p-5 sm:p-6">
+                {contentOnly ? null : (
+                  <p className="text-sm leading-relaxed text-slate-600">
+                    Choose a workspace, then enter an email and role. Subscribers see every workspace
+                    they own; co-admins only see workspaces they were invited to manage.
+                  </p>
+                )}
                 <TeamInviteForm
                   key={`${teamId}-${defaultWorkspaceId}`}
                   workspaces={workspaces}

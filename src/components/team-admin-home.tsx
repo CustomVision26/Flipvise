@@ -1,3 +1,4 @@
+import { Hand } from "lucide-react";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   countTeamAdminNavLeaves,
@@ -5,7 +6,6 @@ import {
   type TeamAdminAddonNavFlags,
 } from "@/lib/team-admin-dashboard-nav";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
-import { cn } from "@/lib/utils";
 
 export function TeamAdminHome({
   addonNavFlags,
@@ -22,15 +22,22 @@ export function TeamAdminHome({
   );
 
   return (
-    <Card className={cn(teamAdminCardClass, "backdrop-blur-sm")}>
-      <CardHeader className="gap-2">
-        <h2 className="text-base font-semibold text-foreground">Welcome</h2>
-        <CardDescription className="text-sm leading-relaxed">
-          Use the sidebar to open any team admin page. Team & members, deck manager,
-          {showAddons ? " add-ons," : ""} and Study Modes (including Quiz Mode) are
-          grouped by category. You have {linkCount} pages available in this
-          workspace.
-        </CardDescription>
+    <Card className={teamAdminCardClass}>
+      <CardHeader className="gap-3">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+            <Hand className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <h2 className="text-base font-semibold text-slate-900">Welcome</h2>
+            <CardDescription className="text-sm leading-relaxed text-slate-600">
+              Use the sidebar to open any team admin page. Team & members, deck manager,
+              {showAddons ? " add-ons," : ""} and Study Modes (including Quiz Mode) are
+              grouped by category. You have {linkCount} pages available in this
+              workspace.
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
     </Card>
   );

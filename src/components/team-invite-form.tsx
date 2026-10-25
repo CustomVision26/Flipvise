@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,10 +277,12 @@ export function TeamInviteForm({
     );
   }
 
+  const fieldClass = "team-admin-invite-field h-11 w-full rounded-xl";
+
   return (
-    <form onSubmit={onSubmit} className="max-w-lg space-y-5">
+    <form onSubmit={onSubmit} className="w-full space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="team-invite-workspace" className="text-sm font-medium">
+        <Label htmlFor="team-invite-workspace" className="text-sm font-semibold text-slate-800">
           Workspace
         </Label>
         <Select
@@ -289,7 +291,7 @@ export function TeamInviteForm({
           disabled={formDisabled}
           required
         >
-          <SelectTrigger id="team-invite-workspace" className="h-10 w-full">
+          <SelectTrigger id="team-invite-workspace" className={fieldClass}>
             <SelectValue placeholder="Select workspace">
               {(value) => {
                 if (value == null) return "Select workspace";
@@ -321,7 +323,7 @@ export function TeamInviteForm({
         </Select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="team-invite-email" className="text-sm font-medium">
+        <Label htmlFor="team-invite-email" className="text-sm font-semibold text-slate-800">
           Email
         </Label>
         <div className="flex gap-2">
@@ -341,7 +343,7 @@ export function TeamInviteForm({
             }}
             disabled={formDisabled}
             placeholder="member@example.com"
-            className="h-10 min-w-0 flex-1"
+            className={cn(fieldClass, "min-w-0 flex-1")}
           />
           <Popover open={emailPickerOpen} onOpenChange={setEmailPickerOpen}>
             <PopoverTrigger
@@ -352,7 +354,7 @@ export function TeamInviteForm({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className={cn("h-10 shrink-0 gap-1.5 px-3", props.className)}
+                  className={cn("team-admin-invite-field h-11 shrink-0 gap-1.5 rounded-xl px-3", props.className)}
                   disabled={formDisabled || suggestionEmails.length === 0}
                   aria-label="Choose from accepted member emails"
                 >
@@ -404,7 +406,7 @@ export function TeamInviteForm({
         )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="team-invite-invitee-name" className="text-sm font-medium">
+        <Label htmlFor="team-invite-invitee-name" className="text-sm font-semibold text-slate-800">
           Invitee name
         </Label>
         <Input
@@ -421,7 +423,7 @@ export function TeamInviteForm({
           disabled={formDisabled}
           placeholder="Full name or preferred name"
           maxLength={255}
-          className="h-10 w-full"
+          className={fieldClass}
         />
         <p className="text-xs leading-relaxed text-muted-foreground">
           Required. Auto-filled when the email matches a workspace member, a prior invite, or a
@@ -429,7 +431,7 @@ export function TeamInviteForm({
         </p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="team-invite-role" className="text-sm font-medium">
+        <Label htmlFor="team-invite-role" className="text-sm font-semibold text-slate-800">
           Role
         </Label>
         <Select
@@ -438,19 +440,20 @@ export function TeamInviteForm({
           disabled={formDisabled}
           required
         >
-          <SelectTrigger id="team-invite-role" className="h-10 w-full">
+          <SelectTrigger id="team-invite-role" className={fieldClass}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="team_member">Member</SelectItem>
-            <SelectItem value="team_admin">Team admin</SelectItem>
+            <SelectItem value="team_member">team_member</SelectItem>
+            <SelectItem value="team_admin">team_admin</SelectItem>
           </SelectContent>
         </Select>
       </div>
       {showSubmitTooltip ? (
         <Tooltip>
           <TooltipTrigger render={<span className="inline-flex w-full sm:max-w-xs" tabIndex={0} />}>
-            <Button type="submit" disabled={submitDisabled} className="h-10 w-full sm:w-auto sm:min-w-[11rem]">
+            <Button type="submit" disabled={submitDisabled} className="team-admin-invite-submit h-11 w-full gap-2 rounded-xl sm:w-auto sm:min-w-[12rem]">
+              <Send className="size-4" aria-hidden />
               {pending ? "Sending…" : "Send invitation"}
             </Button>
           </TooltipTrigger>
@@ -459,7 +462,8 @@ export function TeamInviteForm({
           </TooltipContent>
         </Tooltip>
       ) : (
-        <Button type="submit" disabled={submitDisabled} className="h-10 w-full sm:w-auto sm:min-w-[11rem]">
+        <Button type="submit" disabled={submitDisabled} className="team-admin-invite-submit h-11 w-full gap-2 rounded-xl sm:w-auto sm:min-w-[12rem]">
+          <Send className="size-4" aria-hidden />
           {pending ? "Sending…" : "Send invitation"}
         </Button>
       )}

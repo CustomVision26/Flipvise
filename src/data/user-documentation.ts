@@ -127,7 +127,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Team and Education team subscribers create, rename, delete, and review history for owned team workspaces.",
         howItWorks: [
-          "Add workspaces up to your plan’s workspace limit from this page (Education Gold and Education Enterprise included). Open create workspace guide to follow adding another workspace from Team Admin or Manage workspaces. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. Open it from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for, then fill in the matching fields (Change hides those fields until you pick again); Flipvise suggests an abbreviated name you can edit before creating (duplicate auto-generated names get a suffix such as -2).",
+          "Add workspaces up to your plan’s workspace limit from this page (Education Gold and Education Enterprise included). Open create workspace guide to follow adding another workspace from Team Admin or Manage workspaces. On Team Admin the control is a purple Add Workspace button beside Info. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck. Open it from Team Admin → Add Workspace or the team switcher → Manage workspaces. Choose who the workspace is for, then fill in the matching fields (Change hides those fields until you pick again); Flipvise suggests an abbreviated name you can edit before creating (duplicate auto-generated names get a suffix such as -2).",
           "Rename or delete workspaces you own.",
           "Workspace history shows create/rename/delete audit events.",
         ],
@@ -983,11 +983,11 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "The Dashboards bar: owners see Personal Dashboard only (Team Dashboard and Team Admin are omitted — Team Dashboard duplicates Personal Dash, and they are already on Team Admin). Invited co-admins still see Team Dashboard.",
           "Default landing: Deck Manager → Assign decks to members.",
           "Owners (teamMemberId=0) see all owned workspaces; co-admins see scoped workspaces.",
-          "Info opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation).",
-          "Add Workspace (owners) opens Manage Workspaces (/dashboard/workspaces) to create another workspace. Open create workspace guide for the screenshot walkthrough.",
+          "Info shows an info icon and the word Info, and opens workspace details (name, plan, owner, created date, setup fields such as school and class when they were saved at creation). The label stays readable in light and dark mode.",
+          "Add Workspace is a purple button. Owners use it to open Manage Workspaces (/dashboard/workspaces) and create another workspace. Open create workspace guide for the screenshot walkthrough.",
           "The Add-ons sidebar appears only when this workspace has a paid or assigned add-on that is compatible with its plan (for example Live Classroom™ on Education Gold).",
           "Live Classroom™ opens from Team Admin → Add-ons when that add-on is active, or from /dashboard/live-classroom.",
-          "The sidebar and section tabs use raised, color-accented controls so the open section stays easy to see.",
+          "The sidebar, overview cards, menu, and members table stay solid and readable in light and dark mode. The open page is a violet pill with a violet bar, and Workspace overview shows workspaces, members, decks, and cards with a usage bar and percent. Send invite uses the form: workspace, email, invitee name, role, then Send invitation.",
         ],
         requirements: [
           "Team owner or invited team_admin role.",
@@ -1056,7 +1056,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         route: "/dashboard/team-admin/members",
         purpose: "View roster, change roles, and remove members.",
         howItWorks: [
-          "List all members with roles (Member, Team Admin).",
+          "List all members with roles (Member, Team Admin). Search members filters the roster by name or email. Row actions open from the menu on the right.",
           "Double-click a member row to open a details dialog (name, email, acceptance date, role, workspace, assigned decks).",
           "Promote or demote co-admins.",
           "Team admins can update a member’s role and remove them only if they invited that member (Added by). The workspace owner can manage every member.",
@@ -1117,7 +1117,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose: "Send, track, and revoke team invitations.",
         howItWorks: [
           "Send Invite creates a 3-day expiring link; Loops email goes to invitees without a Flipvise account — registered users get inbox only. Open invite unregistered member to a workspace guide to follow sending the invite, the email, sign-up, and the new roster row. UI Guides also includes AI Lesson Builder for the plan owner and AI Lesson Builder for a new deck.",
-          "Invitee name is required and auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account.",
+          "Invitee name is required and auto-fills when the email matches a workspace member, a prior invite, or a registered Flipvise account. Send invitation is the button under Role.",
           "Pending Invitations lists revocable open invites.",
           "Invite History shows past invitations.",
         ],

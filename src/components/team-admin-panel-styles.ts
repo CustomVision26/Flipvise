@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { tabPanelContentClass } from "@/lib/tab-panel-styles";
 
 /** Scroll targets for team-admin section tabs — used in URLs (`#…`) and panel headings. */
 export const TEAM_ADMIN_PANEL_IDS = {
@@ -24,33 +23,32 @@ export function teamAdminTabClass(isActive: boolean) {
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_8px_16px_-12px_rgba(0,0,0,0.65)] sm:rounded-none sm:rounded-t-xl sm:border-b-2",
     isActive
-      ? "border-sky-300/55 bg-primary font-bold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_18px_-12px_rgba(56,189,248,0.85)] sm:border-sky-300 sm:bg-transparent sm:font-semibold sm:text-foreground sm:shadow-[inset_0_-2px_0_0_rgba(56,189,248,0.95)]"
-      : "border-transparent bg-muted/70 font-medium text-muted-foreground hover:-translate-y-0.5 hover:bg-muted hover:text-foreground sm:bg-transparent sm:shadow-none sm:hover:translate-y-0 sm:hover:bg-transparent sm:hover:text-foreground",
+      ? "border-violet-200 bg-violet-100 font-semibold text-violet-800 shadow-none"
+      : "border-transparent bg-transparent font-medium text-slate-500 hover:bg-violet-50 hover:text-violet-800",
   );
 }
 
-/** Nested pill tabs (Send invite, Pending, …). */
+/** Nested pill tabs (Send invite, Pending, Quiz Mode, …). */
 export function teamAdminSubTabClass(isActive: boolean) {
   return cn(
-    "inline-flex h-9 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-medium transition-all duration-200 sm:text-sm",
+    "team-admin-subtab inline-flex h-9 shrink-0 items-center justify-center rounded-full border px-3.5 text-xs font-medium transition-colors sm:text-sm",
     isActive
-      ? "border-emerald-300/45 bg-background font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_8px_16px_-12px_rgba(16,185,129,0.8)]"
-      : "border-transparent text-muted-foreground hover:-translate-y-0.5 hover:bg-muted/70 hover:text-foreground",
+      ? "team-admin-subtab-active border-violet-200 bg-violet-100 font-semibold text-violet-800"
+      : "border-transparent text-slate-500 hover:bg-violet-50 hover:text-violet-800",
   );
 }
 
 export const teamAdminCardClass =
-  "border-border/80 bg-card/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_16px_32px_-22px_rgba(0,0,0,0.65)]";
+  "team-admin-surface rounded-2xl border border-stone-200 bg-white text-slate-900 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]";
 
 /** Open tab panel — primary border, bold presence, entrance motion. */
 export const teamAdminActivePanelClass = cn(
-  tabPanelContentClass,
-  "shadow-lg ring-2 ring-primary/20",
+  "team-admin-surface rounded-2xl border border-stone-200 bg-white text-slate-900 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]",
   "animate-in fade-in-0 slide-in-from-bottom-3 duration-300 fill-mode-both",
 );
 
 /** Nested sub-tab content (invite send / pending / history, etc.). */
-export const teamAdminSubTabPanelClass = cn(tabPanelContentClass, "p-4");
+export const teamAdminSubTabPanelClass = "rounded-2xl p-1 sm:p-2";
 
 export const teamAdminActivePanelTitleClass =
   "text-base font-bold tracking-tight text-foreground sm:text-lg";
@@ -68,4 +66,4 @@ export const teamWorkspaceDeckTitleLinkClass = cn(
 );
 
 export const teamAdminTableWrapClass =
-  "overflow-x-auto rounded-lg border border-border/80 bg-background/40";
+  "overflow-x-auto rounded-lg border border-stone-200 bg-white";

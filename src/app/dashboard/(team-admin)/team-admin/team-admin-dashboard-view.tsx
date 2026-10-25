@@ -49,8 +49,8 @@ import { TeamAdminHome } from "@/components/team-admin-home";
 import { TeamAdminPageChrome } from "@/components/team-admin-page-chrome";
 import { TeamWorkspaceInfoButton } from "@/components/team-workspace-info-button";
 import { buildTeamWorkspaceInfo } from "@/lib/workspace-creation-profile";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { MANAGE_WORKSPACES_HREF } from "@/lib/team-workspace-url";
 import Link from "next/link";
 
@@ -334,12 +334,15 @@ export default async function TeamAdminDashboardView({
 
   const addTeamAside =
     isOwner && isWorkspaceSubscriptionPlanSlug(selected.planSlug) ? (
-      <Link
-        href={MANAGE_WORKSPACES_HREF}
-        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+      <Button
+        nativeButton={false}
+        size="sm"
+        className="team-admin-add-workspace h-9 gap-1.5 rounded-full px-3.5"
+        render={<Link href={MANAGE_WORKSPACES_HREF} />}
       >
+        <Plus className="size-3.5" aria-hidden />
         Add Workspace
-      </Link>
+      </Button>
     ) : null;
 
   const workspaceInfo = buildTeamWorkspaceInfo({

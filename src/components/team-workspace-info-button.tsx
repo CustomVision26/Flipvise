@@ -36,11 +36,18 @@ export function TeamWorkspaceInfoButton({ info }: { info: TeamWorkspaceInfo }) {
   return (
     <Dialog>
       <DialogTrigger
-        render={<Button type="button" variant="outline" size="sm" className="gap-1.5" />}
-      >
-        <Info className="size-3.5" aria-hidden />
-        Info
-      </DialogTrigger>
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="team-admin-info-button h-9 min-w-[5.5rem] gap-1.5 rounded-full px-3.5"
+          >
+            <Info className="size-4 shrink-0" aria-hidden />
+            <span>Info</span>
+          </Button>
+        }
+      />
       <DialogContent className="w-[calc(100vw-2rem)] max-w-md mx-4 sm:mx-auto">
         <DialogHeader>
           <DialogTitle>Workspace info</DialogTitle>

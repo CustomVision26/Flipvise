@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -9,8 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { TeamMemberHistoryRow } from "@/lib/team-member-history-types";
-import { teamAdminTableWrapClass } from "@/components/team-admin-panel-styles";
 import type { ClerkUserFieldDisplay } from "@/lib/clerk-user-display";
+import { cn } from "@/lib/utils";
 
 function formatEventTimestamp(d: Date | string) {
   const date = d instanceof Date ? d : new Date(d);
@@ -39,6 +40,37 @@ function roleLabel(role: TeamMemberHistoryRow["memberRole"]) {
   }
 }
 
+function ActionBadge({ action }: { action: TeamMemberHistoryRow["action"] }) {
+  const added = action === "added";
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "h-6 rounded-full border-transparent px-2.5 text-xs font-medium",
+        added
+          ? "team-admin-added-badge bg-emerald-100 text-emerald-700"
+          : "team-admin-removed-badge bg-rose-100 text-rose-700",
+      )}
+    >
+      {actionLabel(action)}
+    </Badge>
+  );
+}
+
+function RoleBadge({ role }: { role: TeamMemberHistoryRow["memberRole"] }) {
+  if (role === "team_admin") {
+    return (
+      <Badge
+        variant="outline"
+        className="team-admin-role-badge h-6 rounded-full border-transparent bg-violet-100 px-2.5 text-xs font-medium text-violet-700"
+      >
+        Team admin
+      </Badge>
+    );
+  }
+  return <span className="text-sm text-slate-700">{roleLabel(role)}</span>;
+}
+
 function displayForUserId(
   userId: string,
   userFieldDisplayById: Record<string, ClerkUserFieldDisplay>,
@@ -65,29 +97,33 @@ export function TeamMemberHistoryTable({
 
   return (
     <>
-      <div className={`${teamAdminTableWrapClass} hidden sm:block`}>
+      <div className="hidden overflow-hidden rounded-2xl border border-violet-100 bg-white sm:block">
         <Table className="min-w-[48rem] text-sm">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[11rem]">Event time</TableHead>
-              <TableHead className="w-[6rem]">Action</TableHead>
-              <TableHead>Member</TableHead>
-              <TableHead className="w-[7rem]">Role</TableHead>
-              <TableHead>By</TableHead>
+          <TableHeader className="bg-violet-50 [&_tr]:border-violet-100">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[11rem] text-violet-400">Event time</TableHead>
+              <TableHead className="w-[6rem] text-violet-400">Action</TableHead>
+              <TableHead className="text-violet-400">Member</TableHead>
+              <TableHead className="w-[8rem] text-violet-400">Role</TableHead>
+              <TableHead className="text-violet-400">By</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {list.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
+              <TableRow key={row.id} className="border-violet-50 hover:bg-violet-50/40">
+                <TableCell className="whitespace-nowrap text-slate-500">
                   {formatEventTimestamp(row.createdAt)}
                 </TableCell>
-                <TableCell>{actionLabel(row.action)}</TableCell>
-                <TableCell className="min-w-0 break-words">
+                <TableCell>
+                  <ActionBadge action={row.action} />
+                </TableCell>
+                <TableCell className="min-w-0 break-words font-medium text-slate-800">
                   {displayForUserId(row.memberUserId, userFieldDisplayById)}
                 </TableCell>
-                <TableCell>{roleLabel(row.memberRole)}</TableCell>
-                <TableCell className="min-w-0 break-words">
+                <TableCell>
+                  <RoleBadge role={row.memberRole} />
+                </TableCell>
+                <TableCell className="min-w-0 break-words text-slate-700">
                   {row.actorUserId
                     ? displayForUserId(row.actorUserId, userFieldDisplayById)
                     : "—"}
@@ -105,8 +141,8 @@ export function TeamMemberHistoryTable({
             className="space-y-2 rounded-lg border border-border/80 bg-background/40 p-4"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{actionLabel(row.action)}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">
+              <ActionBadge action={row.action} />
+              <span className="shrink-0 text-xs text-slate-500">
                 {formatEventTimestamp(row.createdAt)}
               </span>
             </div>
@@ -114,9 +150,9 @@ export function TeamMemberHistoryTable({
               <span className="text-muted-foreground">Member: </span>
               {displayForUserId(row.memberUserId, userFieldDisplayById)}
             </p>
-            <p className="text-sm leading-relaxed">
+            <p className="flex items-center gap-2 text-sm leading-relaxed">
               <span className="text-muted-foreground">Role: </span>
-              {roleLabel(row.memberRole)}
+              <RoleBadge role={row.memberRole} />
             </p>
             <p className="text-sm leading-relaxed">
               <span className="text-muted-foreground">By: </span>

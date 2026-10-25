@@ -46,10 +46,10 @@ function useTeamAdminNavWorkspace() {
 
 function navLinkClass(active: boolean) {
   return cn(
-    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+    "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors",
     active
-      ? "bg-primary/15 font-medium text-foreground"
-      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+      ? "bg-violet-100 font-medium text-violet-950 shadow-[inset_3px_0_0_0_#7c3aed]"
+      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
   );
 }
 
@@ -156,7 +156,7 @@ export function TeamAdminDashboardNav({
       className={cn("flex flex-col gap-5", className)}
     >
       <div>
-        <p className="mb-2 px-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+        <p className="mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
           Overview
         </p>
         <Link
@@ -172,13 +172,10 @@ export function TeamAdminDashboardNav({
 
       {sections.map((section, sectionIndex) => (
         <div key={section.title}>
-          {sectionIndex > 0 ? <Separator className="mb-5 bg-border/60" /> : null}
-          <div className="mb-2 space-y-0.5 px-2.5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          {sectionIndex > 0 ? <Separator className="mb-5 bg-stone-200" /> : null}
+          <div className="mb-2 px-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
               {section.title}
-            </p>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {section.description}
             </p>
           </div>
           <ul className="flex flex-col gap-0.5">
@@ -233,14 +230,10 @@ export function TeamAdminDashboardNavPanel({
     <div
       className={cn(
         teamAdminCardClass,
-        "rounded-2xl border border-white/10 bg-gradient-to-b from-card/90 via-card/80 to-card/65 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_18px_36px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md",
+        "p-3",
         className,
       )}
     >
-      <div
-        aria-hidden
-        className="mb-3 h-1 rounded-full bg-gradient-to-r from-sky-400 via-amber-300 to-emerald-400"
-      />
       <TeamAdminDashboardNav onNavigate={onNavigate} addonNav={addonNav} />
     </div>
   );

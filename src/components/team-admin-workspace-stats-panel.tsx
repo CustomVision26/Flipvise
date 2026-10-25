@@ -1,19 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, LayoutGrid, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  TeamAdminWorkspaceDeckCardTotals,
-  type TeamAdminWorkspaceDeckCardTotalsRow,
-} from "@/components/team-admin-workspace-deck-card-totals";
+import type { ReactNode } from "react";
+import { Building2, Layers, SquareStack, Users } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import type { TeamAdminWorkspaceDeckCardTotalsRow } from "@/components/team-admin-workspace-deck-card-totals";
 import { teamAdminCardClass } from "@/components/team-admin-panel-styles";
 import {
   limitsForPlan,
@@ -41,6 +32,45 @@ function toNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function usagePercent(used: number, max: number) {
+  if (max <= 0) return 0;
+  return Math.min(100, Math.round((used / max) * 100));
+}
+
+function MetricTile({
+  label,
+  icon,
+  iconClass,
+  used,
+  max,
+}: {
+  label: string;
+  icon: ReactNode;
+  iconClass: string;
+  used: number;
+  max: number;
+}) {
+  const percent = usagePercent(used, max);
+  return (
+    <div className="team-admin-metric rounded-xl border border-stone-200 bg-white p-4">
+      <div className="flex items-center gap-3">
+        <span className={cn("flex size-10 items-center justify-center rounded-xl", iconClass)}>
+          {icon}
+        </span>
+        <p className="text-sm font-medium text-slate-500">{label}</p>
+      </div>
+      <p className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-slate-900">
+        {used}
+        {max > 0 ? (
+          <span className="text-base font-medium text-slate-400"> / {max}</span>
+        ) : null}
+      </p>
+      <Progress value={percent} className="mt-3" />
+      <p className="mt-1.5 text-xs font-medium text-slate-500">{percent}%</p>
+    </div>
+  );
+}
+
 export function TeamAdminWorkspaceStatsPanel({
   workspacesCount = 0,
   maxWorkspaces = 0,
@@ -50,108 +80,60 @@ export function TeamAdminWorkspaceStatsPanel({
   planSlug,
   className,
   showWorkspacesAndMembers = true,
-  defaultOpen = false,
 }: TeamAdminWorkspaceStatsPanelProps) {
-  const [open, setOpen] = useState(defaultOpen);
-
   const limits = limitsForPlan(planSlug);
   const deckCount = teamDecksWithCardCounts.length;
   const cardCount = teamDecksWithCardCounts.reduce((sum, d) => sum + toNumber(d.cardCount), 0);
   const cardsCapacity = workspaceCardsCapacityForPlan(planSlug);
 
-  const collapsedSummary = showWorkspacesAndMembers
-    ? `${workspacesCount} / ${maxWorkspaces} workspaces · ${memberCount} / ${maxMembersPerTeam} members · ${deckCount}${limits.maxDecksPerWorkspace > 0 ? ` / ${limits.maxDecksPerWorkspace}` : ""} decks · ${cardCount}${cardsCapacity > 0 ? ` / ${cardsCapacity}` : ""} cards`
-    : `${deckCount}${limits.maxDecksPerWorkspace > 0 ? ` / ${limits.maxDecksPerWorkspace}` : ""} decks · ${cardCount}${cardsCapacity > 0 ? ` / ${cardsCapacity}` : ""} cards`;
-
   return (
     <Card className={cn(teamAdminCardClass, className)}>
-      <CardHeader className="space-y-0 p-0">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-auto w-full justify-between gap-3 rounded-xl px-4 py-3 text-left sm:px-5 sm:py-4"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-expanded={open}
-        >
-          <div className="min-w-0 flex-1 space-y-1">
-            <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              Workspace overview
-            </CardTitle>
-            {!open ? (
-              <p className="text-xs text-muted-foreground">{collapsedSummary}</p>
-            ) : null}
-          </div>
-          {open ? (
-            <ChevronUp className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          ) : (
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          )}
-        </Button>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+          Workspace overview
+        </CardTitle>
       </CardHeader>
-
-      {open ? (
-        <CardContent className="border-t border-border/60 px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
-          <div
-            className={cn(
-              "grid gap-4",
-              showWorkspacesAndMembers ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2",
-            )}
-          >
-            {showWorkspacesAndMembers ? (
-              <>
-                <Card className="border-border/80 bg-card/60 shadow-sm">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        Workspaces
-                      </CardTitle>
-                      <LayoutGrid className="size-4 text-muted-foreground" aria-hidden />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight">
-                      {workspacesCount}
-                      <span className="text-base font-normal text-muted-foreground">
-                        {" "}
-                        / {maxWorkspaces}
-                      </span>
-                    </p>
-                    <CardDescription className="mt-1 text-xs sm:text-sm">
-                      Active subscriber-owned workspaces
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-                <Card className="border-border/80 bg-card/60 shadow-sm">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        Members
-                      </CardTitle>
-                      <Users className="size-4 text-muted-foreground" aria-hidden />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-semibold tabular-nums tracking-tight">
-                      {memberCount}
-                      <span className="text-base font-normal text-muted-foreground">
-                        {" "}
-                        / {maxMembersPerTeam}
-                      </span>
-                    </p>
-                    <CardDescription className="mt-1 text-xs sm:text-sm">
-                      Members in this workspace
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </>
-            ) : null}
-            <TeamAdminWorkspaceDeckCardTotals
-              teamDecksWithCardCounts={teamDecksWithCardCounts}
-              planSlug={planSlug}
-            />
-          </div>
-        </CardContent>
-      ) : null}
+      <CardContent>
+        <div
+          className={cn(
+            "grid gap-3",
+            showWorkspacesAndMembers ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2",
+          )}
+        >
+          {showWorkspacesAndMembers ? (
+            <>
+              <MetricTile
+                label="Workspaces"
+                icon={<Building2 className="size-5" aria-hidden />}
+                iconClass="bg-violet-100 text-violet-600"
+                used={workspacesCount}
+                max={maxWorkspaces}
+              />
+              <MetricTile
+                label="Members"
+                icon={<Users className="size-5" aria-hidden />}
+                iconClass="bg-sky-100 text-sky-600"
+                used={memberCount}
+                max={maxMembersPerTeam}
+              />
+            </>
+          ) : null}
+          <MetricTile
+            label="Decks"
+            icon={<Layers className="size-5" aria-hidden />}
+            iconClass="bg-violet-100 text-violet-600"
+            used={deckCount}
+            max={limits.maxDecksPerWorkspace}
+          />
+          <MetricTile
+            label="Cards"
+            icon={<SquareStack className="size-5" aria-hidden />}
+            iconClass="bg-amber-100 text-amber-600"
+            used={cardCount}
+            max={cardsCapacity}
+          />
+        </div>
+      </CardContent>
     </Card>
   );
 }
