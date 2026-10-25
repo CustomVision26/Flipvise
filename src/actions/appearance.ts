@@ -56,27 +56,52 @@ export async function getAppearanceSnapshotAction() {
 
 export async function updateCurrentUserAppearancePreferencesAction(
   data: z.infer<typeof userPatchSchema>,
-) {
+): Promise<
+  | { ok: true; snapshot: Awaited<ReturnType<typeof getAppearanceSnapshot>> }
+  | { ok: false; error: string }
+> {
   noStore();
-  const access = await getAccessContext();
-  const { userId } = access;
-  if (!userId || !canUpdateUserAppearance(userId, userId)) {
-    throw new Error("Unauthorized");
+  try {
+    const access = await getAccessContext();
+    const { userId } = access;
+    if (!userId || !canUpdateUserAppearance(userId, userId)) {
+      return { ok: false, error: "Sign in to save appearance settings." };
+    }
+
+    const parsed = userPatchSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, error: "Invalid appearance settings." };
+    }
+
+    const snapshot = await updateCurrentUserAppearancePreferences(
+      userId,
+      {
+        illustratedDesignPreferred: parsed.data.illustratedDesignPreferred,
+        reduceAnimations: parsed.data.reduceAnimations,
+      },
+      resolvePlanSlugForAddonEligibility(access),
+    );
+    // The client applies the saved snapshot immediately. Revalidating the root
+    // layout from this action re-renders the page behind the account modal and
+    // surfaces an opaque Server Components digest when that render fails.
+    return { ok: true, snapshot };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (
+      message.includes("Failed query") ||
+      message.includes("does not exist") ||
+      message.includes("user_appearance_preferences")
+    ) {
+      return {
+        ok: false,
+        error: "Appearance settings could not be saved. The standard design stays on.",
+      };
+    }
+    return {
+      ok: false,
+      error: "Could not save appearance settings.",
+    };
   }
-
-  const parsed = userPatchSchema.safeParse(data);
-  if (!parsed.success) throw new Error("Invalid appearance settings.");
-
-  const saved = await updateCurrentUserAppearancePreferences(
-    userId,
-    {
-      illustratedDesignPreferred: parsed.data.illustratedDesignPreferred,
-      reduceAnimations: parsed.data.reduceAnimations,
-    },
-    resolvePlanSlugForAddonEligibility(access),
-  );
-  revalidatePath("/", "layout");
-  return saved;
 }
 
 export async function getAdminAppearanceSettingsAction() {
@@ -102,7 +127,11 @@ export async function updateAdminAppearanceSettingsAction(
   const saved = await withUpdatedByLabel(
     await updateAdminAppearanceSettings(userId, parsed.data.illustratedDesignEnabled),
   );
-  revalidatePath("/", "layout");
-  revalidatePath("/admin/feature-controls");
+  try {
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/feature-controls");
+  } catch {
+    // The setting is already stored. A failed refresh must not fail the save.
+  }
   return saved;
 }

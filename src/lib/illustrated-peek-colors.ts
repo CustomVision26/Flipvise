@@ -2,7 +2,9 @@ const PEEK_ORANGES = ["#fb923c", "#f97316", "#fdba74", "#ea580c", "#ff8a3d"] as 
 const PEEK_BLUES = ["#60a5fa", "#38bdf8", "#2563eb", "#818cf8", "#3b82f6"] as const;
 
 function peekSeed(seed: number | string): number {
-  if (typeof seed === "number" && Number.isFinite(seed)) return Math.abs(Math.trunc(seed));
+  if (typeof seed === "number") {
+    return Number.isFinite(seed) ? Math.abs(Math.trunc(seed)) : 0;
+  }
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 33 + seed.charCodeAt(i)) >>> 0;
   return hash;

@@ -77,6 +77,9 @@ function appearanceSaveError(err: unknown): string {
   ) {
     return "Appearance settings could not be saved. The standard design stays on.";
   }
+  if (message.includes("Server Components render")) {
+    return "Could not save appearance settings.";
+  }
   return message || "Could not save appearance settings.";
 }
 
@@ -218,17 +221,21 @@ export function IllustratedAppearanceProvider({
       };
       setSnapshot(optimistic);
       try {
-        const next = await updateCurrentUserAppearancePreferencesAction(patch);
-        if (!shouldApplyAppearanceSnapshot(userIdRef.current, next.userId)) {
+        const result = await updateCurrentUserAppearancePreferencesAction(patch);
+        if (!result.ok) {
+          setSnapshot(previous);
+          setError(result.error);
+          return;
+        }
+        if (!shouldApplyAppearanceSnapshot(userIdRef.current, result.snapshot.userId)) {
           setSnapshot(previous);
           return;
         }
-        setSnapshot(next);
-        writeCachedSnapshot(next);
+        setSnapshot(result.snapshot);
+        writeCachedSnapshot(result.snapshot);
       } catch (err) {
         setSnapshot(previous);
         setError(appearanceSaveError(err));
-        throw err;
       } finally {
         setSaving(false);
       }
