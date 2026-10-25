@@ -1672,7 +1672,7 @@ export function QuizStudy({
       className="flex flex-1 flex-col items-center gap-4 sm:gap-6 w-full min-w-0"
       style={deckAccentCss}
     >
-      <div className="w-full max-w-2xl flex flex-col gap-3">
+      <div className="flex w-full flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 sm:gap-3">
             <div
@@ -1771,7 +1771,7 @@ export function QuizStudy({
         </div>
       </div>
 
-      <IllustratedPeekFrame seed={current.cardId} className="w-full max-w-2xl">
+      <IllustratedPeekFrame seed={current.cardId} className="w-full">
       <div
         className={cn(
           "w-full rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
@@ -1889,7 +1889,7 @@ export function QuizStudy({
 
       {current.type !== "fill_in_blank" ? (
       <div
-        className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3"
+        className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4"
         role="radiogroup"
         aria-label="Answer options"
       >
@@ -1906,7 +1906,7 @@ export function QuizStudy({
                 role="radio"
                 aria-checked={isSelected}
                 className={cn(
-                  "flex-1 justify-start text-left h-auto py-3 px-4 whitespace-normal break-words",
+                  "h-auto flex-1 justify-start whitespace-normal break-words rounded-full px-4 py-3.5 text-left sm:px-5 sm:py-4",
                   isSelected ? "" : "hover:bg-muted/50",
                   deckAccent.hasDeckAccent &&
                     isSelected &&
@@ -1958,14 +1958,14 @@ export function QuizStudy({
       </div>
       ) : null}
 
-      <div className="w-full max-w-2xl flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+      <div className="grid w-full grid-cols-3 gap-3 sm:gap-4">
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger render={<span className="inline-flex" tabIndex={0} />}>
+            <TooltipTrigger render={<span className="inline-flex w-full" tabIndex={0} />}>
               <Button
                 variant="outline"
                 size="default"
-                className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                className="h-11 w-full gap-1 rounded-full px-3 text-xs sm:h-12 sm:gap-2 sm:px-4 sm:text-sm"
                 onClick={goPrev}
                 disabled={currentIndex === 0}
               >
@@ -1980,12 +1980,12 @@ export function QuizStudy({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger
-              render={<span className="inline-flex" tabIndex={0} />}
+              render={<span className="inline-flex w-full" tabIndex={0} />}
             >
               <Button
                 size="default"
                 className={cn(
-                  "gap-2 h-10 sm:h-11 px-4 sm:px-6 text-sm",
+                  "h-11 w-full gap-2 rounded-full px-4 text-sm sm:h-12 sm:px-6",
                   deckAccent.hasDeckAccent &&
                     "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
                 )}
@@ -2003,12 +2003,12 @@ export function QuizStudy({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger
-              render={<span className="inline-flex" tabIndex={0} />}
+              render={<span className="inline-flex w-full" tabIndex={0} />}
             >
               <Button
                 variant="outline"
                 size="default"
-                className="gap-1 sm:gap-2 h-10 sm:h-11 px-3 sm:px-4 text-xs sm:text-sm"
+                className="h-11 w-full gap-1 rounded-full px-3 text-xs sm:h-12 sm:gap-2 sm:px-4 sm:text-sm"
                 onClick={goNext}
                 disabled={currentIndex === totalQuestions - 1}
               >
@@ -2022,7 +2022,7 @@ export function QuizStudy({
       </div>
 
       {submitError && (
-        <div className="w-full max-w-2xl flex flex-col items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-center">
+        <div className="flex w-full flex-col items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-center">
           <p className="text-sm text-destructive">{submitError}</p>
           <TooltipProvider>
             <Tooltip>

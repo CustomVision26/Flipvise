@@ -147,9 +147,7 @@ export function AiRecallStudy({
   );
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("intro");
-  useDeckScreen(
-    phase === "intro" ? "prep" : phase === "complete" ? "results" : "study",
-  );
+  useDeckScreen(phase === "complete" ? "results" : "study");
   const [studentAnswer, setStudentAnswer] = useState("");
   const [answerModality, setAnswerModality] =
     useState<RecallAnswerModality>("text");
@@ -775,7 +773,7 @@ export function AiRecallStudy({
   const showAnswer = phase === "revealed" || phase === "unlocking";
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 sm:gap-5">
+    <div className="mx-auto flex w-full flex-1 flex-col gap-4 sm:gap-5">
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <Badge variant="secondary" className="gap-1 text-xs">
@@ -974,19 +972,22 @@ export function AiRecallStudy({
             }}
             variant="outline"
             spacing={0}
-            className={cn("flex w-full", effectiveIllustratedDesign && "illustrated-mode-tabs")}
+            className={cn(
+              "flex h-12 w-full",
+              effectiveIllustratedDesign && "illustrated-recall-modes rounded-full border p-1",
+            )}
             aria-label="Answer input mode"
           >
-            <ToggleGroupItem value="text" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">
-              <Keyboard className="h-3.5 w-3.5" />
+            <ToggleGroupItem value="text" className="h-10 flex-1 gap-1.5 rounded-full px-2 text-xs sm:text-sm">
+              <Keyboard className="h-4 w-4" />
               Type
             </ToggleGroupItem>
-            <ToggleGroupItem value="voice" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">
-              <Mic className="h-3.5 w-3.5" />
+            <ToggleGroupItem value="voice" className="h-10 flex-1 gap-1.5 rounded-full px-2 text-xs sm:text-sm">
+              <Mic className="h-4 w-4" />
               Voice
             </ToggleGroupItem>
-            <ToggleGroupItem value="drawing" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">
-              <Pencil className="h-3.5 w-3.5" />
+            <ToggleGroupItem value="drawing" className="h-10 flex-1 gap-1.5 rounded-full px-2 text-xs sm:text-sm">
+              <Pencil className="h-4 w-4" />
               Draw
             </ToggleGroupItem>
           </ToggleGroup>
@@ -1019,7 +1020,10 @@ export function AiRecallStudy({
                     if (answerModality !== "voice") setAnswerModality("text");
                   }}
                   rows={3}
-                  className="min-h-[88px] flex-1 resize-y"
+                  className={cn(
+                    "min-h-[88px] flex-1 resize-y",
+                    effectiveIllustratedDesign && "illustrated-recall-field",
+                  )}
                   disabled={isPending}
                 />
                 <TooltipProvider>
@@ -1084,7 +1088,10 @@ export function AiRecallStudy({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="gap-1.5 text-muted-foreground"
+                    className={cn(
+                      "gap-1.5 text-muted-foreground",
+                      effectiveIllustratedDesign && "illustrated-recall-skip",
+                    )}
                     onClick={handleIDontKnow}
                     disabled={isPending}
                   >
@@ -1102,7 +1109,10 @@ export function AiRecallStudy({
                 >
                   <Button
                     type="button"
-                    className="gap-2"
+                    className={cn(
+                      "h-11 gap-2 rounded-full px-6",
+                      effectiveIllustratedDesign && "illustrated-recall-submit",
+                    )}
                     onClick={handleSubmit}
                     disabled={!canSubmitAnswer() || isPending}
                   >

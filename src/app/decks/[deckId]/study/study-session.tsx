@@ -291,8 +291,7 @@ export function StudySession({
       >
         <div
           className={cn(
-            "illustrated-study-modes mx-auto flex w-full max-w-2xl flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card/55 px-4 py-3 shadow-md shadow-black/10 backdrop-blur-md sm:px-5",
-            effectiveIllustratedDesign && "max-w-3xl",
+            "illustrated-study-modes mx-auto flex w-full flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card/55 px-4 py-3 shadow-md shadow-black/10 backdrop-blur-md sm:px-5",
             effectiveReducedMotion ? "" : "transition-colors",
           )}
         >
@@ -301,21 +300,21 @@ export function StudySession({
           </p>
           <TabsList className="h-auto w-full flex-wrap justify-center gap-1 bg-muted/40 p-1">
             {showReviewTab ? (
-              <TabsTrigger value="review" className="gap-1.5">
+              <TabsTrigger value="review" className="min-w-0 flex-1 gap-1.5">
                 <span aria-hidden>📖</span>
                 Standard Review
               </TabsTrigger>
             ) : null}
 
             {showAiRecallTab ? (
-              <TabsTrigger value="ai_recall" className="gap-1.5">
+              <TabsTrigger value="ai_recall" className="min-w-0 flex-1 gap-1.5">
                 <span aria-hidden>🤖</span>
                 AI Recall™
               </TabsTrigger>
             ) : null}
 
             {showQuizTab ? (
-              <TabsTrigger value="quiz" className="gap-1.5">
+              <TabsTrigger value="quiz" className="min-w-0 flex-1 gap-1.5">
                 <ListChecks className="h-3.5 w-3.5" />
                 Quiz
               </TabsTrigger>
@@ -326,7 +325,7 @@ export function StudySession({
                     <TabsTrigger
                       value="quiz"
                       disabled
-                      className="gap-1.5 opacity-40"
+                      className="min-w-0 flex-1 gap-1.5 opacity-40"
                     />
                   }
                 >
