@@ -31,6 +31,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import { IllustratedDeckTile } from "@/components/illustrated/surfaces";
 import { deleteDeckAction, getDeckDeleteImpactAction } from "@/actions/decks";
 import type { DeckDeleteImpact } from "@/db/queries/deck-delete-impact";
 import { DeckDeleteWarningBody } from "@/components/deck-delete-warning-body";
@@ -225,6 +227,8 @@ export function DeckCardPopover({
   const [deleteImpactLoading, setDeleteImpactLoading] = React.useState(false);
 
   const [coverAnchor, setCoverAnchor] = React.useState<DOMRect | null>(null);
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  const illustratedTile = effectiveIllustratedDesign && view !== "list";
 
   const displayName = formatDeckCardDisplayName(deck.name);
   const lessonPlanDayLabel = formatLessonPlanDayCardLabel(
@@ -308,12 +312,16 @@ export function DeckCardPopover({
   });
 
   const wrapperClass = cn(
-    "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500",
+    effectiveIllustratedDesign && view !== "list"
+      ? "relative h-full"
+      : "animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both duration-500",
     view === "compact"
       ? "relative h-full min-h-[140px] sm:min-h-[160px]"
       : view === "list"
         ? "relative"
-        : "relative min-h-[4.75rem]",
+        : illustratedTile
+          ? "relative h-full"
+          : "relative min-h-[4.75rem]",
   );
 
   const triggerClassName = cn(
@@ -545,7 +553,7 @@ export function DeckCardPopover({
   const deckMetaClass = hasGradient ? "text-white/80" : "text-foreground/70";
   const deckDescriptionClass = hasGradient ? "text-white/80" : "text-foreground/75";
 
-  const deckCard = (
+  const standardDeckCard = (
     <Card
       className={cn(
         itemCardContainerClass,
@@ -731,6 +739,19 @@ export function DeckCardPopover({
         </div>
       )}
     </Card>
+  );
+
+  const deckCard = illustratedTile ? (
+    <IllustratedDeckTile
+      name={displayName}
+      description={deck.description}
+      gradeLevel={deck.gradeLevel}
+      coverImageUrl={deck.coverImageUrl}
+      cardCount={deck.cardCount}
+      updatedLabel={view === "compact" ? updatedShort : `Updated ${updatedLabel}`}
+    />
+  ) : (
+    standardDeckCard
   );
 
   return (

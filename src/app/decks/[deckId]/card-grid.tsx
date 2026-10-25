@@ -7,6 +7,9 @@ import {
   Hash,
 } from "lucide-react";
 import { setViewModeAction } from "@/actions/view-mode";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import { DeckArtwork, IllustratedCardTile } from "@/components/illustrated/surfaces";
+import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -269,6 +272,9 @@ interface CardGridProps {
   cards: CardData[];
   deckId: number;
   hasAI?: boolean;
+  deckName?: string;
+  deckDescription?: string | null;
+  coverImageUrl?: string | null;
   initialView?: ViewMode;
   /** When false, hide edit/delete actions (view-only deck access). */
   canEditContent?: boolean;
@@ -278,6 +284,9 @@ export function CardGrid({
   cards,
   deckId,
   hasAI = false,
+  deckName = "",
+  deckDescription = null,
+  coverImageUrl = null,
   initialView = "grid",
   canEditContent = true,
 }: CardGridProps) {
@@ -286,6 +295,12 @@ export function CardGrid({
   const [page, setPage] = useState(1);
   const [view, setView] = useState<ViewMode>(initialView);
   const [, startTransition] = useTransition();
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  const artwork = resolveIllustratedArtwork({
+    name: deckName,
+    description: deckDescription,
+    coverImageUrl,
+  });
 
   function handleViewChange(next: ViewMode) {
     setView(next);
@@ -310,7 +325,7 @@ export function CardGrid({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="illustrated-cards-meta flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-xs sm:text-sm tabular-nums">
           {sorted.length === 0
             ? "No cards"
@@ -396,12 +411,26 @@ export function CardGrid({
                     style={{ animationDelay: `${i * 20}ms` }}
                   >
                     <TableCell className="whitespace-normal pl-4 align-top">
-                      <CardFrontTableCell
-                        front={card.front}
-                        isMC={isMC}
-                        frontImageUrl={card.frontImageUrl}
-                        cardTextClass={cardTextClass}
-                      />
+                      <div className="flex items-start gap-2">
+                        {effectiveIllustratedDesign ? (
+                          <span className="relative mt-0.5 size-10 shrink-0 overflow-hidden rounded-md" aria-hidden>
+                            <DeckArtwork
+                              subject={artwork.subject}
+                              topicText={card.front}
+                              variantIndex={card.id}
+                              role="card-cover"
+                              displayWidth={40}
+                              displayHeight={40}
+                            />
+                          </span>
+                        ) : null}
+                        <CardFrontTableCell
+                          front={card.front}
+                          isMC={isMC}
+                          frontImageUrl={card.frontImageUrl}
+                          cardTextClass={cardTextClass}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="hidden align-top sm:table-cell">
                       {cardTypeBadges(card, isMC)}
@@ -428,7 +457,9 @@ export function CardGrid({
       <div
         className={
           view === "compact"
-            ? "grid grid-cols-2 items-stretch gap-1.5 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+            ? effectiveIllustratedDesign
+              ? "grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              : "grid grid-cols-2 items-stretch gap-1.5 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
             : "flex flex-col gap-1"
         }
       >
@@ -439,13 +470,6 @@ export function CardGrid({
             const correctIdx = card.correctChoiceIndex ?? 0;
             return card.choices?.[correctIdx] ?? card.back ?? "";
           })();
-          const updatedLabel = card.updatedAt.toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          });
           const updatedShort = card.updatedAt.toLocaleString("en-US", {
             month: "short",
             day: "numeric",
@@ -460,6 +484,54 @@ export function CardGrid({
           // Card text sits on the solid card surface (not the deck gradient).
           const cardTextClass = itemPrimaryTextClass(false);
 
+          if (view === "compact" && effectiveIllustratedDesign) {
+            return (
+              <IllustratedCardTile
+                key={card.id}
+                subject={artwork.subject}
+                topicText={card.front}
+                variantIndex={card.id}
+                art={
+                  card.frontImageUrl ? (
+                    <CardFrontImage
+                      src={card.frontImageUrl}
+                      alt={card.front ?? (isMC ? "Question image" : "Front image")}
+                      label={isMC ? "Question image" : "Front image"}
+                      variant="tile"
+                      className="!aspect-auto !h-full !w-full"
+                    />
+                  ) : undefined
+                }
+                footer={
+                  <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-2">
+                    <span className="truncate text-xs text-muted-foreground tabular-nums">
+                      {updatedCompact}
+                    </span>
+                    {canEditContent ? (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <EditCardDialog card={card} deckId={deckId} hasAI={hasAI} />
+                        <DeleteCardDialog cardId={card.id} deckId={deckId} />
+                      </div>
+                    ) : null}
+                  </div>
+                }
+              >
+                <div className="mb-1 flex flex-wrap items-center gap-1">
+                  {cardTypeBadges(card, isMC)}
+                </div>
+                <CardFaceText
+                  front={card.front}
+                  correctAnswer={correctAnswer}
+                  isMC={isMC}
+                  frontImageUrl={null}
+                  backImageUrl={card.backImageUrl}
+                  cardTextClass={cn(cardTextClass, "text-slate-900 drop-shadow-none")}
+                  variant="compact"
+                />
+              </IllustratedCardTile>
+            );
+          }
+
           if (view === "list") {
             return (
               <Card
@@ -472,6 +544,18 @@ export function CardGrid({
                 style={{ animationDelay: `${i * 20}ms` }}
               >
                 <ItemWatermark label="CARD" view="list" />
+                {effectiveIllustratedDesign ? (
+                  <span className="relative size-10 shrink-0 overflow-hidden rounded-md" aria-hidden>
+                    <DeckArtwork
+                      subject={artwork.subject}
+                      topicText={card.front}
+                      variantIndex={card.id}
+                      role="card-cover"
+                      displayWidth={40}
+                      displayHeight={40}
+                    />
+                  </span>
+                ) : null}
                 <CardFaceText
                   front={card.front}
                   correctAnswer={correctAnswer}

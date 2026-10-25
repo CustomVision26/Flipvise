@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { Hash } from "lucide-react";
 import { setViewModeAction } from "@/actions/view-mode";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import {
   Select,
   SelectContent,
@@ -205,6 +206,8 @@ export function DeckGrid({
   const [page, setPage] = useState(1);
   const [view, setView] = useState<ViewMode>(initialView);
   const [, startTransition] = useTransition();
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  const illustratedTiles = effectiveIllustratedDesign && view !== "list";
 
   function handleViewChange(next: ViewMode) {
     setView(next);
@@ -307,7 +310,7 @@ export function DeckGrid({
       </div>
 
       {/* Optional column header for detailed Grid view */}
-      {view === "grid" && paginated.length > 0 && (
+      {view === "grid" && paginated.length > 0 && !illustratedTiles && (
         <div className="hidden sm:flex items-center gap-3 sm:gap-4 px-4 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
           <span className="flex-1">Name / Description</span>
           <span className="w-16 text-right">Cards</span>
@@ -318,7 +321,9 @@ export function DeckGrid({
       {/* Deck container — Grid & List are stacked rows; Compact is a tile grid */}
       <div
         className={
-          view === "compact"
+          illustratedTiles
+            ? "grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            : view === "compact"
             ? "grid grid-cols-2 items-stretch gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
             : view === "list"
               ? "flex flex-col gap-1"

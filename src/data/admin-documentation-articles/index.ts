@@ -429,6 +429,33 @@ const ALL_ARTICLES: DocArticle[] = [
     ],
   ),
   a(
+    "feature-controls",
+    "Feature Controls — In-Depth Guide",
+    "The illustrated deck design master switch lives at /admin/feature-controls.",
+    [
+      {
+        id: "switch",
+        title: "Master switch",
+        bullets: [
+          "Enable Illustrated Deck Design allows users on every plan except Free to opt in from Manage account → Appearance. Free accounts stay on the standard design.",
+          "Off shows the standard design everywhere. Saved user preferences are not cleared.",
+          "Save changes records administrator id, previous value, new value, timestamp, and action illustrated_design_enabled.",
+          "Visible online sessions update within about 60 seconds, or when the window regains focus or reconnects.",
+          "Apply drizzle/0079_illustrated_appearance.sql before using this page. Do not run it against production until you intend to.",
+        ],
+      },
+      {
+        id: "artwork",
+        title: "Artwork",
+        bullets: [
+          "Cartoon scenes are stored in public/illustrated/reference-bank. Image generation uses a matching local scene before calling an online image model.",
+          "Decks match a cover image first, then a reference-bank scene, then an explicit subject, then keywords, then a general vector illustration.",
+          "Replace a tile in public/illustrated/reference-bank/tiles to change a scene. Do not put question text inside the image.",
+        ],
+      },
+    ],
+  ),
+  a(
     "audit-log",
     "Audit Log — In-Depth Guide",
     "Read-only log of admin privilege grants and revocations at /admin/audit-log.",

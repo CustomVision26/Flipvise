@@ -16,7 +16,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Central platform administration hub for monitoring users, billing, support, plans, and affiliates.",
         howItWorks: [
           "Overview metrics show total users, decks, cards, admin-granted Pro Plus, and paid subscriber counts.",
-          "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, AI & analytics, Access & support, Plans & growth, and Documentation.",
+          "Sticky left sidebar (Teacher Dashboard–style) groups navigation: Overview Dashboard, Users & workspaces, Billing, AI & analytics, Access & support (including Feature Controls), Plans & growth, and Documentation.",
           "Personal Dashboard link returns to your own Flipvise workspace.",
           "Support notifications bell in the header surfaces unread ticket and contact alerts.",
           "The admin shell loads public contact settings, including the WhatsApp number shown on Contact Us and in the page footer.",
@@ -195,6 +195,26 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
         ],
         requirements: ["Platform admin access."],
         doNots: ["Audit entries cannot be edited or deleted from the UI."],
+      },
+      {
+        id: "feature-controls",
+        title: "Feature Controls",
+        route: "/admin/feature-controls",
+        purpose: "Master switch for the optional illustrated deck design.",
+        howItWorks: [
+          "Enable Illustrated Deck Design lets signed-in users on every plan except Free turn on cartoon artwork and layered cards. Free always stays on the standard design. Matching scenes come from the local reference bank before any online image generation. Turning the switch off shows the standard design for everyone.",
+          "User preferences and deck cover images are kept. Turning the switch back on restores each saved choice.",
+          "Save changes writes the switch and an audit row (administrator, old value, new value, time, action illustrated_design_enabled).",
+          "Open, visible sessions refresh the switch about every 60 seconds, and also when the tab is focused or the device reconnects. Offline devices keep the last look until they reconnect.",
+        ],
+        requirements: [
+          "Platform admin access.",
+          "Migration drizzle/0079_illustrated_appearance.sql applied.",
+        ],
+        doNots: [
+          "Do not expect the switch to change study progress, quiz timers, or exam lockouts.",
+          "Do not turn this on in production until the illustrated screens have been reviewed.",
+        ],
       },
     ],
   },

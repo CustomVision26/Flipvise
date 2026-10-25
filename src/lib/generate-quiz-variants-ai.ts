@@ -12,6 +12,10 @@ import {
   type CardQuizVariants,
   type FillInBlankSegment,
 } from "@/lib/card-quiz-variants";
+import {
+  stripLatexArtifacts,
+  stripLatexArtifactsDeep,
+} from "@/lib/source-import-reading-passage";
 
 /**
  * OpenAI structured output requires every property to be listed in `required`.
@@ -53,7 +57,7 @@ function normalizeAiFillInBlankSegments(
 
   for (const seg of segments) {
     if (seg.type === "text") {
-      const value = seg.text.trim();
+      const value = stripLatexArtifacts(seg.text).trim();
       if (!value) return null;
       out.push({ type: "text", value });
       continue;
@@ -61,7 +65,7 @@ function normalizeAiFillInBlankSegments(
 
     if (seg.type === "blank") {
       const acceptedAnswers = seg.answers
-        .map((answer) => answer.trim())
+        .map((answer) => stripLatexArtifacts(answer).trim())
         .filter((answer) => answer.length > 0);
       if (acceptedAnswers.length === 0) return null;
       out.push({ type: "blank", acceptedAnswers });
@@ -114,6 +118,7 @@ export async function generateQuizVariantsForCard(input: {
         ? "When correctAnswer is true, the statement must match the stored correct answer."
         : "When false, the statement must be plausible but clearly wrong when you know the fact.",
       "Do not prefix with 'True or false:' — only the sentence.",
+      "Write math in plain text. Never use LaTeX, TeX, or backslash characters.",
     );
   }
 
@@ -129,6 +134,7 @@ export async function generateQuizVariantsForCard(input: {
       "For the blank segment: set text to '' and answers to 1–3 acceptable spellings of the correct answer.",
       "Example shape: [{ type: 'text', text: 'The capital of France is ', answers: [] }, { type: 'blank', text: '', answers: ['Paris'] }].",
       "Alternate text and blank segments so the sentence reads naturally with one blank.",
+      "Write math in plain text. Never use LaTeX, TeX, or backslash characters.",
     );
   }
 
@@ -178,7 +184,7 @@ export async function generateQuizVariantsForCard(input: {
 
     if (includeTrueFalse && data.trueFalse?.statement?.trim()) {
       result.trueFalse = {
-        statement: data.trueFalse.statement.trim(),
+        statement: stripLatexArtifacts(data.trueFalse.statement).trim(),
         correctAnswer: data.trueFalse.correctAnswer,
       };
     }
@@ -207,7 +213,7 @@ export async function generateQuizVariantsForCard(input: {
       result.sourceMcq = mcqSnapshotFromContext(mcqContext);
     }
 
-    return result;
+    return stripLatexArtifactsDeep(result);
   }
 
   throw new Error("AI could not create the requested quiz formats.");

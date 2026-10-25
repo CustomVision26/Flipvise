@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { stripLatexArtifacts } from "@/lib/source-import-reading-passage";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -134,6 +135,9 @@ type SubmitQuizOptions = {
 };
 
 import { cn } from "@/lib/utils";
+import { IllustratedQuizFrame } from "@/components/illustrated/surfaces";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
 import type { DeckQuizFormatAssignments } from "@/lib/quiz-format-assignments";
 import { distributionFromQuestionTypes } from "@/lib/quiz-format-assignments";
 import { FormattedCardFront } from "@/components/formatted-card-front";
@@ -224,7 +228,7 @@ function normalizeText(text: string): string {
  * `submitQuizResultAction` still receives the full stored option string.
  */
 function formatQuizOptionForDisplay(raw: string): string {
-  const text = raw.trim();
+  const text = stripLatexArtifacts(raw).trim();
   if (!text) return raw;
   if (!/\bStep\s*\d+\s*:/i.test(text)) return text;
 
@@ -603,6 +607,8 @@ export function QuizStudy({
   const canStartQuiz = canStartSecuredQuiz && !scheduleBlocksStart;
 
   const [result, setResult] = useState<QuizResult | null>(null);
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  useDeckScreen(result ? "results" : quizStarted ? "quiz-live" : "prep");
   const [submitting, startTransition] = useTransition();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1554,8 +1560,9 @@ export function QuizStudy({
                       size="default"
                       disabled={!canStartQuiz}
                       className={cn(
-                        "w-full gap-2 sm:w-auto sm:min-w-40",
-                        canStartQuiz &&
+                        "illustrated-ready-pill w-full gap-2 sm:w-auto sm:min-w-40",
+                        !effectiveIllustratedDesign &&
+                          canStartQuiz &&
                           deckAccent.hasDeckAccent &&
                           "!bg-[var(--deck-accent)] !text-[var(--deck-accent-fg)] hover:opacity-90 border-transparent",
                       )}
@@ -1603,7 +1610,7 @@ export function QuizStudy({
                       type="button"
                       variant="outline"
                       size="default"
-                      className="w-full gap-2 sm:w-auto"
+                      className="illustrated-ready-pill w-full gap-2 sm:w-auto"
                       disabled={cardOrderReshuffling || quizStarted}
                       onClick={() => void handleReshuffleCardOrder()}
                     >
@@ -1626,7 +1633,7 @@ export function QuizStudy({
                     <Button
                       variant="outline"
                       size="default"
-                      className="w-full gap-2 sm:w-auto"
+                      className="illustrated-ready-pill w-full gap-2 sm:w-auto"
                       onClick={leaveStudy}
                     />
                   }
@@ -2039,7 +2046,13 @@ export function QuizStudy({
 
   return (
     <>
-      {quizBody}
+      <IllustratedQuizFrame
+        active={quizStarted}
+        deckName={deckName}
+        deckDescription={deckDescription}
+      >
+        {quizBody}
+      </IllustratedQuizFrame>
       {quizSubmitDialogs}
     </>
   );

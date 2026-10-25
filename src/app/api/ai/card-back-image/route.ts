@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       teamId: bundle.deck.teamId ?? null,
       subscriptionPlan: access.effectivePlanSlug,
       isPlatformAdmin: access.isAdmin || access.isSuperadmin,
+      planSlug: access.effectivePlanSlug,
     });
     if (!image) {
       return NextResponse.json(

@@ -4,6 +4,12 @@ import { cookies, headers } from "next/headers";
 import { Poppins } from "next/font/google";
 import Image from "next/image";
 import { AppProviders } from "@/components/app-providers";
+import { IllustratedAppearanceProvider } from "@/components/illustrated-appearance-provider";
+import { getAppearanceSnapshot } from "@/db/queries/appearance";
+import {
+  planAllowsIllustratedDesign,
+  STANDARD_APPEARANCE,
+} from "@/lib/illustrated-appearance";
 import { HeaderLogo } from "@/components/header-logo";
 import { AppTopNav } from "@/components/app-top-nav";
 import { AuthenticatedShellChrome } from "@/components/authenticated-shell-chrome";
@@ -13,6 +19,7 @@ import { HelpCenter } from "@/components/help-center";
 import { DashboardAddonsBanner } from "@/components/dashboard-addons-banner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAccessContext } from "@/lib/access";
+import { resolvePlanSlugForAddonEligibility } from "@/lib/addon-plan-eligibility";
 import { buildDashboardAddonBannerItems } from "@/lib/dashboard-addon-banner-items";
 import { isAiEssayComingSoonForTeamMember } from "@/lib/essay-access";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
@@ -255,6 +262,27 @@ export default async function RootLayout({
     isTeamInviteRoute ||
     (isNativeSignInRoute && showHeaderAddons);
 
+  const illustratedPlanSlug = resolvePlanSlugForAddonEligibility({
+    effectivePlanSlug,
+    isAdmin,
+    adminGranted,
+    hasClerkPersonalProPlus,
+    hasClerkPersonalPro,
+    activeTeamPlan,
+    activeEducationTeamPlan,
+  });
+  const appearanceFallback = {
+    userId,
+    ...STANDARD_APPEARANCE,
+    planAllowsIllustrated: planAllowsIllustratedDesign(illustratedPlanSlug),
+  };
+  let appearanceInitial = appearanceFallback;
+  try {
+    appearanceInitial = await getAppearanceSnapshot(userId, illustratedPlanSlug);
+  } catch {
+    appearanceInitial = appearanceFallback;
+  }
+
   return (
     <html
       lang="en"
@@ -267,6 +295,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col relative">
         <AppProviders>
+          <IllustratedAppearanceProvider initial={appearanceInitial}>
             {showHeaderChrome && (
               <AuthenticatedShellChrome>
                 <header
@@ -418,6 +447,7 @@ export default async function RootLayout({
               </div>
             </div>
             <SiteContactFooter />
+          </IllustratedAppearanceProvider>
         </AppProviders>
       </body>
     </html>

@@ -1,12 +1,16 @@
 import type { CardQuizVariants } from "@/lib/card-quiz-variants";
 import { db } from "@/db";
-import { cards, decks } from "@/db/schema";
+import { cards, decks, quizResults, quizSecuritySessions } from "@/db/schema";
+import {
+  stripLatexArtifacts,
+  stripLatexArtifactsDeep,
+} from "@/lib/source-import-reading-passage";
 import { resolveDeckViewerAccess } from "@/db/queries/teams";
 import { getDeckRowById, setDeckCoverImageUrl } from "@/db/queries/decks";
 import { coverPlaceholderCardSql } from "@/db/queries/cover-placeholder-cards";
 import { isCoverPlaceholderCard } from "@/lib/cover-placeholder-card";
 import { deleteFromS3 } from "@/lib/s3";
-import { and, asc, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, inArray, or, sql } from "drizzle-orm";
 
 type CardRow = typeof cards.$inferSelect;
 
@@ -466,4 +470,88 @@ export async function mergeCardQuizVariants(
   };
   await updateCardQuizVariants(cardId, deckId, merged);
   return merged;
+}
+
+/**
+ * Rewrite learner-facing card and quiz text so stored LaTeX backslashes
+ * become plain fractions such as 2/6.
+ */
+export async function stripStoredLearnerLatex() {
+  const cardRows = await db
+    .select({
+      id: cards.id,
+      front: cards.front,
+      back: cards.back,
+      choices: cards.choices,
+      quizVariants: cards.quizVariants,
+    })
+    .from(cards)
+    .where(
+      or(
+        sql`position(chr(92) in coalesce(${cards.front}, '')) > 0`,
+        sql`position(chr(92) in coalesce(${cards.back}, '')) > 0`,
+        sql`position(chr(92) in coalesce(${cards.choices}::text, '')) > 0`,
+        sql`position(chr(92) in coalesce(${cards.quizVariants}::text, '')) > 0`,
+        sql`position(' .' in coalesce(${cards.front}, '')) > 0`,
+        sql`position(' .' in coalesce(${cards.back}, '')) > 0`,
+        sql`position(' .' in coalesce(${cards.choices}::text, '')) > 0`,
+      ),
+    );
+
+  let cardsUpdated = 0;
+  for (const row of cardRows) {
+    const front = row.front == null ? row.front : stripLatexArtifacts(row.front).trim();
+    const back = row.back == null ? row.back : stripLatexArtifacts(row.back).trim();
+    const choices = row.choices?.map((choice) => stripLatexArtifacts(choice).trim()) ?? row.choices;
+    const quizVariants = row.quizVariants
+      ? stripLatexArtifactsDeep(row.quizVariants)
+      : row.quizVariants;
+    const changed =
+      front !== row.front ||
+      back !== row.back ||
+      JSON.stringify(choices) !== JSON.stringify(row.choices) ||
+      JSON.stringify(quizVariants) !== JSON.stringify(row.quizVariants);
+    if (!changed) continue;
+    await db
+      .update(cards)
+      .set({ front, back, choices, quizVariants })
+      .where(eq(cards.id, row.id));
+    cardsUpdated += 1;
+  }
+
+  const resultRows = await db
+    .select({ id: quizResults.id, perCard: quizResults.perCard })
+    .from(quizResults)
+    .where(sql`position(chr(92) in coalesce(${quizResults.perCard}::text, '')) > 0`);
+  let resultsUpdated = 0;
+  for (const row of resultRows) {
+    if (!row.perCard) continue;
+    const perCard = stripLatexArtifactsDeep(row.perCard);
+    if (JSON.stringify(perCard) === JSON.stringify(row.perCard)) continue;
+    await db.update(quizResults).set({ perCard }).where(eq(quizResults.id, row.id));
+    resultsUpdated += 1;
+  }
+
+  const sessionRows = await db
+    .select({
+      id: quizSecuritySessions.id,
+      sessionState: quizSecuritySessions.sessionState,
+    })
+    .from(quizSecuritySessions)
+    .where(
+      sql`position(chr(92) in coalesce(${quizSecuritySessions.sessionState}::text, '')) > 0`,
+    );
+  let sessionsUpdated = 0;
+  for (const row of sessionRows) {
+    if (!row.sessionState) continue;
+    const sessionState = stripLatexArtifactsDeep(row.sessionState);
+    if (JSON.stringify(sessionState) === JSON.stringify(row.sessionState)) continue;
+    await db
+      .update(quizSecuritySessions)
+      .set({ sessionState })
+      .where(eq(quizSecuritySessions.id, row.id));
+    sessionsUpdated += 1;
+  }
+
+  return { cardsUpdated, resultsUpdated, sessionsUpdated };
 }

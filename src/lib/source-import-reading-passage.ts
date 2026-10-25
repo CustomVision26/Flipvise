@@ -42,12 +42,22 @@ Rules:
  * Strip LaTeX / TeX artifacts that models often emit in math passages
  * (e.g. `\\( x \\)`, `\\times`) so students see plain readable text.
  */
+function replaceLatexFractions(value: string): string {
+  return value.replace(
+    /\\?(?:d|t|c)?frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g,
+    (_, numerator: string, denominator: string) =>
+      `${numerator.trim()}/${denominator.trim()}`,
+  );
+}
+
 export function stripLatexArtifacts(text: string): string {
-  return text
+  const unwrapped = text
     .replace(/\\\(([\s\S]*?)\\\)/g, "$1")
     .replace(/\\\[([\s\S]*?)\\\]/g, "$1")
     .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
-    .replace(/\$([^$\n]+)\$/g, "$1")
+    .replace(/\$([^$\n]+)\$/g, "$1");
+  return replaceLatexFractions(unwrapped)
+    .replace(/\\(?:text|mathrm|mathbf)\s*\{([^{}]*)\}/g, "$1")
     .replace(/\\times\b/g, "×")
     .replace(/\\div\b/g, "÷")
     .replace(/\\pm\b/g, "±")
@@ -56,10 +66,27 @@ export function stripLatexArtifacts(text: string): string {
     .replace(/\\geq\b/g, "≥")
     .replace(/\\neq\b/g, "≠")
     .replace(/\\%/g, "%")
+    .replace(/\\left\b/g, "")
+    .replace(/\\right\b/g, "")
     .replace(/\\([a-zA-Z]+)/g, "$1")
     .replace(/\\([{}_])/g, "$1")
     .replace(/\\/g, "")
-    .replace(/[ \t]{2,}/g, " ");
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([.,;:!?])/g, "$1");
+}
+
+/** Plain-text copy of strings inside generated or stored learner content. */
+export function stripLatexArtifactsDeep<T>(value: T): T {
+  if (typeof value === "string") return stripLatexArtifacts(value) as T;
+  if (Array.isArray(value)) return value.map((item) => stripLatexArtifactsDeep(item)) as T;
+  if (value && typeof value === "object") {
+    const next: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      next[key] = stripLatexArtifactsDeep(item);
+    }
+    return next as T;
+  }
+  return value;
 }
 
 /** Removes A–D option lines accidentally included on reading-passage card fronts. */

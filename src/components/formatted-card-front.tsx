@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { stripLatexArtifacts } from "@/lib/source-import-reading-passage";
 import {
   parseCardFront,
   parseDefinitionItems,
@@ -118,7 +119,7 @@ export function FormattedCardFront({
   hasGradient = false,
   className,
 }: FormattedCardFrontProps) {
-  const trimmed = text.trim();
+  const trimmed = stripLatexArtifacts(text).trim();
   if (!trimmed) return null;
 
   const parsed = parseCardFront(trimmed);

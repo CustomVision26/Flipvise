@@ -28,6 +28,10 @@ import {
 import { SpeakButton, VoiceSelector, type TtsVoice } from "@/components/speak-button";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
+import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
+import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { cn } from "@/lib/utils";
 
 
@@ -99,8 +103,17 @@ export function FlashcardStudy({
   hasAiReading = false,
 }: FlashcardStudyProps) {
   const router = useRouter();
+  const { effectiveIllustratedDesign, effectiveReducedMotion } =
+    useIllustratedAppearance();
   const cardGradient = getGradientBySlug(deckGradient);
   const hasGradient = cardGradient.slug !== "none";
+  const reviewArt = resolveIllustratedArtwork({ name: deckName });
+  const illustratedFace = effectiveIllustratedDesign;
+  const faceChrome = illustratedFace
+    ? "illustrated-readable border border-[#eadfce] bg-[#fff8ee] text-slate-900"
+    : hasGradient
+      ? cn(cardGradient.classes, "border border-white/20")
+      : "bg-card border";
   const [deck, setDeck] = useState<CardData[]>(cards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [visibleIndex, setVisibleIndex] = useState(0);
@@ -108,6 +121,7 @@ export function FlashcardStudy({
   const [answerRevealKey, setAnswerRevealKey] = useState(0);
   const [voice, setVoice] = useState<TtsVoice>("nova");
   const [sessionComplete, setSessionComplete] = useState(false);
+  useDeckScreen(sessionComplete ? "results" : "study");
   const [autoShuffle, setAutoShuffle] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [slideX, setSlideX] = useState(0);
@@ -447,11 +461,13 @@ export function FlashcardStudy({
 
       {/* Flashcard */}
       <div
-        className="w-full max-w-xl select-none"
+        className="relative w-full max-w-xl select-none"
         style={{
           transform: `translateX(calc(${slideX}% + ${dragOffsetX}px))`,
           opacity: slideOpacity,
-          transition: enableSlideTransition
+          transition: effectiveReducedMotion
+            ? "none"
+            : enableSlideTransition
             ? `transform ${SLIDE_MS}ms cubic-bezier(0.4, 0, 0.2, 1), opacity ${SLIDE_MS}ms ease`
             : isDragSnapBack
             ? "transform 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)"
@@ -467,39 +483,66 @@ export function FlashcardStudy({
         role="button"
         aria-label={isFlipped ? "Card back — click to flip" : "Card front — click to flip"}
       >
+      {effectiveIllustratedDesign ? (
+        <>
+          <span className="illustrated-layer illustrated-layer-a" aria-hidden />
+          <span className="illustrated-layer illustrated-layer-b" aria-hidden />
+        </>
+      ) : null}
       <div
         className={cn(
-          dragOffsetX === 0 && !enableSlideTransition && "animate-flashcard-float",
+          "relative z-[1]",
+          dragOffsetX === 0 && !enableSlideTransition && !effectiveReducedMotion && "animate-flashcard-float",
         )}
       >
       <div
         key={visibleIndex}
-        className="animate-flashcard-enter"
+        className={effectiveReducedMotion ? undefined : "animate-flashcard-enter"}
         style={{ perspective: "1200px" }}
       >
         <div
           className="flashcard-container"
           style={{
             transformStyle: "preserve-3d",
-            transition: "transform 0.55s cubic-bezier(0.45, 0, 0.55, 1)",
-            transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
+            transition: effectiveReducedMotion
+              ? "none"
+              : "transform 0.55s cubic-bezier(0.45, 0, 0.55, 1)",
+            transform: effectiveReducedMotion
+              ? undefined
+              : isFlipped
+                ? "rotateY(180deg)"
+                : "rotateY(0deg)",
             position: "relative",
           }}
         >
-          {/* Front */}
+          {(!effectiveReducedMotion || !isFlipped) ? (
           <div
+            inert={isFlipped ? true : undefined}
+            aria-hidden={isFlipped ? true : undefined}
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
             className={cn(
-              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[220px] sm:min-h-[300px] md:h-[380px] animate-flashcard-shimmer",
-              hasGradient
-                ? cn(cardGradient.classes, "border border-white/20")
-                : "bg-card border",
+              effectiveReducedMotion
+                ? "relative flex min-h-[220px] flex-col overflow-hidden rounded-xl shadow-md sm:rounded-2xl"
+                : "absolute inset-0 flex min-h-[220px] flex-col overflow-hidden rounded-xl shadow-md animate-flashcard-shimmer sm:min-h-[300px] sm:rounded-2xl md:h-[380px]",
+              faceChrome,
             )}
           >
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0">
-              <Badge variant="secondary" className={cn("text-xs", hasGradient && "bg-white/20 text-white border-white/30")}>Front</Badge>
-              <span className={cn("text-xs hidden sm:inline", hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
+              <Badge variant="secondary" className={cn("text-xs", hasGradient && !illustratedFace && "bg-white/20 text-white border-white/30", illustratedFace && "bg-violet-100 text-violet-900")}>Front</Badge>
+              <span className={cn("text-xs hidden sm:inline", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
             </div>
+            {illustratedFace && !currentCard.frontImageUrl && (currentCard.front?.length ?? 0) < 220 ? (
+              <div className="relative mx-4 h-36 shrink-0 overflow-hidden rounded-xl sm:mx-6 sm:h-44" aria-hidden>
+                <IllustratedScene
+                  subject={reviewArt.subject}
+                  text={deckName}
+                  role="hero"
+                  fit="contain"
+                  displayWidth={280}
+                  displayHeight={176}
+                />
+              </div>
+            ) : null}
             {currentCard.frontImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2">
                 <button
@@ -534,30 +577,35 @@ export function FlashcardStudy({
                 <FormattedCardFront
                   text={currentCard.front}
                   variant="study"
-                  hasGradient={hasGradient}
+                  hasGradient={hasGradient && !illustratedFace}
                 />
               )}
             </div>
           </div>
+          ) : null}
 
-          {/* Back */}
+          {(!effectiveReducedMotion || isFlipped) ? (
           <div
+            inert={!isFlipped ? true : undefined}
+            aria-hidden={!isFlipped ? true : undefined}
             style={{
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
-              transform: "rotateY(180deg)",
+              transform: effectiveReducedMotion ? undefined : "rotateY(180deg)",
             }}
             className={cn(
-              "absolute inset-0 flex flex-col rounded-xl sm:rounded-2xl shadow-md overflow-hidden min-h-[220px] sm:min-h-[300px] md:h-[380px] animate-flashcard-shimmer",
-              hasGradient
-                ? cn(cardGradient.classes, "border border-white/20")
-                : "bg-card border",
+              effectiveReducedMotion
+                ? "relative flex min-h-[220px] flex-col overflow-hidden rounded-xl shadow-md sm:rounded-2xl"
+                : "absolute inset-0 flex min-h-[220px] flex-col overflow-hidden rounded-xl shadow-md animate-flashcard-shimmer sm:min-h-[300px] sm:rounded-2xl md:h-[380px]",
+              faceChrome,
             )}
           >
-            {isFlipped && <MagicAnswerAmbience revealKey={answerRevealKey} />}
+            {isFlipped && !effectiveReducedMotion && !illustratedFace ? (
+              <MagicAnswerAmbience revealKey={answerRevealKey} />
+            ) : null}
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 shrink-0 relative z-10">
-              <Badge variant="outline" className={cn("text-xs", hasGradient && "bg-white/20 text-white border-white/30")}>Back</Badge>
-              <span className={cn("text-xs hidden sm:inline", hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
+              <Badge variant="outline" className={cn("text-xs", hasGradient && !illustratedFace && "bg-white/20 text-white border-white/30", illustratedFace && "border-violet-200 bg-violet-100 text-violet-900")}>Back</Badge>
+              <span className={cn("text-xs hidden sm:inline", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to flip back</span>
             </div>
             {currentCard.backImageUrl && (
               <div className="shrink-0 px-3 sm:px-6 pb-2 relative z-10">
@@ -593,12 +641,13 @@ export function FlashcardStudy({
                 <FormattedCardAnswer
                   text={currentCard.back}
                   variant="study"
-                  hasGradient={hasGradient}
+                  hasGradient={hasGradient && !illustratedFace}
                   revealKey={answerRevealKey}
                 />
               )}
             </div>
           </div>
+          ) : null}
         </div>
       </div>
       </div>

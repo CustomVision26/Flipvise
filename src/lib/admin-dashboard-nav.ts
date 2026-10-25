@@ -6,6 +6,7 @@ import {
   LayoutList,
   LifeBuoy,
   Megaphone,
+  Palette,
   Puzzle,
   ReceiptText,
   ShieldCheck,
@@ -86,6 +87,12 @@ export const ADMIN_DASHBOARD_NAV: AdminNavSection[] = [
         icon: ShieldCheck,
         isActive: (pathname) =>
           pathname === "/admin/admin-roles" || pathname === "/admin/audit-log",
+      },
+      {
+        title: "Feature Controls",
+        path: "/admin/feature-controls",
+        icon: Palette,
+        isActive: (pathname) => pathname === "/admin/feature-controls",
       },
       {
         title: "Support Center",

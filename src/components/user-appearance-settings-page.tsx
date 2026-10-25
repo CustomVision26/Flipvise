@@ -35,6 +35,7 @@ import {
   type FreeUiThemeId,
 } from "@/lib/free-ui-theme";
 import { setFreeUiThemeAction } from "@/actions/free-ui-theme";
+import { AppearanceSettingsSection } from "@/components/illustrated/appearance-settings-section";
 import { MicrophoneSettingsDialog } from "@/components/microphone-settings-dialog";
 
 export interface UserAppearanceSettingsPageProps {
@@ -196,6 +197,8 @@ export function UserAppearanceSettingsPage({
           </CardContent>
         </Card>
       )}
+
+      <AppearanceSettingsSection />
 
       <Card size="sm">
         <CardHeader className="border-b border-border pb-3">

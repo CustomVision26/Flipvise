@@ -1,0 +1,989 @@
+[
+  {
+    "id": "human-body",
+    "group": "Core subjects",
+    "subject": "Biology",
+    "topic": "Human Body",
+    "brief": "heart lungs DNA",
+    "keywords": [
+      "anatomy",
+      "body",
+      "organs"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/human-body.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "atoms-reactions",
+    "group": "Core subjects",
+    "subject": "Chemistry",
+    "topic": "Atoms & Reactions",
+    "brief": "molecule models, flasks and unlabelled element tiles",
+    "keywords": [
+      "atoms",
+      "molecules",
+      "reactions"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/atoms-reactions.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "forces-motion",
+    "group": "Core subjects",
+    "subject": "Physics",
+    "topic": "Forces & Motion",
+    "brief": "ramp, ball, spring and magnet",
+    "keywords": [
+      "force",
+      "motion",
+      "mechanics"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/forces-motion.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "earth-weather",
+    "group": "Core subjects",
+    "subject": "Geography",
+    "topic": "Earth & Weather",
+    "brief": "globe, mountain, sun and clouds",
+    "keywords": [
+      "weather",
+      "earth",
+      "geography"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/earth-weather.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "story-writing",
+    "group": "Core subjects",
+    "subject": "English",
+    "topic": "Story Writing",
+    "brief": "open storybook, quill and imaginative castle",
+    "keywords": [
+      "writing",
+      "stories",
+      "creative writing"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/story-writing.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "geometry",
+    "group": "Core subjects",
+    "subject": "Mathematics",
+    "topic": "Geometry",
+    "brief": "cube cone sphere compass ruler",
+    "keywords": [
+      "shapes",
+      "geometry",
+      "solids"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/geometry.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "coding",
+    "group": "Applied learning",
+    "subject": "Computer Science",
+    "topic": "Coding",
+    "brief": "laptop, friendly robot, abstract code blocks",
+    "keywords": [
+      "coding",
+      "programming",
+      "computer science"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/coding.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "entrepreneurship",
+    "group": "Applied learning",
+    "subject": "Business",
+    "topic": "Entrepreneurship",
+    "brief": "storefront, parcels, idea bulb",
+    "keywords": [
+      "business",
+      "entrepreneur",
+      "startup"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/entrepreneurship.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "workshop-safety",
+    "group": "Applied learning",
+    "subject": "Auto Mechanics",
+    "topic": "Workshop Safety",
+    "brief": "goggles gloves wrench and secured vehicle lift",
+    "keywords": [
+      "auto mechanics",
+      "workshop",
+      "safety"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/workshop-safety.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "spanish-everyday",
+    "group": "Applied learning",
+    "subject": "Spanish",
+    "topic": "Everyday Words",
+    "brief": "speech bubbles, book and everyday objects",
+    "keywords": [
+      "spanish",
+      "vocabulary",
+      "language"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/spanish-everyday.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "plant-growth",
+    "group": "Applied learning",
+    "subject": "Agriculture",
+    "topic": "Plant Growth",
+    "brief": "seedlings, soil, watering can and sun",
+    "keywords": [
+      "plants",
+      "agriculture",
+      "growth"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/plant-growth.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "jamaican-heritage",
+    "group": "Applied learning",
+    "subject": "History",
+    "topic": "Jamaican Heritage",
+    "brief": "lush Jamaican coastal landscape, historic stone fort and craft drum",
+    "keywords": [
+      "jamaica",
+      "heritage",
+      "jamaican history"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/jamaican-heritage.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "fractions-decimals",
+    "group": "Mathematics",
+    "subject": "Mathematics",
+    "topic": "Fractions & Decimals",
+    "brief": "fraction circles, decimal blocks and ruler",
+    "keywords": [
+      "fractions",
+      "decimals"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/fractions-decimals.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "algebraic-expressions",
+    "group": "Mathematics",
+    "subject": "Mathematics",
+    "topic": "Algebraic Expressions",
+    "brief": "variable-shaped blocks and balance scale",
+    "keywords": [
+      "expressions",
+      "variables"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/algebraic-expressions.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "statistics-probability",
+    "group": "Mathematics",
+    "subject": "Mathematics",
+    "topic": "Statistics & Probability",
+    "brief": "dice spinner and abstract bar shapes",
+    "keywords": [
+      "probability",
+      "statistics"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/statistics-probability.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "trigonometry",
+    "group": "Mathematics",
+    "subject": "Mathematics",
+    "topic": "Trigonometry",
+    "brief": "triangle protractor and wave",
+    "keywords": [
+      "trigonometry",
+      "angles"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/trigonometry.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "measurement-units",
+    "group": "Mathematics",
+    "subject": "Mathematics",
+    "topic": "Measurement & Units",
+    "brief": "ruler scale and measuring jug",
+    "keywords": [
+      "measurement",
+      "units",
+      "weight"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/measurement-units.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "money-budgeting",
+    "group": "Mathematics",
+    "subject": "Mathematics",
+    "topic": "Money & Budgeting",
+    "brief": "coins calculator savings jars",
+    "keywords": [
+      "money",
+      "budget",
+      "finance"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/money-budgeting.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "cells-organelles",
+    "group": "Life Science",
+    "subject": "Biology",
+    "topic": "Cells & Organelles",
+    "brief": "decorative cutaway cell and microscope",
+    "keywords": [
+      "cells",
+      "organelles"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/cells-organelles.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "ecosystems-food-webs",
+    "group": "Life Science",
+    "subject": "Biology",
+    "topic": "Ecosystems & Food Webs",
+    "brief": "forest pond plants and animals, no arrows",
+    "keywords": [
+      "ecosystems",
+      "habitats",
+      "food webs"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/ecosystems-food-webs.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "genetics-inheritance",
+    "group": "Life Science",
+    "subject": "Biology",
+    "topic": "Genetics & Inheritance",
+    "brief": "DNA helix and pea plants",
+    "keywords": [
+      "genetics",
+      "inheritance"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/genetics-inheritance.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "nutrition-digestion",
+    "group": "Life Science",
+    "subject": "Biology",
+    "topic": "Nutrition & Digestion",
+    "brief": "food plate and simplified digestive model",
+    "keywords": [
+      "nutrition",
+      "digestion"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/nutrition-digestion.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "microbes-immunity",
+    "group": "Life Science",
+    "subject": "Biology",
+    "topic": "Microbes & Immunity",
+    "brief": "microscope decorative microbes protective shield",
+    "keywords": [
+      "microbes",
+      "immunity",
+      "bacteria"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/microbes-immunity.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "photosynthesis",
+    "group": "Life Science",
+    "subject": "Biology",
+    "topic": "Plants & Photosynthesis",
+    "brief": "leaf sunlight droplets roots",
+    "keywords": [
+      "photosynthesis",
+      "plant biology"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/photosynthesis.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "electricity-circuits",
+    "group": "Physical Science",
+    "subject": "Physics",
+    "topic": "Electricity & Circuits",
+    "brief": "battery bulb and simple wire loop",
+    "keywords": [
+      "electricity",
+      "circuits"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/electricity-circuits.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "light-optics",
+    "group": "Physical Science",
+    "subject": "Physics",
+    "topic": "Light & Optics",
+    "brief": "prism rainbow and lens",
+    "keywords": [
+      "light",
+      "optics"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/light-optics.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "sound-waves",
+    "group": "Physical Science",
+    "subject": "Physics",
+    "topic": "Sound & Waves",
+    "brief": "tuning fork and smooth abstract waves",
+    "keywords": [
+      "sound",
+      "waves"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/sound-waves.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "states-matter",
+    "group": "Physical Science",
+    "subject": "Chemistry",
+    "topic": "States of Matter",
+    "brief": "ice cube water glass wispy vapour",
+    "keywords": [
+      "matter",
+      "solid",
+      "liquid",
+      "gas"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/states-matter.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "acids-bases",
+    "group": "Physical Science",
+    "subject": "Chemistry",
+    "topic": "Acids & Bases",
+    "brief": "test tubes colour indicator strips, no values",
+    "keywords": [
+      "acids",
+      "bases",
+      "chemistry"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/acids-bases.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "energy-heat",
+    "group": "Physical Science",
+    "subject": "Physics",
+    "topic": "Energy & Heat",
+    "brief": "sun thermometer and turbine",
+    "keywords": [
+      "energy",
+      "heat",
+      "temperature"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/energy-heat.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "solar-system",
+    "group": "Earth & Space",
+    "subject": "Astronomy",
+    "topic": "Solar System",
+    "brief": "stylised planets and telescope, no orbital accuracy claims",
+    "keywords": [
+      "space",
+      "planets",
+      "solar system"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/solar-system.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "moon-phases",
+    "group": "Earth & Space",
+    "subject": "Astronomy",
+    "topic": "Moon Phases",
+    "brief": "moon motifs telescope starry night, decorative not a phase chart",
+    "keywords": [
+      "moon",
+      "astronomy"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/moon-phases.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "rocks-minerals",
+    "group": "Earth & Space",
+    "subject": "Geology",
+    "topic": "Rocks & Minerals",
+    "brief": "colourful mineral crystals and rocks",
+    "keywords": [
+      "rocks",
+      "minerals",
+      "geology"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/rocks-minerals.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "volcanoes-earthquakes",
+    "group": "Earth & Space",
+    "subject": "Geology",
+    "topic": "Volcanoes & Earthquakes",
+    "brief": "volcano and abstract seismic trace",
+    "keywords": [
+      "volcano",
+      "earthquake"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/volcanoes-earthquakes.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "oceans-water-cycle",
+    "group": "Earth & Space",
+    "subject": "Geography",
+    "topic": "Oceans & Water Cycle",
+    "brief": "ocean clouds rain, no diagram arrows",
+    "keywords": [
+      "ocean",
+      "water cycle"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/oceans-water-cycle.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "climate-conservation",
+    "group": "Earth & Space",
+    "subject": "Geography",
+    "topic": "Climate & Conservation",
+    "brief": "globe forest solar panels wind turbines",
+    "keywords": [
+      "climate",
+      "conservation"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/climate-conservation.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "reading-comprehension",
+    "group": "English & Literacy",
+    "subject": "English",
+    "topic": "Reading Comprehension",
+    "brief": "open book magnifying glass",
+    "keywords": [
+      "reading",
+      "comprehension"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/reading-comprehension.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "grammar-sentences",
+    "group": "English & Literacy",
+    "subject": "English",
+    "topic": "Grammar & Sentences",
+    "brief": "linked blank sentence blocks and books",
+    "keywords": [
+      "grammar",
+      "sentences"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/grammar-sentences.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "poetry",
+    "group": "English & Literacy",
+    "subject": "English",
+    "topic": "Poetry & Figurative Language",
+    "brief": "quill moon floating book",
+    "keywords": [
+      "poetry",
+      "figurative language"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/poetry.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "persuasive-writing",
+    "group": "English & Literacy",
+    "subject": "English",
+    "topic": "Persuasive Writing",
+    "brief": "pen speech bubble and balanced argument cards",
+    "keywords": [
+      "persuasive writing",
+      "argument"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/persuasive-writing.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "spelling-vocabulary",
+    "group": "English & Literacy",
+    "subject": "English",
+    "topic": "Spelling & Vocabulary",
+    "brief": "blank alphabet-style cubes dictionary",
+    "keywords": [
+      "spelling",
+      "vocabulary"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/spelling-vocabulary.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "public-speaking",
+    "group": "English & Literacy",
+    "subject": "English",
+    "topic": "Public Speaking",
+    "brief": "microphone podium audience silhouettes",
+    "keywords": [
+      "public speaking",
+      "speech"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/public-speaking.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "ancient-egypt",
+    "group": "History & Civics",
+    "subject": "History",
+    "topic": "Ancient Egypt",
+    "brief": "pyramids papyrus pottery without writing",
+    "keywords": [
+      "egypt",
+      "ancient egypt"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/ancient-egypt.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "ancient-rome",
+    "group": "History & Civics",
+    "subject": "History",
+    "topic": "Ancient Rome",
+    "brief": "Colosseum mosaic scroll",
+    "keywords": [
+      "rome",
+      "ancient rome"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/ancient-rome.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "caribbean-independence",
+    "group": "History & Civics",
+    "subject": "History",
+    "topic": "Caribbean Independence",
+    "brief": "Caribbean islands motif ribbons blank document",
+    "keywords": [
+      "caribbean",
+      "independence"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/caribbean-independence.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "government-democracy",
+    "group": "History & Civics",
+    "subject": "Civics",
+    "topic": "Government & Democracy",
+    "brief": "ballot box civic building",
+    "keywords": [
+      "government",
+      "democracy"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/government-democracy.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "rights-responsibilities",
+    "group": "History & Civics",
+    "subject": "Civics",
+    "topic": "Rights & Responsibilities",
+    "brief": "scales diverse people tokens community book",
+    "keywords": [
+      "rights",
+      "responsibilities"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/rights-responsibilities.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "world-exploration",
+    "group": "History & Civics",
+    "subject": "History",
+    "topic": "World Exploration",
+    "brief": "sailing ship globe compass",
+    "keywords": [
+      "exploration",
+      "navigation"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/world-exploration.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "cybersecurity",
+    "group": "Technology & Careers",
+    "subject": "Computer Science",
+    "topic": "Cybersecurity Basics",
+    "brief": "laptop padlock shield",
+    "keywords": [
+      "cybersecurity",
+      "security"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/cybersecurity.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "web-development",
+    "group": "Technology & Careers",
+    "subject": "Computer Science",
+    "topic": "Web Development",
+    "brief": "browser window blank blocks cursor",
+    "keywords": [
+      "web",
+      "development",
+      "html"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/web-development.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "robotics",
+    "group": "Technology & Careers",
+    "subject": "Technology",
+    "topic": "Robotics & Automation",
+    "brief": "robotic arm and gears",
+    "keywords": [
+      "robotics",
+      "automation"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/robotics.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "electrical-safety",
+    "group": "Technology & Careers",
+    "subject": "TVET",
+    "topic": "Electrical Installation Safety",
+    "brief": "insulated tools protective gloves disconnected plug",
+    "keywords": [
+      "electrical",
+      "installation",
+      "safety"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/electrical-safety.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "carpentry",
+    "group": "Technology & Careers",
+    "subject": "TVET",
+    "topic": "Carpentry & Joinery",
+    "brief": "wood joints clamps hand plane",
+    "keywords": [
+      "carpentry",
+      "joinery"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/carpentry.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "culinary-hygiene",
+    "group": "Technology & Careers",
+    "subject": "TVET",
+    "topic": "Culinary Skills & Hygiene",
+    "brief": "chef hat clean board vegetables",
+    "keywords": [
+      "culinary",
+      "cooking",
+      "hygiene"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/culinary-hygiene.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "emotions-empathy",
+    "group": "Life Skills & Early Learning",
+    "subject": "Life Skills",
+    "topic": "Emotions & Empathy",
+    "brief": "expressive face tokens and heart",
+    "keywords": [
+      "emotions",
+      "empathy"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/emotions-empathy.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "time-management",
+    "group": "Life Skills & Early Learning",
+    "subject": "Life Skills",
+    "topic": "Time Management",
+    "brief": "clock blank planner checkboxes",
+    "keywords": [
+      "time",
+      "planning"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/time-management.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "road-safety",
+    "group": "Life Skills & Early Learning",
+    "subject": "Life Skills",
+    "topic": "Road Safety",
+    "brief": "pedestrian crossing traffic lights child safely waiting on pavement",
+    "keywords": [
+      "road safety",
+      "pedestrian"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/road-safety.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "colours-shapes",
+    "group": "Life Skills & Early Learning",
+    "subject": "Early Learning",
+    "topic": "Colours & Shapes",
+    "brief": "colourful circle square triangle paint swatches",
+    "keywords": [
+      "colours",
+      "colors",
+      "shapes"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/colours-shapes.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "counting",
+    "group": "Life Skills & Early Learning",
+    "subject": "Early Learning",
+    "topic": "Counting & Number Sense",
+    "brief": "counting blocks abacus unmarked tiles",
+    "keywords": [
+      "counting",
+      "numbers"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/counting.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "phonics",
+    "group": "Life Skills & Early Learning",
+    "subject": "Early Learning",
+    "topic": "Phonics & Letter Sounds",
+    "brief": "blank letter-shaped blocks apple storybook",
+    "keywords": [
+      "phonics",
+      "letter sounds"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/phonics.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "british-history",
+    "group": "Earlier deck examples",
+    "subject": "History",
+    "topic": "British History",
+    "brief": "castle clock tower parchment crown",
+    "keywords": [
+      "british history",
+      "britain"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/british-history.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "air-pollution",
+    "group": "Earlier deck examples",
+    "subject": "Environmental Science",
+    "topic": "Air Pollution",
+    "brief": "earth tree soft clouds small factory",
+    "keywords": [
+      "air pollution",
+      "environment"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/air-pollution.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "algebra-1",
+    "group": "Earlier deck examples",
+    "subject": "Mathematics",
+    "topic": "Algebra 1",
+    "brief": "sculpted algebra-style blocks balance and geometry",
+    "keywords": [
+      "algebra",
+      "algebra 1"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/algebra-1.png",
+    "transparent": false,
+    "status": "pending"
+  },
+  {
+    "id": "statistics-data",
+    "group": "Earlier deck examples",
+    "subject": "Mathematics",
+    "topic": "Statistics & Data",
+    "brief": "dice spinner abstract bar-chart objects",
+    "keywords": [
+      "statistics",
+      "data",
+      "data analysis"
+    ],
+    "role": "deck-cover",
+    "file": "public/illustrated/deck-bank/statistics-data.png",
+    "transparent": false,
+    "status": "pending"
+  }
+]

@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ListChecks } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
 import type { DeckQuizFormatAssignments } from "@/lib/quiz-format-assignments";
 import type { CardQuizVariants } from "@/lib/card-quiz-variants";
@@ -31,6 +32,7 @@ import {
 import { FlashcardStudy } from "./flashcard-study";
 import { QuizStudy } from "./quiz-study";
 import { AiRecallStudy } from "./ai-recall-study";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 
 type CardData = {
   id: number;
@@ -200,6 +202,8 @@ export function StudySession({
   const [pendingLeaveTab, setPendingLeaveTab] = useState<StudyModeTab | null>(
     null,
   );
+  const { effectiveIllustratedDesign, effectiveReducedMotion } =
+    useIllustratedAppearance();
 
   const handleAiRecallBusyChange = useCallback((busy: boolean) => {
     setAiRecallBusy(busy);
@@ -285,7 +289,13 @@ export function StudySession({
         }}
         className="flex flex-1 flex-col gap-5 sm:gap-7"
       >
-        <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card/55 px-4 py-3 shadow-md shadow-black/10 backdrop-blur-md sm:px-5">
+        <div
+          className={cn(
+            "illustrated-study-modes mx-auto flex w-full max-w-2xl flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card/55 px-4 py-3 shadow-md shadow-black/10 backdrop-blur-md sm:px-5",
+            effectiveIllustratedDesign && "max-w-3xl",
+            effectiveReducedMotion ? "" : "transition-colors",
+          )}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Study Mode
           </p>

@@ -1,4 +1,5 @@
 import type { CardQuizVariants, FillInBlankSegment } from "@/lib/card-quiz-variants";
+import { stripLatexArtifacts } from "@/lib/source-import-reading-passage";
 import { applyQuizCardOrder } from "@/lib/quiz-card-order";
 import type { QuizFormatsSettings } from "@/lib/quiz-formats";
 
@@ -111,7 +112,7 @@ function summarizeQuizFormatCounts(counts: Record<QuizQuestionType, number>): st
 }
 
 export function normalizeQuizText(text: string): string {
-  return text.replace(/\s+/g, " ").trim().toLowerCase();
+  return stripLatexArtifacts(text).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function shuffleArray<T>(arr: T[]): T[] {

@@ -24,6 +24,9 @@ import {
 import { withTeamWorkspaceQuery } from "@/lib/team-workspace-url";
 import { AddCardDialog } from "./add-card-dialog";
 import { DeleteAllCardsDialogLoader } from "./delete-all-cards-dialog-loader";
+import { IllustratedDeckHeader } from "@/components/illustrated/surfaces";
+import { CardsPanelPattern } from "@/components/illustrated/cards-panel-pattern";
+import { resolveIllustratedPageTheme } from "@/lib/illustrated-page-theme";
 import { StudyLink } from "@/components/study-link";
 import { GenerateCardsButtonLoader } from "./generate-cards-button-loader";
 import { CardGrid } from "./card-grid";
@@ -151,16 +154,22 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
     day: "numeric",
   });
 
+  const pageTheme = resolveIllustratedPageTheme({
+    name: deck.name,
+    description: deck.description,
+    gradeLevel: deck.gradeLevel,
+  });
+
   return (
     <div
       className={cn(
-        "relative flex min-h-0 flex-1 flex-col overflow-hidden",
+        "deck-page-surface relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden",
         deckGradient.classes,
       )}
     >
       {hasGradient ? (
         <div
-          className="pointer-events-none absolute inset-0 overflow-hidden"
+          className="illustrated-standard-wash pointer-events-none absolute inset-0 overflow-hidden"
           aria-hidden
         >
           <div className="absolute -right-24 -top-28 size-[22rem] rounded-full bg-white/12 blur-3xl animate-float-gentle" />
@@ -178,7 +187,15 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
       ) : null}
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:gap-8 sm:p-8">
+        <IllustratedDeckHeader
+          name={deck.name}
+          description={deck.description}
+          gradeLevel={deck.gradeLevel}
+          coverImageUrl={deck.coverImageUrl}
+          className="min-w-0 flex-1"
+        >
         <section
+          data-deck-hero=""
           className={cn(
             "animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both",
             "rounded-2xl border p-5 sm:p-7",
@@ -187,8 +204,8 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
               : "border-border/80 bg-card/60 shadow-lg shadow-black/10",
           )}
         >
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-8">
-            <div className="flex min-w-0 flex-1 flex-col justify-between gap-5">
+          <div className="illustrated-hero-row flex flex-col gap-6 lg:flex-row lg:items-stretch lg:justify-between lg:gap-8">
+            <div className="illustrated-hero-copy flex min-w-0 flex-1 flex-col justify-between gap-5">
               <div className="space-y-4">
                 <Link
                   href={dashboardHref}
@@ -397,7 +414,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
 
             <aside
               className={cn(
-                "flex w-full shrink-0 flex-col justify-between gap-4 rounded-xl border p-4 sm:p-5 lg:max-w-sm",
+                "illustrated-ai-panel flex w-full shrink-0 flex-col justify-between gap-4 rounded-xl border p-4 sm:p-5 lg:w-80",
                 "animate-in fade-in-0 slide-in-from-right-2 duration-700 fill-mode-both",
                 hasGradient
                   ? "border-white/20 bg-black/30 shadow-xl shadow-black/20 backdrop-blur-md"
@@ -472,7 +489,7 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
           {canEdit && isAtCardLimit ? (
             <p
               className={cn(
-                "mt-5 border-t pt-4 text-xs",
+                "illustrated-hero-note mt-5 border-t pt-4 text-xs",
                 hasGradient
                   ? "border-white/10 text-rose-100 font-medium"
                   : "border-border/60 text-destructive",
@@ -501,17 +518,19 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             </p>
           ) : null}
         </section>
+        </IllustratedDeckHeader>
 
         <section
           className={cn(
-            "animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both",
+            "illustrated-cards-shell animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both",
             "flex flex-1 flex-col gap-5 rounded-2xl border p-4 sm:p-6",
             hasGradient
               ? "border-white/12 bg-background/90 shadow-2xl shadow-black/30 backdrop-blur-xl"
               : "border-border/80 bg-card/80 shadow-lg",
           )}
         >
-          <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-4">
+          <CardsPanelPattern pattern={pageTheme.pattern} />
+          <div className="illustrated-cards-toolbar flex items-center justify-between gap-3 border-b border-border/60 pb-4">
             <div className="space-y-0.5">
               <h2 className="text-base font-semibold tracking-tight sm:text-lg">
                 Cards
@@ -584,6 +603,9 @@ export default async function DeckPage({ params, searchParams }: DeckPageProps) 
             <CardGrid
               cards={cards}
               deckId={id}
+              deckName={deck.name}
+              deckDescription={deck.description}
+              coverImageUrl={deck.coverImageUrl}
               hasAI={effectiveAI}
               initialView={initialView}
               canEditContent={canEdit}

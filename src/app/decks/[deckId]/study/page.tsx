@@ -42,6 +42,7 @@ import {
   withTeamWorkspaceQuery,
 } from "@/lib/team-workspace-url";
 import { personalDashboardHrefWithUserPlanQuery } from "@/lib/personal-dashboard-url";
+import { IllustratedDeckHero } from "@/components/illustrated/shell";
 import { StudySessionLoader } from "./study-session-loader";
 import { LiveClassroomStudyJoinCard } from "@/components/live-classroom-study-join-card";
 import {
@@ -334,16 +335,27 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+    <div className="deck-page-surface relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="illustrated-standard-wash pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute -right-24 -top-24 size-[20rem] rounded-full bg-primary/12 blur-3xl animate-float-gentle" />
         <div className="absolute -left-16 top-1/3 size-[16rem] rounded-full bg-violet-500/10 blur-3xl animate-pulse-slow" />
         <div className="absolute bottom-[-4rem] right-1/4 size-[14rem] rounded-full bg-fuchsia-500/8 blur-3xl animate-drift" />
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 p-4 sm:gap-7 sm:p-8">
-        <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-border/70 bg-card/55 p-5 shadow-lg shadow-black/10 backdrop-blur-md sm:p-7">
-          <div className="flex flex-col gap-3">
+        <IllustratedDeckHero
+          name={deck.name}
+          description={deck.description}
+          gradeLevel={deck.gradeLevel}
+          coverImageUrl={deck.coverImageUrl}
+          className="illustrated-study-hero"
+        >
+        <section
+          data-deck-hero=""
+          className="illustrated-study-banner illustrated-readable animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both rounded-2xl border border-border/70 bg-card/55 p-5 shadow-lg shadow-black/10 backdrop-blur-md sm:p-7"
+        >
+          <div className="illustrated-hero-row flex flex-col gap-3">
+            <div className="illustrated-hero-copy flex flex-col gap-3">
             <Link
               href={studyBackHref}
               className="group inline-flex w-fit items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
@@ -411,8 +423,10 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
                 />
               ) : null}
             </div>
+            </div>
           </div>
         </section>
+        </IllustratedDeckHero>
 
         <div className="animate-in fade-in-0 slide-in-from-bottom-3 duration-700 fill-mode-both flex flex-1 flex-col">
           <StudySessionLoader

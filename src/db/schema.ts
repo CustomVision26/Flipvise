@@ -2328,6 +2328,42 @@ export const liveClassroomLobbyInboxMessages = pgTable(
   ],
 );
 
+/**
+ * Per-user appearance choices. Missing rows resolve to both flags false.
+ * The global master switch never overwrites these values.
+ */
+export const userAppearancePreferences = pgTable('user_appearance_preferences', {
+  userId: varchar({ length: 255 }).primaryKey(),
+  illustratedDesignPreferred: boolean().notNull().default(false),
+  reduceAnimations: boolean().notNull().default(false),
+  updatedAt: timestamp().notNull().defaultNow(),
+});
+
+/** Singleton (id = 1) — illustrated design master switch. Default off. */
+export const platformAppearanceSettings = pgTable('platform_appearance_settings', {
+  id: integer().primaryKey().default(1),
+  illustratedDesignEnabled: boolean().notNull().default(false),
+  updatedAt: timestamp().notNull().defaultNow(),
+  updatedByUserId: varchar({ length: 255 }),
+});
+
+/** Audit trail for the illustrated-design master switch. */
+export const platformAppearanceAuditLogs = pgTable(
+  'platform_appearance_audit_logs',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    adminUserId: varchar({ length: 255 }).notNull(),
+    /** Stable action id, e.g. illustrated_design_enabled. */
+    action: varchar({ length: 64 }).notNull(),
+    oldValue: boolean().notNull(),
+    newValue: boolean().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index('platform_appearance_audit_logs_created_idx').on(t.createdAt),
+  ],
+);
+
 /** Row shapes for client `import type` — avoids bundling table refs into client runtime chunks. */
 export type TeamInvitationRow = InferSelectModel<typeof teamInvitations>;
 export type TeamMemberRow = InferSelectModel<typeof teamMembers>;

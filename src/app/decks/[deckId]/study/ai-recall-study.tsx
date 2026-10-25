@@ -32,6 +32,11 @@ import {
 } from "lucide-react";
 import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
+import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
+import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
+import { IllustratedInfoPanel } from "@/components/illustrated/shell";
+import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
+import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { cn } from "@/lib/utils";
 import { isNetworkOnlineForAiRecall } from "@/lib/ai-recall-network";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
@@ -130,6 +135,11 @@ export function AiRecallStudy({
 }: AiRecallStudyProps) {
   const cardGradient = getGradientBySlug(deckGradient);
   const hasGradient = cardGradient.slug !== "none";
+  const { effectiveIllustratedDesign } = useIllustratedAppearance();
+  const recallArt = resolveIllustratedArtwork({
+    name: deckName,
+    description: deckDescription,
+  });
 
   const [online, setOnline] = useState(true);
   const [queue, setQueue] = useState(() =>
@@ -137,6 +147,9 @@ export function AiRecallStudy({
   );
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>("intro");
+  useDeckScreen(
+    phase === "intro" ? "prep" : phase === "complete" ? "results" : "study",
+  );
   const [studentAnswer, setStudentAnswer] = useState("");
   const [answerModality, setAnswerModality] =
     useState<RecallAnswerModality>("text");
@@ -614,7 +627,11 @@ export function AiRecallStudy({
       cards.length,
     );
     return (
-      <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-2xl border border-border bg-card/60 p-6 text-center sm:p-8">
+      <IllustratedInfoPanel deckName={deckName} deckDescription={deckDescription}>
+      <div className={cn(
+        "flex w-full flex-col items-center gap-5 text-center",
+        !effectiveIllustratedDesign && "mx-auto max-w-lg rounded-2xl border border-border bg-card/60 p-6 sm:p-8",
+      )}>
         <Badge variant="secondary" className="gap-1 text-xs">
           <Sparkles className="h-3 w-3" aria-hidden />
           AI Recall™
@@ -647,6 +664,7 @@ export function AiRecallStudy({
           Ready to start
         </Button>
       </div>
+      </IllustratedInfoPanel>
     );
   }
 
@@ -819,17 +837,34 @@ export function AiRecallStudy({
 
       <div
         className={cn(
-          "relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-border shadow-sm sm:min-h-[280px]",
-          hasGradient ? cn("text-white", cardGradient.classes) : "bg-card",
+          "relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border shadow-sm sm:min-h-[280px]",
+          effectiveIllustratedDesign
+            ? "illustrated-readable border-[#eadfce] bg-[#fff8ee] text-slate-900"
+            : hasGradient
+              ? cn("border-border text-white", cardGradient.classes)
+              : "border-border bg-card",
         )}
       >
+        {effectiveIllustratedDesign && !current.frontImageUrl && (current.front?.length ?? 0) < 180 ? (
+          <div className="relative mx-4 mt-3 h-36 overflow-hidden rounded-xl sm:mx-5 sm:h-44" aria-hidden>
+            <IllustratedScene
+              subject={recallArt.subject}
+              text={deckName}
+              role="hero"
+              fit="contain"
+              displayWidth={280}
+              displayHeight={176}
+            />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between px-3 pt-3 sm:px-5 sm:pt-4">
           <div className="flex items-center gap-1.5">
             <Badge
               variant="outline"
               className={cn(
                 "text-xs",
-                hasGradient && "border-white/30 bg-white/20 text-white",
+                effectiveIllustratedDesign && "border-violet-200 bg-violet-100 text-violet-900",
+                hasGradient && !effectiveIllustratedDesign && "border-white/30 bg-white/20 text-white",
               )}
             >
               Question
@@ -850,7 +885,11 @@ export function AiRecallStudy({
             <span
               className={cn(
                 "inline-flex items-center gap-1 text-xs",
-                hasGradient ? "text-white/80" : "text-muted-foreground",
+                effectiveIllustratedDesign
+                  ? "text-slate-600"
+                  : hasGradient
+                    ? "text-white/80"
+                    : "text-muted-foreground",
               )}
             >
               <Lock className="h-3.5 w-3.5" />
@@ -911,7 +950,7 @@ export function AiRecallStudy({
             <FormattedCardFront
               text={current.front}
               variant="study"
-              hasGradient={hasGradient}
+              hasGradient={hasGradient && !effectiveIllustratedDesign}
             />
           ) : (
             <p className="text-sm text-muted-foreground">No question text.</p>
@@ -931,7 +970,7 @@ export function AiRecallStudy({
             }}
             variant="outline"
             spacing={0}
-            className="flex w-full"
+            className={cn("flex w-full", effectiveIllustratedDesign && "illustrated-mode-tabs")}
             aria-label="Answer input mode"
           >
             <ToggleGroupItem value="text" className="h-9 flex-1 gap-1.5 px-2 text-xs sm:text-sm">

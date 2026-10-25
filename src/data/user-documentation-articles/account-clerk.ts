@@ -84,6 +84,8 @@ export const ACCOUNT_CLERK_ARTICLES: DocArticle[] = [
           "Free users: 3 interface color presets.",
           "Pro: 8 interface background accent colors.",
           "Pro Plus, team tier, or admin grant: full 12-color palette.",
+          "Illustrated Deck Design is available on every plan except Free. It appears after a platform admin enables it. Your on/off choice is saved either way, including on Free.",
+          "Reduce animations limits movement. The device reduced-motion setting is also respected.",
           "Account menu links back to Personal Dash at /dashboard without a Clerk user id in the address bar.",
         ],
       },

@@ -51,6 +51,7 @@ import { AddDeckDialogLoader as AddDeckDialog } from "@/components/add-deck-dial
 import { TeamMemberDeckActions } from "@/components/team-member-deck-actions";
 import { EducationOwnerWorkspaceDecks } from "@/components/education-owner-workspace-decks";
 import { DeckGrid } from "./deck-grid";
+import { PersonalDashboardBackground } from "@/components/illustrated/personal-dashboard-background";
 import { AiDocumentStudioDashboardEntry } from "@/components/ai-document-studio-dashboard-entry";
 import { LiveClassroomDashboardEntry } from "@/components/live-classroom-dashboard-entry";
 import {
@@ -210,10 +211,23 @@ function DashboardTeamWorkspaceSubline({
   );
 }
 
-function DashboardAtmosphere({ children }: { children: ReactNode }) {
+function DashboardAtmosphere({
+  children,
+  personal = false,
+}: {
+  children: ReactNode;
+  personal?: boolean;
+}) {
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+    <div
+      className={
+        personal
+          ? "personal-dashboard-page relative flex min-h-0 flex-1 flex-col overflow-hidden"
+          : "relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      }
+    >
+      {personal ? <PersonalDashboardBackground /> : null}
+      <div className="personal-dashboard-orbs pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute -right-24 -top-28 size-[22rem] rounded-full bg-cyan-500/15 blur-3xl animate-float-gentle" />
         <div className="absolute -left-16 top-1/3 size-[18rem] rounded-full bg-violet-500/15 blur-3xl animate-pulse-slow" />
         <div className="absolute bottom-[-5rem] right-1/4 size-[16rem] rounded-full bg-fuchsia-500/12 blur-3xl animate-drift" />
@@ -835,7 +849,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showLiveClassroom = accessHasAddon(access, LIVE_CLASSROOM_ADDON_KEY);
 
   return (
-    <DashboardAtmosphere>
+    <DashboardAtmosphere personal>
       {showAiDocumentStudio || showLiveClassroom ? (
         <div className="flex flex-wrap items-center gap-2">
           {showAiDocumentStudio ? <AiDocumentStudioDashboardEntry /> : null}

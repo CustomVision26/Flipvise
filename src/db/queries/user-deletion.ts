@@ -24,6 +24,8 @@ import {
   savedLessonPlans,
   userAddonEntitlements,
   stripeSubscriptions,
+  userAppearancePreferences,
+  platformAppearanceAuditLogs,
   userPlanTrials,
   billingNoticeInboxMessages,
   welcomeInboxMessages,
@@ -204,6 +206,12 @@ export async function purgeAllUserData(
     .where(eq(billingProrationLines.userId, userId));
   await db.delete(stripeSubscriptions).where(eq(stripeSubscriptions.userId, userId));
   await db.delete(userPlanTrials).where(eq(userPlanTrials.userId, userId));
+  await db
+    .delete(userAppearancePreferences)
+    .where(eq(userAppearancePreferences.userId, userId));
+  await db
+    .delete(platformAppearanceAuditLogs)
+    .where(eq(platformAppearanceAuditLogs.adminUserId, userId));
   await db
     .delete(billingNoticeInboxMessages)
     .where(eq(billingNoticeInboxMessages.recipientUserId, userId));

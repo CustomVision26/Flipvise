@@ -583,7 +583,7 @@ export function FormatQuizQuestionButton({
         type="button"
         variant="outline"
         size="default"
-        className="w-full gap-2 sm:w-auto"
+        className="illustrated-ready-pill w-full gap-2 sm:w-auto"
         onClick={() => setOpen(true)}
       >
         <ListChecks className="h-4 w-4" aria-hidden />

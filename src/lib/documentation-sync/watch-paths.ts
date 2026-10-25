@@ -282,7 +282,11 @@ export const USER_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonly
     "src/actions/account-details-edit.ts",
     "src/actions/account-recovery-profile.ts",
   ],
-  "appearance-settings": ["src/components/header-user-section.tsx"],
+  "appearance-settings": [
+    "src/components/header-user-section.tsx",
+    "src/components/user-appearance-settings-page.tsx",
+    "src/components/illustrated/appearance-settings-section.tsx",
+  ],
   "billing-tab": [
     "src/components/header-user-section.tsx",
     "src/components/user-billing-page.tsx",
@@ -435,6 +439,8 @@ export const ADMIN_DOC_SUPPLEMENTAL_WATCH_PATHS: Readonly<Record<string, readonl
     "src/components/admin-dashboard-nav.tsx",
     "src/lib/admin-dashboard-nav.ts",
     "src/app/admin/layout.tsx",
+    "src/app/admin/feature-controls/page.tsx",
+    "src/components/illustrated/admin-appearance-control.tsx",
   ],
   "all-users": [
     "src/lib/admin/serialize-admin-users.ts",

@@ -19,6 +19,7 @@ import {
   userFacingServerActionError,
 } from "@/lib/server-action-client-error";
 import { deleteFromS3, uploadCardImageBufferToS3 } from "@/lib/s3";
+import { stripLatexArtifacts } from "@/lib/source-import-reading-passage";
 import {
   createCard,
   updateCard,
@@ -310,7 +311,7 @@ function capitalizeFirstLetter(text: string): string {
  * (e.g. "Q: ", "Front: ") and capitalize the first letter.
  */
 function cleanAiText(text: string): string {
-  return capitalizeFirstLetter(stripAiLabelPrefix(text.trim())).trimEnd();
+  return capitalizeFirstLetter(stripAiLabelPrefix(stripLatexArtifacts(text.trim()))).trimEnd();
 }
 
 /**
@@ -319,7 +320,7 @@ function cleanAiText(text: string): string {
  * but we still capitalize the first letter for display consistency.
  */
 function cleanUserText(text: string): string {
-  return capitalizeFirstLetter(text.trim()).trimEnd();
+  return capitalizeFirstLetter(stripLatexArtifacts(text.trim())).trimEnd();
 }
 
 type DeckLike = { name: string; description: string | null };
@@ -409,6 +410,7 @@ You will receive a deck context (name, description, and existing cards), the car
 
 Rules:
 - NEVER use markdown formatting (no **, no *, no #, no backticks)
+- NEVER use LaTeX, TeX, or backslash characters. Write fractions as 2/6
 - Keep each distractor concise — same approximate length as the correct answer
 - Return exactly 3 distractors, no more, no less
 - Stay strictly within the subject matter and scope of the deck`,
@@ -933,6 +935,7 @@ For a step-by-step/problem-solving back, each distractor should be a short plaus
 
 Rules:
 - NEVER use markdown formatting (no **, no *, no #, no backticks) in any card or distractor
+- NEVER use LaTeX, TeX, or backslash characters. Write fractions as 2/6
 - NEVER use bullet points or dashes in step-by-step cards
 - Use the step-by-step format ONLY when the topic genuinely requires working through a process
 - When existing cards are provided, treat them as the source of truth for tone, length, and format — match them
@@ -1236,6 +1239,7 @@ For **non-problem-solving questions** (definitions, facts, concepts, language le
 
 Rules:
 - NEVER use markdown formatting (no **, no *, no #, no backticks)
+- NEVER use LaTeX, TeX, or backslash characters. Write fractions as 2/6
 - NEVER use bullet points or dashes in step-by-step solutions
 - Use plain newlines between steps
 - When existing cards are provided, treat them as the source of truth for tone, length, and format
@@ -1671,6 +1675,7 @@ You will receive a deck context (name, description, and existing cards), a quest
 
 Rules:
 - NEVER use markdown formatting (no **, no *, no #, no backticks)
+- NEVER use LaTeX, TeX, or backslash characters. Write fractions as 2/6
 - Keep each distractor concise — same approximate length as the correct answer
 - Return exactly 3 distractors, no more, no less
 - The "correctAnswer" field in your response MUST be the exact correct answer the user provided, unchanged
@@ -1686,6 +1691,7 @@ You will receive a deck context (name, description, and existing cards) and a qu
 
 Rules:
 - NEVER use markdown formatting (no **, no *, no #, no backticks)
+- NEVER use LaTeX, TeX, or backslash characters. Write fractions as 2/6
 - Keep the correct answer and distractors roughly similar in length and style
 - Match the established style of the existing cards in the deck
 - Return exactly 3 distractors
@@ -1796,6 +1802,7 @@ For a step-by-step/problem-solving back, each distractor should be a short plaus
 
 Rules:
 - NEVER use markdown formatting (no **, no *, no #, no backticks) in any card or distractor
+- NEVER use LaTeX, TeX, or backslash characters. Write fractions as 2/6
 - NEVER use bullet points or dashes in step-by-step cards
 - Use the step-by-step format ONLY when the topic genuinely requires working through a process
 - When existing cards are provided, treat them as the source of truth for tone, length, and format — match them
