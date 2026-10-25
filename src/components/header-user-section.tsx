@@ -434,7 +434,7 @@ export function HeaderUserSection({
                 )}
                 aria-label="Affiliate portal"
               >
-                <Megaphone className="size-3.5 shrink-0 text-violet-300" aria-hidden />
+                <Megaphone className="size-3.5 shrink-0 text-violet-800 dark:text-violet-200" aria-hidden />
                 <span className="hidden xl:inline">Affiliate</span>
               </Link>
             </HeaderNavTooltip>

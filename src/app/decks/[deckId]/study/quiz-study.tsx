@@ -1771,7 +1771,11 @@ export function QuizStudy({
         </div>
       </div>
 
-      <IllustratedPeekFrame seed={current.cardId} className="w-full">
+      <IllustratedPeekFrame
+        key={current.cardId}
+        seed={current.cardId}
+        className="w-full animate-flashcard-enter"
+      >
       <div
         className={cn(
           "w-full rounded-xl sm:rounded-2xl border shadow-md overflow-hidden",
@@ -1821,7 +1825,7 @@ export function QuizStudy({
           <div className="px-3 sm:px-6 pb-2">
             <div
               className={cn(
-                "relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border bg-muted/20 shadow-inner",
+                "study-art-arrive relative w-full h-40 sm:h-60 md:h-72 rounded-lg overflow-hidden border bg-muted/20 shadow-inner",
                 deckAccent.hasDeckAccent ? "border-white/25" : "border-border",
               )}
             >
@@ -1929,7 +1933,7 @@ export function QuizStudy({
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-2">
                     {optionImageUrl ? (
-                      <span className="relative block h-24 w-full max-w-xs overflow-hidden rounded-md border border-border/60 bg-muted/20">
+                      <span className="study-art-arrive relative block h-24 w-full max-w-xs overflow-hidden rounded-md border border-border/60 bg-muted/20">
                         <Image
                           src={optionImageUrl}
                           alt=""

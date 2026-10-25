@@ -263,7 +263,7 @@ export function DeckGrid({
   return (
     <div className="flex flex-col gap-4">
       {/* Controls bar */}
-      <div className="flex flex-col gap-2 border-b border-border/50 pb-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="panel-see-through-chrome flex flex-col gap-2 border-b border-border/50 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-xs sm:text-sm tabular-nums">
           {sorted.length === 0
             ? "No decks"

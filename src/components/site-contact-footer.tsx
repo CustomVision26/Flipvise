@@ -53,7 +53,7 @@ function FooterContactDetails({
   const mapHref = `https://maps.google.com/?q=${encodeURIComponent(addressLines.join(", "))}`;
 
   return (
-    <footer className="dark relative z-10 mt-auto border-t border-cyan-400/20 bg-background text-foreground">
+    <footer className="relative z-10 mt-auto border-t border-border bg-transparent text-foreground">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px overflow-hidden" aria-hidden>
         <div className="animate-aurora h-full w-full bg-gradient-to-r from-cyan-400/0 via-cyan-300/80 to-teal-300/0" />
       </div>
@@ -61,7 +61,7 @@ function FooterContactDetails({
       <div className="relative mx-auto w-full max-w-6xl px-4 py-3 sm:px-6">
         <Card
           size="sm"
-          className="animate-in fade-in-0 slide-in-from-bottom-2 gap-0 overflow-hidden border-cyan-400/25 bg-card/80 py-0 shadow-none ring-1 ring-cyan-400/20 duration-500"
+          className="animate-in fade-in-0 slide-in-from-bottom-2 gap-0 overflow-hidden border-border bg-background py-0 text-foreground shadow-none ring-1 ring-border duration-500"
         >
           <CardContent className="flex flex-col gap-2 px-3 py-2.5 sm:px-4">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-5">
@@ -165,7 +165,7 @@ export async function SiteContactFooter() {
   } catch (error) {
     console.error("[SiteContactFooter]", error);
     return (
-      <footer className="relative z-10 mt-auto border-t border-border px-4 py-6">
+      <footer className="relative z-10 mt-auto border-t border-border bg-transparent px-4 py-6 text-foreground">
         <LegalLinks />
       </footer>
     );

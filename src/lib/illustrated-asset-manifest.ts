@@ -40,7 +40,13 @@ export type IllustratedProp =
   | "quiz-stopwatch"
   | "quiz-pencil"
   | "quiz-stars"
-  | "quiz-spark";
+  | "quiz-spark"
+  | "review-cards"
+  | "review-headphones"
+  | "review-bulb"
+  | "recall-mic"
+  | "recall-keyboard"
+  | "recall-bubbles";
 
 const SCENE_TILE_WIDTH = 251;
 const SCENE_TILE_HEIGHT = 119;
@@ -585,10 +591,10 @@ export const ILLUSTRATED_ASSET_MANIFEST: IllustratedAsset[] = [
     subject: "general",
     topic: "ai-recall-intro",
     role: "prop",
-    path: "/illustrated/heroes/ai-recall-intro.jpg",
+    path: "/illustrated/props/ai-recall-intro.png",
     width: 1024,
     height: 1024,
-    transparent: false,
+    transparent: true,
     suitableDisplay: suitableDisplay(1024, 1024),
     reviewStatus: "limited",
     fit: "contain",
@@ -646,6 +652,90 @@ export const ILLUSTRATED_ASSET_MANIFEST: IllustratedAsset[] = [
     height: 720,
     transparent: true,
     suitableDisplay: suitableDisplay(1280, 720),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "review-cards",
+    subject: "general",
+    topic: "review-cards",
+    role: "prop",
+    path: "/illustrated/props/review-cards.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "review-headphones",
+    subject: "general",
+    topic: "review-headphones",
+    role: "prop",
+    path: "/illustrated/props/review-headphones.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "review-bulb",
+    subject: "general",
+    topic: "review-bulb",
+    role: "prop",
+    path: "/illustrated/props/review-bulb.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "recall-mic",
+    subject: "general",
+    topic: "recall-mic",
+    role: "prop",
+    path: "/illustrated/props/recall-mic.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "recall-keyboard",
+    subject: "general",
+    topic: "recall-keyboard",
+    role: "prop",
+    path: "/illustrated/props/recall-keyboard.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
+    reviewStatus: "limited",
+    fit: "contain",
+    keywords: [],
+  },
+  {
+    id: "recall-bubbles",
+    subject: "general",
+    topic: "recall-bubbles",
+    role: "prop",
+    path: "/illustrated/props/recall-bubbles.png",
+    width: 1024,
+    height: 1024,
+    transparent: true,
+    suitableDisplay: suitableDisplay(1024, 1024),
     reviewStatus: "limited",
     fit: "contain",
     keywords: [],

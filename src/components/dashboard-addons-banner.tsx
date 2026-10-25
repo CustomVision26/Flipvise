@@ -28,27 +28,27 @@ import type { DashboardAddonBannerItem } from "@/lib/dashboard-addon-banner-item
 
 export type { DashboardAddonBannerItem };
 
-/** Soft accent chips — readable on dark UI without solid candy fills. */
+/** Accent chips. Dark labels on light theme, light labels on dark theme. */
 const ADDON_CHIP_STYLES = [
-  "border-teal-500/35 bg-teal-500/10 text-teal-100 hover:bg-teal-500/18",
-  "border-amber-500/35 bg-amber-500/10 text-amber-100 hover:bg-amber-500/18",
-  "border-rose-500/35 bg-rose-500/10 text-rose-100 hover:bg-rose-500/18",
-  "border-sky-500/35 bg-sky-500/10 text-sky-100 hover:bg-sky-500/18",
-  "border-indigo-500/35 bg-indigo-500/10 text-indigo-100 hover:bg-indigo-500/18",
-  "border-emerald-500/35 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/18",
-  "border-orange-500/35 bg-orange-500/10 text-orange-100 hover:bg-orange-500/18",
-  "border-fuchsia-500/35 bg-fuchsia-500/10 text-fuchsia-100 hover:bg-fuchsia-500/18",
+  "border-teal-800/40 bg-teal-700/10 text-teal-950 hover:bg-teal-700/20 dark:border-teal-200/40 dark:bg-teal-300/15 dark:text-teal-50 dark:hover:bg-teal-300/25",
+  "border-amber-800/40 bg-amber-700/10 text-amber-950 hover:bg-amber-700/20 dark:border-amber-200/40 dark:bg-amber-300/15 dark:text-amber-50 dark:hover:bg-amber-300/25",
+  "border-rose-800/40 bg-rose-700/10 text-rose-950 hover:bg-rose-700/20 dark:border-rose-200/40 dark:bg-rose-300/15 dark:text-rose-50 dark:hover:bg-rose-300/25",
+  "border-sky-800/40 bg-sky-700/10 text-sky-950 hover:bg-sky-700/20 dark:border-sky-200/40 dark:bg-sky-300/15 dark:text-sky-50 dark:hover:bg-sky-300/25",
+  "border-indigo-800/40 bg-indigo-700/10 text-indigo-950 hover:bg-indigo-700/20 dark:border-indigo-200/40 dark:bg-indigo-300/15 dark:text-indigo-50 dark:hover:bg-indigo-300/25",
+  "border-emerald-800/40 bg-emerald-700/10 text-emerald-950 hover:bg-emerald-700/20 dark:border-emerald-200/40 dark:bg-emerald-300/15 dark:text-emerald-50 dark:hover:bg-emerald-300/25",
+  "border-orange-800/40 bg-orange-700/10 text-orange-950 hover:bg-orange-700/20 dark:border-orange-200/40 dark:bg-orange-300/15 dark:text-orange-50 dark:hover:bg-orange-300/25",
+  "border-fuchsia-800/40 bg-fuchsia-700/10 text-fuchsia-950 hover:bg-fuchsia-700/20 dark:border-fuchsia-200/40 dark:bg-fuchsia-300/15 dark:text-fuchsia-50 dark:hover:bg-fuchsia-300/25",
 ] as const;
 
 const ADDON_ICON_STYLES = [
-  "bg-teal-500/25 text-teal-50",
-  "bg-amber-500/25 text-amber-50",
-  "bg-rose-500/25 text-rose-50",
-  "bg-sky-500/25 text-sky-50",
-  "bg-indigo-500/25 text-indigo-50",
-  "bg-emerald-500/25 text-emerald-50",
-  "bg-orange-500/25 text-orange-50",
-  "bg-fuchsia-500/25 text-fuchsia-50",
+  "bg-teal-800/15 text-teal-950 dark:bg-teal-200/20 dark:text-teal-50",
+  "bg-amber-800/15 text-amber-950 dark:bg-amber-200/20 dark:text-amber-50",
+  "bg-rose-800/15 text-rose-950 dark:bg-rose-200/20 dark:text-rose-50",
+  "bg-sky-800/15 text-sky-950 dark:bg-sky-200/20 dark:text-sky-50",
+  "bg-indigo-800/15 text-indigo-950 dark:bg-indigo-200/20 dark:text-indigo-50",
+  "bg-emerald-800/15 text-emerald-950 dark:bg-emerald-200/20 dark:text-emerald-50",
+  "bg-orange-800/15 text-orange-950 dark:bg-orange-200/20 dark:text-orange-50",
+  "bg-fuchsia-800/15 text-fuchsia-950 dark:bg-fuchsia-200/20 dark:text-fuchsia-50",
 ] as const;
 
 const ADDON_KEY_COLOR_INDEX: Record<string, number> = {
@@ -217,12 +217,12 @@ export function DashboardAddonsBanner({
     ) : variant === "header" ? (
       <div
         data-addons-banner="header"
-        className="relative w-full max-w-full overflow-hidden rounded-md border border-border/60 bg-muted/25"
+        className="relative w-full max-w-full overflow-hidden rounded-md border border-border bg-background text-foreground"
         role="region"
         aria-label="Premium add-ons"
       >
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-7 bg-gradient-to-r from-background via-background/80 to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-7 bg-gradient-to-l from-background via-background/80 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-7 bg-gradient-to-r from-background to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-7 bg-gradient-to-l from-background to-transparent" />
         {marqueeTrack}
       </div>
     ) : (

@@ -20,7 +20,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         title: "Editor features",
         bullets: [
           "Open create deck guide to walk through + New Deck from Personal Dashboard, filling in details, adding an optional cover, and seeing the new deck in your library. The guide stays open while you browse.",
-          "Card count vs plan cap, a Free plan, Paid plan, or Complimentary badge (hover Paid plan or Complimentary for your tier; Complimentary is grant access, not a paid subscription), last updated date, and deck capacity. Illustrated Deck Design adds a subject banner and, in compact view, illustrated card tiles. Grid stays a table and list stays a list.",
+          "Card count vs plan cap, a Free plan, Paid plan, or Complimentary badge (hover Paid plan or Complimentary for your tier; Complimentary is grant access, not a paid subscription), last updated date, and deck capacity. Illustrated Deck Design adds a subject banner and, in compact view, illustrated card tiles. The cards panel is clear so the artwork background shows through. Grid stays a table and list stays a list.",
           "AI card generation on Pro, Pro Plus, Education Plus, and team-tier / education team workspaces. The panel notes that the topic you submit is sent to OpenAI and links to AI data handling.",
           "Deck cover image on create or edit — shown on dashboard tiles; hover a tile to preview the cover. The cover is not a flashcard.",
           "Open Study to launch flashcard review or quiz mode.",
@@ -92,7 +92,7 @@ export const DECKS_STUDY_ARTICLES: DocArticle[] = [
         id: "modes",
         title: "Study modes",
         bullets: [
-          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered. A deck cover image is not a flashcard and is not included in study or quiz. Illustrated Deck Design adds subject artwork without changing flip, recall, quiz timing, or Exam Mode.",
+          "Study Mode selector at the top: Standard Review, AI Recall™, and Quiz (when available). Your last selected mode is remembered. A deck cover image is not a flashcard and is not included in study or quiz. Illustrated Deck Design adds subject artwork without changing flip, recall, quiz timing, or Exam Mode. The study mode bar and the session panel are clear over the artwork, and the mode tabs plus Previous, Flip, and Next use a light surface. On a wide screen, Standard Review floats a card stack, headphones, and a lightbulb around the card, and AI Recall™’s ready screen floats a microphone, keyboard, and speech bubbles. Next and Previous replay a short 3D entrance on the card and its pictures.",
           "Standard Review — flip cards to reveal answers, then Next. Works online and offline (browser PWA / Capacitor). No Correct/Incorrect self-grading.",
           "Double-click the front or back image on a flashcard to open a full-size preview; Escape or click outside closes it.",
           "AI Recall™ — answer first (type, voice, or draw) before the solution unlocks; AI evaluates understanding, then Continue or Review Again. Requires Pro Plus / Education Plus / team plans and an internet connection.",

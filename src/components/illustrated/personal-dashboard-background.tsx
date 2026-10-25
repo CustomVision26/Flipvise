@@ -37,6 +37,7 @@ export function PersonalDashboardBackground() {
           alt=""
           width={art.width}
           height={art.height}
+          unoptimized
           className={art.className}
         />
       ))}

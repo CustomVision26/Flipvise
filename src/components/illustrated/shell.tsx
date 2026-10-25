@@ -7,6 +7,7 @@ import { useIllustratedAppearance } from "@/components/illustrated-appearance-pr
 import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
 import { peekLayerColors } from "@/lib/illustrated-peek-colors";
+import type { IllustratedProp } from "@/lib/illustrated-asset-manifest";
 
 export function IllustratedStudyShell({
   children,
@@ -150,7 +151,7 @@ export function IllustratedInfoPanel({
   return (
     <IllustratedCardStack className={cn("mx-auto w-full max-w-lg", className)} seed={deckName}>
       <div className="illustrated-readable rounded-2xl border border-[#eadfce] bg-[#fff8ee] p-6 text-center text-slate-900 sm:p-8">
-        <div className="relative mx-auto mb-4 h-36 w-36" aria-hidden>
+        <div className="study-art-arrive relative mx-auto mb-4 h-36 w-36" aria-hidden>
           <IllustratedScene prop="ai-recall-intro" displayWidth={144} displayHeight={144} />
         </div>
         {children}
@@ -340,6 +341,84 @@ export function IllustratedQuizPrepFrame({
           {children}
         </IllustratedCardStack>
       </div>
+    </div>
+  );
+}
+
+type StudyOrbitSlot = "side-left" | "side-right" | "corner-left" | "corner-right";
+
+const REVIEW_ORBIT: Array<{
+  prop: IllustratedProp;
+  slot: StudyOrbitSlot;
+  displayWidth: number;
+  displayHeight: number;
+}> = [
+  { prop: "review-cards", slot: "side-left", displayWidth: 176, displayHeight: 200 },
+  { prop: "review-headphones", slot: "side-right", displayWidth: 176, displayHeight: 176 },
+  { prop: "review-bulb", slot: "corner-right", displayWidth: 120, displayHeight: 140 },
+];
+
+const RECALL_ORBIT: Array<{
+  prop: IllustratedProp;
+  slot: StudyOrbitSlot;
+  displayWidth: number;
+  displayHeight: number;
+}> = [
+  { prop: "recall-mic", slot: "side-left", displayWidth: 150, displayHeight: 188 },
+  { prop: "recall-keyboard", slot: "side-right", displayWidth: 200, displayHeight: 132 },
+  { prop: "recall-bubbles", slot: "corner-left", displayWidth: 120, displayHeight: 120 },
+  { prop: "recall-bubbles", slot: "corner-right", displayWidth: 104, displayHeight: 104 },
+];
+
+/** Floating study-mode props around a card. Hidden when Illustrated Deck Design is off. */
+export function IllustratedStudyOrbit({
+  variant,
+  motionKey = 0,
+  enterFrom = "next",
+  className,
+  children,
+}: {
+  variant: "review" | "recall";
+  motionKey?: number | string;
+  enterFrom?: "next" | "prev";
+  className?: string;
+  children: ReactNode;
+}) {
+  const { effectiveIllustratedDesign, effectiveReducedMotion } =
+    useIllustratedAppearance();
+  if (!effectiveIllustratedDesign) return <div className={className}>{children}</div>;
+  const pieces = variant === "review" ? REVIEW_ORBIT : RECALL_ORBIT;
+  return (
+    <div
+      className={cn("illustrated-study-orbit relative", className)}
+      data-enter={enterFrom}
+    >
+      {pieces.map((piece) => (
+        <div
+          key={`${piece.slot}-${piece.prop}`}
+          className={cn(
+            "illustrated-study-prop pointer-events-none absolute z-20 hidden lg:block",
+            `illustrated-study-prop-${piece.slot}`,
+          )}
+          aria-hidden
+        >
+          <span
+            key={`${motionKey}-${piece.slot}`}
+            className={cn(
+              "relative block h-full w-full",
+              !effectiveReducedMotion && "illustrated-study-prop-motion",
+            )}
+          >
+            <IllustratedScene
+              prop={piece.prop}
+              fit="contain"
+              displayWidth={piece.displayWidth}
+              displayHeight={piece.displayHeight}
+            />
+          </span>
+        </div>
+      ))}
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }

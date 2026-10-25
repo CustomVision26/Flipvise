@@ -32,6 +32,7 @@ import { getGradientBySlug } from "@/lib/deck-gradients";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
 import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
+import { IllustratedStudyOrbit } from "@/components/illustrated/shell";
 import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { cn } from "@/lib/utils";
 
@@ -127,6 +128,7 @@ export function FlashcardStudy({
   const [reviewedCount, setReviewedCount] = useState(0);
   const [slideX, setSlideX] = useState(0);
   const [slideOpacity, setSlideOpacity] = useState(1);
+  const [enterFrom, setEnterFrom] = useState<"next" | "prev">("next");
   const [enableSlideTransition, setEnableSlideTransition] = useState(false);
   const [dragOffsetX, setDragOffsetX] = useState(0);
   const [isDragSnapBack, setIsDragSnapBack] = useState(false);
@@ -137,6 +139,7 @@ export function FlashcardStudy({
   } | null>(null);
   const dragStartXRef = useRef<number | null>(null);
   const hasDraggedRef = useRef(false);
+  const pendingEnterRef = useRef<"next" | "prev">("next");
   const pendingNavRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const snapBackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -147,6 +150,7 @@ export function FlashcardStudy({
 
   function navigateTo(newIndex: number, direction: "left" | "right") {
     if (pendingNavRef.current) clearTimeout(pendingNavRef.current);
+    pendingEnterRef.current = direction === "left" ? "next" : "prev";
     setCurrentIndex(newIndex);
 
     // Phase 1: slide + fade out
@@ -158,6 +162,7 @@ export function FlashcardStudy({
       // Phase 2: reset flip, update content, snap to opposite side (invisible)
       setEnableSlideTransition(false);
       setIsFlipped(false);
+      setEnterFrom(pendingEnterRef.current);
       setVisibleIndex(newIndex);
       setSlideX(direction === "left" ? 35 : -35);
 
@@ -462,8 +467,14 @@ export function FlashcardStudy({
       </p>
 
       {/* Flashcard */}
+      <IllustratedStudyOrbit
+        variant="review"
+        motionKey={visibleIndex}
+        enterFrom={enterFrom}
+        className="w-full max-w-xl"
+      >
       <div
-        className="relative w-full max-w-xl select-none"
+        className="relative w-full select-none"
         style={{
           transform: `translateX(calc(${slideX}% + ${dragOffsetX}px))`,
           opacity: slideOpacity,
@@ -485,6 +496,15 @@ export function FlashcardStudy({
         role="button"
         aria-label={isFlipped ? "Card back — click to flip" : "Card front — click to flip"}
       >
+      <div
+        key={`${visibleIndex}-${enterFrom}`}
+        className={cn(
+          "relative",
+          !effectiveReducedMotion &&
+            (enterFrom === "prev" ? "animate-flashcard-enter-prev" : "animate-flashcard-enter"),
+        )}
+        style={{ perspective: "1200px" }}
+      >
       {effectiveIllustratedDesign ? (
         <>
           <span
@@ -505,11 +525,7 @@ export function FlashcardStudy({
           dragOffsetX === 0 && !enableSlideTransition && !effectiveReducedMotion && "animate-flashcard-float",
         )}
       >
-      <div
-        key={visibleIndex}
-        className={effectiveReducedMotion ? undefined : "animate-flashcard-enter"}
-        style={{ perspective: "1200px" }}
-      >
+      <div>
         <div
           className="flashcard-container"
           style={{
@@ -542,7 +558,7 @@ export function FlashcardStudy({
               <span className={cn("text-xs hidden sm:inline", illustratedFace ? "text-slate-600" : hasGradient ? "text-white/70" : "text-muted-foreground")}>Click to reveal answer</span>
             </div>
             {illustratedFace && !currentCard.frontImageUrl && (currentCard.front?.length ?? 0) < 220 ? (
-              <div className="relative mx-4 h-36 shrink-0 overflow-hidden rounded-xl sm:mx-6 sm:h-44" aria-hidden>
+              <div className="study-art-arrive relative mx-4 h-36 shrink-0 overflow-hidden rounded-xl sm:mx-6 sm:h-44" aria-hidden>
                 <IllustratedScene
                   subject={reviewArt.subject}
                   text={deckName}
@@ -557,7 +573,7 @@ export function FlashcardStudy({
               <div className="shrink-0 px-3 sm:px-6 pb-2">
                 <button
                   type="button"
-                  className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner cursor-zoom-in transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="study-art-arrive relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner cursor-zoom-in transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   title="Double-click to enlarge"
                   aria-label="Double-click to enlarge front image"
                   onPointerDown={(event) => event.stopPropagation()}
@@ -621,7 +637,7 @@ export function FlashcardStudy({
               <div className="shrink-0 px-3 sm:px-6 pb-2 relative z-10">
                 <button
                   type="button"
-                  className="relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner cursor-zoom-in transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="study-art-arrive relative w-full h-28 sm:h-40 md:h-48 rounded-lg overflow-hidden border border-border bg-muted/20 shadow-inner cursor-zoom-in transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   title="Double-click to enlarge"
                   aria-label="Double-click to enlarge back image"
                   onPointerDown={(event) => event.stopPropagation()}
@@ -662,6 +678,8 @@ export function FlashcardStudy({
       </div>
       </div>
       </div>
+      </div>
+      </IllustratedStudyOrbit>
 
       {/* Listen row — outside the card so clicks never trigger the flip */}
       {hasAiReading && (currentCard.front || currentCard.back) && (
@@ -688,7 +706,7 @@ export function FlashcardStudy({
       )}
 
       {/* Navigation controls — flip to reveal, then Next (no self-grading). */}
-      <div className="flex flex-col items-center gap-2 sm:gap-3">
+      <div className="study-contrast-controls flex flex-col items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2 sm:gap-3">
           <TooltipProvider>
             <Tooltip>

@@ -152,7 +152,7 @@ export const ADMIN_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Search and role/status filters match All Users patterns.",
           "Quiz question formats (multiple choice, true/false, fill-in-the-blank) are configured by subscribers in Team Admin → Study Modes → Quiz Mode → Quiz formats — not from this platform admin view.",
           "Study privileges also control Standard Review, AI Recall™, and Quiz (single modes or combinations) per member per assigned deck.",
-          "AI Recall™ is available on Pro Plus, Education Plus, team-tier, and education team plans (and platform admins). Session results are on-screen only and not saved automatically.",
+          "AI Recall™ is available on Pro Plus, Education Plus, team-tier, and education team plans (and platform admins). Session results are on-screen only and not saved automatically. Illustrated Deck Design may show a microphone, keyboard, and speech bubbles on the ready screen; that artwork does not change scoring.",
           "Subscribers can reshuffle which format each card uses after saving formats and generating AI content where required.",
         ],
         requirements: ["Platform admin access."],

@@ -71,7 +71,7 @@
     "db:ensure-team-member-max-create-decks": "tsx scripts/ensure-team-member-max-create-decks.ts",
     "db:ensure-team-creation-profile": "tsx scripts/ensure-team-creation-profile.ts",
     "db:ensure-ai-usage-tables": "tsx scripts/ensure-ai-usage-tables.ts",
-    "test:appearance": "tsx --test src/lib/illustrated-appearance.test.ts src/lib/illustrated-reference-bank.test.ts src/lib/illustrated-asset-manifest.test.ts",
+    "test:appearance": "tsx --test src/lib/illustrated-appearance.test.ts src/lib/illustrated-reference-bank.test.ts src/lib/illustrated-asset-manifest.test.ts src/lib/artwork-background.test.ts",
     "test:ai-usage": "tsx --test src/lib/ai-usage/pricing.test.ts src/lib/ai-usage/limits.test.ts src/lib/ai-usage/csv.test.ts src/lib/ai-usage/period.test.ts src/lib/ai-usage/abuse.test.ts",
     "db:push:prod": "drizzle-kit push --config=drizzle.config.prod.mjs",
     "db:generate:local": "drizzle-kit generate --config=drizzle.config.local.ts",

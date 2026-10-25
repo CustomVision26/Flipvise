@@ -366,6 +366,7 @@ const ALL_ARTICLES: DocArticle[] = [
           "Eligible: Pro Plus, Education Plus, team-tier and education team plans, and platform admins. Not available on Free or standard Pro.",
           "Requires internet — offline users see a soft gate and can continue with Standard Review.",
           "Learners answer with Type, Voice, or Draw before the solution unlocks; AI feedback is shown without AI Score / Confidence percentages.",
+          "Illustrated Deck Design can float a microphone, keyboard, and speech bubbles on the AI Recall™ ready screen, and a card stack, headphones, and lightbulb around Standard Review. Those pictures do not change answers, scores, or timers.",
           "Review Again requeues a card later in the same session (amber progress count + Review Again badge).",
           "Session complete shows Reviewed / Correct / Incorrect / Forced unlocks, Session score (correct ÷ reviewed), and an AI motivational quote with author (under 50% improve; 50–90% encourage; over 90% flower of excellence).",
           "End-of-session results are on screen only and are not saved to the database automatically — dashboard AI Recall analytics panels only reflect sessions that were explicitly saved.",

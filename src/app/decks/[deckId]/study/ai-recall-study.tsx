@@ -34,7 +34,7 @@ import { ImageEnlargeOverlay } from "@/components/image-enlarge-overlay";
 import { getGradientBySlug } from "@/lib/deck-gradients";
 import { useIllustratedAppearance } from "@/components/illustrated-appearance-provider";
 import { useDeckScreen } from "@/components/illustrated/deck-appearance-provider";
-import { IllustratedInfoPanel, IllustratedPeekFrame } from "@/components/illustrated/shell";
+import { IllustratedInfoPanel, IllustratedPeekFrame, IllustratedStudyOrbit } from "@/components/illustrated/shell";
 import { IllustratedScene } from "@/components/illustrated/illustrated-scene";
 import { resolveIllustratedArtwork } from "@/lib/illustrated-reference-bank";
 import { cn } from "@/lib/utils";
@@ -625,7 +625,12 @@ export function AiRecallStudy({
       cards.length,
     );
     return (
-      <IllustratedInfoPanel deckName={deckName} deckDescription={deckDescription}>
+      <IllustratedStudyOrbit variant="recall" motionKey="lobby" className="mx-auto w-full max-w-lg">
+      <IllustratedInfoPanel
+        deckName={deckName}
+        deckDescription={deckDescription}
+        className="animate-flashcard-enter"
+      >
       <div className={cn(
         "flex w-full flex-col items-center gap-5 text-center",
         !effectiveIllustratedDesign && "mx-auto max-w-lg rounded-2xl border border-border bg-card/60 p-6 sm:p-8",
@@ -663,6 +668,7 @@ export function AiRecallStudy({
         </Button>
       </div>
       </IllustratedInfoPanel>
+      </IllustratedStudyOrbit>
     );
   }
 
@@ -835,7 +841,11 @@ export function AiRecallStudy({
         ) : null}
       </div>
 
-      <IllustratedPeekFrame seed={current.id} className="w-full">
+      <IllustratedPeekFrame
+        key={current.id}
+        seed={current.id}
+        className="w-full animate-flashcard-enter"
+      >
       <div
         className={cn(
           "relative z-[1] flex min-h-[220px] flex-col overflow-hidden rounded-2xl border shadow-sm sm:min-h-[280px]",
@@ -847,7 +857,7 @@ export function AiRecallStudy({
         )}
       >
         {effectiveIllustratedDesign && !current.frontImageUrl && (current.front?.length ?? 0) < 180 ? (
-          <div className="relative mx-4 mt-3 h-36 overflow-hidden rounded-xl sm:mx-5 sm:h-44" aria-hidden>
+          <div className="study-art-arrive relative mx-4 mt-3 h-36 overflow-hidden rounded-xl sm:mx-5 sm:h-44" aria-hidden>
             <IllustratedScene
               subject={recallArt.subject}
               text={deckName}
@@ -923,7 +933,7 @@ export function AiRecallStudy({
           <div className="mx-3 mt-2 shrink-0 sm:mx-5">
             <button
               type="button"
-              className="relative h-28 w-full cursor-zoom-in overflow-hidden rounded-lg border border-border/50 bg-muted/20 transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-36"
+              className="study-art-arrive relative h-28 w-full cursor-zoom-in overflow-hidden rounded-lg border border-border/50 bg-muted/20 transition-[box-shadow] hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-36"
               title="Double-click to enlarge"
               aria-label="Double-click to enlarge question image"
               onDoubleClick={(event) => {

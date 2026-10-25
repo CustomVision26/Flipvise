@@ -992,7 +992,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       )}
 
       {/* Deck grid */}
-      <section className={dashboardDeckPanelClass}>
+      <section className={`${dashboardDeckPanelClass} dashboard-deck-panel`}>
       {decks.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-14 text-center sm:py-24">
           <div className="relative flex h-16 w-16 items-center justify-center">

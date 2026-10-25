@@ -354,7 +354,7 @@ export function StudySession({
           heavy study trees were racing DOM deletions (removeChild on null)
           when switching modes / restoring the last mode from localStorage.
         */}
-        <div className="flex flex-1 flex-col" role="tabpanel">
+        <div className="study-mode-stage flex flex-1 flex-col" role="tabpanel">
           {effectiveTab === "review" && showReviewTab ? (
             <FlashcardStudy
               key="study-mode-review"
