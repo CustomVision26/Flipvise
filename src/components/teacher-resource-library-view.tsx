@@ -3,7 +3,19 @@
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Pencil, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  ClipboardList,
+  FileSpreadsheet,
+  FileText,
+  Pencil,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +66,13 @@ import {
 } from "@/lib/teacher-workspace-member-grouping";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+const SECTION_TAB_ICONS: Record<string, LucideIcon> = {
+  lessonPlans: FileText,
+  homework: ClipboardList,
+  worksheets: FileSpreadsheet,
+  studyGuides: BookOpen,
+};
 
 const FILTER_ALL = "__all__";
 
@@ -358,7 +377,7 @@ function ResourceRenameButton({
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="library-dialog sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Rename resource</DialogTitle>
             <DialogDescription>
@@ -455,7 +474,7 @@ function ResourceDeleteButton({
       </Button>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent className="sm:max-w-md">
+        <AlertDialogContent className="library-confirm sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this resource?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -498,7 +517,7 @@ function ResourceItemCard({
     : "";
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 px-4 py-3">
+    <div className="library-item flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 px-4 py-3">
       <div className="min-w-0">
         <p className="font-medium text-foreground">{item.title}</p>
         <p className="text-sm text-muted-foreground">
@@ -523,7 +542,7 @@ function ResourceItemCard({
           </p>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="library-actions flex flex-wrap items-center gap-2">
         {item.pdfUrl ? (
           <a
             href={item.pdfUrl}
@@ -605,13 +624,13 @@ function ResourceItemCard({
           />
         ) : null}
         {item.isPlaceholder ? (
-          <Badge variant="secondary">Placeholder</Badge>
+          <Badge variant="secondary" className="library-badge-saved">Placeholder</Badge>
         ) : item.isSourceDeckDeleted ? (
-          <Badge variant="destructive">Deck deleted</Badge>
+          <Badge variant="destructive" className="library-badge-alert">Deck deleted</Badge>
         ) : item.isOutdatedVsSourceDeck ? (
-          <Badge variant="destructive">Deck updated</Badge>
+          <Badge variant="destructive" className="library-badge-alert">Deck updated</Badge>
         ) : (
-          <Badge variant="secondary">Saved</Badge>
+          <Badge variant="secondary" className="library-badge-saved">Saved</Badge>
         )}
       </div>
     </div>
@@ -675,7 +694,7 @@ function ResourceFiltersBar({
     searchQuery.trim().length > 0 || hasActiveResourceFilters(filters);
 
   return (
-    <div className="mb-4 space-y-3">
+    <div className="library-toolbar mb-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1">
           <Search
@@ -686,7 +705,7 @@ function ResourceFiltersBar({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search resources…"
-            className="pl-9"
+            className="library-search pl-9"
             aria-label={`Search ${sectionId}`}
           />
         </div>
@@ -694,7 +713,7 @@ function ResourceFiltersBar({
           type="button"
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="library-filters gap-2"
           onClick={() => onFiltersOpenChange(!filtersOpen)}
         >
           <SlidersHorizontal className="size-4" aria-hidden />
@@ -723,7 +742,7 @@ function ResourceFiltersBar({
       </div>
 
       {filtersOpen ? (
-        <div className="grid gap-3 rounded-lg border border-border/70 bg-muted/10 p-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="library-filter-panel grid gap-3 rounded-lg border border-border/70 bg-muted/10 p-4 sm:grid-cols-2 lg:grid-cols-3">
           <FilterSelect
             id={`${sectionId}-subject`}
             label="Subject"
@@ -984,7 +1003,7 @@ function GroupedResourceSection({
         return (
           <div
             key={adminKey}
-            className="overflow-hidden rounded-lg border border-border/70"
+            className="library-group overflow-hidden rounded-lg border border-border/70"
           >
             <Button
               type="button"
@@ -1025,7 +1044,7 @@ function GroupedResourceSection({
                   return (
                     <div
                       key={subjectKey}
-                      className="overflow-hidden rounded-lg border border-border/60"
+                      className="library-group overflow-hidden rounded-lg border border-border/60"
                     >
                       <Button
                         type="button"
@@ -1154,7 +1173,7 @@ function SubjectGroupedResourceList({
         return (
           <div
             key={subjectKey}
-            className="overflow-hidden rounded-lg border border-border/70"
+            className="library-group overflow-hidden rounded-lg border border-border/70"
           >
             <Button
               type="button"
@@ -1553,30 +1572,31 @@ export function TeacherResourceLibraryView({
   }
 
   return (
-    <Tabs defaultValue={defaultTab} className="w-full gap-4">
-      <div className="-mx-1 overflow-x-auto px-1">
-        <TabsList
-          variant="line"
-          className="h-auto w-max min-w-full justify-start gap-1 rounded-none border-b border-border/80 bg-transparent p-0"
-        >
-          {sections.map((section) => (
+    <Tabs defaultValue={defaultTab} className="library-board w-full gap-4">
+      <div className="library-tab-scroll">
+        <TabsList className="library-tabs h-auto w-max min-w-full justify-start gap-1 p-1.5">
+          {sections.map((section) => {
+            const TabIcon = SECTION_TAB_ICONS[section.id];
+            return (
             <TabsTrigger
               key={section.id}
               value={section.id}
-              className="rounded-none px-3 py-2.5 after:bottom-0"
+              className="gap-1.5 px-3 py-2.5"
             >
+              {TabIcon ? <TabIcon className="size-4 shrink-0" aria-hidden /> : null}
               {section.title}
-              <span className="text-xs font-normal text-muted-foreground tabular-nums">
+              <span className="library-tab-count text-xs font-normal tabular-nums">
                 ({section.items.length})
               </span>
             </TabsTrigger>
-          ))}
+            );
+          })}
         </TabsList>
       </div>
 
       {sections.map((section) => (
         <TabsContent key={section.id} value={section.id} className="mt-0">
-          <Card className="border-border/80 bg-card/60">
+          <Card className="library-panel border-border/80 bg-card/60">
             {isWorkspaceOwner ? (
               <CardDescription className="px-6 pt-6">
                 Grouped by team admin, then subject. Click a group to expand or collapse.

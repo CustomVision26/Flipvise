@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   CircleHelp,
@@ -72,6 +72,15 @@ export function EssayDashboardShell({
   unlocked: boolean;
 }) {
   const pathname = usePathname();
+  const returnTo = useSearchParams().get("returnTo");
+  const studioHref =
+    returnTo &&
+    returnTo.startsWith("/teacher") &&
+    !returnTo.startsWith("//") &&
+    !returnTo.includes("://") &&
+    !returnTo.includes("\\")
+      ? `${AI_DOC_STUDIO_BASE}?returnTo=${encodeURIComponent(returnTo)}`
+      : AI_DOC_STUDIO_BASE;
   const [howItWorksOpen, setHowItWorksOpen] = React.useState(false);
 
   return (
@@ -79,7 +88,7 @@ export function EssayDashboardShell({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-2">
           <Link
-            href={AI_DOC_STUDIO_BASE}
+            href={studioHref}
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
               "-ml-2 w-fit gap-1.5 text-muted-foreground",

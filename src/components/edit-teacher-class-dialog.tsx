@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -251,9 +252,16 @@ export function EditTeacherClassDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="flex max-h-[min(92vh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogContent className="class-form-dialog flex max-h-[min(92dvh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
           <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <DialogHeader className="shrink-0 gap-2 border-b border-border px-8 py-6 text-left">
+            <DialogHeader className="class-form-header shrink-0 gap-2 border-b border-border px-8 py-6 text-left">
+              <Image
+                src="/artwork/home/docs-owl.png"
+                alt=""
+                width={96}
+                height={96}
+                className="class-form-owl"
+              />
               <DialogTitle className="text-xl font-semibold tracking-tight">Edit class</DialogTitle>
               <DialogDescription className="max-w-2xl text-sm leading-6">
                 Update the schedule details for this class. Linked deck resources stay attached to
@@ -301,7 +309,7 @@ export function EditTeacherClassDialog({
               <Button
                 type="submit"
                 size="lg"
-                className="min-w-36"
+                className="class-form-submit min-w-36"
                 disabled={isPending || isResolvingPlanPeriod || decks.length === 0}
               >
                 {isPending ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
@@ -284,7 +285,7 @@ export function TeacherRegisterStudentPanel({
   }
 
   return (
-    <Card className={cn(teamAdminCardClass, "overflow-visible backdrop-blur-sm")}>
+    <Card className={cn(teamAdminCardClass, "progress-panel overflow-visible backdrop-blur-sm")}>
       <CardHeader className="gap-3 pb-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
@@ -310,7 +311,7 @@ export function TeacherRegisterStudentPanel({
         {showForm ? (
           <form
             onSubmit={handleSubmit}
-            className="grid gap-4 rounded-xl border border-border/70 bg-muted/15 p-4 sm:grid-cols-2"
+            className="progress-form grid gap-4 rounded-xl border border-border/70 bg-muted/15 p-4 sm:grid-cols-2"
           >
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="register-student-class">Class</Label>
@@ -339,7 +340,7 @@ export function TeacherRegisterStudentPanel({
                       {selectedClassOption?.label ?? null}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="progress-menu">
                     <SelectItem value={CLASS_NONE} disabled>
                       Select a class
                     </SelectItem>
@@ -374,7 +375,7 @@ export function TeacherRegisterStudentPanel({
                         {selectedInvitee ? formatInviteeDisplayLabel(selectedInvitee) : null}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="progress-menu">
                       <SelectItem value={INVITEE_NONE} disabled>
                         Select a workspace student
                       </SelectItem>
@@ -477,7 +478,7 @@ export function TeacherRegisterStudentPanel({
             )}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border/70">
+          <div className="progress-table-scroll overflow-x-auto rounded-xl border border-border/70">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b border-border/70 bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
@@ -537,8 +538,15 @@ export function TeacherRegisterStudentPanel({
       </CardContent>
 
       <Dialog open={editingStudent != null} onOpenChange={(open) => !open && closeEditDialog()}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="progress-edit-dialog sm:max-w-lg">
+          <DialogHeader className="progress-dialog-header">
+            <Image
+              src="/artwork/home/docs-owl.png"
+              alt=""
+              width={88}
+              height={88}
+              className="progress-dialog-owl"
+            />
             <DialogTitle>Edit student</DialogTitle>
             <DialogDescription>
               Update contact details or change the class assignment for this student.
@@ -573,7 +581,7 @@ export function TeacherRegisterStudentPanel({
                       {selectedEditClassOption?.label ?? null}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="progress-menu">
                     <SelectItem value={CLASS_NONE} disabled>
                       Select a class
                     </SelectItem>

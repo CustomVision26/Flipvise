@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition, Fragment } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ChevronDown, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
@@ -508,7 +509,7 @@ function ProgressResultRows({
           <TableCell className="text-sm text-muted-foreground">
             {formatDate(row.savedAt)}
           </TableCell>
-          <TableCell className="hidden text-right sm:table-cell">
+          <TableCell className="text-right">
             <span className={cn("font-semibold tabular-nums", scoreToneClass(row.percent))}>
               {row.percent}%
             </span>
@@ -784,7 +785,7 @@ export function TeacherStudentProgressView({
   }
 
   const quizResultsCard = (
-      <Card className={cn(teamAdminCardClass, "overflow-visible backdrop-blur-sm")}>
+      <Card className={cn(teamAdminCardClass, "progress-panel overflow-visible backdrop-blur-sm")}>
         <CardHeader className="gap-4 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
@@ -814,7 +815,7 @@ export function TeacherStudentProgressView({
           </div>
 
           {filtersOpen ? (
-            <div className="space-y-4 rounded-xl border border-border/70 bg-muted/15 p-4">
+            <div className="progress-filter-panel space-y-4 rounded-xl border border-border/70 bg-muted/15 p-4">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
                   <Label htmlFor="student-progress-search">Search</Label>
@@ -976,15 +977,15 @@ export function TeacherStudentProgressView({
                   setPage(1);
                 }}
               />
-              <div className="overflow-x-auto rounded-lg border border-border/80">
-              <Table>
+              <div className="progress-table-scroll overflow-x-auto rounded-lg border border-border/80">
+              <Table className="progress-table">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="min-w-[10rem]">Member</TableHead>
                     <TableHead className="min-w-[8rem]">Subject</TableHead>
                     <TableHead className="min-w-[10rem]">Topic</TableHead>
                     <TableHead className="min-w-[11rem]">Created</TableHead>
-                    <TableHead className="hidden text-right sm:table-cell">Score</TableHead>
+                    <TableHead className="text-right">Score</TableHead>
                     <TableHead className="min-w-[9rem] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1117,17 +1118,17 @@ export function TeacherStudentProgressView({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+    <div className="progress-studio mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 py-2">
+      <header className="progress-hero">
+        <div className="progress-hero-copy">
           <Link
             href={backHref}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2 shrink-0")}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "progress-back gap-2 shrink-0")}
           >
             <ArrowLeft className="size-4" aria-hidden />
             Back
           </Link>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Student Progress</h1>
             <p className="text-sm text-muted-foreground">
               {isEducationTeamWorkspace
@@ -1138,7 +1139,14 @@ export function TeacherStudentProgressView({
             </p>
           </div>
         </div>
-      </div>
+        <Image
+          src="/artwork/home/docs-owl.png"
+          alt=""
+          width={112}
+          height={112}
+          className="progress-hero-owl"
+        />
+      </header>
 
       <Tabs
         value={activeTab}
@@ -1149,7 +1157,7 @@ export function TeacherStudentProgressView({
       >
         <TabsList
           className={cn(
-            "h-auto w-full gap-1.5 bg-muted/60 p-1.5",
+            "progress-tabs h-auto w-full gap-1.5 bg-muted/60 p-1.5",
             showRegisterStudentTab && showQuizResultsTab && showGradesAndReportsTabs
               ? "grid grid-cols-3"
               : "flex flex-nowrap justify-start overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",

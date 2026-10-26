@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -308,7 +309,7 @@ function ClassDeleteButton({
       </Button>
 
       <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent className="sm:max-w-md">
+        <AlertDialogContent className="classes-confirm-dialog sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this class?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -357,7 +358,7 @@ function ClassCard({
   const subject = teacherClassSubjectLabel(cls);
 
   return (
-    <Card className="flex flex-col border-border/80 bg-card/60">
+    <Card className="classes-detail flex flex-col border-border/80 bg-card/60">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base leading-snug">
@@ -470,7 +471,8 @@ function ClassRecordsTable({
   const [openClassId, setOpenClassId] = useState<number | null>(null);
 
   return (
-    <Table>
+    <div className="classes-table-scroll">
+    <Table className="classes-table">
       <TableHeader>
         <TableRow>
           <TableHead className="w-10">
@@ -535,6 +537,7 @@ function ClassRecordsTable({
         })}
       </TableBody>
     </Table>
+    </div>
   );
 }
 
@@ -632,7 +635,7 @@ function GroupedClassesList({
         return (
           <div
             key={adminGroup.leaderUserId}
-            className="overflow-hidden rounded-xl border border-border/80 bg-card/40"
+            className="classes-group overflow-hidden rounded-xl border border-border/80 bg-card/40"
           >
             <Button
               type="button"
@@ -687,7 +690,7 @@ function GroupedClassesList({
                   return (
                     <div
                       key={memberKey}
-                      className="overflow-hidden rounded-lg border border-border/70"
+                      className="classes-subgroup overflow-hidden rounded-lg border border-border/70"
                     >
                       <Button
                         type="button"
@@ -836,17 +839,17 @@ export function TeacherClassesView({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+    <div className="classes-studio mx-auto flex w-full min-w-0 flex-col gap-6 py-2">
+      <header className="classes-hero">
+        <div className="classes-hero-copy">
           <Link
             href={backHref}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "classes-back gap-2")}
           >
             <ArrowLeft className="size-4" aria-hidden />
             Back
           </Link>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Classes</h1>
             <p className="text-sm text-muted-foreground">
               Decks linked to classes used for lesson plan generation.
@@ -854,6 +857,7 @@ export function TeacherClassesView({
             </p>
           </div>
         </div>
+        <div className="classes-hero-side">
         <CreateTeacherClassDialog
           decks={decks}
           teamId={workspace.teamId}
@@ -861,10 +865,18 @@ export function TeacherClassesView({
           ownerDeckPicker={ownerDeckPicker}
           lessonPlanDeckIds={lessonPlanDeckIds}
         />
-      </div>
+          <Image
+            src="/artwork/home/docs-owl.png"
+            alt=""
+            width={112}
+            height={112}
+            className="classes-hero-owl"
+          />
+        </div>
+      </header>
 
       {decks.length === 0 ? (
-        <Card className="border-border/80 bg-card/60">
+        <Card className="classes-empty border-border/80 bg-card/60">
           <CardContent className="py-8 text-sm leading-relaxed text-muted-foreground">
             Create or link a deck in your teacher workspace before adding a class schedule.
           </CardContent>
@@ -872,7 +884,7 @@ export function TeacherClassesView({
       ) : null}
 
       {classes.length === 0 ? (
-        <Card className="border-border/80 bg-card/60">
+        <Card className="classes-empty border-border/80 bg-card/60">
           <CardContent className="py-8 text-sm leading-relaxed text-muted-foreground">
             No classes yet. Click <span className="font-medium text-foreground">Create class</span>{" "}
             to link a deck to an academic schedule slot.
@@ -880,7 +892,7 @@ export function TeacherClassesView({
         </Card>
       ) : (
         <>
-          <Card className="border-border/80 bg-card/60">
+          <Card className="classes-toolbar border-border/80 bg-card/60">
             <CardContent className="space-y-3 py-6">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative min-w-[12rem] flex-1">
@@ -892,7 +904,7 @@ export function TeacherClassesView({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search classes…"
-                    className="pl-9"
+                    className="classes-search pl-9"
                     aria-label="Search classes"
                   />
                 </div>
@@ -900,7 +912,7 @@ export function TeacherClassesView({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="classes-filters gap-2"
                   onClick={() => setFiltersOpen((open) => !open)}
                 >
                   <SlidersHorizontal className="size-4" aria-hidden />
@@ -929,7 +941,7 @@ export function TeacherClassesView({
               </div>
 
               {filtersOpen ? (
-                <div className="grid gap-3 rounded-lg border border-border/70 bg-muted/10 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="classes-filter-panel grid gap-3 rounded-lg border border-border/70 bg-muted/10 p-4 sm:grid-cols-2 lg:grid-cols-3">
                   <FilterSelect
                     id="class-subject"
                     label="Subject"
@@ -1017,7 +1029,7 @@ export function TeacherClassesView({
           </Card>
 
           {filteredClasses.length === 0 ? (
-            <Card className="border-border/80 bg-card/60">
+            <Card className="classes-empty border-border/80 bg-card/60">
               <CardContent className="py-8 text-sm text-muted-foreground">
                 No classes match your search or filters.
               </CardContent>
@@ -1039,15 +1051,17 @@ export function TeacherClassesView({
                 teamId={workspace.teamId}
                 onClassDeleted={handleClassDeleted}
               />
+              <div className="classes-pager">
               <TeacherRecordPagination
                 page={safePage}
                 totalPages={totalPages}
                 onPageChange={setPage}
               />
+              </div>
             </>
           ) : (
             <>
-              <div className="overflow-hidden rounded-xl border border-border/80 bg-card/40">
+              <div className="classes-group overflow-hidden rounded-xl border border-border/80 bg-card/40">
                 <ClassRecordsTable
                   classes={paginatedClasses}
                   deckResourcesByClassId={deckResourcesByClassId}
@@ -1058,11 +1072,13 @@ export function TeacherClassesView({
                   onClassDeleted={handleClassDeleted}
                 />
               </div>
+              <div className="classes-pager">
               <TeacherRecordPagination
                 page={safePage}
                 totalPages={totalPages}
                 onPageChange={setPage}
               />
+              </div>
             </>
           )}
         </>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Download, Pencil, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -301,8 +302,15 @@ export function TeacherStudentReportPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden sm:max-w-5xl">
-        <DialogHeader className="shrink-0 border-b border-border/70 pb-4">
+      <DialogContent className="progress-report-dialog flex max-h-[90dvh] flex-col gap-0 overflow-hidden sm:max-w-5xl">
+        <DialogHeader className="progress-dialog-header shrink-0 border-b border-border/70 pb-4">
+          <Image
+            src="/artwork/home/docs-owl.png"
+            alt=""
+            width={88}
+            height={88}
+            className="progress-dialog-owl"
+          />
           <DialogTitle>Generated report preview</DialogTitle>
           <DialogDescription>
             Review the report built from your filters and selected records. Edit notes before

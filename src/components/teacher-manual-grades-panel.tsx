@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
@@ -482,7 +483,7 @@ function QuizResultScoreFields({
                   {selected ? memberQuizResultLabel(selected) : null}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="progress-menu">
                 <SelectItem value={RESULT_NONE} disabled>
                   Select a quiz result
                 </SelectItem>
@@ -1263,7 +1264,7 @@ export const TeacherManualGradesPanel = forwardRef<
   const addGradeForm = showForm ? (
           <form
             onSubmit={handleSubmit}
-            className="grid gap-4 rounded-xl border border-border/70 bg-muted/15 p-4 sm:grid-cols-2"
+            className="progress-form grid gap-4 rounded-xl border border-border/70 bg-muted/15 p-4 sm:grid-cols-2"
           >
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="manual-grade-student-name">Student name</Label>
@@ -1291,7 +1292,7 @@ export const TeacherManualGradesPanel = forwardRef<
                         : "Select a registered student"}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="progress-menu">
                     <StudentSelectSearch
                       id="manual-grade-student-search"
                       value={studentSearch}
@@ -1378,7 +1379,7 @@ export const TeacherManualGradesPanel = forwardRef<
                       maxGrade: "",
                     }));
                   }}
-                  className="grid w-full grid-cols-2 gap-2"
+                  className="progress-type-toggle grid w-full grid-cols-2 gap-2"
                 >
                   <ToggleGroupItem value="assignment" className="h-10 px-3">
                     Assignment grade
@@ -1413,7 +1414,7 @@ export const TeacherManualGradesPanel = forwardRef<
                                   : null}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="progress-menu">
                               <SelectItem value={ASSIGNMENT_NONE} disabled>
                                 Select an assignment
                               </SelectItem>
@@ -1527,7 +1528,7 @@ export const TeacherManualGradesPanel = forwardRef<
                                 {selectedQuiz ? selectedQuiz.title : null}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="progress-menu">
                               <SelectItem value={QUIZ_NONE} disabled>
                                 {isEducationTeamWorkspace
                                   ? "Select an assigned deck"
@@ -1705,8 +1706,15 @@ export const TeacherManualGradesPanel = forwardRef<
 
   const editGradeDialog = (
       <Dialog open={editingGrade != null} onOpenChange={(open) => !open && closeEditDialog()}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="progress-edit-dialog sm:max-w-2xl">
+          <DialogHeader className="progress-dialog-header">
+            <Image
+              src="/artwork/home/docs-owl.png"
+              alt=""
+              width={88}
+              height={88}
+              className="progress-dialog-owl"
+            />
             <DialogTitle>Edit grade</DialogTitle>
             <DialogDescription>
               Update the student, assignment, grade, or class details for this record.
@@ -1727,7 +1735,7 @@ export const TeacherManualGradesPanel = forwardRef<
                         : editForm.studentName || "Select a registered student"}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent nestedInModal>
+                  <SelectContent nestedInModal className="progress-menu">
                     <StudentSelectSearch
                       id="edit-manual-grade-student-search"
                       value={editStudentSearch}
@@ -1820,7 +1828,7 @@ export const TeacherManualGradesPanel = forwardRef<
                       maxGrade: "",
                     }));
                   }}
-                  className="grid w-full grid-cols-2 gap-2"
+                  className="progress-type-toggle grid w-full grid-cols-2 gap-2"
                 >
                   <ToggleGroupItem value="assignment" className="h-10 px-3">
                     Assignment grade
@@ -1855,7 +1863,7 @@ export const TeacherManualGradesPanel = forwardRef<
                                   : editForm.assignmentTitle || null}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="progress-menu">
                               <SelectItem value={ASSIGNMENT_NONE} disabled>
                                 Select an assignment
                               </SelectItem>
@@ -1949,7 +1957,7 @@ export const TeacherManualGradesPanel = forwardRef<
                                   : editForm.assignmentTitle || null}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="progress-menu">
                               <SelectItem value={QUIZ_NONE} disabled>
                                 {isEducationTeamWorkspace
                                   ? "Select an assigned deck"

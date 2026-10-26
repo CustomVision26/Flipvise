@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, FileText, Lock, Sparkles } from "lucide-react";
 import { getAccessContext, canAccessAddon } from "@/lib/access";
 import {
   DOCUMENT_STUDIO_TITLE,
@@ -20,7 +20,21 @@ import {
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
-export default async function AiDocumentStudioHubPage() {
+function teacherReturnHref(returnTo: string | undefined): string {
+  if (!returnTo || !returnTo.startsWith("/teacher") || returnTo.startsWith("//")) {
+    return "/teacher";
+  }
+  if (returnTo.includes("://") || returnTo.includes("\\")) return "/teacher";
+  return returnTo;
+}
+
+export default async function AiDocumentStudioHubPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string }>;
+}) {
+  const { returnTo } = await searchParams;
+  const backHref = teacherReturnHref(returnTo);
   const access = await getAccessContext();
   const essayComingSoon =
     access.userId != null
@@ -31,6 +45,13 @@ export default async function AiDocumentStudioHubPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:gap-8 sm:p-8">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1.5">
+          <Link
+            href={backHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            Back
+          </Link>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Premium add-on
           </p>
@@ -64,7 +85,7 @@ export default async function AiDocumentStudioHubPage() {
             const openHref =
               type.enabled && entitled && type.href
                 ? type.id === "essay"
-                  ? AI_ESSAY_STUDIO_BASE
+                  ? `${AI_ESSAY_STUDIO_BASE}?returnTo=${encodeURIComponent(backHref)}`
                   : type.href
                 : null;
 

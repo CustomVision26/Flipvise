@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -100,8 +101,9 @@ export default async function TeacherResourcesPage({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <div className="flex items-center gap-3">
+    <div className="library-studio mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-6 py-2">
+      <header className="library-hero">
+        <div className="library-hero-copy">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger
@@ -110,7 +112,7 @@ export default async function TeacherResourcesPage({
                   href={backHref}
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
-                    "gap-2",
+                    "library-back gap-2",
                   )}
                 />
               }
@@ -121,13 +123,21 @@ export default async function TeacherResourcesPage({
             <TooltipContent>Return to the previous teacher page</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">Teacher Resource Library</h1>
           <p className="text-sm text-muted-foreground">
             Saved lesson plans, quizzes, worksheets, and study guides.
           </p>
         </div>
-      </div>
+        </div>
+        <Image
+          src="/artwork/home/docs-owl.png"
+          alt=""
+          width={112}
+          height={112}
+          className="library-hero-owl"
+        />
+      </header>
 
       <TeacherResourceLibraryView
         sections={sections}

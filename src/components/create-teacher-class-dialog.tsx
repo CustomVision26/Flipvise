@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import Image from "next/image";
+import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   createTeacherClassAction,
@@ -255,14 +256,22 @@ export function CreateTeacherClassDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
-          <Button type="button" disabled={!isPlanOwner && decks.length === 0}>
+          <Button type="button" className="classes-create" disabled={!isPlanOwner && decks.length === 0}>
+            <Plus className="size-4" aria-hidden />
             Create class
           </Button>
         }
       />
-      <DialogContent className="flex max-h-[min(92vh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+      <DialogContent className="class-form-dialog flex max-h-[min(92dvh,56rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <DialogHeader className="shrink-0 gap-2 border-b border-border px-8 py-6 text-left">
+          <DialogHeader className="class-form-header shrink-0 gap-2 border-b border-border px-8 py-6 text-left">
+            <Image
+              src="/artwork/home/docs-owl.png"
+              alt=""
+              width={96}
+              height={96}
+              className="class-form-owl"
+            />
             <DialogTitle className="text-xl font-semibold tracking-tight">Create class</DialogTitle>
             <DialogDescription className="max-w-2xl text-sm leading-6">
               Link a deck to a schedule slot. You can open lesson plans, homework, and other
@@ -313,7 +322,7 @@ export function CreateTeacherClassDialog({
             <Button
               type="submit"
               size="lg"
-              className="min-w-36"
+              className="class-form-submit min-w-36"
               disabled={isPending || isResolvingPlanPeriod || visibleDecks.length === 0}
             >
               {isPending ? (

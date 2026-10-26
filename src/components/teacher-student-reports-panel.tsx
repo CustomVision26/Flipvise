@@ -277,7 +277,7 @@ export function TeacherStudentReportsPanel({
 
   return (
     <>
-      <Card className={cn(teamAdminCardClass, "overflow-visible backdrop-blur-sm")}>
+      <Card className={cn(teamAdminCardClass, "progress-panel overflow-visible backdrop-blur-sm")}>
         <CardHeader className="gap-3 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
@@ -319,7 +319,7 @@ export function TeacherStudentReportsPanel({
             quizResultRows={quizResultRows}
           />
 
-          <div className="grid gap-4 rounded-xl border border-border/70 bg-muted/15 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="progress-filter-panel grid gap-4 rounded-xl border border-border/70 bg-muted/15 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="report-academic-year">Academic year</Label>
               <Input
@@ -377,7 +377,7 @@ export function TeacherStudentReportsPanel({
                   </Button>
                 ) : null}
               </div>
-              <div className="overflow-x-auto rounded-xl border border-border/70">
+              <div className="progress-table-scroll overflow-x-auto rounded-xl border border-border/70">
                 <table className="w-full min-w-[980px] text-left text-sm">
                   <thead className="border-b border-border/70 bg-muted/20 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>

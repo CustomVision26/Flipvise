@@ -94,7 +94,12 @@ export function TeacherDashboardNav({
               const path =
                 item.absoluteHref ??
                 `/teacher${item.suffix.startsWith("/") ? item.suffix : `/${item.suffix}`}`;
-              const href = item.absoluteHref ?? buildTeacherToolHref(item.suffix, workspace);
+              const currentTeacherPath = workspace.queryString
+                ? `${pathname}?${workspace.queryString}`
+                : pathname;
+              const href = item.absoluteHref
+                ? `${item.absoluteHref}?returnTo=${encodeURIComponent(currentTeacherPath)}`
+                : buildTeacherToolHref(item.suffix, workspace);
               return (
                 <li key={`${section.title}-${item.title}`}>
                   <Link

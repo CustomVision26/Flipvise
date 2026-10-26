@@ -269,21 +269,25 @@ export function DashboardAddonsBanner({
     ) : variant === "header" ? (
       <div
         data-addons-banner="header"
-        className="flex w-max max-w-full items-center gap-2 overflow-x-auto"
+        className="header-addon-marquee relative min-w-0 overflow-hidden"
         role="region"
         aria-label="Premium add-ons"
       >
-        {[...addons]
-          .sort((a, b) => headerAddonRank(a.key) - headerAddonRank(b.key))
-          .map((item, index) => (
-            <AddonChipButton
-              key={item.key}
-              item={item}
-              header
-              colorIndex={colorIndexForAddon(item.key, index)}
-              onActivate={onChipActivate}
-            />
-          ))}
+        <div className="flex w-max items-center gap-2 animate-addons-marquee hover:[animation-play-state:paused] motion-reduce:animate-none">
+          {[0, 1].flatMap((copy) =>
+            [...addons]
+              .sort((a, b) => headerAddonRank(a.key) - headerAddonRank(b.key))
+              .map((item, index) => (
+                <AddonChipButton
+                  key={`${item.key}-${copy}`}
+                  item={item}
+                  header
+                  colorIndex={colorIndexForAddon(item.key, index)}
+                  onActivate={onChipActivate}
+                />
+              )),
+          )}
+        </div>
       </div>
     ) : (
       <div

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-26T19:39:49.728Z",
+  "updatedAt": "2026-10-26T20:45:03.414Z",
   "pages": {
     "homepage": {
       "watchFingerprint": "8cdb7100a87ad81dea8380cc985887a74744552af2ceb4a337f706a08d33f348",
@@ -11,8 +11,8 @@
       "docFingerprint": "62c9d5b8808aacd41f3df1ab9706fe9eaed1aa89aadfa4d42a260bf5d0b57207"
     },
     "personal-dashboard": {
-      "watchFingerprint": "2a6e75799b395ddb4593c15df774e51b09a86817e48366aedaf30e419e932e05",
-      "docFingerprint": "3886356e1f1b1fbaf8d5a5a76d399b4723ec322c0175ccb73447aa43ea887977"
+      "watchFingerprint": "4c98a2fa4b31a07333e72214edaa9e9e2c806bc0937cfdc0ffb1259d85bf287c",
+      "docFingerprint": "c82323b9f9ca5c365dd82c23f9b07d851524f365feb9058993aed343803f4cb3"
     },
     "team-workspace-dashboard": {
       "watchFingerprint": "072a1d449a896f66df91195cd7bd444f03bd79f76be2486499cbe4703a9d0a5b",
@@ -99,8 +99,8 @@
       "docFingerprint": "01b9aec9966e25f8550d2f4876c6a26929374eaf3215f9c5a6f7ded9dbf51243"
     },
     "pricing-add-ons": {
-      "watchFingerprint": "00e71222cf563b822de12f9827f72cb037fdb742edf4fb0e529883b220371df1",
-      "docFingerprint": "9056ff0624208c15e1751a4770da775ebb1fc9c3e06702a8984f1903dd14f2ef"
+      "watchFingerprint": "8ca44e1adfdbafa468c670ae1ff3a3968baff3b137a69ef2ef569165cbf9c386",
+      "docFingerprint": "331e39d998be07ab37b2b60891fb484e198e3e53ab0ebafb7aced4fd741aca3a"
     },
     "stripe-billing-payment": {
       "watchFingerprint": "d6cf569b6564719406f06bf8c4801d7ae283f857942c1628f2b4730e72ab50f2",
@@ -215,8 +215,8 @@
       "docFingerprint": "1ee9b3bde78b6d53c63e74eae2e24b85d5233452c386eeaf27696e8e53307629"
     },
     "teacher-resources": {
-      "watchFingerprint": "57864044073f90bc9331b64a2c22efc7d573a5380b442531730a0ee0603e96d3",
-      "docFingerprint": "5319c8ea009c5b53d84002aca75c7216e30016cc3662422fe6036cbb329dc82d"
+      "watchFingerprint": "d1124780e5a372f4fa27d85cbf431ef285dc1d610d7ec4b62e9aca7c6d87130d",
+      "docFingerprint": "6b50220d752a3bf3d71ab678a668e927ca81746bba6228bb6d524cb7d1e317bd"
     },
     "affiliate-dashboard": {
       "watchFingerprint": "518b317279debc789e5b8c6be5d97d60e1a19f3b15652e665ec97747582895d5",

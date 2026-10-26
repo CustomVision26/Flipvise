@@ -70,7 +70,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "Add Deck opens the creation dialog: name, subject, or course, description or topic, grade level, difficulty, optional deck cover image, and background gradient. Open create deck guide from Deck Editor to walk through that flow.",
           "Edit deck (from a deck card menu) updates the same metadata and optional cover image; the cover is not a flashcard.",
           "Delete deck asks for confirmation. On Education plans, the dialog lists permanent losses (cards, assignments, classes). Linked lesson plans stay in the Resource Library — Edit and Create Quiz remain available when another related deck can keep the link, and become unavailable only when deleting the last linked deck. On a non-Education plan, if the deck still has linked lesson plans from a previous Education subscription, the dialog warns that the Education lesson-plan link will be lost and that returning to Education later shows only the saved plan without a working deck link.",
-          "The two premium add-ons sit beside the logo as glossy pills, and again under the logo on small screens: pink Live Classroom and teal AI Essay. A leading Flipvise is left off those header labels. Locked pills open Unlock Feature; unlocked AI Essay opens the AI Essay workspace. Plans, the gold plan badge, the blue account button, round book, help, and bell buttons, and UI Guides stay readable in light and dark. The UI Guides catalog is a solid illustrated window with a reading owl and colored guide icons. Documentation articles for this dashboard are solid illustrated panels with a reading owl.",
+          "The two premium add-ons sit beside the logo as glossy pills that run in a continuous banner, and again under the logo on small screens: pink Live Classroom and teal AI Essay. The banner pauses while the pointer is over it. A leading Flipvise is left off those header labels. Locked pills open Unlock Feature; unlocked AI Essay opens the AI Essay workspace. Plans, the gold plan badge, the blue account button, round book, help, and bell buttons, and UI Guides stay readable in light and dark. The UI Guides catalog is a solid illustrated window with a reading owl and colored guide icons. Documentation articles for this dashboard are solid illustrated panels with a reading owl.",
           "A Live Classroom™ button appears on Personal Dashboard only when that add-on is paid or assigned (admin grant) on your account.",
           "Click a deck to edit cards or start studying.",
           "Usage banners show deck and card limits for your current plan.",
@@ -653,7 +653,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
           "During a plan change, locked add-ons you do not already have may be offered before payment.",
           "Access can also come from a Team Admin assignment or a complimentary grant from Flipvise.",
           "AI Essay unlocks generation, drafts, submissions, and AI feedback. Open it from the add-ons banner on your dashboard after purchase or grant.",
-          "How it work? in the AI Essay header explains the Essay Generator workflow and links to this Add-on Catalog guide.",
+          "How it work? in the AI Essay header explains the Essay Generator workflow and links to this Add-on Catalog guide. AI Document Studio has a Back button that returns to the teacher page it was opened from.",
           "Overview shows recent essays and recent AI feedback, continue draft, generate, and assigned essays.",
           "Generate Essay creates a prompt, objectives, optional outline, vocabulary, rubric, and an optional hidden model essay. The form notes that the topic you submit is sent to OpenAI and links to AI data handling.",
           "The writing workspace includes word count, an optional timer, save draft (including offline cache), submit, and AI feedback.",
@@ -1301,7 +1301,7 @@ export const USER_DOCUMENTATION_SECTIONS: DocSection[] = [
         purpose:
           "Browse, reopen, and reuse saved lesson plans, quizzes, homework, study guides, and worksheets.",
         howItWorks: [
-          "Open Teacher Resource Library for the plan owner guide to follow Saved Lesson Plans, Saved Homework, Saved Worksheets, and Saved Study Guides. Saved materials from each AI tool appear here for quick access.",
+          "Open Teacher Resource Library for the plan owner guide to follow Saved Lesson Plans, Saved Homework, Saved Worksheets, and Saved Study Guides. Saved materials from each AI tool appear here for quick access. The library header, tabs, groups, resource cards, filters, and dialogs use solid panels and a reading owl that stay readable in light and dark.",
           "Reopen saved items to edit, regenerate, or export (PDF where supported).",
           "Lesson plan cards show the creator’s name; on team workspaces, Owner and Team Admin creators are labeled (Owner) or (Team Admin) next to that name (source line and footer).",
           "Lesson plans linked to a source deck show a Deck updated badge when that deck (or its cards) changed after the plan was saved — use Edit to refresh the plan.",

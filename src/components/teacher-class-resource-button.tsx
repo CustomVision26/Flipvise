@@ -53,7 +53,7 @@ export function TeacherClassResourceButton({
         <Icon className="size-3.5" aria-hidden />
         {label}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-52">
+      <DropdownMenuContent align="start" className="classes-resource-menu min-w-52">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Saved for this deck</DropdownMenuLabel>
           {savedItems.map((item) => {

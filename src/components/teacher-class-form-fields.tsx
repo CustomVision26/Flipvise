@@ -1,5 +1,6 @@
 "use client";
 
+import { BookOpen, Clock3, GraduationCap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -111,9 +112,10 @@ export function TeacherClassFormFields({
     memberOptions?.find((member) => member.userId === selectedMemberUserId) ?? null;
 
   return (
-    <div className="flex flex-col gap-8 px-8 py-7">
-      <section className="grid gap-5 sm:grid-cols-2">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase sm:col-span-2">
+    <div className="class-form-fields flex flex-col gap-5 px-8 py-7">
+      <section className="class-form-section grid gap-5 sm:grid-cols-2">
+        <h3 className="class-form-kicker text-xs font-medium tracking-wide uppercase sm:col-span-2">
+          <BookOpen className="size-4 shrink-0" aria-hidden />
           Class materials
         </h3>
         {memberOptions && memberOptions.length > 0 && onMemberChange ? (
@@ -132,7 +134,7 @@ export function TeacherClassFormFields({
                   {selectedMember?.label ?? "Select a member"}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent nestedInModal>
+              <SelectContent nestedInModal className="class-form-menu">
                 {memberOptions.map((member) => (
                   <SelectItem key={member.userId} value={member.userId}>
                     {member.label}
@@ -156,7 +158,7 @@ export function TeacherClassFormFields({
                 {selectedDeck?.name ?? "Select a deck"}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent nestedInModal>
+            <SelectContent nestedInModal className="class-form-menu">
               {decks.map((deck) => (
                 <SelectItem key={deck.id} value={String(deck.id)}>
                   {deck.name}
@@ -172,8 +174,9 @@ export function TeacherClassFormFields({
         </div>
       </section>
 
-      <section className="grid gap-5 sm:grid-cols-2">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase sm:col-span-2">
+      <section className="class-form-section grid gap-5 sm:grid-cols-2">
+        <h3 className="class-form-kicker text-xs font-medium tracking-wide uppercase sm:col-span-2">
+          <GraduationCap className="size-4 shrink-0" aria-hidden />
           Academic schedule
         </h3>
         <div className="space-y-2">
@@ -198,7 +201,7 @@ export function TeacherClassFormFields({
             <SelectTrigger id={`${idPrefix}-term`} className={fieldControlClassName}>
               <SelectValue placeholder="Select term" />
             </SelectTrigger>
-            <SelectContent nestedInModal>
+            <SelectContent nestedInModal className="class-form-menu">
               {TEACHER_CLASS_TERM_OPTIONS.map((term) => (
                 <SelectItem key={term} value={term}>
                   {term}
@@ -230,7 +233,7 @@ export function TeacherClassFormFields({
             <SelectTrigger id={`${idPrefix}-month`} className={fieldControlClassName}>
               <SelectValue placeholder="Select month" />
             </SelectTrigger>
-            <SelectContent nestedInModal>
+            <SelectContent nestedInModal className="class-form-menu">
               {TEACHER_CLASS_MONTH_OPTIONS.map((monthName) => (
                 <SelectItem key={monthName} value={monthName}>
                   {monthName}
@@ -266,7 +269,7 @@ export function TeacherClassFormFields({
                   placeholder={isResolvingPlanPeriod ? "Checking lesson plan…" : "Select day"}
                 />
               </SelectTrigger>
-              <SelectContent nestedInModal>
+              <SelectContent nestedInModal className="class-form-menu">
                 {TEACHER_CLASS_DAY_OPTIONS.map((weekday) => (
                   <SelectItem key={weekday} value={weekday}>
                     {weekday}
@@ -278,8 +281,9 @@ export function TeacherClassFormFields({
         </div>
       </section>
 
-      <section className="grid gap-5 sm:grid-cols-2">
-        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase sm:col-span-2">
+      <section className="class-form-section grid gap-5 sm:grid-cols-2">
+        <h3 className="class-form-kicker text-xs font-medium tracking-wide uppercase sm:col-span-2">
+          <Clock3 className="size-4 shrink-0" aria-hidden />
           Timetable
         </h3>
         {hasLinkedLessonPlan ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { AiRecallTeamMonitor } from "@/components/ai-recall-team-monitor";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ export function AiRecallTeacherStatsPanel({
   const [open, setOpen] = useState(true);
 
   return (
-    <Card className={cn(teamAdminCardClass, className)}>
+    <Card className={cn(teamAdminCardClass, "progress-studio recall-insights", className)}>
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
@@ -37,6 +38,14 @@ export function AiRecallTeacherStatsPanel({
               Active Recall session analytics for your students and classes.
             </CardDescription>
           </div>
+          <div className="flex shrink-0 items-start gap-2">
+          <Image
+            src="/artwork/home/docs-owl.png"
+            alt=""
+            width={88}
+            height={88}
+            className="recall-insights-owl"
+          />
           <Button
             type="button"
             variant="ghost"
@@ -53,6 +62,7 @@ export function AiRecallTeacherStatsPanel({
               <ChevronDown className="size-4" aria-hidden />
             )}
           </Button>
+          </div>
         </div>
       </CardHeader>
       {open ? (
@@ -112,7 +122,7 @@ export function AiRecallTeacherStatsPanel({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+    <div className="recall-metric rounded-lg border border-border/60 bg-background/40 px-3 py-2">
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="text-lg font-semibold tabular-nums">{value}</p>
     </div>
